@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Shared image for api, worker and beat (docs/10 §6). Build from the repo root:
-#   docker build -f infra/docker/python.Dockerfile -t schoolos-api .
+#   docker build -f apps/api/Dockerfile -t schoolos-api .
 ARG PYTHON_IMAGE=python:3.12-slim-bookworm
 
 FROM ${PYTHON_IMAGE} AS build
@@ -8,7 +8,7 @@ FROM ${PYTHON_IMAGE} AS build
 # Never baked into the image; production builds do not pass it.
 RUN --mount=type=secret,id=extra_ca,required=false \
     if [ -s /run/secrets/extra_ca ]; then export PIP_CERT=/run/secrets/extra_ca; fi; \
-    pip install --no-cache-dir uv==0.8.17
+    pip install --no-cache-dir uv==0.12.19
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PROJECT_ENVIRONMENT=/opt/venv
 WORKDIR /src
 COPY pyproject.toml uv.lock .python-version ./

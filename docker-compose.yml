@@ -5,7 +5,7 @@ name: schoolos
 x-python-app: &python-app
   build:
     context: .
-    dockerfile: infra/docker/python.Dockerfile
+    dockerfile: apps/api/Dockerfile
   image: schoolos-python:dev
   env_file: .env
   environment:

@@ -241,7 +241,7 @@ jobs:
           - image: api
             dockerfile: apps/api/Dockerfile
           - image: worker
-            dockerfile: apps/worker/Dockerfile
+            dockerfile: apps/api/Dockerfile  # api, worker and beat share one image
           - image: web
             dockerfile: apps/web/Dockerfile
     env:

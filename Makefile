@@ -7,7 +7,7 @@ UV        ?= uv
 COMPOSE   ?= docker compose
 HAS_WEB   := $(wildcard package.json)
 GITLEAKS_IMAGE ?= zricethezav/gitleaks:v8.30.1
-TRIVY_IMAGE    ?= aquasec/trivy:0.69.3
+TRIVY_IMAGE    ?= aquasec/trivy:0.74.0
 SEMGREP_VERSION ?= 1.178.0
 
 .PHONY: help install dev down logs migrate seed-synthetic test test-api test-web test-security \
@@ -17,7 +17,7 @@ help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-16s %s\n",$$1,$$2}'
 
 install: ## Install Python (uv) and Node (npm) dependencies from lockfiles
-	$(UV) sync --frozen --all-packages
+	$(UV) sync --locked --all-packages
 ifneq ($(HAS_WEB),)
 	npm ci
 endif
@@ -52,59 +52,22 @@ test: test-api test-web ## Run all unit/integration tests
 test-api: ## Python tests (real Postgres via testcontainers) with coverage
 	$(UV) run pytest --cov --cov-report=term-missing:skip-covered --cov-report=xml
 
-test-security: ## Security suites: RLS catalog, tenant isolation, authz, redaction
-	$(UV) run pytest apps/api/tests/security -q
-
-migration-check: ## Upgrade/downgrade round trip on a fresh database
-	$(UV) run pytest apps/api/tests/migrations -q
-
-test-web: ## Web unit tests (vitest)
-ifneq ($(HAS_WEB),)
-	npm run test --workspaces --if-present
-else
-	@echo "web workspace not present; skipping"
-endif
-
-e2e: ## Playwright end-to-end tests against the local stack
-ifneq ($(HAS_WEB),)
-	npm run e2e --workspace apps/web --if-present
-else
-	@echo "web workspace not present"
-endif
-
-lint: ## ruff + format check + import-linter + eslint + prettier
-	$(UV) run ruff check .
-	$(UV) run ruff format --check .
-	@if [ -f .importlinter ]; then $(UV) run lint-imports; fi
-ifneq ($(HAS_WEB),)
-	npm run lint --workspaces --if-present
-	npx --no-install prettier --check .
-endif
-
-format: ## Auto-format Python and TS
-	$(UV) run ruff format .
-	$(UV) run ruff check --fix .
-ifneq ($(HAS_WEB),)
-	npx --no-install prettier --write .
-endif
-
-typecheck: ## mypy --strict + tsc
-	$(UV) run mypy apps/api apps/worker
-ifneq ($(HAS_WEB),)
-	npm run typecheck --workspaces --if-present
-endif
+test-# CI installs gitleaks/trivy on PATH (.github/actions/install-tools); locally we fall back to pinned images.
+GITLEAKS = $(if $(shell command -v gitleaks 2>/dev/null),gitleaks,docker run --rm -v "$(CURDIR):/repo" -w /repo $(GITLEAKS_IMAGE))
+TRIVY    = $(if $(shell command -v trivy 2>/dev/null),trivy,docker run --rm -v "$(CURDIR):/repo" -w /repo $(TRIVY_IMAGE))
 
 security: ## gitleaks, semgrep, pip-audit, npm audit, trivy (fs + config)
-	docker run --rm -v "$(CURDIR):/repo" $(GITLEAKS_IMAGE) dir /repo --no-banner --redact $(if $(wildcard .gitleaks.toml),--config /repo/.gitleaks.toml,)
+	$(GITLEAKS) git --no-banner --redact --config .gitleaks.toml .
 	$(UV) run --with semgrep==$(SEMGREP_VERSION) --no-project semgrep scan --error --metrics=off \
-	  --config p/python --config p/typescript --config p/owasp-top-ten $(if $(wildcard .semgrep),--config .semgrep,) \
-	  --exclude .venv --exclude node_modules --exclude docs .
-	$(UV) export --frozen --all-packages --no-dev --no-emit-workspace --format requirements-txt > /tmp/sos-requirements.txt
+	  --config .semgrep --config p/python --config p/typescript --config p/owasp-top-ten \
+	  --exclude .venv --exclude node_modules --exclude docs --exclude .claude .
+	$(UV) export --locked --all-packages --no-dev --no-emit-workspace --format requirements-txt > /tmp/sos-requirements.txt
 	$(UV) run pip-audit --strict --disable-pip -r /tmp/sos-requirements.txt
 ifneq ($(HAS_WEB),)
 	npm audit --audit-level=high
 endif
-	docker run --rm -v "$(CURDIR):/repo" $(TRIVY_IMAGE) fs --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /repo/node_modules --skip-dirs /repo/.venv /repo
+	$(TRIVY) fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .venv --skip-dirs .claude .
+	$(TRIVY) config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .claude .
 
 eval: ## RAG evaluation harness (M2; no knowledge module yet)
 	@echo "eval: no knowledge module yet (M2). Nothing to evaluate."
