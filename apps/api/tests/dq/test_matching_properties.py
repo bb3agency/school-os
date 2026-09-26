@@ -11,6 +11,7 @@ import random
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from app.core.textnorm import comparison_key
 from app.devtools.names import GIVEN_FIRST, GIVEN_SECOND, SURNAMES, TELUGU
 from app.dq.matching import MatchClass, classify, match_key
 
@@ -100,3 +101,10 @@ def test_empty_or_self(text: str) -> None:
     expected = MatchClass.MISSING if not match_key(text) else MatchClass.EXACT
     assert classify(text, text).match_class is expected
     assert classify(text, None).match_class is MatchClass.MISSING
+
+
+@SETTINGS
+@given(st.text(alphabet=st.sampled_from(list("abcdKLMNsri .-_,/\t")), max_size=40))
+def test_latin_tokens_agree_with_textnorm_comparison_key(text: str) -> None:
+    """The matcher builds on app.core.textnorm: same tokens, initials only gain a dot."""
+    assert match_key(text).replace(".", "").split() == comparison_key(text).split()
