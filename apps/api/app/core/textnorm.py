@@ -16,7 +16,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Final
 
-# --- Telugu tables (Unicode block U+0C00–U+0C7F) ------------------------------------------------
+# --- Telugu tables (Unicode block U+0C00-U+0C7F) ------------------------------------------------
 
 _VOWELS: Final[dict[str, str]] = {
     "అ": "a", "ఆ": "aa", "ఇ": "i", "ఈ": "ee", "ఉ": "u", "ఊ": "oo", "ఋ": "ru", "ౠ": "ruu",
@@ -37,7 +37,7 @@ _CONSONANTS: Final[dict[str, str]] = {
     "ౘ": "ts", "ౙ": "dz", "ౚ": "r",
 }  # fmt: skip
 _VIRAMA: Final = "్"
-_ANUSVARA: Final = "ం"
+_ANUSVARA: Final = "\u0c02"  # Telugu anusvara (written as an escape: looks like Latin o)
 _VISARGA: Final = "ః"
 _CHANDRABINDU: Final = "ఁ"
 _TELUGU_DIGITS: Final = {chr(0x0C66 + i): str(i) for i in range(10)}
