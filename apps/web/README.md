@@ -16,6 +16,11 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 | `src/lib/bff/`            | Browser side: session info, typed BFF client (CSRF header, 401 → sign-in, 428 → step-up), TanStack Query hooks                              |
 | `src/components/session/` | "Lock now" button and the idle-timeout `<dialog>`                                                                                           |
 | `src/instrumentation.ts`  | Validates the BFF config once at server start                                                                                               |
+| `src/features/platform/`  | Platform admin panel screens (C14): TanStack Query + `ActionDialog` forms against `/api/v1/platform/*`                                      |
+| `src/features/school/`    | School console screens (structure, users, audit, plan & billing, support, announcements banner)                                             |
+| `src/features/auth/`      | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                 |
+| `src/lib/forms.ts`        | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                       |
+| `src/lib/api-errors.ts`   | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                    |
 
 ## Sessions and security (summary)
 
@@ -45,6 +50,28 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 - Logout (`POST /bff/auth/logout`, CSRF) revokes the session, revokes the refresh token at
   the IdP when it has a revocation endpoint, and returns the IdP end-session URL (with
   `client_id` and `post_logout_redirect_uri`, never the ID token) or `/signed-out`.
+
+## Staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)
+
+After the OIDC callback (staff, not step-up) the BFF calls, in order:
+
+1. `POST /api/v1/me/accept-invitations` — a `403 mfa_required` ends the sign-in without a
+   session and shows the MFA message (`/signed-out?error=mfa_required`).
+2. `GET /api/v1/me/schools` —
+   - exactly one **active** school: it becomes the active school (`X-Active-Tenant`) and the
+     user lands on `next`;
+   - several schools (or a single suspended one): `/[locale]/choose-school?next=…`, which
+     lists them with their status (suspended/offboarding disabled, with the reason) and
+     POSTs `/bff/auth/active-tenant`;
+   - none: `/[locale]/no-access` ("ask the office to send the invitation again", with a
+     "Check again" button that re-runs accept-invitations).
+3. `POST /api/v1/me/login-event` once the school is known (right away for one school, or on
+   the first choice in the picker), so the API can audit it in that school's log.
+
+The school layout redirects to the picker when the session has no active school (or `/me`
+answers `active_tenant_required`), hides menu items the user lacks (from `/me` effective
+permissions; UX only, the API checks every call) and shows "Switch school" when `/me`
+lists more than one school. Platform menus are filtered the same way from `/platform/me`.
 
 ## BFF routes
 
@@ -83,36 +110,67 @@ SOS_WEB_TEST_REDIS_URL=redis://127.0.0.1:6390/15 npm test -w @schoolos/web
 ```
 
 `npm run e2e -w @schoolos/web` (Playwright, after `npm run build`) checks the redirect to
-sign-in, the signed-out page (CSP, Telugu) and the health check without an IdP.
+sign-in, the signed-out page (CSP, Telugu), the health check, and axe-core (WCAG 2.2 AA) on
+the signed-out page, without an IdP.
+
+With `E2E_STAND_IN=1` (and Valkey at `REDIS_URL`) it also signs in through a scripted
+stand-in IdP and canned API (`e2e/support/stand-in.ts`; synthetic data only) and runs axe
+plus keyboard-only paths on school pages (billing, support, home, the picker) and platform
+pages (dashboard, schools, invoices, plans, the provision wizard, a dialog):
+
+```bash
+docker run --rm -d --name sos-e2e-valkey -p 127.0.0.1:6391:6379 valkey/valkey:8.1-alpine
+npm run build -w @schoolos/web
+E2E_STAND_IN=1 E2E_PORT=3100 REDIS_URL=redis://localhost:6391/1 npm run e2e -w @schoolos/web
+```
+
+If the Playwright browser download is blocked, run the same command inside
+`mcr.microsoft.com/playwright:v1.63.0-noble` with `--network host`.
 
 ## Manual verification with the dev OIDC stub
 
 The compose `oidc` service (profile `dev`, `ghcr.io/navikt/mock-oauth2-server`, config
 `infra/docker/oidc.json`) issues 10-minute tokens for issuers `schoolos` and `platform`;
-operators get `sos:mfa: "true"`. The issuer URL is `http://localhost:8080/...` as the
-browser sees it, which the web **container** cannot reach, so run the web app on the host:
+operators get `sos:mfa: "true"`.
 
-1. `cp .env.example .env` (dev-only values) and `make dev` with the `dev` profile
-   (`docker compose --profile dev up -d db valkey s3 s3-init migrate api oidc`).
-2. Create a synthetic school and a staff member whose `core.users.idp_subject` equals the
-   subject you will type at the stub's login page (`make seed-synthetic` once Task 13 lands;
-   until then insert one as in `apps/api/tests/api/world.py`). Owner, principal and
-   office_admin need MFA: enter the claim `{"sos:mfa": "true"}` at the stub's login page if
-   your stub version offers the claims box.
-3. Run the web app on the host with the root `.env`:
-   `set -a; . ./.env; set +a; npm run dev -w @schoolos/web`
-   (`.env.example` points `API_INTERNAL_URL` and `REDIS_URL` at localhost).
-4. Open <http://localhost:3000/en/settings/structure>: you are sent to the stub, sign in,
-   and come back to the page. Check in the browser dev tools: cookie `sos_session` is
-   HttpOnly; no `Authorization` header or token appears in any `/bff/*` response,
-   `localStorage` or `sessionStorage`; POSTs carry `X-CSRF-Token`.
-5. Structure, users and audit load from the API; "Lock now" signs out through the stub's
-   end-session endpoint to `/en/signed-out`; after 14 idle minutes the warning dialog opens.
-6. Operators: <http://localhost:3000/en/platform> signs in with the `platform` issuer.
-   Platform API routes that are not built yet show "Not available yet".
+**One issuer name everywhere:** `http://oidc.localhost:8080/<issuer>`. Browsers resolve any
+`*.localhost` name to loopback (RFC 6761), so they reach the stub on `127.0.0.1:8080`; inside
+compose the `oidc` service has the network alias `oidc.localhost`, so the `web` and `api`
+containers reach the same name. The stub derives `iss` from the Host header, so tokens carry
+`http://oidc.localhost:8080/…` for everyone. (A network alias is used rather than
+`extra_hosts: host-gateway`, which cannot reach a port published on `127.0.0.1` on Linux.)
+The web config accepts an http issuer only on loopback or `*.localhost`, and only when the
+app itself runs on `http://localhost…`; the API's `is_dev_issuer` treats `*.localhost` as a
+development issuer (allowed in `local`, refused in staging/prod).
 
-This flow was also exercised end to end (2026-09-26) with `next start`, Valkey 8.1, the
-real API on Postgres 16 + pgvector and a scripted stand-in IdP (the stub image cannot be
-pulled in the build sandbox): sign-in, `GET /me`, structure lists, users, a CSRF-protected
-`POST /classes` (201), `auth.login.succeeded` in the audit log, the staff → `/platform` 403,
-token-free page HTML, logout and the 401 afterwards all behaved as described above.
+1. `cp .env.example .env` (dev-only values; issuers already point at `oidc.localhost`).
+2. `docker compose --profile dev up -d --build` (db, valkey, s3, migrate, api, web, oidc…),
+   then `make seed-synthetic` for synthetic schools and staff (subjects like
+   `synthetic|synth-a|principal|1`) and
+   `uv run python -m app.platform.bootstrap_owner --subject <sub> --email … --display-name …`
+   for the first operator.
+3. Open <http://localhost:3000/en/settings/structure>, sign in at the stub with a synthetic
+   subject (owner, principal and office_admin need MFA: add the claim `{"sos:mfa": "true"}`
+   if your stub version offers the claims box). One school → the page; several → the picker.
+4. Check in the browser dev tools: cookie `sos_session` is HttpOnly; no `Authorization`
+   header or token appears in any `/bff/*` response, `localStorage` or `sessionStorage`;
+   POSTs carry `X-CSRF-Token` (creating POSTs also `Idempotency-Key`).
+5. Operators: <http://localhost:3000/en/platform> signs in with the `platform` issuer.
+
+Running the web app (or API) on the host instead of in compose: set all four issuer
+variables to `http://localhost:8080/…` (host processes may not resolve `*.localhost`), and
+`API_INTERNAL_URL`/`REDIS_URL` to localhost as in `.env.example`.
+
+### Verified end to end (2026-09-26)
+
+`next start` + Valkey 8.1 + the real API (`uvicorn app.main:app`) on Postgres 16 + pgvector
+(migrations to `0007_accept_invitations`, `seed-synthetic --tenants 2`, `bootstrap_owner`),
+with the scripted stand-in IdP (the stub image cannot be pulled in the build sandbox):
+staff sign-in → accept-invitations → schools → login event; menu filtered by `/me`;
+Plan & billing (no subscription → friendly note); structure; support ticket opened (T-1),
+thread + reply; operator dashboard KPIs; plan created and published (step-up fresh);
+school provisioned (201, owner invite created), subscription tab, "Go live"; offboarding
+requested, then approval by the same operator refused with `409 same_operator` and
+explained; operator reply on the school's ticket; platform audit chain verified (intact).
+This run found one bug (a client-module function called from a server page), now fixed and
+guarded by `src/app/client-boundary.test.ts`.
