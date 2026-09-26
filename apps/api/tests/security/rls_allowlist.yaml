@@ -1,0 +1,53 @@
+# Reviewed exceptions for the RLS catalog test (docs/12 §4.5, ADR-0013).
+# Every change to this file needs a security review (CODEOWNERS).
+
+# Tenant-scoped schemas checked by the catalog test.
+tenant_schemas: [core, sis, kb, audit, ops]
+
+# Tables in tenant schemas WITHOUT a tenant_id column. They must still be listed here so that
+# adding a global table is always a deliberate, reviewed decision.
+global_tables:
+  ops.alembic_version: "Migration bookkeeping; app roles have no privileges on it."
+  core.permissions: "Global permission catalog; read-only to the app."
+  core.users: "Global identity (a person may work at two schools); RLS via membership policy."
+  core.tenants: "Tenant registry keyed by id; RLS policy own_tenant (id = current_tenant())."
+
+# Tables with RLS whose isolation policy is an approved variant of tenant_isolation.
+policy_variants:
+  core.tenants: own_tenant
+  core.users: users_in_tenant
+  sis.attribute_definitions: attrdef_read
+
+# Tables allowed to carry the definer_access policy (current_user = 'sos_definer').
+# Only the allowlisted SECURITY DEFINER functions run as sos_definer.
+definer_access_tables:
+  - core.tenants
+  - core.users
+  - core.memberships
+  - core.roles
+  - core.role_permissions
+  - core.membership_roles
+  - core.membership_scopes
+  - core.tenant_keys
+  - core.academic_years
+  - core.classes
+  - core.sections
+  - audit.chain_heads
+  - audit.events
+  - ops.outbox
+
+# The only SECURITY DEFINER functions permitted (owned by sos_definer, search_path pinned).
+definer_functions:
+  - core.resolve_login
+  - core.find_user_id_by_subject
+  - core.create_user_for_invite
+  - core.list_tenant_ids
+  - core.provision_tenant
+  - core.set_tenant_status
+  - core.tenant_usage_summary
+  - core.current_subscription
+  - ops.claim_outbox
+
+# Schema platform: sos_app may only read these tables.
+platform_tables_readable_by_app:
+  - platform.feature_flags
