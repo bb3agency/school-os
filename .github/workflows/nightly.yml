@@ -1,0 +1,123 @@
+# Nightly checks (docs/12 §9 release gates, docs/07 §15).
+#   - full test suite incl. security suites and migrations, plus E2E
+#   - dependency/secret/IaC re-scan (new CVEs appear without code changes)
+#   - OWASP ZAP baseline against staging (placeholder: passive scan, report only)
+#   - RAG evaluation harness (placeholder until the knowledge module lands)
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 21 * * *" # 02:47 IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  SOS_ENV: ci
+  FORCE_COLOR: "1"
+  UV_NO_PROGRESS: "1"
+  NPM_CONFIG_FUND: "false"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  full-tests:
+    name: full test suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make test
+        run: make test
+      - name: make test-security
+        run: make test-security
+      - name: make migration-check
+        run: make migration-check
+
+  e2e:
+    name: e2e (playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make e2e
+        run: make e2e
+
+  security-rescan:
+    name: security re-scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/install-tools
+        with:
+          tools: gitleaks trivy
+      - uses: ./.github/actions/setup-toolchain
+      - name: make security
+        env:
+          SEMGREP_SEND_METRICS: "off"
+        run: make security
+
+  zap-baseline:
+    # Passive ZAP baseline scan against staging. Placeholder: warnings do not fail the job yet
+    # (-I); tighten with a reviewed rules file once staging is live (docs/07 §15).
+    name: zap baseline (staging)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TARGET_URL: ${{ vars.STAGING_BASE_URL }}
+      ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+    steps:
+      - name: Skip when staging is not configured
+        id: cfg
+        run: |
+          if [[ -z "$TARGET_URL" ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ZAP baseline skipped: repository variable STAGING_BASE_URL is not set"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: ZAP baseline
+        if: steps.cfg.outputs.run == 'true'
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm -v "$PWD/zap:/zap/wrk:rw" "$ZAP_IMAGE" \
+            zap-baseline.py -t "$TARGET_URL" -I -r zap-report.html -J zap-report.json
+      - name: Upload ZAP report
+        if: always() && steps.cfg.outputs.run == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-baseline
+          path: zap/
+          retention-days: 30
+          if-no-files-found: warn
+
+  eval:
+    # RAG evaluation harness (docs/06 §13). Placeholder until app/knowledge exists; the make
+    # target owns what runs. Synthetic datasets only.
+    name: rag eval
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make eval
+        run: make eval
