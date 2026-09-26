@@ -18,7 +18,6 @@ import boto3
 from celery import shared_task
 
 from app.audit.archive import (
-    DEFAULT_RETENTION_DAYS,
     ArchiveIncompleteError,
     export_all,
 )
@@ -39,9 +38,8 @@ def _tenant_ids() -> list[Any]:
 def build_signer(settings: Settings) -> Signer:
     """KMS in staging/production; the local-dev Ed25519 key elsewhere."""
     if settings.key_wrapper is KeyWrapperKind.KMS:
-        # Requested from the core owner: a dedicated `audit_signing_key_arn` setting.
-        arn = getattr(settings, "audit_signing_key_arn", None)
-        if not isinstance(arn, str) or not arn:
+        arn = settings.audit_signing_key_arn
+        if not arn:
             raise SignerRefused("SOS_AUDIT_SIGNING_KEY_ARN is not configured")
         return KmsSigner(arn, region=settings.aws_region)
     return LocalDevSigner(settings)
@@ -75,7 +73,9 @@ def archive_daily(day: str | None = None) -> dict[str, Any]:
         s3=build_s3_client(settings),
         signer=build_signer(settings),
         bucket=settings.s3_bucket_audit,
-        object_lock_retention_days=DEFAULT_RETENTION_DAYS if settings.is_production_like else None,
+        object_lock_retention_days=(
+            settings.audit_archive_retention_days if settings.is_production_like else None
+        ),
         statement_timeout_ms=settings.worker_statement_timeout_ms,
     )
     return {

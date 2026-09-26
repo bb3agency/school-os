@@ -93,7 +93,8 @@ services:
     restart: "no"
     depends_on:
       db: { condition: service_healthy }
-    command: ["alembic", "-c", "/app/alembic.ini", "upgrade", "head"]
+    # Schema migrations, then create audit.events partitions ahead of time (migrator role).
+    command: ["sh", "-c", "alembic -c /app/alembic.ini upgrade head && python -m app.audit.partitions --months-ahead 12"]
 
   api:
     <<: *python-app

@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     key_wrapper: KeyWrapperKind = KeyWrapperKind.LOCAL_DEV
     local_dev_master_key: SecretStr | None = None
     kms_data_key_arn: str | None = None
+    # Asymmetric KMS key (ECC_NIST_P256, SIGN_VERIFY) for signing daily audit archives.
+    audit_signing_key_arn: str | None = None
+    audit_archive_retention_days: int = Field(default=3 * 365 + 1, ge=1)
 
     otel_exporter_otlp_endpoint: str | None = None
 
