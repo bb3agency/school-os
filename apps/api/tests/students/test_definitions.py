@@ -35,7 +35,9 @@ def valid_aadhaar(seed: int = 7) -> str:
     return body + verhoeff_check_digit(body)
 
 
-def definition(key: str, data_type: str, classification: str = "C2", **validation: object) -> AttributeDef:
+def definition(
+    key: str, data_type: str, classification: str = "C2", **validation: object
+) -> AttributeDef:
     return AttributeDef(
         key=key,
         data_type=data_type,  # type: ignore[arg-type]
@@ -51,7 +53,9 @@ def definition(key: str, data_type: str, classification: str = "C2", **validatio
 NAME = definition("full_name", "text", max_length=120, name=True)
 DOB = definition("dob", "date", not_future=True)
 GENDER = definition("gender", "enum", values=["female", "male", "transgender"])
-LAST4 = definition("aadhaar_last4", "digits4", "C3", pattern="^[0-9]{4}$", sources=["aadhaar_as_printed"])
+LAST4 = definition(
+    "aadhaar_last4", "digits4", "C3", pattern="^[0-9]{4}$", sources=["aadhaar_as_printed"]
+)
 TODAY = dt.date(2026, 9, 26)
 
 
@@ -139,7 +143,11 @@ def test_reject_full_aadhaar_names_each_field() -> None:
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
-    [("9876543210", "9876543210"), ("+91 98765 43210", "9876543210"), ("098765-43210", "9876543210")],
+    [
+        ("9876543210", "9876543210"),
+        ("+91 98765 43210", "9876543210"),
+        ("098765-43210", "9876543210"),
+    ],
 )
 def test_phone_normalisation(raw: str, expected: str) -> None:
     assert normalize_phone(raw) == expected

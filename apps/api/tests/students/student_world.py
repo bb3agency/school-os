@@ -115,7 +115,9 @@ def create(
     configure_keyring()
     values = identity_values(name, "2012-03-14", "Kommineni Ramana", "Kommineni Sarada")
     if admission_no:
-        values.append(ValueIn(attribute_key="admission_no", source="admission_register", value=admission_no))
+        values.append(
+            ValueIn(attribute_key="admission_no", source="admission_register", value=admission_no)
+        )
     values.extend(extra or [])
     section_id = school.ids[section_key] if section_key else None
     with tenant_session(school.tenant_id, school.people["owner"].user_id) as db:
@@ -141,17 +143,27 @@ def ensure_students(w: Any) -> dict[str, uuid.UUID]:
     if a is None:
         sensitive = [
             ValueIn(attribute_key="mother_tongue", source="parent_form", value="Telugu"),
-            ValueIn(attribute_key="health_notes", source="parent_form", value="Synthetic asthma note"),
+            ValueIn(
+                attribute_key="health_notes", source="parent_form", value="Synthetic asthma note"
+            ),
             ValueIn(attribute_key="aadhaar_last4", source="aadhaar_as_printed", value="4821"),
         ]
         a = {
-            "s9a": create(w.a, name="Synthetica Venkata Sai", section_key="section_9a", extra=sensitive),
+            "s9a": create(
+                w.a, name="Synthetica Venkata Sai", section_key="section_9a", extra=sensitive
+            ),
             "s9c": create(w.a, name="Synthetica Lakshmi Devi", section_key="section_9c"),
-            "s10a": create(w.a, name="Synthetica Ravi Teja", section_key="section_10a", extra=sensitive),
+            "s10a": create(
+                w.a, name="Synthetica Ravi Teja", section_key="section_10a", extra=sensitive
+            ),
             "mover": create(w.a, name="Synthetica Mover Kumar", section_key="section_9a"),
         }
         a["g9a"] = add_guardian(
-            w.a, a["s9a"], full_name="Synthetica Ramana", phone="9876501234", address="Synthetic street 1"
+            w.a,
+            a["s9a"],
+            full_name="Synthetica Ramana",
+            phone="9876501234",
+            address="Synthetic street 1",
         )
         _CACHE[w.a.tenant_id] = a
     b = _CACHE.get(w.b.tenant_id)
@@ -162,7 +174,10 @@ def ensure_students(w: Any) -> dict[str, uuid.UUID]:
             section_key="section_9a",
             extra=[ValueIn(attribute_key="mother_tongue", source="parent_form", value="Telugu")],
         )
-        b = {"sb": sb, "gb": add_guardian(w.b, sb, full_name="Synthetica Guardian B", phone="9876505678")}
+        b = {
+            "sb": sb,
+            "gb": add_guardian(w.b, sb, full_name="Synthetica Guardian B", phone="9876505678"),
+        }
         _CACHE[w.b.tenant_id] = b
     return {**a, **{f"b_{k}": v for k, v in b.items()}}
 
@@ -186,7 +201,9 @@ def version(admin: Engine, table: str, row_id: uuid.UUID) -> int:
     assert table in {"sis.students", "sis.guardians", "sis.enrollments"}
     with admin.connect() as c:
         return int(
-            c.execute(text(f"SELECT version FROM {table} WHERE id = :i"), {"i": row_id}).scalar_one()
+            c.execute(
+                text(f"SELECT version FROM {table} WHERE id = :i"), {"i": row_id}
+            ).scalar_one()
         )
 
 

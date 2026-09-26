@@ -23,7 +23,11 @@ from app.students.search import parse_query, translit_key
     ],
 )
 def test_FR_STU_010_query_tokens(
-    query: str, name: str, sections: set[tuple[str, str]], classes: set[str], admission: tuple[str, ...]
+    query: str,
+    name: str,
+    sections: set[tuple[str, str]],
+    classes: set[str],
+    admission: tuple[str, ...],
 ) -> None:
     parsed = parse_query(query)
     assert parsed.name_text == name

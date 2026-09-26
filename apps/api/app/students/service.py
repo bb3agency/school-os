@@ -1437,8 +1437,15 @@ def add_guardian(
             resource_id=guardian.id,
             summary={
                 "student_id": student_id,
-                "has_phone": guardian.phone_ciphertext is not None,
-                "has_address": guardian.address_ciphertext is not None,
+                "fields": sorted(
+                    f
+                    for f, present in (
+                        ("full_name", True),
+                        ("phone", guardian.phone_ciphertext is not None),
+                        ("address", guardian.address_ciphertext is not None),
+                    )
+                    if present
+                ),
             },
         )
     _audit(

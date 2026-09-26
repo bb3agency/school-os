@@ -185,7 +185,7 @@ CREATE INDEX av_superseded_by ON sis.attribute_values (tenant_id, superseded_by)
 -- Denormalised projection for search and lists (C2 only), maintained in the same transaction.
 CREATE TABLE sis.student_profiles (
   tenant_id           uuid NOT NULL,
-  student_id          uuid PRIMARY KEY,
+  student_id          uuid NOT NULL,
   full_name           text,
   full_name_norm      text,
   full_name_translit  text,
@@ -197,6 +197,9 @@ CREATE TABLE sis.student_profiles (
   status              text,
   search_tsv          tsvector,
   updated_at          timestamptz NOT NULL DEFAULT now(),
+  -- (tenant_id, student_id): tenant first, and a probe with another school's id meets only the
+  -- composite FK, never a global unique key.
+  CONSTRAINT student_profiles_pkey PRIMARY KEY (tenant_id, student_id),
   CONSTRAINT student_profiles_student_fk FOREIGN KEY (tenant_id, student_id)
     REFERENCES sis.students (tenant_id, id) ON DELETE CASCADE,
   CONSTRAINT student_profiles_section_fk FOREIGN KEY (tenant_id, current_section_id)

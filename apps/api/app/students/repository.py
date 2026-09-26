@@ -16,8 +16,10 @@ from typing import Any
 from sqlalchemy import (
     ColumnElement,
     Row,
+    Text,
     and_,
     case,
+    cast,
     false,
     func,
     insert,
@@ -28,6 +30,7 @@ from sqlalchemy import (
     true,
     update,
 )
+from sqlalchemy.dialects.postgresql import REGCONFIG
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, aliased
@@ -314,14 +317,15 @@ def set_verification(
 
 
 def upsert_profile(session: Session, *, search_doc: str, **values: Any) -> None:
-    row = {**values, "search_tsv": func.to_tsvector(literal("simple"), search_doc)}
+    tsv = func.to_tsvector(literal("simple", type_=REGCONFIG), cast(search_doc, Text))
+    row = {**values, "search_tsv": tsv}
     stmt = pg_insert(StudentProfile).values(**row)
     update_cols: dict[str, Any] = {
         k: stmt.excluded[k] for k in row if k not in ("tenant_id", "student_id")
     }
     update_cols["updated_at"] = func.now()
     session.execute(
-        stmt.on_conflict_do_update(index_elements=["student_id"], set_=update_cols),
+        stmt.on_conflict_do_update(index_elements=["tenant_id", "student_id"], set_=update_cols),
         execution_options={"synchronize_session": False},
     )
 

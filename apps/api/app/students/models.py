@@ -154,7 +154,7 @@ class StudentProfile(Base):
         {"schema": SCHEMA},
     )
 
-    tenant_id: Mapped[uuid.UUID]
+    tenant_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     student_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     full_name: Mapped[str | None] = mapped_column(Text)
     full_name_norm: Mapped[str | None] = mapped_column(Text)
