@@ -263,6 +263,12 @@ def me(session: Session, ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -
     )
 
 
+def me_in_tenant(ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -> MeOut:
+    """:func:`me` in its own transaction (used right after switching the active school)."""
+    with tenant_session(ctx.tenant_id, ctx.user_id) as session:
+        return me(session, ctx, tenant_ids=tenant_ids)
+
+
 # --- users (user.manage) ------------------------------------------------------------------------
 
 
