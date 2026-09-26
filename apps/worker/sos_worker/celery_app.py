@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from app.core.config import get_settings
 from celery import Celery
+from celery.schedules import crontab
 from kombu import Queue
 
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
 
 # Task modules registered as they are built (each module owns its tasks.py).
-TASK_MODULES: list[str] = ["sos_worker.tasks"]
+TASK_MODULES: list[str] = ["sos_worker.tasks", "app.audit.tasks"]
 
 
 def create_celery() -> Celery:
@@ -36,7 +37,17 @@ def create_celery() -> Celery:
         enable_utc=True,
         broker_connection_retry_on_startup=True,
         task_routes={"maintenance.*": {"queue": "maintenance"}},
-        beat_schedule={},
+        beat_schedule={
+            # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
+            "audit-archive-daily": {
+                "task": "audit.archive_daily",
+                "schedule": crontab(minute=30, hour=20),
+            },
+            "audit-verify-daily": {
+                "task": "audit.verify_all_chains",
+                "schedule": crontab(minute=45, hour=20),
+            },
+        },
     )
     return app
 
