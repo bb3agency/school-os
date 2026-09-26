@@ -1,0 +1,298 @@
+# SchoolOS CI (docs/10 §7, docs/12 §9, docs/07 §14).
+#
+# Every job calls the same `make` target a developer runs locally (local == CI). The single
+# required status check for branch protection is `ci-ok`, which fails if any job failed or
+# was cancelled.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # Superseded PR pushes are cancelled; every commit on main runs to completion.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SOS_ENV: ci
+  FORCE_COLOR: "1"
+  PY_COLORS: "1"
+  UV_NO_PROGRESS: "1"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make lint
+        run: make lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make typecheck
+        run: make typecheck
+
+  test:
+    # test-api needs Docker (testcontainers: pgvector Postgres, Valkey, SeaweedFS); GitHub's
+    # ubuntu runners provide it. test-web runs vitest.
+    name: test (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [test-api, test-web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: make "$TARGET"
+
+  migrations:
+    # Alembic upgrade -> downgrade -> upgrade on a seeded synthetic DB + RLS catalog test
+    # (docs/12 §4.5, CLAUDE.md §6 invariant 12).
+    name: migrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make migration-check
+        run: make migration-check
+
+  authz-suite:
+    # Route enumeration, authz matrix, BOLA, cross-tenant isolation (docs/12 §4.1-4.7).
+    name: authz-suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make test-security
+        run: make test-security
+
+  security:
+    # gitleaks (full history), semgrep (.semgrep + p/python p/typescript p/owasp-top-ten),
+    # pip-audit, npm audit --audit-level=high, trivy fs + config. All via `make security`.
+    name: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # gitleaks scans the full history
+      - uses: ./.github/actions/install-tools
+        with:
+          tools: gitleaks trivy
+      - uses: ./.github/actions/setup-toolchain
+      - name: make security
+        env:
+          SEMGREP_SEND_METRICS: "off"
+        run: make security
+
+  ci-config:
+    # Lints the CI/governance config itself: custom semgrep rule tests, actionlint, zizmor.
+    name: ci-config
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.19"
+          enable-cache: false
+      - uses: ./.github/actions/install-tools
+        with:
+          tools: actionlint
+      - name: semgrep rule tests
+        env:
+          SEMGREP_SEND_METRICS: "off"
+        run: uvx semgrep==1.178.0 --test --metrics=off .semgrep
+      - name: actionlint
+        run: actionlint -color
+      - name: zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Explicit --config: see .github/zizmor.yml for the one disabled audit and why.
+        run: uvx zizmor==1.30.1 --format=github --config .github/zizmor.yml .
+
+  terraform:
+    name: terraform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-tools
+        with:
+          tools: terraform tflint trivy
+      - name: Find Terraform roots
+        id: roots
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          dirs=$(find infra/terraform deploy/dedicated -name '*.tf' -not -path '*/.terraform/*' \
+                   -exec dirname {} \; 2>/dev/null | sort -u | tr '\n' ' ' || true)
+          echo "dirs=${dirs}" >> "$GITHUB_OUTPUT"
+          if [[ -z "${dirs// /}" ]]; then
+            echo "::notice::No Terraform files found under infra/terraform or deploy/dedicated; skipping."
+          else
+            echo "Terraform directories: ${dirs}"
+          fi
+      - name: terraform fmt
+        if: steps.roots.outputs.dirs != ''
+        env:
+          DIRS: ${{ steps.roots.outputs.dirs }}
+        run: |
+          rc=0
+          for d in $DIRS; do terraform fmt -check -diff "$d" || rc=1; done
+          exit "$rc"
+      - name: terraform validate
+        if: steps.roots.outputs.dirs != ''
+        env:
+          DIRS: ${{ steps.roots.outputs.dirs }}
+        run: |
+          for d in $DIRS; do
+            echo "::group::validate $d"
+            if [[ -f "$d/.terraform.lock.hcl" ]]; then
+              # Root modules commit their lock file; CI must not change it.
+              terraform -chdir="$d" init -backend=false -lockfile=readonly -no-color
+            else
+              terraform -chdir="$d" init -backend=false -no-color
+            fi
+            terraform -chdir="$d" validate -no-color
+            echo "::endgroup::"
+          done
+      - name: tflint
+        if: steps.roots.outputs.dirs != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # avoids rate limits when tflint --init fetches plugins
+          DIRS: ${{ steps.roots.outputs.dirs }}
+        run: |
+          cfg=()
+          for c in .tflint.hcl infra/terraform/.tflint.hcl; do
+            if [[ -f "$c" ]]; then cfg=(--config "$PWD/$c"); break; fi
+          done
+          for d in $DIRS; do
+            echo "::group::tflint $d"
+            tflint --chdir="$d" "${cfg[@]}" --init
+            tflint --chdir="$d" "${cfg[@]}" --format compact
+            echo "::endgroup::"
+          done
+      - name: trivy config (IaC misconfiguration)
+        run: |
+          targets=()
+          for t in infra deploy; do [[ -d "$t" ]] && targets+=("$t"); done
+          if [[ ${#targets[@]} -eq 0 ]]; then echo "nothing to scan"; exit 0; fi
+          for t in "${targets[@]}"; do
+            trivy config --exit-code 1 --severity HIGH,CRITICAL --quiet "$t"
+          done
+
+  images:
+    # Build each image, generate an SPDX SBOM (syft) and scan it (trivy); nothing is pushed.
+    # docs/10 §6: images must have no unwaived HIGH/CRITICAL (fixable) CVEs before push.
+    name: images (${{ matrix.image }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            dockerfile: apps/api/Dockerfile
+          - image: worker
+            dockerfile: apps/worker/Dockerfile
+          - image: web
+            dockerfile: apps/web/Dockerfile
+    env:
+      IMAGE: schoolos-${{ matrix.image }}:${{ github.sha }}
+      DOCKERFILE: ${{ matrix.dockerfile }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-tools
+        with:
+          tools: syft trivy
+      - name: docker build
+        run: |
+          if [[ ! -f "$DOCKERFILE" ]]; then
+            echo "::error file=${DOCKERFILE}::Dockerfile not found (expected ${DOCKERFILE}, build context = repo root)"
+            exit 1
+          fi
+          docker build --pull -f "$DOCKERFILE" -t "$IMAGE" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            .
+      - name: SBOM (syft, SPDX JSON)
+        env:
+          NAME: ${{ matrix.image }}
+        run: syft scan "docker:${IMAGE}" -o "spdx-json=sbom-${NAME}.spdx.json" -q
+      - name: trivy image scan
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --quiet "$IMAGE"
+      - name: Upload SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-${{ matrix.image }}
+          path: sbom-${{ matrix.image }}.spdx.json
+          retention-days: 30
+          if-no-files-found: error
+
+  ci-ok:
+    # The only check to mark as required in branch protection / rulesets.
+    name: ci-ok
+    if: always()
+    needs: [lint, typecheck, test, migrations, authz-suite, security, ci-config, terraform, images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All CI jobs passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key] | join(", ")')
+          if [[ -n "$bad" ]]; then
+            echo "::error::CI jobs not successful: $bad"
+            exit 1
+          fi

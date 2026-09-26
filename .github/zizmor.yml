@@ -1,0 +1,10 @@
+# zizmor configuration (GitHub Actions static analysis; run in the `ci-config` CI job).
+rules:
+  self-repository:
+    # zizmor 1.30 suggests GitHub's new `uses: $/...` self-repository syntax (July 2026) for
+    # our local composite actions. actionlint 1.7.12 (latest) rejects that syntax, and both
+    # linters gate CI, so we keep `uses: ./.github/actions/...` for now. Every job checks out
+    # the repository with actions/checkout (persist-credentials: false) as its first step and
+    # nothing clones other code before the local action runs. Re-enable this audit and switch
+    # to `$/` once actionlint supports it.
+    disable: true

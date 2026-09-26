@@ -1,0 +1,72 @@
+name: Install pinned CLI tools
+description: >-
+  Downloads pinned release binaries (gitleaks, trivy, tflint, syft, terraform, actionlint),
+  verifies each against a SHA-256 recorded here, and puts them on PATH. Checksums were taken
+  from each project's published checksums file at the pinned version. Bump version and
+  sha256 together (Dependabot cannot update this file). Binaries are installed into
+  /usr/local/bin (already on PATH), so the action never writes to $GITHUB_PATH.
+
+inputs:
+  tools:
+    description: Space-separated list of tools to install.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install ${{ inputs.tools }}
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      run: |
+        set -euo pipefail
+        bin="${RUNNER_TEMP}/sos-tools/bin"
+        dl="${RUNNER_TEMP}/sos-tools/dl"
+        mkdir -p "$bin" "$dl"
+        gh_release="https://github.com"
+
+        fetch() { # name url sha256
+          local out="$dl/$1"
+          curl -sSfL --retry 3 --retry-delay 2 -o "$out" "$2"
+          echo "$3  $out" | sha256sum --check --strict --quiet
+        }
+
+        for tool in $TOOLS; do
+          case "$tool" in
+            gitleaks)
+              v=8.30.1
+              fetch gitleaks.tgz "$gh_release/gitleaks/gitleaks/releases/download/v$v/gitleaks_${v}_linux_x64.tar.gz" \
+                551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+              tar -xzf "$dl/gitleaks.tgz" -C "$bin" gitleaks ;;
+            trivy)
+              v=0.74.0
+              fetch trivy.tgz "$gh_release/aquasecurity/trivy/releases/download/v$v/trivy_${v}_Linux-64bit.tar.gz" \
+                2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+              tar -xzf "$dl/trivy.tgz" -C "$bin" trivy ;;
+            tflint)
+              v=0.64.0
+              fetch tflint.zip "$gh_release/terraform-linters/tflint/releases/download/v$v/tflint_linux_amd64.zip" \
+                cca9d13e2e1d7a2c627af60ff899a3c9b74212899416aeb96ec764d2ef954537
+              unzip -oq "$dl/tflint.zip" tflint -d "$bin" ;;
+            syft)
+              v=1.52.0
+              fetch syft.tgz "$gh_release/anchore/syft/releases/download/v$v/syft_${v}_linux_amd64.tar.gz" \
+                caeedb81fb0491615f1ebd1761e4145d41ee86dd2cc7bf80669f9f5ad9d6133d
+              tar -xzf "$dl/syft.tgz" -C "$bin" syft ;;
+            terraform)
+              v=1.16.4
+              fetch terraform.zip "https://releases.hashicorp.com/terraform/$v/terraform_${v}_linux_amd64.zip" \
+                dc94af0eef1147718ad7c8daea792ed199e3e0492eec180d0adafa2a65a879df
+              unzip -oq "$dl/terraform.zip" terraform -d "$bin" ;;
+            actionlint)
+              v=1.7.12
+              fetch actionlint.tgz "$gh_release/rhysd/actionlint/releases/download/v$v/actionlint_${v}_linux_amd64.tar.gz" \
+                8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+              tar -xzf "$dl/actionlint.tgz" -C "$bin" actionlint ;;
+            *)
+              echo "::error::install-tools: unknown tool '$tool'"
+              exit 1 ;;
+          esac
+          sudo install -m 0755 "$bin/$tool" "/usr/local/bin/$tool"
+          echo "installed $tool $v"
+        done

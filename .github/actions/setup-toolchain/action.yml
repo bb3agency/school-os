@@ -1,0 +1,39 @@
+name: Set up SchoolOS toolchain
+description: >-
+  Installs uv + Python 3.12 and Node (version from .nvmrc), restores the uv and npm caches,
+  then runs `make install` so CI uses exactly the same entry point as local development.
+
+inputs:
+  cache:
+    description: Restore/save the uv and npm caches. Set to "false" in release/deploy workflows.
+    required: false
+    default: "true"
+  install:
+    description: Run `make install` after setting up the toolchains.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up uv and Python
+      uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        version: "0.12.19"
+        python-version: "3.12"
+        enable-cache: ${{ inputs.cache }}
+        cache-dependency-glob: |
+          uv.lock
+          **/pyproject.toml
+
+    - name: Set up Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: .nvmrc
+        cache: ${{ inputs.cache == 'true' && 'npm' || '' }}
+        package-manager-cache: ${{ inputs.cache == 'true' }}
+
+    - name: make install
+      if: inputs.install == 'true'
+      shell: bash
+      run: make install
