@@ -86,7 +86,8 @@ export async function createHarness(
       for (const cookie of response.headers.getSetCookie()) {
         const [pair, ...attributes] = cookie.split(";").map((part) => part.trim());
         const [name, value] = (pair ?? "").split(/=(.*)/s) as [string, string];
-        if (attributes.some((attribute) => attribute.toLowerCase() === "max-age=0")) jar.delete(name);
+        if (attributes.some((attribute) => attribute.toLowerCase() === "max-age=0"))
+          jar.delete(name);
         else jar.set(name, value);
       }
       return response;

@@ -86,10 +86,12 @@ describe("GET /bff/auth/callback", () => {
     );
     const cookies = response.headers.getSetCookie();
     const session = cookies.find((c) => c.startsWith("__Host-sos_session="));
-    expect(session).toMatch(/^__Host-sos_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Secure$/);
-    expect(cookies.some((c) => c.startsWith("__Host-sos_auth_tx=;") && c.includes("Max-Age=0"))).toBe(
-      true,
+    expect(session).toMatch(
+      /^__Host-sos_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Secure$/,
     );
+    expect(
+      cookies.some((c) => c.startsWith("__Host-sos_auth_tx=;") && c.includes("Max-Age=0")),
+    ).toBe(true);
     expect(h.jar.has("__Host-sos_auth_tx")).toBe(false);
   });
 
@@ -138,12 +140,21 @@ describe("GET /bff/auth/callback", () => {
   it("rejects a PKCE verifier mismatch (code injected from another sign-in)", async () => {
     // Attacker starts their own sign-in and injects the resulting code into the victim's callback.
     const attacker = await createHarness();
-    const attackerLogin = await handleLogin(attacker.request("/bff/auth/login"), attacker.runtime, "staff");
-    const victimLogin = h.absorb(await handleLogin(h.request("/bff/auth/login"), h.runtime, "staff"));
+    const attackerLogin = await handleLogin(
+      attacker.request("/bff/auth/login"),
+      attacker.runtime,
+      "staff",
+    );
+    const victimLogin = h.absorb(
+      await handleLogin(h.request("/bff/auth/login"), h.runtime, "staff"),
+    );
     const victimState = locationOf(victimLogin).searchParams.get("state") ?? "";
     // Same IdP: register the attacker's code at the victim harness's IdP.
     const attackerAuthorize = new URL(attackerLogin.headers.get("location") ?? "");
-    attackerAuthorize.searchParams.set("nonce", locationOf(victimLogin).searchParams.get("nonce") ?? "");
+    attackerAuthorize.searchParams.set(
+      "nonce",
+      locationOf(victimLogin).searchParams.get("nonce") ?? "",
+    );
     const back = h.idp.staff.authorize(attackerAuthorize, clerk, { state: victimState });
     const response = h.absorb(await handleCallback(h.request(back.href), h.runtime, "staff"));
     expect(response.headers.get("location")).toContain("error=signin_failed");
@@ -314,7 +325,11 @@ describe("GET /bff/auth/step-up (SEC-005)", () => {
     await h.signIn("staff", clerk);
     const before = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
     const response = h.absorb(
-      await handleStepUp(h.request("/bff/auth/step-up?next=/en/settings/users"), h.runtime, "staff"),
+      await handleStepUp(
+        h.request("/bff/auth/step-up?next=/en/settings/users"),
+        h.runtime,
+        "staff",
+      ),
     );
     const url = locationOf(response);
     expect(url.searchParams.get("prompt")).toBe("login");
@@ -332,7 +347,9 @@ describe("GET /bff/auth/step-up (SEC-005)", () => {
 
   it("refuses a stale auth_time on step-up", async () => {
     await h.signIn("staff", clerk);
-    const response = h.absorb(await handleStepUp(h.request("/bff/auth/step-up"), h.runtime, "staff"));
+    const response = h.absorb(
+      await handleStepUp(h.request("/bff/auth/step-up"), h.runtime, "staff"),
+    );
     const back = h.idp.staff.authorize(locationOf(response), {
       ...clerk,
       authTime: Math.floor(Date.now() / 1000) - 3600,

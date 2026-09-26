@@ -61,6 +61,23 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
     expect(headers.get("content-security-policy")).not.toContain("upgrade-insecure-requests");
   });
 
+  it("passes the current path to layouts for the sign-in return, ignoring a client value", () => {
+    const response = proxy(
+      request("/en/settings/users?page=2", { "x-sos-path": "https://evil.example/" }),
+    );
+    expect(response.headers.get("x-middleware-request-x-sos-path")).toBe(
+      "/en/settings/users?page=2",
+    );
+  });
+
+  it("localises the signed-out page and keeps its query", () => {
+    const response = proxy(request("/signed-out?kind=operator&error=signin_failed"));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toMatch(
+      /\/en\/signed-out\?kind=operator&error=signin_failed$/,
+    );
+  });
+
   it("does not localise the BFF or health check but still sets headers", () => {
     for (const path of ["/healthz", "/bff/api/v1/me", "/bff/api/v1/files/report.pdf"]) {
       const response = proxy(request(path));

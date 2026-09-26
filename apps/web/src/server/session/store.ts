@@ -246,7 +246,10 @@ export class SessionStore {
   /** Replace tokens after a refresh (caller holds the refresh lock). */
   async saveTokens(session: Session, tokens: TokenSet, accessExpiresAt: number): Promise<void> {
     const pxMs = Math.max(1, Math.min(this.idleTimeoutMs, session.absoluteExpiresAt - this.now()));
-    const stored: StoredTokens = { sealed: this.sealTokens(session.id, tokens), accessExp: accessExpiresAt };
+    const stored: StoredTokens = {
+      sealed: this.sealTokens(session.id, tokens),
+      accessExp: accessExpiresAt,
+    };
     await this.kv.set(key.tokens(session.id), JSON.stringify(stored), { pxMs });
   }
 

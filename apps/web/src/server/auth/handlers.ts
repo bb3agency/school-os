@@ -11,7 +11,7 @@ import {
   seeOther,
 } from "@/server/bff/http";
 import { callApi } from "@/server/bff/upstream";
-import type { SessionKind } from "@/server/config";
+import { signedOutPath, type SessionKind } from "@/server/config";
 import { logEvent } from "@/server/log";
 import type { AuthRuntime } from "@/server/runtime";
 import {
@@ -39,14 +39,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_SMALL_BODY = 4 * 1024;
 
 export type SignInError =
-  | "signin_expired"
-  | "signin_failed"
-  | "signin_unavailable"
-  | "mfa_required"
-  | "step_up_failed";
+  "signin_expired" | "signin_failed" | "signin_unavailable" | "mfa_required" | "step_up_failed";
 
-function signedOutUrl(error?: SignInError): string {
-  return error ? `/signed-out?error=${error}` : "/signed-out";
+function signedOutUrl(kind: SessionKind, error?: SignInError): string {
+  const base = signedOutPath(kind);
+  return error ? `${base}${base.includes("?") ? "&" : "?"}error=${error}` : base;
 }
 
 function platformDisabled(requestId: string): Response {
@@ -72,8 +69,12 @@ async function startSignIn(
       stepUp: stepUpSessionId !== null,
     });
   } catch (error) {
-    logEvent("oidc_discovery_failed", { kind, code: error instanceof Error ? error.name : "unknown" }, "error");
-    return seeOther(runtime, signedOutUrl("signin_unavailable"));
+    logEvent(
+      "oidc_discovery_failed",
+      { kind, code: error instanceof Error ? error.name : "unknown" },
+      "error",
+    );
+    return seeOther(runtime, signedOutUrl(kind, "signin_unavailable"));
   }
   const secure = runtime.config.secureCookies;
   const transaction = runtime.transactions.encode({
@@ -160,7 +161,7 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
   const clearTransaction = clearCookie(transactionCookieName(kind, secure), secure);
   const fail = (error: SignInError) => {
     logEvent("signin_failed", { kind, code: error, request_id: requestId });
-    return seeOther(runtime, signedOutUrl(error), [clearTransaction]);
+    return seeOther(runtime, signedOutUrl(kind, error), [clearTransaction]);
   };
 
   const transaction = runtime.transactions.decode(
@@ -243,7 +244,11 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
   if (kind === "staff" && !transaction.stepUpSessionId) {
     await recordLoginEvent(runtime, session, tokens.accessToken, requestId);
   }
-  logEvent(transaction.stepUpSessionId ? "step_up_completed" : "signin_completed", { kind }, "info");
+  logEvent(
+    transaction.stepUpSessionId ? "step_up_completed" : "signin_completed",
+    { kind },
+    "info",
+  );
   return seeOther(runtime, next, [
     serializeCookie(sessionCookieName(kind, secure), cookieValue, { secure }),
     clearTransaction,
@@ -258,14 +263,14 @@ export async function handleLogout(request: Request, runtime: AuthRuntime) {
   const clear = clearCookie(sessionCookieName(kind, secure), secure);
   const current = await readSession(request, runtime, kind, { touch: false });
   if (!current) {
-    return jsonResponse({ redirect_to: signedOutUrl() }, { cookies: [clear], requestId });
+    return jsonResponse({ redirect_to: signedOutUrl(kind) }, { cookies: [clear], requestId });
   }
   if (!csrfOk(request, current.session, runtime)) return csrfFailed(requestId);
 
   await revokeAtIdp(runtime, current.session);
   await runtime.store.revoke(current.session.id);
   logEvent("signed_out", { kind }, "info");
-  let redirectTo = signedOutUrl();
+  let redirectTo = signedOutUrl(kind);
   try {
     // client_id + post_logout_redirect_uri only: the ID token never goes to the browser.
     const endSession = await runtime.oidc[kind].endSessionUrl(null);
@@ -336,7 +341,8 @@ export async function handleSessions(request: Request, runtime: AuthRuntime) {
       : null;
     if (!revoked) return problem(requestId, 404, "not_found", "Session not found");
     const secure = runtime.config.secureCookies;
-    const cookies = revoked.id === owner.id ? [clearCookie(sessionCookieName(kind, secure), secure)] : [];
+    const cookies =
+      revoked.id === owner.id ? [clearCookie(sessionCookieName(kind, secure), secure)] : [];
     const response = jsonResponse(null, { status: 204, cookies, requestId });
     response.headers.delete("Content-Type");
     return response;
@@ -378,7 +384,9 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
 
   const body = await readSmallJson(request);
   const tenantId =
-    body && typeof body === "object" && "tenant_id" in body ? (body as { tenant_id: unknown }).tenant_id : null;
+    body && typeof body === "object" && "tenant_id" in body
+      ? (body as { tenant_id: unknown }).tenant_id
+      : null;
   if (typeof tenantId !== "string" || !UUID.test(tenantId)) {
     return problem(requestId, 422, "validation_error", "Validation failed", {
       errors: [{ field: "tenant_id", code: "invalid_uuid", message_key: "errors.invalid_uuid" }],

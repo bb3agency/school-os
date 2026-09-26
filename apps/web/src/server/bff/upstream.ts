@@ -52,9 +52,15 @@ export async function callApi(runtime: AuthRuntime, call: ApiCall): Promise<Resp
     if (value) headers.set(name, value);
   }
   if (!headers.has("accept")) headers.set("accept", "application/json");
-  headers.set("accept-language", negotiateLanguage(call.incomingHeaders?.get("accept-language") ?? null));
+  headers.set(
+    "accept-language",
+    negotiateLanguage(call.incomingHeaders?.get("accept-language") ?? null),
+  );
   headers.set("authorization", `Bearer ${call.accessToken}`);
-  headers.set(SERVICE_TOKEN_HEADER, await mintServiceToken(runtime.config.serviceTokenKey, runtime.now));
+  headers.set(
+    SERVICE_TOKEN_HEADER,
+    await mintServiceToken(runtime.config.serviceTokenKey, runtime.now),
+  );
   headers.set("x-request-id", call.requestId);
   if (call.session.kind === "staff" && call.session.activeTenantId) {
     headers.set("x-active-tenant", call.session.activeTenantId);

@@ -81,7 +81,11 @@ describe("SessionStore (SEC-004, SEC-006, FR-IAM-003)", () => {
 
   it("expires after 12 hours absolute even when active", async () => {
     const { cookieValue } = await store.create(staff());
-    for (let elapsed = 0; elapsed < ABSOLUTE_TIMEOUT_MS.staff - 10 * MINUTE; elapsed += 10 * MINUTE) {
+    for (
+      let elapsed = 0;
+      elapsed < ABSOLUTE_TIMEOUT_MS.staff - 10 * MINUTE;
+      elapsed += 10 * MINUTE
+    ) {
       clock += 10 * MINUTE;
       expect(await store.load(cookieValue, { touch: true })).not.toBeNull();
     }

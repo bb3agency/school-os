@@ -94,13 +94,9 @@ export function csrfOk(request: Request, session: Session, runtime: AuthRuntime)
 }
 
 export function csrfFailed(requestId: string): Response {
-  return problem(
-    requestId,
-    403,
-    "csrf_failed",
-    "Security check failed",
-    { detail: "Reload the page and try again." },
-  );
+  return problem(requestId, 403, "csrf_failed", "Security check failed", {
+    detail: "Reload the page and try again.",
+  });
 }
 
 export function kindParam(request: Request): SessionKind {

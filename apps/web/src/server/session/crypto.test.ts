@@ -32,9 +32,9 @@ describe("session crypto (SEC-006)", () => {
     expect(() => unseal(deriveKey(secret, "auth-transaction"), sealed, "tokens:session-a")).toThrow(
       SealError,
     );
-    expect(() => unseal(deriveKey(randomBytes(32), "session-tokens"), sealed, "tokens:session-a")).toThrow(
-      SealError,
-    );
+    expect(() =>
+      unseal(deriveKey(randomBytes(32), "session-tokens"), sealed, "tokens:session-a"),
+    ).toThrow(SealError);
   });
 
   it("makes 256-bit session ids and compares secrets safely", () => {

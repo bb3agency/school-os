@@ -124,7 +124,11 @@ export async function createFakeIdp(options: FakeIdpOptions) {
     if (body.get("grant_type") === "authorization_code") {
       const pending = codes.get(body.get("code") ?? "");
       codes.delete(body.get("code") ?? "");
-      if (!pending || pending.clientId !== clientId || pending.redirectUri !== body.get("redirect_uri")) {
+      if (
+        !pending ||
+        pending.clientId !== clientId ||
+        pending.redirectUri !== body.get("redirect_uri")
+      ) {
         return json({ error: "invalid_grant" }, 400);
       }
       const challenge = createHash("sha256")
@@ -155,7 +159,8 @@ export async function createFakeIdp(options: FakeIdpOptions) {
     const url = new URL(authorizationUrl);
     const redirectUri = url.searchParams.get("redirect_uri") ?? "";
     const code = randomBytes(12).toString("hex");
-    if (url.searchParams.get("code_challenge_method") !== "S256") throw new Error("PKCE S256 required");
+    if (url.searchParams.get("code_challenge_method") !== "S256")
+      throw new Error("PKCE S256 required");
     codes.set(code, {
       clientId: url.searchParams.get("client_id") ?? "",
       redirectUri,

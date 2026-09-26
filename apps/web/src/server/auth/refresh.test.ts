@@ -46,7 +46,9 @@ function refresherFor(client: OidcClient, sharedStore = store) {
   });
 }
 
-async function newSession(accessExpiresInMs: number): Promise<{ cookie: string; session: Session }> {
+async function newSession(
+  accessExpiresInMs: number,
+): Promise<{ cookie: string; session: Session }> {
   const { cookieValue, session } = await store.create({
     kind: "staff",
     subject: "sub-1",
@@ -127,7 +129,9 @@ describe("token refresh (FR-IAM-004)", () => {
     const idp = fakeIdp({ delayMs: 20 });
     const { session } = await newSession(10_000);
     const refresher = refresherFor(idp.client);
-    const results = await Promise.all(Array.from({ length: 5 }, () => refresher.ensureFresh(session)));
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => refresher.ensureFresh(session)),
+    );
     expect(idp.refresh).toHaveBeenCalledTimes(1);
     expect(new Set(results.map((s) => s.accessExpiresAt)).size).toBe(1);
   });

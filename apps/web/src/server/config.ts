@@ -37,6 +37,11 @@ export interface AuthConfig {
   platformEnabled: boolean;
 }
 
+/** Where people land after signing out (outside the authenticated route groups). */
+export function signedOutPath(kind: SessionKind): string {
+  return kind === "operator" ? "/signed-out?kind=operator" : "/signed-out";
+}
+
 export class ConfigError extends Error {
   constructor(readonly problems: readonly string[]) {
     super(`Invalid web BFF configuration: ${problems.join("; ")}`);
@@ -142,7 +147,7 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
       clientId: need(idVar),
       clientSecret: need(secretVar),
       redirectUri: `${base}${callbackPath}`,
-      postLogoutRedirectUri: `${base}/signed-out`,
+      postLogoutRedirectUri: `${base}${signedOutPath(kind)}`,
       scope: OIDC_SCOPE,
       allowInsecureIssuer,
     };

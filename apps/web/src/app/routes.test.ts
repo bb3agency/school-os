@@ -29,7 +29,11 @@ describe("route handlers", () => {
     expect(response.headers.get("content-type")).toContain("application/problem+json");
     expect(response.headers.get("x-request-id")).toBe("req_abc-123");
     const body = (await response.json()) as Record<string, unknown>;
-    expect(body).toMatchObject({ status: 503, code: "service_unavailable", request_id: "req_abc-123" });
+    expect(body).toMatchObject({
+      status: 503,
+      code: "service_unavailable",
+      request_id: "req_abc-123",
+    });
     expect(JSON.stringify(body)).not.toMatch(/SESSION_SECRET|REDIS_URL|OIDC/);
   });
 

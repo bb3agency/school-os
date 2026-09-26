@@ -105,13 +105,10 @@ function loginUrl(kind: SessionKind): string {
 }
 
 function sessionEnded(requestId: string, kind: SessionKind): Response {
-  return problem(
-    requestId,
-    401,
-    "unauthenticated",
-    "Sign in to continue",
-    { detail: "Your session has ended. Sign in again.", login_url: loginUrl(kind) },
-  );
+  return problem(requestId, 401, "unauthenticated", "Sign in to continue", {
+    detail: "Your session has ended. Sign in again.",
+    login_url: loginUrl(kind),
+  });
 }
 
 async function resolveSession(
@@ -183,9 +180,16 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
     } catch (error) {
       if (error instanceof SessionEndedError) return sessionEnded(requestId, kind);
       if (error instanceof RefreshBusyError) {
-        return problem(requestId, 503, "service_unavailable", "Try again in a moment", {}, {
-          "Retry-After": "1",
-        });
+        return problem(
+          requestId,
+          503,
+          "service_unavailable",
+          "Try again in a moment",
+          {},
+          {
+            "Retry-After": "1",
+          },
+        );
       }
       logEvent("token_refresh_error", { kind, request_id: requestId }, "error");
       return problem(requestId, 503, "service_unavailable", "Sign-in service is unavailable");
@@ -211,7 +215,11 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
       });
     }
 
-    if (upstream.status === 401 && attempt === 0 && (await problemCode(upstream)) === "token_expired") {
+    if (
+      upstream.status === 401 &&
+      attempt === 0 &&
+      (await problemCode(upstream)) === "token_expired"
+    ) {
       await upstream.body?.cancel();
       staleAccessToken = accessToken;
       continue;
@@ -219,7 +227,11 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
 
     if (upstream.status === 428) {
       await upstream.body?.cancel();
-      const next = nextFromReferer(request.headers.get("referer"), runtime.config.appBaseUrl.origin, kind);
+      const next = nextFromReferer(
+        request.headers.get("referer"),
+        runtime.config.appBaseUrl.origin,
+        kind,
+      );
       const stepUpPath = kind === "operator" ? "/bff/auth/platform/step-up" : "/bff/auth/step-up";
       return problem(requestId, 428, "step_up_required", "Confirm it's you", {
         detail: "For your security, sign in again to continue.",

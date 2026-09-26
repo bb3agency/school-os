@@ -4,8 +4,17 @@ import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { SidebarNav, type NavItem } from "@/components/ui/SidebarNav";
 import { SkipLink } from "./SkipLink";
 
-/** School office console chrome: light header, sidebar navigation, main landmark. */
-export function SchoolShell({ children }: { children: ReactNode }) {
+/**
+ * School office console chrome: light header, sidebar navigation, main landmark.
+ * `headerActions` holds the session controls (who is signed in, "Lock now").
+ */
+export function SchoolShell({
+  children,
+  headerActions,
+}: {
+  children: ReactNode;
+  headerActions?: ReactNode;
+}) {
   const t = useTranslations();
   const items: NavItem[] = [
     { href: "/", label: t("school.nav.home"), exact: true },
@@ -22,7 +31,10 @@ export function SchoolShell({ children }: { children: ReactNode }) {
         data-print="hide"
       >
         <p className="text-lg font-bold text-primary">{t("common.appName")}</p>
-        <LanguageSwitcher />
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          {headerActions}
+          <LanguageSwitcher />
+        </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <aside

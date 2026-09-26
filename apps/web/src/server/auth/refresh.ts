@@ -2,7 +2,12 @@ import "server-only";
 import type { SessionKind } from "@/server/config";
 import { logEvent } from "@/server/log";
 import { randomToken } from "@/server/session/crypto";
-import { sessionKeys, type Session, type SessionStore, type TokenSet } from "@/server/session/store";
+import {
+  sessionKeys,
+  type Session,
+  type SessionStore,
+  type TokenSet,
+} from "@/server/session/store";
 import { OidcGrantError, type OidcClient } from "./oidc";
 
 /**

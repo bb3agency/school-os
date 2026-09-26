@@ -124,14 +124,17 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
   });
 
   describe("CSRF (docs/07 §5.2)", () => {
-    it.each(["POST", "PUT", "PATCH", "DELETE"])("%s without the token is refused", async (method) => {
-      await h.signIn("staff", clerk);
-      h.apiCalls.length = 0;
-      const response = await call("/bff/api/v1/classes", { method, body: "{}" });
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({ code: "csrf_failed" });
-      expect(h.apiCalls).toHaveLength(0);
-    });
+    it.each(["POST", "PUT", "PATCH", "DELETE"])(
+      "%s without the token is refused",
+      async (method) => {
+        await h.signIn("staff", clerk);
+        h.apiCalls.length = 0;
+        const response = await call("/bff/api/v1/classes", { method, body: "{}" });
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ code: "csrf_failed" });
+        expect(h.apiCalls).toHaveLength(0);
+      },
+    );
 
     it("a wrong token is refused", async () => {
       await h.signIn("staff", clerk);
@@ -280,7 +283,9 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
 
   it("returns 401 when the refresh token was reused and the family is revoked", async () => {
     await h.signIn("staff", clerk);
-    const session = (await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false }))!;
+    const session = (await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
+      touch: false,
+    }))!;
     const stored = (await h.runtime.store.tokens(session.id))!;
     await h.runtime.store.spendRefreshToken(session.familyId, stored.tokens.refreshToken ?? "");
     await h.runtime.store.saveTokens(session, stored.tokens, Date.now() + 1_000);
