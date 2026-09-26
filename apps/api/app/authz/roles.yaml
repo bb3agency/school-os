@@ -13,8 +13,6 @@
 #                         school          ✓  school-wide
 #                         scoped          S  limited to the membership's class/section scopes
 #                         school_step_up  ✓ᴿ school-wide, step-up MFA for changes
-# support.ticket.create is not in the 07 §6.2 table yet (proposed in 16 §19 Q6 and contract §5);
-# it is granted to every staff role except auditor_readonly.
 version: 1
 
 roles:

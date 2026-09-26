@@ -100,7 +100,7 @@ flowchart LR
 | T13 | LLM provider retains/uses prompts | I | Commercial API terms, ZDR requested, data minimization, sub-processor disclosure in DPA | Low–medium |
 | T14 | Resource exhaustion (bulk uploads, OCR floods) | D | Per-tenant quotas, queue fairness, size/page limits, WAF rate rules | Low |
 | T15 | AI cost abuse ("denial of wallet") | D | Per-user/tenant rate limits, monthly budgets, max tokens, anomaly alerts | Low |
-| T16 | Privilege escalation via role changes | E | `role.assign` limited to owner/principal, step-up MFA, alerts on privileged grants | Low |
+| T16 | Privilege escalation via role changes | E | `role.assign` limited to owner/principal, step-up MFA, alerts on privileged grants; holders may only grant roles whose permissions they hold, except `owner` (root of trust, `assign_any_role`); the last active owner cannot be suspended or demoted | Low |
 | T17 | Platform operator misuse | E/I | No standing data access, school-approved time-bound break-glass, actions visible to school | Low–medium |
 | T18 | Injection (SQL, template, command) | T/E | Bound parameters only, no dynamic SQL from AI, auto-escaping templates, no shell calls with input | Low |
 | T19 | Dependency or CI compromise | T/E | Pinned deps with hashes, SHA-pinned actions, OIDC to AWS (no stored keys), scans, SBOM, protected branches | Medium |
@@ -137,7 +137,7 @@ Review the model at each milestone and after any incident.
 ## 6. Authorization
 
 ### 6.1 Model
-- **RBAC:** roles are sets of `resource.action` permissions (catalog in `core.permissions`). System roles are cloned per tenant at provisioning; tenants may create custom roles from the catalog, but cannot grant platform permissions: `platform.*` keys cannot exist in `core.permissions` (DB CHECK) and platform roles are not tenant roles (§6.5).
+- **RBAC:** roles are sets of `resource.action` permissions (catalog in `core.permissions`). System roles are cloned per tenant at provisioning; tenants may create custom roles from the catalog, but cannot grant platform permissions: `platform.*` keys exist in `core.permissions` only with `is_platform = true` (a CHECK ties the flag to the prefix) and a trigger on `core.role_permissions` refuses to grant them; platform roles are not tenant roles (§6.5). Every active member also holds the implicit `session.authenticated` permission (never stored in `role_permissions`), which guards routes that only need a signed-in member.
 - **Scopes (ABAC):** each membership has scopes (`school`, `class:<id>`, `section:<id>`). Scope is applied by **scoped repositories** on every read path: lists, search, exports and AI tools.
 - **Sensitivity:** C3 data requires `student.read_sensitive` in addition to basic read.
 - **Enforcement points:** (1) route dependency `require(permission, scope)`; (2) service-level checks for object state (e.g., cannot approve own request); (3) scoped repositories; (4) RLS for tenant; (5) retrieval ACL filters; (6) AI tool gating.
@@ -162,6 +162,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | tenant.settings.manage | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | tenant.structure.manage (academic years, classes, sections) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | tenant.billing.read (Plan & billing page) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
+| support.ticket.create (open and reply to support tickets; no student data) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | user.manage (invite, deactivate) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
 | role.assign | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | student.read_basic | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
