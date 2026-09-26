@@ -207,3 +207,71 @@ class SectionOut(_Out):
     version: int
     created_at: dt.datetime
     updated_at: dt.datetime
+
+
+# --- school settings (FR-TEN-012) -------------------------------------------------------------
+
+DateFormat = Literal["DD/MM/YYYY", "DD-MM-YYYY", "YYYY-MM-DD"]
+Language = Literal["en", "te"]
+
+
+def _default_languages() -> list[Language]:
+    return ["en", "te"]
+
+
+def _unique_languages(v: list[Language] | None) -> list[Language] | None:
+    if v is not None and len(set(v)) != len(v):
+        raise ValueError("languages must be unique")
+    return v
+
+
+class TenantSettings(BaseModel):
+    """Validated school settings stored in ``core.tenants.settings`` (FR-TEN-012).
+
+    Other keys in the stored object (e.g. retention rules, ``/admin/retention`` in M1) are kept
+    untouched when these settings change.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    languages: list[Language] = Field(
+        default_factory=_default_languages, min_length=1, max_length=2
+    )
+    date_format: DateFormat = "DD/MM/YYYY"
+    idle_timeout_minutes: int = Field(default=15, ge=5, le=30)
+    ai_features_enabled: bool = True
+    ai_monthly_budget_inr: int = Field(default=5000, ge=0, le=10_000_000)
+
+    @field_validator("languages")
+    @classmethod
+    def _languages(cls, v: list[Language]) -> list[Language]:
+        _unique_languages(v)
+        return v
+
+
+class TenantSettingsPatch(_In):
+    """Send only the settings to change."""
+
+    languages: list[Language] | None = Field(default=None, min_length=1, max_length=2)
+    date_format: DateFormat | None = None
+    idle_timeout_minutes: int | None = Field(default=None, ge=5, le=30)
+    ai_features_enabled: bool | None = None
+    ai_monthly_budget_inr: int | None = Field(default=None, ge=0, le=10_000_000)
+
+    @field_validator("languages")
+    @classmethod
+    def _languages(cls, v: list[Language] | None) -> list[Language] | None:
+        return _unique_languages(v)
+
+
+class TenantOut(_Out):
+    id: uuid.UUID
+    code: str
+    name: str
+    boards: list[str]
+    state_code: str
+    status: TenantStatus
+    plan_tier: Tier
+    deployment_mode: Tier
+    settings: TenantSettings
+    version: int

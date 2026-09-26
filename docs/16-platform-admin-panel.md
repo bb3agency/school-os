@@ -816,7 +816,7 @@ The control plane:
 5. validates the body against the strict schema (unknown fields rejected, size ≤ 16 KB) → `422`;
 6. checks `deployment_id` and `tenant_id` in the body match the registry → `401`.
 
-Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored KMS-wrapped in `platform.deployments`, and on the host in SSM Parameter Store (SecureString) read at start-up. Rotation keeps the old and new keys valid together for 7 days.
+Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored KMS-wrapped in `platform.deployments`, and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days.
 
 ### 12.3 Payload (schema version 1)
 
@@ -883,8 +883,8 @@ Full steps live in the ops runbook (11 §8, R10). Outline:
 
 ### 13.2 Build
 1. **Panel:** Provision school → Dedicated (step-up). Creates the deployment (`provisioning`), subscription, billing account, tenant ID and heartbeat key; shows the key **once**.
-2. **Terraform:** new directory `infra/terraform/envs/dedicated/<tenant_code>/` using module `dedicated_host`: EC2 in ap-south-1 (encrypted EBS, IMDSv2 only, no SSH, SSM agent), security group allowing only 80/443 inbound, host KMS key, files bucket and backup bucket (ap-south-2) encrypted with that key, instance role limited to those buckets, keys and its SSM parameters, CloudWatch log group (400 days).
-3. **Secrets:** database passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, OIDC client secret and the heartbeat key into SSM Parameter Store under `/schoolos/<tenant_code>/`.
+2. **Terraform:** `infra/terraform/envs/dedicated-template` with one tfvars file and one backend config per school, using module `dedicated_host`: EC2 in ap-south-1 (encrypted EBS, IMDSv2 only, no SSH, SSM agent), security group allowing only 80/443 inbound, host KMS key, files bucket and backup bucket (ap-south-2) encrypted with that key, instance role limited to those buckets, keys and its Secrets Manager secrets, CloudWatch log group (400 days).
+3. **Secrets:** database passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, OIDC client secret and the heartbeat key into AWS Secrets Manager under `schoolos/<tenant_code>/`.
 4. **Host bootstrap** (SSM document): apply the OS hardening baseline (SEC-030), install the container runtime, pull images **by digest**, write `deploy/dedicated/compose.yaml` with `SOS_DEPLOYMENT_MODE=dedicated`, run `infra/db/bootstrap.sql`, run the `migrate` service, then provision the tenant with the chosen tenant ID (same `core.provision_tenant()` function) and send the owner invite.
 5. **Identity:** create the deployment's OIDC app client with callback URLs on its host name(s) (§19, Q4).
 6. **DNS and TLS:** default host name, and the school's CNAME for the custom domain; Caddy obtains certificates via ACME; HSTS on.

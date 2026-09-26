@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from app.audit.api import router as audit_router
 from app.core.config import Settings, get_settings
 from app.core.errors import install_error_handlers
 from app.core.health import router as health_router
 from app.core.logging import setup_logging
 from app.core.middleware import install_middleware
 from app.core.telemetry import setup_telemetry
+from app.identity.api import router as identity_router
+from app.tenancy.api import router as tenancy_router
 
 API_PREFIX = "/api/v1"
 
@@ -28,6 +31,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     install_middleware(app, settings)
     app.include_router(health_router)
+    # Tenant (school-side) routes stay mounted in both shared and dedicated deployments.
+    app.include_router(identity_router)
+    app.include_router(tenancy_router)
+    app.include_router(audit_router)
     setup_telemetry(app, settings)
     return app
 

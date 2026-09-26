@@ -18,6 +18,10 @@ from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
 
+# Importing identity.service registers the system-role cloning hook in
+# tenancy.POST_PROVISION_HOOKS so provisioning behaves the same in workers as in the API.
+import app.identity.service  # noqa: F401  isort: skip
+
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
 
 # Task modules registered as they are built (each module owns its tasks.py).

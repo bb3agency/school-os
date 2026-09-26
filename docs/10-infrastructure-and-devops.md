@@ -71,7 +71,7 @@ infra/terraform/
 │   ├── cognito/        staff and operator user pools (Essentials), app clients, pre-token-generation Lambda (ADR-0018)
 │   ├── observability/  log groups (retention), alarms, dashboards
 │   ├── ci_oidc/        GitHub OIDC provider + deploy roles
-│   └── dedicated_host/ one school's EC2 host, KMS key, buckets, IAM, SSM parameters, log group (§15)
+│   └── dedicated_host/ one school's EC2 host, KMS key, buckets, IAM, Secrets Manager secrets, log group (§15)
 └── envs/
     ├── staging/  main.tf, variables.tfvars
     ├── prod/     main.tf, variables.tfvars
@@ -198,9 +198,9 @@ A dedicated-tier school gets its own host running the same images as the shared 
 |---|---|
 | EC2 instance | ap-south-1; Graviton where images allow; Amazon Linux 2023 (or Ubuntu LTS) hardened image; IMDSv2 only; encrypted gp3 EBS with the host's KMS key; SSM agent; no SSH key pair |
 | Network | Dedicated VPC subnet per region shared by dedicated hosts, one security group per host: inbound 80/443 only; egress to AWS endpoints, the control plane, LLM/embeddings/OCR providers and OS/image registries |
-| KMS | One customer-managed key per host (EBS, buckets, backups, SSM parameters); deleting it crypto-shreds the host's data and backups |
+| KMS | One customer-managed key per host (EBS, buckets, backups, Secrets Manager secrets); deleting it crypto-shreds the host's data and backups |
 | S3 | Files bucket (ap-south-1) and backup bucket (ap-south-2), private, versioned, TLS-only, encrypted with the host key; lifecycle per 05 §13 |
-| IAM | Instance role limited to its own buckets, key, SSM parameters (`/schoolos/<tenant_code>/*`) and log group |
+| IAM | Instance role limited to its own buckets, key, Secrets Manager secrets (`schoolos/<tenant_code>/*`) and log group |
 | SSM | Parameters (SecureString) for DB passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, OIDC client secret, heartbeat key |
 | Logs | CloudWatch log group in ap-south-1, 400-day retention (CERT-In/DPDP) |
 | DNS | Default host name under the SchoolOS domain; optional custom domain (school adds a CNAME) |
@@ -218,7 +218,7 @@ Services: `caddy` (TLS termination, ACME certificates for the default and custom
 | Logical dump | `pg_dump -Fc` nightly, encrypted | Same | 30 days |
 | Files | S3 versioning on the files bucket; replication to ap-south-2 | ap-south-2 | Per lifecycle |
 
-Targets: RPO ≤ 15 min, RTO ≤ 8 h (NFR-AVL-005). A restore to a scratch host is tested **before go-live** and quarterly (R6). Backup age and WAL lag are reported in the heartbeat and alerted (11 §11).
+Targets: RPO ≤ 15 min, RTO ≤ 8 h (NFR-AVL-005). The RPO needs continuous WAL archiving: `deploy/dedicated/compose.walg.yaml` is opt-in and the host refuses to install WAL-G until `deploy/dedicated/walg/walg.lock` carries a reviewed version and checksum, so **enabling WAL-G is a go-live precondition for every dedicated school** (without it the nightly `pg_dump` gives RPO 24 h). A restore to a scratch host is tested **before go-live** and quarterly (R6). Backup age and WAL lag are reported in the heartbeat and alerted (11 §11).
 
 ### 15.4 Hardening and patching (SEC-030)
 

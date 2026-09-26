@@ -1,0 +1,4 @@
+# Copy to backend.hcl and run: terraform init -backend-config=backend.hcl
+# Values come from `terraform output` of infra/terraform/bootstrap in the prod account.
+bucket     = "sos-tfstate-<PROD_ACCOUNT_ID>"
+kms_key_id = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<STATE_KEY_ID>"

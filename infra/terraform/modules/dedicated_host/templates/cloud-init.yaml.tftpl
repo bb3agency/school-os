@@ -1,0 +1,175 @@
+#cloud-config
+# SchoolOS dedicated host bootstrap (rendered by Terraform). Contains NO secrets: credentials are pulled
+# from Secrets Manager at runtime by /opt/schoolos/scripts/fetch-secrets.sh using the instance role.
+
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - amazon-ecr-credential-helper
+  - auditd
+  - audispd-plugins
+  - unattended-upgrades
+  - apt-listchanges
+  - jq
+  - nvme-cli
+  - xfsprogs
+  - ca-certificates
+  - curl
+  - chrony
+
+write_files:
+  - path: /etc/schoolos/host.env
+    owner: root:root
+    permissions: "0644"
+    content: |
+      # Non-secret host configuration (rendered by Terraform; see deploy/dedicated/.env.template).
+      SCHOOL_CODE=${school_code}
+      SOS_ENV=prod
+      SOS_DEPLOYMENT_MODE=dedicated
+      AWS_REGION=${region}
+      AWS_DEFAULT_REGION=${region}
+      SOS_BACKUP_REGION=${backup_region}
+      SOS_PUBLIC_HOST=${public_host}
+      SOS_CUSTOM_DOMAIN=${custom_domain}
+      SOS_ACME_EMAIL=${acme_email}
+      SOS_VERSION=${release_version}
+      SOS_ECR_REGISTRY=${ecr_registry}
+      SOS_S3_BUCKET_FILES=${files_bucket}
+      SOS_S3_BUCKET_AUDIT=${audit_bucket}
+      SOS_BACKUP_BUCKET=${backup_bucket}
+      SOS_BACKUP_KMS_KEY_ARN=${backup_kms_key_arn}
+      SOS_KMS_KEY_ARN=${kms_key_arn}
+      SOS_KEY_WRAPPER=kms
+      SOS_DATA_VOLUME_ID=${data_volume_id}
+      SOS_SECRET_JSON_IDS="${secret_json_ids}"
+      SOS_SECRET_PLAIN="OIDC_CLIENT_SECRET=${oidc_client_secret_arn}"
+      SOS_OIDC_ISSUER=${oidc_issuer}
+      SOS_OIDC_AUDIENCE=${oidc_client_id}
+      OIDC_CLIENT_ID=${oidc_client_id}
+      SOS_FLEET_URL=${control_plane_url}
+      SOS_DEPLOYMENT_ID=${deployment_id}
+      SOS_LOG_GROUP=${log_group}
+      SOS_INSTALL_DIR=${install_dir}
+      SOS_BUNDLE_S3_PREFIX=${bundle_s3_prefix}
+      SOS_BUNDLE_SHA256=${bundle_sha256}
+      SOS_WALG_ENABLED=${walg_enabled}
+
+  - path: /etc/docker/daemon.json
+    owner: root:root
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "20m", "max-file": "5" },
+        "live-restore": true,
+        "no-new-privileges": true,
+        "userland-proxy": false,
+        "icc": false
+      }
+
+  - path: /root/.docker/config.json
+    owner: root:root
+    permissions: "0600"
+    content: |
+      { "credHelpers": { "${ecr_registry}": "ecr-login" } }
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root:root
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Download-Upgradeable-Packages "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+
+  - path: /etc/apt/apt.conf.d/52schoolos-unattended-upgrades
+    owner: root:root
+    permissions: "0644"
+    content: |
+      // Security updates daily; reboot if required at 02:30 IST (21:00 UTC), outside school hours.
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "21:00";
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+  - path: /etc/audit/rules.d/50-schoolos.rules
+    owner: root:root
+    permissions: "0640"
+    content: |
+      -w /etc/schoolos/ -p wa -k schoolos-config
+      -w /opt/schoolos/ -p wa -k schoolos-bundle
+      -w /etc/docker/ -p wa -k docker-config
+      -w /usr/bin/docker -p x -k docker-exec
+      -w /etc/sudoers -p wa -k sudoers
+      -w /etc/sudoers.d/ -p wa -k sudoers
+      -w /etc/passwd -p wa -k identity
+      -w /etc/shadow -p wa -k identity
+      -w /etc/group -p wa -k identity
+      -a always,exit -F arch=b64 -S execve -F euid=0 -F auid>=1000 -F auid!=unset -k privileged-exec
+
+  - path: /etc/sysctl.d/90-schoolos.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      kernel.kptr_restrict = 2
+      kernel.dmesg_restrict = 1
+      kernel.unprivileged_bpf_disabled = 1
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.default.accept_redirects = 0
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv4.conf.all.log_martians = 1
+      net.ipv4.tcp_syncookies = 1
+      fs.protected_hardlinks = 1
+      fs.protected_symlinks = 1
+      fs.suid_dumpable = 0
+
+  - path: /etc/chrony/sources.d/amazon-time-sync.sources
+    owner: root:root
+    permissions: "0644"
+    content: |
+      # Amazon Time Sync Service (CERT-In NTP requirement, docs/08 §6)
+      server 169.254.169.123 prefer iburst minpoll 4 maxpoll 4
+
+  - path: /usr/local/sbin/schoolos-install-bundle
+    owner: root:root
+    permissions: "0750"
+    content: |
+      #!/bin/sh
+      # First install: fetch the deploy/dedicated bundle for SOS_VERSION from S3, verify it, unpack it to
+      # /opt/schoolos/releases/<version>, link SOS_INSTALL_DIR to it and run bootstrap-host.sh.
+      # Later versions are installed by scripts/upgrade.sh the same way.
+      set -eu
+      . /etc/schoolos/host.env
+      PATH="/snap/bin:$PATH"
+      rel="/opt/schoolos/releases/$SOS_VERSION"
+      tmp="$(mktemp -d)"
+      trap 'rm -rf "$tmp"' EXIT
+      aws s3 cp --only-show-errors "$SOS_BUNDLE_S3_PREFIX/$SOS_VERSION/schoolos-dedicated.tar.gz" "$tmp/bundle.tar.gz"
+      aws s3 cp --only-show-errors "$SOS_BUNDLE_S3_PREFIX/$SOS_VERSION/schoolos-dedicated.tar.gz.sha256" "$tmp/bundle.sha256"
+      expected="$${SOS_BUNDLE_SHA256:-$(cut -d' ' -f1 "$tmp/bundle.sha256")}"
+      echo "$expected  $tmp/bundle.tar.gz" | sha256sum -c -
+      install -d -m 0755 "$rel"
+      tar -xzf "$tmp/bundle.tar.gz" -C "$rel" --no-same-owner
+      install -d -m 0755 "$(dirname "$SOS_INSTALL_DIR")"
+      ln -sfn "$rel" "$SOS_INSTALL_DIR"
+      exec "$SOS_INSTALL_DIR/scripts/bootstrap-host.sh"
+
+runcmd:
+  # No SSH on this host: access is via SSM Session Manager only.
+  - [systemctl, disable, --now, ssh.socket]
+  - [systemctl, disable, --now, ssh.service]
+  - [systemctl, mask, ssh.service]
+  - [sysctl, --system]
+  - [augenrules, --load]
+  - [systemctl, enable, --now, auditd]
+  - [systemctl, enable, --now, unattended-upgrades]
+  - [systemctl, enable, --now, docker]
+  - [systemctl, restart, chrony]
+  - [snap, install, aws-cli, --classic]
+  - [/usr/local/sbin/schoolos-install-bundle]
+
+final_message: "SchoolOS dedicated host bootstrap finished after $UPTIME seconds"

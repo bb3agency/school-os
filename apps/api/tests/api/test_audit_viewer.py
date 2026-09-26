@@ -1,0 +1,85 @@
+"""Audit viewer and chain verification over the API (FR-AUD-005, US-1001, SEC-007)."""
+
+from __future__ import annotations
+
+import sys
+from typing import Any
+
+import pytest
+from sqlalchemy import Engine
+
+pytestmark = pytest.mark.db
+W = sys.modules["sos_test_api_world"]
+
+
+def test_FR_AUD_005_filters_and_cursor(world: Any, api: Any, admin_engine: Engine) -> None:
+    owner = world.person("owner")
+    page = api.call(owner, "GET", "/api/v1/audit/events", params={"limit": 5})
+    assert page.status_code == 200, page.text
+    first = page.json()
+    seqs = [e["seq"] for e in first["data"]]
+    assert seqs == sorted(seqs, reverse=True)
+    assert first["next_cursor"]
+    more = api.call(
+        owner, "GET", "/api/v1/audit/events", params={"limit": 5, "cursor": first["next_cursor"]}
+    ).json()
+    assert max(e["seq"] for e in more["data"]) < min(seqs)
+    for event in first["data"]:
+        assert set(event) == {
+            "id",
+            "seq",
+            "occurred_at",
+            "actor_type",
+            "actor_id",
+            "action",
+            "resource_type",
+            "resource_id",
+            "summary",
+            "request_id",
+        }
+    sections = api.call(
+        owner,
+        "GET",
+        "/api/v1/audit/events",
+        params={"action": "section.created", "resource_type": "section"},
+    ).json()["data"]
+    assert len(sections) == 3
+    by_actor = api.call(
+        owner, "GET", "/api/v1/audit/events", params={"actor": str(owner.user_id)}
+    ).json()["data"]
+    assert by_actor
+    assert all(e["actor_id"] == str(owner.user_id) for e in by_actor)
+    window = api.call(
+        owner,
+        "GET",
+        "/api/v1/audit/events",
+        params={"from": "2000-01-01T00:00:00Z", "to": "2000-01-02T00:00:00Z"},
+    ).json()["data"]
+    assert window == []
+    assert (
+        api.call(owner, "GET", "/api/v1/audit/events", params={"action": "DROP TABLE"}).status_code
+        == 422
+    )
+
+
+def test_FR_AUD_005_cross_tenant_events_never_visible(world: Any, api: Any) -> None:
+    events = api.call(
+        world.person("auditor_readonly"), "GET", "/api/v1/audit/events", params={"limit": 200}
+    ).json()["data"]
+    b_ids = {str(v) for v in world.b.ids.values()} | {str(world.b.tenant_id)}
+    assert not any(e["resource_id"] in b_ids for e in events)
+
+
+def test_US_1001_AC2_verify_reports_intact_chain(world: Any, api: Any) -> None:
+    res = api.call(world.person("principal"), "GET", "/api/v1/audit/verify")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is True
+    assert body["checked"] > 0
+    assert body["first_bad_seq"] is None
+
+
+def test_FR_AUD_005_needs_audit_read(world: Any, api: Any) -> None:
+    for role in ("office_staff", "teacher", "accountant"):
+        assert api.call(world.person(role), "GET", "/api/v1/audit/events").status_code == 403
+        assert api.call(world.person(role), "GET", "/api/v1/audit/verify").status_code == 403

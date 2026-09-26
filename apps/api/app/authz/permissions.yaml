@@ -1,0 +1,259 @@
+# Permission catalog (docs/07 §6.1-6.2, §6.5; FR-IAM-011; CLAUDE.md §6.13).
+# Versioned configuration shipped inside the package (the API image does not copy /config).
+# Migration 0004_authz_seed upserts every entry into core.permissions.
+#
+# Fields
+#   description  what holding the permission allows (English; UI labels live in apps/web i18n)
+#   sensitivity  normal | sensitive | critical (core.permissions_sensitivity_check)
+#   step_up      MFA within the last 5 minutes is required for state-changing use (07 §5.2, ᴿ)
+#   is_platform  control-plane permission (platform.*): exists in core.permissions so the catalog
+#                is complete, but the database refuses to grant it to any tenant role
+#                (trigger role_permissions_not_platform) and require() refuses to use it
+#   implicit     held by every active member without a role grant; never stored in
+#                core.role_permissions (used for "authenticated" routes such as GET /me)
+version: 1
+
+permissions:
+  # --- implicit --------------------------------------------------------------------------
+  session.authenticated:
+    description: Any active member of the school (own profile, active school, sign-in event, school profile read)
+    sensitivity: normal
+    step_up: false
+    implicit: true
+
+  # --- tenant administration -------------------------------------------------------------
+  tenant.settings.manage:
+    description: Change school settings (languages, date format, idle timeout, AI features and budget, retention)
+    sensitivity: critical
+    step_up: true
+  tenant.structure.manage:
+    description: Create and edit academic years, classes and sections
+    sensitivity: normal
+    step_up: false
+  tenant.billing.read:
+    description: See the school's plan, usage and invoices (Plan & billing page)
+    sensitivity: normal
+    step_up: false
+  tenant.export_all:
+    description: Export all of the school's data
+    sensitivity: critical
+    step_up: true
+  user.manage:
+    description: Invite, activate, suspend and remove staff accounts
+    sensitivity: critical
+    step_up: true
+  role.assign:
+    description: Change the roles and class/section scopes of staff accounts
+    sensitivity: critical
+    step_up: true
+  support.ticket.create:
+    description: Open and read the school's own support tickets
+    sensitivity: normal
+    step_up: false
+  breakglass.approve:
+    description: Approve or revoke temporary platform support access
+    sensitivity: critical
+    step_up: true
+
+  # --- students --------------------------------------------------------------------------
+  student.read_basic:
+    description: See basic student records (C2)
+    sensitivity: normal
+    step_up: false
+  student.read_sensitive:
+    description: See sensitive student fields (C3) such as health, category, income and guardian contacts
+    sensitivity: sensitive
+    step_up: false
+  student.create:
+    description: Add new students
+    sensitivity: normal
+    step_up: false
+  student.update_nonidentity:
+    description: Update non-identity student attributes and add source observations
+    sensitivity: normal
+    step_up: false
+  student.identity_change.request:
+    description: Request a change to an identity field (maker)
+    sensitivity: sensitive
+    step_up: false
+  student.identity_change.approve:
+    description: Approve or reject identity-field change requests (checker)
+    sensitivity: critical
+    step_up: true
+  student.export:
+    description: Bulk export of student personal data
+    sensitivity: critical
+    step_up: true
+
+  # --- imports and data quality ------------------------------------------------------------
+  import.run:
+    description: Upload imports, map columns and review extraction items
+    sensitivity: normal
+    step_up: false
+  import.commit:
+    description: Commit or revert imports and confirm extraction items
+    sensitivity: sensitive
+    step_up: false
+  dq.findings.read:
+    description: See data-quality findings and start checks
+    sensitivity: normal
+    step_up: false
+  dq.findings.resolve:
+    description: Resolve data-quality findings
+    sensitivity: normal
+    step_up: false
+  dq.findings.waive:
+    description: Waive data-quality findings, including blockers
+    sensitivity: critical
+    step_up: true
+
+  # --- documents and knowledge -------------------------------------------------------------
+  document.upload:
+    description: Upload documents and new versions
+    sensitivity: normal
+    step_up: false
+  document.read:
+    description: Read documents and download them
+    sensitivity: normal
+    step_up: false
+  document.manage_acl:
+    description: Change who can see a document, and delete documents
+    sensitivity: sensitive
+    step_up: false
+  kb.ask:
+    description: Ask questions of the school's records and documents
+    sensitivity: normal
+    step_up: false
+  kb.verified_answer.manage:
+    description: Create and maintain verified answers
+    sensitivity: normal
+    step_up: false
+
+  # --- exports, audit, finance, insights ---------------------------------------------------
+  export.board:
+    description: Board registration pre-check exports (e.g. CISCE)
+    sensitivity: sensitive
+    step_up: false
+  export.portal:
+    description: Government portal pre-check exports (e.g. UDISE+)
+    sensitivity: sensitive
+    step_up: false
+  audit.read:
+    description: See the school's audit log and verify its integrity
+    sensitivity: sensitive
+    step_up: false
+  finance.read:
+    description: See finance data (M6)
+    sensitivity: sensitive
+    step_up: false
+  insights.read:
+    description: See student insights for educational activities and child safety (M5)
+    sensitivity: sensitive
+    step_up: false
+
+  # --- control plane (docs/07 §6.5, contract §5); never grantable to tenant roles ------------
+  platform.tenants.read:
+    description: See schools, their plan, status, deployment and usage (no student data)
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.tenants.provision:
+    description: Provision and activate schools
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.tenants.suspend:
+    description: Suspend and reactivate schools
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.tenants.offboard:
+    description: Offboard schools (two-person)
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.plans.manage:
+    description: Manage plans and pricing
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.subscriptions.read:
+    description: See subscriptions
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.subscriptions.manage:
+    description: Change subscriptions
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.invoices.read:
+    description: See invoices and payments
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.invoices.manage:
+    description: Issue, void and mark invoices paid
+    sensitivity: sensitive
+    step_up: false
+    is_platform: true
+  platform.flags.read:
+    description: See feature flags
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.flags.manage:
+    description: Change feature flags
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.usage.read:
+    description: See usage and quotas
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.fleet.read:
+    description: See deployments and fleet health
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.fleet.manage:
+    description: Manage deployments and heartbeat keys
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.announcements.manage:
+    description: Publish announcements to schools
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.support.read:
+    description: See support tickets
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.support.manage:
+    description: Answer and close support tickets
+    sensitivity: normal
+    step_up: false
+    is_platform: true
+  platform.breakglass.request:
+    description: Request temporary support access to a school
+    sensitivity: sensitive
+    step_up: false
+    is_platform: true
+  platform.breakglass.emergency:
+    description: Emergency support access without school approval (two-person)
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.operators.manage:
+    description: Invite and deactivate operators and change their roles
+    sensitivity: critical
+    step_up: true
+    is_platform: true
+  platform.audit.read:
+    description: See and verify the platform audit log
+    sensitivity: sensitive
+    step_up: false
+    is_platform: true
