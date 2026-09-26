@@ -27,6 +27,11 @@ from sqlalchemy.engine import make_url
 
 from app.core import db as core_db
 
+# Synthetic supplier identity so tests that build staging/prod Settings pass the invoice guard
+# (FR-PLT-016). Tests of the guard itself pass the dev placeholders explicitly.
+os.environ.setdefault("SOS_BILLING_SUPPLIER_LEGAL_NAME", "Synthetic Test Supplier Private Limited")
+os.environ.setdefault("SOS_BILLING_SUPPLIER_GSTIN", "37ABCDE1234F1Z5")
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BOOTSTRAP_SQL = REPO_ROOT / "infra" / "db" / "bootstrap.sql"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"

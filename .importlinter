@@ -36,6 +36,8 @@ source_modules =
     app.authz
     app.tenancy
     app.platform
+    app.ops
+    app.devtools
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -51,6 +53,8 @@ source_modules =
     app.authz
     app.identity
     app.platform
+    app.ops
+    app.devtools
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -66,6 +70,8 @@ source_modules =
     app.authz
     app.identity
     app.tenancy
+    app.ops
+    app.devtools
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -84,6 +90,8 @@ forbidden_modules =
     app.identity
     app.tenancy
     app.platform
+    app.ops
+    app.devtools
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
@@ -96,3 +104,20 @@ source_modules =
     app.tenancy
 forbidden_modules =
     app.platform
+
+[importlinter:contract:ops-internals]
+name = ops: repository/models are private (use app.ops.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.devtools
+forbidden_modules =
+    app.ops.repository
+    app.ops.models
+allow_indirect_imports = True

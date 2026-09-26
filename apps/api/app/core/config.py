@@ -30,6 +30,11 @@ class KeyWrapperKind(StrEnum):
     LOCAL_DEV = "local-dev"
 
 
+# Placeholder supplier identity for local/CI invoices; refused in staging/prod (FR-PLT-016).
+DEV_SUPPLIER_NAME = "SchoolOS Synthetic Supplier (dev)"
+DEV_SUPPLIER_GSTIN = "37AAAAA0000A1Z5"
+
+
 class Settings(BaseSettings):
     """Typed settings; env prefix ``SOS_``."""
 
@@ -82,8 +87,8 @@ class Settings(BaseSettings):
     otel_exporter_otlp_endpoint: str | None = None
 
     # Control plane / fleet (docs/16 §10, §12; ADR-0015). Supplier identity for GST invoices.
-    billing_supplier_legal_name: str = "SchoolOS Synthetic Supplier (dev)"
-    billing_supplier_gstin: str = "37AAAAA0000A1Z5"
+    billing_supplier_legal_name: str = DEV_SUPPLIER_NAME
+    billing_supplier_gstin: str = DEV_SUPPLIER_GSTIN
     billing_supplier_state_code: str = Field(default="37", pattern=r"^[0-9]{2}$")
     # Dedicated hosts: where and as whom the heartbeat client reports (outbound only).
     control_plane_url: str | None = None
@@ -106,6 +111,13 @@ class Settings(BaseSettings):
                 value: SecretStr = getattr(self, name)
                 if "dev-only" in value.get_secret_value():
                     raise ValueError(f"{name} uses a dev-only default in {self.env}")
+            # Invoices are tax documents: never issue them with the placeholder supplier.
+            if self.billing_supplier_gstin == DEV_SUPPLIER_GSTIN:
+                raise ValueError(f"billing_supplier_gstin uses the dev placeholder in {self.env}")
+            if self.billing_supplier_legal_name == DEV_SUPPLIER_NAME:
+                raise ValueError(
+                    f"billing_supplier_legal_name uses the dev placeholder in {self.env}"
+                )
         return self
 
 

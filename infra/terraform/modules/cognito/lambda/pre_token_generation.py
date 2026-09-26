@@ -1,10 +1,10 @@
 """Cognito pre-token-generation trigger (event version V2_0) for SchoolOS (ADR-0018, SEC-005).
 
-Adds the custom claim ``sos:mfa`` to access and ID tokens: ``"true"`` when the user has an MFA method
-enabled, else ``"false"``. The staff pool has device remembering off and adaptive authentication never
-skips MFA, so a user with MFA enabled always completed an MFA challenge for this session. The API
-refuses privileged memberships (owner, principal, office_admin) without ``sos:mfa == "true"`` and uses
-``auth_time`` for step-up freshness.
+Adds the custom claim ``sos:mfa`` to access and ID tokens: ``"true"`` when the user has an
+MFA method enabled, else ``"false"``. The staff pool has device remembering off and adaptive
+authentication never skips MFA, so a user with MFA enabled always completed an MFA challenge
+for this session. The API refuses privileged memberships (owner, principal, office_admin)
+without ``sos:mfa == "true"`` and uses ``auth_time`` for step-up freshness.
 
 No personal data is logged: only the outcome and the trigger source.
 """
