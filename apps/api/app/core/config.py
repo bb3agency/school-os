@@ -111,10 +111,12 @@ class Settings(BaseSettings):
                 value: SecretStr = getattr(self, name)
                 if "dev-only" in value.get_secret_value():
                     raise ValueError(f"{name} uses a dev-only default in {self.env}")
-            # Invoices are tax documents: never issue them with the placeholder supplier.
-            if self.billing_supplier_gstin == DEV_SUPPLIER_GSTIN:
+            # Invoices are tax documents: never issue them with the placeholder supplier. Only the
+            # shared tier runs the control plane (billing); dedicated hosts never invoice.
+            invoicing = self.deployment_mode is DeploymentMode.SHARED
+            if invoicing and self.billing_supplier_gstin == DEV_SUPPLIER_GSTIN:
                 raise ValueError(f"billing_supplier_gstin uses the dev placeholder in {self.env}")
-            if self.billing_supplier_legal_name == DEV_SUPPLIER_NAME:
+            if invoicing and self.billing_supplier_legal_name == DEV_SUPPLIER_NAME:
                 raise ValueError(
                     f"billing_supplier_legal_name uses the dev placeholder in {self.env}"
                 )

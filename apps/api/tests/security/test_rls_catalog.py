@@ -193,3 +193,21 @@ def test_ADR_0013_app_role_cannot_touch_platform_tables(admin_engine: Engine) ->
         if r.sel:
             assert r.role == "sos_app", f"{r.role} must not read {r.fq}"
             assert r.fq in readable, f"sos_app must not read {r.fq}"
+
+
+def test_ADR_0013_definer_access_allowlist_matches_the_catalog_exactly(
+    admin_engine: Engine,
+) -> None:
+    """The allowlist must list exactly the tables that carry ``definer_access`` (no stale rows)."""
+    with admin_engine.connect() as conn:
+        carrying = set(
+            conn.execute(
+                text(
+                    "SELECT n.nspname || '.' || c.relname FROM pg_policy p "
+                    "JOIN pg_class c ON c.oid = p.polrelid "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                    "WHERE p.polname = 'definer_access' AND NOT c.relispartition"
+                )
+            ).scalars()
+        )
+    assert set(ALLOWLIST["definer_access_tables"]) == carrying

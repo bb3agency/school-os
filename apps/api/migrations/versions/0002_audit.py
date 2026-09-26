@@ -182,7 +182,8 @@ UPGRADE_SQL: list[str] = [
     "REVOKE ALL ON audit.chain_heads FROM PUBLIC, sos_app, sos_readonly, sos_definer",
     "GRANT SELECT, INSERT, UPDATE ON audit.chain_heads TO sos_app",
     "GRANT SELECT ON audit.chain_heads TO sos_readonly",
-    # core.provision_tenant (0003) creates the genesis head as sos_definer.
+    # Genesis heads are created lazily by audit.record() on a tenant's first audited action;
+    # sos_definer keeps SELECT/INSERT for definer functions that audit before the first event.
     "GRANT SELECT, INSERT ON audit.chain_heads TO sos_definer",
     # ---- platform (control-plane) chain -----------------------------------------------------------
     """

@@ -61,3 +61,14 @@ def test_FR_PLT_016_prod_rejects_dev_supplier_name() -> None:
 
 def test_FR_PLT_016_prod_accepts_real_supplier_identity() -> None:
     assert _prod().billing_supplier_gstin == "37ABCDE1234F1Z5"
+
+
+def test_FR_PLT_016_dedicated_hosts_do_not_need_a_supplier_identity() -> None:
+    from app.core.config import DEV_SUPPLIER_GSTIN, DEV_SUPPLIER_NAME, DeploymentMode
+
+    s = _prod(
+        deployment_mode=DeploymentMode.DEDICATED,
+        billing_supplier_gstin=DEV_SUPPLIER_GSTIN,
+        billing_supplier_legal_name=DEV_SUPPLIER_NAME,
+    )
+    assert s.deployment_mode is DeploymentMode.DEDICATED
