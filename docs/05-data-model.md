@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-26 |
 | DB | PostgreSQL 16+ (pgvector, pg_trgm, citext, pgcrypto) |
 | Related | 04-Architecture §8, 06-RAG, 07-Security §7, 08-Privacy §7, 16-Platform admin panel §7, ADR-0013 |
-| Changes | 0.2: database roles incl. `sos_platform` and `sos_definer` (NOBYPASSRLS) with per-table `definer_access` policies (§3); `set_config` tenant context; allowlisted definer functions; composite tenant foreign keys applied to all DDL; audit `seq`, `chain_heads.last_seq`, RFC 8785 canonical JSON, genesis hash, TRUNCATE trigger, RLS on partitions (§7); `ops.job_runs.tenant_id NOT NULL`; `ops.idempotency_keys`; `ops.feature_flags` moved to `platform.feature_flags`; schema `platform` (DDL in 16 §7); classification and retention for platform data. 0.1: baseline |
+| Changes | 0.3: matches migrations 0001–0007: exact roles and grants (§3.1), `context_free_session` (§3.2), `definer_access` table list and allowlist keys (§3.3), eleven definer functions with grantees and the create-as-`sos_definer` pattern (§3.4), core DDL from `0003` incl. `is_platform` permissions (§4), audit DDL/partitions from `0002` and ops DDL from `0006` (§7). 0.2: database roles incl. `sos_platform` and `sos_definer` (NOBYPASSRLS) with per-table `definer_access` policies (§3); `set_config` tenant context; allowlisted definer functions; composite tenant foreign keys applied to all DDL; audit `seq`, `chain_heads.last_seq`, RFC 8785 canonical JSON, genesis hash, TRUNCATE trigger, RLS on partitions (§7); `ops.job_runs.tenant_id NOT NULL`; `ops.idempotency_keys`; `ops.feature_flags` moved to `platform.feature_flags`; schema `platform` (DDL in 16 §7); classification and retention for platform data. 0.1: baseline |
 
 ---
 
@@ -50,38 +50,65 @@ erDiagram
 
 ## 3. Database roles and tenant context
 
-Decisions: ADR-0003 (RLS), ADR-0013 (cross-tenant paths and privilege separation).
+Decisions: ADR-0003 (RLS), ADR-0013 (cross-tenant paths and privilege separation; see its Amendments section for where the implementation differs from the original text). Sources of truth: `infra/db/bootstrap.sql`, migrations `0001_baseline` … `0007_accept_invitations`, and `apps/api/tests/security/rls_allowlist.yaml`.
 
 ### 3.1 Roles
 
-Roles, schemas and extensions are created by `infra/db/bootstrap.sql`, run as the database admin (compose init, testcontainers, an ECS one-off task in AWS, and the dedicated-host bootstrap), never by the app. **No role has `BYPASSRLS` or superuser.**
+Roles, schemas and extensions are created by `infra/db/bootstrap.sql`, run once per database as the database admin (compose init, testcontainers, an ECS one-off task in AWS, and the dedicated-host bootstrap), never by the app. It is idempotent and re-applies role attributes on every run. `0001_baseline` refuses to run if any schema or role below is missing. **No role has `BYPASSRLS`, `SUPERUSER`, `CREATEDB`, `CREATEROLE` or `REPLICATION`.**
 
 ```sql
-CREATE ROLE sos_owner     NOLOGIN;                       -- owns all objects in core, sis, kb, audit, ops, platform
-CREATE ROLE sos_migrator  LOGIN IN ROLE sos_owner;       -- Alembic only; env.py runs SET ROLE sos_owner
-CREATE ROLE sos_app       LOGIN NOBYPASSRLS;             -- tenant API + workers
-CREATE ROLE sos_platform  LOGIN NOBYPASSRLS;             -- control plane (platform admin panel)
-CREATE ROLE sos_readonly  LOGIN NOBYPASSRLS;             -- reporting, still tenant-scoped
-CREATE ROLE sos_definer   NOLOGIN NOBYPASSRLS;           -- owns only the allowlisted SECURITY DEFINER functions
+-- infra/db/bootstrap.sql (abridged; passwords are psql variables, never in the file)
+CREATE ROLE sos_owner    NOLOGIN;   -- owns every object in core, sis, kb, audit, ops, platform
+CREATE ROLE sos_definer  NOLOGIN;   -- owns ONLY the allowlisted SECURITY DEFINER functions (§3.4)
+CREATE ROLE sos_migrator LOGIN;     -- Alembic; env.py runs SET ROLE sos_owner
+CREATE ROLE sos_app      LOGIN;     -- tenant API + workers (RLS applies)
+CREATE ROLE sos_platform LOGIN;     -- control plane (schema platform only)
+CREATE ROLE sos_readonly LOGIN;     -- reporting (RLS applies)
+ALTER ROLE <each> NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION;
 
-CREATE SCHEMA core AUTHORIZATION sos_owner;  -- likewise sis, kb, audit, ops, platform
+GRANT sos_owner, sos_definer TO CURRENT_USER;                     -- the admin running the script (RDS)
+GRANT sos_owner   TO sos_migrator WITH INHERIT FALSE, SET TRUE;   -- SET ROLE only, no implicit privileges
+GRANT sos_definer TO sos_migrator WITH INHERIT FALSE, SET TRUE;   -- migrations create definer functions AS sos_definer
+
+ALTER ROLE sos_app, sos_platform, sos_readonly SET search_path = pg_catalog, public;
+ALTER ROLE sos_app, sos_platform SET idle_in_transaction_session_timeout = '30s';
+
+CREATE EXTENSION IF NOT EXISTS vector, pg_trgm, citext, pgcrypto;   -- in public
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+CREATE SCHEMA core AUTHORIZATION sos_owner;   -- likewise sis, kb, audit, ops, platform
+REVOKE ALL ON SCHEMA core, sis, kb, audit, ops, platform FROM PUBLIC;
+GRANT USAGE ON SCHEMA core, sis, kb, audit, ops TO sos_app, sos_readonly, sos_definer;
+GRANT USAGE ON SCHEMA platform TO sos_app, sos_platform, sos_definer;
+GRANT USAGE ON SCHEMA core TO sos_platform;                -- to call definer functions; no table grants
+
+-- Default privileges for objects created by sos_owner
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner, sos_definer REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, ops  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sos_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, ops  GRANT USAGE, SELECT ON SEQUENCES TO sos_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA audit              GRANT SELECT, INSERT ON TABLES TO sos_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, audit GRANT SELECT ON TABLES TO sos_readonly;
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA platform          GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sos_platform;
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA platform          GRANT USAGE, SELECT ON SEQUENCES TO sos_platform;
 ```
+
+Effective table privileges after migrations `0002`–`0007` (default privileges, then narrowed per table):
 
 | Role | Privileges |
 |---|---|
-| `sos_app` | DML on `core`, `sis`, `kb`, `ops`; INSERT + SELECT on `audit.events`, SELECT + UPDATE on `audit.chain_heads`; on `platform` only SELECT on `platform.feature_flags`; EXECUTE on allowlisted definer functions |
-| `sos_platform` | DML on `platform` (audit tables INSERT + SELECT only); **no privileges on any table in `core`, `sis`, `kb`, `audit`, `ops`**; EXECUTE on allowlisted definer functions. It physically cannot read student data |
-| `sos_readonly` | SELECT on tenant schemas, RLS applies; nothing on `platform` |
-| `sos_definer` | Only the table privileges its functions need; cannot log in; nobody can `SET ROLE` to it |
+| `sos_app` | DML on `sis`, `kb` and most of `core`/`ops`, **narrowed** in `0003`/`0006`: `core.tenants` SELECT + `UPDATE (name, settings, version)` only; `core.users` SELECT + `UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)` only (**no INSERT/DELETE**; users come from definer functions); `core.permissions` SELECT only; `core.tenant_keys` SELECT, INSERT + `UPDATE (retired_at)` only; `ops.outbox` SELECT, INSERT only. Audit: SELECT + INSERT on `audit.events`, SELECT + INSERT + UPDATE on `audit.chain_heads`, nothing on partitions. Platform: SELECT on `platform.feature_flags` only. EXECUTE on the definer functions granted to it (§3.4) |
+| `sos_platform` | DML on `platform` tables (audit tables: `platform.audit_events` SELECT + INSERT, `platform.audit_chain_head` SELECT + UPDATE); **no privileges on any table in `core`, `sis`, `kb`, `audit`, `ops`**; EXECUTE on the definer functions granted to it. It physically cannot read student data |
+| `sos_readonly` | SELECT on `core`, `sis`, `kb`, `audit` (RLS applies); nothing on `core.tenant_keys`, `ops` or `platform` |
+| `sos_definer` | Only what its functions need (§3.4); NOLOGIN; only `sos_migrator` and the bootstrap admin can `SET ROLE` to it (never a runtime role) |
+| `sos_migrator` | Nothing directly (`INHERIT FALSE`); acts as `sos_owner` (and, inside migrations, `sos_definer`) via `SET ROLE` |
 
 ### 3.2 Tenant context
 
 ```sql
--- Tenant context helpers (fail closed when unset)
-CREATE FUNCTION core.current_tenant() RETURNS uuid
-  LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('app.tenant_id', true), '')::uuid $$;
-CREATE FUNCTION core.current_user_id() RETURNS uuid
-  LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('app.user_id', true), '')::uuid $$;
+-- bootstrap.sql: tenant context helpers (fail closed when unset); EXECUTE for sos_app, sos_readonly, sos_definer, sos_platform
+CREATE FUNCTION core.current_tenant() RETURNS uuid LANGUAGE sql STABLE PARALLEL SAFE
+  AS $$ SELECT nullif(current_setting('app.tenant_id', true), '')::uuid $$;
+CREATE FUNCTION core.current_user_id() RETURNS uuid LANGUAGE sql STABLE PARALLEL SAFE
+  AS $$ SELECT nullif(current_setting('app.user_id', true), '')::uuid $$;
 ```
 
 Application usage (every request/job):
@@ -89,13 +116,20 @@ Application usage (every request/job):
 ```python
 with core.db.tenant_session(tenant_id, user_id) as s:
     # executes: BEGIN;
-    #   SELECT set_config('app.tenant_id', :t, true), set_config('app.user_id', :u, true);
+    #   SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', :user_id, true),
+    #          set_config('statement_timeout', :timeout, true);
     # is_local = true: settings vanish at transaction end (same as SET LOCAL, but bound parameters)
     ...
     # COMMIT on success, ROLLBACK on error
 ```
 
-Control-plane code uses `core.db.platform_session()` instead: role `sos_platform`, no tenant context.
+| Session helper | Role | Tenant context | Used for |
+|---|---|---|---|
+| `core.db.tenant_session(tenant_id, user_id=None)` | `sos_app` | set | Every tenant request and job |
+| `core.db.context_free_session()` | `sos_app` | none (RLS returns nothing) | Only calling definer functions before a school is chosen: `resolve_login`, `find_user_id_by_subject`, `list_tenant_ids`, `accept_invitations` |
+| `core.db.platform_session()` | `sos_platform` | none | Control plane (schema `platform`, platform definer functions) |
+
+Statement timeouts: `SOS_DB_STATEMENT_TIMEOUT_MS` (default 5 s) for requests, `SOS_WORKER_STATEMENT_TIMEOUT_MS` (default 120 s) for long worker jobs (audit archive and verification).
 
 ### 3.3 Standard RLS policy
 
@@ -109,34 +143,67 @@ CREATE POLICY tenant_isolation ON <schema>.<table>
   WITH CHECK (tenant_id = core.current_tenant());
 ```
 
-A catalog test fails if any table with a `tenant_id` column in `core`, `sis`, `kb`, `audit` or `ops` lacks ENABLE + FORCE and this policy (catalog check on `pg_class.relrowsecurity`, `relforcerowsecurity`, `pg_policies`), unless it is a reviewed variant listed in `apps/api/tests/security/rls_allowlist.yaml`: `core.tenants` (policy on `id`), `core.users` (membership-based), `core.permissions` (global catalog), `sis.attribute_definitions` (global rows). Schema `platform` is exempt from RLS; the test instead checks grants (§3.6).
+The catalog test (`apps/api/tests/security/test_rls_catalog.py`, 12 §4.5) fails if any table in `core`, `sis`, `kb`, `audit` or `ops` (`tenant_schemas` in the allowlist) with a `tenant_id` column lacks ENABLE + FORCE and this policy, unless `rls_allowlist.yaml` lists it:
+
+| Allowlist key | Entries |
+|---|---|
+| `global_tables` (no `tenant_id`, listed so a new global table is always a reviewed decision) | `ops.alembic_version`, `core.permissions`, `core.users`, `core.tenants` |
+| `policy_variants` (approved variant instead of `tenant_isolation`) | `core.tenants` → `own_tenant` (`id = core.current_tenant()`); `core.users` → `users_in_tenant` (membership-based; plus `users_in_tenant_update` for UPDATE); `sis.attribute_definitions` → `attrdef_read` (M1) |
+| `platform_tables_readable_by_app` | `platform.feature_flags` |
+
+Schema `platform` is exempt from RLS; the privilege-separation tests check its grants instead (§3.6).
 
 **Definer access.** Tables that an allowlisted definer function must reach across tenants carry one extra permissive policy. Inside a `SECURITY DEFINER` function `current_user` is `sos_definer`, so this policy opens those tables to the function and to nothing else:
 
 ```sql
-CREATE POLICY definer_access ON <schema>.<table>
+CREATE POLICY definer_access ON <schema>.<table> AS PERMISSIVE FOR ALL TO PUBLIC
   USING (current_user = 'sos_definer') WITH CHECK (current_user = 'sos_definer');
 ```
 
-`definer_access` exists **only** on: `core.tenants`, `core.users`, `core.memberships`, `core.roles`, `core.role_permissions`, `core.membership_roles`, `core.membership_scopes`, `core.tenant_keys`, `audit.chain_heads`, `audit.events` (and every partition), `ops.outbox`, and the tables counted by `core.tenant_usage_summary()` (e.g., `sis.students`, `kb.documents`, `kb.document_versions`, `kb.queries`, `sis.import_batches`). The exact list is pinned in an allowlist file beside `rls_allowlist.yaml`; the catalog test fails on any difference.
+The allowlist (`definer_access_tables` in `rls_allowlist.yaml`) is exactly: `core.tenants`, `core.users`, `core.memberships`, `core.roles`, `core.role_permissions`, `core.membership_roles`, `core.membership_scopes`, `core.tenant_keys`, `core.academic_years`, `core.classes`, `core.sections`, `audit.chain_heads`, `audit.events`, `ops.outbox`. The catalog test fails if any other table carries the policy. The policy currently exists on:
+
+| Migration | Tables with `definer_access` |
+|---|---|
+| `0002_audit` | `audit.events` (parent only; partitions are reachable by nobody but the owner), `audit.chain_heads` |
+| `0003_core_schema` | `core.tenants`, `core.users`, `core.memberships`, `core.tenant_keys`, `core.sections`, `core.academic_years` |
+| `0005_platform` | `core.roles`, `core.membership_roles`, `core.membership_scopes` (created only if absent; marked with a policy comment so the downgrade drops only its own) |
+| `0006_ops` | `ops.outbox` |
+
+`core.role_permissions` and `core.classes` are allowlisted but carry no policy yet. Tables that later milestones' usage counts need (e.g. `sis.students`, `kb.documents`) are **not** allowlisted; adding them needs an ADR-0013 amendment and an allowlist change.
 
 ### 3.4 Allowlisted `SECURITY DEFINER` functions
 
-These are the **only** cross-tenant read/write paths. Each is owned by `sos_definer`, sets `search_path = pg_catalog, <schema>, pg_temp`, returns the minimum columns, has `EXECUTE` revoked from `PUBLIC` and granted only to the listed callers, and is audited by its caller.
+These are the **only** cross-tenant read/write paths (`definer_functions` in `rls_allowlist.yaml`). Each is owned by `sos_definer`, sets `search_path = pg_catalog, pg_temp`, has a fully schema-qualified body (including `pg_catalog.now()`, `pg_catalog.count()` etc.), returns the minimum columns, has `EXECUTE` revoked from `PUBLIC` and granted only to the listed roles, and is audited by its caller.
 
-| Function | Callers | Purpose |
-|---|---|---|
-| `core.resolve_login(p_subject text)` | `sos_app` | Active memberships for a login subject (before a tenant is chosen) |
-| `core.find_user_id_by_subject(p_subject text)` | `sos_app` | User ID for an OIDC subject, or NULL |
-| `core.create_user_for_invite(...)` | `sos_app`, `sos_platform` | Create or reuse a global user and an invited membership with roles |
-| `core.list_tenant_ids(p_status text[])` | `sos_app`, `sos_platform` | Tenant IDs by status, for per-tenant job fan-out |
-| `core.provision_tenant(...)` | `sos_platform` | Tenant row, wrapped keys, audit chain head + first event, system roles cloned from templates |
-| `core.set_tenant_status(p_tenant uuid, p_status text)` | `sos_platform` | Change status; writes a tenant audit event (`actor_type = 'platform'`) |
-| `core.tenant_usage_summary(p_tenant uuid)` | `sos_platform` | Counts only (16 §11) |
-| `core.current_subscription()` | `sos_app` | The current tenant's own plan, status, usage vs limits and invoice list from `platform` (returns `jsonb`) |
-| `ops.claim_outbox(batch int)` | `sos_app` (dispatcher) | Claim pending outbox rows (`FOR UPDATE SKIP LOCKED`) |
+| Function | EXECUTE | Returns | Behaviour | Migration |
+|---|---|---|---|---|
+| `core.resolve_login(p_subject text)` | `sos_app` | `TABLE (user_id, tenant_id, membership_id, tenant_status)` | Active, unexpired memberships of the active user with that IdP subject, ordered by creation; reports the tenant status (suspended schools are handled by the API) | 0003 |
+| `core.find_user_id_by_subject(p_subject text)` | `sos_app` | `uuid` or NULL | — | 0003 |
+| `core.create_user_for_invite(p_subject text, p_display_name text, p_email citext, p_language text)` | `sos_app` | `uuid` (user id) | Requires tenant **and** user context and an active, unexpired inviter membership in a `provisioning`/`active` school (else `insufficient_privilege`); inserts a UUIDv7 user or returns the existing one for the subject without overwriting it. Membership, roles and scopes are then written by the app under RLS | 0003 |
+| `core.list_tenant_ids(p_status text[])` | `sos_app`, `sos_platform` | `TABLE (tenant_id uuid)` | Tenant IDs with the given statuses (all when NULL), for per-tenant job fan-out | 0003 |
+| `core.provision_tenant(p_id uuid, p_code text, p_name text, p_boards text[], p_plan_tier text, p_deployment_mode text)` | `sos_platform` | `uuid` | Inserts **only** the tenant row, status `provisioning`. Keys (`tenancy.initialise_tenant`), system roles (post-provision hooks) and the owner invite (`core.create_owner_invite`) follow as separate steps (16 §5.4) | 0003 |
+| `core.set_tenant_status(p_tenant uuid, p_status text)` | `sos_platform` | `text` — the **previous** status | Locks the row; allows only `provisioning→active`, `active→suspended`, `suspended→active`, `active→offboarding`, `suspended→offboarding`, `offboarding→deleted` (else `object_not_in_prerequisite_state`); **`provisioning→active` requires an unretired `core.tenant_keys` row**; bumps `version`. Writes no audit event (the caller does) | 0003 |
+| `core.tenant_usage_summary(p_tenant uuid)` | `sos_platform` | `TABLE (active_memberships int, users int, sections int, academic_years int)` | Counts only (16 §11) | 0003 |
+| `core.current_subscription()` | `sos_app` | `jsonb` | For `core.current_tenant()` only: live subscription (non-cancelled first), plan code/version/name/tier/period, status, period dates, trial end, past-due and grace dates, `cancel_at_period_end`, `limits`, latest `usage_daily` row, and the last 24 non-draft invoices with `amount_due_inr` | 0005 |
+| `core.create_owner_invite(p_tenant uuid, p_subject text, p_display_name text, p_email citext, p_language text)` | `sos_platform` | `TABLE (user_id, membership_id, owner_role_assigned boolean)` | Only while the tenant is `provisioning` and has no memberships: creates/reuses the user (refuses a disabled one), an `invited` membership with `mfa_required = true`, a `school` scope, and the `owner` role if it has been cloned | 0005 |
+| `core.accept_invitations(p_subject text)` | `sos_app` | `TABLE (tenant_id, membership_id, user_id)` | Activates the caller's own `invited` memberships created in the last 30 days, unexpired, in `active` schools (ADR-0019) | 0007 |
+| `ops.claim_outbox(p_batch int)` | `sos_app` | `TABLE (id, tenant_id, event_type, payload)` | Claims up to `clamp(p_batch, 1, 500)` (default 100) pending rows `FOR UPDATE SKIP LOCKED`, sets `dispatched_at` | 0006 |
 
-A catalog test pins this exact list and asserts every `SECURITY DEFINER` function in the database is on it, is owned by `sos_definer` and sets `search_path`.
+`sos_definer` table privileges (granted in the migrations, nothing via default privileges): `core.tenants` SELECT, INSERT, UPDATE; `core.users` SELECT, INSERT; `core.memberships` SELECT, INSERT, `UPDATE (status, updated_at, version)`; SELECT on `core.tenant_keys`, `core.sections`, `core.academic_years`, `core.roles`; INSERT on `core.membership_scopes`, `core.membership_roles`; SELECT, INSERT on `audit.events`, `audit.chain_heads`; SELECT, `UPDATE (dispatched_at)` on `ops.outbox`; SELECT on `platform.plans`, `platform.subscriptions`, `platform.invoices`, `platform.usage_daily`.
+
+**Migration pattern for a definer function** (never `ALTER FUNCTION … OWNER TO`, which `sos_owner` cannot do for a role it is not a member of):
+
+```sql
+GRANT CREATE ON SCHEMA core TO sos_definer;       -- exists only inside this migration transaction
+SET ROLE sos_definer;
+CREATE FUNCTION core.<name>(...) ... SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$ ... $$;
+REVOKE ALL ON FUNCTION core.<name>(...) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION core.<name>(...) TO <callers>;
+SET ROLE sos_owner;
+REVOKE CREATE ON SCHEMA core FROM sos_definer;    -- a test asserts sos_definer has no CREATE on core
+```
+
+Downgrades drop the functions as `sos_owner` (owner of the schema). Tests: `apps/api/tests/security/test_definer_functions.py` and `test_rls_catalog.py` (12 §4.9).
 
 ### 3.5 Composite tenant foreign keys
 
@@ -158,167 +225,288 @@ CREATE TABLE sis.enrollments (
 
 Rules:
 - Every tenant-owned table that is referenced declares `UNIQUE (tenant_id, id)`.
-- Nullable references use the same composite FK (default `MATCH SIMPLE`: no check while the reference is NULL).
-- References to global tables (`core.users`, `core.permissions`, global `sis.attribute_definitions` rows) stay single-column.
+- Nullable references use the same composite FK (default `MATCH SIMPLE`: no check while the reference is NULL). To clear only the reference column on delete, use `ON DELETE SET NULL (column)` (e.g. `core.sections.class_teacher_membership_id`).
+- References to global tables (`core.users`, `core.permissions`, `core.tenants`, global `sis.attribute_definitions` rows) stay single-column.
 - References to tables created later in the revision chain (e.g., `sis.attribute_values.evidence_document_id → kb.documents`) get their composite FK in the migration that creates the referenced table.
-- Polymorphic references (`core.membership_scopes.scope_ref`, `kb.document_acl.principal_ref`) cannot use an FK; services validate them inside the tenant session.
-- A test inserts a child that references another tenant's parent and expects a foreign-key violation (12 §4.10).
+- Polymorphic references (`core.membership_scopes.scope_ref`, `kb.document_acl.principal_ref`) cannot use an FK; `core.membership_scopes.scope_ref` is validated by the trigger `membership_scopes_ref_valid` (class/section of the same tenant) and protected by `classes_scope_restrict`/`sections_scope_restrict` (a class/section still used as a scope cannot be deleted).
+- Tests: `apps/api/tests/security/test_composite_fks.py` (catalog: every tenant→tenant FK is composite; every referenced tenant table has `UNIQUE (tenant_id, id)`; behaviour: referencing another tenant's row fails) (12 §4.10).
 
 ### 3.6 Schema `platform`
 
-Control-plane tables (operators, plans, subscriptions, billing accounts, invoices, payments, deployments, usage, feature flags, announcements, support tickets, platform audit, platform jobs) live in schema `platform`. It holds no student data, so it has **no RLS**; isolation is by grants: only `sos_platform` has DML; `sos_app` has only SELECT on `platform.feature_flags`; `sos_readonly` has nothing. Full DDL: [16 §7](16-platform-admin-panel.md#7-data-model-schema-platform).
+Control-plane tables (operators, plans, subscriptions, billing accounts, invoices, payments, deployments, usage, usage threshold events, feature flags, announcements, support tickets, break-glass requests, platform audit, platform jobs) live in schema `platform`. It holds no student data, so it has **no RLS**; isolation is by grants: only `sos_platform` has DML; `sos_app` has only SELECT on `platform.feature_flags`; `sos_readonly` has nothing; `sos_definer` has SELECT on the four tables `core.current_subscription()` reads. Full DDL: [16 §7](16-platform-admin-panel.md#7-data-model-schema-platform).
 
 ## 4. Core schema (tenancy, identity, authorization)
 
-> DDL in this document is grouped by topic for readability. In migrations, create tables first, then functions, then policies (some policies reference tables defined later here). Standard RLS (§3) applies to every table with `tenant_id` even where not repeated.
+The DDL below is `0003_core_schema` verbatim (constraints named as in the database). Standard RLS (§3.3) applies to every table with `tenant_id`: `core.tenant_keys`, `core.memberships`, `core.roles`, `core.role_permissions`, `core.membership_roles`, `core.membership_scopes`, `core.academic_years`, `core.classes`, `core.sections`.
 
 ```sql
 CREATE TABLE core.tenants (
-  id            uuid PRIMARY KEY,
-  code          text UNIQUE NOT NULL,              -- short slug
-  name          text NOT NULL,
-  boards        text[] NOT NULL DEFAULT '{}',      -- e.g. {CISCE}
-  state_code    text NOT NULL DEFAULT 'AP',
-  status        text NOT NULL CHECK (status IN ('provisioning','active','suspended','offboarding','deleted')),
-  settings      jsonb NOT NULL DEFAULT '{}',       -- languages, retention, ai_budget, idle_timeout
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now(),
-  version       int NOT NULL DEFAULT 1
+  id               uuid PRIMARY KEY,
+  code             text NOT NULL,
+  name             text NOT NULL,
+  boards           text[] NOT NULL DEFAULT '{}',
+  state_code       text NOT NULL DEFAULT 'AP',
+  status           text NOT NULL DEFAULT 'provisioning',
+  plan_tier        text NOT NULL DEFAULT 'shared',
+  deployment_mode  text NOT NULL DEFAULT 'shared',
+  settings         jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  version          int NOT NULL DEFAULT 1,
+  CONSTRAINT tenants_code_key UNIQUE (code),
+  CONSTRAINT tenants_code_format CHECK (code ~ '^[a-z][a-z0-9-]{1,31}$'),
+  CONSTRAINT tenants_name_length CHECK (char_length(name) BETWEEN 1 AND 200),
+  CONSTRAINT tenants_state_code_format CHECK (state_code ~ '^[A-Z]{2}$'),
+  CONSTRAINT tenants_status_check
+    CHECK (status IN ('provisioning','active','suspended','offboarding','deleted')),
+  CONSTRAINT tenants_plan_tier_check CHECK (plan_tier IN ('shared','dedicated')),
+  CONSTRAINT tenants_deployment_mode_check CHECK (deployment_mode IN ('shared','dedicated')),
+  CONSTRAINT tenants_settings_object CHECK (jsonb_typeof(settings) = 'object'),
+  CONSTRAINT tenants_version_positive CHECK (version >= 1)
 );
--- RLS: app may read only its own tenant row; definer functions reach all rows (§3.3)
-ALTER TABLE core.tenants ENABLE ROW LEVEL SECURITY; ALTER TABLE core.tenants FORCE ROW LEVEL SECURITY;
-CREATE POLICY own_tenant ON core.tenants USING (id = core.current_tenant()) WITH CHECK (id = core.current_tenant());
-CREATE POLICY definer_access ON core.tenants
-  USING (current_user = 'sos_definer') WITH CHECK (current_user = 'sos_definer');
 
-CREATE TABLE core.tenant_keys (                     -- envelope encryption (07 §7)
-  tenant_id     uuid NOT NULL REFERENCES core.tenants(id),
+CREATE TABLE core.tenant_keys (
+  tenant_id     uuid NOT NULL,
   key_version   int  NOT NULL,
-  wrapped_dek   bytea NOT NULL,                     -- DEK encrypted by KMS CMK
-  wrapped_hmac  bytea NOT NULL,                     -- HMAC key for blind indexes
+  wrapped_dek   bytea NOT NULL,
+  wrapped_hmac  bytea NOT NULL,
   kms_key_arn   text NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now(),
   retired_at    timestamptz,
-  PRIMARY KEY (tenant_id, key_version)
+  CONSTRAINT tenant_keys_pkey PRIMARY KEY (tenant_id, key_version),
+  CONSTRAINT tenant_keys_tenant_fk FOREIGN KEY (tenant_id) REFERENCES core.tenants (id),
+  -- key_version is stored in 2 bytes of every ciphertext header (docs/05 §9).
+  CONSTRAINT tenant_keys_version_range CHECK (key_version BETWEEN 1 AND 65535),
+  CONSTRAINT tenant_keys_retired_after_created CHECK (retired_at IS NULL OR retired_at >= created_at)
 );
 
-CREATE TABLE core.users (                           -- global identity (a person may work at 2 schools)
+CREATE TABLE core.users (
   id                 uuid PRIMARY KEY,
-  idp_subject        text UNIQUE NOT NULL,
+  idp_subject        text NOT NULL,
   display_name       text NOT NULL,
-  email              citext,
+  email              public.citext,
   phone_ciphertext   bytea,
-  preferred_language text NOT NULL DEFAULT 'en' CHECK (preferred_language IN ('en','te')),
-  status             text NOT NULL CHECK (status IN ('active','disabled')),
+  preferred_language text NOT NULL DEFAULT 'en',
+  status             text NOT NULL DEFAULT 'active',
   created_at         timestamptz NOT NULL DEFAULT now(),
-  last_login_at      timestamptz
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  last_login_at      timestamptz,
+  version            int NOT NULL DEFAULT 1,
+  CONSTRAINT users_idp_subject_key UNIQUE (idp_subject),
+  CONSTRAINT users_idp_subject_length CHECK (char_length(idp_subject) BETWEEN 1 AND 255),
+  CONSTRAINT users_display_name_length CHECK (char_length(display_name) BETWEEN 1 AND 200),
+  CONSTRAINT users_preferred_language_check CHECK (preferred_language IN ('en','te')),
+  CONSTRAINT users_status_check CHECK (status IN ('active','disabled')),
+  CONSTRAINT users_version_positive CHECK (version >= 1)
 );
--- RLS: visible only if the user has a membership in the current tenant
-ALTER TABLE core.users ENABLE ROW LEVEL SECURITY; ALTER TABLE core.users FORCE ROW LEVEL SECURITY;
-CREATE POLICY users_in_tenant ON core.users USING (
-  EXISTS (SELECT 1 FROM core.memberships m WHERE m.user_id = users.id AND m.tenant_id = core.current_tenant())
-);
-
--- Login happens before a tenant is chosen, so RLS above would hide the user.
--- Cross-tenant reads happen only through the allowlisted definer functions (§3.4), e.g.:
-CREATE FUNCTION core.resolve_login(p_subject text)
-  RETURNS TABLE (user_id uuid, tenant_id uuid, membership_id uuid)
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, core, pg_temp AS $$
-    SELECT u.id, m.tenant_id, m.id
-    FROM core.users u JOIN core.memberships m ON m.user_id = u.id
-    WHERE u.idp_subject = p_subject AND u.status = 'active' AND m.status = 'active'
-  $$;
-ALTER FUNCTION core.resolve_login(text) OWNER TO sos_definer;
-REVOKE ALL ON FUNCTION core.resolve_login(text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION core.resolve_login(text) TO sos_app;
--- core.users and core.memberships carry the definer_access policy (§3.3).
 
 CREATE TABLE core.memberships (
-  id          uuid PRIMARY KEY,
-  tenant_id   uuid NOT NULL REFERENCES core.tenants(id),
-  user_id     uuid NOT NULL REFERENCES core.users(id),
-  status      text NOT NULL CHECK (status IN ('invited','active','suspended','removed')),
-  created_by  uuid,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (tenant_id, user_id),
-  UNIQUE (tenant_id, id)
+  id            uuid PRIMARY KEY,
+  tenant_id     uuid NOT NULL,
+  user_id       uuid NOT NULL,
+  status        text NOT NULL DEFAULT 'invited',
+  expires_at    timestamptz,
+  mfa_required  boolean NOT NULL DEFAULT false,
+  created_by    uuid,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  version       int NOT NULL DEFAULT 1,
+  CONSTRAINT memberships_tenant_id_id_key UNIQUE (tenant_id, id),
+  CONSTRAINT memberships_tenant_id_user_id_key UNIQUE (tenant_id, user_id),
+  CONSTRAINT memberships_tenant_fk FOREIGN KEY (tenant_id) REFERENCES core.tenants (id),
+  CONSTRAINT memberships_user_fk FOREIGN KEY (user_id) REFERENCES core.users (id),
+  CONSTRAINT memberships_created_by_fk FOREIGN KEY (created_by)
+    REFERENCES core.users (id) ON DELETE SET NULL,
+  CONSTRAINT memberships_status_check
+    CHECK (status IN ('invited','active','suspended','removed')),
+  CONSTRAINT memberships_expiry_after_creation CHECK (expires_at IS NULL OR expires_at > created_at),
+  CONSTRAINT memberships_version_positive CHECK (version >= 1)
 );
+CREATE INDEX memberships_user_id_idx ON core.memberships (user_id);
 
-CREATE TABLE core.permissions (                     -- global catalog (read-only to app)
-  key          text PRIMARY KEY CHECK (key NOT LIKE 'platform.%'),  -- platform permissions never enter the tenant catalog
+CREATE TABLE core.permissions (
+  key          text PRIMARY KEY,
   description  text NOT NULL,
-  sensitivity  text NOT NULL CHECK (sensitivity IN ('normal','sensitive','critical'))
+  sensitivity  text NOT NULL DEFAULT 'normal',
+  step_up      boolean NOT NULL DEFAULT false,
+  is_platform  boolean NOT NULL DEFAULT false,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT permissions_key_format CHECK (key ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'),
+  CONSTRAINT permissions_sensitivity_check
+    CHECK (sensitivity IN ('normal','sensitive','critical')),
+  -- Platform permissions are exactly the platform.* keys; they can never be granted to a
+  -- tenant role (trigger on core.role_permissions below).
+  CONSTRAINT permissions_platform_prefix CHECK (is_platform = starts_with(key, 'platform.'))
 );
 
 CREATE TABLE core.roles (
   id          uuid PRIMARY KEY,
-  tenant_id   uuid NOT NULL REFERENCES core.tenants(id),
-  key         text NOT NULL,                        -- 'office_admin', or custom
+  tenant_id   uuid NOT NULL,
+  key         text NOT NULL,
   name_en     text NOT NULL,
   name_te     text NOT NULL,
-  is_system   boolean NOT NULL DEFAULT false,       -- system roles cloned at provisioning
-  UNIQUE (tenant_id, key),
-  UNIQUE (tenant_id, id)
+  is_system   boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  version     int NOT NULL DEFAULT 1,
+  CONSTRAINT roles_tenant_id_id_key UNIQUE (tenant_id, id),
+  CONSTRAINT roles_tenant_id_key_key UNIQUE (tenant_id, key),
+  CONSTRAINT roles_tenant_fk FOREIGN KEY (tenant_id) REFERENCES core.tenants (id),
+  CONSTRAINT roles_key_format CHECK (key ~ '^[a-z][a-z0-9_]{1,63}$'),
+  CONSTRAINT roles_name_en_length CHECK (char_length(name_en) BETWEEN 1 AND 100),
+  CONSTRAINT roles_name_te_length CHECK (char_length(name_te) BETWEEN 1 AND 100),
+  CONSTRAINT roles_version_positive CHECK (version >= 1)
 );
+
 CREATE TABLE core.role_permissions (
   tenant_id       uuid NOT NULL,
   role_id         uuid NOT NULL,
-  permission_key  text NOT NULL REFERENCES core.permissions(key),
-  PRIMARY KEY (tenant_id, role_id, permission_key),
-  FOREIGN KEY (tenant_id, role_id) REFERENCES core.roles (tenant_id, id) ON DELETE CASCADE
+  permission_key  text NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT role_permissions_pkey PRIMARY KEY (tenant_id, role_id, permission_key),
+  CONSTRAINT role_permissions_role_fk FOREIGN KEY (tenant_id, role_id)
+    REFERENCES core.roles (tenant_id, id) ON DELETE CASCADE,
+  CONSTRAINT role_permissions_permission_fk FOREIGN KEY (permission_key)
+    REFERENCES core.permissions (key)
 );
+CREATE INDEX role_permissions_permission_key_idx ON core.role_permissions (permission_key);
+
 CREATE TABLE core.membership_roles (
   tenant_id      uuid NOT NULL,
   membership_id  uuid NOT NULL,
   role_id        uuid NOT NULL,
-  PRIMARY KEY (tenant_id, membership_id, role_id),
-  FOREIGN KEY (tenant_id, membership_id) REFERENCES core.memberships (tenant_id, id) ON DELETE CASCADE,
-  FOREIGN KEY (tenant_id, role_id)       REFERENCES core.roles (tenant_id, id)
+  granted_by     uuid,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT membership_roles_pkey PRIMARY KEY (tenant_id, membership_id, role_id),
+  CONSTRAINT membership_roles_membership_fk FOREIGN KEY (tenant_id, membership_id)
+    REFERENCES core.memberships (tenant_id, id) ON DELETE CASCADE,
+  CONSTRAINT membership_roles_role_fk FOREIGN KEY (tenant_id, role_id)
+    REFERENCES core.roles (tenant_id, id),
+  CONSTRAINT membership_roles_granted_by_fk FOREIGN KEY (granted_by)
+    REFERENCES core.users (id) ON DELETE SET NULL
 );
+CREATE INDEX membership_roles_role_idx ON core.membership_roles (tenant_id, role_id);
+
+CREATE TABLE core.academic_years (
+  id          uuid PRIMARY KEY,
+  tenant_id   uuid NOT NULL,
+  label       text NOT NULL,
+  starts_on   date NOT NULL,
+  ends_on     date NOT NULL,
+  is_current  boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  version     int NOT NULL DEFAULT 1,
+  CONSTRAINT academic_years_tenant_id_id_key UNIQUE (tenant_id, id),
+  CONSTRAINT academic_years_tenant_id_label_key UNIQUE (tenant_id, label),
+  CONSTRAINT academic_years_tenant_fk FOREIGN KEY (tenant_id) REFERENCES core.tenants (id),
+  CONSTRAINT academic_years_label_length CHECK (char_length(label) BETWEEN 1 AND 32),
+  CONSTRAINT academic_years_dates_ordered CHECK (starts_on < ends_on),
+  CONSTRAINT academic_years_version_positive CHECK (version >= 1)
+);
+-- FR-TEN-010: exactly one current year per tenant.
+CREATE UNIQUE INDEX one_current_year ON core.academic_years (tenant_id) WHERE is_current;
+
+CREATE TABLE core.classes (
+  id          uuid PRIMARY KEY,
+  tenant_id   uuid NOT NULL,
+  code        text NOT NULL,
+  display_en  text NOT NULL,
+  display_te  text NOT NULL,
+  sort_order  int  NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  version     int NOT NULL DEFAULT 1,
+  CONSTRAINT classes_tenant_id_id_key UNIQUE (tenant_id, id),
+  CONSTRAINT classes_tenant_id_code_key UNIQUE (tenant_id, code),
+  CONSTRAINT classes_tenant_fk FOREIGN KEY (tenant_id) REFERENCES core.tenants (id),
+  CONSTRAINT classes_code_format CHECK (code ~ '^[A-Z0-9][A-Z0-9_-]{0,15}$'),
+  CONSTRAINT classes_display_en_length CHECK (char_length(display_en) BETWEEN 1 AND 100),
+  CONSTRAINT classes_display_te_length CHECK (char_length(display_te) BETWEEN 1 AND 100),
+  CONSTRAINT classes_sort_order_range CHECK (sort_order BETWEEN 0 AND 10000),
+  CONSTRAINT classes_version_positive CHECK (version >= 1)
+);
+
+CREATE TABLE core.sections (
+  id                           uuid PRIMARY KEY,
+  tenant_id                    uuid NOT NULL,
+  class_id                     uuid NOT NULL,
+  academic_year_id             uuid NOT NULL,
+  name                         text NOT NULL,
+  class_teacher_membership_id  uuid,
+  created_at                   timestamptz NOT NULL DEFAULT now(),
+  updated_at                   timestamptz NOT NULL DEFAULT now(),
+  version                      int NOT NULL DEFAULT 1,
+  CONSTRAINT sections_tenant_id_id_key UNIQUE (tenant_id, id),
+  CONSTRAINT sections_year_class_name_key UNIQUE (tenant_id, academic_year_id, class_id, name),
+  CONSTRAINT sections_class_fk FOREIGN KEY (tenant_id, class_id)
+    REFERENCES core.classes (tenant_id, id),
+  CONSTRAINT sections_academic_year_fk FOREIGN KEY (tenant_id, academic_year_id)
+    REFERENCES core.academic_years (tenant_id, id),
+  CONSTRAINT sections_class_teacher_fk FOREIGN KEY (tenant_id, class_teacher_membership_id)
+    REFERENCES core.memberships (tenant_id, id) ON DELETE SET NULL (class_teacher_membership_id),
+  CONSTRAINT sections_name_length CHECK (char_length(name) BETWEEN 1 AND 16),
+  CONSTRAINT sections_version_positive CHECK (version >= 1)
+);
+CREATE INDEX sections_class_idx ON core.sections (tenant_id, class_id);
+CREATE INDEX sections_class_teacher_idx ON core.sections (tenant_id, class_teacher_membership_id)
+  WHERE class_teacher_membership_id IS NOT NULL;
+
 CREATE TABLE core.membership_scopes (
   id             uuid PRIMARY KEY,
   tenant_id      uuid NOT NULL,
   membership_id  uuid NOT NULL,
-  scope_type     text NOT NULL CHECK (scope_type IN ('school','class','section')),
-  scope_ref      uuid,                              -- class_id/section_id; NULL for 'school' (validated by service)
-  CHECK ((scope_type = 'school') = (scope_ref IS NULL)),
-  FOREIGN KEY (tenant_id, membership_id) REFERENCES core.memberships (tenant_id, id) ON DELETE CASCADE
+  scope_type     text NOT NULL,
+  scope_ref      uuid,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT membership_scopes_tenant_id_id_key UNIQUE (tenant_id, id),
+  CONSTRAINT membership_scopes_unique_scope
+    UNIQUE NULLS NOT DISTINCT (tenant_id, membership_id, scope_type, scope_ref),
+  CONSTRAINT membership_scopes_membership_fk FOREIGN KEY (tenant_id, membership_id)
+    REFERENCES core.memberships (tenant_id, id) ON DELETE CASCADE,
+  CONSTRAINT membership_scopes_type_check CHECK (scope_type IN ('school','class','section')),
+  CONSTRAINT membership_scopes_ref_matches_type CHECK ((scope_type = 'school') = (scope_ref IS NULL))
 );
-
-CREATE TABLE core.academic_years (
-  id          uuid PRIMARY KEY,
-  tenant_id   uuid NOT NULL REFERENCES core.tenants(id),
-  label       text NOT NULL,                        -- '2026-27'
-  starts_on   date NOT NULL,
-  ends_on     date NOT NULL,
-  is_current  boolean NOT NULL DEFAULT false,
-  UNIQUE (tenant_id, label),
-  UNIQUE (tenant_id, id),
-  CHECK (ends_on > starts_on)
-);
-CREATE UNIQUE INDEX one_current_year ON core.academic_years(tenant_id) WHERE is_current;
-
-CREATE TABLE core.classes (
-  id uuid PRIMARY KEY, tenant_id uuid NOT NULL REFERENCES core.tenants(id),
-  code text NOT NULL,                               -- 'NUR','LKG','I'..'XII'
-  display_en text NOT NULL, display_te text NOT NULL, sort_order int NOT NULL,
-  UNIQUE (tenant_id, code),
-  UNIQUE (tenant_id, id)
-);
-CREATE TABLE core.sections (
-  id uuid PRIMARY KEY, tenant_id uuid NOT NULL,
-  class_id uuid NOT NULL,
-  academic_year_id uuid NOT NULL,
-  name text NOT NULL,                               -- 'A'
-  class_teacher_membership_id uuid,
-  UNIQUE (tenant_id, academic_year_id, class_id, name),
-  UNIQUE (tenant_id, id),
-  FOREIGN KEY (tenant_id, class_id)                    REFERENCES core.classes (tenant_id, id),
-  FOREIGN KEY (tenant_id, academic_year_id)            REFERENCES core.academic_years (tenant_id, id),
-  FOREIGN KEY (tenant_id, class_teacher_membership_id) REFERENCES core.memberships (tenant_id, id)
-);
--- Writes to academic_years, classes and sections require tenant.structure.manage (07 §6.2).
+CREATE INDEX membership_scopes_ref_idx ON core.membership_scopes (tenant_id, scope_ref)
+  WHERE scope_ref IS NOT NULL;
 ```
+
+Policies, triggers and grants of `0003`:
+
+```sql
+-- RLS variants (rls_allowlist.yaml policy_variants)
+CREATE POLICY own_tenant ON core.tenants
+  USING (id = core.current_tenant()) WITH CHECK (id = core.current_tenant());
+CREATE POLICY users_in_tenant ON core.users FOR SELECT
+  USING (EXISTS (SELECT 1 FROM core.memberships AS m
+                 WHERE m.user_id = users.id AND m.tenant_id = core.current_tenant()));
+CREATE POLICY users_in_tenant_update ON core.users FOR UPDATE
+  USING (<same EXISTS>) WITH CHECK (<same EXISTS>);
+-- (no INSERT/DELETE policy on core.users: the app has no such grant)
+
+-- Triggers (SECURITY INVOKER functions owned by sos_owner, search_path pinned)
+--   <table>_set_updated_at        BEFORE UPDATE on tenants, users, memberships, roles, academic_years, classes, sections
+--   role_permissions_not_platform BEFORE INSERT/UPDATE OF permission_key ON core.role_permissions:
+--                                 refuses any permission with is_platform (check_violation)
+--   membership_scopes_ref_valid   BEFORE INSERT/UPDATE ON core.membership_scopes: scope_ref must be a
+--                                 class/section of the same tenant (foreign_key_violation)
+--   classes_scope_restrict, sections_scope_restrict  BEFORE DELETE: refuse while used as a scope
+
+-- sos_app grants narrowed from the default privileges (ADR-0013 Amendment A2)
+REVOKE INSERT, UPDATE, DELETE ON core.tenants FROM sos_app;
+GRANT UPDATE (name, settings, version) ON core.tenants TO sos_app;
+REVOKE INSERT, UPDATE, DELETE ON core.users FROM sos_app;
+GRANT UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)
+  ON core.users TO sos_app;
+REVOKE INSERT, UPDATE, DELETE ON core.permissions FROM sos_app;
+REVOKE UPDATE, DELETE ON core.tenant_keys FROM sos_app;
+GRANT UPDATE (retired_at) ON core.tenant_keys TO sos_app;
+REVOKE ALL ON core.tenant_keys FROM sos_readonly;
+```
+
+**Permission catalog.** `core.permissions` is seeded by `0004_authz_seed` from `apps/api/app/authz/permissions.yaml` (upsert; a later catalog change gets its own revision re-running the upsert). It contains tenant permissions, the implicit `session.authenticated` (held by every active member, never stored in `core.role_permissions`), and the `platform.*` keys with `is_platform = true`, so route guards can be checked against one table. `permissions_platform_prefix` ties the flag to the prefix and `role_permissions_not_platform` makes them ungrantable to tenant roles. System roles are **not** seeded by a migration: they are cloned into each school at provisioning from `apps/api/app/authz/roles.yaml` (roles are tenant rows under RLS).
+
+Writes to `core.academic_years`, `core.classes` and `core.sections` require `tenant.structure.manage` (07 §6.2). `POST /classes/defaults` adds the missing classes from `apps/api/app/tenancy/academic_defaults.yaml` (Nursery–XII, EN/TE names).
 
 ## 5. Student information schema (`sis`)
 
@@ -601,130 +789,203 @@ When a document's ACL changes, a job rewrites `acl_*` arrays on its chunks (same
 
 ### 7.1 Audit (ADR-0011 as amended by ADR-0013)
 
+Migration `0002_audit` creates both chains: the per-tenant chain in schema `audit` and the control-plane chain in schema `platform`.
+
 ```sql
+CREATE FUNCTION audit.block_mutation() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
+  BEGIN
+    RAISE EXCEPTION 'audit.events is append-only'
+      USING ERRCODE = 'insufficient_privilege',
+            HINT = 'Audit events can never be updated, deleted or truncated (FR-AUD-002).';
+  END $$;
+
 CREATE TABLE audit.events (
-  id uuid NOT NULL, tenant_id uuid NOT NULL,
-  seq bigint NOT NULL CHECK (seq >= 1),             -- per-tenant, gapless, from chain_heads.last_seq + 1
-  occurred_at timestamptz NOT NULL DEFAULT now(),
-  actor_type text NOT NULL CHECK (actor_type IN ('user','system','platform')),
-  actor_id uuid, action text NOT NULL,              -- 'student.value.recorded','cr.approved','kb.asked',...
-  resource_type text NOT NULL, resource_id uuid,
-  summary jsonb NOT NULL,                           -- IDs, field names, counts; never raw personal values
-  request_id text, ip_hash bytea,
-  prev_hash bytea NOT NULL CHECK (octet_length(prev_hash) = 32),
-  hash bytea NOT NULL CHECK (octet_length(hash) = 32),
-  PRIMARY KEY (occurred_at, id)
-) PARTITION BY RANGE (occurred_at);                 -- monthly partitions (see below)
-
-CREATE TABLE audit.chain_heads (
-  tenant_id  uuid PRIMARY KEY,
-  last_seq   bigint NOT NULL DEFAULT 0 CHECK (last_seq >= 0),
-  last_hash  bytea  NOT NULL DEFAULT decode(repeat('00', 32), 'hex')   -- genesis: 32 zero bytes
-             CHECK (octet_length(last_hash) = 32),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
--- RLS: tenant_isolation + definer_access on audit.events, on EVERY partition, and on audit.chain_heads
+  id            uuid        NOT NULL,
+  tenant_id     uuid        NOT NULL,
+  seq           bigint      NOT NULL CHECK (seq > 0),          -- per-tenant, gapless: chain_heads.last_seq + 1
+  occurred_at   timestamptz NOT NULL DEFAULT clock_timestamp(), -- set by the app (µs); default is a fallback
+  actor_type    text        NOT NULL CHECK (actor_type IN ('user', 'system', 'platform')),
+  actor_id      uuid,
+  action        text        NOT NULL CHECK (action ~ '^[a-z_]+(\.[a-z_]+)+$'),
+  resource_type text        NOT NULL,
+  resource_id   uuid,
+  summary       jsonb       NOT NULL CHECK (jsonb_typeof(summary) = 'object'),  -- IDs, field names, counts, codes
+  request_id    text,
+  ip_hash       bytea,
+  prev_hash     bytea       NOT NULL CHECK (octet_length(prev_hash) = 32),
+  hash          bytea       NOT NULL CHECK (octet_length(hash) = 32),
+  PRIMARY KEY (tenant_id, seq, occurred_at)                     -- partition key must be in the PK
+) PARTITION BY RANGE (occurred_at);
+CREATE INDEX events_tenant_occurred_idx ON audit.events (tenant_id, occurred_at);
 ALTER TABLE audit.events ENABLE ROW LEVEL SECURITY; ALTER TABLE audit.events FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON audit.events
   USING (tenant_id = core.current_tenant()) WITH CHECK (tenant_id = core.current_tenant());
 CREATE POLICY definer_access ON audit.events
   USING (current_user = 'sos_definer') WITH CHECK (current_user = 'sos_definer');
--- (same three statements for audit.chain_heads)
-
--- Grants: append-only for the app
-REVOKE ALL ON audit.events, audit.chain_heads FROM PUBLIC;
+CREATE TRIGGER events_append_only BEFORE UPDATE OR DELETE ON audit.events
+  FOR EACH ROW EXECUTE FUNCTION audit.block_mutation();
+CREATE TRIGGER events_no_truncate BEFORE TRUNCATE ON audit.events
+  FOR EACH STATEMENT EXECUTE FUNCTION audit.block_mutation();
+REVOKE ALL ON audit.events FROM PUBLIC, sos_app, sos_readonly, sos_definer;
 GRANT SELECT, INSERT ON audit.events TO sos_app;
-GRANT SELECT, UPDATE ON audit.chain_heads TO sos_app;        -- head row of its own tenant only (RLS)
+GRANT SELECT ON audit.events TO sos_readonly;
+GRANT SELECT, INSERT ON audit.events TO sos_definer;
 
-CREATE FUNCTION audit.block_mutation() RETURNS trigger LANGUAGE plpgsql AS
-$$ BEGIN RAISE EXCEPTION 'audit.events is append-only'; END $$;
-CREATE TRIGGER no_update   BEFORE UPDATE OR DELETE ON audit.events FOR EACH ROW EXECUTE FUNCTION audit.block_mutation();
-CREATE TRIGGER no_truncate BEFORE TRUNCATE ON audit.events FOR EACH STATEMENT EXECUTE FUNCTION audit.block_mutation();
+CREATE TABLE audit.chain_heads (
+  tenant_id  uuid        PRIMARY KEY,
+  last_seq   bigint      NOT NULL CHECK (last_seq >= 0),
+  last_hash  bytea       NOT NULL CHECK (octet_length(last_hash) = 32),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+-- ENABLE + FORCE RLS, tenant_isolation and definer_access policies (as on audit.events)
+REVOKE ALL ON audit.chain_heads FROM PUBLIC, sos_app, sos_readonly, sos_definer;
+GRANT SELECT, INSERT, UPDATE ON audit.chain_heads TO sos_app;   -- own tenant's head only (RLS)
+GRANT SELECT ON audit.chain_heads TO sos_readonly;
+GRANT SELECT, INSERT ON audit.chain_heads TO sos_definer;
 
--- Each monthly partition, e.g. 2026-10:
-CREATE TABLE audit.events_2026_10 PARTITION OF audit.events
-  FOR VALUES FROM ('2026-10-01') TO ('2026-11-01');
-CREATE UNIQUE INDEX ON audit.events_2026_10 (tenant_id, seq);
-ALTER TABLE audit.events_2026_10 ENABLE ROW LEVEL SECURITY; ALTER TABLE audit.events_2026_10 FORCE ROW LEVEL SECURITY;
--- + tenant_isolation and definer_access policies, + BEFORE TRUNCATE trigger on the partition
+-- Platform (control-plane) chain: no RLS, privilege separation instead (16 §7)
+CREATE TABLE platform.audit_events (
+  id                uuid        PRIMARY KEY,
+  seq               bigint      NOT NULL UNIQUE CHECK (seq > 0),
+  occurred_at       timestamptz NOT NULL DEFAULT clock_timestamp(),
+  actor_type        text        NOT NULL CHECK (actor_type IN ('operator', 'system')),
+  actor_id          uuid,
+  action            text        NOT NULL CHECK (action ~ '^[a-z_]+(\.[a-z_]+)+$'),
+  resource_type     text        NOT NULL,
+  resource_id       uuid,
+  subject_tenant_id uuid,                                   -- affected school, if any
+  summary           jsonb       NOT NULL CHECK (jsonb_typeof(summary) = 'object'),
+  request_id        text,
+  ip_hash           bytea,
+  prev_hash         bytea       NOT NULL CHECK (octet_length(prev_hash) = 32),
+  hash              bytea       NOT NULL CHECK (octet_length(hash) = 32)
+);
+CREATE INDEX audit_events_occurred_idx ON platform.audit_events (occurred_at);
+CREATE INDEX audit_events_subject_idx ON platform.audit_events (subject_tenant_id, occurred_at)
+  WHERE subject_tenant_id IS NOT NULL;
+-- BEFORE UPDATE OR DELETE (row) and BEFORE TRUNCATE (statement) triggers → platform.block_mutation()
+CREATE TABLE platform.audit_chain_head (
+  id         boolean     PRIMARY KEY DEFAULT true CHECK (id),   -- single row
+  last_seq   bigint      NOT NULL CHECK (last_seq >= 0),
+  last_hash  bytea       NOT NULL CHECK (octet_length(last_hash) = 32),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO platform.audit_chain_head (id, last_seq, last_hash) VALUES (true, 0, decode(repeat('00', 32), 'hex'));
+REVOKE ALL ON platform.audit_events, platform.audit_chain_head
+  FROM PUBLIC, sos_app, sos_readonly, sos_platform, sos_definer;
+GRANT SELECT, INSERT ON platform.audit_events TO sos_platform;
+GRANT SELECT, UPDATE ON platform.audit_chain_head TO sos_platform;
 ```
 
-**Chain write** (inside the audited transaction, via `audit.service.record()`):
-1. `SELECT last_seq, last_hash FROM audit.chain_heads WHERE tenant_id = :t FOR UPDATE`.
-2. `seq = last_seq + 1`; `hash = sha256(last_hash || jcs(event))`, where `jcs` is **RFC 8785 JSON Canonicalization** (Python package `rfc8785`) of the event without `hash` (fields `id, tenant_id, seq, occurred_at, actor_type, actor_id, action, resource_type, resource_id, summary, request_id, ip_hash, prev_hash`; bytes as lowercase hex, timestamps as RFC 3339 UTC with microseconds).
+**Chain write** (inside the audited transaction, via `audit.service.record()`; tenant context required, else `AuditContextError`):
+1. `SELECT last_seq, last_hash FROM audit.chain_heads WHERE tenant_id = :t FOR UPDATE`. If the tenant has no head yet, insert the genesis head (`last_seq = 0`, `last_hash` = 32 zero bytes, `ON CONFLICT DO NOTHING`) and lock it.
+2. `occurred_at` = the application's `datetime.now(UTC)` (microsecond precision, so the hashed value is exactly the stored value); `seq = last_seq + 1`; `hash = sha256(last_hash || jcs(event))`, where `jcs` is **RFC 8785 JSON Canonicalization** (Python package `rfc8785`) of every stored column except the hashes: UUIDs as lowercase strings, `occurred_at` as RFC 3339 UTC with microseconds and `Z`, `ip_hash` as lowercase hex or null (`app/audit/hashing.py`).
 3. Insert the event with `prev_hash = last_hash`; update the head (`last_seq`, `last_hash`, `updated_at`).
 
-The first event of a tenant has `seq = 1` and `prev_hash` = 32 zero bytes (the genesis head written by `core.provision_tenant()`). Locking the head serializes audit writes per tenant, which is acceptable at our scale. The verifier walks each tenant's events in `seq` order and reports the first gap, duplicate or hash mismatch.
+`summary` is validated before anything is written: IDs, field names, counts and codes only; personal-looking keys and values, long strings and long digit runs are rejected. The first event of a tenant has `seq = 1` and `prev_hash` = 32 zero bytes. Locking the head serializes audit writes per tenant; different tenants never block each other. The verifier (`verify_chain`) walks a tenant's events in `seq` order and reports the first gap, duplicate, reorder, hash mismatch or head mismatch. The platform chain (`audit.service.record_platform()`, head `platform.audit_chain_head`) uses the same algorithm.
 
-**Why the extra guards:** row triggers do not fire on `TRUNCATE`, so a statement trigger blocks it; policies on a partitioned parent do not apply when a partition is queried directly, so every partition gets RLS and policies; a unique index across partitions is impossible without the partition key, so each partition has `UNIQUE (tenant_id, seq)` and the locked head guarantees the sequence.
+**Why the extra guards:** row triggers do not fire on `TRUNCATE`, so a statement trigger blocks it on the parent and on every partition (row triggers are cloned to partitions, TRUNCATE triggers are not); policies on a partitioned parent do not apply when a partition is queried directly, so every partition has RLS enabled and forced **and** all privileges revoked from `sos_app`, `sos_readonly` and `sos_definer` (only the parent is reachable); PostgreSQL cannot enforce `UNIQUE (tenant_id, seq)` across partitions without the partition key, so the key is `(tenant_id, seq, occurred_at)` and the locked head guarantees contiguous sequence numbers (the verifier detects any duplicate).
 
-**Partitions:** migration `0002_audit` creates the current month plus 24 months ahead. Creating tables needs the owner role, so the `migrate` task on each deploy (as `sos_migrator`) tops partitions up to 12 months ahead and applies RLS, policies and triggers; a daily beat check alerts when fewer than 3 future partitions exist.
+**Partitions.** Monthly range partitions named `audit.events_yYYYYmMM` with explicit UTC bounds. They are created only by `audit.create_month_partition(date)` / `audit.ensure_partitions(int)`: `SECURITY INVOKER` functions owned by `sos_owner` and executable only by it (never by the app, never through a definer function). Each new partition gets ENABLE + FORCE RLS, the `tenant_isolation` policy, the `events_no_truncate` trigger and `REVOKE ALL … FROM PUBLIC, sos_app, sos_readonly, sos_definer`.
+- `0002_audit` creates every month from 2026-09 through the later of 2028-08 (24 months) and the current month + 12.
+- After every `alembic upgrade head`, the deploy (compose `migrate`, the ECS migrate task, the dedicated-host `migrate` service) runs `python -m app.audit.partitions --months-ahead 12` with migrator credentials (`SET LOCAL ROLE sos_owner`).
+- There is **no DEFAULT partition**: an insert outside every partition fails (fail closed) instead of landing in a catch-all table.
+- The daily verification job logs `audit.partitions.low_runway` (alerted) when less than 90 days of partitions remain.
 
-The platform has its own chain in `platform.audit_events` with the same algorithm (16 §7).
+**Daily jobs** (beat, UTC): `audit.archive_daily` at 20:30 (02:00 IST) writes a signed JSONL.gz archive per tenant and day to the audit bucket (`t/<tenant_id>/yyyy/mm/dd/audit-<date>.jsonl.gz` + `.sig`; KMS `ECDSA_SHA_256` with `SOS_AUDIT_SIGNING_KEY_ARN`, or a local Ed25519 key outside staging/prod); `audit.verify_all_chains` at 20:45 verifies every active or suspended tenant (IDs from `core.list_tenant_ids`) in its own `tenant_session`, plus the platform chain on the shared deployment. `python -m app.audit.verify_all` does the same on demand (restore drills).
 
 ### 7.2 Ops (tenant-side operations)
 
+Migration `0006_ops`. Every table is tenant-owned (RLS ENABLE + FORCE, `tenant_isolation`); `ops.outbox` also carries `definer_access`. Platform-level jobs (invoice runs, usage collection, fleet checks, platform audit verification) use `platform.job_runs` (16 §7).
+
 ```sql
 CREATE TABLE ops.job_runs (
-  id uuid PRIMARY KEY, tenant_id uuid NOT NULL,
-  task_name text NOT NULL, idempotency_key text NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending','running','succeeded','failed','dead')),
-  attempts int NOT NULL DEFAULT 0, progress jsonb, error text,
-  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (tenant_id, idempotency_key)
+  id               uuid PRIMARY KEY,
+  tenant_id        uuid NOT NULL REFERENCES core.tenants (id),
+  task_name        text NOT NULL CHECK (task_name ~ '^[a-z_]+(\.[a-z_]+)+$'),
+  idempotency_key  text NOT NULL CHECK (char_length(idempotency_key) BETWEEN 1 AND 200),
+  status           text NOT NULL CHECK (status IN ('pending','running','succeeded','failed','dead')),
+  attempts         int NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  progress         jsonb,
+  error            text CHECK (char_length(error) <= 500),
+  created_by       uuid,
+  started_at       timestamptz,
+  finished_at      timestamptz,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT job_runs_tenant_id_id_key UNIQUE (tenant_id, id),
+  CONSTRAINT job_runs_tenant_key UNIQUE (tenant_id, idempotency_key),
+  CONSTRAINT job_runs_finished_after_start CHECK (finished_at IS NULL OR started_at IS NOT NULL)
 );
--- Platform-level jobs (invoice runs, usage collection, fleet checks) use platform.job_runs (16 §7).
 
--- Transactional outbox: domain events written in the same transaction as the change,
--- relayed to Celery by a dispatcher; payloads carry IDs only (no personal values)
 CREATE TABLE ops.outbox (
-  id uuid PRIMARY KEY, tenant_id uuid NOT NULL,
-  event_type text NOT NULL, payload jsonb NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(), dispatched_at timestamptz
+  id             uuid PRIMARY KEY,
+  tenant_id      uuid NOT NULL REFERENCES core.tenants (id),
+  event_type     text NOT NULL CHECK (event_type ~ '^[a-z_]+(\.[a-z_]+)+$'),
+  payload        jsonb NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  dispatched_at  timestamptz,
+  CONSTRAINT outbox_tenant_id_id_key UNIQUE (tenant_id, id)
 );
 CREATE INDEX outbox_pending ON ops.outbox (created_at) WHERE dispatched_at IS NULL;
--- The dispatcher is the only cross-tenant consumer: it calls the allowlisted definer function
--- ops.claim_outbox(batch int) (owned by sos_definer; ops.outbox carries definer_access) that selects
--- pending rows FOR UPDATE SKIP LOCKED, marks them dispatched and returns (id, tenant_id, event_type,
--- payload). Workers then open a normal tenant_session(tenant_id) to act on each event.
 
--- Idempotency for POSTs that create resources or start jobs (09 §2)
 CREATE TABLE ops.idempotency_keys (
-  tenant_id        uuid NOT NULL,
+  tenant_id        uuid NOT NULL REFERENCES core.tenants (id),
   user_id          uuid NOT NULL,
   key              text NOT NULL CHECK (char_length(key) BETWEEN 8 AND 128),
-  method           text NOT NULL,
-  route            text NOT NULL,                   -- route template, e.g. 'POST /api/v1/exports'
+  method           text NOT NULL CHECK (method IN ('POST','PUT','PATCH','DELETE')),
+  route            text NOT NULL CHECK (char_length(route) BETWEEN 1 AND 200),
   request_sha256   bytea NOT NULL CHECK (octet_length(request_sha256) = 32),
   status           text NOT NULL CHECK (status IN ('in_progress','completed')),
-  response_status  int,
+  response_status  int CHECK (response_status BETWEEN 100 AND 599),
   resource_type    text,
   resource_id      uuid,
-  location         text,                            -- e.g. '/api/v1/jobs/{id}'
+  location         text,
   created_at       timestamptz NOT NULL DEFAULT now(),
   expires_at       timestamptz NOT NULL DEFAULT now() + interval '24 hours',
   PRIMARY KEY (tenant_id, user_id, key),
-  CHECK (status = 'in_progress' OR response_status IS NOT NULL)
+  CONSTRAINT idempotency_keys_completed CHECK (status = 'in_progress' OR response_status IS NOT NULL)
 );
 CREATE INDEX idempotency_expiry ON ops.idempotency_keys (expires_at);
--- Same key + same request hash → replay status and Location (the resource is re-read under the caller's
--- current permissions; no response body is stored, so no personal data is duplicated here).
--- Same key + different hash → 422 idempotency_key_reused. Key still in_progress → 409. Purged daily after expiry.
 
 CREATE TABLE ops.break_glass_grants (
-  id uuid PRIMARY KEY, tenant_id uuid NOT NULL,
-  platform_user_id uuid NOT NULL,                   -- platform.operators.id (no cross-schema FK)
-  approved_by_membership uuid,
-  reason text NOT NULL, scope jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('requested','approved','active','expired','revoked','denied')),
-  starts_at timestamptz, expires_at timestamptz, revoked_at timestamptz,
-  CHECK (expires_at IS NULL OR expires_at <= starts_at + interval '8 hours'),
-  FOREIGN KEY (tenant_id, approved_by_membership) REFERENCES core.memberships (tenant_id, id)
+  id                      uuid PRIMARY KEY,
+  tenant_id               uuid NOT NULL REFERENCES core.tenants (id),
+  platform_user_id        uuid NOT NULL,           -- platform.operators.id (no cross-schema FK)
+  platform_request_id     uuid,                    -- platform.breakglass_requests.id
+  approved_by_membership  uuid,
+  reason                  text NOT NULL CHECK (char_length(reason) BETWEEN 10 AND 500),
+  scope                   jsonb NOT NULL CHECK (jsonb_typeof(scope) = 'object'),
+  status                  text NOT NULL CHECK (status IN
+                            ('requested','approved','active','expired','revoked','denied')),
+  starts_at               timestamptz,
+  expires_at              timestamptz,
+  revoked_at              timestamptz,
+  created_at              timestamptz NOT NULL DEFAULT now(),
+  updated_at              timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT break_glass_grants_tenant_id_id_key UNIQUE (tenant_id, id),
+  -- 07 §6.4: a grant lasts at most 8 hours.
+  CONSTRAINT break_glass_grants_max_8h CHECK (
+    expires_at IS NULL
+    OR (starts_at IS NOT NULL AND expires_at > starts_at
+        AND expires_at <= starts_at + interval '8 hours')),
+  CONSTRAINT break_glass_grants_window_when_active
+    CHECK (status NOT IN ('active','approved') OR (starts_at IS NOT NULL AND expires_at IS NOT NULL)),
+  CONSTRAINT break_glass_grants_revoked_at CHECK ((status = 'revoked') = (revoked_at IS NOT NULL)),
+  CONSTRAINT break_glass_grants_approver_fk FOREIGN KEY (tenant_id, approved_by_membership)
+    REFERENCES core.memberships (tenant_id, id)
 );
+
+-- Outbox rows are written by the app and only claimed by the dispatcher (never edited):
+REVOKE UPDATE, DELETE ON ops.outbox FROM sos_app;
+GRANT SELECT, UPDATE (dispatched_at) ON ops.outbox TO sos_definer;
+-- updated_at triggers on ops.job_runs and ops.break_glass_grants
 ```
 
-All `ops` tables are tenant-owned and use the standard RLS policy. Feature flags moved out of `ops`: they are platform data in `platform.feature_flags` (16 §7).
+- **Outbox:** domain events are written in the same transaction as the change; payloads carry IDs only. The dispatcher (beat `ops.dispatch_outbox`, every 5 s) is the only cross-tenant consumer: it calls `ops.claim_outbox(batch)` (§3.4), then workers open a normal `tenant_session(tenant_id)` per event.
+- **Idempotency keys** (09 §2): same key + same request hash → replay status and `Location` (the resource is re-read under the caller's current permissions; no response body is stored); same key + different hash → `422 idempotency_key_reused`; key still `in_progress` → `409`. Purged daily after expiry (beat `ops.purge_idempotency_keys`, 02:40 IST). Control-plane routes cannot use this table (`sos_platform` has no `ops` privileges); they keep idempotency records in Valkey (16 §8).
+- **Break-glass grants:** at most 8 hours (`break_glass_grants_max_8h`), a window is required once `approved`/`active`, `revoked_at` iff `revoked`. The workflow ships in M1 (07 §6.4).
 
 ## 8. Data classification
 
@@ -768,7 +1029,7 @@ Identity attributes resolve to the verified admission-register value (BR-01). If
 
 ## 12. Partitioning (Stage 1 → 2)
 
-- `audit.events`: monthly range partitions from day one.
+- `audit.events`: monthly range partitions from day one (`audit.events_yYYYYmMM`, no DEFAULT partition; creation and runway in §7.1).
 - `kb.document_chunks`: hash-partition by `tenant_id` (e.g., 16 partitions) when crossing ~10M rows or when recall/latency degrade.
 - `kb.queries`: monthly range partitions once volume warrants; retention-driven partition drops.
 
@@ -793,11 +1054,13 @@ Identity attributes resolve to the verified admission-register value (BR-01). If
 
 ## 14. Migration guidelines
 
-- Alembic, one logical change per revision; `sos_migrator` role only; run as a pre-deploy task.
+- Alembic, one logical change per revision; `sos_migrator` role only (`SET ROLE sos_owner`); run as a pre-deploy task followed by `python -m app.audit.partitions --months-ahead 12`.
 - **Expand → migrate → contract** for breaking changes (add nullable column → backfill in batches → switch reads → drop old in a later release).
 - Every new tenant table ships with RLS in the **same** migration; CI catalog test enforces it.
 - Every new tenant→tenant reference is a composite FK (§3.5); every new referenced table declares `UNIQUE (tenant_id, id)`.
-- Adding a `SECURITY DEFINER` function or a `definer_access` policy needs an ADR and an update to the pinned allowlists (§3.3–3.4).
-- Revision IDs are fixed and linear: `0001_baseline` → `0002_audit` → `0003_core_schema` → `0004_authz_seed` → `0005_platform` → `0006_ops`, then later modules.
+- Adding a `SECURITY DEFINER` function or a `definer_access` policy needs an ADR and an update to the pinned lists in `apps/api/tests/security/rls_allowlist.yaml` (§3.3–3.4).
+- Revision IDs are fixed and linear: `0001_baseline` → `0002_audit` → `0003_core_schema` → `0004_authz_seed` → `0005_platform` → `0006_ops` → `0007_accept_invitations`, then later modules.
+- Definer functions are created with the pattern in §3.4 (as `sos_definer`, `CREATE` granted and revoked inside the migration).
+- `make migration-check` (`apps/api/tests/migrations/`) runs upgrade → downgrade → upgrade on a fresh database; CI job `migrations`.
 - Backfills run as idempotent jobs with progress, never in the migration transaction for large tables.
 - `CREATE INDEX CONCURRENTLY` for large tables (outside transaction blocks).
