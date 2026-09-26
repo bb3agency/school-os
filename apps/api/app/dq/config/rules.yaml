@@ -1,0 +1,140 @@
+# Data-quality rule catalog (docs/02 §5, FR-DQ-001). Declarative metadata only: the checks
+# themselves are implemented by the DQ engine (M1 wave 2) and looked up by `check`.
+# Loaded and validated by app.dq.rules.load_rules(): every rule needs EN and TE text
+# (explanations.yaml `rules`) and at least one known correction route; the first route is the
+# primary suggestion. Bump a rule's `version` whenever its behaviour changes (findings store it).
+#
+# severity:
+#   {mode: fixed, level: <severity>}                        the catalog severity
+#   {mode: match_class, floor: <sev>|null, cap: <sev>|null}  name rules: severity of the match
+#     class (match_classes.yaml), raised to `floor` and lowered to `cap`; no finding when the
+#     class has no severity (EXACT, MISSING).
+# sources: attribute value sources compared (docs/05 §5 sis.attribute_values.source), or
+#   `canonical` for checks on the resolved canonical value (docs/05 §10).
+# Routes follow BR-01/BR-03: the admission register is the legal anchor, so when another
+# source disagrees the other source is corrected first; the school record route comes next
+# for the case where the register itself is wrong.
+version: 1
+
+rules:
+  - id: DQ-001
+    version: 1
+    check: name_match
+    scope: student
+    attribute_keys: [full_name]
+    sources: [admission_register, aadhaar_as_printed]
+    severity: {mode: match_class}
+    explanation_key: DQ-001
+    routes: [ROUTE-UIDAI, ROUTE-SCHOOL-CR]
+
+  - id: DQ-002
+    version: 1
+    check: value_equal
+    scope: student
+    attribute_keys: [dob]
+    sources: [admission_register, aadhaar_as_printed]
+    severity: {mode: fixed, level: blocker}
+    explanation_key: DQ-002
+    routes: [ROUTE-UIDAI, ROUTE-SCHOOL-CR]
+
+  - id: DQ-003
+    version: 1
+    check: value_equal
+    scope: student
+    attribute_keys: [gender]
+    sources: [admission_register, aadhaar_as_printed]
+    severity: {mode: fixed, level: high}
+    explanation_key: DQ-003
+    routes: [ROUTE-UIDAI, ROUTE-SCHOOL-CR]
+
+  - id: DQ-004
+    version: 1
+    check: name_match
+    scope: student
+    attribute_keys: [father_name, mother_name]
+    sources: [admission_register, birth_certificate, tc_incoming, parent_form]
+    severity: {mode: match_class, floor: medium, cap: high}   # docs/02 §5 "medium/high"
+    explanation_key: DQ-004
+    routes: [ROUTE-SCHOOL-CR]
+
+  - id: DQ-005
+    version: 1
+    check: required_fields
+    scope: student
+    attribute_keys: []          # the export profile lists the required fields
+    sources: [canonical]
+    requires_profile: true
+    severity: {mode: fixed, level: blocker}
+    explanation_key: DQ-005
+    routes: [ROUTE-SCHOOL-CR]
+
+  - id: DQ-006
+    version: 1
+    check: name_format
+    scope: student
+    attribute_keys: [full_name, father_name, mother_name]
+    sources: [canonical]
+    requires_profile: true
+    severity: {mode: fixed, level: blocker}
+    explanation_key: DQ-006
+    routes: [ROUTE-SCHOOL-CR]
+
+  - id: DQ-007
+    version: 1
+    check: age_band
+    scope: student
+    attribute_keys: [dob]
+    sources: [canonical]
+    severity: {mode: fixed, level: medium}
+    explanation_key: DQ-007
+    routes: [ROUTE-SCHOOL-CR]
+
+  - id: DQ-008
+    version: 1
+    check: duplicate
+    scope: student_pair
+    attribute_keys: [full_name, dob, father_name]
+    sources: [canonical]
+    severity: {mode: fixed, level: high}
+    explanation_key: DQ-008
+    routes: [ROUTE-SCHOOL-CR]
+
+  - id: DQ-009
+    version: 1
+    check: aadhaar_details
+    scope: student
+    attribute_keys: [aadhaar_last4, full_name, dob, gender]
+    sources: [aadhaar_as_printed]
+    severity: {mode: fixed, level: medium}
+    explanation_key: DQ-009
+    routes: [ROUTE-SCHOOL-CR]
+
+  - id: DQ-010
+    version: 1
+    check: cross_source
+    scope: student
+    attribute_keys: [full_name, dob, gender, father_name, mother_name]
+    sources: [admission_register, board_registration]
+    severity: {mode: fixed, level: high}
+    explanation_key: DQ-010
+    routes: [ROUTE-BOARD, ROUTE-SCHOOL-CR]
+
+  - id: DQ-011
+    version: 1
+    check: cross_source
+    scope: student
+    attribute_keys: [full_name, dob, gender, father_name, mother_name]
+    sources: [admission_register, udise_plus]
+    severity: {mode: fixed, level: medium}
+    explanation_key: DQ-011
+    routes: [ROUTE-UDISE, ROUTE-SCHOOL-CR]
+
+  - id: DQ-012
+    version: 1
+    check: enrolment_overlap
+    scope: enrolment
+    attribute_keys: []
+    sources: []
+    severity: {mode: fixed, level: high}
+    explanation_key: DQ-012
+    routes: [ROUTE-SCHOOL-CR]
