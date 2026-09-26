@@ -4,7 +4,14 @@ import type { ApiClient, Problem } from "@schoolos/api-client";
 import { useQuery, type QueryKey } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import { useMemo } from "react";
-import { loadError, loading, ready, unavailable, type Loadable } from "@/lib/loadable";
+import {
+  loadError,
+  loading,
+  ready,
+  unavailable,
+  type Loadable,
+  type LoadErrorReason,
+} from "@/lib/loadable";
 import { AuthRedirectError, createBffClient } from "./fetch";
 import type { Navigate, SessionKind } from "./session-client";
 
@@ -59,6 +66,21 @@ export function useBffClient(kind: SessionKind): ApiClient {
   );
 }
 
+const REASONS: Record<string, LoadErrorReason> = {
+  active_tenant_required: "active_tenant_required",
+  mfa_required: "mfa_required",
+  tenant_suspended: "tenant_suspended",
+  no_membership: "forbidden",
+  forbidden: "forbidden",
+  wrong_session: "forbidden",
+};
+
+function reasonOf(error: unknown): LoadErrorReason | undefined {
+  if (!(error instanceof ApiError)) return undefined;
+  if (error.code && error.code in REASONS) return REASONS[error.code];
+  return error.status === 403 ? "forbidden" : undefined;
+}
+
 /** Query through the BFF, exposed as a Loadable for the view components. */
 export function useApiQuery<T>(queryKey: QueryKey, load: () => Promise<T>): Loadable<T> {
   const query = useQuery({
@@ -75,7 +97,8 @@ export function useApiQuery<T>(queryKey: QueryKey, load: () => Promise<T>): Load
     if (query.error instanceof NotAvailableError) return unavailable;
     // Navigating to sign-in or step-up: keep showing the loading state.
     if (query.error instanceof AuthRedirectError) return loading;
-    return loadError;
+    const reason = reasonOf(query.error);
+    return reason ? { status: "error", reason } : loadError;
   }
   return ready(query.data);
 }

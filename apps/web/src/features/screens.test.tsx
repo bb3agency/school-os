@@ -13,6 +13,37 @@ const navigate = vi.fn();
 
 const page = (data: unknown[]) => Response.json({ data, next_cursor: null });
 
+// Fixtures in the generated API shapes (apps/api/openapi.json). Synthetic data only.
+const STAMP = {
+  version: 1,
+  created_at: "2026-06-01T04:30:00Z",
+  updated_at: "2026-06-01T04:30:00Z",
+};
+const YEAR = {
+  id: "0192f3a4-0000-7000-8000-0000000000a1",
+  label: "2026-27",
+  starts_on: "2026-06-01",
+  ends_on: "2027-04-30",
+  is_current: true,
+  ...STAMP,
+};
+const CLASS_6 = {
+  id: "0192f3a4-0000-7000-8000-0000000000c6",
+  code: "6",
+  display_en: "Class 6",
+  display_te: "6వ తరగతి",
+  sort_order: 6,
+  ...STAMP,
+};
+const section = (name: string) => ({
+  id: `0192f3a4-0000-7000-8000-0000000000${name.toLowerCase()}${name.toLowerCase()}`.slice(0, 36),
+  academic_year_id: YEAR.id,
+  class_id: CLASS_6.id,
+  name,
+  class_teacher_membership_id: null,
+  ...STAMP,
+});
+
 beforeEach(() => {
   forgetSessionInfo();
   seen = [];
@@ -36,17 +67,26 @@ afterEach(() => {
 });
 
 describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
-  it("structure: shows rows, 'not available yet' for 404 and a plain error for 500", async () => {
-    routes["/bff/api/v1/academic-years"] = () =>
-      page([
-        {
-          id: "y1",
-          label: "2026-27",
-          starts_on: "2026-06-01",
-          ends_on: "2027-04-30",
-          is_current: true,
-        },
-      ]);
+  it("structure: classes in Telugu, sections with their class, section counts", async () => {
+    routes["/bff/api/v1/academic-years"] = () => page([YEAR]);
+    routes["/bff/api/v1/classes"] = () => page([CLASS_6]);
+    routes["/bff/api/v1/sections"] = () => page([section("A"), section("B")]);
+    renderWithIntl(<StructureScreen />, "te");
+
+    expect(await screen.findByText("2026-27")).toBeInTheDocument();
+    const classes = await screen.findByRole("region", {
+      name: new RegExp(`^${messages.te.school.structure.classes.title}\\.`),
+    });
+    expect(within(classes).getByText("6వ తరగతి")).toBeInTheDocument();
+    expect(within(classes).getByText("2")).toBeInTheDocument();
+    const sections = await screen.findByRole("region", {
+      name: new RegExp(`^${messages.te.school.structure.sections.title}\\.`),
+    });
+    expect(within(sections).getAllByText("6వ తరగతి")).toHaveLength(2);
+  });
+
+  it("structure: 'not available yet' for 404 and a plain error for 500", async () => {
+    routes["/bff/api/v1/academic-years"] = () => page([YEAR]);
     routes["/bff/api/v1/sections"] = () =>
       Response.json({ code: "internal_error" }, { status: 500 });
     renderWithIntl(<StructureScreen />, "te");
@@ -67,17 +107,29 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     routes["/bff/api/v1/users"] = () =>
       page([
         {
-          id: "u1",
+          id: "0192f3a4-0000-7000-8000-0000000000d1",
+          membership_id: "0192f3a4-0000-7000-8000-0000000000e1",
           display_name: "Lakshmi K",
-          login: "lakshmi",
-          roles: ["office_staff"],
-          scope_summary: null,
-          status: "active",
-          last_sign_in_at: null,
+          email: null,
+          preferred_language: "te",
+          status: "suspended",
+          expires_at: null,
+          roles: ["office_staff", "custom_librarian"],
+          scopes: [
+            { type: "class", ref: CLASS_6.id },
+            { type: "section", ref: "s1" },
+            { type: "section", ref: "s2" },
+          ],
+          last_login_at: null,
+          created_at: "2026-06-01T04:30:00Z",
+          version: 3,
         },
       ]);
     renderWithIntl(<UsersScreen />);
     expect(await screen.findByText("Lakshmi K")).toBeInTheDocument();
+    expect(screen.getByText("Office staff and custom_librarian")).toBeInTheDocument();
+    expect(screen.getByText("1 class and 2 sections")).toBeInTheDocument();
+    expect(screen.getByText(messages.en.status.member.suspended)).toBeInTheDocument();
     expect(seen.find((u) => u.pathname === "/bff/api/v1/users")?.searchParams.get("limit")).toBe(
       "200",
     );
@@ -99,6 +151,21 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
+  it("explains 'choose a school first' (409 active_tenant_required) and no access (403)", async () => {
+    routes["/bff/api/v1/users"] = () =>
+      Response.json({ code: "active_tenant_required" }, { status: 409 });
+    renderWithIntl(<UsersScreen />);
+    expect(
+      await screen.findByText(messages.en.errors.load.active_tenant_required),
+    ).toBeInTheDocument();
+  });
+
+  it("explains a missing permission (403)", async () => {
+    routes["/bff/api/v1/users"] = () => Response.json({ code: "forbidden" }, { status: 403 });
+    renderWithIntl(<UsersScreen />, "te");
+    expect(await screen.findByText(messages.te.errors.load.forbidden)).toBeInTheDocument();
+  });
+
   it("session ended: sends the user to sign in", async () => {
     routes["/bff/api/v1/users"] = () => Response.json({ code: "unauthenticated" }, { status: 401 });
     renderWithIntl(<UsersScreen />);
@@ -108,13 +175,28 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
   });
 
   it("audit: passes filters, converting DD/MM/YYYY dates", async () => {
-    routes["/bff/api/v1/audit/events"] = () => page([]);
+    routes["/bff/api/v1/audit/events"] = () =>
+      page([
+        {
+          id: "0192f3a4-0000-7000-8000-0000000000f1",
+          seq: 7,
+          occurred_at: "2026-09-26T04:30:00Z",
+          actor_type: "user",
+          actor_id: "0192f3a4-0000-7000-8000-0000000000d1",
+          action: "tenant.class.created",
+          resource_type: "class",
+          resource_id: CLASS_6.id,
+          summary: { fields: ["code", "display_en"], count: 1 },
+          request_id: "req_1",
+        },
+      ]);
     renderWithIntl(
       <AuditScreen
         filters={{ actor: " clerk ", action: "", from: "01/06/2026", to: "31/02/2026" }}
       />,
     );
-    expect(await screen.findByText(messages.en.school.audit.emptyTitle)).toBeInTheDocument();
+    expect(await screen.findByText("fields: code, display_en; count: 1")).toBeInTheDocument();
+    expect(screen.getByText("Staff user · 0192f3a4")).toBeInTheDocument();
     const url = seen.find((u) => u.pathname === "/bff/api/v1/audit/events");
     expect(url?.searchParams.get("actor")).toBe("clerk");
     expect(url?.searchParams.get("from")).toBe("2026-06-01");

@@ -71,12 +71,13 @@ export function DataTable<T>({
   captionHidden = false,
 }: DataTableProps<T>) {
   const t = useTranslations("common");
+  const te = useTranslations("errors");
 
   if (state.status === "loading") return <LoadingState label={t("loading")} />;
   if (state.status === "error") {
     return (
       <Alert tone="danger" title={t("loadErrorTitle")}>
-        {t("loadErrorBody")}
+        {state.reason ? te(`load.${state.reason}`) : t("loadErrorBody")}
       </Alert>
     );
   }

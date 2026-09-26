@@ -1,5 +1,5 @@
 import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -14,10 +14,26 @@ export interface StructureViewProps {
   sections: Loadable<readonly Section[]>;
 }
 
+/** Class name in the UI language (the API stores English and Telugu names). */
+export function className(schoolClass: SchoolClass, locale: string): string {
+  return locale === "te" && schoolClass.display_te
+    ? schoolClass.display_te
+    : schoolClass.display_en;
+}
+
 /** US-202 / FR-TEN-010: academic years, classes and sections (writes: tenant.structure.manage). */
 export function StructureView({ years, classes, sections }: StructureViewProps) {
   const t = useTranslations("school.structure");
   const tc = useTranslations("common");
+  const locale = useLocale();
+
+  const classById = new Map(
+    classes.status === "ready" ? classes.data.map((row) => [row.id, row] as const) : [],
+  );
+  const sectionCount = (classId: string): string | null =>
+    sections.status === "ready"
+      ? String(sections.data.filter((section) => section.class_id === classId).length)
+      : null;
 
   const yearColumns: Column<AcademicYear>[] = [
     { key: "label", header: t("years.colYear"), cell: (row) => row.label },
@@ -39,12 +55,23 @@ export function StructureView({ years, classes, sections }: StructureViewProps) 
     },
   ];
   const classColumns: Column<SchoolClass>[] = [
-    { key: "name", header: t("classes.colName"), cell: (row) => row.name },
+    { key: "name", header: t("classes.colName"), cell: (row) => className(row, locale) },
     { key: "order", header: t("classes.colOrder"), cell: (row) => row.sort_order },
-    { key: "sections", header: t("classes.colSections"), cell: (row) => row.section_count },
+    {
+      key: "sections",
+      header: t("classes.colSections"),
+      cell: (row) => <Value>{sectionCount(row.id)}</Value>,
+    },
   ];
   const sectionColumns: Column<Section>[] = [
-    { key: "class", header: t("sections.colClass"), cell: (row) => row.class_name },
+    {
+      key: "class",
+      header: t("sections.colClass"),
+      cell: (row) => {
+        const parent = classById.get(row.class_id);
+        return <Value>{parent ? className(parent, locale) : null}</Value>;
+      },
+    },
     { key: "name", header: t("sections.colName"), cell: (row) => row.name },
   ];
 

@@ -96,6 +96,12 @@
       "expired": "Expired",
       "rejected": "Rejected",
       "revoked": "Revoked"
+    },
+    "member": {
+      "invited": "Invited",
+      "active": "Active",
+      "suspended": "Suspended",
+      "removed": "Removed"
     }
   },
   "deploymentMode": {
@@ -158,7 +164,7 @@
       "description": "Invite staff, give them roles and choose which classes they can see.",
       "invite": "Invite user",
       "colName": "Name",
-      "colLogin": "Sign-in ID",
+      "colEmail": "Email",
       "colRoles": "Roles",
       "colScope": "Can see",
       "colStatus": "Status",
@@ -170,6 +176,8 @@
       "colRole": "Role",
       "colRoleKey": "Role key",
       "scopeSchool": "Whole school",
+      "scopeClasses": "{count, plural, one {# class} other {# classes}}",
+      "scopeSections": "{count, plural, one {# section} other {# sections}}",
       "roles": {
         "owner": "Owner",
         "principal": "Principal",
@@ -227,7 +235,12 @@
       "colRecord": "Record",
       "colSummary": "Details",
       "emptyTitle": "No audit events to show",
-      "emptyBody": "Try a wider date range or clear the filters."
+      "emptyBody": "Try a wider date range or clear the filters.",
+      "actor": {
+        "user": "Staff user",
+        "system": "System",
+        "operator": "SchoolOS support"
+      }
     }
   },
   "platform": {
@@ -552,8 +565,12 @@
     "notFoundTitle": "Page not found",
     "notFoundBody": "Check the address, or go back to the home page.",
     "goHome": "Go to home",
-    "sessionEnded": "Your session has ended. Sign in again to continue.",
-    "forbidden": "You don't have access to this. Ask your school's office admin if you need it."
+    "load": {
+      "forbidden": "You don't have access to this. Ask your school's office admin if you need it.",
+      "active_tenant_required": "You work in more than one school. Choose the school first, then open this page again.",
+      "mfa_required": "Your role needs two-step verification (MFA). Set it up, then sign in again.",
+      "tenant_suspended": "This school's access is paused. The owner can contact SchoolOS support."
+    }
   },
   "auth": {
     "signedInAs": "Signed in as {name}",
