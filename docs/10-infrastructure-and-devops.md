@@ -68,7 +68,7 @@ infra/terraform/
 │   ├── redis/                ElastiCache for Valkey 8 (TLS, AUTH token via write-only attributes)
 │   ├── s3/                   shared-tier buckets (files, audit archive with Object Lock), lifecycle by tag
 │   ├── s3_bucket/            hardened private bucket used by every stack
-│   ├── kms/                  CMKs (data, audit, backup), rotation, key policies
+│   ├── kms/                  CMKs (data, audit, backup, logs; annual rotation) + asymmetric audit-signing keys, key policies
 │   ├── secrets/              Secrets Manager secrets (ephemeral generation, write-only values)
 │   ├── ecr/                  repositories (immutable tags, scan on push, KMS)
 │   ├── ecs_cluster/          Fargate cluster, Container Insights, ECS Exec audit, Service Connect
@@ -93,6 +93,8 @@ Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs 
 - Checks: `terraform fmt/validate`, `tflint`, Trivy/Checkov IaC scan (no public buckets, encryption on, logging on).
 - Mandatory tags: `project`, `env`, `owner`, `data_class`, `cost_center`.
 - Log group retention: security/access/app logs **400 days** (≥ 13 months) in ap-south-1.
+- App container settings: `shared_platform` gives the `api`, `worker`, `beat` and `migrate` tasks the same base settings (`local.app_env` + `local.app_base_secrets`; `migrate` adds `SOS_MIGRATOR_DATABASE_URL`, `api`/`worker` add the provider API keys) under the names in §11, so each task passes the staging/prod start-up guards. The shared tier needs `billing_supplier_legal_name` and `billing_supplier_gstin` (validated GSTIN whose first two digits equal `billing_supplier_state_code`, default `37`); the staging tfvars example uses a synthetic supplier that is not valid for tax invoices. `apps/api/tests/deploy/test_env_contract.py` parses the HCL maps and `deploy/dedicated/compose.yaml` and fails when a name is not a setting or a container would be refused at start-up.
+- Audit archive signing (FR-AUD-004): an asymmetric `audit-signing` KMS key (`ECC_NIST_P256`, `SIGN_VERIFY`, `ECDSA_SHA_256`) per shared environment and per dedicated host; only the worker task role (shared) and the host's instance role (dedicated) may `kms:Sign`/`kms:GetPublicKey`. AWS KMS does not rotate asymmetric keys: replacing one means a new key and keeping the old public key to verify older archives.
 
 ## 6. Containers
 
@@ -220,6 +222,8 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_DEPLOYMENT_ID`, `SOS_DEDICATED_TENANT_ID` | none | Dedicated hosts: identity in the heartbeat |
 | `SOS_HEARTBEAT_KEY_ID`, `SOS_HEARTBEAT_KEY` | none | Dedicated hosts: heartbeat HMAC key (base64url, shown once by the panel) |
 
+Deployments use exactly these names: Terraform `shared_platform` (§5) and `deploy/dedicated/compose.yaml` (§15.2) give every app container (api, worker, beat, migrate) the full set it needs, and `apps/api/tests/deploy/test_env_contract.py` enforces it. Names that reach app containers without being settings are allowlisted there with the reader: `AWS_DEFAULT_REGION` (AWS SDK), `SOS_HOST_STATE_DIR` (dedicated host state mount), `SOS_ANTHROPIC_API_KEY` and `SOS_EMBEDDINGS_API_KEY` (until the knowledge gateway adds its settings, M2).
+
 Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
 
 **Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`.
@@ -260,16 +264,18 @@ A dedicated-tier school gets its own host running the same images as the shared 
 |---|---|
 | EC2 instance | ap-south-1; Graviton where images allow; Ubuntu 24.04 LTS (Canonical AMI via SSM public parameter), hardened; IMDSv2 only; encrypted gp3 EBS with the host's KMS key; SSM agent; no SSH key pair |
 | Network | Dedicated VPC subnet per region shared by dedicated hosts, one security group per host: inbound 80/443 only; egress to AWS endpoints, the control plane, LLM/embeddings/OCR providers and OS/image registries |
-| KMS | One customer-managed key per host (EBS, buckets, backups, Secrets Manager secrets); deleting it crypto-shreds the host's data and backups |
+| KMS | One customer-managed key per host (EBS, buckets, Secrets Manager secrets, tenant key wrapping: `SOS_KMS_DATA_KEY_ARN`) plus the backup key in ap-south-2; deleting them crypto-shreds the host's data and backups. A separate asymmetric audit-signing key per host (`ECC_NIST_P256`, `SOS_AUDIT_SIGNING_KEY_ARN`; the instance role may `kms:Sign` and `kms:GetPublicKey`) signs the daily audit archives |
 | S3 | Files bucket (ap-south-1) and backup bucket (ap-south-2), private, versioned, TLS-only, encrypted with the host key; lifecycle per 05 §13 |
 | IAM | Instance role limited to its own buckets, key, Secrets Manager secrets (`schoolos/<tenant_code>/*`) and log group |
-| Secrets | AWS Secrets Manager secrets encrypted with the host key: generated secrets (DB passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, …) and an operator secret filled after apply (LLM API key, heartbeat key); `deploy/dedicated/scripts/fetch-secrets.sh` renders them into a 0600 env file |
+| Secrets | AWS Secrets Manager secrets encrypted with the host key: generated secrets (DB passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, …) and an operator secret filled after apply (`SOS_ANTHROPIC_API_KEY`, `SOS_HEARTBEAT_KEY_ID`, `SOS_HEARTBEAT_KEY`); `deploy/dedicated/scripts/fetch-secrets.sh` renders them into a 0600 env file. Non-secret host settings (`SOS_CONTROL_PLANE_URL`, `SOS_DEPLOYMENT_ID`, `SOS_DEDICATED_TENANT_ID`, key ARNs) come from Terraform in `/etc/schoolos/host.env` |
 | Logs | CloudWatch log group in ap-south-1, 400-day retention (CERT-In/DPDP) |
 | DNS | Default host name under the SchoolOS domain; optional custom domain (school adds a CNAME) |
 
 ### 15.2 Runtime: `deploy/dedicated/compose.yaml`
 
-Services: `caddy` (TLS termination, ACME certificates for the default and custom domains, HSTS, security headers), `web`, `api`, `worker`, `beat`, `postgres` (`pgvector/pgvector:0.8.6-pg16-bookworm`), `valkey` (`valkey/valkey:8.1-alpine`). Images are pulled **by digest**. Only `caddy` publishes ports (80/443); Postgres and Valkey listen on the internal container network only. `SOS_DEPLOYMENT_MODE=dedicated` removes control-plane routes and schedules. `beat` sends the heartbeat (16 §12).
+Services: `caddy` (TLS termination, ACME certificates for the default and custom domains, HSTS, security headers), `web`, `api`, `worker`, `beat`, `postgres` (`pgvector/pgvector:0.8.6-pg16-bookworm`), `valkey` (`valkey/valkey:8.1-alpine`). Images are pulled **by digest**. Only `caddy` publishes ports (80/443); Postgres and Valkey listen on the internal container network only. `SOS_DEPLOYMENT_MODE=dedicated` removes control-plane routes and schedules. `beat` schedules the heartbeat and the worker sends it (16 §12). The `api`, `worker`, `beat` and one-off `migrate` services share one settings block (`x-app-env`, names as in §11), so each passes the production start-up guards.
+
+After `db-bootstrap` and `migrate`, the school is created on the host with `python -m app.platform.provision_dedicated` (run in the api image via `scripts/compose.sh run --rm api ...`; see `deploy/dedicated/README.md`, Provisioning step 6). It refuses unless `SOS_DEPLOYMENT_MODE=dedicated` and `--tenant-id` equals `SOS_DEDICATED_TENANT_ID` (the tenant ID the control plane chose, 16 §5.4), and it refuses a second school on the same host. It registers the tenant with that ID, creates its keys and system roles, invites the owner and activates the school; it is resumable and audited.
 
 ### 15.3 Backups and restore
 
