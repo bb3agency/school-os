@@ -76,6 +76,11 @@ def _target(w: Any) -> Any:
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
+    ("POST", "/api/v1/me/accept-invitations"): lambda w, r, a: (
+        "/api/v1/me/accept-invitations",
+        None,
+        {},
+    ),
     ("POST", "/api/v1/me/active-tenant"): lambda w, r, a: (
         "/api/v1/me/active-tenant",
         {"tenant_id": str(w.a.tenant_id)},

@@ -17,6 +17,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Any
 
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
@@ -267,6 +268,43 @@ def record_login_event(
         )
         if succeeded:
             repo.record_login(session, user_id)
+
+
+def accept_invitations(subject: str, *, request_id: str | None = None) -> list[uuid.UUID]:
+    """Accept the signed-in user's pending invitations on first sign-in (ADR-0019).
+
+    ``subject`` MUST come from a verified access token. Activation and the
+    ``membership.invitation_accepted`` audit events share one transaction: the tenant context is
+    switched per accepted school (transaction-local ``set_config``) so each event lands in that
+    school's own chain. Only the caller's own memberships are involved. Returns the school IDs.
+    """
+    accepted: list[uuid.UUID] = []
+    with context_free_session() as session:
+        for tenant_id, membership_id, user_id in repo.accept_invitations(session, subject):
+            session.execute(
+                text(
+                    "SELECT set_config('app.tenant_id', :t, true), "
+                    "set_config('app.user_id', :u, true)"
+                ),
+                {"t": str(tenant_id), "u": str(user_id)},
+            )
+            audit.record(
+                session,
+                action="membership.invitation_accepted",
+                resource_type="membership",
+                resource_id=membership_id,
+                summary={"membership_id": membership_id},
+                actor_type="user",
+                actor_id=user_id,
+                request_id=request_id or _request_id(),
+            )
+            accepted.append(tenant_id)
+        session.execute(
+            text(
+                "SELECT set_config('app.tenant_id', '', true), set_config('app.user_id', '', true)"
+            )
+        )
+    return accepted
 
 
 # --- me ---------------------------------------------------------------------------------------

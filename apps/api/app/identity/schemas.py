@@ -176,6 +176,12 @@ class ActiveTenantIn(_In):
     tenant_id: uuid.UUID
 
 
+class AcceptedInvitationsOut(_Out):
+    """Schools whose invitation was accepted by this sign-in (ADR-0019)."""
+
+    accepted: list[uuid.UUID]
+
+
 class SchoolChoiceOut(_Out):
     """A school the signed-in user may work in (school picker; no personal data)."""
 

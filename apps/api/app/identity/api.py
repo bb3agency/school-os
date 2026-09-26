@@ -38,6 +38,7 @@ from app.core.errors import Forbidden, ValidationFailed
 from app.identity import service as identity
 from app.identity.principal import Principal, get_principal
 from app.identity.schemas import (
+    AcceptedInvitationsOut,
     ActiveTenantIn,
     InviteIn,
     LoginEventOut,
@@ -79,6 +80,23 @@ def get_me(
     and the schools they can switch to (permission: any active member)."""
     tenant_ids = [c.tenant_id for c in resolver.choices(principal)]
     return identity.me(db, ctx, tenant_ids=tenant_ids)
+
+
+@router.post("/me/accept-invitations", response_model=AcceptedInvitationsOut)
+def accept_my_invitations(
+    principal: Caller, resolver: Resolver, request: Request
+) -> AcceptedInvitationsOut:
+    """Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the
+    OIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged
+    active membership without MFA gets 403 ``mfa_required`` (FR-IAM-002)."""
+    choices = resolver.choices(principal)
+    if not principal.mfa and any(resolver.snapshot(c).mfa_required for c in choices):
+        raise Forbidden(
+            "Your role needs two-step verification (MFA). Set it up, then sign in again.",
+            code="mfa_required",
+        )
+    accepted = identity.accept_invitations(principal.subject, request_id=request_id_of(request))
+    return AcceptedInvitationsOut(accepted=accepted)
 
 
 @router.get("/me/schools", response_model=SchoolChoicesOut)

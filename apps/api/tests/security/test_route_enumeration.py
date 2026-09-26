@@ -24,6 +24,7 @@ from app.main import create_app
 # Routes that authenticate the caller but do not need a resolved school.
 TENANTLESS = {
     ("GET", "/api/v1/me/schools"),
+    ("POST", "/api/v1/me/accept-invitations"),
     ("POST", "/api/v1/me/active-tenant"),
     ("POST", "/api/v1/me/login-event"),
 }

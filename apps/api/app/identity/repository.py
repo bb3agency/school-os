@@ -85,6 +85,23 @@ def resolve_login(session: Session, subject: str) -> list[LoginMembership]:
     ]
 
 
+def accept_invitations(
+    session: Session, subject: str
+) -> list[tuple[uuid.UUID, uuid.UUID, uuid.UUID]]:
+    """Activate the subject's own pending invitations (ADR-0019, ``core.accept_invitations``).
+
+    Returns (tenant_id, membership_id, user_id) for each accepted membership.
+    """
+    rows = session.execute(
+        text("SELECT tenant_id, membership_id, user_id FROM core.accept_invitations(:s)"),
+        {"s": subject},
+    ).all()
+    return [
+        (uuid.UUID(str(r.tenant_id)), uuid.UUID(str(r.membership_id)), uuid.UUID(str(r.user_id)))
+        for r in rows
+    ]
+
+
 def find_user_id_by_subject(session: Session, subject: str) -> uuid.UUID | None:
     value: object = session.execute(
         text("SELECT core.find_user_id_by_subject(:s)"), {"s": subject}
