@@ -28,6 +28,7 @@ dev = [
   "import-linter==2.15",
   "pip-audit==2.10.1",
   "types-pyyaml==6.0.12.20260906",
+  "types-openpyxl==3.1.5.20260827",
   "boto3-stubs[s3,kms]==1.43.103",
   "celery-types==0.26.0",
   "pre-commit==4.6.2",
