@@ -3,6 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
+/** Obvious placeholder (>= 32 bytes); accepted by the BFF only for http://localhost. */
+const devOnly = (name: string) => `dev-only-e2e-${name}-${"x".repeat(32)}`;
+
 /**
  * End-to-end smoke tests (`make e2e`). Not part of the CI unit stage.
  * By default builds nothing: it starts `next start` against an existing `next build`.
@@ -36,7 +39,21 @@ export default defineConfig({
           url: `${baseURL}/healthz`,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
-          env: { APP_BASE_URL: baseURL },
+          // Local http run: dev-only placeholder values are accepted only for localhost.
+          env: {
+            APP_BASE_URL: baseURL,
+            SESSION_SECRET: process.env.SESSION_SECRET ?? devOnly("session"),
+            SOS_SERVICE_TOKEN_KEY: process.env.SOS_SERVICE_TOKEN_KEY ?? devOnly("service"),
+            REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379/1",
+            API_INTERNAL_URL: process.env.API_INTERNAL_URL ?? "http://localhost:8000",
+            OIDC_ISSUER: process.env.OIDC_ISSUER ?? "http://localhost:8080/schoolos",
+            OIDC_CLIENT_ID: "schoolos-web",
+            OIDC_CLIENT_SECRET: devOnly("staff-client"),
+            PLATFORM_OIDC_ISSUER:
+              process.env.PLATFORM_OIDC_ISSUER ?? "http://localhost:8080/platform",
+            PLATFORM_OIDC_CLIENT_ID: "schoolos-platform",
+            PLATFORM_OIDC_CLIENT_SECRET: devOnly("operator-client"),
+          },
         },
       }),
 });

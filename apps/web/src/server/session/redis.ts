@@ -6,9 +6,13 @@ import type { KeyValue } from "./kv";
 /** Compare-and-delete for lock release: only the holder's token removes the lock. */
 const DEL_IF_EQUALS = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end`;
 
+const CONNECT_TIMEOUT_MS = 3_000;
+
 function createValkeyClient(url: string) {
   return createClient({
     url,
+    // Fail fast while disconnected instead of queueing (a request must not hang).
+    disableOfflineQueue: true,
     socket: {
       connectTimeout: 2_000,
       reconnectStrategy: (retries: number) => Math.min(100 * 2 ** retries, 3_000),
@@ -67,6 +71,19 @@ export class RedisKeyValue implements KeyValue {
 export async function connectRedis(url: string): Promise<RedisKeyValue> {
   const client = createValkeyClient(url);
   client.on("error", () => logEvent("valkey_error"));
-  await client.connect();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("valkey connect timeout")), CONNECT_TIMEOUT_MS);
+  });
+  try {
+    // connect() keeps retrying while Valkey is down; give up after a few seconds so the
+    // caller answers 503 and the next request tries again.
+    await Promise.race([client.connect(), timeout]);
+  } catch (error) {
+    client.destroy();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   return new RedisKeyValue(client);
 }
