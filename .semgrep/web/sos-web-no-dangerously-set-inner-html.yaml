@@ -1,0 +1,26 @@
+rules:
+  - id: sos-web-no-dangerously-set-inner-html
+    message: >-
+      dangerouslySetInnerHTML is banned in apps/web (docs/13 §5, docs/07 §11). School records,
+      OCR text and AI answers are untrusted input; render them as React text nodes, or use a
+      reviewed component that builds elements from a parsed, allowlisted structure.
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      owasp: "A03:2021 - Injection"
+      references:
+        - docs/13-engineering-standards.md §5
+    paths:
+      include:
+        - "/apps/web/**"
+        - "/packages/**"
+    pattern-either:
+      - pattern: <$EL dangerouslySetInnerHTML={$X} />
+      - pattern: <$EL dangerouslySetInnerHTML={$X}>$...CHILDREN</$EL>
+      - pattern: |
+          { dangerouslySetInnerHTML: $X }
+      - pattern: |
+          { ..., dangerouslySetInnerHTML: $X, ... }
+      - pattern: $OBJ.dangerouslySetInnerHTML = $X

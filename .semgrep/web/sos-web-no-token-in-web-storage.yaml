@@ -1,0 +1,41 @@
+rules:
+  - id: sos-web-no-token-in-web-storage
+    message: >-
+      Never keep tokens, sessions or credentials in localStorage/sessionStorage: any script
+      on the page can read them. SchoolOS uses the BFF pattern — tokens live server-side and
+      the browser only holds an HttpOnly session cookie (CLAUDE.md §3, docs/07 §5.2, SEC-004).
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-922: Insecure Storage of Sensitive Information"
+      references:
+        - docs/07-security-architecture.md §5.2
+        - docs/13-engineering-standards.md §5
+    paths:
+      include:
+        - "/apps/web/**"
+        - "/packages/**"
+    patterns:
+      - pattern-either:
+          # key names a token/session/credential
+          - patterns:
+              - pattern-either:
+                  - pattern: $STORE.setItem($KEY, $VALUE)
+                  - pattern: $STORE[$KEY] = $VALUE
+                  - pattern: $STORE.$KEY = $VALUE
+              - metavariable-regex:
+                  metavariable: $KEY
+                  regex: (?i)^.*(token|jwt|bearer|session|secret|credential|passw|api[_-]?key|auth|refresh|access).*$
+          # value is a token/session/credential, whatever the key is called
+          - patterns:
+              - pattern-either:
+                  - pattern: $STORE.setItem($KEY, $VALUE)
+                  - pattern: $STORE[$KEY] = $VALUE
+                  - pattern: $STORE.$KEY = $VALUE
+              - metavariable-regex:
+                  metavariable: $VALUE
+                  regex: (?i)^.*(token|jwt|bearer|session|secret|credential|passw|api[_-]?key|auth).*$
+      - metavariable-regex:
+          metavariable: $STORE
+          regex: ^((window|globalThis|self)\.)?(localStorage|sessionStorage)$

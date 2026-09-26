@@ -1,0 +1,98 @@
+# import-linter contracts for the API package (CLAUDE.md §4 module boundaries).
+#
+# Run from the repo root with the uv environment (sos-api is an editable workspace member,
+# so `app` is importable):   uv run lint-imports --config .importlinter
+#
+# Rules expressed here:
+#   1. Modules talk to each other only through `service.py`: nobody outside module Y may
+#      import app.Y.repository or app.Y.models. core, authz and audit are shared building
+#      blocks that everyone may import, so they get no such contract.
+#   2. core is the bottom layer: it must not import any feature module.
+#   3. Tenant-side modules must not import the control plane (app.platform); a dedicated host
+#      runs with the platform routes disabled (CONTRACT §1).
+#
+# Indirect imports are allowed in (1): app.tenancy.service -> app.identity.service ->
+# app.identity.repository is the intended shape. Only direct imports are violations.
+#
+# import-linter fails on modules that do not exist, so only modules that exist today are
+# listed. When a new module lands, add it to every `source_modules` list below and add its
+# own "<module>-internals" contract. Future modules (CLAUDE.md §4):
+#   students, imports, dq, changes, documents, knowledge, exports, notifications, admin, ops
+# Note for knowledge: also forbid app.knowledge.gateway internals once it exists, and keep
+# the semgrep rule `sos-llm-sdk-outside-gateway` for third-party SDK imports.
+
+[importlinter]
+root_package = app
+
+# --- 1. module internals are private -------------------------------------------------------
+
+[importlinter:contract:identity-internals]
+name = identity: repository/models are private (use app.identity.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.tenancy
+    app.platform
+forbidden_modules =
+    app.identity.repository
+    app.identity.models
+allow_indirect_imports = True
+
+[importlinter:contract:tenancy-internals]
+name = tenancy: repository/models are private (use app.tenancy.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.platform
+forbidden_modules =
+    app.tenancy.repository
+    app.tenancy.models
+allow_indirect_imports = True
+
+[importlinter:contract:platform-internals]
+name = platform: repository/models are private (use app.platform.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+forbidden_modules =
+    app.platform.repository
+    app.platform.models
+allow_indirect_imports = True
+
+# --- 2. core is the base layer -------------------------------------------------------------
+
+[importlinter:contract:core-is-base]
+name = core must not import feature modules
+type = forbidden
+source_modules =
+    app.core
+forbidden_modules =
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+
+# --- 3. tenant side never depends on the control plane ------------------------------------
+
+[importlinter:contract:tenant-side-without-control-plane]
+name = tenant-side modules must not import the control plane (app.platform)
+type = forbidden
+source_modules =
+    app.core
+    app.identity
+    app.tenancy
+forbidden_modules =
+    app.platform
