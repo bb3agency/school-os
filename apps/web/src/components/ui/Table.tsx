@@ -80,6 +80,9 @@ export function DataTable<T>({
       </Alert>
     );
   }
+  if (state.status === "unavailable") {
+    return <EmptyState title={t("notAvailableYetTitle")} body={t("notAvailableYetBody")} />;
+  }
   if (state.data.length === 0) {
     return <EmptyState title={emptyTitle} body={emptyBody} action={emptyAction} />;
   }
