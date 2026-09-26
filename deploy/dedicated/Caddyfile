@@ -1,0 +1,66 @@
+# SchoolOS dedicated host edge (TB1). Automatic HTTPS (ACME) for the platform host name and the
+# school's optional custom domain; HTTP only redirects. Only the web/BFF is proxied: the API is reachable
+# solely on the internal container network, and fleet/metrics paths are never exposed here.
+{
+	email {$SOS_ACME_EMAIL}
+	# Admin API stays inside the container (healthcheck only; the port is not published).
+	admin 127.0.0.1:2019
+	servers {
+		protocols h1 h2 h3
+		trusted_proxies static private_ranges
+	}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Frame-Options "DENY"
+		-Server
+		-X-Powered-By
+		# Content-Security-Policy is set by the web app (per-request nonce, 07 §11).
+	}
+}
+
+{$SOS_PUBLIC_HOST} {$SOS_CUSTOM_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+
+	# Never exposed on a school host: control-plane fleet API and metrics.
+	@internal path /api/v1/fleet /api/v1/fleet/* /metrics /metrics/*
+	respond @internal "Not found" 404
+
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy web:3000 {
+		health_uri /healthz
+		health_interval 15s
+		header_up -X-Service-Token
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 120s
+		}
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				# OIDC callback parameters are credentials; never log them.
+				request>uri query {
+					replace code REDACTED
+					replace state REDACTED
+				}
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+				resp_headers>Set-Cookie delete
+			}
+		}
+	}
+}
