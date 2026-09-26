@@ -1,0 +1,148 @@
+# CLAUDE.md: Operating contract for AI coding assistants
+
+Read this file completely before writing or changing code. If a request conflicts with this file, stop and say so.
+
+## 1. What SchoolOS is (60 seconds)
+
+A multi-tenant SaaS for Indian private schools (starting in Andhra Pradesh). The admin office enters student details once; SchoolOS checks them against other sources (admission register, Aadhaar-as-printed, UDISE+, board registration), flags mismatches before portal submissions, generates certificates/registers, and answers questions from the school's own records and documents with citations ("Ask the school").
+
+Users are office clerks, principals, management, accountants, exam coordinators and teachers. They are busy, often not technical, and work on shared office PCs with patchy internet. Parent-facing output is bilingual: English and Telugu.
+
+## 2. Sources of truth
+
+| Topic | Doc |
+|---|---|
+| Scope, business rules | `docs/01-BRD.md`, `docs/02-PRD.md` |
+| Requirements with IDs | `docs/03-TRD.md` |
+| Architecture, modules, flows | `docs/04-system-architecture.md` |
+| Schema, RLS, classification | `docs/05-data-model.md` |
+| RAG, tools, prompts, evals | `docs/06-rag-architecture.md` |
+| Security controls | `docs/07-security-architecture.md` |
+| Privacy/DPDP/Aadhaar | `docs/08-privacy-and-compliance.md` |
+| API conventions | `docs/09-api-specification.md` |
+| Standards and workflow | `docs/13-engineering-standards.md` |
+| What to build next | `docs/14-roadmap.md` |
+
+Reference requirement IDs (e.g. `FR-STU-004`, `SEC-012`) in commit messages, PR descriptions and test names.
+
+## 3. Tech stack (do not substitute without a new ADR)
+
+- **API/Workers:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2.x (typed, sync sessions with psycopg 3), Alembic, Celery + Redis, httpx
+- **Database:** PostgreSQL 16+ with `pgvector`, `pg_trgm`, `citext`; RLS on every tenant table
+- **Files:** S3 (ap-south-1), private buckets, SSE-KMS, presigned URLs
+- **Web:** Next.js (App Router) + TypeScript strict + Tailwind; BFF pattern (tokens never reach browser JS); i18n `en` + `te`
+- **PDF:** HTML/CSS templates rendered by headless Chromium (Playwright) in workers; bundled Noto Sans Telugu
+- **LLM:** Anthropic Claude via commercial API keys, only through `app/knowledge/gateway/` (see ADR-0005)
+- **Embeddings:** provider interface in `app/knowledge/embeddings/`; model chosen by evaluation (ADR-0006)
+- **Identity:** OIDC provider behind `app/identity/` (reference: Amazon Cognito, ADR-0012)
+- **Infra:** Terraform, AWS ap-south-1 (Mumbai), backups copied to ap-south-2 (Hyderabad); GitHub Actions
+
+## 4. Repository layout
+
+```
+apps/api/app/
+  core/          config, db session, tenant context, logging, errors, redaction
+  identity/      OIDC integration, users, sessions
+  tenancy/       tenants, academic structure (years, classes, sections)
+  authz/         roles, permissions, scopes, require() dependency, policy tests
+  audit/         hash-chained audit events, verification job
+  students/      students, guardians, per-source attribute values, canonical view
+  imports/       Excel/CSV/Sheets import, register-photo extraction, verification queue
+  dq/            data-quality rules engine, findings, name matching
+  changes/       change requests (maker-checker) for identity fields
+  documents/     upload, storage, versions, ACLs, virus scan hook
+  knowledge/     ingestion, chunking, embeddings, retrieval, tools, prompts, gateway, evals
+  exports/       board/portal pre-check sheets (CISCE, UDISE+), generic CSV/XLSX
+  notifications/ in-app notifications, bilingual templates
+  admin/         tenant admin, retention settings, data export
+  ops/           platform operator console, break-glass, feature flags
+apps/worker/     Celery entrypoint (imports app.* tasks)
+apps/web/        Next.js app (app router, BFF route handlers, i18n)
+evals/           RAG datasets + harness (synthetic data only)
+infra/terraform/ modules/ + envs/{staging,prod}
+docs/            this documentation
+```
+
+Each backend module: `api.py` (routes) · `schemas.py` (Pydantic IO) · `service.py` (business logic) · `repository.py` (DB access) · `models.py` (SQLAlchemy) · `tasks.py` (Celery) · `tests/`.
+Modules call other modules **only via their `service.py` public functions**. Never import another module's repository or models directly. `core`, `authz` and `audit` may be used by everyone.
+
+## 5. Commands
+
+```bash
+make dev             # start local stack (docker compose)
+make migrate         # alembic upgrade head
+make seed-synthetic  # synthetic tenant with Telugu/English names; NEVER real data
+make test            # pytest + vitest
+make e2e             # playwright
+make lint typecheck  # ruff, mypy --strict, eslint, tsc
+make security        # semgrep, gitleaks, pip-audit, npm audit, trivy (images)
+make eval            # RAG evaluation harness (see docs/06 §13)
+make check           # everything CI runs
+```
+
+## 6. Non-negotiable invariants (tests enforce these; never weaken them)
+
+1. **Tenant isolation.** Every tenant-owned table has `tenant_id uuid NOT NULL`, RLS `ENABLE` + `FORCE`, and the standard policy. The app DB role has no `BYPASSRLS`. Every request and job sets `SET LOCAL app.tenant_id` inside its transaction via `core.db.tenant_session()`. Never disable RLS to make a test pass.
+2. **Authorization on every route.** Each route declares `Depends(require("<permission>", scope=...))`. A test enumerates all routes and fails if any lacks it (public health checks are the only allowlisted exceptions).
+3. **Object-level access through scoped repositories.** Never fetch a student/document by ID without the caller's scope (e.g., a class teacher only sees their sections). BOLA tests exist per resource.
+4. **No Aadhaar numbers, ever.** Store only `aadhaar_last4` and the as-printed demographic fields. `core.redaction` MUST mask any 12-digit sequence that passes the Verhoeff check in OCR output, extracted text, logs, prompts and exports.
+5. **No PII in logs, traces, metrics, error reports or analytics.** Use structured logging with `redact()`. IDs yes, names/DOB/phones no.
+6. **Never auto-correct official records.** Mismatches create `dq_findings`. Identity-field changes go through `changes` (maker-checker) with an evidence document. The admission register is the legal anchor (BR-01).
+7. **Audit everything that matters** (identity data changes, role/permission changes, exports, AI queries, break-glass, logins) in the **same transaction**, via `audit.record()`. The audit table is append-only (DB grants + trigger).
+8. **AI must be grounded.** Retrieval filters by tenant and permissions **in SQL before ranking**. The LLM never receives data the user cannot see. Answers cite sources (search_result blocks) or say "not found in school records". Citations are validated server-side.
+9. **LLM tools are read-only in core.** Any write suggested by AI requires a human to confirm through normal endpoints.
+10. **Secrets** come from environment/Secrets Manager only. Product code uses **API keys**, never a personal/consumer AI subscription. Request Zero Data Retention for the production API organization.
+11. **No real student data** in dev, test, staging, fixtures, screenshots, or AI coding sessions. Use `make seed-synthetic`.
+12. **Migrations are backward compatible** (expand → migrate → contract). Each migration has a downgrade or is marked irreversible with reason.
+13. **Model IDs, provider names, thresholds and prompts live in config/versioned files**, not inline in code.
+14. **Children's data purpose limit.** Student insights (M5) are for educational activities and child safety only. No marketing, no cross-tenant analytics on identifiable data.
+
+## 7. How to implement a user story
+
+1. Find the story (`US-…`) in `docs/02-PRD.md` and its requirements in `docs/03-TRD.md`.
+2. Restate the acceptance criteria and which invariants apply. If anything is unclear, ask before coding.
+3. Write/extend tests first: unit, API (incl. authz denial + cross-tenant denial), and migration test if schema changes.
+4. Implement in the owning module (routes → service → repository). Keep route handlers thin.
+5. Add audit events and redaction where data is sensitive.
+6. Update OpenAPI docstrings, i18n keys (`en` and `te`), and the docs if behaviour changed.
+7. Run `make check`. Paste the summary in the PR.
+
+## 8. Definition of done
+
+- Acceptance criteria pass as automated tests
+- Authz tests: allowed role succeeds; disallowed role gets 403; other tenant gets 404
+- No new PII in logs (log-redaction test covers new fields)
+- Migrations upgrade and downgrade cleanly on a populated synthetic DB
+- UI strings exist in `en` and `te`; screens usable at 1366×768 and keyboard-only
+- Docs updated; ADR added if a decision changed
+- CI green, including security scans and (for knowledge changes) `make eval` gates
+
+## 9. Coding conventions (summary; full rules in docs/13)
+
+- Python: ruff format + lint, mypy strict, Pydantic models for all IO, no business logic in routes, explicit transactions, UUIDv7 IDs, timezone-aware UTC datetimes, NFC-normalized text
+- SQL: SQLAlchemy Core/ORM with bound parameters only; no string-built SQL with user input
+- TypeScript: strict, no `any`, zod-validated forms, generated API client, TanStack Query
+- Errors: RFC 9457 problem+json; never leak stack traces or other tenants' existence
+- Commits: Conventional Commits, referencing IDs (e.g., `feat(dq): add initials rule (FR-DQ-006)`)
+
+## 10. Frontend and browser support
+
+- **Browser Support:** Baseline Widely Available features only unless a documented fallback exists. Targets: current Chrome/Edge on Windows 10+ office PCs, Android Chrome. Assume 1366×768 screens and slow connections.
+- Before implementing a UI pattern, check current web-platform guidance (e.g., the `modern-web-guidance` tool) rather than relying on memory.
+- Print is a first-class output: A4 print CSS, register formats, no clipped Telugu glyphs. Fonts are self-hosted (no external font CDNs).
+- Plain language, sentence case, errors that say how to fix the problem. Every AI answer shows its source chips.
+
+## 11. Never do this
+
+- Add microservices, Kubernetes, GraphQL, or a separate vector database in core without an ADR
+- Call an LLM provider SDK outside `knowledge/gateway`
+- Send whole student records to the LLM when a field suffices
+- Give AI tools write access or network access
+- Log request bodies, prompts or completions containing personal data
+- Store files in the database or on local disk in production
+- Add dependencies without checking licence (no AGPL in core), maintenance and known CVEs
+- Skip tests "for now"
+
+## 12. When unsure
+
+Stop, explain the trade-off, and propose an ADR (`docs/adr/ADR-XXXX-title.md`, template in `docs/adr/README.md`).
