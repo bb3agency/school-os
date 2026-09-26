@@ -6,6 +6,7 @@ import { useCallback, useRef, useState, type FormEvent } from "react";
 import type { z } from "zod";
 import { apiFieldErrors } from "@/lib/api-errors";
 import { ApiError, newIdempotencyKey } from "@/lib/bff/query";
+import { translateOr } from "@/lib/i18n-dynamic";
 
 /**
  * Native <form> + zod + the BFF (PRD §8: instant inline validation that says how to fix it).
@@ -81,14 +82,8 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const translateClient = useCallback(
-    (key: string) => (tv.has(key) ? tv(key) : tv("invalid")),
-    [tv],
-  );
-  const translateServer = useCallback(
-    (key: string) => (tf.has(key) ? tf(key) : tf("invalid")),
-    [tf],
-  );
+  const translateClient = useCallback((key: string) => translateOr(tv, key, "invalid"), [tv]);
+  const translateServer = useCallback((key: string) => translateOr(tf, key, "invalid"), [tf]);
 
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {

@@ -113,7 +113,44 @@ export async function handleStepUp(request: Request, runtime: AuthRuntime, kind:
   return startSignIn(runtime, kind, next, current?.session.id ?? null);
 }
 
-/** Best-effort audit of the sign-in by the API (route may not exist yet; 404 is fine). */
+/** One JSON call from the BFF to the API on the user's behalf (sign-in helpers). */
+async function apiCall(
+  runtime: AuthRuntime,
+  session: Session,
+  accessToken: string,
+  method: "GET" | "POST",
+  path: string,
+  requestId: string,
+): Promise<{ status: number; body: unknown }> {
+  const response = await callApi(runtime, {
+    session,
+    accessToken,
+    method,
+    path,
+    incomingHeaders: new Headers({ "content-type": "application/json" }),
+    body: method === "POST" ? new TextEncoder().encode("{}") : null,
+    requestId,
+    headersTimeoutMs: 5_000,
+  });
+  let body: unknown = null;
+  if ((response.headers.get("content-type") ?? "").includes("json")) {
+    body = await response.json().catch(() => null);
+  } else {
+    await response.body?.cancel();
+  }
+  return { status: response.status, body };
+}
+
+function problemCodeOf(body: unknown): string | null {
+  return body && typeof body === "object" && typeof (body as { code?: unknown }).code === "string"
+    ? (body as { code: string }).code
+    : null;
+}
+
+/**
+ * Best-effort audit of the sign-in by the API (`auth.login.succeeded` / `denied` in the
+ * school's log). Sent with X-Active-Tenant when the school is known.
+ */
 async function recordLoginEvent(
   runtime: AuthRuntime,
   session: Session,
@@ -121,23 +158,126 @@ async function recordLoginEvent(
   requestId: string,
 ): Promise<void> {
   try {
-    const response = await callApi(runtime, {
+    const { status } = await apiCall(
+      runtime,
       session,
       accessToken,
-      method: "POST",
-      path: "/api/v1/me/login-event",
-      incomingHeaders: new Headers({ "content-type": "application/json" }),
-      body: new TextEncoder().encode("{}"),
+      "POST",
+      "/api/v1/me/login-event",
       requestId,
-      headersTimeoutMs: 3_000,
-    });
-    await response.body?.cancel();
-    if (!response.ok && response.status !== 404) {
-      logEvent("login_event_not_recorded", { status: response.status, request_id: requestId });
+    );
+    if (status >= 400 && status !== 404) {
+      logEvent("login_event_not_recorded", { status, request_id: requestId });
     }
   } catch {
     logEvent("login_event_not_recorded", { code: "network", request_id: requestId });
   }
+}
+
+interface SchoolChoice {
+  tenant_id: string;
+  status: string;
+}
+
+function parseSchools(body: unknown): SchoolChoice[] | null {
+  const data = body && typeof body === "object" ? (body as { data?: unknown }).data : undefined;
+  if (!Array.isArray(data)) return null;
+  return data.filter(
+    (item): item is SchoolChoice =>
+      item !== null &&
+      typeof item === "object" &&
+      typeof (item as SchoolChoice).tenant_id === "string" &&
+      UUID.test((item as SchoolChoice).tenant_id) &&
+      typeof (item as SchoolChoice).status === "string",
+  );
+}
+
+type StaffSignIn =
+  | { kind: "mfa_required" }
+  | { kind: "single"; tenantId: string }
+  | { kind: "choose" }
+  | { kind: "none" }
+  | { kind: "unknown" };
+
+/**
+ * After a staff sign-in (ADR-0019, FR-IAM-013): accept pending invitations FIRST, then list
+ * the user's schools. One usable school becomes the active school; several (or one that is
+ * suspended) go to the picker; none shows "no access yet". The login event is audited once
+ * the school is known (here, or when the user picks one).
+ */
+async function afterStaffSignIn(
+  runtime: AuthRuntime,
+  session: Session,
+  accessToken: string,
+  requestId: string,
+): Promise<StaffSignIn> {
+  try {
+    const accepted = await apiCall(
+      runtime,
+      session,
+      accessToken,
+      "POST",
+      "/api/v1/me/accept-invitations",
+      requestId,
+    );
+    if (accepted.status === 403 && problemCodeOf(accepted.body) === "mfa_required") {
+      return { kind: "mfa_required" };
+    }
+    if (accepted.status >= 400) {
+      logEvent("invitations_not_accepted", { status: accepted.status, request_id: requestId });
+    }
+  } catch {
+    logEvent("invitations_not_accepted", { code: "network", request_id: requestId });
+  }
+
+  let schools: SchoolChoice[] | null = null;
+  try {
+    const listed = await apiCall(
+      runtime,
+      session,
+      accessToken,
+      "GET",
+      "/api/v1/me/schools",
+      requestId,
+    );
+    if (listed.status === 403 && problemCodeOf(listed.body) === "mfa_required") {
+      return { kind: "mfa_required" };
+    }
+    if (listed.status === 200) schools = parseSchools(listed.body);
+    else logEvent("schools_not_listed", { status: listed.status, request_id: requestId });
+  } catch {
+    logEvent("schools_not_listed", { code: "network", request_id: requestId });
+  }
+
+  if (schools === null) {
+    // A hiccup: sign in as before; the school pages ask for a school if they need one.
+    await recordLoginEvent(runtime, session, accessToken, requestId);
+    return { kind: "unknown" };
+  }
+  if (schools.length === 0) return { kind: "none" };
+  const only = schools.length === 1 ? schools[0] : undefined;
+  if (only) {
+    const tenantId = only.tenant_id.toLowerCase();
+    // Audited either way: the API records a denial for a suspended school.
+    await recordLoginEvent(
+      runtime,
+      { ...session, activeTenantId: tenantId },
+      accessToken,
+      requestId,
+    );
+    if (only.status === "active") {
+      await runtime.store.setActiveTenant(session, tenantId);
+      return { kind: "single", tenantId };
+    }
+    return { kind: "choose" };
+  }
+  await runtime.store.setActiveTenant(session, null, { loginEventPending: true });
+  return { kind: "choose" };
+}
+
+/** The UI language of a `next` path (`/te/...`), English otherwise. */
+function localeOf(path: string): "en" | "te" {
+  return /^\/te(\/|$|\?)/.test(path) ? "te" : "en";
 }
 
 async function revokeAtIdp(runtime: AuthRuntime, session: Session): Promise<void> {
@@ -242,7 +382,18 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
     ...carried,
   });
   if (kind === "staff" && !transaction.stepUpSessionId) {
-    await recordLoginEvent(runtime, session, tokens.accessToken, requestId);
+    const outcome = await afterStaffSignIn(runtime, session, tokens.accessToken, requestId);
+    const locale = localeOf(next);
+    if (outcome.kind === "mfa_required") {
+      // A privileged role without MFA gets no session at all (FR-IAM-002).
+      await store.revoke(session.id);
+      return fail("mfa_required");
+    }
+    if (outcome.kind === "choose") {
+      next = `/${locale}/choose-school?next=${encodeURIComponent(next)}`;
+    } else if (outcome.kind === "none") {
+      next = `/${locale}/no-access`;
+    }
   }
   logEvent(
     transaction.stepUpSessionId ? "step_up_completed" : "signin_completed",
@@ -422,7 +573,20 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
     return problem(requestId, 503, "service_unavailable", "Try again in a moment");
   }
 
-  await runtime.store.setActiveTenant(session, tenantId.toLowerCase());
+  const chosen = tenantId.toLowerCase();
+  if (session.loginEventPending) {
+    // First school chosen after sign-in: now the API can audit the login in its log.
+    const stored = await runtime.store.tokens(session.id);
+    if (stored) {
+      await recordLoginEvent(
+        runtime,
+        { ...session, activeTenantId: chosen },
+        stored.tokens.accessToken,
+        requestId,
+      );
+    }
+  }
+  await runtime.store.setActiveTenant(session, chosen, { loginEventPending: false });
   const updated = (await runtime.store.get(session.id)) ?? session;
   return jsonResponse(sessionInfo(updated, runtime.now(), runtime.store.idleTimeoutMs), {
     requestId,

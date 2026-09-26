@@ -95,7 +95,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
     dialogRef.current?.showModal();
   }, [form]);
 
-  const showingResult = renderResult !== undefined && form.result !== undefined;
+  const result = form.result;
 
   return (
     <>
@@ -159,8 +159,8 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                 </svg>
               </button>
             </div>
-            {showingResult && renderResult && form.result !== undefined ? (
-              <div className="space-y-4 p-5">{renderResult(form.result, close)}</div>
+            {renderResult !== undefined && result !== undefined ? (
+              <div className="space-y-4 p-5">{renderResult(result, close)}</div>
             ) : (
               <form noValidate onSubmit={form.onSubmit}>
                 <div className="max-h-[60vh] space-y-4 overflow-y-auto p-5">

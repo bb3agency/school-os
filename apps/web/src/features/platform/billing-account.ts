@@ -52,10 +52,15 @@ const fieldSchemas = {
   po_reference: optionalText(100),
 } as const;
 
-export function billingShape(prefix = ""): Record<string, z.ZodType> {
+type FieldSchemas = typeof fieldSchemas;
+export type BillingShape<P extends string> = {
+  [K in BillingField as `${P}${K}`]: FieldSchemas[K];
+};
+
+export function billingShape<P extends string = "">(prefix: P = "" as P): BillingShape<P> {
   return Object.fromEntries(
     BILLING_FIELDS.map((field) => [`${prefix}${field}`, fieldSchemas[field]]),
-  );
+  ) as BillingShape<P>;
 }
 
 /** Cross-field GST rules (API model validator). */
@@ -77,7 +82,7 @@ export function toBillingAccount(prefix: string, value: Record<string, unknown>)
   ) as unknown as BillingAccountInput;
 }
 
-export function billingAccountSchema(prefix = "") {
+export function billingAccountSchema<P extends string = "">(prefix: P = "" as P) {
   return z
     .object(billingShape(prefix))
     .superRefine((value, ctx) => checkBilling(prefix, value, ctx))

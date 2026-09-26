@@ -12,6 +12,7 @@ import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { formValues, useApiForm, zodErrorKeys } from "@/lib/forms";
+import { translateOr } from "@/lib/i18n-dynamic";
 import { BillingAccountFields } from "./BillingAccountFields";
 import { PK, planLabel, usePlanDirectory } from "./data";
 import {
@@ -100,7 +101,7 @@ export function ProvisionSchoolForm() {
     const found = Object.fromEntries(
       Object.entries(stepErrors(step, all)).map(([field, key]) => [
         field,
-        tv.has(key) ? tv(key) : tv("invalid"),
+        translateOr(tv, key, "invalid"),
       ]),
     );
     setStepOnlyErrors(found);
