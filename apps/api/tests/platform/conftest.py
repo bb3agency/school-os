@@ -222,7 +222,7 @@ class Api:
 
 
 @pytest.fixture
-def api(
+def api(  # noqa: PLR0917 - pytest fixture
     platform_idp: Idp,
     tenant_idp: Idp,
     wrapper: LocalDevKeyWrapper,

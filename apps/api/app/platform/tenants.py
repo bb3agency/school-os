@@ -61,12 +61,14 @@ from app.tenancy.schemas import TenantProvisionIn
 
 log = get_logger(__name__)
 HEARTBEAT_KEY_BYTES = 32
+_KEY_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz"
 
 
 def new_heartbeat_key(tenant_id: uuid.UUID, wrapper: KeyWrapper) -> tuple[str, bytes, str]:
     """Return (key_id, wrapped key, plaintext key as base64url). Plaintext is shown once."""
     raw = secrets.token_bytes(HEARTBEAT_KEY_BYTES)
-    key_id = "hb-" + secrets.token_hex(8)
+    # Letters only: key IDs appear in audit summaries, which reject long digit runs.
+    key_id = "hb-" + "".join(secrets.choice(_KEY_ID_ALPHABET) for _ in range(16))
     wrapped = wrapper.wrap(raw, tenant_id=tenant_id)
     return key_id, wrapped, base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
