@@ -63,33 +63,44 @@ apps/api/app/
   platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
-apps/worker/     Celery entrypoint (imports app.* tasks)
+  devtools/      synthetic data generator (make seed-synthetic; local/ci only)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0007_accept_invitations
+apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/)
+apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
+apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)
 apps/web/        Next.js app (app router, BFF route handlers, i18n; operator UI under /[locale]/platform/*)
-evals/           RAG datasets + harness (synthetic data only)
-infra/terraform/ modules/ (incl. dedicated_host) + envs/{staging,prod,dedicated-template (one tfvars per school)}
+packages/api-client/  TypeScript client generated from apps/api/openapi.json
+infra/terraform/ bootstrap/ + modules/ (incl. shared_platform, dedicated_host) + envs/{staging,prod,dedicated-template (one tfvars per school)}
 infra/db/        bootstrap.sql: database roles, schemas, extensions (run as DB admin)
-deploy/dedicated/ compose.yaml + Caddy config for dedicated-tier hosts
-config/          models, DQ rules, export profiles, permission catalogs (incl. platform_permissions.yaml), billing
+infra/docker/    local-only helpers (db init, dev OIDC stub config, SeaweedFS config)
+deploy/dedicated/ compose.yaml + Caddyfile + scripts for dedicated-tier hosts
 docs/            this documentation
+evals/, config/  planned (M2): RAG harness; models, prompts, DQ rules, export profiles
 ```
 
-Each backend module: `api.py` (routes) · `schemas.py` (Pydantic IO) · `service.py` (business logic) · `repository.py` (DB access) · `models.py` (SQLAlchemy) · `tasks.py` (Celery) · `tests/`.
-Modules call other modules **only via their `service.py` public functions**. Never import another module's repository or models directly. `core`, `authz` and `audit` may be used by everyone. `platform` uses only `core.db.platform_session()` and never imports tenant modules.
+Each backend module: `api.py` (routes) · `schemas.py` (Pydantic IO) · `service.py` (business logic) · `repository.py` (DB access) · `models.py` (SQLAlchemy) · `tasks.py` (Celery); its tests live in `apps/api/tests/<module>/`.
+Versioned configuration ships inside the package next to the module that reads it (the API image does not copy a root `config/`): `app/authz/permissions.yaml` (the one permission catalog, tenant and `platform.*`, seeded into `core.permissions` by `0004_authz_seed`), `app/authz/roles.yaml` (tenant system roles), `app/platform/roles.yaml` (operator role matrix, two-person list), `app/platform/billing.yaml` (billing, fleet and support rules), `app/tenancy/academic_defaults.yaml`. Settings and secrets come only from `SOS_*` environment variables read by `app/core/config.py` (list: `docs/10-infrastructure-and-devops.md` §11).
+Modules call other modules **only via their `service.py` public functions**. Never import another module's repository or models directly (import-linter enforces this, and forbids `core`, `identity` and `tenancy` from importing `platform`). `core`, `authz` and `audit` may be used by everyone. `platform` uses `core.db.platform_session()` for its own data and never imports tenant modules' repositories or models. **Pending product-owner confirmation** (the code already does this; ADR-0013 Amendment A10, docs/14 M0 status): `platform` may call `tenancy.service` only for provisioning and lifecycle (definer-function wrappers, key initialisation) and may open `tenant_session()` only to write school-chain audit events, serve the school-side billing/announcement/support routes and count active users; never for tenant data reads.
 
 ## 5. Commands
 
 ```bash
-make install         # install Python (uv) and Node (npm workspaces) dependencies
-make dev             # start local stack (docker compose)
-make migrate         # alembic upgrade head
-make seed-synthetic  # synthetic tenant with Telugu/English names; NEVER real data
-make test            # pytest + vitest
-make e2e             # playwright
-make lint typecheck  # ruff, mypy --strict, eslint, tsc
-make security        # semgrep, gitleaks, pip-audit, npm audit, trivy (images)
-make eval            # RAG evaluation harness (see docs/06 §13)
-make check           # everything CI runs
+make install          # uv sync --locked --all-packages + npm ci
+make dev              # local stack (db, valkey, s3, migrate, api, worker, beat, web); creates .env from .env.example
+make migrate          # alembic upgrade head + audit partitions, as sos_migrator (also runs inside make dev)
+make seed-synthetic   # synthetic schools, structure and staff; NEVER real data (refuses outside SOS_ENV=local|ci)
+make openapi          # regenerate apps/api/openapi.json and the TS client (a test fails when it is stale)
+make test             # test-api (pytest + testcontainers) + test-web (vitest)
+make test-security    # security suites only (RLS catalog, isolation, route enumeration, authz matrix, BOLA)
+make migration-check  # migration upgrade/downgrade round trips (fresh and populated DB)
+make e2e              # playwright
+make lint typecheck   # ruff, import-linter, eslint, prettier; mypy --strict, tsc
+make security         # gitleaks, semgrep, pip-audit, npm audit, trivy fs + config
+make eval             # RAG evaluation harness (placeholder until M2; see docs/06 §13)
+make check            # lint typecheck test security (what CI runs; CI adds migrations, authz-suite, terraform, images)
 ```
+
+Also: `make down`, `make logs`, `make db-shell`, `make format`. The dev OIDC stub is in compose profile `dev` (`docker compose --profile dev up -d oidc`). The API image takes build arg `INSTALL_PSQL` (compose passes `SOS_INSTALL_PSQL`, default `false`). Every `SOS_*` setting, its default and the staging/prod start-up guards (no `local-dev` key wrapper, no `dev-only` secrets, no placeholder invoice supplier) are listed in `docs/10-infrastructure-and-devops.md` §11.
 
 ## 6. Non-negotiable invariants (tests enforce these; never weaken them)
 

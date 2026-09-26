@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-26 |
 | Style | Modular monolith + async workers, multi-tenant (pool model with RLS); managed SaaS in a shared tier and a dedicated tier |
 | Related | ADR-0001..0017, 05-Data model, 06-RAG, 07-Security, 10-Infrastructure, 16-Platform admin panel |
-| Changes | 0.2: deployment tiers and control plane (§16), local and CI stack (§17), `platform` module (§4), `set_config` tenant context (§5), Valkey replaces Redis (§3, §10, §12, §14), dedicated tier replaces the silo escape hatch (§9), flags moved to `platform.feature_flags` (§13), ADR index (§15). 0.1: baseline |
+| Changes | 0.3: `platform` dependencies as built (§4); tenancy provisioning functions; local stack table matches `docker-compose.yml` (§17). 0.2: deployment tiers and control plane (§16), local and CI stack (§17), `platform` module (§4), `set_config` tenant context (§5), Valkey replaces Redis (§3, §10, §12, §14), dedicated tier replaces the silo escape hatch (§9), flags moved to `platform.feature_flags` (§13), ADR index (§15). 0.1: baseline |
 
 ---
 
@@ -84,7 +84,7 @@ flowchart TB
 | `identity` | users, OIDC, sessions | `get_current_user()`, `revoke_sessions()` | core |
 | `authz` | roles, permissions, scopes, policy | `require()`, `scope_filter()`, `can()` | core, identity |
 | `audit` | audit events, chain verification | `record()`, `verify_chain()` | core |
-| `tenancy` | tenants, years, classes, sections, enrolments, settings | `provision_tenant()`, `current_year()` | core, authz, audit |
+| `tenancy` | tenants, years, classes, sections, enrolments, settings | `register_tenant()` / `set_tenant_status()` (wrappers over the definer functions), `initialise_tenant()` (keys + post-provision hooks) | core, authz, audit, identity |
 | `students` | students, guardians, attribute values, canonical view | `get_profile()`, `record_value()`, `search()` | core, authz, audit, tenancy |
 | `imports` | batches, mappings, extraction queue | `validate_batch()`, `commit_batch()` | students, documents |
 | `dq` | rules, name matching, findings | `run_checks()`, `resolve()` | students |
@@ -95,9 +95,9 @@ flowchart TB
 | `notifications` | in-app notifications, templates | `notify()` | core |
 | `admin` | tenant admin, retention, full export | `export_tenant()` | all services (read) |
 | `ops` | job runs, outbox, idempotency keys, break-glass grants (tenant-side) | `grant_break_glass()`, `claim_outbox()` | tenancy, audit |
-| `platform` | control plane: operators, school registry and provisioning, plans, subscriptions, billing accounts, invoices, payments (billing), usage, fleet/deployments and heartbeat, feature flags, announcements, support tickets, platform audit viewer (ADR-0017; 16) | `provision_school()`, `open_ticket_from_tenant()`, `current_flags()` | core, audit; tenant data only through allowlisted definer functions (ADR-0013) |
+| `platform` | control plane: operators, school registry and provisioning, plans, subscriptions, billing accounts, invoices, payments (billing), usage, fleet/deployments and heartbeat, feature flags, announcements, support tickets, platform audit viewer (ADR-0017; 16) | `current_subscription()`, `invite_school_owner()`, `open_ticket_from_tenant()`, `is_flag_enabled()` | core, audit, authz, `tenancy.service` (provisioning/lifecycle only); tenant rows only through allowlisted definer functions (ADR-0013, Amendment A10) |
 
-**Dependency rules (enforced by import-linter in CI):** no cycles; modules use other modules only through `service.py`; `knowledge.tools` call other modules' services under the caller's user context (never raw repositories). `platform` uses only `core.db.platform_session()` (role `sos_platform`) and never imports tenant modules; tenant modules call `platform.service` only for the narrow entry points listed above.
+**Dependency rules (enforced by import-linter in CI):** no cycles; modules use other modules only through `service.py`; `knowledge.tools` call other modules' services under the caller's user context (never raw repositories). `platform` uses `core.db.platform_session()` (role `sos_platform`) for its own data and never imports tenant modules' repositories or models; as built it also calls `tenancy.service` for provisioning and lifecycle and opens `tenant_session()` for school-chain audit events, the school-side billing/announcement/support routes and the active-user count (ADR-0013 Amendment A10; pending product-owner confirmation, 14 · M0 status). import-linter forbids `core`, `identity` and `tenancy` from importing `platform`; tenant modules call `platform.service` only for the narrow entry points listed above.
 
 ## 5. Request lifecycle
 
@@ -375,14 +375,13 @@ The local stack mirrors a dedicated host plus the control plane, using permissiv
 | `db` | `pgvector/pgvector:0.8.6-pg16-bookworm` | 5432 | PostgreSQL; `infra/db/bootstrap.sql` runs on first start (roles, schemas, extensions) |
 | `valkey` | `valkey/valkey:8.1-alpine` | 6379 | Celery broker, rate limits, sessions, caches |
 | `s3` | `chrislusf/seaweedfs` (pinned release) | 8333 | S3-compatible object storage |
-| `s3-init` | same as `s3` or AWS CLI | — | One-off: creates `SOS_S3_BUCKET_FILES` and `SOS_S3_BUCKET_AUDIT` |
-| `migrate` | api image | — | One-off: `alembic upgrade head` as `sos_migrator` |
+| `s3-init` | api image | — | One-off: creates `SOS_S3_BUCKET_FILES` and `SOS_S3_BUCKET_AUDIT` |
+| `migrate` | api image | — | One-off: `alembic upgrade head` + `python -m app.audit.partitions --months-ahead 12` as `sos_migrator` |
 | `api` | api image | 8000 | FastAPI (tenant and platform routes; `SOS_DEPLOYMENT_MODE=shared` locally) |
-| `worker` | api image | — | Celery worker, all queues |
+| `worker` | api image | — | Celery worker (`sos_worker.celery_app`), queues `ingest,embed,ocr,dq,exports,pdf,maintenance` |
 | `beat` | api image | — | Celery beat |
 | `web` | web image | 3000 | Next.js school app and platform route group |
 | `oidc` (profile `dev`) | `ghcr.io/navikt/mock-oauth2-server` (pinned) | 8080 | Dev OIDC stub for staff and operators; never in staging/prod |
-| `otel` (optional profile) | OpenTelemetry collector | 4318 | Local traces/metrics |
 
-CI starts the same `db`, `valkey` and `s3` images (service containers or testcontainers) so integration tests match local behaviour.
+CI starts the same `db`, `valkey` and `s3` images through testcontainers so integration tests match local behaviour. An OpenTelemetry collector is not part of the local stack; set `SOS_OTEL_EXPORTER_OTLP_ENDPOINT` to export traces.
 

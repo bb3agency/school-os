@@ -2,7 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 (new document) |
+| Version | 0.3 · 2026-09-26 |
+| Changes | 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
 | Capability | C14 · Milestone M0 (roadmap Task 11) |
 | Requirements | FR-PLT-001..030 (03-TRD §3.12) · stories US-1301..US-1310, US-1204 (02-PRD §4) |
 | Decisions | ADR-0013 (privilege separation), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture) |
@@ -57,7 +58,7 @@ Operators are SchoolOS staff, not school users. One person may hold several role
 |---|---|
 | Module | `apps/api/app/platform/` (ADR-0017); billing is part of it |
 | API routes | `/api/v1/platform/*` with `require_platform("platform.<…>")`; heartbeat `POST /api/v1/fleet/heartbeat` with `require_fleet_signature()` |
-| DB access | `core.db.platform_session()` as `sos_platform` (`SOS_PLATFORM_DATABASE_URL`) |
+| DB access | `core.db.platform_session()` as `sos_platform` (`SOS_PLATFORM_DATABASE_URL`). Exceptions (ADR-0013 Amendment A10): `tenant_session()` for school-chain audit events (§16), the school-side routes (§8.3) and the daily active-user count (§11); `app.tenancy.service` wrappers for the definer functions |
 | Web | Next.js route group `/[locale]/platform/*`; production host `admin.<domain>`; own `__Host-sos_platform_session` cookie; BFF handlers mirror API paths |
 | Identity | Separate OIDC client (`SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE`; web `PLATFORM_OIDC_CLIENT_ID/SECRET`); reference setup: a separate Cognito user pool with MFA ON and the `sos:mfa` claim (ADR-0018); MFA mandatory for every operator |
 | Jobs | Shared `worker`/`beat`; progress in `platform.job_runs` |
@@ -102,18 +103,26 @@ Each screen lists the permission needed to see it; actions list their own permis
 
 1. **School:** name, short code (slug, unique), boards, state (default AP), preferred languages.
 2. **Tier:** shared or dedicated. For dedicated: region (ap-south-1), optional custom domain.
-3. **Owner:** owner's name, email or username, phone (optional). Stored only for the invite.
-4. **Plan:** plan and version; trial (default length from config `billing.trial_days`) or active; optional negotiated price with reason.
+3. **Owner** (shared tier, required): display name, optional email, language, and the owner's sign-in subject in the staff user pool (the account is created there first). Stored only for the invite.
+4. **Plan:** plan and version; trial (length from the plan's `trial_days`, default 30) or active; optional negotiated price with reason.
 5. **Billing account:** legal name, GSTIN (optional), billing email, address, state code.
 6. **Review and confirm** (step-up).
 
-Result for **shared** (one `platform_session()` transaction): KMS generates the tenant DEK and HMAC key (before the transaction) → `core.provision_tenant(...)` creates the tenant row, wrapped keys, audit chain head and first tenant audit event, and system roles → `core.create_user_for_invite(...)` creates the owner's invited membership → billing account, subscription and deployment rows are inserted → platform audit event. After commit a job sends the owner invite. Retrying with the same `Idempotency-Key` returns the same result.
+Result for **shared** (`app/platform/tenants.py`), in four steps:
 
-Result for **dedicated**: the deployment row (`status = provisioning`), billing account, subscription and a new heartbeat key are created in the control plane; the tenant row itself is created **on the host** by the provisioning runbook (§13) using the same definer function with the tenant ID chosen here.
+1. One `platform_session()` transaction: `core.provision_tenant(...)` (tenant row, status `provisioning`), deployment, billing account, subscription (and, when started as `active`, the first period's draft invoice), platform events `tenant.provisioned`. A failure leaves none of them.
+2. `tenancy.initialise_tenant` in the new school's own `tenant_session`: KMS (or the local-dev wrapper) generates and wraps the DEK and HMAC key into `core.tenant_keys`; post-provision hooks clone the system roles from `apps/api/app/authz/roles.yaml`.
+3. `core.create_owner_invite(...)` (platform session; public wrapper `platform.service.invite_school_owner(platform_db, tenant_id=, subject=, display_name=, email=, language=)`): an `invited` owner membership with `mfa_required`, school scope and the `owner` role; platform event `tenant.owner_invite_created`.
+4. `tenant.provisioned` in the school's own audit chain (`actor_type = 'platform'`, §16).
+
+Steps 2–4 are idempotent: retrying with the same `Idempotency-Key` replays the result, and a retry with the same code and school name resumes an interrupted provisioning. The owner accepts the invite on first sign-in (`POST /api/v1/me/accept-invitations`, ADR-0019) once the school is `active`; an operator makes it live with `POST /platform/tenants/{id}/activate` (refused by the database until a data key exists). Invite **email delivery is not built yet** (`owner-invite:resend` only records `tenant.owner_invite_sent`).
+
+Result for **dedicated**: the deployment row (`status = provisioning`), billing account, subscription and a new heartbeat key are created in the control plane; the tenant row itself is created **on the host** by the provisioning runbook (§13) with the tenant ID chosen here. The heartbeat key is returned once in the `201` response (`heartbeat_key_id`, `heartbeat_key`) and never again.
 
 ### 5.5 Suspend, reactivate, offboard
 - **Suspend (non-billing)** — `platform.tenants.suspend` (ᴿ): reason required (security incident, abuse, school's written request). Calls `core.set_tenant_status(tenant, 'suspended')` for shared; for dedicated, the engineer runs the fleet command (§13.3). Billing suspensions go through the subscription (§5.7).
-- **Reactivate** — same permission and step-up; reason required.
+- **Reactivate** — same permission and step-up; reason required. A billing suspension is lifted from the subscription instead (`409 billing_suspension`).
+- **Activate (go-live)** — `platform.tenants.provision` (ᴿ): `provisioning → active` through `core.set_tenant_status`, which refuses a tenant without an unretired data key.
 - **What suspension does:** staff sign-in shows a suspension notice; the school `owner` can still sign in to download the full data export and see Plan & billing (BR-08). No data is deleted. Scheduled tenant jobs pause, except audit verification and retention purges.
 - **Offboard** — `platform.tenants.offboard` (ᴿ, **two-person**): operator A records the request (reason, reference to the school's written request); operator B (a different operator holding the permission) approves with step-up. Then: tenant status `offboarding` → school confirms it has its export (or the export is delivered by us per R8) → access disabled → deletion job removes tenant data **within 30 days** → wrapped keys destroyed (crypto-shredding; for dedicated, the host's KMS key is scheduled for deletion and the host destroyed) → certificate of deletion issued → status `deleted`. Invoices and the billing account stay in `platform` as business records (retention in 08 §14).
 
@@ -173,7 +182,7 @@ In the **school** app, for holders of `tenant.billing.read` (owner, principal, a
 
 ## 6. Permissions
 
-Catalog: `config/platform_permissions.yaml` (the authz tests are generated from it; this table must stay identical to 07 §6.5). Platform permissions can never be granted to tenant roles (`core.permissions` has `CHECK (key NOT LIKE 'platform.%')`; platform roles are not `core.roles` rows). ᴿ = step-up MFA within 5 minutes. **2P** = two different operators.
+Catalog: the `platform.*` entries of `apps/api/app/authz/permissions.yaml` (descriptions, sensitivity, step-up; `is_platform: true`) plus the role matrix and two-person list in `apps/api/app/platform/roles.yaml`. The platform authz tests are generated from them and pin this table (it must stay identical to 07 §6.5). Platform permissions exist in `core.permissions` with `is_platform = true` but can never be granted to tenant roles (CHECK ties the flag to the `platform.` prefix; trigger `role_permissions_not_platform`); platform roles are not `core.roles` rows. ᴿ = step-up MFA within 5 minutes. **2P** = two different operators.
 
 | Permission | platform_owner | platform_engineer | support_agent | billing_admin | platform_viewer |
 |---|---|---|---|---|---|
@@ -206,51 +215,52 @@ Notes:
 ## 7. Data model (schema `platform`)
 
 Rules for this schema:
-- Owned by `sos_owner`; DML granted to `sos_platform` only (audit tables INSERT + SELECT only). `sos_app` has only `SELECT` on `platform.feature_flags`. `sos_definer` gets `SELECT` on the tables `core.current_subscription()` reads (`plans`, `subscriptions`, `invoices`, `usage_daily`).
+- Owned by `sos_owner`; DML granted to `sos_platform` only, through default privileges (audit tables: events SELECT + INSERT, head SELECT + UPDATE). `sos_app` has only `SELECT` on `platform.feature_flags`. `sos_definer` gets `SELECT` on the tables `core.current_subscription()` reads (`plans`, `subscriptions`, `invoices`, `usage_daily`).
 - No RLS (no student data; not tenant-owned). `tenant_id` columns here are plain references to `core.tenants.id`; there is no cross-schema FK because dedicated schools' tenant rows live on their own hosts.
 - No personal data about students. Personal data here is limited to operators and school billing/support contacts (08 §14).
 - Money is `numeric(14,2)` in INR. Dates of business meaning (`period_start`, `issue_date`) are IST calendar dates; timestamps are `timestamptz` UTC.
+- `platform.audit_events` and `platform.audit_chain_head` are created by `0002_audit` (DDL in [05 §7.1](05-data-model.md#71-audit-adr-0011-as-amended-by-adr-0013)); everything else below by `0005_platform`, verbatim.
 
 ```sql
--- Grants (in migration 0005_platform; schema itself is created by infra/db/bootstrap.sql)
-REVOKE ALL ON SCHEMA platform FROM PUBLIC;
-GRANT USAGE ON SCHEMA platform TO sos_platform, sos_app, sos_definer;
-ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA platform
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sos_platform;
+-- Schema, USAGE and default privileges come from infra/db/bootstrap.sql (05 §3.1):
+--   GRANT USAGE ON SCHEMA platform TO sos_app, sos_platform, sos_definer;
+--   ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA platform
+--     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sos_platform;
 
--- 7.1 Operators and roles ---------------------------------------------------
 CREATE TABLE platform.operators (
   id              uuid PRIMARY KEY,
-  idp_subject     text UNIQUE,                          -- set on first sign-in
-  email           citext NOT NULL UNIQUE,
-  display_name    text NOT NULL,
+  idp_subject     text UNIQUE CHECK (char_length(idp_subject) BETWEEN 1 AND 255),
+  email           public.citext NOT NULL UNIQUE,
+  display_name    text NOT NULL CHECK (char_length(display_name) BETWEEN 1 AND 200),
   status          text NOT NULL CHECK (status IN ('invited','active','deactivated')),
   mfa_enrolled    boolean NOT NULL DEFAULT false,
   invited_by      uuid REFERENCES platform.operators(id),
   created_at      timestamptz NOT NULL DEFAULT now(),
   last_login_at   timestamptz,
   deactivated_at  timestamptz,
-  version         int NOT NULL DEFAULT 1,
-  CHECK ((status = 'deactivated') = (deactivated_at IS NOT NULL)),
-  CHECK (status <> 'active' OR (idp_subject IS NOT NULL AND mfa_enrolled))
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  version         int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT operators_deactivated_at CHECK ((status = 'deactivated') = (deactivated_at IS NOT NULL)),
+  CONSTRAINT operators_active_needs_mfa
+    CHECK (status <> 'active' OR (idp_subject IS NOT NULL AND mfa_enrolled))
 );
 
 CREATE TABLE platform.operator_roles (
   operator_id  uuid NOT NULL REFERENCES platform.operators(id),
   role_key     text NOT NULL CHECK (role_key IN
-                 ('platform_owner','platform_engineer','support_agent','billing_admin','platform_viewer')),
-  granted_by   uuid REFERENCES platform.operators(id),  -- NULL only for the bootstrap owner (CLI)
+                 ('platform_owner','platform_engineer','support_agent','billing_admin',
+                  'platform_viewer')),
+  granted_by   uuid REFERENCES platform.operators(id),
   granted_at   timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (operator_id, role_key),
-  CHECK (granted_by IS NULL OR granted_by <> operator_id)  -- no self-grant
+  CONSTRAINT operator_roles_no_self_grant CHECK (granted_by IS NULL OR granted_by <> operator_id)
 );
 
--- 7.2 Plans ----------------------------------------------------------------
 CREATE TABLE platform.plans (
   id                     uuid PRIMARY KEY,
   code                   text NOT NULL CHECK (code ~ '^[a-z0-9][a-z0-9-]{1,40}$'),
   version                int  NOT NULL CHECK (version >= 1),
-  name                   text NOT NULL,
+  name                   text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 100),
   tier                   text NOT NULL CHECK (tier IN ('shared','dedicated')),
   billing_period         text NOT NULL CHECK (billing_period IN ('monthly','annual')),
   pricing_model          text NOT NULL CHECK (pricing_model IN ('flat','per_student')),
@@ -259,27 +269,27 @@ CREATE TABLE platform.plans (
   included_students      int CHECK (included_students >= 0),
   gst_rate               numeric(5,2) NOT NULL DEFAULT 18.00 CHECK (gst_rate IN (0, 5, 12, 18, 28)),
   sac_code               text NOT NULL CHECK (sac_code ~ '^[0-9]{6}$'),
-  limits                 jsonb NOT NULL DEFAULT '{}',  -- {"students":2500,"staff_users":60,"storage_gb":50,
-                                                       --  "documents":5000,"ai_tokens_month":2000000}
-  features               jsonb NOT NULL DEFAULT '{}',  -- flag defaults for this plan
+  trial_days             int NOT NULL DEFAULT 30 CHECK (trial_days BETWEEN 0 AND 365),
+  limits                 jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(limits) = 'object'),
+  features               jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(features) = 'object'),
   status                 text NOT NULL CHECK (status IN ('draft','published','retired')),
   published_at           timestamptz,
   created_by             uuid NOT NULL REFERENCES platform.operators(id),
   created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now(),
   UNIQUE (code, version),
-  CHECK ((pricing_model = 'per_student') = (per_student_price_inr IS NOT NULL)),
-  CHECK ((status = 'draft') = (published_at IS NULL))
+  CONSTRAINT plans_per_student_price
+    CHECK ((pricing_model = 'per_student') = (per_student_price_inr IS NOT NULL)),
+  CONSTRAINT plans_published_at CHECK ((status = 'draft') = (published_at IS NULL))
 );
--- Trigger platform.plans_freeze: once status <> 'draft', only status may change (published -> retired).
 
--- 7.3 Billing accounts -----------------------------------------------------
 CREATE TABLE platform.billing_accounts (
   id                    uuid PRIMARY KEY,
   tenant_id             uuid NOT NULL UNIQUE,
-  legal_name            text NOT NULL,
+  legal_name            text NOT NULL CHECK (char_length(legal_name) BETWEEN 1 AND 200),
   gstin                 text CHECK (gstin ~ '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$'),
   pan                   text CHECK (pan ~ '^[A-Z]{5}[0-9]{4}[A-Z]$'),
-  billing_email         citext NOT NULL,
+  billing_email         public.citext NOT NULL,
   billing_contact_name  text,
   billing_phone         text CHECK (billing_phone ~ '^\+?[0-9]{10,13}$'),
   address_line1         text NOT NULL,
@@ -287,27 +297,28 @@ CREATE TABLE platform.billing_accounts (
   city                  text NOT NULL,
   district              text,
   postal_code           text NOT NULL CHECK (postal_code ~ '^[1-9][0-9]{5}$'),
-  state_code            text NOT NULL CHECK (state_code ~ '^[0-9]{2}$'),  -- GST state code; AP = '37'
+  state_code            text NOT NULL CHECK (state_code ~ '^[0-9]{2}$'),
   po_reference          text,
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now(),
-  version               int NOT NULL DEFAULT 1,
-  CHECK (gstin IS NULL OR substr(gstin, 1, 2) = state_code),
-  CHECK (gstin IS NULL OR pan IS NULL OR substr(gstin, 3, 10) = pan)
+  version               int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT billing_accounts_gstin_state CHECK (gstin IS NULL OR substr(gstin, 1, 2) = state_code),
+  CONSTRAINT billing_accounts_gstin_pan
+    CHECK (gstin IS NULL OR pan IS NULL OR substr(gstin, 3, 10) = pan)
 );
 
--- 7.4 Deployments (also the platform's registry of schools) ----------------
 CREATE TABLE platform.deployments (
   id                        uuid PRIMARY KEY,
   tenant_id                 uuid NOT NULL UNIQUE,
-  tenant_code               text NOT NULL UNIQUE,
-  school_name               text NOT NULL,              -- public (C0) name only
+  tenant_code               text NOT NULL UNIQUE CHECK (tenant_code ~ '^[a-z][a-z0-9-]{1,31}$'),
+  school_name               text NOT NULL CHECK (char_length(school_name) BETWEEN 1 AND 200),
+  boards                    text[] NOT NULL DEFAULT '{}',
   mode                      text NOT NULL CHECK (mode IN ('shared','dedicated')),
   region                    text NOT NULL DEFAULT 'ap-south-1' CHECK (region = 'ap-south-1'),
   backup_region             text NOT NULL DEFAULT 'ap-south-2' CHECK (backup_region = 'ap-south-2'),
-  host_ref                  text,                       -- EC2 instance ID (dedicated only)
-  hostname                  text,                       -- default host name (dedicated)
-  custom_domain             citext UNIQUE,
+  host_ref                  text CHECK (host_ref ~ '^i-[0-9a-f]{8,17}$'),
+  hostname                  text CHECK (hostname ~ '^[a-z0-9.-]{1,253}$'),
+  custom_domain             public.citext UNIQUE CHECK (custom_domain ~ '^[a-z0-9.-]{1,253}$'),
   tenant_status             text NOT NULL CHECK (tenant_status IN
                               ('provisioning','active','suspended','offboarding','deleted')),
   tenant_status_reason      text,
@@ -316,11 +327,12 @@ CREATE TABLE platform.deployments (
   app_version               text,
   target_version            text,
   last_heartbeat_at         timestamptz,
-  last_heartbeat            jsonb,                      -- last validated payload (§12.3); no personal data
+  last_heartbeat            jsonb,
   heartbeat_key_id          text,
-  heartbeat_key_ciphertext  bytea,                      -- KMS-wrapped 32-byte key
-  heartbeat_next_key_id     text,                       -- rotation overlap
+  heartbeat_key_ciphertext  bytea,
+  heartbeat_next_key_id     text,
   heartbeat_next_key_ciphertext bytea,
+  heartbeat_rotation_started_at timestamptz,
   offboard_requested_by     uuid REFERENCES platform.operators(id),
   offboard_requested_at     timestamptz,
   offboard_reason           text,
@@ -329,28 +341,39 @@ CREATE TABLE platform.deployments (
   deletion_certificate_ref  text,
   created_at                timestamptz NOT NULL DEFAULT now(),
   updated_at                timestamptz NOT NULL DEFAULT now(),
-  version                   int NOT NULL DEFAULT 1,
-  CHECK (mode = 'dedicated' OR (host_ref IS NULL AND custom_domain IS NULL AND heartbeat_key_id IS NULL)),
-  CHECK (mode = 'shared' OR status = 'decommissioned' OR heartbeat_key_ciphertext IS NOT NULL),
-  CHECK ((heartbeat_key_id IS NULL) = (heartbeat_key_ciphertext IS NULL)),
-  CHECK ((heartbeat_next_key_id IS NULL) = (heartbeat_next_key_ciphertext IS NULL)),
-  CHECK ((offboard_requested_by IS NULL) = (offboard_requested_at IS NULL)),
-  CHECK (offboard_approved_by IS NULL
-         OR (offboard_requested_by IS NOT NULL AND offboard_approved_by <> offboard_requested_by)),
-  CHECK (tenant_status <> 'suspended' OR tenant_status_reason IS NOT NULL)
+  version                   int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT deployments_shared_has_no_host
+    CHECK (mode = 'dedicated' OR (host_ref IS NULL AND custom_domain IS NULL
+                                  AND heartbeat_key_id IS NULL)),
+  CONSTRAINT deployments_dedicated_has_key
+    CHECK (mode = 'shared' OR status = 'decommissioned' OR heartbeat_key_ciphertext IS NOT NULL),
+  CONSTRAINT deployments_key_pair CHECK ((heartbeat_key_id IS NULL) = (heartbeat_key_ciphertext IS NULL)),
+  CONSTRAINT deployments_next_key_pair
+    CHECK ((heartbeat_next_key_id IS NULL) = (heartbeat_next_key_ciphertext IS NULL)),
+  CONSTRAINT deployments_rotation_started
+    CHECK ((heartbeat_next_key_id IS NULL) = (heartbeat_rotation_started_at IS NULL)),
+  CONSTRAINT deployments_offboard_request
+    CHECK ((offboard_requested_by IS NULL) = (offboard_requested_at IS NULL)),
+  CONSTRAINT deployments_offboard_approved_at
+    CHECK ((offboard_approved_by IS NULL) = (offboard_approved_at IS NULL)),
+  -- SEC-029: two different operators request and approve offboarding.
+  CONSTRAINT deployments_offboard_two_person
+    CHECK (offboard_approved_by IS NULL
+           OR (offboard_requested_by IS NOT NULL AND offboard_approved_by <> offboard_requested_by)),
+  CONSTRAINT deployments_suspension_reason
+    CHECK (tenant_status <> 'suspended' OR tenant_status_reason IS NOT NULL)
 );
 
--- 7.5 Subscriptions --------------------------------------------------------
 CREATE TABLE platform.subscriptions (
   id                    uuid PRIMARY KEY,
   tenant_id             uuid NOT NULL REFERENCES platform.deployments(tenant_id),
   billing_account_id    uuid NOT NULL REFERENCES platform.billing_accounts(id),
   plan_id               uuid NOT NULL REFERENCES platform.plans(id),
-  pending_plan_id       uuid REFERENCES platform.plans(id),     -- applies at next period
+  pending_plan_id       uuid REFERENCES platform.plans(id),
   status                text NOT NULL CHECK (status IN ('trial','active','past_due','suspended','cancelled')),
   trial_ends_at         timestamptz,
   current_period_start  date NOT NULL,
-  current_period_end    date NOT NULL,                          -- exclusive
+  current_period_end    date NOT NULL,
   price_override_inr    numeric(14,2) CHECK (price_override_inr >= 0),
   override_reason       text,
   past_due_since        date,
@@ -358,27 +381,33 @@ CREATE TABLE platform.subscriptions (
   suspended_at          timestamptz,
   suspended_by          uuid REFERENCES platform.operators(id),
   suspension_reason     text,
-  exam_window_override_by uuid REFERENCES platform.operators(id), -- platform_owner approval (§9.3)
+  exam_window_override_by uuid REFERENCES platform.operators(id),
+  cancel_at_period_end  boolean NOT NULL DEFAULT false,
   cancelled_at          timestamptz,
   cancel_reason         text,
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now(),
-  version               int NOT NULL DEFAULT 1,
-  CHECK (current_period_end > current_period_start),
-  CHECK (status <> 'trial' OR trial_ends_at IS NOT NULL),
-  CHECK ((price_override_inr IS NULL) = (override_reason IS NULL)),
-  -- billing suspension only ever follows past_due (non-billing suspension is on the tenant, §5.5)
-  CHECK (status NOT IN ('past_due','suspended') OR (past_due_since IS NOT NULL AND grace_ends_on IS NOT NULL)),
-  CHECK (grace_ends_on IS NULL OR grace_ends_on >= past_due_since + 15),
-  CHECK (status <> 'suspended'
-         OR (suspended_at IS NOT NULL AND suspended_by IS NOT NULL AND suspension_reason IS NOT NULL)),
-  CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL))
+  version               int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT subscriptions_period CHECK (current_period_end > current_period_start),
+  CONSTRAINT subscriptions_trial_end CHECK (status <> 'trial' OR trial_ends_at IS NOT NULL),
+  CONSTRAINT subscriptions_override_reason
+    CHECK ((price_override_inr IS NULL) = (override_reason IS NULL)),
+  CONSTRAINT subscriptions_past_due_fields
+    CHECK (status NOT IN ('past_due','suspended')
+           OR (past_due_since IS NOT NULL AND grace_ends_on IS NOT NULL)),
+  CONSTRAINT subscriptions_grace_15_days
+    CHECK (grace_ends_on IS NULL OR grace_ends_on >= past_due_since + 15),
+  CONSTRAINT subscriptions_suspension_fields
+    CHECK (status <> 'suspended'
+           OR (suspended_at IS NOT NULL AND suspended_by IS NOT NULL AND suspension_reason IS NOT NULL)),
+  CONSTRAINT subscriptions_cancelled_at CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL)),
+  CONSTRAINT subscriptions_cancel_reason CHECK (NOT cancel_at_period_end OR cancel_reason IS NOT NULL)
 );
-CREATE UNIQUE INDEX one_live_subscription ON platform.subscriptions (tenant_id) WHERE status <> 'cancelled';
+CREATE UNIQUE INDEX one_live_subscription ON platform.subscriptions (tenant_id)
+  WHERE status <> 'cancelled';
 
--- 7.6 Invoices -------------------------------------------------------------
 CREATE TABLE platform.invoice_sequences (
-  financial_year  text PRIMARY KEY CHECK (financial_year ~ '^[0-9]{4}-[0-9]{2}$'),   -- '2026-27'
+  financial_year  text PRIMARY KEY CHECK (financial_year ~ '^[0-9]{4}-[0-9]{2}$'),
   prefix          text NOT NULL DEFAULT 'SOS' CHECK (prefix ~ '^[A-Z]{2,5}$'),
   last_number     int  NOT NULL DEFAULT 0 CHECK (last_number >= 0),
   updated_at      timestamptz NOT NULL DEFAULT now()
@@ -392,13 +421,13 @@ CREATE TABLE platform.invoices (
   status                      text NOT NULL CHECK (status IN ('draft','issued','paid','void')),
   financial_year              text REFERENCES platform.invoice_sequences(financial_year),
   sequence_no                 int CHECK (sequence_no > 0),
-  invoice_number              text UNIQUE CHECK (invoice_number ~ '^[A-Z0-9/-]{1,20}$'), -- 'SOS/26-27/000123' (≤ 16 chars, CGST Rule 46)
+  -- CGST Rule 46: at most 16 characters, e.g. 'SOS/26-27/000123'.
+  invoice_number              text UNIQUE CHECK (invoice_number ~ '^[A-Z0-9/-]{1,16}$'),
   period_start                date NOT NULL,
-  period_end                  date NOT NULL,                     -- exclusive
+  period_end                  date NOT NULL,
   issue_date                  date,
   due_date                    date,
   currency                    char(3) NOT NULL DEFAULT 'INR' CHECK (currency = 'INR'),
-  -- frozen at issue (snapshots, so later account edits do not change issued invoices)
   supplier_legal_name         text NOT NULL,
   supplier_gstin              text NOT NULL,
   supplier_state_code         text NOT NULL CHECK (supplier_state_code ~ '^[0-9]{2}$'),
@@ -414,7 +443,7 @@ CREATE TABLE platform.invoices (
   total_inr                   numeric(14,2) NOT NULL DEFAULT 0,
   amount_paid_inr             numeric(14,2) NOT NULL DEFAULT 0 CHECK (amount_paid_inr >= 0),
   tds_inr                     numeric(14,2) NOT NULL DEFAULT 0 CHECK (tds_inr >= 0),
-  notes                       text,
+  notes                       text CHECK (char_length(notes) <= 1000),
   issued_by                   uuid REFERENCES platform.operators(id),
   issued_at                   timestamptz,
   voided_by                   uuid REFERENCES platform.operators(id),
@@ -422,73 +451,71 @@ CREATE TABLE platform.invoices (
   void_reason                 text,
   created_at                  timestamptz NOT NULL DEFAULT now(),
   updated_at                  timestamptz NOT NULL DEFAULT now(),
-  version                     int NOT NULL DEFAULT 1,
-  CHECK (period_end > period_start),
-  CHECK (total_inr = taxable_value_inr + cgst_inr + sgst_inr + igst_inr),
-  CHECK (tax_type = CASE WHEN place_of_supply_state_code = supplier_state_code
+  version                     int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT invoices_period CHECK (period_end > period_start),
+  CONSTRAINT invoices_total CHECK (total_inr = taxable_value_inr + cgst_inr + sgst_inr + igst_inr),
+  CONSTRAINT invoices_tax_type CHECK (tax_type = CASE WHEN place_of_supply_state_code = supplier_state_code
                          THEN 'cgst_sgst' ELSE 'igst' END),
-  CHECK ((tax_type = 'igst' AND cgst_inr = 0 AND sgst_inr = 0)
+  CONSTRAINT invoices_tax_split CHECK ((tax_type = 'igst' AND cgst_inr = 0 AND sgst_inr = 0)
       OR (tax_type = 'cgst_sgst' AND igst_inr = 0 AND cgst_inr = sgst_inr)),
-  CHECK ((status = 'draft') = (invoice_number IS NULL)),
-  CHECK ((invoice_number IS NULL) = (financial_year IS NULL AND sequence_no IS NULL AND issue_date IS NULL
-                                     AND due_date IS NULL AND issued_at IS NULL)),
-  CHECK (due_date IS NULL OR due_date >= issue_date),
-  CHECK ((status = 'void') = (voided_at IS NOT NULL AND void_reason IS NOT NULL)),
-  CHECK (status <> 'paid' OR amount_paid_inr + tds_inr >= total_inr),
+  CONSTRAINT invoices_number_iff_not_draft CHECK ((status = 'draft') = (invoice_number IS NULL)),
+  CONSTRAINT invoices_number_fields CHECK ((invoice_number IS NULL) = (financial_year IS NULL AND sequence_no IS NULL
+                                     AND issue_date IS NULL AND due_date IS NULL AND issued_at IS NULL)),
+  CONSTRAINT invoices_due_after_issue CHECK (due_date IS NULL OR due_date >= issue_date),
+  CONSTRAINT invoices_void_fields CHECK ((status = 'void') = (voided_at IS NOT NULL AND void_reason IS NOT NULL)),
+  CONSTRAINT invoices_paid_covered CHECK (status <> 'paid' OR amount_paid_inr + tds_inr >= total_inr),
   UNIQUE (financial_year, sequence_no)
 );
 CREATE UNIQUE INDEX one_invoice_per_period ON platform.invoices (subscription_id, period_start)
   WHERE status <> 'void';
 CREATE INDEX invoices_tenant ON platform.invoices (tenant_id, period_start DESC);
--- Trigger platform.invoices_freeze: after issue only status, amount_paid_inr, tds_inr, void_* and updated_at
--- may change; DELETE allowed only for drafts.
+CREATE INDEX invoices_status_due ON platform.invoices (status, due_date);
 
 CREATE TABLE platform.invoice_lines (
   id              uuid PRIMARY KEY,
-  invoice_id      uuid NOT NULL REFERENCES platform.invoices(id) ON DELETE CASCADE,  -- drafts only
+  invoice_id      uuid NOT NULL REFERENCES platform.invoices(id) ON DELETE CASCADE,
   line_no         int  NOT NULL CHECK (line_no >= 1),
   kind            text NOT NULL CHECK (kind IN
                     ('subscription','per_student','addon','usage_overage','discount','adjustment')),
-  description     text NOT NULL,
+  description     text NOT NULL CHECK (char_length(description) BETWEEN 1 AND 200),
   sac_code        text NOT NULL CHECK (sac_code ~ '^[0-9]{6}$'),
   quantity        numeric(12,3) NOT NULL CHECK (quantity > 0),
   unit_price_inr  numeric(14,2) NOT NULL,
-  amount_inr      numeric(14,2) NOT NULL,          -- round_half_up(quantity * unit_price_inr, 2)
+  amount_inr      numeric(14,2) NOT NULL,
   gst_rate        numeric(5,2) NOT NULL CHECK (gst_rate IN (0, 5, 12, 18, 28)),
   UNIQUE (invoice_id, line_no),
-  CHECK (CASE kind WHEN 'discount'   THEN amount_inr <= 0
+  CONSTRAINT invoice_lines_sign CHECK (CASE kind WHEN 'discount'   THEN amount_inr <= 0
                    WHEN 'adjustment' THEN true
                    ELSE amount_inr >= 0 END)
 );
 
--- 7.7 Payments -------------------------------------------------------------
 CREATE TABLE platform.payments (
   id                   uuid PRIMARY KEY,
   invoice_id           uuid NOT NULL REFERENCES platform.invoices(id),
   tenant_id            uuid NOT NULL,
-  provider             text NOT NULL CHECK (provider IN ('manual')),   -- widened only if ADR-0016 is accepted
+  provider             text NOT NULL CHECK (provider IN ('manual')),
   method               text NOT NULL CHECK (method IN ('bank_transfer','upi','cheque','other')),
   amount_inr           numeric(14,2) NOT NULL CHECK (amount_inr > 0),
   tds_inr              numeric(14,2) NOT NULL DEFAULT 0 CHECK (tds_inr >= 0),
   received_on          date NOT NULL,
-  reference            text NOT NULL,                 -- UTR / UPI reference / cheque number
+  reference            text NOT NULL CHECK (reference ~ '^[A-Za-z0-9/_.-]{1,64}$'),
   provider_payment_id  text,
   status               text NOT NULL CHECK (status IN ('recorded','reversed')),
-  notes                text,
+  notes                text CHECK (char_length(notes) <= 500),
   recorded_by          uuid NOT NULL REFERENCES platform.operators(id),
   recorded_at          timestamptz NOT NULL DEFAULT now(),
   reversed_by          uuid REFERENCES platform.operators(id),
   reversed_at          timestamptz,
   reversal_reason      text,
   UNIQUE (tenant_id, method, reference),
-  CHECK ((status = 'reversed') = (reversed_by IS NOT NULL AND reversed_at IS NOT NULL
+  CONSTRAINT payments_reversal_fields CHECK ((status = 'reversed') = (reversed_by IS NOT NULL AND reversed_at IS NOT NULL
                                   AND reversal_reason IS NOT NULL))
 );
+CREATE INDEX payments_invoice ON platform.payments (invoice_id);
 
--- 7.8 Usage ----------------------------------------------------------------
 CREATE TABLE platform.usage_daily (
   tenant_id         uuid NOT NULL,
-  usage_date        date NOT NULL,                     -- IST calendar day
+  usage_date        date NOT NULL,
   source            text NOT NULL CHECK (source IN ('shared_collector','heartbeat')),
   active_users      int NOT NULL CHECK (active_users >= 0),
   staff_users       int NOT NULL CHECK (staff_users >= 0),
@@ -499,34 +526,43 @@ CREATE TABLE platform.usage_daily (
   ai_input_tokens   bigint NOT NULL DEFAULT 0 CHECK (ai_input_tokens >= 0),
   ai_output_tokens  bigint NOT NULL DEFAULT 0 CHECK (ai_output_tokens >= 0),
   ai_cost_usd       numeric(14,4) NOT NULL DEFAULT 0 CHECK (ai_cost_usd >= 0),
-  ai_cost_inr       numeric(14,2) NOT NULL DEFAULT 0 CHECK (ai_cost_inr >= 0),  -- at configured FX rate
+  ai_cost_inr       numeric(14,2) NOT NULL DEFAULT 0 CHECK (ai_cost_inr >= 0),
   collected_at      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, usage_date)
 );
 
--- 7.9 Feature flags --------------------------------------------------------
+-- 80% / 100% crossings are reported once per metric per billing period (FR-PLT-021).
+CREATE TABLE platform.usage_threshold_events (
+  tenant_id     uuid NOT NULL,
+  metric        text NOT NULL CHECK (metric ~ '^[a-z_]{1,40}$'),
+  threshold     smallint NOT NULL CHECK (threshold IN (80, 100)),
+  period_start  date NOT NULL,
+  usage_value   numeric(20,2) NOT NULL,
+  limit_value   numeric(20,2) NOT NULL,
+  crossed_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, metric, threshold, period_start)
+);
+
 CREATE TABLE platform.feature_flags (
   id               uuid PRIMARY KEY,
-  key              text NOT NULL CHECK (key ~ '^[a-z0-9_]+(\.[a-z0-9_]+)+$'),   -- 'kb.ask.enabled'
-  tenant_id        uuid,                                -- NULL = global
+  key              text NOT NULL CHECK (key ~ '^[a-z0-9_]+(\.[a-z0-9_]+)+$'),
+  tenant_id        uuid,
   enabled          boolean NOT NULL,
   rollout_percent  smallint CHECK (rollout_percent BETWEEN 0 AND 100),
-  description      text,
-  updated_by       uuid REFERENCES platform.operators(id),  -- NULL only when written by the deploy pipeline
+  description      text CHECK (char_length(description) <= 300),
+  updated_by       uuid REFERENCES platform.operators(id),
   updated_at       timestamptz NOT NULL DEFAULT now(),
-  version          int NOT NULL DEFAULT 1,
+  version          int NOT NULL DEFAULT 1 CHECK (version >= 1),
   UNIQUE NULLS NOT DISTINCT (key, tenant_id),
-  CHECK (tenant_id IS NULL OR rollout_percent IS NULL)   -- % rollout only on global rows
+  CONSTRAINT feature_flags_rollout_global_only CHECK (tenant_id IS NULL OR rollout_percent IS NULL)
 );
-GRANT SELECT ON platform.feature_flags TO sos_app;
 
--- 7.10 Announcements -------------------------------------------------------
 CREATE TABLE platform.announcements (
   id                   uuid PRIMARY KEY,
-  title_en             text NOT NULL CHECK (char_length(title_en) <= 120),
-  title_te             text NOT NULL CHECK (char_length(title_te) <= 120),
-  body_en              text NOT NULL CHECK (char_length(body_en) <= 1000),
-  body_te              text NOT NULL CHECK (char_length(body_te) <= 1000),
+  title_en             text NOT NULL CHECK (char_length(title_en) BETWEEN 1 AND 120),
+  title_te             text NOT NULL CHECK (char_length(title_te) BETWEEN 1 AND 120),
+  body_en              text NOT NULL CHECK (char_length(body_en) BETWEEN 1 AND 1000),
+  body_te              text NOT NULL CHECK (char_length(body_te) BETWEEN 1 AND 1000),
   severity             text NOT NULL CHECK (severity IN ('info','maintenance','warning','critical')),
   audience             text NOT NULL CHECK (audience IN ('all','tier','tenants')),
   audience_tier        text CHECK (audience_tier IN ('shared','dedicated')),
@@ -537,24 +573,23 @@ CREATE TABLE platform.announcements (
   created_by           uuid NOT NULL REFERENCES platform.operators(id),
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now(),
-  version              int NOT NULL DEFAULT 1,
-  CHECK (ends_at > starts_at),
-  CHECK ((audience = 'tier') = (audience_tier IS NOT NULL)),
-  CHECK ((audience = 'tenants') = (cardinality(audience_tenant_ids) > 0))
+  version              int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT announcements_window CHECK (ends_at > starts_at),
+  CONSTRAINT announcements_tier CHECK ((audience = 'tier') = (audience_tier IS NOT NULL)),
+  CONSTRAINT announcements_tenants CHECK ((audience = 'tenants') = (cardinality(audience_tenant_ids) > 0))
 );
 
--- 7.11 Support tickets -----------------------------------------------------
 CREATE TABLE platform.support_tickets (
   id                      uuid PRIMARY KEY,
-  ticket_no               bigint GENERATED ALWAYS AS IDENTITY UNIQUE,   -- shown as T-1042
+  ticket_no               bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
   tenant_id               uuid NOT NULL,
-  opened_by_user_id       uuid,                  -- core.users.id (ID only) when opened in the school app
+  opened_by_user_id       uuid,
   opened_by_operator_id   uuid REFERENCES platform.operators(id),
   channel                 text NOT NULL CHECK (channel IN ('app','email','phone','whatsapp')),
   category                text NOT NULL CHECK (category IN
                             ('access','import','data_quality','exports','documents','ask','billing','bug','other')),
   priority                text NOT NULL CHECK (priority IN ('p1','p2','p3','p4')),
-  subject                 text NOT NULL CHECK (char_length(subject) <= 200),
+  subject                 text NOT NULL CHECK (char_length(subject) BETWEEN 1 AND 200),
   status                  text NOT NULL CHECK (status IN
                             ('open','in_progress','waiting_on_school','resolved','closed')),
   assigned_to             uuid REFERENCES platform.operators(id),
@@ -564,162 +599,205 @@ CREATE TABLE platform.support_tickets (
   resolved_at             timestamptz,
   closed_at               timestamptz,
   personal_data_flagged   boolean NOT NULL DEFAULT false,
-  purge_after             date,                  -- closed_at + 1 year
+  purge_after             date,
   created_at              timestamptz NOT NULL DEFAULT now(),
   updated_at              timestamptz NOT NULL DEFAULT now(),
-  version                 int NOT NULL DEFAULT 1,
-  CHECK ((opened_by_user_id IS NULL) <> (opened_by_operator_id IS NULL)),
-  CHECK ((channel = 'app') = (opened_by_user_id IS NOT NULL)),
-  CHECK ((status = 'closed') = (closed_at IS NOT NULL AND purge_after IS NOT NULL)),
-  CHECK (purge_after IS NULL OR purge_after >= (closed_at AT TIME ZONE 'Asia/Kolkata')::date + 365)
+  version                 int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT support_tickets_opener CHECK ((opened_by_user_id IS NULL) <> (opened_by_operator_id IS NULL)),
+  CONSTRAINT support_tickets_app_channel CHECK ((channel = 'app') = (opened_by_user_id IS NOT NULL)),
+  CONSTRAINT support_tickets_closed CHECK ((status = 'closed') = (closed_at IS NOT NULL AND purge_after IS NOT NULL)),
+  CONSTRAINT support_tickets_purge_after
+    CHECK (purge_after IS NULL OR purge_after >= (closed_at AT TIME ZONE 'Asia/Kolkata')::date + 365)
 );
 CREATE INDEX tickets_queue ON platform.support_tickets (status, priority, resolution_due_at);
+CREATE INDEX tickets_tenant ON platform.support_tickets (tenant_id, created_at DESC);
 
 CREATE TABLE platform.support_messages (
   id             uuid PRIMARY KEY,
   ticket_id      uuid NOT NULL REFERENCES platform.support_tickets(id) ON DELETE CASCADE,
   author_type    text NOT NULL CHECK (author_type IN ('school_user','operator','system')),
   author_id      uuid,
-  body           text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 5000),  -- stored after redact()
+  body           text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 5000),
   internal_note  boolean NOT NULL DEFAULT false,
   created_at     timestamptz NOT NULL DEFAULT now(),
-  CHECK (NOT internal_note OR author_type = 'operator'),
-  CHECK (author_type = 'system' OR author_id IS NOT NULL)
+  CONSTRAINT support_messages_internal CHECK (NOT internal_note OR author_type = 'operator'),
+  CONSTRAINT support_messages_author CHECK (author_type = 'system' OR author_id IS NOT NULL)
 );
+CREATE INDEX support_messages_ticket ON platform.support_messages (ticket_id, created_at);
 
--- 7.12 Platform audit chain ------------------------------------------------
-CREATE TABLE platform.audit_events (
-  seq            bigint PRIMARY KEY CHECK (seq >= 1),
-  id             uuid NOT NULL UNIQUE,
-  occurred_at    timestamptz NOT NULL DEFAULT now(),
-  actor_type     text NOT NULL CHECK (actor_type IN ('operator','system','deployment')),
-  actor_id       uuid,
-  action         text NOT NULL,                  -- e.g. 'tenant.provisioned', 'invoice.issued'
-  resource_type  text NOT NULL,
-  resource_id    uuid,
-  tenant_id      uuid,                           -- affected school, if any
-  summary        jsonb NOT NULL,                 -- IDs, field names, before/after of non-personal fields
-  request_id     text,
-  ip_hash        bytea,
-  prev_hash      bytea NOT NULL CHECK (octet_length(prev_hash) = 32),
-  hash           bytea NOT NULL CHECK (octet_length(hash) = 32),
-  CHECK (actor_type = 'system' OR actor_id IS NOT NULL)
+-- Break-glass requests as seen by the control plane (07 §6.4; workflow M1). Emergency access
+-- without school approval needs two different operators holding platform.breakglass.emergency.
+CREATE TABLE platform.breakglass_requests (
+  id                    uuid PRIMARY KEY,
+  tenant_id             uuid NOT NULL,
+  requested_by          uuid NOT NULL REFERENCES platform.operators(id),
+  reason_code           text NOT NULL CHECK (reason_code IN
+                          ('support_request','security_incident','legal_obligation')),
+  reason                text NOT NULL CHECK (char_length(reason) BETWEEN 10 AND 500),
+  scope                 jsonb NOT NULL CHECK (jsonb_typeof(scope) = 'object'),
+  duration_minutes      int NOT NULL CHECK (duration_minutes BETWEEN 15 AND 480),
+  emergency             boolean NOT NULL DEFAULT false,
+  status                text NOT NULL CHECK (status IN
+                          ('requested','approved','active','expired','revoked','denied')),
+  emergency_confirmed_by_1 uuid REFERENCES platform.operators(id),
+  emergency_confirmed_by_2 uuid REFERENCES platform.operators(id),
+  emergency_confirmed_at   timestamptz,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now(),
+  version               int NOT NULL DEFAULT 1 CHECK (version >= 1),
+  CONSTRAINT breakglass_emergency_only
+    CHECK (emergency OR (emergency_confirmed_by_1 IS NULL AND emergency_confirmed_by_2 IS NULL)),
+  CONSTRAINT breakglass_second_after_first
+    CHECK (emergency_confirmed_by_2 IS NULL OR emergency_confirmed_by_1 IS NOT NULL),
+  -- SEC-029: the two emergency confirmations come from different operators.
+  CONSTRAINT breakglass_two_person
+    CHECK (emergency_confirmed_by_2 IS NULL OR emergency_confirmed_by_2 <> emergency_confirmed_by_1),
+  CONSTRAINT breakglass_confirmed_at
+    CHECK ((emergency_confirmed_by_2 IS NULL) = (emergency_confirmed_at IS NULL))
 );
-CREATE INDEX platform_audit_tenant ON platform.audit_events (tenant_id, occurred_at);
+CREATE INDEX breakglass_tenant ON platform.breakglass_requests (tenant_id, created_at DESC);
 
-CREATE TABLE platform.audit_chain_head (
-  singleton   boolean PRIMARY KEY DEFAULT true CHECK (singleton),
-  last_seq    bigint NOT NULL DEFAULT 0 CHECK (last_seq >= 0),
-  last_hash   bytea  NOT NULL DEFAULT decode(repeat('00', 32), 'hex')     -- genesis: 32 zero bytes
-                     CHECK (octet_length(last_hash) = 32),
-  updated_at  timestamptz NOT NULL DEFAULT now()
-);
-INSERT INTO platform.audit_chain_head DEFAULT VALUES;   -- in the same migration
-
-REVOKE UPDATE, DELETE, TRUNCATE ON platform.audit_events FROM PUBLIC, sos_platform;
-REVOKE DELETE, TRUNCATE ON platform.audit_chain_head FROM PUBLIC, sos_platform;
-CREATE TRIGGER platform_audit_no_update BEFORE UPDATE OR DELETE ON platform.audit_events
-  FOR EACH ROW EXECUTE FUNCTION audit.block_mutation();
-CREATE TRIGGER platform_audit_no_truncate BEFORE TRUNCATE ON platform.audit_events
-  FOR EACH STATEMENT EXECUTE FUNCTION audit.block_mutation();
-
--- 7.13 Platform jobs -------------------------------------------------------
 CREATE TABLE platform.job_runs (
   id               uuid PRIMARY KEY,
-  task_name        text NOT NULL,
-  idempotency_key  text NOT NULL UNIQUE,         -- e.g. 'invoices.generate:2026-10'
+  task_name        text NOT NULL CHECK (task_name ~ '^[a-z_]+(\.[a-z_]+)+$'),
+  idempotency_key  text NOT NULL UNIQUE CHECK (char_length(idempotency_key) BETWEEN 1 AND 200),
   status           text NOT NULL CHECK (status IN ('pending','running','succeeded','failed','dead')),
   attempts         int NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   progress         jsonb,
-  error            text,                         -- error code and message; no personal data
+  error            text CHECK (char_length(error) <= 500),
+  created_by       uuid REFERENCES platform.operators(id),
   started_at       timestamptz,
   finished_at      timestamptz,
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
-  CHECK (finished_at IS NULL OR started_at IS NOT NULL)
+  CONSTRAINT job_runs_finished_after_start CHECK (finished_at IS NULL OR started_at IS NOT NULL)
 );
 ```
 
-Platform chain write (inside the action's transaction): `SELECT last_seq, last_hash FROM platform.audit_chain_head FOR UPDATE` → `seq = last_seq + 1` → `hash = sha256(last_hash || jcs(event without hash))` (RFC 8785) → insert event → update head. Same algorithm as the tenant chain (05 §7).
+Triggers, grants and definer functions of `0005_platform`:
+
+```sql
+-- updated_at triggers (platform.tg_set_updated_at) on operators, plans, billing_accounts, deployments,
+-- subscriptions, invoices, announcements, support_tickets, breakglass_requests, job_runs,
+-- feature_flags, invoice_sequences.
+
+-- FR-PLT-010: plans_freeze BEFORE UPDATE OR DELETE ON platform.plans
+--   once status <> 'draft' nothing but status (published -> retired) and updated_at may change;
+--   published/retired plans cannot be deleted (constraint name plans_frozen).
+-- FR-PLT-016: invoices_freeze BEFORE UPDATE OR DELETE ON platform.invoices
+--   after issue only status, amount_paid_inr, tds_inr, voided_by, voided_at, void_reason, updated_at,
+--   version may change; status moves only issued<->paid and issued->void; only drafts can be deleted.
+-- invoice_lines_draft_only BEFORE INSERT OR UPDATE OR DELETE ON platform.invoice_lines
+--   lines of a non-draft invoice cannot change (constraint name invoices_frozen).
+
+GRANT SELECT ON platform.feature_flags TO sos_app;
+GRANT SELECT ON platform.plans, platform.subscriptions, platform.invoices, platform.usage_daily
+  TO sos_definer;                                           -- core.current_subscription()
+GRANT INSERT ON core.memberships, core.membership_scopes, core.membership_roles TO sos_definer;
+GRANT SELECT ON core.roles TO sos_definer;                  -- core.create_owner_invite()
+-- definer_access on core.roles, core.membership_roles, core.membership_scopes (if absent)
+-- Definer functions core.current_subscription() (sos_app) and core.create_owner_invite(...)
+-- (sos_platform): 05 §3.4.
+```
+
+Platform chain write (inside the action's transaction, `audit.service.record_platform()`): `SELECT last_seq, last_hash FROM platform.audit_chain_head FOR UPDATE` → `seq = last_seq + 1` → `hash = sha256(last_hash || jcs(event without hash))` (RFC 8785) → insert event → update head. Same algorithm as the tenant chain (05 §7.1).
+
+Notes on columns that are easy to miss:
+- `plans.trial_days` (default 30, 0–365): trial length for subscriptions started as `trial` on that plan (not a global config value).
+- `deployments.boards` (copied from provisioning), `deployments.heartbeat_rotation_started_at` (set iff a next key exists; the old key stops working 7 days after it, `fleet.key_rotation_overlap_days`), `heartbeat_key_ciphertext`/`heartbeat_next_key_ciphertext`: the 32-byte keys **wrapped** with the KMS data key (local-dev wrapper outside AWS), not hashed, because the control plane must recompute each HMAC.
+- `subscriptions.cancel_at_period_end` (+ `cancel_reason`): `cancel` on a paid subscription ends it at period end; a trial is cancelled at once.
+- `usage_threshold_events`: one row per (school, metric, 80/100, billing period) records the first crossing (FR-PLT-021).
+- `breakglass_requests`: the control-plane side of break-glass (07 §6.4); two different emergency confirmers (`breakglass_two_person`). Tenant-side grants live in `ops.break_glass_grants` (05 §7.2).
+- `job_runs.created_by`: the operator who started a job (`GET /platform/jobs/{id}` shows a job to its creator or to holders of `platform.audit.read`).
+- `invoices.invoice_number` is at most 16 characters (CGST Rule 46), e.g. `SOS/26-27/000123`.
 
 ## 8. API endpoint catalog
 
-Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs, `ETag`/`If-Match`, cursor pagination). Base path `/api/v1`. "ᴿ" = step-up (`428 step_up_required` otherwise). Control-plane idempotency keys are kept for 24 hours in Valkey (operator ID + key → request hash, status and resource ID; no personal data), because `sos_platform` cannot use `ops.idempotency_keys`.
+Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs, `ETag`/`If-Match`, cursor pagination). Base path `/api/v1`. The committed `apps/api/openapi.json` is the authoritative route list (a test fails when it is stale; `make openapi` regenerates it and the TypeScript client). "ᴿ" = step-up (`428 step_up_required` otherwise); step-up follows the permission's catalog flag, except `GET /platform/operators`, which is a read without step-up. Control-plane idempotency keys are kept for 24 hours in Valkey (operator ID + key → request hash, status and resource ID; no personal data), because `sos_platform` cannot use `ops.idempotency_keys`.
+
+"Any operator" means the guard `require_platform("platform.tenants.read")`, which every platform role holds (§6); the constant is `ANY_OPERATOR` in `app/platform/permissions.py`.
 
 ### 8.1 Control plane (`/api/v1/platform/*`, operators only)
 
-| Method | Path | Permission | Notes |
-|---|---|---|---|
-| GET | `/platform/me` | any operator | Operator, roles, effective permissions, step-up freshness |
-| GET | `/platform/dashboard` | any operator | Tiles filtered by the caller's read permissions (§5.1) |
-| GET | `/platform/tenants` | `platform.tenants.read` | Filters: `status`, `tier`, `plan`, `q`, `trial_ending`, `past_due` |
-| GET | `/platform/tenants/{tenant_id}` | `platform.tenants.read` | Registry, status history, owner-invite status |
-| POST | `/platform/tenants` | `platform.tenants.provision` ᴿ | Provision shared or dedicated (§5.4); idempotent |
-| POST | `/platform/tenants/{tenant_id}/owner-invite:resend` | `platform.tenants.provision` | |
-| POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | Reason required; non-billing |
-| POST | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.offboard` ᴿ | First operator: request |
-| POST | `/platform/tenants/{tenant_id}/offboarding:approve` | `platform.tenants.offboard` ᴿ | Second, different operator; `409 same_operator` otherwise |
-| GET | `/platform/tenants/{tenant_id}/usage?from=&to=` | `platform.usage.read` | Daily aggregates |
-| GET | `/platform/usage?from=&to=` | `platform.usage.read` | All schools, aggregated |
-| GET | `/platform/plans` · `/platform/plans/{id}` | `platform.subscriptions.read` or `platform.plans.manage` | |
-| POST | `/platform/plans` | `platform.plans.manage` ᴿ | Creates a draft (new code or new version) |
-| PATCH | `/platform/plans/{id}` | `platform.plans.manage` ᴿ | Drafts only; `409 plan_published` otherwise |
-| POST | `/platform/plans/{id}/publish` · `/retire` | `platform.plans.manage` ᴿ | |
-| GET | `/platform/subscriptions` · `/platform/subscriptions/{id}` | `platform.subscriptions.read` | Filter by `status` |
-| POST | `/platform/subscriptions/{id}/activate` · `/extend-trial` · `/change-plan` · `/cancel` | `platform.subscriptions.manage` ᴿ | |
-| PUT | `/platform/subscriptions/{id}/price-override` | `platform.subscriptions.manage` ᴿ | Amount + reason; DELETE clears |
-| POST | `/platform/subscriptions/{id}/suspend` | `platform.subscriptions.manage` ᴿ | Only `past_due` after grace; exam-window rule (§9.3) |
-| POST | `/platform/subscriptions/{id}/reactivate` | `platform.subscriptions.manage` ᴿ | |
-| GET | `/platform/tenants/{tenant_id}/billing-account` | `platform.subscriptions.read` or `platform.invoices.read` | |
-| PUT | `/platform/tenants/{tenant_id}/billing-account` | `platform.subscriptions.manage` ᴿ | Affects future invoices only |
-| GET | `/platform/invoices` · `/platform/invoices/{id}` | `platform.invoices.read` | Filters: `status`, `financial_year`, `tenant_id` |
-| POST | `/platform/invoices` | `platform.invoices.manage` | Manual draft for a subscription and period |
-| PATCH | `/platform/invoices/{id}` | `platform.invoices.manage` | Draft lines and notes only |
-| DELETE | `/platform/invoices/{id}` | `platform.invoices.manage` | Drafts only |
-| POST | `/platform/invoices/{id}/issue` | `platform.invoices.manage` | Assigns the number (§10.3) |
-| POST | `/platform/invoices/{id}/void` | `platform.invoices.manage` | Issued and unpaid; reason required |
-| POST | `/platform/invoices/{id}/payments` | `platform.invoices.manage` | Record manual payment (§5.9) |
-| POST | `/platform/payments/{id}/reverse` | `platform.invoices.manage` | Reason required |
-| POST | `/platform/invoice-runs` → 202 | `platform.invoices.manage` | Run generation for a month (idempotent) |
-| GET | `/platform/flags` | `platform.flags.read` | Global rows and overrides |
-| PUT | `/platform/flags/{key}` | `platform.flags.manage` ᴿ | Global value and rollout % |
-| PUT · DELETE | `/platform/flags/{key}/tenants/{tenant_id}` | `platform.flags.manage` ᴿ | Per-school override |
-| GET | `/platform/deployments` · `/platform/deployments/{id}` | `platform.fleet.read` | |
-| PATCH | `/platform/deployments/{id}` | `platform.fleet.manage` ᴿ | `target_version`, `custom_domain`, `hostname`, `host_ref` |
-| POST | `/platform/deployments/{id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | Returns the new key **once** for the runbook |
-| POST | `/platform/deployments/{id}/decommission` | `platform.fleet.manage` ᴿ | After offboarding completes |
-| GET | `/platform/announcements` | any operator | |
-| POST · PATCH | `/platform/announcements` · `/{id}` | `platform.announcements.manage` | |
-| POST | `/platform/announcements/{id}/cancel` | `platform.announcements.manage` | |
-| GET | `/platform/support/tickets` · `/{id}` | `platform.support.read` | |
-| POST | `/platform/support/tickets` | `platform.support.manage` | Operator-created (email/phone) |
-| POST | `/platform/support/tickets/{id}/messages` | `platform.support.manage` | Reply or internal note |
-| PATCH | `/platform/support/tickets/{id}` | `platform.support.manage` | Status, priority, assignee, personal-data flag |
-| GET | `/platform/break-glass-requests` | any operator | Status list |
-| POST | `/platform/break-glass-requests` | `platform.breakglass.request` | M1 |
-| POST | `/platform/break-glass-requests/{id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | M1; two different operators |
-| GET | `/platform/operators` | `platform.operators.manage` | |
-| POST | `/platform/operators` | `platform.operators.manage` ᴿ | Invite |
-| PUT | `/platform/operators/{id}/roles` | `platform.operators.manage` ᴿ | Not own roles; keep ≥ 1 owner |
-| POST | `/platform/operators/{id}/deactivate` | `platform.operators.manage` ᴿ | |
-| GET | `/platform/audit/events` | `platform.audit.read` | Filters: `actor`, `action`, `tenant_id`, `from`, `to`; CSV via `Accept: text/csv` |
-| POST | `/platform/audit/verify` → 202 | `platform.audit.read` | Runs verification; result in the job |
-| GET | `/platform/jobs/{id}` | job creator or `platform.audit.read` | Platform job status |
+| Method | Path | Permission | Status | Notes |
+|---|---|---|---|---|
+| GET | `/platform/me` | any operator | 200 | Operator, roles, effective permissions, step-up freshness |
+| GET | `/platform/dashboard` | any operator | 200 | Tiles filtered by the caller's read permissions (§5.1) |
+| GET | `/platform/tenants` | `platform.tenants.read` | 200 | Filters: `status`, `tier`, `plan`, `q`, `trial_ending`, `past_due`; cursor |
+| POST | `/platform/tenants` | `platform.tenants.provision` ᴿ | 201 | Provision shared or dedicated (§5.4); `Idempotency-Key`; the dedicated heartbeat key is returned only in the first response |
+| GET | `/platform/tenants/{tenant_id}` | `platform.tenants.read` | 200 | Registry, statuses, subscription summary, counts |
+| POST | `/platform/tenants/{tenant_id}/activate` | `platform.tenants.provision` ᴿ | 200 | Go-live `provisioning → active`; the database refuses without a data key (`core.set_tenant_status`) |
+| POST | `/platform/tenants/{tenant_id}/owner-invite:resend` | `platform.tenants.provision` ᴿ | 202 | Only while `provisioning`; records `tenant.owner_invite_sent` (email delivery not built yet) |
+| POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | 200 | Reason required; non-billing; a billing suspension is lifted from the subscription (`409 billing_suspension`) |
+| POST | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.offboard` ᴿ | 202 | Two-person step 1: request (`409 already_requested` on repeat) |
+| POST | `/platform/tenants/{tenant_id}/offboarding:approve` | `platform.tenants.offboard` ᴿ | 200 | Step 2 by a different operator (`409 same_operator`; DB CHECK too); tenant → `offboarding` |
+| GET | `/platform/tenants/{tenant_id}/usage` | `platform.usage.read` | 200 | Daily aggregates (`from`, `to`) |
+| GET | `/platform/usage` | `platform.usage.read` | 200 | All schools |
+| GET | `/platform/tenants/{tenant_id}/billing-account` | `platform.subscriptions.read` or `platform.invoices.read` | 200 | |
+| PUT | `/platform/tenants/{tenant_id}/billing-account` | `platform.subscriptions.manage` ᴿ | 200 | Affects future invoices only |
+| GET | `/platform/plans` · `/platform/plans/{plan_id}` | `platform.subscriptions.read` or `platform.plans.manage` | 200 | |
+| POST | `/platform/plans` | `platform.plans.manage` ᴿ | 201 | Creates a draft (new code or new version) |
+| PATCH | `/platform/plans/{plan_id}` | `platform.plans.manage` ᴿ | 200 | Drafts only |
+| POST | `/platform/plans/{plan_id}/publish` · `/retire` | `platform.plans.manage` ᴿ | 200 | |
+| GET | `/platform/subscriptions` · `/platform/subscriptions/{sub_id}` | `platform.subscriptions.read` | 200 | Filter by `status` |
+| POST | `/platform/subscriptions/{sub_id}/activate` · `/extend-trial` · `/change-plan` · `/cancel` | `platform.subscriptions.manage` ᴿ | 200 | Plan change at the next period (immediately for a trial); cancel at period end (a trial at once) |
+| PUT · DELETE | `/platform/subscriptions/{sub_id}/price-override` | `platform.subscriptions.manage` ᴿ | 200 | Amount + reason; DELETE clears |
+| POST | `/platform/subscriptions/{sub_id}/suspend` | `platform.subscriptions.manage` ᴿ | 200 | Only `past_due` after grace; exam-window rule (§9.3) |
+| POST | `/platform/subscriptions/{sub_id}/reactivate` | `platform.subscriptions.manage` ᴿ | 200 | |
+| GET | `/platform/invoices` · `/platform/invoices/{invoice_id}` | `platform.invoices.read` | 200 | Filters: `status`, `financial_year`, `tenant_id` |
+| POST | `/platform/invoices` | `platform.invoices.manage` | 201 | Manual draft for a subscription and period |
+| PATCH | `/platform/invoices/{invoice_id}` | `platform.invoices.manage` | 200 | Draft lines and notes only |
+| DELETE | `/platform/invoices/{invoice_id}` | `platform.invoices.manage` | 204 | Drafts only |
+| POST | `/platform/invoices/{invoice_id}/issue` | `platform.invoices.manage` | 200 | Assigns the number (§10.3) |
+| POST | `/platform/invoices/{invoice_id}/void` | `platform.invoices.manage` | 200 | Issued and unpaid; reason required |
+| POST | `/platform/invoices/{invoice_id}/payments` | `platform.invoices.manage` | 201 | Record manual payment (§5.9) |
+| POST | `/platform/payments/{payment_id}/reverse` | `platform.invoices.manage` | 200 | Reason required |
+| POST | `/platform/invoice-runs` | `platform.invoices.manage` | 202 | Generate drafts for a month now (idempotent per month) |
+| GET | `/platform/flags` | `platform.flags.read` | 200 | Global rows and overrides |
+| PUT | `/platform/flags/{key}` | `platform.flags.manage` ᴿ | 200 | Global value and rollout % |
+| PUT · DELETE | `/platform/flags/{key}/tenants/{tenant_id}` | `platform.flags.manage` ᴿ | 200 · 204 | Per-school override |
+| GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | |
+| PATCH | `/platform/deployments/{deployment_id}` | `platform.fleet.manage` ᴿ | 200 | `target_version`, `custom_domain`, `hostname`, `host_ref` (dedicated only; `If-Match`) |
+| POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook |
+| POST | `/platform/deployments/{deployment_id}/decommission` | `platform.fleet.manage` ᴿ | 200 | After an approved offboarding |
+| GET | `/platform/fleet/versions` | `platform.fleet.read` | 200 | Running versions across deployments (version skew) |
+| GET | `/platform/announcements` | any operator | 200 | |
+| POST | `/platform/announcements` | `platform.announcements.manage` | 201 | |
+| PATCH | `/platform/announcements/{announcement_id}` | `platform.announcements.manage` | 200 | |
+| POST | `/platform/announcements/{announcement_id}/cancel` | `platform.announcements.manage` | 200 | |
+| GET | `/platform/support/tickets` · `/{ticket_id}` | `platform.support.read` | 200 | |
+| POST | `/platform/support/tickets` | `platform.support.manage` | 201 | Operator-created (email/phone/WhatsApp) |
+| POST | `/platform/support/tickets/{ticket_id}/messages` | `platform.support.manage` | 201 | Reply or internal note |
+| PATCH | `/platform/support/tickets/{ticket_id}` | `platform.support.manage` | 200 | Status, priority, assignee, personal-data flag |
+| GET | `/platform/break-glass-requests` | any operator | 200 | Status list, optional `tenant_id` |
+| POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1) |
+| POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029) |
+| GET | `/platform/operators` | `platform.operators.manage` (no step-up) | 200 | |
+| POST | `/platform/operators` | `platform.operators.manage` ᴿ | 201 | Invite |
+| PUT | `/platform/operators/{operator_id}/roles` | `platform.operators.manage` ᴿ | 200 | Not own roles; keep ≥ 1 owner |
+| POST | `/platform/operators/{operator_id}/deactivate` | `platform.operators.manage` ᴿ | 200 | |
+| GET | `/platform/audit/events` | `platform.audit.read` | 200 | Filters: `actor`, `action`, `tenant_id`, `from`, `to`; CSV via `Accept: text/csv` |
+| POST | `/platform/audit/verify` | `platform.audit.read` | 202 | Runs verification; result in the job |
+| GET | `/platform/jobs/{job_id}` | any operator | 200 | Visible to the job's creator or holders of `platform.audit.read`; otherwise 404 |
 
 ### 8.2 Fleet (machine to machine)
 
 | Method | Path | Authentication | Notes |
 |---|---|---|---|
-| POST | `/fleet/heartbeat` | `require_fleet_signature()` (HMAC, §12.2) | Not routed through the BFF; rate limit 1 per minute per deployment |
+| POST | `/fleet/heartbeat` | `require_fleet_signature()` (HMAC, §12.2) | 200; not routed through the BFF or the dedicated edge; rate limit 1 per minute per deployment |
 
 ### 8.3 School app additions (tenant API, `sos_app`)
 
-| Method | Path | Permission | Notes |
-|---|---|---|---|
-| GET | `/tenant/billing` | `tenant.billing.read` | Plan, status, period, usage vs limits (via `core.current_subscription()`) |
-| GET | `/tenant/billing/invoices` | `tenant.billing.read` | Own invoices: number, period, total, status, due |
-| GET | `/announcements` | authenticated | Active announcements for this school (§14) |
-| POST · GET | `/support/tickets` | proposed `support.ticket.create` (§19, Q6) | Opens or lists the school's own tickets via `platform.service` |
+Served by `app/platform/tenant_api.py` in the caller's `tenant_session`.
+
+| Method | Path | Permission | Status | Notes |
+|---|---|---|---|---|
+| GET | `/tenant/billing` | `tenant.billing.read` | 200 | Plan, status, period, trial end, usage vs limits (via `core.current_subscription()`) |
+| GET | `/tenant/billing/invoices` | `tenant.billing.read` | 200 | Own issued invoices, newest first (last 24): number, period, total, amount due, status |
+| GET | `/announcements` | any active member (`session.authenticated`) | 200 | Active announcements for this school, EN and TE (§14) |
+| POST | `/support/tickets` | `support.ticket.create` | 201 | Opens a ticket via `platform.service.open_ticket_from_tenant`; text redacted before storage |
+| GET | `/support/tickets` · `/support/tickets/{ticket_id}` | `support.ticket.create` | 200 | The school's own tickets; internal notes never shown |
+| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | 200 | Reply on the school's own ticket |
 
 ## 9. Billing lifecycle
 
@@ -757,25 +835,25 @@ stateDiagram-v2
 
 ### 9.3 Protected board-exam windows
 
-Suspension must not cut off a school during board exams or registration deadlines. Windows are configured per year in `config/billing.yaml` (`protected_windows`: name, boards, start, end), maintained from the boards' published calendars. If today is inside a window that applies to the school's boards, suspension additionally requires `exam_window_override_by` = a `platform_owner` who approves with step-up; the event records both operators.
+Suspension must not cut off a school during board exams or registration deadlines. Windows are configured per year in `apps/api/app/platform/billing.yaml` (`protected_windows`: name, boards, start, end; empty in M0), maintained from the boards' published calendars. If today is inside a window that applies to the school's boards, suspension additionally requires `exam_window_override_by` = a `platform_owner` who approves with step-up; the event records both operators.
 
 ## 10. Invoice generation job
 
 ### 10.1 Schedule and idempotency
-- Beat task `billing.generate_invoices` runs on the 1st of each month at 02:00 IST (and on demand via `POST /platform/invoice-runs`).
+- Beat task `billing.generate_invoices` runs daily at 02:00 IST; only the first run of a month does work (and on demand via `POST /platform/invoice-runs`). Beat task `billing.daily` (06:00 IST) rolls ended periods and marks past-due subscriptions.
 - It records a `platform.job_runs` row with `idempotency_key = 'invoices.generate:<YYYY-MM>'`; a rerun resumes rather than duplicates. The unique index `one_invoice_per_period` guarantees at most one live invoice per subscription and period.
 
 ### 10.2 What it creates
 - For each subscription in `active` or `past_due` whose next period starts in the run month (monthly: every month; annual: on the anniversary month): one **draft** invoice for the coming period (billing in advance). Trials and cancelled or suspended subscriptions are skipped.
 - Lines: plan base price (or the negotiated price override) with the plan's SAC code; for per-student plans, `max(students_active, included_students) − included_students` extra students at the per-student price, where `students_active` is taken from `usage_daily` on the last day of the previous month.
-- Tax: place of supply = billing account state code. If it equals the supplier's state code (configured supplier in `config/billing.yaml`; AP = 37), CGST 9% + SGST 9%; otherwise IGST 18%. Line amounts are rounded half-up to paise; each tax is computed on the taxable value and rounded half-up to paise.
+- Tax: place of supply = billing account state code. If it equals the supplier's state code (supplier legal name, GSTIN and state code from `SOS_BILLING_SUPPLIER_LEGAL_NAME`, `SOS_BILLING_SUPPLIER_GSTIN`, `SOS_BILLING_SUPPLIER_STATE_CODE`; AP = 37; the API refuses to start in staging/prod with the dev placeholders), CGST 9% + SGST 9%; otherwise IGST 18%. Line amounts are rounded half-up to paise; each tax is computed on the taxable value and rounded half-up to paise.
 - Drafts appear in the invoice list for review; a billing admin issues them (usually the same day).
 
 ### 10.3 Numbering (on issue)
 - Financial year runs 1 April to 31 March (IST): an issue date in April 2026–March 2027 belongs to `2026-27`.
 - In the issuing transaction: `INSERT INTO platform.invoice_sequences (financial_year) VALUES (:fy) ON CONFLICT DO NOTHING`, then `SELECT last_number FROM platform.invoice_sequences WHERE financial_year = :fy FOR UPDATE`, increment, update, and set `invoice_number = 'SOS/' || :fy_short || '/' || lpad(:n::text, 6, '0')` (e.g., `SOS/26-27/000123`, 16 characters).
 - Numbers are **gapless**: drafts have no number; voided invoices keep theirs; numbers are never reused.
-- **Check before the first real invoice:** that format is 18 characters. GST rules (CGST Rule 46) limit invoice serial numbers to 16 characters. A 16-character alternative is `SOS/26-27/000123`. The format is config (`billing.invoice_number_format`), so it can change without a schema change (§19, Q2).
+- The format is config (`billing.invoice_number_format = "{prefix}/{fy_short}/{seq:06d}"` in `apps/api/app/platform/billing.yaml`), giving 16 characters, the CGST Rule 46 limit; the column CHECK allows at most 16. Confirm with a CA before the first real invoice (§19, Q2).
 
 ## 11. Usage metering
 
@@ -789,9 +867,10 @@ Suspension must not cut off a school during board exams or registration deadline
 | `ai_queries`, `ai_input_tokens`, `ai_output_tokens`, `ai_cost_usd` | From the LLM gateway's per-tenant meters (`kb.queries`) |
 | `ai_cost_inr` | `ai_cost_usd` × FX rate from config (`billing.usd_inr_rate`, reviewed monthly) |
 
-- **Shared tier:** beat task `usage.collect_daily` (01:30 IST) calls `core.list_tenant_ids(ARRAY['active','suspended'])` and, for each school, `core.tenant_usage_summary(tenant_id)`, which returns **counts only**; results are upserted into `platform.usage_daily` with `source = 'shared_collector'`.
+- **Shared tier:** beat task `usage.collect_daily` (01:30 IST) calls `core.list_tenant_ids(ARRAY['active','suspended'])` and, for each school, `core.tenant_usage_summary(tenant_id)`, which returns **counts only**, plus one aggregate count in the school's own `tenant_session` (distinct users with audited actions that IST day); results are upserted into `platform.usage_daily` with `source = 'shared_collector'`.
+- **M0 coverage:** `active_users` and `staff_users` (active memberships) are real; `students_active`, `storage_bytes`, `documents` and the AI meters are recorded as 0 until the `sis`/`kb` modules extend `core.tenant_usage_summary` (M1/M2).
 - **Dedicated tier:** the host computes the same function locally and sends the numbers in its heartbeat `usage` block; the control plane upserts them with `source = 'heartbeat'`.
-- **Thresholds:** after each upsert, compare with plan limits; on first crossing of 80% and 100% per metric per billing period, create an operator notification and email the school's billing contact (§5.10). Record `usage.limit_threshold_crossed` in the platform audit log.
+- **Thresholds:** after each upsert, compare with plan limits; on first crossing of 80% and 100% per metric per billing period, record a row in `platform.usage_threshold_events` and `usage.limit_threshold_crossed` in the platform audit log. Operator notifications and the email to the school's billing contact (§5.10) are not built yet (no email delivery in M0).
 
 ## 12. Fleet and heartbeat protocol
 
@@ -808,15 +887,19 @@ Suspension must not cut off a school during board exams or registration deadline
 | `X-SOS-Timestamp` | Unix time in seconds (UTC) |
 | `X-SOS-Signature` | `v1=` + lowercase hex of `HMAC-SHA256(key, timestamp + "." + raw_body)` |
 
-The control plane:
-1. looks up the deployment and key by ID (unknown → `401`, no detail);
-2. rejects if `|now − timestamp| > 300 s` (**5-minute skew window**) → `401`;
-3. computes the HMAC over the exact bytes received and compares in constant time → `401` on mismatch;
-4. rejects a repeated `nonce` seen in the last 10 minutes (Valkey set per deployment) → `409 replay`;
-5. validates the body against the strict schema (unknown fields rejected, size ≤ 16 KB) → `422`;
-6. checks `deployment_id` and `tenant_id` in the body match the registry → `401`.
+The control plane (`require_fleet_signature()` in `app/platform/fleet.py`) checks, in this order, storing nothing on any failure:
+1. deployment and key ID known, and the key currently valid (current key, or the next key during a rotation; the old key stops working 7 days after rotation started) → else `401`, no detail;
+2. `|now − timestamp| ≤ 300 s` (**5-minute skew window**) → else `401`;
+3. body ≤ 16 KB → else `422`;
+4. HMAC over the exact bytes received, compared in constant time → else `401`;
+5. strict schema (unknown fields rejected, no free text) → else `422`;
+6. `deployment_id` and `tenant_id` in the body match the registry → else `401`;
+7. `nonce` not seen in the last 10 minutes (Valkey, per deployment) → else `409 replay`;
+8. at most one accepted heartbeat per deployment per minute → else `429`.
 
-Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored KMS-wrapped in `platform.deployments`, and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days.
+Rejections are logged as `fleet.heartbeat.rejected` with a reason code (not audited individually).
+
+Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days.
 
 ### 12.3 Payload (schema version 1)
 
@@ -885,7 +968,7 @@ Full steps live in the ops runbook (11 §8, R10). Outline:
 1. **Panel:** Provision school → Dedicated (step-up). Creates the deployment (`provisioning`), subscription, billing account, tenant ID and heartbeat key; shows the key **once**.
 2. **Terraform:** `infra/terraform/envs/dedicated-template` with one tfvars file and one backend config per school, using module `dedicated_host`: EC2 in ap-south-1 (encrypted EBS, IMDSv2 only, no SSH, SSM agent), security group allowing only 80/443 inbound, host KMS key, files bucket and backup bucket (ap-south-2) encrypted with that key, instance role limited to those buckets, keys and its Secrets Manager secrets, CloudWatch log group (400 days).
 3. **Secrets:** database passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, OIDC client secret and the heartbeat key into AWS Secrets Manager under `schoolos/<tenant_code>/`.
-4. **Host bootstrap** (SSM document): apply the OS hardening baseline (SEC-030), install the container runtime, pull images **by digest**, write `deploy/dedicated/compose.yaml` with `SOS_DEPLOYMENT_MODE=dedicated`, run `infra/db/bootstrap.sql`, run the `migrate` service, then provision the tenant with the chosen tenant ID (same `core.provision_tenant()` function) and send the owner invite.
+4. **Host bootstrap** (SSM document): apply the OS hardening baseline (SEC-030), install the container runtime, pull images **by digest**, write `deploy/dedicated/compose.yaml` with `SOS_DEPLOYMENT_MODE=dedicated`, run `infra/db/bootstrap.sql`, run the `migrate` service, then provision the tenant with the chosen tenant ID and create the owner invite. **Gap (M0):** there is no host-side provisioning command yet (`deploy/dedicated/README.md` names `python -m app.tenancy.provision_dedicated`, which does not exist); see 14 · M0 status.
 5. **Identity:** create the deployment's OIDC app client with callback URLs on its host name(s) (§19, Q4).
 6. **DNS and TLS:** default host name, and the school's CNAME for the custom domain; Caddy obtains certificates via ACME; HSTS on.
 7. **Backups:** enable WAL-G archiving and nightly base backup + `pg_dump` to the ap-south-2 bucket; **run a restore test** to a scratch host before go-live.
@@ -925,20 +1008,22 @@ After offboarding approval (§5.5): final export delivered → data deleted → 
 
 ## 16. Audit events
 
-Written with `audit.service.record_platform(...)` in `platform.audit_events` unless marked (T), which are written into the school's own chain by a definer function.
+Written with `audit.service.record_platform(...)` in `platform.audit_events`, in the same transaction as the change. Actions marked (+ T) are **also** written into the school's own chain (`actor_type = 'platform'`, shared tier only) with `audit.record()` in a `tenant_session`.
+
+**Known limitation (ADR-0013 Amendment A6).** The school-chain event is not atomic with the control-plane change: it is written first in a separate `sos_app` transaction that commits right after the platform transaction commits. If the platform transaction fails, both roll back; if the tenant commit then fails, the platform change stands without its school-chain event (the platform event still records it). One transaction cannot span the two database roles, and a definer function that writes tenant audit events would widen the allowlist. Listed for decision in 14 · M0 status.
 
 | Area | Actions |
 |---|---|
-| Operators | `operator.invited`, `operator.activated`, `operator.login`, `operator.step_up`, `operator.roles_changed`, `operator.deactivated` |
-| Schools | `tenant.provisioned` (+ T), `tenant.owner_invite_sent`, `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.deleted` |
+| Operators | `operator.invited`, `operator.activated` (first MFA sign-in), `operator.bootstrapped` (system, bootstrap CLI), `operator.roles_changed`, `operator.deactivated` (`operator.login` and `operator.step_up` are not recorded yet) |
+| Schools | `tenant.provisioned` (+ T), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.deleted` (M1, with the deletion job) |
 | Plans | `plan.created`, `plan.updated`, `plan.published`, `plan.retired` |
-| Subscriptions | `subscription.created`, `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.past_due` (system), `subscription.suspended`, `subscription.exam_window_override`, `subscription.reactivated`, `subscription.cancelled` |
-| Billing | `billing_account.updated`, `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system) |
+| Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
+| Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system) |
 | Usage | `usage.limit_threshold_crossed` (system) |
 | Flags | `flag.updated`, `flag.override_set`, `flag.override_removed` |
-| Fleet | `deployment.created`, `deployment.updated`, `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.decommissioned`, `heartbeat.rejected` (system; rate-limited) |
+| Fleet | `deployment.created`, `deployment.updated`, `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.decommissioned` (rejected heartbeats are logged, not audited) |
 | Announcements | `announcement.created`, `announcement.updated`, `announcement.cancelled` |
-| Support | `support.ticket_opened`, `support.ticket_updated`, `support.personal_data_flagged`, `support.message_redacted`, `support.tickets_purged` (system) |
+| Support | `support.ticket_opened`, `support.ticket_updated`, `support.personal_data_flagged`, `support.tickets_purged` (system) |
 | Break-glass | `breakglass.requested`, `breakglass.emergency_confirmed` (M1) |
 | Audit | `audit.verify_run` |
 
@@ -988,7 +1073,7 @@ In addition to the general suites (12 §4):
 | GST | Intra-state → CGST = SGST; inter-state → IGST; totals equal sum; rounding half-up to paise (table-driven) | FR-PLT-017 |
 | Immutability | Issued invoice fields other than status/payments/void cannot change; published plan prices cannot change | FR-PLT-010, FR-PLT-016 |
 | Lifecycle | Past-due after due date; never auto-suspended; suspension before grace end → 409; inside exam window without owner approval → 409 | FR-PLT-014 |
-| Provisioning | Shared provisioning is atomic (failure leaves no tenant, subscription or deployment); idempotent retry; school's audit log shows `tenant.provisioned` | FR-PLT-002 |
+| Provisioning | The first provisioning transaction is atomic (failure leaves no tenant, subscription or deployment); later steps resume idempotently on retry; school's audit log shows `tenant.provisioned` | FR-PLT-002 |
 | Platform audit chain | Every mutating platform route writes exactly one event in the same transaction; tamper and gap detection | FR-PLT-029 |
 | Support redaction | Aadhaar-like and phone numbers in ticket messages are masked before storage | FR-PLT-027 |
 | School billing page | `core.current_subscription()` returns only the caller's tenant; other roles get 403 | FR-PLT-030 |
@@ -998,13 +1083,13 @@ In addition to the general suites (12 §4):
 | # | Question | Proposed default | Owner |
 |---|---|---|---|
 | Q1 | Two-person permissions are held only by `platform_owner`; with one founder, offboarding and emergency break-glass cannot happen. Who is the second owner? | Appoint a trusted second `platform_owner` (co-founder or advisor) before the first paid school; alternatively accept the school owner's written confirmation as the second person for offboarding only (needs an ADR) | Founder |
-| Q2 | Invoice number format `SOS/2026-27/000123` is 18 characters; CGST Rule 46 allows 16. | Switch to `SOS/26-27/000123` before the first issued invoice (config change); confirm with a CA | Founder + CA |
+| Q2 | Invoice number format: CGST Rule 46 allows 16 characters. | **Implemented** as `SOS/26-27/000123` (16 characters, config `invoice_number_format`); still confirm with a CA before the first issued invoice | Founder + CA |
 | Q3 | GST registration and SAC code. Below the registration threshold SchoolOS may not charge GST; the correct SAC for SaaS needs confirming; services to schools are generally taxable at 18% but check exemptions. TDS deducted by schools also needs handling. | Confirm with a CA; until registered, issue invoices with GST rate 0 and a note; keep `tds_inr` in payments | Founder + CA |
 | Q4 | Identity for dedicated hosts: per-deployment app client in the shared Cognito user pool, or a separate user pool per host? | Per-deployment app client (callback URLs per host); revisit for schools that require full separation | Engineering |
 | Q5 | Feature flags on dedicated hosts: the host's local `platform.feature_flags` cannot be written by the control plane. | The deploy pipeline writes the deployment's flag set on each release (`updated_by` NULL); M1: consider delivering flags in the heartbeat response | Engineering |
-| Q6 | Opening tickets from the school app needs a tenant permission that is not in the approved catalog. | Add `support.ticket.create` (all staff roles) to the tenant catalog in Task 12; until then operators open tickets from email/phone | Product owner |
+| Q6 | Opening tickets from the school app needs a tenant permission. | **Settled:** `support.ticket.create` is in the catalog and granted to every staff role (07 §6.2); school routes in §8.3 | Product owner |
 | Q7 | Dedicated schools' Plan & billing page and in-app tickets need data from the control plane. | M1: billing summary in the heartbeat response; tickets via email/phone until an authenticated outbound ticket call is designed | Product owner |
-| Q8 | Default trial length and pilot terms. | `billing.trial_days = 30`, extendable by billing admin; design partner per signed pilot terms | Founder |
+| Q8 | Default trial length and pilot terms. | **Implemented** per plan: `platform.plans.trial_days` (default 30), extendable by billing admin; design partner per signed pilot terms | Founder |
 | Q9 | Should `admin.<domain>` be restricted by IP allowlist in addition to MFA? | Not at Stage 0 (operators travel); WAF rate rules and geo-restriction to India; revisit at Stage 1 | Engineering |
 | Q10 | E-invoicing (IRN) applies above a turnover threshold. | Not needed at Stage 0; add to the compliance calendar | Founder + CA |
 

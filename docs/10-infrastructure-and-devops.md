@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-26 |
 | Cloud | AWS ap-south-1 (Mumbai) primary · ap-south-2 (Hyderabad) backups/DR |
 | Tooling | Terraform · Docker · GitHub Actions · OpenTelemetry |
 | Related | 04-Architecture §11, §16–17, 07-Security §13–14, 11-Operations, 16-Platform admin panel §12–13, ADR-0014, ADR-0015, ADR-0018 |
-| Changes | 0.2: dedicated tier (§15: Terraform module `dedicated_host`, `deploy/dedicated/compose.yaml`, Caddy TLS, WAL-G/`pg_dump` backups to ap-south-2, hardening, patching, fleet upgrades); local compose with SeaweedFS, Valkey, `migrate`, `beat`, OIDC stub and `infra/db/bootstrap.sql` (§11); Valkey and two Cognito pools (§4–5, ADR-0018); fleet step in CD (§8). 0.1: baseline |
+| Changes | 0.3: Terraform module and root list as built (§5); CI jobs as in `ci.yml` (§7); migrate + partition step (§9); local stack, make targets and every `SOS_*` setting from `config.py` (§11). 0.2: dedicated tier (§15: Terraform module `dedicated_host`, `deploy/dedicated/compose.yaml`, Caddy TLS, WAL-G/`pg_dump` backups to ap-south-2, hardening, patching, fleet upgrades); local compose with SeaweedFS, Valkey, `migrate`, `beat`, OIDC stub and `infra/db/bootstrap.sql` (§11); Valkey and two Cognito pools (§4–5, ADR-0018); fleet step in CD (§8). 0.1: baseline |
 
 ---
 
@@ -60,26 +60,36 @@ Endpoints: S3 (gateway), ECR, Secrets Manager, KMS, CloudWatch Logs (interface; 
 
 ```
 infra/terraform/
+├── bootstrap/                remote-state bucket + CMK per AWS account (run once, local state)
 ├── modules/
-│   ├── network/        vpc, subnets, endpoints, nat
-│   ├── rds/            postgres, parameter group (log settings, pgvector), roles bootstrap
-│   ├── redis/          ElastiCache for Valkey (Redis protocol)
-│   ├── s3/             buckets, policies, lifecycle, object lock (audit), replication
-│   ├── kms/            CMKs + key policies (data, audit, backup)
-│   ├── ecs_service/    task def, service, autoscaling, IAM task role
-│   ├── alb_waf/
-│   ├── cognito/        staff and operator user pools (Essentials), app clients, pre-token-generation Lambda (ADR-0018)
-│   ├── observability/  log groups (retention), alarms, dashboards
-│   ├── ci_oidc/        GitHub OIDC provider + deploy roles
-│   └── dedicated_host/ one school's EC2 host, KMS key, buckets, IAM, Secrets Manager secrets, log group (§15)
-└── envs/
-    ├── staging/  main.tf, variables.tfvars
-    ├── prod/     main.tf, variables.tfvars
-    └── dedicated/<tenant_code>/  one directory per dedicated-tier school (module dedicated_host)
+│   ├── network/              VPC, public/app/data subnets in two AZs, endpoints, NAT
+│   ├── rds/                  PostgreSQL 16 (pgvector), parameter group, TLS required, PITR 14 days
+│   ├── rds_backup_replication/  automated-backup replication to ap-south-2 (DR provider)
+│   ├── redis/                ElastiCache for Valkey 8 (TLS, AUTH token via write-only attributes)
+│   ├── s3/                   shared-tier buckets (files, audit archive with Object Lock), lifecycle by tag
+│   ├── s3_bucket/            hardened private bucket used by every stack
+│   ├── kms/                  CMKs (data, audit, backup), rotation, key policies
+│   ├── secrets/              Secrets Manager secrets (ephemeral generation, write-only values)
+│   ├── ecr/                  repositories (immutable tags, scan on push, KMS)
+│   ├── ecs_cluster/          Fargate cluster, Container Insights, ECS Exec audit, Service Connect
+│   ├── ecs_service/          hardened Fargate service or one-off task (migrate, db-bootstrap)
+│   ├── alb_waf/              ALB (TLS 1.2+), WAFv2 managed + rate rules; optional fleet heartbeat route
+│   ├── cognito/              staff and operator user pools (Essentials), app clients, pre-token Lambda (ADR-0018)
+│   ├── observability/        alarms, SNS topic, log groups (400 days), budget
+│   ├── ci_oidc/              GitHub OIDC provider + deploy roles
+│   ├── shared_platform/      composition of the above for one shared-tier environment
+│   └── dedicated_host/       one school's EC2 host, KMS key, buckets, IAM, secrets, log group (§15)
+├── envs/
+│   ├── staging/              shared_platform, small sizes, synthetic data only
+│   ├── prod/                 shared_platform + DR copies; deletion protection asserted by tests
+│   └── dedicated-template/   one backend config + tfvars per school under schools/<code>.* (module dedicated_host)
+└── scripts/validate.sh
 ```
 
+Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs `terraform fmt -check`, `init -backend=false` + `validate`, `tflint` and `trivy config` on every root; **no plan or apply has run against AWS yet** (14 · M0 status).
+
 - Remote state in S3 (versioned, encrypted) with locking; separate state per env.
-- `terraform plan` on PR (posted as comment); `apply` only from the pipeline with approval.
+- Planned: `terraform plan` on PR (posted as comment); `apply` only from the pipeline with approval. Today CI validates only (§7).
 - Checks: `terraform fmt/validate`, `tflint`, Trivy/Checkov IaC scan (no public buckets, encryption on, logging on).
 - Mandatory tags: `project`, `env`, `owner`, `data_class`, `cost_center`.
 - Log group retention: security/access/app logs **400 days** (≥ 13 months) in ap-south-1.
@@ -88,32 +98,36 @@ infra/terraform/
 
 - Multi-stage Dockerfiles; slim/distroless bases; pinned digests. Base and service images per ADR-0014 (`python:3.12-slim-bookworm`, `node:24-bookworm-slim`, `pgvector/pgvector:0.8.6-pg16-bookworm`, `valkey/valkey:8.1-alpine`, pinned `chrislusf/seaweedfs`, pinned `caddy:2`).
 - Run as non-root; read-only root FS; `/tmp` as tmpfs; drop Linux capabilities.
-- Worker image includes Chromium (Playwright) and fonts (Noto Sans/Serif Telugu) for PDF rendering; ClamAV as separate sidecar/service with definitions updated daily.
+- API, worker and beat share one image (`apps/api/Dockerfile`: `python:3.12-slim-bookworm`, uv-built venv, UID 10001, `INSTALL_PSQL=true` for release images, RDS CA bundle). Chromium (Playwright) with Noto Sans/Serif Telugu for PDF rendering and a ClamAV service arrive with the modules that need them (M1/M3).
 - Health endpoints: `/healthz` (liveness), `/readyz` (DB, Valkey reachable).
 - Images tagged with git SHA; SBOM attached; Trivy scan must pass (no critical CVEs) before push to ECR.
 
 ## 7. CI pipeline (GitHub Actions)
 
-```mermaid
-flowchart LR
-  PR[Pull request] --> L[Lint + format<br/>ruff, eslint, prettier]
-  L --> T[Typecheck<br/>mypy strict, tsc]
-  T --> U[Unit + integration tests<br/>pytest w/ Postgres+pgvector, vitest]
-  U --> S[Security<br/>semgrep, gitleaks, pip-audit, npm audit, trivy fs/iac]
-  S --> M[Migration check<br/>upgrade/downgrade on seeded DB + RLS catalog test]
-  M --> A[AuthZ suite<br/>route enumeration, BOLA, cross-tenant]
-  A --> E[RAG eval subset<br/>if knowledge/prompt/model config changed]
-  E --> B[Build images + SBOM + scan]
-  B --> P[terraform plan comment]
-```
+`.github/workflows/ci.yml` runs on pull requests, pushes to `main`, merge groups and manually. Every job calls the same `make` target a developer runs:
 
-- Required checks on `main`; squash merges; Conventional Commit titles.
+| Job | Runs |
+|---|---|
+| `lint` | `make lint` (ruff, ruff format check, import-linter, eslint, prettier) |
+| `typecheck` | `make typecheck` (mypy strict, tsc) |
+| `test (test-api)` / `test (test-web)` | `make test-api` (pytest + testcontainers: Postgres + pgvector, Valkey, SeaweedFS) / `make test-web` (vitest) |
+| `migrations` | `make migration-check` (fresh and populated upgrade/downgrade round trips) |
+| `authz-suite` | `make test-security` (RLS catalog, isolation, route enumeration, authz matrix, BOLA, definer functions, composite FKs) |
+| `security` | `make security` (gitleaks full history, semgrep, pip-audit, npm audit, trivy fs + config) |
+| `ci-config` | semgrep rule tests, actionlint, zizmor |
+| `terraform` | fmt, validate, tflint, trivy config on every Terraform root |
+| `images (api, worker, web)` | docker build, SPDX SBOM (syft), trivy image scan (HIGH/CRITICAL, fixable); nothing pushed |
+| `ci-ok` | The single required check: fails if any job failed or was cancelled |
+
+`nightly.yml` (02:47 IST) runs `make test`, `make test-security`, `make migration-check`, `make e2e`, `make security`, a ZAP baseline against staging (skipped until staging is configured) and `make eval`. The RAG eval subset per PR and `terraform plan` comments arrive with the knowledge module and AWS accounts.
+
+- Required check on `main`: `ci-ok` (branch protection not yet configured); squash merges; Conventional Commit titles.
 - Concurrency groups cancel superseded runs; caches for pip/npm.
 - Secrets in GitHub Environments; AWS via OIDC roles scoped to branch/environment.
 
 ## 8. CD and releases
 
-1. Merge to `main` → images pushed → **staging deploy**: run migrations task (`sos_migrator`) → rolling update → smoke tests → Playwright E2E → ZAP baseline (nightly) → k6 smoke.
+1. Merge to `main` → **staging deploy** (`deploy-staging.yml`): build, SBOM and scan each image, push to ECR → one-off ECS migrate task (`sos_migrator`: `alembic upgrade head` + audit partitions) → roll ECS services → smoke test. Planned additions: Playwright E2E, k6 smoke; ZAP baseline runs nightly.
 2. **Production**: manual approval (GitHub Environment) → migrations (expand-only by policy) → rolling deploy with health checks and circuit-breaker rollback → post-deploy smoke → release notes.
 3. **Rollback:** redeploy previous task definition; migrations are backward compatible so code rollback is safe; contract migrations only after a full release cycle.
 4. **Windows:** production deploys outside school hours (after 18:00 IST or Sundays) unless hotfix; schools notified 48 h ahead of maintenance with expected impact.
@@ -123,11 +137,11 @@ flowchart LR
 ## 9. Database operations
 
 - Bootstrap: `infra/db/bootstrap.sql` runs once per database as the admin user (RDS master user via an ECS one-off task; compose init locally; testcontainers in CI; the dedicated-host bootstrap). It creates roles (`sos_owner`, `sos_migrator`, `sos_app`, `sos_platform`, `sos_readonly`, `sos_definer`; none with BYPASSRLS), schemas (`core`, `sis`, `kb`, `audit`, `ops`, `platform`) and extensions (05 §3).
-- Migrations: Alembic via one-off ECS task as `sos_migrator` (`SET ROLE sos_owner`); `lock_timeout` and `statement_timeout` set; large index builds `CONCURRENTLY`. The same task tops up `audit.events` partitions to 12 months ahead (05 §7.1).
+- Migrations: Alembic via one-off ECS task as `sos_migrator` (`SET ROLE sos_owner`); `lock_timeout` and `statement_timeout` set; large index builds `CONCURRENTLY`. The same task then runs `python -m app.audit.partitions --months-ahead 12` to keep `audit.events` partitions 12 months ahead (05 §7.1). The db-bootstrap one-off task (`psql -f infra/db/bootstrap.sql` as the RDS master user) runs before it and after role-password rotation.
 - Parameters: `log_min_duration_statement` (e.g., 500 ms, no bind values logged), `pg_stat_statements`, `idle_in_transaction_session_timeout`, SSL required.
 - Backups: automated backups with PITR (14 days Stage 0, 35 days Stage 1+); daily snapshot copied to ap-south-2, retained 30 days; monthly snapshot retained 12 months (encrypted, access-restricted).
 - **Restore drill (quarterly):** restore PITR to a new instance in staging account (via snapshot share), run integrity checks (row counts, audit chain verification), record timings against RPO/RTO.
-- Maintenance: autovacuum tuning for high-churn tables (`attribute_values`, `document_chunks`), HNSW index monitoring, alert when `audit.events` has fewer than 3 future partitions.
+- Maintenance: autovacuum tuning for high-churn tables (`attribute_values`, `document_chunks`), HNSW index monitoring, alert (`audit.partitions.low_runway`) when `audit.events` partitions cover less than 90 days ahead.
 
 ## 10. Disaster recovery
 
@@ -140,30 +154,78 @@ flowchart LR
 
 ## 11. Local development
 
-The local stack runs the shared deployment (tenant app + control plane) with permissive-licence images (ADR-0014). Ports and services are fixed so every tool and test agrees:
+The local stack (`docker-compose.yml`, project name `schoolos`) runs the shared deployment (tenant app + control plane) with permissive-licence images pinned by digest (ADR-0014). Every port is bound to `127.0.0.1`.
 
-```yaml
-# compose.yaml (sketch; the real file pins every image tag)
-services:
-  db:       { image: pgvector/pgvector:0.8.6-pg16-bookworm, ports: ["5432:5432"],
-              volumes: ["./infra/db/bootstrap.sql:/docker-entrypoint-initdb.d/00-bootstrap.sql:ro"] }
-  valkey:   { image: valkey/valkey:8.1-alpine, ports: ["6379:6379"] }
-  s3:       { image: chrislusf/seaweedfs:<pinned>, command: "server -s3 -s3.port=8333", ports: ["8333:8333"] }
-  s3-init:  { image: <aws-cli or seaweedfs>, depends_on: [s3], restart: "no" }   # creates the two buckets
-  migrate:  { build: ./apps/api, command: alembic upgrade head, depends_on: [db], restart: "no" }
-  api:      { build: ./apps/api, ports: ["8000:8000"], env_file: .env, depends_on: [migrate, valkey, s3] }
-  worker:   { build: ./apps/api, command: celery -A app.worker worker -Q ingest,embed,ocr,dq,exports,pdf,maintenance }
-  beat:     { build: ./apps/api, command: celery -A app.worker beat }
-  web:      { build: ./apps/web, ports: ["3000:3000"], env_file: .env }
-  oidc:     { image: ghcr.io/navikt/mock-oauth2-server:<pinned>, ports: ["8080:8080"], profiles: ["dev"] }
-  otel:     { image: otel/opentelemetry-collector:<pinned>, ports: ["4318:4318"], profiles: ["otel"] }
-```
+| Service | Image | Port | What it does |
+|---|---|---|---|
+| `db` | `pgvector/pgvector:0.8.6-pg16-bookworm` | 5432 | PostgreSQL; on first start `infra/docker/db-init.sh` runs `infra/db/bootstrap.sql` with the role passwords from `.env` |
+| `valkey` | `valkey/valkey:8.1-alpine` | 6379 | Celery broker, rate limits, BFF sessions (DB 1), caches; no persistence |
+| `s3` | `chrislusf/seaweedfs` (pinned digest) | 8333 | S3-compatible storage (`infra/docker/seaweedfs/s3.json`) |
+| `s3-init` | API image | — | One-off: creates `SOS_S3_BUCKET_FILES` and `SOS_S3_BUCKET_AUDIT` |
+| `migrate` | API image | — | One-off: `alembic upgrade head && python -m app.audit.partitions --months-ahead 12` as `sos_migrator` |
+| `api` | API image (`apps/api/Dockerfile`) | 8000 | FastAPI (tenant and platform routes; `SOS_DEPLOYMENT_MODE=shared`); starts after `migrate` and `s3-init` succeed |
+| `worker` | API image | — | `celery -A sos_worker.celery_app worker -Q ingest,embed,ocr,dq,exports,pdf,maintenance --concurrency=2` |
+| `beat` | API image | — | `celery -A sos_worker.celery_app beat` |
+| `web` | `apps/web/Dockerfile` | 3000 | Next.js school app, platform route group and BFF (`API_INTERNAL_URL=http://api:8000`, `REDIS_URL=redis://valkey:6379/1`) |
+| `oidc` (profile `dev`) | `ghcr.io/navikt/mock-oauth2-server:6.0.3` | 8080 | Dev OIDC stub for staff (`/schoolos`) and operators (`/platform`), config `infra/docker/oidc.json`; never in staging/prod. Not started by `make dev`: use `docker compose --profile dev up -d oidc` |
 
-- `infra/db/bootstrap.sql` runs on the first start of `db` (roles, schemas, extensions); `migrate` then applies Alembic revisions as `sos_migrator`.
-- Environment variables are listed in `.env.example`: `SOS_ENV` (`local|ci|staging|prod`), `SOS_DEPLOYMENT_MODE` (`shared|dedicated`), `SOS_DATABASE_URL` (`sos_app`), `SOS_PLATFORM_DATABASE_URL` (`sos_platform`), `SOS_MIGRATOR_DATABASE_URL`, `SOS_REDIS_URL` (Valkey), `SOS_S3_ENDPOINT_URL`, `SOS_S3_BUCKET_FILES`, `SOS_S3_BUCKET_AUDIT`, `AWS_REGION`, `SOS_OIDC_ISSUER`, `SOS_OIDC_AUDIENCE`, `SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE`, `SOS_SERVICE_TOKEN_KEY`, `SOS_KEY_WRAPPER` (`kms|local-dev`), `SOS_LOCAL_DEV_MASTER_KEY`, `SOS_OTEL_EXPORTER_OTLP_ENDPOINT`, `SOS_LOG_LEVEL`; web: `API_INTERNAL_URL`, `SESSION_SECRET`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, `APP_BASE_URL`, `REDIS_URL`.
-- `make install` sets up Python (uv) and Node (npm workspaces) dependencies; `make dev` starts the stack; `make seed-synthetic` creates a synthetic tenant (Telugu/English names, classes, deliberate mismatches, sample circulars) and a synthetic platform operator.
-- LLM calls in local/CI default to recorded fixtures (VCR-style) unless `LIVE_LLM=1`; eval runs use real APIs with synthetic data.
-- Local identity: the dev OIDC stub serves both staff and operator logins; it is excluded from staging/prod builds. `SOS_KEY_WRAPPER=local-dev` replaces KMS locally only.
+All Python services share one image (`schoolos-python:dev`) with a read-only root filesystem, `/tmp` as tmpfs, `no-new-privileges` and all capabilities dropped. The image's build argument `INSTALL_PSQL` (default `true`; release images always install `postgresql-client` for the ECS db-bootstrap task) is set from `SOS_INSTALL_PSQL` in compose (default `false`, because the `db` container runs `bootstrap.sql` itself).
+
+**Commands** (`make help` lists them; CI runs the same targets):
+
+| Target | What it does |
+|---|---|
+| `make install` | `uv sync --locked --all-packages` and `npm ci` |
+| `make dev` / `down` / `logs` | Start (creating `.env` from `.env.example` if missing; builds, waits for health), stop, tail the stack. Migrations run as part of `make dev` (`migrate` service) |
+| `make migrate` | Starts `db` and runs the `migrate` service (migrations + audit partitions) |
+| `make db-shell` | `psql` as the local admin |
+| `make seed-synthetic` | `python -m app.devtools.seed_synthetic`: deterministic synthetic schools, structure and staff; each first owner created through the production path (owner invite → activate → invitation acceptance). Refuses unless `SOS_ENV` is `local` or `ci` |
+| `make openapi` | Writes `apps/api/openapi.json` (shared mode, sorted) and regenerates `packages/api-client` |
+| `make test` | `test-api` (pytest with coverage; real Postgres via testcontainers, or `SOS_TEST_ADMIN_DATABASE_URL`) + `test-web` (vitest) |
+| `make test-security` | `pytest apps/api/tests/security` (RLS catalog, isolation, route enumeration, authz matrix, BOLA, definer functions, composite FKs) |
+| `make migration-check` | `pytest apps/api/tests/migrations` (fresh and populated round trips) |
+| `make e2e` | Playwright (after `next build`, or against `E2E_BASE_URL`) |
+| `make lint` / `format` / `typecheck` | ruff (+ format check), import-linter, eslint/prettier / auto-format / mypy strict + tsc |
+| `make security` | gitleaks (full history), semgrep (`.semgrep` + p/python, p/typescript, p/owasp-top-ten), pip-audit, `npm audit --audit-level=high`, trivy fs + config (pinned container images when the tools are not installed) |
+| `make eval` | Placeholder until the knowledge module exists (M2) |
+| `make check` | `lint typecheck test security` |
+
+**API and worker settings** (`apps/api/app/core/config.py`, the only code that reads the environment; prefix `SOS_`, unknown variables ignored). In `staging`/`prod` the process refuses to start with `SOS_KEY_WRAPPER=local-dev`, with a `dev-only` value in `SOS_DATABASE_URL`, `SOS_PLATFORM_DATABASE_URL` or `SOS_SERVICE_TOKEN_KEY`, or with the placeholder invoice supplier name or GSTIN.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SOS_ENV` | `local` | `local`, `ci`, `staging`, `prod` (staging/prod: production guards on, API docs off) |
+| `SOS_DEPLOYMENT_MODE` | `shared` | `dedicated` removes control-plane routes and schedules |
+| `SOS_SERVICE_NAME`, `SOS_VERSION`, `SOS_LOG_LEVEL` | `api`, `0.0.0-dev`, `INFO` | Telemetry identity and log level |
+| `SOS_DATABASE_URL` | local `sos_app` URL | Tenant role (RLS) |
+| `SOS_PLATFORM_DATABASE_URL` | local `sos_platform` URL | Control-plane role |
+| `SOS_MIGRATOR_DATABASE_URL` | local `sos_migrator` URL | Alembic and the partition CLI |
+| `SOS_DB_POOL_SIZE` | 10 | Connection pool per engine |
+| `SOS_DB_STATEMENT_TIMEOUT_MS`, `SOS_WORKER_STATEMENT_TIMEOUT_MS` | 5000, 120000 | Transaction-local statement timeouts (requests; long worker jobs) |
+| `SOS_REDIS_URL` | `redis://localhost:6379/0` | Valkey |
+| `SOS_S3_ENDPOINT_URL`, `SOS_S3_BUCKET_FILES`, `SOS_S3_BUCKET_AUDIT` | none, `sos-local-files`, `sos-local-audit-archive` | Object storage (endpoint only for SeaweedFS) |
+| `AWS_REGION` (no prefix) | `ap-south-1` | AWS SDK region |
+| `SOS_OIDC_ISSUER`, `SOS_OIDC_AUDIENCE` | local stub `/schoolos`, `schoolos-web` | Staff tokens (Cognito: audience = app client ID) |
+| `SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE` | local stub `/platform`, `schoolos-platform` | Operator tokens |
+| `SOS_OIDC_JWKS_URI`, `SOS_PLATFORM_OIDC_JWKS_URI` | none (discovery) | Explicit JWKS URLs; compose points them at `http://oidc:8080/...` |
+| `SOS_SERVICE_TOKEN_KEY` | dev-only value | HS256 key for the BFF's `X-Service-Token` (same value in the web app) |
+| `SOS_KEY_WRAPPER` | `local-dev` | `kms` or `local-dev` (local/CI only) |
+| `SOS_LOCAL_DEV_MASTER_KEY` | none | Local-dev key wrapper and local audit-archive signing key |
+| `SOS_KMS_DATA_KEY_ARN` | none | KMS key that wraps tenant DEKs and heartbeat keys (`SOS_KEY_WRAPPER=kms`) |
+| `SOS_AUDIT_SIGNING_KEY_ARN` | none | Asymmetric KMS key (ECC_NIST_P256) signing daily audit archives |
+| `SOS_AUDIT_ARCHIVE_RETENTION_DAYS` | 1096 | Object Lock retention for audit archives |
+| `SOS_OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP endpoint; no trace export when unset |
+| `SOS_BILLING_SUPPLIER_LEGAL_NAME`, `SOS_BILLING_SUPPLIER_GSTIN`, `SOS_BILLING_SUPPLIER_STATE_CODE` | dev placeholders, `37` | Supplier block on GST invoices (placeholders refused in staging/prod) |
+| `SOS_CONTROL_PLANE_URL` | none | Dedicated hosts: where the heartbeat is sent |
+| `SOS_DEPLOYMENT_ID`, `SOS_DEDICATED_TENANT_ID` | none | Dedicated hosts: identity in the heartbeat |
+| `SOS_HEARTBEAT_KEY_ID`, `SOS_HEARTBEAT_KEY` | none | Dedicated hosts: heartbeat HMAC key (base64url, shown once by the panel) |
+
+Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
+
+**Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`.
+
+- Local identity: the dev OIDC stub serves both staff and operator logins; the stub's `http://localhost:8080` issuer is not reachable from inside the web container, so for browser sign-in run the web app on the host (`apps/web/README.md`). `SOS_KEY_WRAPPER=local-dev` replaces KMS locally only.
+- LLM calls in local/CI will default to recorded fixtures unless `LIVE_LLM=1` (M2, with the knowledge module).
 - To try the dedicated tier locally, run `deploy/dedicated/compose.yaml` with `SOS_DEPLOYMENT_MODE=dedicated` against a separate project name.
 
 ## 12. Cost management
@@ -196,12 +258,12 @@ A dedicated-tier school gets its own host running the same images as the shared 
 
 | Resource | Setting |
 |---|---|
-| EC2 instance | ap-south-1; Graviton where images allow; Amazon Linux 2023 (or Ubuntu LTS) hardened image; IMDSv2 only; encrypted gp3 EBS with the host's KMS key; SSM agent; no SSH key pair |
+| EC2 instance | ap-south-1; Graviton where images allow; Ubuntu 24.04 LTS (Canonical AMI via SSM public parameter), hardened; IMDSv2 only; encrypted gp3 EBS with the host's KMS key; SSM agent; no SSH key pair |
 | Network | Dedicated VPC subnet per region shared by dedicated hosts, one security group per host: inbound 80/443 only; egress to AWS endpoints, the control plane, LLM/embeddings/OCR providers and OS/image registries |
 | KMS | One customer-managed key per host (EBS, buckets, backups, Secrets Manager secrets); deleting it crypto-shreds the host's data and backups |
 | S3 | Files bucket (ap-south-1) and backup bucket (ap-south-2), private, versioned, TLS-only, encrypted with the host key; lifecycle per 05 §13 |
 | IAM | Instance role limited to its own buckets, key, Secrets Manager secrets (`schoolos/<tenant_code>/*`) and log group |
-| SSM | Parameters (SecureString) for DB passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, OIDC client secret, heartbeat key |
+| Secrets | AWS Secrets Manager secrets encrypted with the host key: generated secrets (DB passwords, `SOS_SERVICE_TOKEN_KEY`, `SESSION_SECRET`, …) and an operator secret filled after apply (LLM API key, heartbeat key); `deploy/dedicated/scripts/fetch-secrets.sh` renders them into a 0600 env file |
 | Logs | CloudWatch log group in ap-south-1, 400-day retention (CERT-In/DPDP) |
 | DNS | Default host name under the SchoolOS domain; optional custom domain (school adds a CNAME) |
 
