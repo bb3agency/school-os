@@ -386,3 +386,41 @@ def remove_membership_scope(session: Session, scope_id: uuid.UUID) -> bool:
     """Audit: ``membership.scope_removed``."""
     result = session.execute(delete(MembershipScope).where(MembershipScope.id == scope_id))
     return bool(result.rowcount)  # type: ignore[attr-defined]
+
+
+# --- read helpers for identity.service (authz wave) ------------------------------------------
+
+
+def role_permission_keys(session: Session, role_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
+    """Permission keys per role (roles without grants map to an empty set)."""
+    out: dict[uuid.UUID, set[str]] = {rid: set() for rid in role_ids}
+    if not role_ids:
+        return out
+    rows = session.execute(
+        select(RolePermission.role_id, RolePermission.permission_key).where(
+            RolePermission.role_id.in_(role_ids)
+        )
+    ).all()
+    for role_id, key in rows:
+        out.setdefault(role_id, set()).add(key)
+    return out
+
+
+def active_membership_ids_with_role(session: Session, role_id: uuid.UUID) -> list[uuid.UUID]:
+    """Active, unexpired memberships holding ``role_id`` (last-owner guard)."""
+    stmt = (
+        select(Membership.id)
+        .join(
+            MembershipRole,
+            and_(
+                MembershipRole.tenant_id == Membership.tenant_id,
+                MembershipRole.membership_id == Membership.id,
+            ),
+        )
+        .where(
+            MembershipRole.role_id == role_id,
+            Membership.status == "active",
+            or_(Membership.expires_at.is_(None), Membership.expires_at > func.now()),
+        )
+    )
+    return list(session.scalars(stmt))

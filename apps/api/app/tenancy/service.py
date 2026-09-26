@@ -1,8 +1,8 @@
 """Tenancy public API: provisioning, lifecycle, keys and academic structure.
 
-Other modules call only these functions. No routes live here yet: the authz wave adds them and
-wraps each call with ``require(...)``; permissions assumed and audit actions to emit are stated
-per function (audit is wired by the caller in the SAME transaction, CLAUDE.md §6.7).
+Other modules call only these functions. Routes live in ``tenancy.api`` and wrap each call
+with ``require(...)``; the permission assumed is stated per function. Each mutation writes its
+audit event here, in the caller's transaction (CLAUDE.md §6.7).
 
 Requirements: FR-TEN-001, FR-TEN-002, FR-TEN-003, FR-TEN-010; US-201, US-202.
 """
@@ -23,11 +23,13 @@ from sqlalchemy import Engine
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.audit import service as audit
 from app.core.config import get_settings
 from app.core.crypto import KeyWrapper, generate_tenant_keys, get_key_wrapper
 from app.core.db import platform_session, tenant_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
+from app.core.logging import get_context
 from app.tenancy import repository as repo
 from app.tenancy.schemas import (
     AcademicYearCreate,
@@ -39,8 +41,11 @@ from app.tenancy.schemas import (
     SectionCreate,
     SectionOut,
     SectionUpdate,
+    TenantOut,
     TenantProvisioned,
     TenantProvisionIn,
+    TenantSettings,
+    TenantSettingsPatch,
     TenantStatus,
     TenantStatusChange,
     TenantUsage,
@@ -71,6 +76,28 @@ def _db_errors() -> Iterator[None]:
         if mapped is None:
             raise
         raise mapped from exc
+
+
+def _audit(
+    session: Session,
+    *,
+    action: str,
+    resource_type: str,
+    resource_id: uuid.UUID | None,
+    summary: dict[str, Any],
+    system: bool = False,
+) -> None:
+    """Audit in the caller's transaction (CLAUDE.md §6.7); actor = the session's user."""
+    request_id = get_context().get("request_id")
+    audit.record(
+        session,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        summary=summary,
+        actor_type="system" if system else "user",
+        request_id=request_id if isinstance(request_id, str) else None,
+    )
 
 
 def _validation_failed(exc: ValidationError) -> ValidationFailed:
@@ -145,6 +172,14 @@ def initialise_tenant(
                 key_id=wrapper.key_id,
             )
             key_version, key_id = key.key_version, key.kms_key_arn
+            _audit(
+                session,
+                action="tenant.key.created",
+                resource_type="tenant",
+                resource_id=tenant_id,
+                summary={"key_version": key_version, "key_id": key_id},
+                system=True,
+            )
         for hook in POST_PROVISION_HOOKS:
             hook(session, tenant_id)
     return key_version, key_id
@@ -284,6 +319,7 @@ def create_academic_year(session: Session, data: AcademicYearCreate) -> Academic
     repo.lock_academic_structure(session)
     if repo.academic_year_overlaps(session, data.starts_on, data.ends_on):
         raise Conflict("The dates overlap another academic year.", code="academic_year_overlap")
+    previous = repo.get_current_academic_year(session) if data.is_current else None
     with _db_errors():
         if data.is_current:
             repo.clear_current_academic_year(session, except_id=None)
@@ -295,6 +331,21 @@ def create_academic_year(session: Session, data: AcademicYearCreate) -> Academic
             starts_on=data.starts_on,
             ends_on=data.ends_on,
             is_current=data.is_current,
+        )
+    _audit(
+        session,
+        action="academic_year.created",
+        resource_type="academic_year",
+        resource_id=year.id,
+        summary={"label": year.label, "is_current": year.is_current},
+    )
+    if data.is_current:
+        _audit(
+            session,
+            action="academic_year.current_set",
+            resource_type="academic_year",
+            resource_id=year.id,
+            summary={"previous_year_id": previous.id if previous else None, "year_id": year.id},
         )
     return AcademicYearOut.model_validate(year)
 
@@ -325,6 +376,13 @@ def update_academic_year(
         )
     if year is None:
         raise _precondition_or_missing(True, "academic year")
+    _audit(
+        session,
+        action="academic_year.updated",
+        resource_type="academic_year",
+        resource_id=year_id,
+        summary={"fields": sorted(values)},
+    )
     return AcademicYearOut.model_validate(year)
 
 
@@ -344,6 +402,7 @@ def set_current_academic_year(
         raise _precondition_or_missing(True, "academic year")
     if year.is_current:
         return AcademicYearOut.model_validate(year)
+    previous = repo.get_current_academic_year(session)
     with _db_errors():
         repo.clear_current_academic_year(session, except_id=year_id)
         updated = repo.update_academic_year(
@@ -351,6 +410,13 @@ def set_current_academic_year(
         )
     if updated is None:
         raise _precondition_or_missing(True, "academic year")
+    _audit(
+        session,
+        action="academic_year.current_set",
+        resource_type="academic_year",
+        resource_id=year_id,
+        summary={"previous_year_id": previous.id if previous else None, "year_id": year_id},
+    )
     return AcademicYearOut.model_validate(updated)
 
 
@@ -395,6 +461,13 @@ def create_class(session: Session, data: ClassCreate) -> ClassOut:
             display_te=data.display_te,
             sort_order=data.sort_order,
         )
+    _audit(
+        session,
+        action="class.created",
+        resource_type="class",
+        resource_id=klass.id,
+        summary={"code": klass.code, "sort_order": klass.sort_order},
+    )
     return ClassOut.model_validate(klass)
 
 
@@ -408,7 +481,15 @@ def ensure_default_classes(session: Session) -> list[ClassOut]:
         {"id": new_id(), "tenant_id": tenant_id, **item.model_dump()}
         for item in default_class_catalog()
     ]
-    repo.insert_classes_if_missing(session, rows)
+    added = repo.insert_classes_if_missing(session, rows)
+    if added:
+        _audit(
+            session,
+            action="class.defaults_added",
+            resource_type="class",
+            resource_id=None,
+            summary={"count": added},
+        )
     return list_classes(session)
 
 
@@ -423,6 +504,13 @@ def update_class(
         )
     if klass is None:
         raise _precondition_or_missing(repo.get_class(session, class_id) is not None, "class")
+    _audit(
+        session,
+        action="class.updated",
+        resource_type="class",
+        resource_id=class_id,
+        summary={"fields": sorted(values)},
+    )
     return ClassOut.model_validate(klass)
 
 
@@ -459,6 +547,21 @@ def create_section(session: Session, data: SectionCreate) -> SectionOut:
             name=data.name,
             class_teacher_membership_id=data.class_teacher_membership_id,
         )
+    _audit(
+        session,
+        action="section.created",
+        resource_type="section",
+        resource_id=section.id,
+        summary={"class_id": section.class_id, "academic_year_id": section.academic_year_id},
+    )
+    if section.class_teacher_membership_id is not None:
+        _audit(
+            session,
+            action="section.class_teacher_assigned",
+            resource_type="section",
+            resource_id=section.id,
+            summary={"membership_id": section.class_teacher_membership_id},
+        )
     return SectionOut.model_validate(section)
 
 
@@ -477,4 +580,83 @@ def update_section(
         )
     if section is None:
         raise _precondition_or_missing(repo.get_section(session, section_id) is not None, "section")
+    _audit(
+        session,
+        action="section.updated",
+        resource_type="section",
+        resource_id=section_id,
+        summary={"fields": sorted(values)},
+    )
+    if "class_teacher_membership_id" in values:
+        _audit(
+            session,
+            action="section.class_teacher_assigned",
+            resource_type="section",
+            resource_id=section_id,
+            summary={"membership_id": values["class_teacher_membership_id"]},
+        )
     return SectionOut.model_validate(section)
+
+
+# --- school profile and settings (tenant_session; FR-TEN-012) ---------------------------------
+
+
+def _tenant_out(tenant: Any) -> TenantOut:
+    stored: dict[str, Any] = dict(tenant.settings or {})
+    known = {k: v for k, v in stored.items() if k in TenantSettings.model_fields}
+    try:
+        settings = TenantSettings.model_validate(known)
+    except ValidationError:
+        settings = TenantSettings()  # unreadable legacy values fall back to defaults
+    return TenantOut(
+        id=tenant.id,
+        code=tenant.code,
+        name=tenant.name,
+        boards=list(tenant.boards),
+        state_code=tenant.state_code,
+        status=tenant.status,
+        plan_tier=tenant.plan_tier,
+        deployment_mode=tenant.deployment_mode,
+        settings=settings,
+        version=tenant.version,
+    )
+
+
+def get_tenant(session: Session) -> TenantOut:
+    """The caller's own school (RLS ``own_tenant``). Permission: any member."""
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("School not found")
+    return _tenant_out(tenant)
+
+
+def update_tenant_settings(
+    session: Session, data: TenantSettingsPatch, *, expected_version: int
+) -> TenantOut:
+    """Change school settings (``tenant.settings.manage``, step-up; optimistic locking).
+
+    Audit: ``tenant.settings_updated`` with the changed field names.
+    """
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("School not found")
+    current = _tenant_out(tenant).settings.model_dump(mode="json")
+    changes = data.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    try:
+        merged = TenantSettings.model_validate({**current, **changes})
+    except ValidationError as exc:
+        raise _validation_failed(exc) from exc
+    stored = {**dict(tenant.settings or {}), **merged.model_dump(mode="json")}
+    updated = repo.update_tenant_settings(
+        session, expected_version=expected_version, settings=stored
+    )
+    if updated is None:
+        raise PreconditionFailed("The settings were changed by someone else. Reload and try again.")
+    _audit(
+        session,
+        action="tenant.settings_updated",
+        resource_type="tenant",
+        resource_id=updated.id,
+        summary={"fields": sorted(k for k in changes if changes[k] != current.get(k))},
+    )
+    return _tenant_out(updated)
