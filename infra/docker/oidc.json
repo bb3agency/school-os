@@ -1,4 +1,34 @@
 {
   "interactiveLogin": true,
-  "tokenCallbacks": []
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "schoolos",
+      "tokenExpiry": 600,
+      "requestMappings": [
+        {
+          "requestParam": "client_id",
+          "match": "*",
+          "claims": {
+            "aud": ["schoolos-web"],
+            "amr": ["pwd"]
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "platform",
+      "tokenExpiry": 600,
+      "requestMappings": [
+        {
+          "requestParam": "client_id",
+          "match": "*",
+          "claims": {
+            "aud": ["schoolos-platform"],
+            "amr": ["pwd", "mfa"]
+          }
+        }
+      ]
+    }
+  ]
 }

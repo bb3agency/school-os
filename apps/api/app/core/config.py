@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     oidc_audience: str = "schoolos-web"
     platform_oidc_issuer: str = "http://localhost:8080/platform"
     platform_oidc_audience: str = "schoolos-platform"
+    # Optional explicit JWKS URLs (skip discovery). Locally the issuer URL uses localhost, which
+    # is not reachable from inside the api container, so compose points these at the stub.
+    oidc_jwks_uri: str | None = None
+    platform_oidc_jwks_uri: str | None = None
     service_token_key: SecretStr = SecretStr("dev-only-service-token-key-change-me-0123456789")
 
     key_wrapper: KeyWrapperKind = KeyWrapperKind.LOCAL_DEV

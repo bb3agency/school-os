@@ -416,6 +416,7 @@ def build_tenant_verifier(settings: Settings) -> TokenVerifier:
         issuer=settings.oidc_issuer,
         audience=settings.oidc_audience,
         production_like=settings.is_production_like,
+        jwks_uri=settings.oidc_jwks_uri,
     )
 
 
@@ -425,6 +426,7 @@ def build_platform_verifier(settings: Settings) -> TokenVerifier:
         issuer=settings.platform_oidc_issuer,
         audience=settings.platform_oidc_audience,
         production_like=settings.is_production_like,
+        jwks_uri=settings.platform_oidc_jwks_uri,
     )
 
 

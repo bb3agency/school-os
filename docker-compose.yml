@@ -14,6 +14,9 @@ x-python-app: &python-app
     SOS_MIGRATOR_DATABASE_URL: postgresql+psycopg://sos_migrator:${SOS_DB_MIGRATOR_PASSWORD}@db:5432/schoolos
     SOS_REDIS_URL: redis://valkey:6379/0
     SOS_S3_ENDPOINT_URL: http://s3:8333
+    # The dev OIDC stub is reachable as "oidc" inside the network (issuer stays localhost:8080).
+    SOS_OIDC_JWKS_URI: http://oidc:8080/schoolos/jwks
+    SOS_PLATFORM_OIDC_JWKS_URI: http://oidc:8080/platform/jwks
   read_only: true
   tmpfs: [/tmp]
   security_opt: ["no-new-privileges:true"]
