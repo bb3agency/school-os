@@ -6,8 +6,14 @@ only, acknowledge late and have time limits.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from contextvars import Token
+from typing import Any
+
 from app.core.config import get_settings
-from celery import Celery
+from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
+from app.core.telemetry import setup_telemetry
+from celery import Celery, Task, signals
 from kombu import Queue
 
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
@@ -42,3 +48,58 @@ def create_celery() -> Celery:
 
 
 celery_app = create_celery()
+
+# --- Logging and tracing (SEC-008, NFR-OBS-001) ------------------------------------------------
+
+WORKER_SERVICE = "worker"
+_task_log_tokens: dict[str, Mapping[str, Token[Any]]] = {}
+
+
+@signals.setup_logging.connect
+def _configure_logging(**_: object) -> None:
+    """Use the SchoolOS JSON pipeline. Connecting this signal stops Celery hijacking logging."""
+    setup_logging(get_settings(), service=WORKER_SERVICE)
+
+
+@signals.worker_process_init.connect
+def _init_tracing_in_child(**_: object) -> None:
+    """Prefork children: create the tracer provider after fork (exporter threads, sockets)."""
+    setup_telemetry(None, get_settings(), service=WORKER_SERVICE)
+
+
+@signals.worker_init.connect
+def _init_tracing_in_main(sender: object = None, **_: object) -> None:
+    """Solo/threads pools run tasks in the main process, which gets no worker_process_init."""
+    if "prefork" not in str(getattr(sender, "pool_cls", "prefork")).lower():
+        setup_telemetry(None, get_settings(), service=WORKER_SERVICE)
+
+
+@signals.task_prerun.connect
+def _bind_task_context(
+    task_id: str | None = None,
+    task: Task[Any, Any] | None = None,
+    kwargs: Mapping[str, object] | None = None,
+    **_: object,
+) -> None:
+    """Bind task_name, queue, attempt and (from kwargs, if UUIDs) job_id/tenant_id to logs."""
+    if task_id is None or task is None:
+        return
+    delivery = getattr(task.request, "delivery_info", None)
+    queue = delivery.get("routing_key") if isinstance(delivery, dict) else None
+    _task_log_tokens[task_id] = bind_task_context(
+        task_name=task.name,
+        kwargs=kwargs,
+        queue=queue if isinstance(queue, str) else None,
+        attempt=int(getattr(task.request, "retries", 0) or 0),
+    )
+
+
+@signals.task_postrun.connect
+def _clear_task_context(task_id: str | None = None, **_: object) -> None:
+    tokens = _task_log_tokens.pop(task_id, None) if task_id else None
+    if tokens is None:
+        return
+    try:
+        reset_context(tokens)
+    except ValueError:  # token created in another context (should not happen); fail safe
+        clear_context()
