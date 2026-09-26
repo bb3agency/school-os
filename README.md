@@ -1,7 +1,7 @@
 # SchoolOS
 
 > The memory and operations layer for Indian private schools, starting with the admin office.
-> Working name · Documentation baseline v0.1 · 26 September 2026 · Region: Andhra Pradesh, India
+> Working name · Documentation v0.2 · M0 (foundations) in progress · Region: Andhra Pradesh, India
 
 SchoolOS lets a school office **enter student details once and use them everywhere**: board and government portal submissions, certificates, registers, parent notices, and an **"Ask the school"** assistant that answers questions from the school's own records and documents, always with sources.
 
