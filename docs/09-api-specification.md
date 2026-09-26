@@ -2,20 +2,25 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-09-26 |
+| Version | 0.2 · 2026-09-26 |
 | Style | REST/JSON over HTTPS · OpenAPI 3.1 generated from FastAPI (source of truth at runtime: `/api/v1/openapi.json` in non-prod) |
-| Related | 03-TRD (FR IDs), 07-Security §6 (permissions) |
+| Related | 03-TRD (FR IDs), 07-Security §6 (permissions), 16-Platform admin panel §8 (control-plane endpoints) |
+| Changes | 0.2: BFF→API service token (`X-Service-Token`); idempotency store; `tenant.structure.manage` for school structure; promotions marked M1; Plan & billing, announcements and support endpoints; control-plane and fleet endpoints summary (§4, link to 16 §8). 0.1: baseline |
 
 ---
 
 ## 1. Topology
 
 ```
-Browser ──(cookie session)──▶ web/BFF  /bff/api/v1/*  ──(Bearer access token + service auth)──▶ api  /api/v1/*
+Browser ──(cookie session)──▶ web/BFF  /bff/api/v1/*  ──(Authorization: Bearer <user access token>
+                                                        + X-Service-Token: <60 s service JWT>)──▶ api  /api/v1/*
+Dedicated host beat ──(HMAC-signed heartbeat, outbound only)──▶ control plane  /api/v1/fleet/heartbeat
 ```
 
 - Browsers never call the API directly and never hold tokens. BFF routes mirror API paths and add CSRF checks.
-- The API trusts nothing from the BFF except a valid user access token plus internal service authentication; it re-checks tenant, permission and scope on every call.
+- **Service token:** on every call the BFF adds `X-Service-Token`, a short-lived JWT signed with HS256 using `SOS_SERVICE_TOKEN_KEY`: `iss = "sos-web"`, `aud = "sos-api"`, `iat`, `exp = iat + 60 s`, `jti`. The API rejects requests without a valid service token (401), so only the BFF can call it even inside the network.
+- **User token:** `Authorization: Bearer <access token>` from the staff OIDC client (school app) or the operator OIDC client (platform admin panel). With Cognito, access tokens have no `aud`; the API checks issuer, `token_use = "access"` and `client_id` against `SOS_OIDC_AUDIENCE` / `SOS_PLATFORM_OIDC_AUDIENCE` (ADR-0018). Control-plane routes accept only operator tokens; tenant routes accept only staff tokens.
+- The API trusts nothing from the BFF beyond these two tokens; it re-checks tenant, permission and scope on every call.
 
 ## 2. Conventions
 
@@ -25,7 +30,7 @@ Browser ──(cookie session)──▶ web/BFF  /bff/api/v1/*  ──(Bearer ac
 | Format | `application/json; charset=utf-8`; dates `YYYY-MM-DD`; timestamps RFC 3339 UTC; IDs UUID strings |
 | Language | `Accept-Language: en` or `te` selects message/explanation language |
 | Request ID | `X-Request-Id` (generated at edge if absent), echoed in responses and logs |
-| Idempotency | `Idempotency-Key` required on POSTs that create resources or start jobs; stored 24 h per tenant+user |
+| Idempotency | `Idempotency-Key` required on POSTs that create resources or start jobs; stored 24 h per tenant+user in `ops.idempotency_keys` (control plane: per operator, 16 §8). Same key + same body → original status and `Location`; same key + different body → `422 idempotency_key_reused`; still running → `409` |
 | Concurrency | Mutable resources return `ETag`; updates require `If-Match`; mismatch → `412 Precondition Failed` |
 | Pagination | Cursor-based: `?limit=50&cursor=…` (max 200); response `{ "data": [...], "next_cursor": "…" \| null }` |
 | Filtering/sorting | Explicit query params per endpoint (e.g., `?section_id=&status=`); `sort=field` or `sort=-field` from an allowlist |
@@ -55,13 +60,13 @@ Browser ──(cookie session)──▶ web/BFF  /bff/api/v1/*  ──(Bearer ac
 |---|---|
 | 400 | Malformed request |
 | 401 | Not authenticated / token expired |
-| 403 | Authenticated but lacking permission (**only** when existence of the resource isn't sensitive) |
+| 403 | Authenticated but lacking permission (**only** when existence of the resource isn't sensitive); `code: tenant_suspended` when the school is suspended (owner's billing and export routes excepted); `code: mfa_required` when a privileged role signs in without MFA (ADR-0018) |
 | 404 | Not found **or** outside caller's tenant/scope (never reveal existence) |
 | 409 | State conflict (e.g., approving a non-pending request) |
 | 412 | ETag mismatch |
 | 413 / 415 | File too large / unsupported type |
 | 422 | Validation errors |
-| 428 | Step-up authentication required (`code: step_up_required`) |
+| 428 | Step-up authentication required (`code: step_up_required`): MFA and `auth_time` within 5 minutes; the BFF re-authenticates with `prompt=login` |
 | 429 | Rate limited / budget exhausted (`code: ai_budget_exhausted`) |
 | 5xx | Server errors, no internals exposed |
 
@@ -80,11 +85,19 @@ Every endpoint declares its permission; scope rules from 07 §6 apply.
 | Method | Path | Permission |
 |---|---|---|
 | GET/PATCH | `/tenant` | `tenant.settings.manage` (PATCH, step-up) |
-| GET/POST | `/academic-years` · `/classes` · `/sections` | read: `student.read_basic`; write: `tenant.settings.manage` |
-| POST | `/academic-years/{id}/promotions:preview` · `:commit` · `:undo` | `tenant.settings.manage` |
+| GET/POST | `/academic-years` · `/classes` · `/sections` (PATCH on items) | read: `student.read_basic`; write: `tenant.structure.manage` (no step-up) |
+| POST | `/academic-years/{id}/promotions:preview` · `:commit` · `:undo` (**M1**, FR-TEN-011) | `tenant.structure.manage` |
 | GET/POST | `/users` (invite) · PATCH `/users/{id}` | `user.manage` (step-up) |
 | PUT | `/users/{id}/roles` · `/users/{id}/scopes` | `role.assign` (step-up) |
 | GET | `/roles` · `/permissions` | `user.manage` |
+
+### Plan & billing, announcements, support (school side)
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/tenant/billing` | `tenant.billing.read` | Current plan, status, period, trial end, usage vs limits (via `core.current_subscription()`) |
+| GET | `/tenant/billing/invoices` | `tenant.billing.read` | Own invoices: number, period, total, amount due, status |
+| GET | `/announcements` | authenticated | Active platform announcements for this school, in the user's language |
+| POST · GET | `/support/tickets` | proposed `support.ticket.create` (16 §19, Q6) | Open or list the school's own tickets; text is redacted before storage |
 
 ### Students
 | Method | Path | Permission | Notes |
@@ -156,6 +169,22 @@ Every endpoint declares its permission; scope rules from 07 §6 apply.
 | POST | `/admin/break-glass/{id}/approve` · `/revoke` | `breakglass.approve` (step-up) |
 | GET | `/jobs/{id}` | job owner or admin |
 | GET | `/healthz` · `/readyz` | public (no data) |
+
+### Control plane and fleet (shared deployment only)
+Full catalog with permissions: [16 §8](16-platform-admin-panel.md#8-api-endpoint-catalog). Summary:
+
+| Area | Paths (under `/api/v1`) | Protection |
+|---|---|---|
+| Operator session, dashboard | `/platform/me`, `/platform/dashboard` | `require_platform(...)` |
+| Schools and provisioning | `/platform/tenants…` (list, detail, provision, suspend, reactivate, offboarding) | `platform.tenants.*` |
+| Plans, subscriptions, billing accounts | `/platform/plans…`, `/platform/subscriptions…`, `/platform/tenants/{id}/billing-account` | `platform.plans.manage`, `platform.subscriptions.*` |
+| Invoices and payments | `/platform/invoices…`, `/platform/payments/{id}/reverse`, `/platform/invoice-runs` | `platform.invoices.*` |
+| Usage, flags, fleet | `/platform/usage`, `/platform/flags…`, `/platform/deployments…` | `platform.usage.read`, `platform.flags.*`, `platform.fleet.*` |
+| Announcements, support, break-glass | `/platform/announcements…`, `/platform/support/tickets…`, `/platform/break-glass-requests…` | `platform.announcements.manage`, `platform.support.*`, `platform.breakglass.*` |
+| Operators, audit, jobs | `/platform/operators…`, `/platform/audit/events`, `/platform/audit/verify`, `/platform/jobs/{id}` | `platform.operators.manage`, `platform.audit.read` |
+| Fleet heartbeat | `POST /fleet/heartbeat` | `require_fleet_signature()`: HMAC-SHA256, ±5 min, nonce (16 §12) |
+
+These routes are not mounted when `SOS_DEPLOYMENT_MODE=dedicated` (requests get 404). The route-enumeration test accepts exactly `require()`, `require_platform()` and `require_fleet_signature()`; only health checks are public.
 
 ## 5. Examples
 
@@ -239,4 +268,4 @@ Idempotency-Key: 9c1e…
 ## 6. Internal domain events (for workers and future webhooks)
 
 `student.value.recorded` · `student.canonical.changed` · `change_request.submitted|approved|rejected` · `import.committed|reverted` · `dq.run.completed` · `document.version.ready|failed|deleted` · `kb.verified_answer.needs_review` · `export.ready` · `breakglass.granted|expired`.
-Events are emitted after commit (transactional outbox table `ops.outbox`) and consumed by workers; payloads carry IDs only, never personal values.
+Events are emitted after commit (transactional outbox table `ops.outbox`) and consumed by workers; payloads carry IDs only, never personal values. Control-plane actions are not published as tenant events; they are recorded in the platform audit log (16 §16).

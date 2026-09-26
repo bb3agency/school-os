@@ -2,9 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-09-26 |
-| Scope | Core capabilities C1–C13 (milestones M0–M2) + extension points |
-| Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security |
+| Version | 0.2 · 2026-09-26 |
+| Scope | Core capabilities C1–C14 (milestones M0–M2) + extension points |
+| Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security, 16-Platform admin panel |
+| Changes | 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
 
 ---
 
@@ -29,7 +30,7 @@
 | **Exam coordinator** | Clean candidate lists before board deadlines |
 | **Class teacher** | Context on their students; follow up on flagged students (M5) |
 | **Accountant** | Answer fee questions from Tally data without re-entry (M6) |
-| **Platform operator (founder)** | Provision schools, support safely, never see data without approval |
+| **Platform operator team** (owner, engineer, support agent, billing admin, viewer; 16 §2) | Provision schools on the shared or dedicated tier, bill them, keep the fleet healthy, support safely, never see school data without approval |
 
 ## 3. Capability map
 
@@ -46,8 +47,9 @@
 | C9 | Exports framework (board/portal pre-check sheets, versioned profiles) | M1 |
 | C10 | Audit & activity (hash-chained log, viewer, export) | M0 |
 | C11 | Notifications (in-app, bilingual templates) | M1 |
-| C12 | School admin console (users, roles, retention, data export) | M0–M2 |
-| C13 | Platform operator console (provisioning, flags, break-glass) | M0 |
+| C12 | School admin console (users, roles, retention, data export, plan & billing) | M0–M2 |
+| C13 | Platform operator console: folded into C14 (ID kept for traceability; tenant-side break-glass stays under FR-OPS-004) | — |
+| C14 | Platform admin panel / control plane: schools, provisioning (shared and dedicated tiers), plans, subscriptions, invoices, usage, flags, fleet, announcements, support, operators, platform audit (spec in 16) | M0 |
 
 Extension points for later modules: certificates & registers (M3), circulars→tasks & notices (M4), student timeline & early warning (M5), Tally connector (M6).
 
@@ -76,13 +78,15 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 ### C2 · School setup
 
-**US-201** · As the platform operator, I want to provision a school tenant so that it is isolated from all others. [FR-TEN-001..003]
+**US-201** · As the platform operator, I want to provision a school tenant so that it is isolated from all others. [FR-TEN-001..003] *(Delivered through the platform admin panel: US-1301 shared tier, US-1302 dedicated tier.)*
 - AC1: Provisioning creates the tenant, a per-tenant data encryption key, default roles and an owner invite.
 - AC2: A user of tenant A can never read tenant B data through UI, API, search, exports or AI (verified by automated cross-tenant tests).
 
 **US-202** · As an office admin, I want to define academic years, classes and sections so that records are organized the way the school works. [FR-TEN-010..013]
+- Permission: writes need `tenant.structure.manage` (owner, principal, office_admin; no step-up). Reads need `student.read_basic`.
 - AC1: I can create "2026-27" with classes Nursery–XII and sections A–D, and mark one year as current.
-- AC2: Promotions at year end move enrolments forward in bulk with a preview and undo within 24 hours.
+- AC2 (**M1**, FR-TEN-011): Promotions at year end move enrolments forward in bulk with a preview and undo within 24 hours.
+- AC3: Given I lack `tenant.structure.manage`, the create and edit controls are hidden and the API returns 403.
 
 ### C3 · Student record
 
@@ -172,6 +176,72 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 **US-1201** · As the owner, I want to export all our data and set retention rules so that we stay in control. [FR-ADM-001..006, BR-08]
 - AC1: A full export (records as CSV/JSON, documents as files, audit as CSV) is produced asynchronously and downloadable via a time-limited link after re-authentication with MFA.
 
+**US-1204** · As the owner, principal or accountant, I want to see our plan, usage and invoices so that we know what we pay for and what is due. [FR-PLT-030]
+- AC1: Given I hold `tenant.billing.read`, when I open "Plan & billing", then I see the current plan, subscription status, billing period, trial end (if any), usage against plan limits, and a list of invoices with number, period, total, status and amount due.
+- AC2: Given I lack `tenant.billing.read`, the menu item is hidden and the API returns 403.
+- AC3: The page shows only my school's records (data comes from `core.current_subscription()`), never another school's.
+- AC4: Given an invoice is past due, a banner explains the amount, due date and how to pay, in English and Telugu.
+
+### C14 · Platform admin panel (control plane)
+
+Operators are SchoolOS staff with platform roles (16 §2, §6). None of these stories gives access to student data. Full specification: 16.
+
+**US-1301** · As a platform engineer, I want to provision a school on the shared tier so that it can start using SchoolOS the same day. [FR-PLT-001, FR-PLT-002, FR-TEN-003]
+- AC1: Given I hold `platform.tenants.provision` and completed MFA within 5 minutes, when I submit the provisioning wizard, then in one transaction the tenant, its encryption keys, system roles, audit chain, owner invite, billing account, subscription (trial or active) and deployment record are created.
+- AC2: Given the same `Idempotency-Key` is sent twice, then only one school is created and both calls return it.
+- AC3: Given any step fails, then nothing is created.
+- AC4: The school's own audit log shows "tenant provisioned" with the platform as actor; the platform audit log shows which operator did it.
+
+**US-1302** · As a platform engineer, I want to provision a school on a dedicated host so that premium schools get their own isolated server. [FR-PLT-003, FR-PLT-023]
+- AC1: Given I choose the dedicated tier, when I confirm, then a deployment record in status "provisioning", a subscription, a billing account and a heartbeat key are created, and the key is shown to me once.
+- AC2: Given the host has been built with the runbook (16 §13), when its first valid heartbeat arrives, then the deployment becomes "healthy" and shows its version.
+- AC3: Given a custom domain is set, then the deployment record shows it and its certificate expiry is monitored.
+
+**US-1303** · As a platform operator, I want to suspend, reactivate or offboard a school so that we can respond to security issues, non-payment or a school leaving. [FR-PLT-004, FR-PLT-005]
+- AC1: Given I hold `platform.tenants.suspend` and completed step-up, when I suspend a school with a reason, then its staff see a suspension notice at sign-in, the owner can still download a full export and see Plan & billing, and no data is deleted.
+- AC2: Given offboarding was requested by one operator, when the same operator tries to approve it, then the request is refused; a different operator holding `platform.tenants.offboard` must approve with step-up.
+- AC3: Given offboarding is approved, then school data is deleted within 30 days, keys are destroyed (crypto-shredding) and a certificate of deletion is recorded.
+
+**US-1304** · As a billing admin, I want to manage plans and subscriptions so that each school is on the right plan and price. [FR-PLT-010..014]
+- AC1: Given a plan is published, when I try to change its price or limits, then I am asked to create a new version instead; existing subscriptions keep their version.
+- AC2: Given a school on trial, when I activate it, then its status becomes "active" and the next invoice run includes it.
+- AC3: Given I change a school's plan, then the change takes effect from the next billing period.
+- AC4: Given a subscription is past due, when I try to suspend it before the 15-day grace period ends, then the request is refused; after grace it needs step-up and a reason; inside a protected board-exam window it also needs a platform owner's approval.
+- AC5: No subscription is ever suspended automatically.
+
+**US-1305** · As a billing admin, I want to generate, issue and record payment for GST invoices so that schools are billed correctly. [FR-PLT-015..019]
+- AC1: Given it is the 1st of the month, when the invoice job runs, then one draft invoice exists per billable subscription for the coming period, and rerunning the job creates no duplicates.
+- AC2: When I issue a draft, then it gets the next number in the financial year (e.g., `SOS/2026-27/000123`), its contents are frozen, and numbers have no gaps.
+- AC3: Given the school's state code equals ours, then CGST and SGST are charged equally; otherwise IGST; totals add up to the paisa.
+- AC4: When I record a bank or UPI payment (amount, date, reference, TDS), then the balance updates and the invoice becomes "paid" once covered; a wrong entry is reversed with a reason, never deleted.
+- AC5: Given an issued invoice is unpaid, I can void it with a reason; its number is never reused.
+
+**US-1306** · As a platform operator, I want to see each school's usage against its plan so that we can spot growth and cost problems early. [FR-PLT-020, FR-PLT-021]
+- AC1: Given yesterday has ended, then by 06:00 IST each school has a usage row (active users, staff users, students, storage, documents, AI queries, tokens and cost), counts only.
+- AC2: When a school first crosses 80% or 100% of a limit in a billing period, then operators are notified and the school's billing contact is emailed.
+- AC3: Crossing a limit never blocks the school's work (the existing AI budget fallback is the only automatic limit).
+
+**US-1307** · As a platform engineer or support agent, I want to manage feature flags and announcements so that we can roll out changes safely and tell schools about them. [FR-PLT-022, FR-PLT-026]
+- AC1: Given I hold `platform.flags.manage` and completed step-up, when I set a global flag to 10% rollout, then about 10% of schools (stable per school) see the feature, and a per-school override always wins.
+- AC2: Given I post a maintenance announcement for the dedicated tier, when it starts, then staff at dedicated schools see the banner in their language and shared-tier schools do not.
+- AC3: Given either the English or the Telugu text is empty, then the announcement cannot be saved.
+
+**US-1308** · As a platform engineer, I want to see fleet health so that dedicated hosts stay healthy, backed up and up to date. [FR-PLT-023..025]
+- AC1: Given a dedicated host sends a correctly signed heartbeat, then its last-heartbeat time, version and health update.
+- AC2: Given a heartbeat with a bad signature, a timestamp more than 5 minutes off, a replayed nonce or an unknown field, then it is rejected and nothing is stored.
+- AC3: Given no valid heartbeat for 20 minutes, then the deployment shows "unreachable" and the on-call operator is alerted.
+- AC4: Heartbeats never contain personal data.
+
+**US-1309** · As school staff and as a support agent, I want support tickets with clear statuses and response times so that problems are handled without sharing student data. [FR-PLT-027]
+- AC1: When a staff member opens a ticket, then the form warns (EN/TE) not to include student names, dates of birth, Aadhaar or phone numbers, and such numbers are masked before storage.
+- AC2: Each ticket shows its SLA timers by priority; breaches appear on the dashboard.
+- AC3: Given a ticket was closed a year ago, then it has been deleted.
+
+**US-1310** · As a platform owner, I want to manage operators and read a tamper-evident platform audit log so that every control-plane action is accountable. [FR-PLT-028, FR-PLT-029]
+- AC1: Given I hold `platform.operators.manage` and completed step-up, I can invite, assign roles to and deactivate operators; I cannot change my own roles; at least one active platform owner always remains.
+- AC2: Given a new operator has not enrolled MFA, then they cannot use the panel.
+- AC3: Every control-plane change writes exactly one platform audit event in the same transaction; "Verify chain" reports the first broken or missing sequence number, if any.
+
 ---
 
 ## 5. Data-quality rules catalog (initial)
@@ -242,7 +312,7 @@ Each class produces a bilingual explanation code (`NM-ORDER`, `NM-SPACING`, …)
 
 ## 9. Non-goals for core
 
-Dashboards for their own sake · parent logins · payments · automated portal submission · free-form AI actions.
+Dashboards for their own sake · parent logins · parent fee payments · automated portal submission · free-form AI actions. (Billing schools for SchoolOS itself is part of C14.)
 
 ## 10. Pilot release criteria (design partner)
 

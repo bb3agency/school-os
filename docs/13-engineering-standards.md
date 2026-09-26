@@ -2,9 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-09-26 |
+| Version | 0.2 · 2026-09-26 |
 | Applies to | All code, infra, prompts and docs in this repository |
-| Related | CLAUDE.md, 07-Security, 12-Testing |
+| Related | CLAUDE.md, 07-Security, 12-Testing, 16-Platform admin panel |
+| Changes | 0.2: layout adds `platform/`, `deploy/dedicated/`, `infra/db/`, platform config; session-branch policy for AI-assisted work (§2); security review scope incl. `platform/` (§3); ownership and CODEOWNERS (§13). 0.1: baseline |
 
 ---
 
@@ -22,12 +23,17 @@ schoolos/
 ├── packages/
 │   └── api-client/          TS client generated from OpenAPI
 ├── evals/                   RAG datasets (synthetic) + harness + reports
-├── infra/terraform/         modules/ + envs/
-├── config/                  models.yaml, dq_rules.yaml, export_profiles/, prompts index
+├── infra/
+│   ├── terraform/           modules/ (incl. dedicated_host) + envs/ (staging, prod, dedicated/<tenant_code>)
+│   └── db/                  bootstrap.sql (roles, schemas, extensions; run as DB admin)
+├── deploy/
+│   └── dedicated/           compose.yaml + Caddyfile for dedicated-tier hosts
+├── config/                  models.yaml, dq_rules.yaml, export_profiles/, prompts index,
+│                            permissions (tenant catalog + role templates), platform_permissions.yaml, billing.yaml
 ├── scripts/                 seed-synthetic, maintenance tools
 ├── docs/                    documentation, ADRs, templates
 ├── .github/                 workflows, PR template, CODEOWNERS
-├── CLAUDE.md  README.md  SECURITY.md  Makefile  .env.example
+├── CLAUDE.md  README.md  SECURITY.md  Makefile  .env.example  compose.yaml
 ```
 
 ## 2. Git workflow
@@ -37,13 +43,14 @@ schoolos/
 - Squash merge; PR title becomes the commit message.
 - `main` is always deployable; protected with required checks and linear history.
 - Tags: CalVer (`2026.10.1`); CHANGELOG generated from commits.
+- **Session branches for AI-assisted work:** a build session works on one session branch (e.g., `claude/<session-name>`). When several agents work in parallel, each commits only the files it owns in its own git worktree and branch; the lead reviews and merges them into the session branch, and the session branch reaches `main` through a normal PR with all checks. Agents never push to `main` and never edit files owned by another agent; they ask the owner instead.
 
 ## 3. Pull requests
 
 - Small (aim < 400 changed lines excluding generated files), one story or fix per PR.
 - Description: what/why, requirement IDs, screenshots for UI (synthetic data), risk and rollback notes, `make check` summary.
 - Template: `.github/pull_request_template.md` (security/privacy checklist included).
-- **Review rules:** even as a solo developer, every PR gets a structured self-review against the checklist plus an independent AI review pass (fresh session, reviewer instructions, no write access). Changes to `core/`, `authz/`, `audit/`, `knowledge/gateway/`, migrations, crypto and `infra/` require the full security checklist and a second review sitting on a different day.
+- **Review rules:** even as a solo developer, every PR gets a structured self-review against the checklist plus an independent AI review pass (fresh session, reviewer instructions, no write access). Changes to `core/`, `authz/`, `audit/`, `platform/`, `knowledge/gateway/`, migrations, crypto, `infra/` (incl. `infra/db/`), `deploy/dedicated/` and `config/platform_permissions.yaml` require the full security checklist and a second review sitting on a different day.
 
 ## 4. Python standards (API/workers)
 
@@ -122,3 +129,19 @@ schoolos/
 ## 12. Definition of done (engineering view)
 
 See CLAUDE.md §8 and 12-Testing §10. In short: tests (incl. security suites) green, docs updated, i18n complete, migrations reversible, observability added, no PII in logs, reviewed against the checklist.
+
+## 13. Ownership and CODEOWNERS
+
+Each area has an owner who reviews every change to it (`.github/CODEOWNERS`). At Stage 0 the founder owns everything; the table records which review lens applies so it scales when people join.
+
+| Path | Owner (role) | Review lens |
+|---|---|---|
+| `apps/api/app/core/`, `authz/`, `audit/` | Platform security owner | Tenant isolation, authz, audit invariants |
+| `apps/api/app/platform/` | Control-plane owner | Privilege separation (ADR-0013), billing correctness, platform audit |
+| `apps/api/app/knowledge/gateway/`, prompts, `config/models.yaml` | Knowledge owner | ADR-0005, evals |
+| `apps/api/migrations/` | Data owner | Expand/contract, RLS, composite FKs, definer allowlists |
+| `infra/terraform/`, `infra/db/`, `deploy/dedicated/` | Infrastructure owner | Least privilege, encryption, hardening (SEC-030) |
+| `config/platform_permissions.yaml`, `config/billing.yaml` | Control-plane owner + security owner | Permission matrix (07 §6.5), money rules |
+| `docs/` (incl. `docs/adr/`), `CLAUDE.md`, `SECURITY.md` | Documentation owner | Consistency with code and ADRs |
+
+The `platform` module has one owner. Other modules call it only through `platform.service`; it never imports tenant modules' repositories or models.

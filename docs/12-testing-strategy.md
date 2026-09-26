@@ -2,8 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-09-26 |
-| Related | 03-TRD §9, 06-RAG §13, 07-Security §15, 13-Engineering standards |
+| Version | 0.2 · 2026-09-26 |
+| Related | 03-TRD §9, 06-RAG §13, 07-Security §15, 13-Engineering standards, 16-Platform admin panel §18 |
+| Changes | 0.2: Valkey and SeaweedFS in integration tests; RLS catalog test with `definer_access` allowlist and platform exemption (§4.5); new suites §4.8–4.13 (platform privilege separation, definer allowlist, composite FKs, audit sequence concurrency, admin panel authz matrix, heartbeat); `mfa_required` in the authz matrix. 0.1: baseline |
 
 ---
 
@@ -19,7 +20,7 @@
 | Layer | Scope | Tools | When |
 |---|---|---|---|
 | Unit | Pure functions: name normalization, match classes, Verhoeff redaction, canonical resolution, chunking, RRF fusion, crypto helpers | pytest, Hypothesis (property-based), vitest | Every PR |
-| Integration | Services + real Postgres (pgvector) + Redis + MinIO | pytest + testcontainers, factory_boy | Every PR |
+| Integration | Services + real Postgres (pgvector) + Valkey + SeaweedFS (S3), same images as local (ADR-0014) | pytest + testcontainers, factory_boy | Every PR |
 | API | Routes with auth, validation, errors, authz | pytest + httpx TestClient | Every PR |
 | Security suites | Route enumeration, authz matrix, BOLA, cross-tenant, RLS catalog, log redaction | pytest (generated cases) | Every PR |
 | Contract | OpenAPI conformance and fuzzing | Schemathesis | Every PR (fast), nightly (deep) |
@@ -31,7 +32,7 @@
 | Performance | NFR-PERF targets | k6 or Locust (staging) | Weekly + before release |
 | RAG evaluation | Retrieval, faithfulness, citations, leakage, injection | `evals/` harness | PR subset when knowledge changes; full nightly |
 | Security scanning | SAST, deps, secrets, IaC, images, DAST | Semgrep, pip-audit, npm audit/OSV, gitleaks, Trivy, OWASP ZAP baseline | Every PR / nightly (ZAP) |
-| Resilience | Provider outages, Redis loss, slow DB | Fault injection in staging (toggle-based) | Monthly |
+| Resilience | Provider outages, Valkey loss, slow DB, missed heartbeats, control plane down | Fault injection in staging (toggle-based) | Monthly |
 
 ## 3. Synthetic data
 
@@ -42,10 +43,10 @@
 ## 4. Security test suites (must pass on every PR)
 
 ### 4.1 Route enumeration
-Iterate FastAPI's route table; assert every route (except allowlisted health checks) has a `require()` dependency with a permission that exists in `core.permissions`.
+Iterate FastAPI's route table; assert every route (except allowlisted health checks) has exactly one of: `require()` with a permission that exists in `core.permissions`; `require_platform()` with a permission in `config/platform_permissions.yaml` (control-plane routes, which must live under `/api/v1/platform/`); or `require_fleet_signature()` (only `POST /api/v1/fleet/heartbeat`). Also assert that with `SOS_DEPLOYMENT_MODE=dedicated` no `/api/v1/platform/*` or `/api/v1/fleet/*` route is mounted.
 
 ### 4.2 Authorization matrix
-Generated from the role defaults (07 §6.2): for each (role, permission-protected endpoint) pair, call the endpoint as a user with only that role. Expect success for granted permissions, `403`/`404` otherwise. Include step-up cases (`428`) and scope cases (class teacher inside vs outside their section).
+Generated from the role defaults (07 §6.2): for each (role, permission-protected endpoint) pair, call the endpoint as a user with only that role. Expect success for granted permissions, `403`/`404` otherwise. Include step-up cases (`428` when `auth_time` is older than 5 minutes or `sos:mfa` is missing), MFA cases (`403 mfa_required` for owner/principal/office_admin without `sos:mfa`; ADR-0018) and scope cases (class teacher inside vs outside their section).
 
 ### 4.3 BOLA per resource
 For students, guardians, documents, findings, change requests, imports, exports: user in section 9A requests a resource belonging to 9C → `404`; resource IDs taken from another tenant → `404`.
@@ -54,7 +55,10 @@ For students, guardians, documents, findings, change requests, imports, exports:
 Two synthetic tenants with overlapping names. For every read path (lists, detail, search, exports, knowledge ask, document download URLs, audit viewer): tenant A never sees tenant B data. Also direct SQL tests as `sos_app`: with `app.tenant_id` unset, every tenant table returns zero rows; with tenant A set, inserting a row with tenant B's ID fails the policy's `WITH CHECK`.
 
 ### 4.5 RLS catalog test
-Query `pg_class`/`pg_policies`: every table with a `tenant_id` column has `relrowsecurity` and `relforcerowsecurity` true and a `tenant_isolation` policy (or an approved variant). Verify `sos_app` lacks BYPASSRLS and superuser.
+Query `pg_class`/`pg_policies`: every table (and every partition) with a `tenant_id` column in `core`, `sis`, `kb`, `audit`, `ops` has `relrowsecurity` and `relforcerowsecurity` true and a `tenant_isolation` policy, unless it is a reviewed variant in `apps/api/tests/security/rls_allowlist.yaml` (`core.tenants` [id], `core.users` [membership-based], `core.permissions` [global], `sis.attribute_definitions` [global rows]). Also:
+- no role in the database has `rolbypassrls` or `rolsuper` except the bootstrap admin (which the app never uses); `sos_definer` has `NOLOGIN` and `NOBYPASSRLS`;
+- the set of tables carrying the `definer_access` policy equals the pinned allowlist file (05 §3.3), and each such policy is exactly `USING (current_user = 'sos_definer') WITH CHECK (current_user = 'sos_definer')`;
+- schema `platform` has no RLS by design; its isolation is checked by §4.8.
 
 ### 4.6 Redaction and logging
 - Feed text with valid-checksum 12-digit sequences (with spaces/hyphens) through OCR post-processing, ingestion, import parsing, logging and prompt building: output contains only masked forms.
@@ -64,6 +68,37 @@ Query `pg_class`/`pg_policies`: every table with a `tenant_id` column has `relro
 - Self-approval blocked at API **and** DB level (direct SQL update violating the CHECK fails).
 - Every audited action writes exactly one event in the same transaction (rollback test: failed transaction leaves no event).
 - Chain verification detects a tampered event (test with a superuser fixture in an isolated DB).
+- Genesis: a new tenant's first event has `seq = 1` and `prev_hash` = 32 zero bytes; the hash is SHA-256 over `prev_hash || RFC 8785 canonical JSON` and matches a fixed test vector.
+- `TRUNCATE audit.events` (and of a partition) fails even for the table owner role path; UPDATE/DELETE fail; `sos_app` has only INSERT/SELECT.
+
+### 4.8 Platform privilege separation (SEC-026)
+- Catalog: `sos_platform` has **no** privilege (`has_table_privilege` for SELECT/INSERT/UPDATE/DELETE/TRUNCATE) on any table in `core`, `sis`, `kb`, `audit`, `ops`; `sos_app` and `sos_readonly` have none on `platform` tables except `SELECT` on `platform.feature_flags` for `sos_app`.
+- Live: connected as `sos_platform`, `SELECT 1 FROM sis.students LIMIT 1` fails with `permission denied`; connected as `sos_app`, `SELECT 1 FROM platform.invoices` fails likewise.
+- Code: import-linter forbids `app.platform` from importing tenant modules' repositories/models; every platform repository uses `platform_session()`.
+
+### 4.9 Definer function allowlist (ADR-0013)
+- The set of `SECURITY DEFINER` functions (`pg_proc.prosecdef`) equals exactly the pinned list in 05 §3.4; each is owned by `sos_definer`, has `proconfig` containing a `search_path` starting with `pg_catalog`, and has `EXECUTE` revoked from `PUBLIC` and granted only to the listed callers.
+- Behaviour: `core.tenant_usage_summary()` returns counts only (schema of the result has no text columns); `core.current_subscription()` called in tenant A's session never returns tenant B's invoices; `core.resolve_login()` returns only active memberships.
+
+### 4.10 Composite tenant foreign keys (SEC-001, T27)
+- Catalog: every foreign key between two tables that both have `tenant_id` includes `tenant_id` in both column lists; every referenced tenant table has a unique constraint on `(tenant_id, id)`.
+- Behaviour: inserting, as the migrator in an isolated DB, a child row in tenant A that references a parent row of tenant B fails with a foreign-key violation.
+
+### 4.11 Audit sequence under concurrency (FR-AUD-003)
+- 50 concurrent transactions in one tenant each record an event: the resulting `seq` values are exactly 1..50 with no gaps or duplicates, and the chain verifies.
+- Concurrent writes in two tenants do not block each other (per-tenant head lock).
+- A rolled-back transaction leaves neither an event nor an advanced head.
+- Same for the platform chain (`platform.audit_chain_head`).
+
+### 4.12 Platform admin panel authz matrix (FR-PLT-028)
+Generated from `config/platform_permissions.yaml` and the role matrix (07 §6.5): for every `/api/v1/platform/*` route and every platform role, expect 2xx when granted, `403` when not, `428` when the permission is ᴿ and step-up is stale. Also: staff (tenant) tokens on platform routes → `401`; operator tokens on tenant routes → `401`; two-person actions by the same operator → `409`; an operator cannot change their own roles; removing the last `platform_owner` → `409`.
+
+### 4.13 Fleet heartbeat (FR-PLT-024, SEC-028)
+- Accept a correctly signed payload; reject (without storing anything) a wrong key, an altered body, a timestamp more than 300 s in the past or future, a replayed nonce, an unknown or extra field, a body over 16 KB, and a `tenant_id` that does not match the deployment.
+- Rate limit: more than one heartbeat per minute per deployment → `429`.
+- Key rotation: both current and next keys are accepted during the overlap; the old key is rejected after it.
+- Privacy: the JSON schema has no free-text fields; a property test fuzzes payloads and asserts every accepted one matches the schema exactly.
+- Staleness: with the clock advanced 20 minutes and no heartbeat, the deployment becomes `unreachable` and an alert event is emitted.
 
 ## 5. Domain test highlights
 
@@ -126,7 +161,7 @@ Feature: Scope-limited Ask (FR-KB-010)
 |---|---|
 | Lint, format, typecheck | Merge |
 | Unit/integration/API tests | Merge |
-| Security suites (4.1–4.7) | Merge |
+| Security suites (4.1–4.13) | Merge |
 | SAST/deps/secrets/IaC/image scans (no critical/high without waiver) | Merge |
 | Migration + RLS catalog | Merge |
 | RAG hard gates | Merge |

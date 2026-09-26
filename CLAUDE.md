@@ -8,6 +8,8 @@ A multi-tenant SaaS for Indian private schools (starting in Andhra Pradesh). The
 
 Users are office clerks, principals, management, accountants, exam coordinators and teachers. They are busy, often not technical, and work on shared office PCs with patchy internet. Parent-facing output is bilingual: English and Telugu.
 
+SchoolOS is a **managed SaaS** that we run, sold as a recurring subscription in two tiers from one codebase: the **shared tier** (pooled multi-tenant platform in AWS Mumbai) and the **dedicated tier** (one isolated host per school, optional custom domain). A **control plane** (platform admin panel, billing, fleet) runs only in the shared deployment and never reads student data (ADR-0015, ADR-0017, `docs/16-platform-admin-panel.md`).
+
 ## 2. Sources of truth
 
 | Topic | Doc |
@@ -22,20 +24,22 @@ Users are office clerks, principals, management, accountants, exam coordinators 
 | API conventions | `docs/09-api-specification.md` |
 | Standards and workflow | `docs/13-engineering-standards.md` |
 | What to build next | `docs/14-roadmap.md` |
+| Platform admin panel, billing, fleet | `docs/16-platform-admin-panel.md` |
+| Decisions and why | `docs/adr/` (index in `docs/adr/README.md`) |
 
 Reference requirement IDs (e.g. `FR-STU-004`, `SEC-012`) in commit messages, PR descriptions and test names.
 
 ## 3. Tech stack (do not substitute without a new ADR)
 
-- **API/Workers:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2.x (typed, sync sessions with psycopg 3), Alembic, Celery + Redis, httpx
+- **API/Workers:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2.x (typed, sync sessions with psycopg 3), Alembic, Celery + Valkey (Redis protocol; ADR-0014), httpx
 - **Database:** PostgreSQL 16+ with `pgvector`, `pg_trgm`, `citext`; RLS on every tenant table
-- **Files:** S3 (ap-south-1), private buckets, SSE-KMS, presigned URLs
+- **Files:** S3 (ap-south-1), private buckets, SSE-KMS, presigned URLs (SeaweedFS locally and in CI; ADR-0014)
 - **Web:** Next.js (App Router) + TypeScript strict + Tailwind; BFF pattern (tokens never reach browser JS); i18n `en` + `te`
 - **PDF:** HTML/CSS templates rendered by headless Chromium (Playwright) in workers; bundled Noto Sans Telugu
 - **LLM:** Anthropic Claude via commercial API keys, only through `app/knowledge/gateway/` (see ADR-0005)
 - **Embeddings:** provider interface in `app/knowledge/embeddings/`; model chosen by evaluation (ADR-0006)
-- **Identity:** OIDC provider behind `app/identity/` (reference: Amazon Cognito, ADR-0012)
-- **Infra:** Terraform, AWS ap-south-1 (Mumbai), backups copied to ap-south-2 (Hyderabad); GitHub Actions
+- **Identity:** OIDC provider behind `app/identity/` (reference: Amazon Cognito, ADR-0012; MFA and step-up per ADR-0018); operators use a separate OIDC client
+- **Infra:** Terraform, AWS ap-south-1 (Mumbai), backups copied to ap-south-2 (Hyderabad); GitHub Actions; dedicated-tier hosts run `deploy/dedicated/compose.yaml` (ADR-0015)
 
 ## 4. Repository layout
 
@@ -55,20 +59,27 @@ apps/api/app/
   exports/       board/portal pre-check sheets (CISCE, UDISE+), generic CSV/XLSX
   notifications/ in-app notifications, bilingual templates
   admin/         tenant admin, retention settings, data export
-  ops/           platform operator console, break-glass, feature flags
+  ops/           tenant-side job runs, outbox, idempotency keys, break-glass grants
+  platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
+                 payments (billing), usage, fleet + heartbeat, feature flags, announcements,
+                 support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
 apps/worker/     Celery entrypoint (imports app.* tasks)
-apps/web/        Next.js app (app router, BFF route handlers, i18n)
+apps/web/        Next.js app (app router, BFF route handlers, i18n; operator UI under /[locale]/platform/*)
 evals/           RAG datasets + harness (synthetic data only)
-infra/terraform/ modules/ + envs/{staging,prod}
+infra/terraform/ modules/ (incl. dedicated_host) + envs/{staging,prod,dedicated/<tenant_code>}
+infra/db/        bootstrap.sql: database roles, schemas, extensions (run as DB admin)
+deploy/dedicated/ compose.yaml + Caddy config for dedicated-tier hosts
+config/          models, DQ rules, export profiles, permission catalogs (incl. platform_permissions.yaml), billing
 docs/            this documentation
 ```
 
 Each backend module: `api.py` (routes) · `schemas.py` (Pydantic IO) · `service.py` (business logic) · `repository.py` (DB access) · `models.py` (SQLAlchemy) · `tasks.py` (Celery) · `tests/`.
-Modules call other modules **only via their `service.py` public functions**. Never import another module's repository or models directly. `core`, `authz` and `audit` may be used by everyone.
+Modules call other modules **only via their `service.py` public functions**. Never import another module's repository or models directly. `core`, `authz` and `audit` may be used by everyone. `platform` uses only `core.db.platform_session()` and never imports tenant modules.
 
 ## 5. Commands
 
 ```bash
+make install         # install Python (uv) and Node (npm workspaces) dependencies
 make dev             # start local stack (docker compose)
 make migrate         # alembic upgrade head
 make seed-synthetic  # synthetic tenant with Telugu/English names; NEVER real data
@@ -82,13 +93,13 @@ make check           # everything CI runs
 
 ## 6. Non-negotiable invariants (tests enforce these; never weaken them)
 
-1. **Tenant isolation.** Every tenant-owned table has `tenant_id uuid NOT NULL`, RLS `ENABLE` + `FORCE`, and the standard policy. The app DB role has no `BYPASSRLS`. Every request and job sets `SET LOCAL app.tenant_id` inside its transaction via `core.db.tenant_session()`. Never disable RLS to make a test pass.
-2. **Authorization on every route.** Each route declares `Depends(require("<permission>", scope=...))`. A test enumerates all routes and fails if any lacks it (public health checks are the only allowlisted exceptions).
+1. **Tenant isolation.** Every tenant-owned table has `tenant_id uuid NOT NULL`, RLS `ENABLE` + `FORCE`, and the standard policy; references between tenant tables are composite `(tenant_id, x_id)` foreign keys. No database role has `BYPASSRLS`. Every request and job sets the transaction-local tenant context inside its transaction via `core.db.tenant_session()` (`set_config('app.tenant_id', :t, true)`, the same as `SET LOCAL`, with bound parameters). Cross-tenant access exists only through the pinned allowlist of `SECURITY DEFINER` functions owned by `sos_definer` (NOBYPASSRLS), which reach only tables carrying the `definer_access` policy (ADR-0013). The **only** schema without RLS is `platform` (control plane, no student data): it is written only by `sos_platform`, `sos_app` may only read `platform.feature_flags`, and `sos_platform` has **no** privileges on any tenant table. Never disable RLS to make a test pass.
+2. **Authorization on every route.** Each route declares `Depends(require("<permission>", scope=...))`; control-plane routes declare `Depends(require_platform("platform.<...>"))` and the fleet heartbeat declares `Depends(require_fleet_signature())`. A test enumerates all routes and fails if any lacks one of these (public health checks are the only allowlisted exceptions).
 3. **Object-level access through scoped repositories.** Never fetch a student/document by ID without the caller's scope (e.g., a class teacher only sees their sections). BOLA tests exist per resource.
 4. **No Aadhaar numbers, ever.** Store only `aadhaar_last4` and the as-printed demographic fields. `core.redaction` MUST mask any 12-digit sequence that passes the Verhoeff check in OCR output, extracted text, logs, prompts and exports.
 5. **No PII in logs, traces, metrics, error reports or analytics.** Use structured logging with `redact()`. IDs yes, names/DOB/phones no.
 6. **Never auto-correct official records.** Mismatches create `dq_findings`. Identity-field changes go through `changes` (maker-checker) with an evidence document. The admission register is the legal anchor (BR-01).
-7. **Audit everything that matters** (identity data changes, role/permission changes, exports, AI queries, break-glass, logins) in the **same transaction**, via `audit.record()`. The audit table is append-only (DB grants + trigger).
+7. **Audit everything that matters** (identity data changes, role/permission changes, exports, AI queries, break-glass, logins) in the **same transaction**, via `audit.record()`; control-plane actions via `audit.record_platform()`. The audit tables are append-only (DB grants + triggers, including `TRUNCATE`).
 8. **AI must be grounded.** Retrieval filters by tenant and permissions **in SQL before ranking**. The LLM never receives data the user cannot see. Answers cite sources (search_result blocks) or say "not found in school records". Citations are validated server-side.
 9. **LLM tools are read-only in core.** Any write suggested by AI requires a human to confirm through normal endpoints.
 10. **Secrets** come from environment/Secrets Manager only. Product code uses **API keys**, never a personal/consumer AI subscription. Request Zero Data Retention for the production API organization.
@@ -142,6 +153,8 @@ make check           # everything CI runs
 - Store files in the database or on local disk in production
 - Add dependencies without checking licence (no AGPL in core), maintenance and known CVEs
 - Skip tests "for now"
+- Give the control plane (`platform` module, `sos_platform`) access to tenant tables, or add a `SECURITY DEFINER` function or `definer_access` policy without an ADR
+- Put student data in heartbeats, support tickets, invoices or any `platform` table
 
 ## 12. When unsure
 

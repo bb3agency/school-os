@@ -18,4 +18,6 @@ SchoolOS handles children's personal data. We take reports seriously and appreci
 - Good-faith research following these rules will not be pursued legally by SchoolOS.
 
 ## Scope
-In scope: SchoolOS web app, API, and edge agent. Out of scope: third-party services (report to their owners), findings requiring physical access or compromised devices.
+In scope: SchoolOS web app and API (shared tier), the platform admin panel (admin host) and its fleet heartbeat endpoint, dedicated-tier school hosts (including custom domains pointing at them), and the edge agent. Out of scope: third-party services (report to their owners), a school's own DNS or email, findings requiring physical access or compromised devices.
+
+If you can reach student data from the platform admin panel, or one school's data from another school's account or host, treat it as critical and report it immediately.
