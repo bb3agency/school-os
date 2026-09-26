@@ -45,6 +45,23 @@ W = _load_world()
 world = W.world
 api = W.api
 
+
+def _load_students() -> ModuleType:
+    """Shared synthetic students (tests/students/student_world.py)."""
+    name = "sos_test_student_world"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "students" / "student_world.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SW = _load_students()
+
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
 _years = itertools.count(2100)
@@ -71,6 +88,40 @@ def _new_year(w: Any, role: str, admin: Engine) -> Request:
 
 def _target(w: Any) -> Any:
     return w.a.people["target"]
+
+
+def _student(w: Any, role: str) -> uuid.UUID:
+    """A student inside the role's scope: 9A for the class teacher, class X for the teacher."""
+    ids = SW.ensure_students(w)
+    value: uuid.UUID = ids["s10a"] if role == "teacher" else ids["s9a"]
+    return value
+
+
+def _st(w: Any, role: str, suffix: str = "") -> str:
+    return f"/api/v1/students/{_student(w, role)}{suffix}"
+
+
+def _student_patch(w: Any, r: str, a: Engine) -> Request:
+    sid = _student(w, r)
+    return _st(w, r), {"status": "active"}, _if_match(SW.version(a, "sis.students", sid))
+
+
+def _verify(w: Any, r: str, a: Engine) -> Request:
+    value_id = SW.current_value_id(a, _student(w, r), "mother_tongue", "parent_form")
+    return _st(w, r, f"/values/{value_id}/verify"), {"status": "verified"}, {}
+
+
+def _guardian_patch(w: Any, r: str, a: Engine) -> Request:
+    ids = SW.ensure_students(w)
+    path = f"/api/v1/students/{ids['s9a']}/guardians/{ids['g9a']}"
+    return path, {"relationship": "father"}, _if_match(SW.version(a, "sis.guardians", ids["g9a"]))
+
+
+def _enrol(w: Any, r: str, a: Engine) -> Request:
+    mover = SW.ensure_students(w)["mover"]
+    current = SW.active_section(a, mover)
+    target = w.a.ids["section_9c"] if current == w.a.ids["section_9a"] else w.a.ids["section_9a"]
+    return f"/api/v1/students/{mover}/enrollments", {"section_id": str(target)}, {}
 
 
 SPECS: dict[tuple[str, str], Builder] = {
@@ -200,6 +251,52 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("GET", "/api/v1/support/tickets"): lambda w, r, a: ("/api/v1/support/tickets", None, {}),
+    # Students (app/students/api.py; docs/09 Students).
+    ("GET", "/api/v1/attributes"): lambda w, r, a: ("/api/v1/attributes", None, {}),
+    ("GET", "/api/v1/students"): lambda w, r, a: ("/api/v1/students", None, {}),
+    ("POST", "/api/v1/students"): lambda w, r, a: (
+        "/api/v1/students",
+        {
+            "values": [
+                {
+                    "attribute_key": "full_name",
+                    "source": "admission_register",
+                    "value": "Synthetica Matrix Student",
+                }
+            ]
+        },
+        {},
+    ),
+    ("GET", "/api/v1/students/{student_id}"): lambda w, r, a: (_st(w, r), None, {}),
+    ("PATCH", "/api/v1/students/{student_id}"): _student_patch,
+    ("GET", "/api/v1/students/{student_id}/values"): lambda w, r, a: (
+        _st(w, r, "/values"),
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/students/{student_id}/values"): lambda w, r, a: (
+        _st(w, r, "/values"),
+        {"attribute_key": "mother_tongue", "source": "parent_form", "value": "Telugu"},
+        {},
+    ),
+    ("POST", "/api/v1/students/{student_id}/values/{value_id}/verify"): _verify,
+    ("POST", "/api/v1/students/{student_id}/sensitive-reveal"): lambda w, r, a: (
+        _st(w, r, "/sensitive-reveal"),
+        {"attribute_key": "health_notes"},
+        {},
+    ),
+    ("GET", "/api/v1/students/{student_id}/guardians"): lambda w, r, a: (
+        _st(w, r, "/guardians"),
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/students/{student_id}/guardians"): lambda w, r, a: (
+        _st(w, r, "/guardians"),
+        {"relationship": "guardian", "full_name": "Synthetica Matrix Guardian"},
+        {},
+    ),
+    ("PATCH", "/api/v1/students/{student_id}/guardians/{guardian_id}"): _guardian_patch,
+    ("POST", "/api/v1/students/{student_id}/enrollments"): _enrol,
     ("GET", "/api/v1/support/tickets/{ticket_id}"): lambda w, r, a: (
         f"/api/v1/support/tickets/{_ticket(w)}",
         None,
@@ -255,6 +352,10 @@ def _success(method: str, path: str) -> int:
         "/api/v1/classes",
         "/api/v1/sections",
         "/api/v1/support/tickets",
+        "/api/v1/students",
+        "/api/v1/students/{student_id}/values",
+        "/api/v1/students/{student_id}/guardians",
+        "/api/v1/students/{student_id}/enrollments",
     }
     return 201 if method == "POST" and path in creates else 200
 
