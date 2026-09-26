@@ -51,6 +51,7 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/classes/{class_id}"): {},
     ("PATCH", "/api/v1/sections/{section_id}"): {},
     ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): {"body": "Synthetic follow-up"},
+    ("POST", "/api/v1/notifications/{notification_id}/read"): None,
 }
 
 
@@ -67,12 +68,36 @@ def _b_ticket(w: Any) -> uuid.UUID:
     ).id
 
 
+def _b_notification(w: Any) -> uuid.UUID:
+    """A notification of school B's owner (FR-NOT-001; created via notifications.service)."""
+    from sqlalchemy import text
+
+    from app.core.db import tenant_session
+    from app.notifications import service as notifications
+
+    key = f"bola:{uuid.uuid4()}"
+    with tenant_session(w.b.tenant_id) as s:
+        notifications.notify(
+            s,
+            tenant_id=w.b.tenant_id,
+            recipients=[w.b.people["owner"].membership_id],
+            template_key="import.committed",
+            params={"import_id": str(uuid.uuid4()), "rows": 1},
+            dedupe_key=key,
+        )
+        value: object = s.execute(
+            text("SELECT id FROM ops.notifications WHERE dedupe_key = :k"), {"k": key}
+        ).scalar_one()
+    return uuid.UUID(str(value))
+
+
 PARAM_TO_B = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
     "class_id": lambda w: w.b.ids["class_ix"],
     "section_id": lambda w: w.b.ids["section_9a"],
     "ticket_id": _b_ticket,
+    "notification_id": _b_notification,
 }
 
 

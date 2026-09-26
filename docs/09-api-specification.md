@@ -173,6 +173,14 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | GET | `/jobs/{id}` | job owner or admin |
 | GET | `/healthz` · `/readyz` | public (no data) |
 
+### Notifications (FR-NOT-001)
+Own notifications only (another person's or school's ID → 404). Titles and bodies are rendered in the `Accept-Language` language (`te` or `en`, default `en`; `Content-Language` says which).
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/notifications` (`unread`, `limit`, `cursor`) | authenticated |
+| GET | `/notifications/unread-count` | authenticated |
+| POST | `/notifications/{id}/read` · `/notifications/read-all` | authenticated |
+
 ### Control plane and fleet (shared deployment only)
 Full catalog with permissions: [16 §8](16-platform-admin-panel.md#8-api-endpoint-catalog). Summary:
 

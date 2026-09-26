@@ -17,6 +17,7 @@ from kombu import Queue
 from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
+from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
 
@@ -31,6 +32,7 @@ TASK_MODULES: list[str] = [
     "sos_worker.tasks",
     "app.audit.tasks",
     "app.ops.tasks",
+    "app.notifications.tasks",
     "app.platform.tasks",
 ]
 
@@ -67,6 +69,8 @@ def create_celery() -> Celery:
             },
             # FR-OPS-004: outbox relay and idempotency-key purge (both modes).
             **ops_beat_schedule(),
+            # FR-NOT-001: purge read notifications after 90 days (both modes).
+            **notifications_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

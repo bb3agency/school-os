@@ -12,6 +12,7 @@ from app.core.logging import setup_logging
 from app.core.middleware import install_middleware
 from app.core.telemetry import setup_telemetry
 from app.identity.api import router as identity_router
+from app.notifications.api import router as notifications_router
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
 from app.platform.tenant_api import router as platform_tenant_router
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tenancy_router)
     app.include_router(audit_router)
     app.include_router(platform_tenant_router)
+    app.include_router(notifications_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

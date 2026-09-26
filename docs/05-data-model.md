@@ -722,6 +722,22 @@ CREATE TABLE ops.break_glass_grants (
   CHECK (expires_at IS NULL OR expires_at <= starts_at + interval '8 hours'),
   FOREIGN KEY (tenant_id, approved_by_membership) REFERENCES core.memberships (tenant_id, id)
 );
+
+-- In-app notifications (C11, FR-NOT-001; migration 0010_notifications). One row per recipient.
+-- template_key + params are rendered in EN/TE at read time (app/notifications/templates.yaml);
+-- params hold IDs, counts and codes only (validated like audit summaries). The app may only
+-- UPDATE read_at. Read notifications are purged after 90 days.
+CREATE TABLE ops.notifications (
+  id uuid PRIMARY KEY, tenant_id uuid NOT NULL REFERENCES core.tenants (id),
+  recipient_membership_id uuid NOT NULL,
+  template_key text NOT NULL, params jsonb NOT NULL DEFAULT '{}',
+  resource_type text, resource_id uuid,             -- deep link (both or neither)
+  dedupe_key text,                                  -- UNIQUE per recipient when set
+  created_at timestamptz NOT NULL DEFAULT now(), read_at timestamptz,
+  UNIQUE (tenant_id, id),
+  FOREIGN KEY (tenant_id, recipient_membership_id) REFERENCES core.memberships (tenant_id, id)
+    ON DELETE CASCADE
+);
 ```
 
 All `ops` tables are tenant-owned and use the standard RLS policy. Feature flags moved out of `ops`: they are platform data in `platform.feature_flags` (16 §7).
@@ -785,6 +801,7 @@ Identity attributes resolve to the verified admission-register value (BR-01). If
 | Security/ICT logs | ≥ 1 year, stored in India | See 08 §6 |
 | Tenant offboarding | Export → delete within 30 days → crypto-shred | Certificate of deletion issued |
 | `ops.idempotency_keys` | 24 hours | Purged daily |
+| `ops.notifications` | 90 days after being read | Purged daily (`notifications.purge_read`); unread ones are kept |
 | Invoices, invoice lines, payments, billing accounts (`platform`) | 8 years after the financial year ends | Tax and accounting records; kept after offboarding (no student data); confirm period with a CA |
 | Support tickets and messages (`platform`) | 1 year after closing | 16 §15 |
 | Usage aggregates (`platform.usage_daily`) | 3 years | Counts only |
