@@ -3,11 +3,12 @@
 | Field | Value |
 |---|---|
 | Product | SchoolOS (working name) |
-| Version | 0.1 (baseline) |
+| Version | 0.2 · 2026-09-26 |
 | Date | 2026-09-26 |
+| Changes | 0.2: commercial model decided (managed SaaS, shared and dedicated tiers, recurring subscription; §11), platform operator team added to stakeholders (§6), related risk (§14). 0.1: baseline |
 | Owner | Founder (solo student-developer, Andhra Pradesh) |
 | Status | Draft for design-partner validation |
-| Related | 02-PRD, 03-TRD, 08-Privacy |
+| Related | 02-PRD, 03-TRD, 08-Privacy, 16-Platform admin panel, ADR-0015 |
 
 ---
 
@@ -81,7 +82,7 @@ It is not another ERP. It works alongside the school's existing tools (paper reg
 | Class teacher | Attendance, marks, student welfare | Quick student context, early warnings (M5) | Secondary user |
 | Parents | Receive notices/certificates | Correct documents, clear bilingual notices | Indirect |
 | Boards/authorities | Receive submissions | Correct data | Indirect |
-| Founder / platform operator | Builds and runs SchoolOS | Secure, low-ops platform | Operator |
+| Platform operator team (SchoolOS) | Builds and runs SchoolOS: owner, engineers, support, billing (roles in 16 §2) | Secure, low-ops platform; provisioning, billing and support tools without access to school data (BR-09) | Operator / supplier |
 
 ## 7. Scope
 
@@ -97,7 +98,7 @@ It is not another ERP. It works alongside the school's existing tools (paper reg
 Certificates & registers · circulars→tasks and bilingual notices · student timeline & early warning · Tally read connector · multi-school readiness.
 
 ### 7.3 Out of scope (until an explicit decision)
-Replacing Tally or doing accounting · online fee collection/payments · parent mobile app · LMS/homework · timetable · transport/GPS · biometric attendance · automated submission into government portals (no APIs; exports only) · CCTV.
+Replacing Tally or doing accounting · online fee collection from parents · parent mobile app · LMS/homework · timetable · transport/GPS · biometric attendance · automated submission into government portals (no APIs; exports only) · CCTV.
 
 ## 8. Business rules
 
@@ -140,11 +141,26 @@ Replacing Tally or doing accounting · online fee collection/payments · parent 
 
 **Baseline capture (first visit):** time the office spends on one portal cycle and three recent certificates; count last cycle's correction requests; list 20 real questions staff asked in the past month.
 
-## 11. Commercial model (hypotheses to validate)
+## 11. Commercial model
 
-- Pilot is free until the school uses SchoolOS for a real submission cycle; the price and conversion trigger are agreed **before** the pilot starts.
-- Candidate pricing units: per student per year (familiar to schools) or per school tier by enrolment band. Anchor to value (errors avoided, hours saved), not to cheap ERP prices.
-- AI usage is metered internally with per-tenant budgets to protect margins.
+Decided in September 2026 (ADR-0015). Prices are still hypotheses to validate.
+
+**Delivery model: managed SaaS.** SchoolOS runs, patches, backs up and supports the product. Schools use it in a browser. Nothing is installed on the school's premises (except the optional Tally edge agent in M6).
+
+| Tier | What the school gets | Who it suits |
+|---|---|---|
+| **Shared** (default plan) | The school is an isolated tenant on the pooled SchoolOS platform in AWS Mumbai (ap-south-1), backups in Hyderabad (ap-south-2) | Most schools: lowest price, no IT work |
+| **Dedicated** (premium plan) | Its own isolated server in AWS Mumbai running the same software, its own storage and encryption key, nightly encrypted backups to Hyderabad, and an optional **custom domain** (e.g., `office.<school>.edu.in`) | Larger schools, groups, or schools that ask for "our own server" |
+
+Both tiers have the same features, security baseline and data-in-India commitment. The school's data is never used by the platform team without the school's time-bound approval (BR-09).
+
+**Pricing and billing**
+- **Recurring subscription** in INR, monthly or annual, plus GST. Plans are versioned; a school's price does not change mid-period.
+- Candidate pricing units: per student per year (familiar to schools) or a flat price per enrolment band; the dedicated tier adds a fixed monthly amount for the server. Anchor to value (errors avoided, hours saved), not to cheap ERP prices.
+- Pilot is free until the school uses SchoolOS for a real submission cycle (a trial subscription); the price and conversion trigger are agreed **before** the pilot starts.
+- Payment by bank transfer or UPI against a GST invoice at first; online payment collection is a later decision (ADR-0016, Proposed).
+- Non-payment never switches a school off automatically: there is a 15-day grace period, suspension is a human decision, and never during board exam windows without the owner's approval (16 §9).
+- AI usage is metered internally with per-tenant budgets to protect margins; plan limits cover students, staff users, storage, documents and AI usage.
 - Price experiments with the next 3–5 schools after the design partner.
 
 ## 12. Assumptions and dependencies
@@ -173,6 +189,8 @@ Replacing Tally or doing accounting · online fee collection/payments · parent 
 | Government changes portals/rules | High | Medium | Versioned export profiles; monitor circulars; adapt quickly |
 | Founder bandwidth | High | High | Tight scope per milestone; AI-assisted development with strong tests |
 | Vendor lock-in (IdP, cloud) | Medium | Medium | Interfaces around identity, LLM, embeddings, storage; ADRs record exit paths |
+| Dedicated-tier hosts add operations work | Medium | Medium | Same images and pipeline as shared tier; heartbeat monitoring, automated backups and upgrade waves (10 §15); premium price covers the cost |
+| Unpaid invoices from schools | Medium | Medium | Clear terms before pilot; reminders; grace period; manual review before any suspension |
 | Competitors copy "AI assistant" | High | Medium | Moat = AP portal/format knowledge + clean per-source data + Telugu + office workflows |
 
 ## 15. Compliance summary (details in 08)
