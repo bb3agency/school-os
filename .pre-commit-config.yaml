@@ -47,6 +47,7 @@ repos:
         pass_filenames: false
       - id: prettier
         name: prettier
-        entry: npx --no-install prettier --check --ignore-unknown
+        entry: npx --no-install prettier --check --ignore-unknown apps/web packages/api-client
         language: system
         files: ^(apps/web|packages)/
+        pass_filenames: false

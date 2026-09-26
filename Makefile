@@ -6,9 +6,13 @@ SHELL := /bin/bash
 UV        ?= uv
 COMPOSE   ?= docker compose
 HAS_WEB   := $(wildcard package.json)
-GITLEAKS_IMAGE ?= zricethezav/gitleaks:v8.30.1
-TRIVY_IMAGE    ?= aquasec/trivy:0.74.0
+GITLEAKS_IMAGE  ?= zricethezav/gitleaks:v8.30.1
+TRIVY_IMAGE     ?= aquasec/trivy:0.74.0
 SEMGREP_VERSION ?= 1.178.0
+
+# CI installs gitleaks/trivy on PATH (.github/actions/install-tools); locally we fall back to pinned images.
+GITLEAKS = $(if $(shell command -v gitleaks 2>/dev/null),gitleaks,docker run --rm -v "$(CURDIR):/repo" -w /repo $(GITLEAKS_IMAGE))
+TRIVY    = $(if $(shell command -v trivy 2>/dev/null),trivy,docker run --rm -v "$(CURDIR):/repo" -w /repo $(TRIVY_IMAGE))
 
 .PHONY: help install dev down logs migrate seed-synthetic test test-api test-web test-security \
         migration-check e2e lint format typecheck security eval check db-shell openapi
@@ -34,7 +38,7 @@ down: ## Stop the local stack
 logs: ## Tail local stack logs
 	$(COMPOSE) logs -f --tail=100
 
-migrate: .env ## Apply database migrations (alembic upgrade head as sos_migrator)
+migrate: .env ## Apply database migrations and create audit partitions (as sos_migrator)
 	$(COMPOSE) up -d --wait db
 	$(COMPOSE) run --rm migrate
 
@@ -44,17 +48,57 @@ db-shell: ## psql into the local database as the admin
 seed-synthetic: ## Create synthetic tenants (NEVER real data)
 	$(UV) run python -m app.devtools.seed_synthetic
 
-openapi: ## Export the OpenAPI document for the TS client
+openapi: ## Export the OpenAPI document and regenerate the TS client
 	$(UV) run python -c "import json; from app.main import create_app; print(json.dumps(create_app().openapi(), indent=2))" > apps/api/openapi.json
+ifneq ($(HAS_WEB),)
+	npm run generate -w @schoolos/api-client
+endif
 
 test: test-api test-web ## Run all unit/integration tests
 
 test-api: ## Python tests (real Postgres via testcontainers) with coverage
 	$(UV) run pytest --cov --cov-report=term-missing:skip-covered --cov-report=xml
 
-test-# CI installs gitleaks/trivy on PATH (.github/actions/install-tools); locally we fall back to pinned images.
-GITLEAKS = $(if $(shell command -v gitleaks 2>/dev/null),gitleaks,docker run --rm -v "$(CURDIR):/repo" -w /repo $(GITLEAKS_IMAGE))
-TRIVY    = $(if $(shell command -v trivy 2>/dev/null),trivy,docker run --rm -v "$(CURDIR):/repo" -w /repo $(TRIVY_IMAGE))
+test-security: ## Security suites: RLS catalog, tenant isolation, authz, BOLA
+	$(UV) run pytest apps/api/tests/security -q
+
+migration-check: ## Upgrade/downgrade round trip on a fresh database
+	$(UV) run pytest apps/api/tests/migrations -q
+
+test-web: ## Web unit tests (vitest)
+ifneq ($(HAS_WEB),)
+	npm test
+else
+	@echo "web workspace not present; skipping"
+endif
+
+e2e: ## Playwright end-to-end tests (needs `next build` or E2E_BASE_URL pointing at a running stack)
+ifneq ($(HAS_WEB),)
+	npm run e2e
+else
+	@echo "web workspace not present"
+endif
+
+lint: ## ruff + format check + import-linter + eslint + prettier
+	$(UV) run ruff check .
+	$(UV) run ruff format --check .
+	$(UV) run lint-imports --config .importlinter
+ifneq ($(HAS_WEB),)
+	npm run lint
+endif
+
+format: ## Auto-format Python and TS
+	$(UV) run ruff format .
+	$(UV) run ruff check --fix .
+ifneq ($(HAS_WEB),)
+	npm run format
+endif
+
+typecheck: ## mypy --strict + tsc
+	$(UV) run mypy apps/api apps/worker
+ifneq ($(HAS_WEB),)
+	npm run typecheck
+endif
 
 security: ## gitleaks, semgrep, pip-audit, npm audit, trivy (fs + config)
 	$(GITLEAKS) git --no-banner --redact --config .gitleaks.toml .
