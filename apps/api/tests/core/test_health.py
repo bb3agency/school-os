@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, iter_route_contexts
 from fastapi.testclient import TestClient
 
 from app.core.health import PUBLIC_PATHS, get_checks
@@ -44,10 +44,15 @@ def test_SEC_003_only_health_routes_are_unprotected() -> None:
     """
     app = create_app()
     unprotected: list[str] = []
-    for route in app.routes:
-        if not isinstance(route, APIRoute) or route.path in PUBLIC_PATHS | DOC_PATHS:
+    checked = 0
+    # FastAPI wraps included routers; iterate the flattened route contexts, not app.routes.
+    for rc in iter_route_contexts(app.routes):
+        route = rc.original_route
+        if not isinstance(route, APIRoute) or str(rc.path) in PUBLIC_PATHS | DOC_PATHS:
             continue
+        checked += 1
         deps = [d.call for d in route.dependant.dependencies]
         if not any(getattr(dep, "sos_permission", None) for dep in deps):
-            unprotected.append(f"{sorted(route.methods or set())} {route.path}")
+            unprotected.append(f"{sorted(rc.methods or set())} {rc.path}")
+    assert checked > 0, "no API routes found: the check would pass vacuously"
     assert unprotected == []
