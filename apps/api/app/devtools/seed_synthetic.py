@@ -3,7 +3,7 @@
 Usage::
 
     python -m app.devtools.seed_synthetic [--tenants N] [--seed S] [--dataset-version v1]
-                                          [--code-prefix synth] [--admin-database-url URL]
+                                          [--code-prefix synth]
 
 Refuses to run unless ``SOS_ENV`` is ``local`` or ``ci`` (exit code 2). The check runs before
 anything else is imported, and settings that fail validation (e.g. staging/prod guards) are a
@@ -36,11 +36,6 @@ ALLOWED_ENVS: Final = frozenset({Environment.LOCAL, Environment.CI})
 EXIT_OK: Final = 0
 EXIT_FAILED: Final = 1
 EXIT_REFUSED: Final = 2
-# Local compose superuser (.env.example SOS_DB_ADMIN_PASSWORD); used only for each school's
-# first owner (see app.devtools.seeder.AdminOwnerBootstrap). Never logged.
-DEFAULT_ADMIN_DATABASE_URL: Final = (
-    "postgresql+psycopg://postgres:dev-only-admin@localhost:5432/schoolos"
-)
 REFUSED_MESSAGE: Final = "seed-synthetic is disabled outside local/ci (SOS_ENV)\n"
 
 
@@ -65,8 +60,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--admin-database-url",
-        default=DEFAULT_ADMIN_DATABASE_URL,
-        help="local database admin URL, used only to create each school's first owner",
+        default=None,
+        help=(
+            "legacy: create each school's first owner with the database admin connection "
+            "instead of the control-plane invite + acceptance path (default)"
+        ),
     )
     return p
 
@@ -121,8 +119,11 @@ def main(
     log = get_logger("app.devtools.seed_synthetic")
     admin_engine: Engine | None = None
     if owner_bootstrap is None:
-        admin_engine = create_engine(args.admin_database_url, pool_size=1, max_overflow=0)
-        owner_bootstrap = seeder.AdminOwnerBootstrap(admin_engine)
+        if args.admin_database_url:
+            admin_engine = create_engine(args.admin_database_url, pool_size=1, max_overflow=0)
+            owner_bootstrap = seeder.AdminOwnerBootstrap(admin_engine)
+        else:
+            owner_bootstrap = seeder.PlatformOwnerBootstrap()
     try:
         summary = seeder.seed(
             plan, wrapper=wrapper or get_key_wrapper(settings), owner_bootstrap=owner_bootstrap

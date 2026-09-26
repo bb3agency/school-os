@@ -12,6 +12,8 @@ School-side (tenant API) routes that the authz owner wires with ``require(...)``
 - POST /api/v1/support/tickets/{id}/messages (support.ticket.create): ``reply_from_tenant``
 
 Feature flags for tenant code: ``is_flag_enabled(key, tenant_id, session=tenant_session)``.
+
+Provisioning helpers for dev tooling: ``invite_school_owner(platform_session, ...)``.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.platform import announcements, flags, support
+from app.platform import announcements, flags, repository, support
 from app.platform.schemas import (
     AnnouncementBrief,
     SchoolTicketMessageIn,
@@ -38,6 +40,7 @@ __all__ = [
     "active_announcements",
     "current_subscription",
     "get_tenant_ticket",
+    "invite_school_owner",
     "is_flag_enabled",
     "list_tenant_tickets",
     "open_ticket_from_tenant",
@@ -85,3 +88,33 @@ def reply_from_tenant(
     tenant_id: uuid.UUID, user_id: uuid.UUID, ticket_id: uuid.UUID, data: SchoolTicketMessageIn
 ) -> TicketOut:
     return support.reply_from_tenant(tenant_id, user_id, ticket_id, data.body)
+
+
+def invite_school_owner(
+    platform_db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    subject: str,
+    display_name: str,
+    email: str | None,
+    language: str,
+) -> tuple[uuid.UUID, uuid.UUID, bool]:
+    """Create a provisioning school's first (invited) owner via ``core.create_owner_invite``.
+
+    Returns (user_id, membership_id, owner_role_assigned). Allowed only while the school is
+    ``provisioning`` and has no members; the invitee activates it on first sign-in (ADR-0019).
+    Permission assumed: ``platform.tenants.provision``. Audit is the caller's responsibility.
+    """
+    row = repository.call_create_owner_invite(
+        platform_db,
+        tenant_id=tenant_id,
+        subject=subject,
+        display_name=display_name,
+        email=email,
+        language=language,
+    )
+    return (
+        uuid.UUID(str(row["user_id"])),
+        uuid.UUID(str(row["membership_id"])),
+        bool(row["owner_role_assigned"]),
+    )

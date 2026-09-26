@@ -1,0 +1,3 @@
+# Reviewed false positives only (fingerprint = commit:file:rule:line). Keep a reason per entry.
+# Synthetic UUID used as a service-token jti in a unit test; not a secret.
+9f3c4e08d7ec4924ec79f052e3cd3d964e462262:apps/api/tests/identity/test_service_token.py:generic-api-key:78
