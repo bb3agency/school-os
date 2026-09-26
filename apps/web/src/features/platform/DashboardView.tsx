@@ -1,12 +1,20 @@
 import type { PlatformKpis } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { formatCount, formatInr } from "@/lib/format";
 
 /** C14 dashboard. Every KPI shows "—" until its value is available. */
-export function DashboardView({ kpis }: { kpis: PlatformKpis | null }) {
+export function DashboardView({
+  kpis,
+  notice,
+}: {
+  kpis: PlatformKpis | null;
+  /** Shown under the page header, e.g. a load error. */
+  notice?: ReactNode;
+}) {
   const t = useTranslations("platform");
   const tc = useTranslations("common");
   const locale = useLocale();
@@ -39,6 +47,7 @@ export function DashboardView({ kpis }: { kpis: PlatformKpis | null }) {
   return (
     <div className="space-y-6">
       <PageHeader title={t("dashboard.title")} description={t("dashboard.description")} />
+      {notice}
       <section aria-label={t("dashboard.kpisLabel")}>
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {cards.map((card) => (

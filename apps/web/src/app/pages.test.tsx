@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import type * as Navigation from "next/navigation";
 import type { ReactElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformShell } from "@/components/shell/PlatformShell";
 import { SchoolShell } from "@/components/shell/SchoolShell";
 import type { Locale } from "@/i18n/routing";
@@ -20,6 +20,7 @@ vi.mock("next/navigation", async (importOriginal) => {
 
 import SchoolHomePage from "./[locale]/(school)/page";
 import SchoolAuditPage from "./[locale]/(school)/audit/page";
+import SignedOutPage from "./[locale]/signed-out/page";
 import SchoolBillingPage from "./[locale]/(school)/settings/billing/page";
 import SchoolStructurePage from "./[locale]/(school)/settings/structure/page";
 import SchoolUsersPage from "./[locale]/(school)/settings/users/page";
@@ -69,7 +70,13 @@ const pages: PageCase[] = [
   {
     name: "school audit log",
     title: (m) => m.school.audit.title,
-    render: () => <SchoolAuditPage />,
+    render: () => SchoolAuditPage({ searchParams: noSearch() }),
+  },
+  {
+    name: "signed out",
+    title: (m) => m.auth.signedOut.title,
+    render: () =>
+      SignedOutPage({ searchParams: Promise.resolve({ error: "signin_failed", reason: "idle" }) }),
   },
   {
     name: "platform dashboard",
@@ -137,6 +144,17 @@ const pages: PageCase[] = [
 ];
 
 const locales: Locale[] = ["en", "te"];
+
+// Screens load through the BFF; here the API "does not exist yet" (404).
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json({ status: 404, code: "not_found" }, { status: 404 })),
+  );
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("page shells render in both languages (NFR-I18N-001, FR-PLT-001..030)", () => {
   for (const locale of locales) {

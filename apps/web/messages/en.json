@@ -25,7 +25,9 @@
     "applyFilters": "Apply filters",
     "dateHint": "Use DD/MM/YYYY, for example 01/06/2026.",
     "notConnected": "This screen is not connected to the server yet. Nothing was saved.",
-    "scrollableTable": "{caption}. Scroll sideways to see all columns."
+    "scrollableTable": "{caption}. Scroll sideways to see all columns.",
+    "notAvailableYetTitle": "Not available yet",
+    "notAvailableYetBody": "This part of SchoolOS is still being set up. Check again later."
   },
   "language": {
     "label": "Language",
@@ -94,6 +96,12 @@
       "expired": "Expired",
       "rejected": "Rejected",
       "revoked": "Revoked"
+    },
+    "member": {
+      "invited": "Invited",
+      "active": "Active",
+      "suspended": "Suspended",
+      "removed": "Removed"
     }
   },
   "deploymentMode": {
@@ -156,7 +164,7 @@
       "description": "Invite staff, give them roles and choose which classes they can see.",
       "invite": "Invite user",
       "colName": "Name",
-      "colLogin": "Sign-in ID",
+      "colEmail": "Email",
       "colRoles": "Roles",
       "colScope": "Can see",
       "colStatus": "Status",
@@ -168,6 +176,8 @@
       "colRole": "Role",
       "colRoleKey": "Role key",
       "scopeSchool": "Whole school",
+      "scopeClasses": "{count, plural, one {# class} other {# classes}}",
+      "scopeSections": "{count, plural, one {# section} other {# sections}}",
       "roles": {
         "owner": "Owner",
         "principal": "Principal",
@@ -225,7 +235,12 @@
       "colRecord": "Record",
       "colSummary": "Details",
       "emptyTitle": "No audit events to show",
-      "emptyBody": "Try a wider date range or clear the filters."
+      "emptyBody": "Try a wider date range or clear the filters.",
+      "actor": {
+        "user": "Staff user",
+        "system": "System",
+        "operator": "SchoolOS support"
+      }
     }
   },
   "platform": {
@@ -549,6 +564,40 @@
   "errors": {
     "notFoundTitle": "Page not found",
     "notFoundBody": "Check the address, or go back to the home page.",
-    "goHome": "Go to home"
+    "goHome": "Go to home",
+    "load": {
+      "forbidden": "You don't have access to this. Ask your school's office admin if you need it.",
+      "active_tenant_required": "You work in more than one school. Choose the school first, then open this page again.",
+      "mfa_required": "Your role needs two-step verification (MFA). Set it up, then sign in again.",
+      "tenant_suspended": "This school's access is paused. The owner can contact SchoolOS support."
+    }
+  },
+  "auth": {
+    "signedInAs": "Signed in as {name}",
+    "lockNow": "Lock now",
+    "lockNowHint": "Sign out at once so no one else can use this computer as you.",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…",
+    "signOutFailed": "We couldn't sign you out. Check your internet connection, then try again.",
+    "idle": {
+      "title": "Are you still there?",
+      "body": "To keep school records safe on shared computers, you will be signed out in about 1 minute.",
+      "stay": "Stay signed in",
+      "signOut": "Sign out now"
+    },
+    "signedOut": {
+      "title": "You are signed out",
+      "body": "If this is a shared computer, close the browser when you are done.",
+      "idle": "You were signed out because this computer was not used for a while.",
+      "signIn": "Sign in to the school office",
+      "platformSignIn": "Sign in to the platform admin panel"
+    },
+    "errors": {
+      "signin_expired": "Signing in took too long. Sign in again.",
+      "signin_failed": "We couldn't sign you in. Sign in again. If it keeps happening, contact your school's office admin.",
+      "signin_unavailable": "Sign-in is not available right now. Try again in a few minutes.",
+      "mfa_required": "Your account needs two-step verification (MFA). Set it up, then sign in again.",
+      "step_up_failed": "We couldn't confirm it's you. Sign in again to continue."
+    }
   }
 }

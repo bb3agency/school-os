@@ -5,7 +5,12 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: { "@": path.resolve(import.meta.dirname, "src") },
+    alias: {
+      "@": path.resolve(import.meta.dirname, "src"),
+      // Next.js resolves `server-only` to an empty module on the server; the npm package's
+      // default entry throws. Tests exercise server modules directly, so use the empty one.
+      "server-only": path.resolve(import.meta.dirname, "src/test/server-only.ts"),
+    },
   },
   test: {
     environment: "jsdom",

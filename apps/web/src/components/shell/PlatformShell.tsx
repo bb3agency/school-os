@@ -10,7 +10,14 @@ import { SkipLink } from "./SkipLink";
  * dark violet header and sidebar with a yellow "Platform admin" badge, so an operator
  * always knows they are in the control plane.
  */
-export function PlatformShell({ children }: { children: ReactNode }) {
+export function PlatformShell({
+  children,
+  headerActions,
+}: {
+  children: ReactNode;
+  /** Session controls (operator name, sign out). */
+  headerActions?: ReactNode;
+}) {
   const t = useTranslations();
   const items: NavItem[] = [
     { href: "/platform", label: t("platform.nav.dashboard"), exact: true },
@@ -39,7 +46,10 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           <p className="text-lg font-bold">{t("common.appName")}</p>
           <Badge tone="platform">{t("platform.badge")}</Badge>
         </div>
-        <LanguageSwitcher tone="dark" />
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          {headerActions}
+          <LanguageSwitcher tone="dark" />
+        </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <aside

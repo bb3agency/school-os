@@ -1,13 +1,19 @@
 /**
- * HAND-WRITTEN PLACEHOLDER TYPES.
+ * API types.
  *
- * These mirror the endpoints agreed in the build contract (§5, FR-PLT-001..030) and
- * docs/09 so the web shells compile before the API exists. Once `apps/api/openapi.json`
- * is exported, run `npm run generate -w @schoolos/api-client` and switch `src/paths.ts`
- * to re-export the generated `paths`/`components`. Field names follow the API's
- * snake_case JSON. Money is a decimal string (numeric(14,2), INR). Dates are
- * `YYYY-MM-DD`; timestamps are RFC 3339 UTC. No type here carries student data.
+ * - School-side (tenant) types are GENERATED from apps/api/openapi.json
+ *   (`make openapi` → src/generated/schema.ts) and re-exported below under stable names.
+ * - Control-plane (/platform/*) and school billing types are HAND-WRITTEN placeholders
+ *   that mirror the build contract (§5, FR-PLT-001..030) and docs/16 until those API
+ *   routes exist; replace each with its generated schema when it appears in the document.
+ *
+ * Field names follow the API's snake_case JSON. Money is a decimal string (numeric(14,2),
+ * INR). Dates are `YYYY-MM-DD`; timestamps are RFC 3339 UTC. No type here carries student
+ * data.
  */
+import type { components } from "./generated/schema";
+
+type Schemas = components["schemas"];
 
 /** RFC 9457 problem details (docs/09 §3). */
 export interface Problem {
@@ -314,51 +320,18 @@ export interface TenantInvoice {
   status: InvoiceStatus;
 }
 
-export interface AcademicYear {
-  id: string;
-  label: string;
-  starts_on: string;
-  ends_on: string;
-  is_current: boolean;
-}
+/* ------------------------------------------------ tenant (generated from OpenAPI) */
 
-export interface SchoolClass {
-  id: string;
-  name: string;
-  sort_order: number;
-  section_count: number;
-}
-
-export interface Section {
-  id: string;
-  class_id: string;
-  class_name: string;
-  name: string;
-}
-
-export interface TenantUser {
-  id: string;
-  display_name: string;
-  login: string;
-  roles: TenantRoleKey[];
-  scope_summary: string | null;
-  status: PersonStatus;
-  last_sign_in_at: string | null;
-}
-
-export interface TenantRole {
-  key: string;
-  name: string;
-  is_system: boolean;
-}
-
-export interface AuditEvent {
-  id: string;
-  seq: number;
-  occurred_at: string;
-  actor_name: string | null;
-  action: string;
-  resource_type: string;
-  resource_id: string | null;
-  summary: string;
-}
+export type AcademicYear = Schemas["AcademicYearOut"];
+/** Class: `code`, `display_en` / `display_te` (show the one for the UI language), `sort_order`. */
+export type SchoolClass = Schemas["ClassOut"];
+export type Section = Schemas["SectionOut"];
+export type TenantUser = Schemas["UserOut"];
+export type MemberStatus = TenantUser["status"];
+export type Scope = Schemas["ScopeOut"];
+export type TenantRole = Schemas["RoleOut"];
+/** Audit event; `summary` is an object of IDs, field names, counts and codes (no PII). */
+export type AuditEvent = Schemas["AuditEventOut"];
+export type AuditVerify = Schemas["AuditVerifyOut"];
+export type Me = Schemas["MeOut"];
+export type TenantProfile = Schemas["TenantOut"];
