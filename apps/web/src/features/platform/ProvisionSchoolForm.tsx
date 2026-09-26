@@ -1,76 +1,90 @@
 "use client";
 
+import type { ProvisionResult } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
-import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/ui/Input";
+import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { TextAreaField, TextField } from "@/components/ui/Input";
+import { SecretOnce } from "@/components/ui/SecretOnce";
 import { SelectField } from "@/components/ui/Select";
+import { unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
-import { provisionSchoolAction, type ProvisionState } from "./provision-actions";
+import { formValues, useApiForm, zodErrorKeys } from "@/lib/forms";
+import { BillingAccountFields } from "./BillingAccountFields";
+import { PK, planLabel, usePlanDirectory } from "./data";
 import {
-  PROVISION_FIELDS,
   PROVISION_STEPS,
-  STEP_FIELDS,
-  provisionInputFromFormData,
-  validateProvision,
-  type FieldErrors,
-  type ProvisionField,
+  firstStepWith,
+  provisionSchema,
+  stepErrors,
   type ProvisionStep,
 } from "./provision-schema";
 
-export interface PlanOption {
-  key: string;
-  name: string;
-}
-
-const fieldId = (field: ProvisionField) => `provision-${field}`;
-const INITIAL_STATE: ProvisionState = { status: "idle" };
+const fieldId = (field: string) => `provision-${field.replace(/\./g, "-")}`;
 
 /**
- * FR-PLT-001 provision wizard: school → plan and deployment → owner invite → review.
- * One native <form>; inactive steps are hidden (not removed) so every value submits.
- * Each "Next" validates only that step with the shared zod schema; the server action
- * validates everything again.
+ * FR-PLT-001..003 provision wizard (docs/16 §5.4): school → deployment → owner → plan →
+ * billing account → review. One native <form>; inactive steps are hidden (not removed) so
+ * every value submits. "Next" validates only its step; submit validates everything, then
+ * POST /platform/tenants with one Idempotency-Key per attempt (a retry cannot create a
+ * second school). The API asks for step-up MFA (428) if the last sign-in is too old.
+ * A dedicated school's heartbeat key is shown ONCE, then dropped from memory.
  */
-export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] }) {
+export function ProvisionSchoolForm() {
   const t = useTranslations("platform.provision");
-  const tv = useTranslations("platform.validation");
+  const tv = useTranslations("validation");
   const tc = useTranslations("common");
   const tmode = useTranslations("deploymentMode");
+  const api = useBffClient("operator");
+  const { plans } = usePlanDirectory();
 
   const formRef = useRef<HTMLFormElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
-  const [clientErrors, setClientErrors] = useState<FieldErrors>({});
-  const [review, setReview] = useState<Record<ProvisionField, string> | null>(null);
-  const [state, formAction, pending] = useActionState(provisionSchoolAction, INITIAL_STATE);
+  const [stepOnlyErrors, setStepOnlyErrors] = useState<Record<string, string>>({});
+  const [review, setReview] = useState<Record<string, string>>({});
+  const [tier, setTier] = useState<"shared" | "dedicated">("shared");
+  const [done, setDone] = useState<ProvisionResult | null>(null);
+  const [secretShown, setSecretShown] = useState(false);
   const hasNavigated = useRef(false);
 
+  const form = useApiForm({
+    schema: provisionSchema,
+    fieldMap: (field) => field,
+    invalidate: [PK.tenants, PK.dashboard, PK.subscriptions, PK.deployments],
+    submit: (data, key) =>
+      unwrap(
+        api.POST("/api/v1/platform/tenants", {
+          params: { header: { "Idempotency-Key": key } },
+          body: data,
+        }),
+      ),
+    onSuccess: (result) => {
+      setDone(result);
+      setSecretShown(Boolean(result.heartbeat_key));
+    },
+  });
+
+  const errors = { ...form.errors, ...stepOnlyErrors };
   const step: ProvisionStep = PROVISION_STEPS[stepIndex] ?? "school";
-  const errors: FieldErrors =
-    state.status === "invalid" ? { ...state.errors, ...clientErrors } : clientErrors;
-  const errorFields = PROVISION_FIELDS.filter((field) => errors[field]);
+  const errorFields = Object.keys(errors);
 
   useEffect(() => {
-    // Move focus to the new step's heading after Next/Back (not on first render).
     if (hasNavigated.current) stepHeadingRef.current?.focus();
   }, [stepIndex]);
 
-  function currentInput() {
-    const form = formRef.current;
-    return form ? provisionInputFromFormData(new FormData(form)) : null;
-  }
-
-  function stepErrors(target: ProvisionStep, all: FieldErrors): FieldErrors {
-    const scoped: FieldErrors = {};
-    for (const field of STEP_FIELDS[target]) {
-      const key = all[field];
-      if (key) scoped[field] = key;
+  // After a failed submit (client or server), jump to the first step with an error.
+  useEffect(() => {
+    const target = firstStepWith(Object.keys(form.errors));
+    if (target) {
+      hasNavigated.current = true;
+      setStepIndex(PROVISION_STEPS.indexOf(target));
+      requestAnimationFrame(() => summaryRef.current?.focus());
     }
-    return scoped;
-  }
+  }, [form.errors]);
 
   function goTo(index: number) {
     hasNavigated.current = true;
@@ -78,78 +92,106 @@ export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] })
   }
 
   function next() {
-    const input = currentInput();
-    if (!input) return;
-    const result = validateProvision(input);
-    const found = result.ok ? {} : stepErrors(step, result.errors);
-    setClientErrors(found);
+    const element = formRef.current;
+    if (!element) return;
+    const values = formValues(element);
+    const result = provisionSchema.safeParse(values);
+    const all = result.success ? {} : zodErrorKeys(result.error);
+    const found = Object.fromEntries(
+      Object.entries(stepErrors(step, all)).map(([field, key]) => [
+        field,
+        tv.has(key) ? tv(key) : tv("invalid"),
+      ]),
+    );
+    setStepOnlyErrors(found);
     if (Object.keys(found).length > 0) {
       requestAnimationFrame(() => summaryRef.current?.focus());
       return;
     }
-    if (PROVISION_STEPS[stepIndex + 1] === "review") setReview(input);
+    if (PROVISION_STEPS[stepIndex + 1] === "review") setReview(values);
     goTo(stepIndex + 1);
   }
 
   function back() {
-    setClientErrors({});
+    setStepOnlyErrors({});
     goTo(Math.max(0, stepIndex - 1));
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    const input = currentInput();
-    if (!input) return;
-    const result = validateProvision(input);
-    if (result.ok) {
-      setClientErrors({});
-      return; // let the server action run
-    }
-    event.preventDefault();
-    setClientErrors(result.errors);
-    const firstBadStep = PROVISION_STEPS.findIndex(
-      (candidate) => Object.keys(stepErrors(candidate, result.errors)).length > 0,
-    );
-    goTo(firstBadStep === -1 ? 0 : firstBadStep);
-  }
-
-  const errorOf = (field: ProvisionField) => {
-    const key = errors[field];
-    return key ? tv(key) : undefined;
-  };
-
   const stepLabels: Record<ProvisionStep, string> = {
     school: t("steps.school"),
-    plan: t("steps.plan"),
+    deployment: t("steps.deployment"),
     owner: t("steps.owner"),
+    plan: t("steps.plan"),
+    billing: t("steps.billing"),
     review: t("steps.review"),
   };
 
-  const planOptions = plans.map((plan) => ({ value: plan.key, label: plan.name }));
-  const reviewRows: Array<{ field: ProvisionField; label: string; value: string }> = review
-    ? [
-        { field: "schoolName", label: t("fields.schoolName"), value: review.schoolName },
-        { field: "legalName", label: t("fields.legalName"), value: review.legalName },
-        { field: "stateCode", label: t("fields.stateCode"), value: review.stateCode },
-        { field: "billingEmail", label: t("fields.billingEmail"), value: review.billingEmail },
-        { field: "gstin", label: t("fields.gstin"), value: review.gstin },
-        {
-          field: "planKey",
-          label: t("fields.plan"),
-          value: plans.find((plan) => plan.key === review.planKey)?.name ?? review.planKey,
-        },
-        {
-          field: "deploymentMode",
-          label: t("fields.deploymentMode"),
-          value:
-            review.deploymentMode === "shared" || review.deploymentMode === "dedicated"
-              ? tmode(review.deploymentMode)
-              : "",
-        },
-        { field: "customDomain", label: t("fields.customDomain"), value: review.customDomain },
-        { field: "ownerName", label: t("fields.ownerName"), value: review.ownerName },
-        { field: "ownerEmail", label: t("fields.ownerEmail"), value: review.ownerEmail },
-      ]
-    : [];
+  if (done) {
+    if (secretShown && done.heartbeat_key) {
+      return (
+        <div className="max-w-3xl space-y-4 rounded-lg border border-border bg-surface p-6">
+          <h2 className="text-xl font-semibold">{t("heartbeatTitle")}</h2>
+          <p className="text-sm">{t("heartbeatBody")}</p>
+          <SecretOnce
+            label={t("heartbeatKey")}
+            secret={done.heartbeat_key}
+            keyId={done.heartbeat_key_id ?? null}
+            doneLabel={tc("continue")}
+            onDone={() => {
+              // Drop the key from memory: keep only the non-secret facts.
+              setDone({ ...done, heartbeat_key: null });
+              setSecretShown(false);
+              form.reset();
+            }}
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="max-w-3xl space-y-4">
+        <Alert tone="success" live title={t("doneTitle")}>
+          <p>{done.tier === "dedicated" ? t("doneDedicated") : t("doneShared")}</p>
+          <p>{t(`ownerInvite.${done.owner_invite}`)}</p>
+        </Alert>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href={`/platform/schools/${done.tenant_id}`}>{t("openSchool")}</ButtonLink>
+          <ButtonLink href="/platform/schools" variant="secondary">
+            {t("backToSchools")}
+          </ButtonLink>
+        </div>
+      </div>
+    );
+  }
+
+  const planOptions = plans
+    .filter((plan) => plan.status === "published" && plan.tier === tier)
+    .map((plan) => ({ value: plan.id, label: planLabel(plan) }));
+
+  const reviewRows: Array<{ label: string; value: string }> = [
+    { label: t("fields.schoolName"), value: review.school_name ?? "" },
+    { label: t("fields.code"), value: review.code ?? "" },
+    { label: t("fields.boards"), value: review.boards ?? "" },
+    {
+      label: t("fields.deploymentMode"),
+      value: review.tier === "dedicated" || review.tier === "shared" ? tmode(review.tier) : "",
+    },
+    { label: t("fields.customDomain"), value: review.custom_domain ?? "" },
+    { label: t("fields.ownerName"), value: review["owner.display_name"] ?? "" },
+    { label: t("fields.ownerEmail"), value: review["owner.email"] ?? "" },
+    { label: t("fields.ownerSubject"), value: review["owner.idp_subject"] ?? "" },
+    {
+      label: t("fields.plan"),
+      value: plans.find((plan) => plan.id === review.plan_id)?.name ?? "",
+    },
+    {
+      label: t("fields.startAs"),
+      value: review.start_as === "active" ? t("fields.startActive") : t("fields.startTrial"),
+    },
+    { label: t("fields.priceOverride"), value: review.price_override_inr ?? "" },
+    { label: t("fields.legalName"), value: review["billing_account.legal_name"] ?? "" },
+    { label: t("fields.gstin"), value: (review["billing_account.gstin"] ?? "").toUpperCase() },
+    { label: t("fields.billingEmail"), value: review["billing_account.billing_email"] ?? "" },
+  ];
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -161,7 +203,7 @@ export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] })
             className={cn(
               "rounded-full border px-3 py-1",
               index === stepIndex
-                ? "border-primary bg-primary text-on-primary font-semibold"
+                ? "border-primary bg-primary font-semibold text-on-primary"
                 : index < stepIndex
                   ? "border-primary text-primary"
                   : "border-border text-ink-muted",
@@ -179,7 +221,7 @@ export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] })
               {errorFields.map((field) => (
                 <li key={field}>
                   <a href={`#${fieldId(field)}`} className="underline">
-                    {errorOf(field)}
+                    {errors[field]}
                   </a>
                 </li>
               ))}
@@ -188,16 +230,12 @@ export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] })
         </div>
       ) : null}
 
-      {state.status === "not_connected" ? (
-        <Alert tone="warning" live>
-          {t("notConnected")}
-        </Alert>
-      ) : null}
-
       <form
         ref={formRef}
-        action={formAction}
-        onSubmit={onSubmit}
+        onSubmit={(event) => {
+          setStepOnlyErrors({});
+          form.onSubmit(event);
+        }}
         noValidate
         className="space-y-6 rounded-lg border border-border bg-surface p-6"
       >
@@ -205,11 +243,7 @@ export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] })
           <p className="text-sm text-ink-muted">
             {t("stepOf", { current: stepIndex + 1, total: PROVISION_STEPS.length })}
           </p>
-          <h2
-            ref={stepHeadingRef}
-            tabIndex={-1}
-            className="text-xl font-semibold focus:outline-none"
-          >
+          <h2 ref={stepHeadingRef} tabIndex={-1} className="text-xl font-semibold focus:outline-none">
             {stepLabels[step]}
           </h2>
         </div>
@@ -217,146 +251,170 @@ export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] })
         <fieldset hidden={step !== "school"} className="space-y-4">
           <legend className="sr-only">{stepLabels.school}</legend>
           <TextField
-            id={fieldId("schoolName")}
-            name="schoolName"
+            id={fieldId("school_name")}
+            name="school_name"
             label={t("fields.schoolName")}
             hint={t("fields.schoolNameHint")}
-            error={errorOf("schoolName")}
+            error={errors.school_name}
             autoComplete="organization"
+            maxLength={200}
           />
           <TextField
-            id={fieldId("legalName")}
-            name="legalName"
-            label={t("fields.legalName")}
-            error={errorOf("legalName")}
+            id={fieldId("code")}
+            name="code"
+            label={t("fields.code")}
+            hint={t("fields.codeHint")}
+            error={errors.code}
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={32}
+          />
+          <TextField
+            id={fieldId("boards")}
+            name="boards"
+            label={t("fields.boards")}
+            hint={t("fields.boardsHint")}
+            error={errors.boards}
             autoComplete="off"
           />
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField
-              id={fieldId("stateCode")}
-              name="stateCode"
-              label={t("fields.stateCode")}
-              hint={t("fields.stateCodeHint")}
-              error={errorOf("stateCode")}
-              inputMode="numeric"
-              maxLength={2}
-              defaultValue="37"
-              autoComplete="off"
-            />
-            <TextField
-              id={fieldId("gstin")}
-              name="gstin"
-              label={t("fields.gstin")}
-              hint={t("fields.gstinHint")}
-              error={errorOf("gstin")}
-              maxLength={15}
-              autoComplete="off"
-            />
-          </div>
+        </fieldset>
+
+        <fieldset hidden={step !== "deployment"} className="space-y-4">
+          <legend className="sr-only">{stepLabels.deployment}</legend>
+          <fieldset
+            className="space-y-2"
+            aria-describedby={errors.tier ? `${fieldId("tier")}-error` : undefined}
+          >
+            <legend className="text-sm font-semibold">{t("fields.deploymentMode")}</legend>
+            {(["shared", "dedicated"] as const).map((mode) => (
+              <div key={mode} className="flex items-start gap-3 rounded-md border border-border p-3">
+                <input
+                  type="radio"
+                  id={mode === "shared" ? fieldId("tier") : `${fieldId("tier")}-${mode}`}
+                  name="tier"
+                  value={mode}
+                  checked={tier === mode}
+                  onChange={() => setTier(mode)}
+                  aria-describedby={`${fieldId("tier")}-${mode}-hint`}
+                  className="mt-1 size-4 accent-primary"
+                />
+                <div>
+                  <label
+                    htmlFor={mode === "shared" ? fieldId("tier") : `${fieldId("tier")}-${mode}`}
+                    className="font-semibold"
+                  >
+                    {tmode(mode)}
+                  </label>
+                  <p id={`${fieldId("tier")}-${mode}-hint`} className="text-sm text-ink-muted">
+                    {mode === "shared" ? t("fields.sharedHint") : t("fields.dedicatedHint")}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </fieldset>
           <TextField
-            id={fieldId("billingEmail")}
-            name="billingEmail"
+            id={fieldId("custom_domain")}
+            name="custom_domain"
+            label={t("fields.customDomain")}
+            hint={t("fields.customDomainHint")}
+            error={errors.custom_domain}
+            autoComplete="off"
+            spellCheck={false}
+            disabled={tier !== "dedicated"}
+          />
+        </fieldset>
+
+        <fieldset hidden={step !== "owner"} className="space-y-4">
+          <legend className="sr-only">{stepLabels.owner}</legend>
+          <p className="text-sm text-ink-muted">
+            {tier === "dedicated" ? t("fields.ownerHintDedicated") : t("fields.ownerHint")}
+          </p>
+          <TextField
+            id={fieldId("owner.display_name")}
+            name="owner.display_name"
+            label={t("fields.ownerName")}
+            error={errors["owner.display_name"]}
+            autoComplete="off"
+            maxLength={200}
+          />
+          <TextField
+            id={fieldId("owner.email")}
+            name="owner.email"
             type="email"
-            label={t("fields.billingEmail")}
-            error={errorOf("billingEmail")}
-            autoComplete="email"
+            label={t("fields.ownerEmail")}
+            hint={t("fields.ownerEmailHint")}
+            error={errors["owner.email"]}
+            autoComplete="off"
+          />
+          <TextField
+            id={fieldId("owner.idp_subject")}
+            name="owner.idp_subject"
+            label={t("fields.ownerSubject")}
+            hint={t("fields.ownerSubjectHint")}
+            error={errors["owner.idp_subject"]}
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={255}
+          />
+          <SelectField
+            id={fieldId("owner.language")}
+            name="owner.language"
+            label={t("fields.ownerLanguage")}
+            defaultValue="en"
+            options={[
+              { value: "en", label: "English" },
+              { value: "te", label: "తెలుగు" },
+            ]}
           />
         </fieldset>
 
         <fieldset hidden={step !== "plan"} className="space-y-4">
           <legend className="sr-only">{stepLabels.plan}</legend>
           <SelectField
-            id={fieldId("planKey")}
-            name="planKey"
+            id={fieldId("plan_id")}
+            name="plan_id"
             label={t("fields.plan")}
-            hint={planOptions.length === 0 ? t("fields.noPlans") : undefined}
-            error={errorOf("planKey")}
+            hint={planOptions.length === 0 ? t("fields.noPlans") : t("fields.planHint")}
+            error={errors.plan_id}
             placeholder={t("fields.planPlaceholder")}
             options={planOptions}
             defaultValue=""
           />
-          <fieldset
-            className="space-y-2"
-            aria-describedby={
-              errors.deploymentMode ? `${fieldId("deploymentMode")}-error` : undefined
-            }
-          >
-            <legend className="text-sm font-semibold">{t("fields.deploymentMode")}</legend>
-            {(["shared", "dedicated"] as const).map((mode) => (
-              <div
-                key={mode}
-                className="flex items-start gap-3 rounded-md border border-border p-3"
-              >
-                <input
-                  type="radio"
-                  id={
-                    mode === "shared"
-                      ? fieldId("deploymentMode")
-                      : `${fieldId("deploymentMode")}-${mode}`
-                  }
-                  name="deploymentMode"
-                  value={mode}
-                  defaultChecked={mode === "shared"}
-                  aria-describedby={`${fieldId("deploymentMode")}-${mode}-hint`}
-                  className="mt-1 size-4 accent-primary"
-                />
-                <div>
-                  <label
-                    htmlFor={
-                      mode === "shared"
-                        ? fieldId("deploymentMode")
-                        : `${fieldId("deploymentMode")}-${mode}`
-                    }
-                    className="font-semibold"
-                  >
-                    {tmode(mode)}
-                  </label>
-                  <p
-                    id={`${fieldId("deploymentMode")}-${mode}-hint`}
-                    className="text-sm text-ink-muted"
-                  >
-                    {mode === "shared" ? t("fields.sharedHint") : t("fields.dedicatedHint")}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {errors.deploymentMode ? (
-              <p
-                id={`${fieldId("deploymentMode")}-error`}
-                className="text-sm font-semibold text-danger"
-              >
-                {errorOf("deploymentMode")}
-              </p>
-            ) : null}
-          </fieldset>
+          <SelectField
+            id={fieldId("start_as")}
+            name="start_as"
+            label={t("fields.startAs")}
+            defaultValue="trial"
+            options={[
+              { value: "trial", label: t("fields.startTrial") },
+              { value: "active", label: t("fields.startActive") },
+            ]}
+          />
           <TextField
-            id={fieldId("customDomain")}
-            name="customDomain"
-            label={t("fields.customDomain")}
-            hint={t("fields.customDomainHint")}
-            error={errorOf("customDomain")}
+            id={fieldId("price_override_inr")}
+            name="price_override_inr"
+            label={t("fields.priceOverride")}
+            hint={t("fields.priceOverrideHint")}
+            error={errors.price_override_inr}
+            inputMode="decimal"
             autoComplete="off"
-            spellCheck={false}
+          />
+          <TextAreaField
+            id={fieldId("override_reason")}
+            name="override_reason"
+            label={t("fields.overrideReason")}
+            error={errors.override_reason}
+            maxLength={500}
+            rows={2}
           />
         </fieldset>
 
-        <fieldset hidden={step !== "owner"} className="space-y-4">
-          <legend className="sr-only">{stepLabels.owner}</legend>
-          <p className="text-sm text-ink-muted">{t("fields.ownerHint")}</p>
-          <TextField
-            id={fieldId("ownerName")}
-            name="ownerName"
-            label={t("fields.ownerName")}
-            error={errorOf("ownerName")}
-            autoComplete="name"
-          />
-          <TextField
-            id={fieldId("ownerEmail")}
-            name="ownerEmail"
-            type="email"
-            label={t("fields.ownerEmail")}
-            error={errorOf("ownerEmail")}
-            autoComplete="email"
+        <fieldset hidden={step !== "billing"} className="space-y-4">
+          <legend className="sr-only">{stepLabels.billing}</legend>
+          <BillingAccountFields
+            errors={errors}
+            prefix="billing_account."
+            idPrefix="provision-billing_account"
           />
         </fieldset>
 
@@ -365,22 +423,25 @@ export function ProvisionSchoolForm({ plans }: { plans: readonly PlanOption[] })
             <p>{t("reviewIntro")}</p>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
               {reviewRows.map((row) => (
-                <div key={row.field} className="contents">
+                <div key={row.label} className="contents">
                   <dt className="text-ink-muted">{row.label}</dt>
                   <dd className="font-semibold break-words">{row.value || t("notProvided")}</dd>
                 </div>
               ))}
             </dl>
+            <p className="text-sm text-ink-muted">{tc("stepUpNote")}</p>
           </section>
         ) : null}
 
+        <ApiErrorAlert error={form.error} />
+
         <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
-          <Button variant="secondary" onClick={back} disabled={stepIndex === 0 || pending}>
+          <Button variant="secondary" onClick={back} disabled={stepIndex === 0 || form.pending}>
             {tc("back")}
           </Button>
           {step === "review" ? (
-            <Button type="submit" disabled={pending} aria-disabled={pending || undefined}>
-              {pending ? t("submitting") : t("submit")}
+            <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
+              {form.pending ? t("submitting") : t("submit")}
             </Button>
           ) : (
             <Button onClick={next}>{tc("next")}</Button>
