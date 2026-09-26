@@ -1,0 +1,9 @@
+# shellcheck shell=sh
+# Pinned WAL-G release for dedicated hosts (Apache-2.0). bootstrap-host.sh refuses to install WAL-G
+# until the version and both checksums are filled in from the release's published SHA-256 sums and
+# reviewed (a PR that sets them is the approval record).
+# Asset name: wal-g-pg-${WALG_UBUNTU}-<aarch64|x86_64>.tar.gz from github.com/wal-g/wal-g/releases
+WALG_VERSION=
+WALG_UBUNTU=ubuntu-22.04
+WALG_SHA256_AARCH64=
+WALG_SHA256_X86_64=

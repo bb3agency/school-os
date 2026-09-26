@@ -1,0 +1,18 @@
+# WAL-G continuous archiving (RPO <= 15 min). Added by scripts/compose.sh when SOS_WALG_ENABLED=true,
+# which also renders SOS_PG_ARCHIVE_MODE=on (used by the db command in compose.yaml).
+# The db container then needs egress to S3 in ap-south-2 (app network) and the host-installed wal-g
+# binary + wrapper scripts (read-only). Credentials come from the instance role via IMDSv2 (hop limit 2).
+services:
+  db:
+    environment:
+      AWS_REGION: ${SOS_BACKUP_REGION:?}
+      WALG_S3_PREFIX: s3://${SOS_BACKUP_BUCKET:?}/wal-g
+      WALG_S3_SSE: aws:kms
+      WALG_S3_SSE_KMS_ID: ${SOS_BACKUP_KMS_KEY_ARN:?}
+      WALG_COMPRESSION_METHOD: brotli
+      WALG_UPLOAD_CONCURRENCY: "2"
+      PGHOST: /var/run/postgresql
+      PGUSER: postgres
+    volumes:
+      - /var/lib/schoolos/walg:/opt/walg:ro
+    networks: [data, app]
