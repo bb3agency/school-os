@@ -68,7 +68,18 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    keys = [row["key"] for row in _catalog()]
-    op.get_bind().execute(
-        sa.text("DELETE FROM core.permissions WHERE key = ANY(:keys)"), {"keys": keys}
-    )
+    """Remove catalog rows this revision added, keeping any still granted to a role.
+
+    With schools present, ``core.role_permissions`` references most keys. The migrator cannot
+    see those rows to filter them (FORCE RLS applies to the table owner), but foreign-key checks
+    bypass RLS, so each delete runs in its own savepoint and a referenced key is kept. Keeping it
+    loses nothing: re-upgrading upserts the same rows, and 0003's downgrade drops the table.
+    """
+    bind = op.get_bind()
+    for row in _catalog():
+        savepoint = bind.begin_nested()
+        try:
+            bind.execute(sa.text("DELETE FROM core.permissions WHERE key = :k"), {"k": row["key"]})
+            savepoint.commit()
+        except sa.exc.IntegrityError:
+            savepoint.rollback()
