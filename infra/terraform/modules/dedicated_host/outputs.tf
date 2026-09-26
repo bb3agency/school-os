@@ -13,6 +13,11 @@ output "files_bucket" {
   value       = module.files.id
 }
 
+output "audit_bucket" {
+  description = "Per-school audit archive bucket (Object Lock COMPLIANCE)."
+  value       = module.audit_archive.id
+}
+
 output "generated_secret_arn" {
   description = "ARN of the generated-credentials secret (value never output)."
   value       = aws_secretsmanager_secret.generated.arn
@@ -55,5 +60,6 @@ output "posture" {
     log_retention_days   = aws_cloudwatch_log_group.host.retention_in_days
     files_bucket_sse     = module.files.sse_algorithm
     files_bucket_private = module.files.public_access_block
+    audit_lock_mode      = module.audit_archive.object_lock_mode
   }
 }

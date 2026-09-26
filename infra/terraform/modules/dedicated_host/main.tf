@@ -61,6 +61,19 @@ module "files" {
   tags = local.tags
 }
 
+# Daily signed audit export (07 §4 T4) for this school; Object Lock COMPLIANCE like the shared tier.
+module "audit_archive" {
+  source = "../s3_bucket"
+
+  name        = "${local.name}-audit-${local.account}"
+  kms_key_arn = var.kms_key_arn
+  object_lock = { mode = "COMPLIANCE", years = var.audit_object_lock_years }
+  lifecycle_rules = [
+    { id = "multipart", abort_incomplete_multipart_days = 7 },
+  ]
+  tags = merge(local.tags, { data_class = "C2-audit" })
+}
+
 # --- Logs ----------------------------------------------------------------------------------
 
 # Container logs (Docker awslogs driver; no personal data by the app's logging contract) and host scripts.
@@ -143,6 +156,12 @@ data "aws_iam_policy_document" "host" {
       "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:AbortMultipartUpload",
     ]
     resources = ["${module.files.arn}/*"]
+  }
+
+  statement {
+    sid       = "AuditArchiveWrite"
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
+    resources = [module.audit_archive.arn, "${module.audit_archive.arn}/*"]
   }
 
   # Backups: write + read for restore drills. No delete except WAL-G's own retention under wal-g/
@@ -337,6 +356,7 @@ resource "aws_instance" "host" {
     release_version        = var.release_version
     ecr_registry           = var.ecr_registry
     files_bucket           = module.files.id
+    audit_bucket           = module.audit_archive.id
     backup_bucket          = var.backup_bucket_name
     backup_kms_key_arn     = var.backup_kms_key_arn
     kms_key_arn            = var.kms_key_arn

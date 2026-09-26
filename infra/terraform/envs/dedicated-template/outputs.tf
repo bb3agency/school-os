@@ -22,7 +22,7 @@ output "ssm_session_command" {
 }
 
 output "operator_secret_arn" {
-  description = "Set SOS_ANTHROPIC_API_KEY, SOS_FLEET_HMAC_KEY and SOS_DEPLOYMENT_ID here (put-secret-value)."
+  description = "Set SOS_ANTHROPIC_API_KEY and SOS_FLEET_HMAC_KEY here (put-secret-value)."
   value       = module.host.operator_secret_arn
 }
 

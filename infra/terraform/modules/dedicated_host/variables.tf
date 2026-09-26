@@ -110,6 +110,12 @@ variable "fleet_deploy_log_group" {
   default     = "/schoolos/dedicated/deploy"
 }
 
+variable "audit_object_lock_years" {
+  description = "COMPLIANCE-mode retention of the per-school audit archive (docs/05 §13: 3 years)."
+  type        = number
+  default     = 3
+}
+
 variable "log_retention_days" {
   description = "Retention of the host's CloudWatch log group (400 days: CERT-In/DPDP)."
   type        = number
@@ -175,7 +181,7 @@ variable "control_plane_url" {
 variable "operator_secret_keys" {
   description = "Keys of the operator-supplied JSON secret (placeholders __SET_ME__ until set)."
   type        = list(string)
-  default     = ["SOS_ANTHROPIC_API_KEY", "SOS_FLEET_HMAC_KEY", "SOS_DEPLOYMENT_ID"]
+  default     = ["SOS_ANTHROPIC_API_KEY", "SOS_FLEET_HMAC_KEY"]
 }
 
 variable "generated_secret_version" {

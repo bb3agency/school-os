@@ -84,6 +84,15 @@ run "fleet_tags_and_logs" {
   }
 }
 
+run "audit_archive_compliance" {
+  command = plan
+
+  assert {
+    condition     = module.audit_archive.object_lock_mode == "COMPLIANCE" && module.audit_archive.object_lock_years == 3 && module.audit_archive.object_lock_enabled
+    error_message = "Per-school audit archive uses Object Lock COMPLIANCE for 3 years."
+  }
+}
+
 run "only_80_443_inbound" {
   command = plan
 
