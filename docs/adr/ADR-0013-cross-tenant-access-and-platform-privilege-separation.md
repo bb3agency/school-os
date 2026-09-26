@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · Amended by ADR-0018, ADR-0019 · implementation amendments 2026-09-26 (see [Amendments](#amendments-2026-09-26)) |
 | Date | 2026-09-26 |
 | Deciders | Founder (product owner approval of build proposals B1–B25) |
 | Amends / supersedes | Amends [ADR-0003](ADR-0003-pool-tenancy-rls.md), [ADR-0011](ADR-0011-hash-chained-audit.md), [ADR-0012](ADR-0012-managed-oidc-identity.md) |
@@ -147,3 +147,83 @@ SELECT set_config('app.tenant_id', :tenant_id, true), set_config('app.user_id', 
 ## Related requirements
 
 FR-TEN-001..003, FR-AUD-001..004, FR-PLT-001..005, FR-PLT-028..030, FR-IAM-002, SEC-001, SEC-002, SEC-007, SEC-026, SEC-027, BR-09; 05 §3, §7; 07 §6.5–6.6, §7; 12 §4.5–4.12; 16.
+
+## Amendments (2026-09-26)
+
+Recorded after the M0 build (migrations `0001_baseline` … `0007_accept_invitations`). The decision above stands. These entries record where the implementation differs in detail, so readers do not have to diff the ADR against the code. Entries marked **(deviation)** change something the ADR promised; they are listed for a product decision in [14 · M0 status](../14-roadmap.md#m0-status-2026-09-26). The authoritative sources are the migrations, `infra/db/bootstrap.sql` and `apps/api/tests/security/rls_allowlist.yaml`; [05 §3](../05-data-model.md#3-database-roles-and-tenant-context) documents them in full.
+
+**A1 · Roles (§1).**
+- `sos_migrator` is a member of **both** `sos_owner` and `sos_definer` `WITH INHERIT FALSE, SET TRUE`. It gets no implicit privileges, but a migration can `SET ROLE sos_definer` to create definer functions. The bootstrap admin is granted both roles too. `sos_app`, `sos_platform` and `sos_readonly` are members of neither (test `test_SEC_002_app_and_platform_roles_cannot_become_owner_or_definer`). "Nobody can `SET ROLE` to it" therefore holds for every runtime role, not for the migrator.
+- Login roles have `search_path = pg_catalog, public`; `sos_app` and `sos_platform` have `idle_in_transaction_session_timeout = 30s`.
+- `sos_readonly` reads `core`, `sis`, `kb` and `audit` (not `ops`) and has no privileges on `core.tenant_keys`.
+- `sos_platform` has `USAGE` on schema `core` only so it can call definer functions; it has no table privileges there.
+
+**A2 · Narrower `sos_app` grants than §1 states.** `0003_core_schema` narrows "DML on `core`" per table:
+- `core.tenants`: `SELECT` and column-level `UPDATE (name, settings, version)`. No `INSERT` or `DELETE`: rows come from `core.provision_tenant`, status changes only from `core.set_tenant_status`.
+- `core.users`: `SELECT` and column-level `UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)`. **No `INSERT` or `DELETE`**: users come from `core.create_user_for_invite` or `core.create_owner_invite`. The RLS policies `users_in_tenant` (SELECT) and `users_in_tenant_update` (UPDATE) require a membership in the current tenant.
+- `core.tenant_keys`: `SELECT`, `INSERT` and column-level `UPDATE (retired_at)`. No `DELETE`: crypto-shredding is an offboarding action.
+- `core.permissions`: `SELECT` only. `ops.outbox`: `SELECT` and `INSERT` only; only `ops.claim_outbox` marks rows dispatched.
+- `audit.chain_heads`: `SELECT`, `INSERT` and `UPDATE`. The app creates a tenant's genesis head on the tenant's first audited action.
+
+**A3 · Definer functions (§2).** Every function sets `search_path = pg_catalog, pg_temp` (not `pg_catalog, <schema>, pg_temp`), and its body is fully schema-qualified, including `pg_catalog.now()` and similar calls. Functions are created **as** `sos_definer`: the migration runs `GRANT CREATE ON SCHEMA core TO sos_definer`, `SET ROLE sos_definer`, `CREATE FUNCTION`, `SET ROLE sos_owner` and `REVOKE CREATE`, all inside one transaction. This is needed because `sos_owner` cannot `ALTER FUNCTION … OWNER TO` a role it is not a member of. The pinned list now has eleven functions:
+
+| Function | EXECUTE | Returns | Differences from §2 |
+|---|---|---|---|
+| `core.resolve_login(p_subject text)` | `sos_app` | `TABLE (user_id, tenant_id, membership_id, tenant_status)` | Also returns the tenant status, so suspended schools are reported rather than hidden. Only active, unexpired memberships of active users |
+| `core.find_user_id_by_subject(p_subject text)` | `sos_app` | `uuid` | — |
+| `core.create_user_for_invite(p_subject, p_display_name, p_email citext, p_language)` | `sos_app` only (not `sos_platform`) | `uuid` (user ID only) | Needs tenant **and** user context. The inviter must hold an active, unexpired membership in a `provisioning` or `active` school. Creates or reuses the global user; the app then writes the membership, roles and scopes under RLS |
+| `core.list_tenant_ids(p_status text[])` | `sos_app`, `sos_platform` | `TABLE (tenant_id uuid)` | — |
+| `core.provision_tenant(p_id, p_code, p_name, p_boards, p_plan_tier, p_deployment_mode)` | `sos_platform` | `uuid` | **Creates only the tenant row** (status `provisioning`). `tenancy.initialise_tenant` writes the wrapped DEK and HMAC key in the new school's `tenant_session`; post-provision hooks clone the system roles; the genesis chain head appears with the first audit event |
+| `core.set_tenant_status(p_tenant uuid, p_status text)` | `sos_platform` | `text` (the **previous** status) | Legal transitions only: `provisioning→active`, `active↔suspended`, `active→offboarding`, `suspended→offboarding`, `offboarding→deleted`. `provisioning→active` requires an unretired `core.tenant_keys` row. Writes **no** audit event; the caller does (A6) |
+| `core.tenant_usage_summary(p_tenant uuid)` | `sos_platform` | `TABLE (active_memberships, users, sections, academic_years)` (int counts) | Counts only. Student, document, storage and AI counts join when those tables exist (M1/M2) |
+| `core.current_subscription()` | `sos_app` | `jsonb` | The current tenant's plan, status, period, limits, latest usage row and last 24 non-draft invoices |
+| `core.create_owner_invite(p_tenant, p_subject, p_display_name, p_email citext, p_language)` | `sos_platform` | `TABLE (user_id, membership_id, owner_role_assigned boolean)` | **New.** A school's first owner, only while the tenant is `provisioning` and has no members. Creates or reuses the user and adds an `invited` membership with `mfa_required = true`, a `school` scope, and the `owner` role once it has been cloned |
+| `core.accept_invitations(p_subject text)` | `sos_app` | `TABLE (tenant_id, membership_id, user_id)` | **New** ([ADR-0019](ADR-0019-invitation-acceptance-on-first-sign-in.md)) |
+| `ops.claim_outbox(p_batch int)` | `sos_app` | `TABLE (id, tenant_id, event_type, payload)` | Batch clamped to 1–500 (default 100); `FOR UPDATE SKIP LOCKED` |
+
+The catalog tests check that every `SECURITY DEFINER` function in `core`, `sis`, `kb`, `audit`, `ops` and `platform` is on this list, is owned by `sos_definer` and pins `search_path`. The `0003` functions are also checked for their exact EXECUTE grantees and for `search_path=pg_catalog, pg_temp`.
+
+**A4 · `definer_access` tables (§3).** The allowlist is the `definer_access_tables` key inside `apps/api/tests/security/rls_allowlist.yaml`, not a separate file. It lists `core.tenants`, `core.users`, `core.memberships`, `core.roles`, `core.role_permissions`, `core.membership_roles`, `core.membership_scopes`, `core.tenant_keys`, `core.academic_years`, `core.classes`, `core.sections`, `audit.chain_heads`, `audit.events` and `ops.outbox`. The policy currently exists on twelve of them; `core.role_permissions` and `core.classes` do not carry it yet.
+- The catalog test fails when a table carries the policy **without** being listed. A second test asserts that the tables the `0003` functions need do carry it.
+- Tables that `core.tenant_usage_summary` will count in later milestones (e.g. `sis.students`) are **not** listed yet. Adding them needs an allowlist change.
+- Audit partitions do **not** carry `definer_access`. Every role except the owner has its privileges on partitions revoked, so partitions are reachable only through the parent.
+
+`sos_definer` holds exactly these table privileges:
+- `core.tenants`: `SELECT, INSERT, UPDATE`. `core.users`: `SELECT, INSERT`. `core.memberships`: `SELECT, INSERT` and `UPDATE (status, updated_at, version)`.
+- `SELECT` on `core.tenant_keys`, `core.sections`, `core.academic_years` and `core.roles`. `INSERT` on `core.membership_scopes` and `core.membership_roles`.
+- `SELECT, INSERT` on `audit.events` and `audit.chain_heads`. `SELECT, UPDATE (dispatched_at)` on `ops.outbox`.
+- `SELECT` on `platform.plans`, `platform.subscriptions`, `platform.invoices` and `platform.usage_daily`.
+
+**A5 · Platform permissions (§4).** The ADR planned `CHECK (key NOT LIKE 'platform.%')`. Instead, the `platform.*` keys **are** rows of `core.permissions`, with `is_platform = true`. The catalog is therefore complete, and route guards can be checked against one table.
+- `CHECK (is_platform = starts_with(key, 'platform.'))` ties the flag to the prefix.
+- The trigger `role_permissions_not_platform` refuses to grant any platform permission to a tenant role.
+- `require()` refuses platform keys; `require_platform()` refuses non-platform keys.
+- The single catalog is `apps/api/app/authz/permissions.yaml`, seeded by `0004_authz_seed`. The operator role matrix and the two-person list are in `apps/api/app/platform/roles.yaml`. There is no `config/platform_permissions.yaml`.
+- The catalog also holds the implicit `session.authenticated`. Every active member has it without a role grant, and it is never stored in `core.role_permissions`.
+
+**A6 · School-chain events for platform actions (§5) (deviation).** `platform.audit_events` and `platform.audit_chain_head` are created in `0002_audit` together with the tenant chain, not in `0005_platform`. `sos_platform` has `SELECT, INSERT` on the events and `SELECT, UPDATE` on the head. Each platform event is written in the same transaction as the control-plane change.
+
+The school-chain copies (`tenant.provisioned`, `tenant.activated`, `tenant.suspended`, `tenant.reactivated`, `tenant.offboard_approved`; `actor_type = 'platform'`) are **not** written by a definer function:
+- `audit.record()` writes them in a `tenant_session` (`sos_app`) that is opened around the platform transaction and committed **right after** it.
+- If the platform transaction fails, both roll back.
+- If the tenant commit fails after the platform commit, the platform change stands without its school-chain event.
+- Reason: one transaction cannot span the `sos_platform` and `sos_app` connections, and a definer function that writes tenant audit events would widen the allowlist.
+- Dedicated schools get no school-chain event from the control plane, because their rows live on the host.
+
+**A7 · Audit chain (§6).** `audit.events` has `PRIMARY KEY (tenant_id, seq, occurred_at)` on the parent, and so on every partition. There is no separate `UNIQUE (tenant_id, seq)` per partition: the locked head gives contiguous sequence numbers, and the verifier detects gaps, duplicates and reordering.
+- `occurred_at` is set by the application with microsecond precision, so the hashed value equals the stored one. The column default `clock_timestamp()` is only a fallback.
+- Monthly partitions are named `audit.events_yYYYYmMM`. Each has RLS enabled and forced with `tenant_isolation`, a `BEFORE TRUNCATE` trigger, and all privileges revoked from `sos_app`, `sos_readonly` and `sos_definer`. There is no `DEFAULT` partition.
+- Partitions are created by the owner-only, `SECURITY INVOKER` function `audit.create_month_partition`. `0002_audit` calls it, and so does `python -m app.audit.partitions --months-ahead 12` (run as the migrator) after every `alembic upgrade head`.
+
+**A8 · Tenant context (§8).** `tenant_session()` sets `app.tenant_id`, `app.user_id` and `statement_timeout` in one `set_config(…, true)` statement. `core.db.context_free_session()` opens an `sos_app` transaction with no tenant context. It is used only to call `core.resolve_login`, `core.find_user_id_by_subject`, `core.list_tenant_ids` and `core.accept_invitations`.
+
+**A9 · Jobs (§9).** `ops.job_runs` and `platform.job_runs` also record `created_by`.
+
+**A10 · Control-plane code paths (§4) (deviation).** `app.platform` calls `app.tenancy.service` wrappers for `core.provision_tenant` and `core.set_tenant_status`, passing its own `platform_session`. It also calls `tenancy.initialise_tenant` to create the new school's keys. It opens `tenant_session()` (role `sos_app`, RLS applies) for three purposes only:
+- the school-chain events of A6;
+- the school-side routes it serves (`/tenant/billing`, `/announcements`, `/support/tickets`);
+- one aggregate count per school for usage (distinct users with audit events that day).
+
+`sos_platform` itself still has no tenant-table privileges.
+
+**A11 · Heartbeat keys.** Per-deployment heartbeat keys are stored **wrapped** in `platform.deployments.heartbeat_key_ciphertext`, not hashed: KMS in AWS, the local-dev wrapper elsewhere. The control plane has to recompute the HMAC, so it needs the key itself.
