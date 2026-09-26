@@ -156,6 +156,27 @@ services:
       - ./infra/docker/oidc.json:/config/oidc.json:ro
     ports: ["127.0.0.1:8080:8080"]
 
+  # Optional malware scanner for uploads (FR-DOC-002, docs/10 §6). Start it with
+  # `docker compose --profile av up -d clamav` and set SOS_AV_SCANNER=clamav and
+  # SOS_CLAMAV_HOST=clamav for api/worker. First start downloads signatures (several minutes);
+  # freshclam inside the container keeps them updated. GPL-2.0 image run as a separate service
+  # (never linked into SchoolOS code). Without it the dev-only scanner is used (refused in prod).
+  clamav:
+    profiles: ["av"]
+    image: clamav/clamav:1.4@sha256:a5f03c12a79dbe9f6d8a527b6bb1ea053fa8dd061d3738a26897f055ee2d9303
+    volumes:
+      - clamdb:/var/lib/clamav
+    ports: ["127.0.0.1:3310:3310"]
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
 volumes:
   pgdata:
   s3data:
+  clamdb:

@@ -143,14 +143,16 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 ### Documents
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/documents/uploads` → presigned POST (size/type constrained) | `document.upload` |
-| POST | `/documents` (register uploaded object + metadata + ACL) → 202 | `document.upload` |
-| GET | `/documents` · `/documents/{id}` | `document.read` |
-| POST | `/documents/{id}/versions` | `document.upload` |
-| PUT | `/documents/{id}/acl` | `document.manage_acl` |
-| GET | `/documents/{id}/download-url?version=` | `document.read` (presigned, ≤ 5 min) |
-| GET | `/documents/{id}/pages/{n}` | `document.read` (page image for citation preview) |
-| DELETE | `/documents/{id}` | `document.manage_acl` |
+| POST | `/documents/uploads` (`filename`, `content_type`, `size_bytes`, `purpose`, optional `document_id` for a new version) → 201 presigned POST (exact key, Content-Type and size; ≤ 10 min) | `document.upload` |
+| POST | `/documents` (`upload_id` + metadata + ACL) → 202, version 1 `queued` for the malware scan | `document.upload` |
+| GET | `/documents` (`purpose`, `doc_type`, `academic_year_id`, `status`, cursor) · `/documents/{id}` (with versions, `ETag`) | `document.read` (ACL and scopes; 404 outside them) |
+| POST | `/documents/{id}/versions` (`upload_id`) → 202 | `document.upload` |
+| PUT | `/documents/{id}/acl` (`If-Match`) | `document.manage_acl` |
+| GET | `/documents/{id}/download-url?version=` | `document.read` (presigned, ≤ 5 min, `attachment`; only `ready` versions; C3 needs `student.read_sensitive` or being the uploader) |
+| GET | `/documents/{id}/pages/{n}` | `document.read` (page image for citation preview; M2, not built yet) |
+| DELETE | `/documents/{id}` → 204 (objects purged by a worker) | `document.manage_acl` |
+
+Document errors: 413 `file_too_large`; 415 `unsupported_file_type` / `polyglot_suspected` / `not_text` / `not_utf8` (the uploaded object is deleted); 409 `upload_missing`, `upload_expired`, `upload_already_used`, `upload_in_progress`, `duplicate_document` (only when the caller can see the existing document), `version_unchanged`, `version_conflict`, `not_versionable`, `document_not_ready`, `document_in_use`; 403 `sensitive_document`; 422 `acl_required_for_scoped_upload`, `acl_outside_scope`, `sensitivity_below_minimum`, `size_mismatch`.
 
 ### Knowledge
 | Method | Path | Permission |
