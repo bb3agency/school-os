@@ -99,6 +99,16 @@ def test_BR_01_identity_register_value_needs_a_change_request(world: Any, fresh:
         )
     assert exc.value.status == 403
     assert exc.value.code == "identity_change_required"
+    # Re-sending the identical register value (e.g. an import re-run) is a harmless no-op.
+    again = run(
+        world,
+        students.record_value,
+        fresh,
+        "full_name",
+        "admission_register",
+        "Kommineni Venkata Sai",
+    )
+    assert again.superseded is None
     with pytest.raises(students.IdentityChangeRequired):
         run(
             world,

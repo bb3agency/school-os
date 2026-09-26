@@ -689,19 +689,22 @@ def record_value(  # noqa: PLR0917 - signature fixed by the M1 build contract
     change_request_id: uuid.UUID | None = None,
     confidence: Decimal | None = None,
     expected_version: int | None = None,
+    permission: str = READ,
 ) -> ValueRecorded:
     """Record one observed value from ``source`` (FR-STU-002/003/005); supersedes the previous
-    current value of the same attribute and source, or returns it unchanged if identical.
+    current value of the same attribute and source, or returns it unchanged if identical (so
+    re-running an import is harmless).
 
-    Callers: ``POST /students/{id}/values`` (``student.update_nonidentity``), imports and the
-    extraction queue (their own permissions). Refused with 403 ``identity_change_required``:
-    replacing the admission-register value of an identity attribute, and any ``verified`` or
-    ``rejected`` identity value. ``expected_version`` (If-Match) guards lost updates (412).
-    Audit: ``student.value.recorded``.
+    Callers: ``POST /students/{id}/values`` (``student.update_nonidentity``, passed as
+    ``permission`` so its scope applies too), imports and the extraction queue (their own
+    route permissions; object scope via ``student.read_basic``). Refused with 403
+    ``identity_change_required``: replacing the admission-register value of an identity
+    attribute, and any ``verified`` or ``rejected`` identity value. ``expected_version``
+    (If-Match) guards lost updates (412). Audit: ``student.value.recorded``.
     """
     structure = _structure(session)
     student = _visible_student(
-        session, ctx, student_id, permission=READ, structure=structure, lock=True
+        session, ctx, student_id, permission=permission, structure=structure, lock=True
     )
     if expected_version is not None and student.version != expected_version:
         raise PreconditionFailed("The student was changed by someone else. Reload and try again.")
@@ -710,7 +713,6 @@ def record_value(  # noqa: PLR0917 - signature fixed by the M1 build contract
     clean = validate_value(definition, source, value)
     _check_evidence(evidence_document_id)
     previous = repo.current_value(session, student_id, attribute_key, source)
-    _identity_guard(definition, source, verification, previous)
     if (
         previous is not None
         and previous.verification_status in (verification, "verified")
@@ -725,6 +727,7 @@ def record_value(  # noqa: PLR0917 - signature fixed by the M1 build contract
             superseded=None,
             student_version=student.version,
         )
+    _identity_guard(definition, source, verification, previous)
     row = _insert_value(
         session,
         ctx,
@@ -784,6 +787,7 @@ def record_value_in(
         data.value,
         evidence_document_id=data.evidence_document_id,
         expected_version=expected_version,
+        permission=UPDATE,
     )
 
 
