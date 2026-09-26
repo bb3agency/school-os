@@ -1,0 +1,191 @@
+# System roles cloned into every school at provisioning (docs/07 §6.2; FR-IAM-010, FR-IAM-011).
+# Versioned configuration shipped inside the package. The golden test
+# apps/api/tests/authz/test_catalog.py parses the docs/07 §6.2 table and asserts this file
+# matches it exactly, so change both together.
+#
+# Per role
+#   name_en / name_te   display names (core.roles.name_en / name_te)
+#   mfa_required        FR-IAM-002: sessions holding this role need the MFA claim (403 mfa_required)
+#   membership_ttl_days memberships created with this role expire after N days (07 §6.2)
+#   grants              permission -> school | scoped | school_step_up
+#                         school          ✓  school-wide
+#                         scoped          S  limited to the membership's class/section scopes
+#                         school_step_up  ✓ᴿ school-wide, step-up MFA for changes
+# support.ticket.create is not in the 07 §6.2 table yet (proposed in 16 §19 Q6 and contract §5);
+# it is granted to every staff role except auditor_readonly.
+version: 1
+
+roles:
+  owner:
+    name_en: Owner
+    name_te: యజమాని
+    mfa_required: true
+    grants:
+      tenant.settings.manage: school_step_up
+      tenant.structure.manage: school
+      tenant.billing.read: school
+      user.manage: school_step_up
+      role.assign: school_step_up
+      student.read_basic: school
+      student.read_sensitive: school
+      student.identity_change.approve: school_step_up
+      student.export: school_step_up
+      dq.findings.read: school
+      document.upload: school
+      document.read: school
+      document.manage_acl: school
+      kb.ask: school
+      audit.read: school
+      finance.read: school
+      insights.read: school
+      breakglass.approve: school_step_up
+      tenant.export_all: school_step_up
+      support.ticket.create: school
+
+  principal:
+    name_en: Principal
+    name_te: ప్రధానోపాధ్యాయులు
+    mfa_required: true
+    grants:
+      tenant.settings.manage: school_step_up
+      tenant.structure.manage: school
+      tenant.billing.read: school
+      user.manage: school_step_up
+      role.assign: school_step_up
+      student.read_basic: school
+      student.read_sensitive: school
+      student.create: school
+      student.update_nonidentity: school
+      student.identity_change.request: school
+      student.identity_change.approve: school_step_up
+      student.export: school_step_up
+      import.run: school
+      import.commit: school
+      dq.findings.read: school
+      dq.findings.resolve: school
+      dq.findings.waive: school_step_up
+      document.upload: school
+      document.read: school
+      document.manage_acl: school
+      kb.ask: school
+      kb.verified_answer.manage: school
+      export.board: school
+      export.portal: school
+      audit.read: school
+      finance.read: school
+      insights.read: school
+      breakglass.approve: school_step_up
+      support.ticket.create: school
+
+  office_admin:
+    name_en: Office admin
+    name_te: కార్యాలయ నిర్వాహకులు
+    mfa_required: true
+    grants:
+      tenant.structure.manage: school
+      user.manage: school_step_up
+      student.read_basic: school
+      student.read_sensitive: school
+      student.create: school
+      student.update_nonidentity: school
+      student.identity_change.request: school
+      student.export: school_step_up
+      import.run: school
+      import.commit: school
+      dq.findings.read: school
+      dq.findings.resolve: school
+      dq.findings.waive: school_step_up
+      document.upload: school
+      document.read: school
+      document.manage_acl: school
+      kb.ask: school
+      kb.verified_answer.manage: school
+      export.board: school
+      export.portal: school
+      audit.read: school
+      support.ticket.create: school
+
+  office_staff:
+    name_en: Office staff
+    name_te: కార్యాలయ సిబ్బంది
+    mfa_required: false
+    grants:
+      student.read_basic: school
+      student.create: school
+      student.update_nonidentity: school
+      student.identity_change.request: school
+      import.run: school
+      dq.findings.read: school
+      dq.findings.resolve: school
+      document.upload: school
+      document.read: school
+      kb.ask: school
+      support.ticket.create: school
+
+  accountant:
+    name_en: Accountant
+    name_te: అకౌంటెంట్
+    mfa_required: false
+    grants:
+      tenant.billing.read: school
+      student.read_basic: school
+      document.upload: school
+      document.read: school
+      kb.ask: school
+      finance.read: school
+      support.ticket.create: school
+
+  exam_coordinator:
+    name_en: Exam coordinator
+    name_te: పరీక్షల సమన్వయకర్త
+    mfa_required: false
+    grants:
+      student.read_basic: school
+      student.identity_change.request: school
+      student.export: school_step_up
+      import.run: school
+      import.commit: school
+      dq.findings.read: school
+      dq.findings.resolve: school
+      document.upload: school
+      document.read: school
+      kb.ask: school
+      export.board: school
+      export.portal: school
+      support.ticket.create: school
+
+  class_teacher:
+    name_en: Class teacher
+    name_te: తరగతి ఉపాధ్యాయులు
+    mfa_required: false
+    grants:
+      student.read_basic: scoped
+      student.read_sensitive: scoped
+      dq.findings.read: scoped
+      document.upload: scoped
+      document.read: scoped
+      kb.ask: scoped
+      insights.read: scoped
+      support.ticket.create: school
+
+  teacher:
+    name_en: Teacher
+    name_te: ఉపాధ్యాయులు
+    mfa_required: false
+    grants:
+      student.read_basic: scoped
+      document.read: scoped
+      kb.ask: scoped
+      support.ticket.create: school
+
+  auditor_readonly:
+    name_en: Auditor (read-only)
+    name_te: ఆడిటర్ (చదవడానికి మాత్రమే)
+    mfa_required: false
+    membership_ttl_days: 14
+    grants:
+      student.read_basic: school
+      dq.findings.read: school
+      document.read: school
+      audit.read: school
+      finance.read: school
