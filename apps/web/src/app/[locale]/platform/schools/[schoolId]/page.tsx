@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { parseSchoolTab, SchoolDetailScreen } from "@/features/platform/SchoolDetailView";
+import { SchoolDetailScreen } from "@/features/platform/SchoolDetailView";
+import { parseSchoolTab } from "@/features/platform/school-tabs";
 import { pageMetadata } from "@/lib/metadata";
 import { UUID_PATTERN } from "@/lib/validation";
 

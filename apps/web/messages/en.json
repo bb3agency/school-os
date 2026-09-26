@@ -222,7 +222,7 @@
       "trialEndsOn": "Trial ends on",
       "amountDue": "Amount due",
       "endsAtPeriodEnd": "Ends at the end of this period",
-      "planUnavailable": "Plan details are not shown on this server. Invoices are sent to your billing email.",
+      "planUnavailable": "No plan details here yet. Invoices are sent to your billing email; contact SchoolOS support with questions.",
       "changePlanHint": "To change your plan, contact SchoolOS support.",
       "usageTitle": "Usage",
       "usageAsOf": "As of {date}",

@@ -23,26 +23,9 @@ import { PK, ifMatch, useCan, usePlanDirectory } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { InvoiceTable } from "./InvoiceTable";
 import { TicketTable } from "./SupportScreens";
+import { SCHOOL_TABS, type SchoolTab } from "./school-tabs";
 import { ReasonField, SubscriptionActions } from "./SubscriptionActions";
 import { UsageTable } from "./UsageTable";
-
-export const SCHOOL_TABS = [
-  "overview",
-  "subscription",
-  "invoices",
-  "usage",
-  "deployment",
-  "flags",
-  "tickets",
-] as const;
-export type SchoolTab = (typeof SCHOOL_TABS)[number];
-
-export function parseSchoolTab(value: string | string[] | undefined): SchoolTab {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  return (SCHOOL_TABS as readonly string[]).includes(candidate ?? "")
-    ? (candidate as SchoolTab)
-    : "overview";
-}
 
 const reasonSchema = z.object({ reason });
 
