@@ -1,0 +1,31 @@
+# gitleaks configuration (SEC-009). Used by `make security` locally and in CI.
+#
+# We extend gitleaks' built-in rule set and add exactly one narrow allowlist: placeholder
+# values in `.env.example` files. A finding is ignored only when ALL of these hold:
+#   - it comes from the keyword-based `generic-api-key` rule (placeholders cannot match the
+#     provider-specific rules, which require real key prefixes such as AKIA / ghp_ / sk-ant-),
+#   - the file is a `.env.example`, and
+#   - the detected secret is an obvious placeholder: `change-me-...` or `dev-only-...`.
+# Anything else in .env.example (including a real token pasted after a placeholder prefix)
+# is still reported.
+#
+# `targetRules` is deliberate: in gitleaks 8.30 a *global* allowlist that has `paths`
+# skips the whole file before rules run, even with condition = "AND". A rule-scoped
+# allowlist evaluates path AND secret per finding.
+#
+# Do not add broad path or regex allowlists here. For a reviewed false positive, add its
+# fingerprint to `.gitleaksignore` (with a comment) in a PR reviewed by CODEOWNERS.
+
+title = "SchoolOS gitleaks config"
+minVersion = "v8.30.0"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Placeholder values in .env.example files (never real secrets)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)\.env\.example$''']
+regexTarget = "secret"
+regexes = ['''^["']?(change-me|dev-only)-[A-Za-z0-9._~+/=-]*["']?$''']

@@ -1,0 +1,37 @@
+# CODEOWNERS — security-sensitive paths need an owner's review (docs/07 §14, docs/13 §3).
+# Later rules win over earlier ones. Owner handle is a placeholder: confirm @bb3agency (or
+# replace it with a team such as @<org>/schoolos-security) before enabling
+# "Require review from Code Owners" in branch protection.
+
+# Core platform code: tenancy context, DB sessions, config, redaction, logging
+/apps/api/app/core/                 @bb3agency
+# Authorization: require(), roles, permissions, scopes
+/apps/api/app/authz/                @bb3agency
+# Hash-chained audit log
+/apps/api/app/audit/                @bb3agency
+# Control plane (platform admin panel, billing, fleet)
+/apps/api/app/platform/             @bb3agency
+# The only place allowed to call LLM providers
+/apps/api/app/knowledge/gateway/    @bb3agency
+# Database migrations (RLS, grants, expand/contract)
+/apps/api/migrations/               @bb3agency
+# Cross-module security suites (route enumeration, BOLA, RLS catalog) — never weaken
+/apps/api/tests/security/           @bb3agency
+# Versioned prompts, model IDs and thresholds (CLAUDE.md §6 invariant 13)
+/config/prompts/                    @bb3agency
+/config/models.yaml                 @bb3agency
+
+# Infrastructure and deployment
+/infra/                             @bb3agency
+/deploy/                            @bb3agency
+
+# CI/CD, repository governance and security tooling config
+/.github/                           @bb3agency
+/.semgrep/                          @bb3agency
+/.gitleaks.toml                     @bb3agency
+/.gitleaksignore                    @bb3agency
+/.trivyignore                       @bb3agency
+/.importlinter                      @bb3agency
+/Makefile                           @bb3agency
+/CLAUDE.md                          @bb3agency
+/SECURITY.md                        @bb3agency

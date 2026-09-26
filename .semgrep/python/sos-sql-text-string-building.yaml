@@ -1,0 +1,63 @@
+rules:
+  - id: sos-sql-text-string-building
+    message: >-
+      SQL passed to text()/exec_driver_sql()/execute() must be a constant string with bound
+      parameters (text("... WHERE id = :id"), {"id": value}). Building SQL with an f-string,
+      str.format, % or + invites SQL injection and bypasses RLS review (CLAUDE.md §9,
+      docs/13 §4). For dynamic identifiers use SQLAlchemy constructs (select(), table(),
+      quoted_name) instead.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      owasp: "A03:2021 - Injection"
+      references:
+        - CLAUDE.md §9
+        - docs/13-engineering-standards.md §4
+    paths:
+      include:
+        - "/apps/**"
+        - "/scripts/**"
+        - "/evals/**"
+      exclude:
+        # Migrations interpolate module-level identifier constants (schema/table names in RLS
+        # boilerplate loops) and are CODEOWNERS-reviewed; tests build catalog queries the same
+        # way (ruff S608 is likewise ignored for tests in pyproject.toml).
+        - "/apps/api/migrations/**"
+        - "/apps/*/tests/**"
+    patterns:
+      - pattern-either:
+          # SQL built inline in the call
+          - pattern: $FN(f"...", ...)
+          - pattern: $FN("..." % $ARGS, ...)
+          - pattern: $FN("...".format(...), ...)
+          - pattern: $FN("..." + $X, ...)
+          - pattern: $FN($X + "...", ...)
+          - pattern: $FN("...".join(...), ...)
+          # SQL built in a local variable first
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      $Q = f"..."
+                      ...
+                  - pattern-inside: |
+                      $Q = "..." % $ARGS
+                      ...
+                  - pattern-inside: |
+                      $Q = "...".format(...)
+                      ...
+                  - pattern-inside: |
+                      $Q = "..." + $X
+                      ...
+                  - pattern-inside: |
+                      $Q = $X + "..."
+                      ...
+                  - pattern-inside: |
+                      $Q += $X
+                      ...
+              - pattern: $FN($Q, ...)
+      - metavariable-regex:
+          metavariable: $FN
+          # semgrep anchors this regex at the start of the callee text.
+          regex: ^(((sqlalchemy|sa|sql)\.)?text|.*\.(exec_driver_sql|execute|executemany|executescript))$

@@ -1,0 +1,28 @@
+rules:
+  - id: sos-env-outside-config
+    message: >-
+      Read configuration through `app.core.config` (pydantic-settings), not os.environ /
+      os.getenv. Only apps/api/app/core/config.py may touch the process environment
+      (docs/13 §4, CLAUDE.md §6.10). Add a typed field to Settings and inject it instead.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: maintainability
+      references:
+        - docs/13-engineering-standards.md §4
+        - CLAUDE.md §6 invariant 10 and 13
+    paths:
+      include:
+        - "/apps/**"
+      exclude:
+        - "/apps/api/app/core/config.py"
+        # Tests set process env through pytest's monkeypatch.setenv, which this rule does not flag;
+        # direct os.environ use in tests is still discouraged but not blocked.
+        - "/apps/*/tests/**"
+    pattern-either:
+      - pattern: os.environ
+      - pattern: os.environb
+      - pattern: os.getenv(...)
+      - pattern: os.getenvb(...)
+      - pattern: os.putenv(...)
+      - pattern: os.unsetenv(...)

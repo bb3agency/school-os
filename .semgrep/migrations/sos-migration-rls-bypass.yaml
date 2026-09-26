@@ -1,0 +1,26 @@
+rules:
+  - id: sos-migration-rls-bypass
+    message: >-
+      Migrations must never grant BYPASSRLS or switch row-level security off
+      (DISABLE ROW LEVEL SECURITY / NO FORCE ROW LEVEL SECURITY). Tenant isolation is
+      invariant 1 in CLAUDE.md §6 and SEC-001/SEC-002. If a downgrade() genuinely has to
+      reverse an ENABLE on a table that survives the downgrade, suppress this finding on that
+      line with `# nosemgrep: sos-migration-rls-bypass` plus a reason, and get CODEOWNERS
+      review. Privileged roles are created only in infra/db/bootstrap.sql.
+    severity: ERROR
+    languages: [generic]
+    metadata:
+      category: security
+      references:
+        - CLAUDE.md §6 invariant 1
+        - docs/07-security-architecture.md §7, §16 (SEC-001, SEC-002)
+    paths:
+      include:
+        - "/apps/api/migrations/**"
+    pattern-either:
+      # \b before BYPASSRLS keeps NOBYPASSRLS (the safe attribute) from matching.
+      - pattern-regex: (?i)\bBYPASSRLS\b
+      - pattern-regex: (?i)\bDISABLE\s+ROW\s+LEVEL\s+SECURITY\b
+      - pattern-regex: (?i)\bNO\s+FORCE\s+ROW\s+LEVEL\s+SECURITY\b
+      # SQLAlchemy/alembic helpers or raw psycopg that set the role attribute via a variable
+      - pattern-regex: (?i)\brow_security\s*(=|TO)\s*'?(off|false)\b

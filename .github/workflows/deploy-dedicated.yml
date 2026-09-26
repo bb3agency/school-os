@@ -1,0 +1,190 @@
+# Dedicated-tier deploy (one isolated host per school) — docs/10 §8 step 2, CONTRACT §1.
+#
+# Manually dispatched with a CalVer release tag. After approval on the `production`
+# environment, AWS SSM Run Command executes `deploy/dedicated/upgrade.sh <version>` on the
+# selected host(s), one host at a time, stopping at the first failure. No inbound SSH.
+#
+# Hosts are selected by EC2 tags that the Terraform `dedicated_host` module must set:
+#   schoolos:tier          = dedicated
+#   schoolos:deployment-id = <deployment id, e.g. dep-7k2m9x>
+#
+# Repository variables:
+#   PRODUCTION_AWS_ROLE_ARN   IAM role assumed via GitHub OIDC; trust policy should require
+#                             sub = repo:<owner>/<repo>:environment:production. It needs only
+#                             ssm:SendCommand (AWS-RunShellScript, instances tagged
+#                             schoolos:tier=dedicated), ssm:ListCommands, ssm:ListCommandInvocations.
+# Optional:
+#   DEDICATED_INSTALL_DIR     default /opt/schoolos (checkout of deploy/dedicated on the host)
+#   DEDICATED_SSM_LOG_GROUP   CloudWatch log group for command output, default /schoolos/dedicated/deploy
+#   DEDICATED_MAX_CONCURRENCY hosts upgraded in parallel when deployment=all, default 1
+name: deploy-dedicated
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag to deploy (CalVer, e.g. 2026.10.1)
+        required: true
+        type: string
+      deployment:
+        description: Deployment id (e.g. dep-7k2m9x) or "all" for every dedicated host
+        required: true
+        type: string
+      hotfix:
+        description: Allow deploying during school hours (hotfix only)
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: deploy-dedicated
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  preflight:
+    name: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read # read the release tag through the API
+    outputs:
+      enabled: ${{ steps.config.outputs.enabled }}
+    steps:
+      - name: Check deploy configuration
+        id: config
+        env:
+          PRODUCTION_AWS_ROLE_ARN: ${{ vars.PRODUCTION_AWS_ROLE_ARN }}
+        run: |
+          if [[ -z "$PRODUCTION_AWS_ROLE_ARN" ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Dedicated deploy skipped"
+              echo "Repository variable \`PRODUCTION_AWS_ROLE_ARN\` is not configured."
+              echo "See the header of \`.github/workflows/deploy-dedicated.yml\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::Dedicated deploy skipped; PRODUCTION_AWS_ROLE_ARN is not set"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate inputs
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          VERSION: ${{ inputs.version }}
+          DEPLOYMENT: ${{ inputs.deployment }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$VERSION" =~ ^20[0-9]{2}\.(1[0-2]|[1-9])\.[0-9]{1,3}$ ]]; then
+            echo "::error::version must be a CalVer release tag like 2026.10.1"; exit 1
+          fi
+          if ! [[ "$DEPLOYMENT" == "all" || "$DEPLOYMENT" =~ ^[a-z0-9][a-z0-9-]{2,62}$ ]]; then
+            echo "::error::deployment must be a deployment id ([a-z0-9-]) or 'all'"; exit 1
+          fi
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" --silent; then
+            echo "::error::Release tag ${VERSION} does not exist in ${GITHUB_REPOSITORY}"; exit 1
+          fi
+
+      - name: Check maintenance window
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          HOTFIX: ${{ inputs.hotfix }}
+        run: |
+          # docs/10 §8.4: deploy after 18:00 IST or on Sundays, unless it is a hotfix.
+          hour=$(TZ=Asia/Kolkata date +%-H)
+          dow=$(TZ=Asia/Kolkata date +%u) # 7 = Sunday
+          if [[ "$dow" == "7" || "$hour" -ge 18 || "$hour" -lt 6 ]]; then
+            echo "Inside the maintenance window (IST hour $hour, weekday $dow)."
+          elif [[ "$HOTFIX" == "true" ]]; then
+            echo "::warning::Deploying during school hours because hotfix=true."
+          else
+            echo "::error::Outside the maintenance window (18:00-06:00 IST or Sunday). Re-run with hotfix=true only for an urgent fix."
+            exit 1
+          fi
+
+  deploy:
+    name: upgrade dedicated host(s) via SSM
+    needs: preflight
+    if: needs.preflight.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: production # required reviewers = approval gate
+    permissions:
+      id-token: write # GitHub OIDC -> AWS STS
+    env:
+      AWS_REGION: ap-south-1
+      VERSION: ${{ inputs.version }}
+      DEPLOYMENT: ${{ inputs.deployment }}
+      INSTALL_DIR: ${{ vars.DEDICATED_INSTALL_DIR || '/opt/schoolos' }}
+      LOG_GROUP: ${{ vars.DEDICATED_SSM_LOG_GROUP || '/schoolos/dedicated/deploy' }}
+      MAX_CONCURRENCY: ${{ vars.DEDICATED_MAX_CONCURRENCY || '1' }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PRODUCTION_AWS_ROLE_ARN }}
+          role-session-name: gha-dedicated-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Send upgrade command
+        id: send
+        run: |
+          if [[ "$DEPLOYMENT" == "all" ]]; then
+            target="Key=tag:schoolos:tier,Values=dedicated"
+          else
+            target="Key=tag:schoolos:deployment-id,Values=${DEPLOYMENT}"
+          fi
+          # Inputs were validated in preflight; build the parameters as JSON with shell quoting,
+          # never by string eval. AWS-RunShellScript runs /bin/sh (dash on Debian/Ubuntu), so
+          # only POSIX `set -eu` here; upgrade.sh carries its own bash shebang.
+          params=$(jq -n --arg dir "$INSTALL_DIR" --arg v "$VERSION" '{
+            commands: ["set -eu", ("cd " + ($dir | @sh)), ("./deploy/dedicated/upgrade.sh " + ($v | @sh))],
+            executionTimeout: ["3600"]
+          }')
+          cmd=$(aws ssm send-command \
+                  --document-name AWS-RunShellScript \
+                  --targets "$target" \
+                  --parameters "$params" \
+                  --max-concurrency "$MAX_CONCURRENCY" --max-errors 0 \
+                  --timeout-seconds 600 \
+                  --comment "SchoolOS ${VERSION} (run ${GITHUB_RUN_ID})" \
+                  --cloud-watch-output-config "CloudWatchOutputEnabled=true,CloudWatchLogGroupName=${LOG_GROUP}" \
+                  --query 'Command.CommandId' --output text)
+          echo "command_id=${cmd}" >> "$GITHUB_OUTPUT"
+          echo "SSM command: ${cmd}"
+
+      - name: Wait for completion
+        env:
+          COMMAND_ID: ${{ steps.send.outputs.command_id }}
+        run: |
+          deadline=$(( $(date +%s) + 80*60 ))
+          while :; do
+            read -r status targets done_count < <(aws ssm list-commands --command-id "$COMMAND_ID" \
+              --query 'Commands[0].[Status,TargetCount,CompletedCount]' --output text)
+            echo "status=$status completed=$done_count/$targets"
+            case "$status" in Pending|InProgress|Cancelling) ;; *) break ;; esac
+            if (( $(date +%s) > deadline )); then echo "::error::Timed out waiting for SSM"; exit 1; fi
+            sleep 20
+          done
+          aws ssm list-command-invocations --command-id "$COMMAND_ID" \
+            --query 'CommandInvocations[].{instance:InstanceId,status:Status,detail:StatusDetails}' \
+            --output table
+          if [[ "$targets" == "0" ]]; then
+            echo "::error::No dedicated hosts matched deployment '${DEPLOYMENT}'"; exit 1
+          fi
+          if [[ "$status" != "Success" ]]; then
+            echo "::error::Upgrade failed (status ${status}). Remaining hosts were not upgraded. Output: CloudWatch ${LOG_GROUP}"
+            exit 1
+          fi
+          {
+            echo "### Dedicated deploy: ${VERSION}"
+            echo "- deployment: \`${DEPLOYMENT}\`"
+            echo "- hosts upgraded: ${done_count}"
+            echo "- SSM command: \`${COMMAND_ID}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

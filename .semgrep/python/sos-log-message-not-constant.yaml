@@ -1,0 +1,44 @@
+rules:
+  - id: sos-log-message-not-constant
+    message: >-
+      Log messages must be constant event names (e.g. log.info("student.created",
+      student_id=sid)). Do not build the message with an f-string, str.format, % or +:
+      interpolated values bypass redaction and leak PII into logs (CLAUDE.md §6.5, docs/13 §8).
+      Pass values as structured fields; core.logging redacts them.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      references:
+        - CLAUDE.md §6 invariant 5
+        - docs/13-engineering-standards.md §8
+    paths:
+      include:
+        - "/apps/**"
+        - "/scripts/**"
+        - "/evals/**"
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: $LOG.$METHOD(f"...", ...)
+                  - pattern: $LOG.$METHOD("..." % $ARGS, ...)
+                  - pattern: $LOG.$METHOD("...".format(...), ...)
+                  - pattern: $LOG.$METHOD("..." + $X, ...)
+                  - pattern: $LOG.$METHOD($X + "...", ...)
+                  - pattern: $LOG.$METHOD(str($X), ...)
+              - metavariable-regex:
+                  metavariable: $METHOD
+                  regex: ^(debug|info|warning|warn|error|exception|critical|fatal|msg)$
+          # Logger.log(level, msg, ...): the message is the second argument
+          - pattern: $LOG.log($LEVEL, f"...", ...)
+          - pattern: $LOG.log($LEVEL, "..." % $ARGS, ...)
+          - pattern: $LOG.log($LEVEL, "...".format(...), ...)
+          - pattern: $LOG.log($LEVEL, "..." + $X, ...)
+          - pattern: $LOG.log($LEVEL, $X + "...", ...)
+      - metavariable-regex:
+          metavariable: $LOG
+          # Anchored at the start by semgrep: log, logger, logging, self._log, audit_log,
+          # app_logger, structlog, get_logger(__name__), logging.getLogger(...).
+          regex: (?i)^(.*[._])?(log|logger|logging|structlog)$|^(.*\.)?get_?logger\(.*\)$

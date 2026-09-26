@@ -1,0 +1,32 @@
+rules:
+  - id: sos-llm-sdk-outside-gateway
+    message: >-
+      LLM/embedding provider SDKs (anthropic, openai, voyageai) may only be imported inside
+      apps/api/app/knowledge/gateway/ (CLAUDE.md §11, ADR-0005). Call the gateway's service
+      functions instead so redaction, budgets, audit and provider settings always apply.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+      references:
+        - CLAUDE.md §3 and §11
+        - docs/06-rag-architecture.md
+    paths:
+      include:
+        - "/apps/**"
+        - "/scripts/**"
+        - "/evals/**"
+      exclude:
+        - "/apps/api/app/knowledge/gateway/**"
+    patterns:
+      - pattern-either:
+          - pattern: import $MOD
+          - pattern: import $MOD as $ALIAS
+          - pattern: from $MOD import $NAME
+          - pattern: from $MOD import $NAME as $ALIAS
+          - pattern: importlib.import_module("$MOD", ...)
+          - pattern: import_module("$MOD", ...)
+          - pattern: __import__("$MOD", ...)
+      - metavariable-regex:
+          metavariable: $MOD
+          regex: ^(anthropic|openai|voyageai)(\..+)?$
