@@ -112,7 +112,7 @@ Result for **shared** (`app/platform/tenants.py`), in four steps:
 
 1. One `platform_session()` transaction: `core.provision_tenant(...)` (tenant row, status `provisioning`), deployment, billing account, subscription (and, when started as `active`, the first period's draft invoice), platform events `tenant.provisioned`. A failure leaves none of them.
 2. `tenancy.initialise_tenant` in the new school's own `tenant_session`: KMS (or the local-dev wrapper) generates and wraps the DEK and HMAC key into `core.tenant_keys`; post-provision hooks clone the system roles from `apps/api/app/authz/roles.yaml`.
-3. `core.create_owner_invite(...)` (platform session): an `invited` owner membership with `mfa_required`, school scope and the `owner` role; platform event `tenant.owner_invite_created`.
+3. `core.create_owner_invite(...)` (platform session; public wrapper `platform.service.invite_school_owner(platform_db, tenant_id=, subject=, display_name=, email=, language=)`): an `invited` owner membership with `mfa_required`, school scope and the `owner` role; platform event `tenant.owner_invite_created`.
 4. `tenant.provisioned` in the school's own audit chain (`actor_type = 'platform'`, §16).
 
 Steps 2–4 are idempotent: retrying with the same `Idempotency-Key` replays the result, and a retry with the same code and school name resumes an interrupted provisioning. The owner accepts the invite on first sign-in (`POST /api/v1/me/accept-invitations`, ADR-0019) once the school is `active`; an operator makes it live with `POST /platform/tenants/{id}/activate` (refused by the database until a data key exists). Invite **email delivery is not built yet** (`owner-invite:resend` only records `tenant.owner_invite_sent`).
