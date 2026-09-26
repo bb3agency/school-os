@@ -32,17 +32,43 @@ The product is built **module by module** on a shared core that does not change 
 | 12 | [Testing Strategy](docs/12-testing-strategy.md) | Test layers, authz/RLS tests, RAG evals, security testing |
 | 13 | [Engineering Standards](docs/13-engineering-standards.md) | Repo layout, conventions, reviews, AI-assisted development |
 | 14 | [Roadmap](docs/14-roadmap.md) | Milestones M0–M7 with exit criteria |
-| 15 | [Glossary](docs/15-glossary.md) | Domain and technical terms |
-| — | [ADRs](docs/adr/) | Architecture decisions and why they were made |
+| 15 | [Glossary](docs/15-glossary.md) | Domain, technical, platform and billing terms |
+| 16 | [Platform Admin Panel](docs/16-platform-admin-panel.md) | Control plane: provisioning (shared and dedicated tiers), plans, invoices, usage, fleet heartbeat, support, operators |
+| — | [ADRs](docs/adr/README.md) | Architecture decisions and why they were made (process, template, index) |
 | — | [CLAUDE.md](CLAUDE.md) | Operating contract for AI coding assistants |
 | — | [SECURITY.md](SECURITY.md) | Vulnerability reporting |
 
+### Architecture decisions
+
+| ADR | Decision | Status |
+|---|---|---|
+| [0001](docs/adr/ADR-0001-modular-monolith.md) | Modular monolith with async workers | Accepted |
+| [0002](docs/adr/ADR-0002-postgresql-pgvector.md) | PostgreSQL + pgvector as the single store of record | Accepted |
+| [0003](docs/adr/ADR-0003-pool-tenancy-rls.md) | Pool multi-tenancy with row-level security | Accepted, amended by 0013, 0015 |
+| [0004](docs/adr/ADR-0004-technology-stack.md) | Technology stack | Accepted, amended by 0014 |
+| [0005](docs/adr/ADR-0005-llm-gateway-and-provider.md) | LLM gateway and provider | Accepted |
+| [0006](docs/adr/ADR-0006-embeddings-by-evaluation.md) | Embeddings chosen by evaluation | Accepted |
+| [0007](docs/adr/ADR-0007-no-aadhaar-storage.md) | Never store Aadhaar numbers | Accepted |
+| [0008](docs/adr/ADR-0008-tools-not-text-to-sql.md) | Read-only tools instead of text-to-SQL | Accepted |
+| [0009](docs/adr/ADR-0009-aws-india-hosting.md) | Host on AWS in India | Accepted, amended by 0015 |
+| [0010](docs/adr/ADR-0010-maker-checker.md) | Maker-checker for identity changes | Accepted |
+| [0011](docs/adr/ADR-0011-hash-chained-audit.md) | Hash-chained, append-only audit | Accepted, amended by 0013 |
+| [0012](docs/adr/ADR-0012-managed-oidc-identity.md) | Managed OIDC identity | Accepted, amended by 0013, 0018 |
+| [0013](docs/adr/ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths and platform privilege separation | Accepted |
+| [0014](docs/adr/ADR-0014-local-ci-service-images.md) | SeaweedFS and Valkey for local/CI | Accepted |
+| [0015](docs/adr/ADR-0015-deployment-and-commercial-model.md) | Managed SaaS: shared and dedicated tiers | Accepted |
+| [0016](docs/adr/ADR-0016-payments-provider.md) | Payments provider | Proposed |
+| [0017](docs/adr/ADR-0017-platform-admin-panel-architecture.md) | Platform admin panel architecture | Accepted |
+| [0018](docs/adr/ADR-0018-mfa-and-step-up-with-cognito.md) | MFA and step-up with Cognito | Accepted |
+
 ## Reading order
 
-- **Starting to build (with AI):** `CLAUDE.md` → `14-roadmap.md` (M0) → `04` → `05` → `07` → `13`
+- **Starting to build (with AI):** `CLAUDE.md` → `14-roadmap.md` (M0) → `04` → `05` → `07` → `13` → ADRs 0013–0018
+- **Building the platform admin panel (control plane):** `16` → ADR-0013, ADR-0015, ADR-0017 → `05` §3 → `07` §6.5–6.6 → `12` §4.8–4.13
+- **Setting up a dedicated-tier school:** ADR-0015 → `10` §15 → `16` §12–13 → `11` §11
 - **Building the knowledge core:** `06` → `05` (kb schema) → `07` §LLM security → `12` §RAG evaluation
 - **Before the first real school data:** `08` → `07` → `10` §Backups → `14` §Pilot-ready gate
-- **Talking to a school:** `01` → `02`
+- **Talking to a school:** `01` (incl. §11 commercial model) → `02`
 
 ## Document conventions
 
