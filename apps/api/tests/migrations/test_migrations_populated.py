@@ -64,7 +64,7 @@ def populated(
             stdout=out,
             stderr=err,
             wrapper=LocalDevKeyWrapper(SETTINGS),
-            owner_bootstrap=seeder.AdminOwnerBootstrap(engines["admin"]),
+            owner_bootstrap=seeder.PlatformOwnerBootstrap(),
         )
         assert code == cli.EXIT_OK, err.getvalue()
         yield cfg, admin_url

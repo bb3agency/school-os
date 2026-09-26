@@ -50,6 +50,7 @@ from app.core.logging import get_logger
 from app.devtools.plan import DatasetPlan, StaffSpec, TenantPlan
 from app.identity import service as identity
 from app.identity.schemas import InviteIn, ScopeIn, UserOut
+from app.platform import service as platform_service
 from app.tenancy import service as tenancy
 from app.tenancy.schemas import (
     AcademicYearCreate,
@@ -77,12 +78,48 @@ class SeedError(RuntimeError):
 # --- first owner -----------------------------------------------------------------------------
 
 
+class PlatformOwnerBootstrap:
+    """Production path for a school's first owner (default).
+
+    1. ``platform.service.invite_school_owner`` (``core.create_owner_invite``) while the school
+       is ``provisioning``, audited on the platform chain;
+    2. the school is activated (its key already exists from ``initialise_tenant``);
+    3. the owner accepts on "first sign-in" via ``identity.accept_invitations`` (ADR-0019),
+       audited in the school's chain. Idempotent: re-runs find the active owner and skip.
+    """
+
+    def __call__(self, tenant_id: uuid.UUID, spec: StaffSpec) -> None:
+        with platform_session() as pdb:
+            _user_id, membership_id, _assigned = platform_service.invite_school_owner(
+                pdb,
+                tenant_id=tenant_id,
+                subject=spec.subject,
+                display_name=spec.display_name,
+                email=spec.email,
+                language=spec.preferred_language,
+            )
+            audit.record_platform(
+                pdb,
+                action="tenant.owner_invite_created",
+                resource_type="membership",
+                resource_id=membership_id,
+                summary={"source": AUDIT_SOURCE},
+                actor_type="system",
+                subject_tenant_id=tenant_id,
+                request_id=REQUEST_ID,
+            )
+        with platform_session() as pdb:
+            tenancy.activate_tenant(pdb, tenant_id)
+        identity.accept_invitations(spec.subject, request_id=REQUEST_ID)
+
+
 class AdminOwnerBootstrap:
     """Dev/CI-only stand-in for the control-plane owner invite (see module docstring).
 
     Uses the database admin connection because no application role may create a school's
     first member on this code base. Mirrors ``core.create_owner_invite`` and additionally makes
-    the membership active (the invite-acceptance flow does not exist yet).
+    the membership active. Superseded by ``PlatformOwnerBootstrap`` (the default); kept for
+    tests that need an owner without the control plane.
     """
 
     def __init__(self, engine: Engine) -> None:
@@ -288,7 +325,8 @@ def _ensure_tenant(
             owner = _members_by_email(session).get(plan.owner.email)
     if owner is None or owner.status != "active" or "owner" not in owner.roles:
         raise SeedError(f"tenant {plan.tenant_id}: the synthetic owner is not an active owner")
-    if status == "provisioning":
+    # The platform bootstrap activates the school itself (acceptance needs an active school).
+    if _tenant_status(plan) == "provisioning":
         with platform_session() as pdb:
             tenancy.activate_tenant(pdb, plan.tenant_id)
     return owner

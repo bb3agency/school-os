@@ -72,7 +72,7 @@ def run_seed(admin_engine: Engine, *args: str) -> Run:
         stdout=out,
         stderr=err,
         wrapper=_wrapper(),
-        owner_bootstrap=seeder.AdminOwnerBootstrap(admin_engine),
+        owner_bootstrap=seeder.PlatformOwnerBootstrap(),
     )
     return Run(code, out.getvalue(), err.getvalue())
 
@@ -453,3 +453,27 @@ def test_seed_refuses_a_code_taken_by_another_tenant(
     run = run_seed(admin_engine, "--code-prefix", prefix, "--tenants", "1")
     assert run.code == cli.EXIT_FAILED
     assert "used by another tenant" in run.err
+
+
+def test_ADR_0019_first_owner_goes_through_invite_and_acceptance(
+    seeded: Seeded, admin_engine: Engine
+) -> None:
+    """Default path: control-plane owner invite, then acceptance on first sign-in."""
+    for tenant in seeded.plan.tenants:
+        with admin_engine.connect() as c:
+            accepted = c.execute(
+                text(
+                    "SELECT count(*) FROM audit.events "
+                    "WHERE tenant_id = :t AND action = 'membership.invitation_accepted'"
+                ),
+                {"t": tenant.tenant_id},
+            ).scalar_one()
+            invited = c.execute(
+                text(
+                    "SELECT count(*) FROM platform.audit_events "
+                    "WHERE subject_tenant_id = :t AND action = 'tenant.owner_invite_created'"
+                ),
+                {"t": tenant.tenant_id},
+            ).scalar_one()
+        assert accepted == 1
+        assert invited == 1
