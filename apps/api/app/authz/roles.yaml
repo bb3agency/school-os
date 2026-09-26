@@ -7,6 +7,8 @@
 #   name_en / name_te   display names (core.roles.name_en / name_te)
 #   mfa_required        FR-IAM-002: sessions holding this role need the MFA claim (403 mfa_required)
 #   membership_ttl_days memberships created with this role expire after N days (07 §6.2)
+#   assign_any_role     holders may grant and revoke every role (the school's root of trust);
+#                       everyone else may only grant roles whose permissions they hold
 #   grants              permission -> school | scoped | school_step_up
 #                         school          ✓  school-wide
 #                         scoped          S  limited to the membership's class/section scopes
@@ -20,6 +22,7 @@ roles:
     name_en: Owner
     name_te: యజమాని
     mfa_required: true
+    assign_any_role: true
     grants:
       tenant.settings.manage: school_step_up
       tenant.structure.manage: school

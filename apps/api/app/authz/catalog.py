@@ -59,6 +59,7 @@ class RoleDef:
     mfa_required: bool
     membership_ttl: timedelta | None
     grants: tuple[RoleGrant, ...]
+    assign_any_role: bool = False
 
     @property
     def permission_keys(self) -> frozenset[str]:
@@ -153,6 +154,7 @@ def _parse_roles(raw: dict[str, Any], permissions: dict[str, PermissionDef]) -> 
             name_en=name_en,
             name_te=name_te,
             mfa_required=bool(spec.get("mfa_required", False)),
+            assign_any_role=bool(spec.get("assign_any_role", False)),
             membership_ttl=timedelta(days=ttl_days) if ttl_days else None,
             grants=tuple(grants),
         )
@@ -183,6 +185,11 @@ def tenant_permission(key: str) -> PermissionDef:
 
 def implicit_permissions() -> frozenset[str]:
     return frozenset(k for k, p in permission_catalog().items() if p.implicit)
+
+
+def assign_any_roles() -> frozenset[str]:
+    """Role keys whose holders may grant/revoke every role (roles.yaml ``assign_any_role``)."""
+    return frozenset(k for k, r in system_roles().items() if r.assign_any_role)
 
 
 def mfa_roles() -> frozenset[str]:

@@ -22,7 +22,14 @@ from sqlalchemy.orm import Session
 
 from app.audit import service as audit
 from app.authz import cache
-from app.authz.catalog import RoleDef, implicit_permissions, permission_catalog, system_roles
+from app.authz.catalog import (
+    RoleDef,
+    assign_any_roles,
+    implicit_permissions,
+    mfa_roles,
+    permission_catalog,
+    system_roles,
+)
 from app.authz.context import UserContext
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
@@ -146,16 +153,37 @@ def _roles_by_key(session: Session, keys: Sequence[str]) -> dict[str, Role]:
     return {k: roles[k] for k in keys}
 
 
+def _not_grantable() -> Forbidden:
+    return Forbidden(
+        "You cannot give or take away a role with more access than your own.",
+        code="role_not_grantable",
+    )
+
+
 def _guard_grantable(session: Session, ctx: UserContext, roles: Iterable[Role]) -> None:
-    """Nobody may grant or take away a role carrying permissions they do not hold."""
+    """``role.assign``: nobody may grant or take away a role carrying permissions they do not
+    hold, except holders of an ``assign_any_role`` role (the owner, roles.yaml)."""
+    if ctx.roles & assign_any_roles():
+        return
     role_list = list(roles)
     perms = repo.role_permission_keys(session, [r.id for r in role_list])
     for role in role_list:
         if not perms.get(role.id, set()) <= ctx.permissions:
-            raise Forbidden(
-                "You cannot give or take away a role with more access than your own.",
-                code="role_not_grantable",
-            )
+            raise _not_grantable()
+
+
+def _guard_invite_roles(session: Session, ctx: UserContext, roles: Iterable[Role]) -> None:
+    """``user.manage`` invites (US-102 AC1): any non-privileged system role may be given.
+    Privileged roles (MFA roles: owner, principal, office_admin) and custom roles additionally
+    need ``role.assign`` and pass the :func:`_guard_grantable` rule."""
+    role_list = list(roles)
+    privileged = mfa_roles()
+    sensitive = [r for r in role_list if not r.is_system or r.key in privileged]
+    if not sensitive or ctx.roles & assign_any_roles():
+        return
+    if not ctx.has("role.assign"):
+        raise _not_grantable()
+    _guard_grantable(session, ctx, sensitive)
 
 
 def _guard_last_owner(session: Session, membership: Membership) -> None:
@@ -296,13 +324,14 @@ def get_user(session: Session, user_id: uuid.UUID) -> UserOut:
 def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
     """US-102: create (or find) the account, an ``invited`` membership, roles and scopes.
 
-    Roles must exist in this school and carry no permission the inviter lacks. Memberships with
+    Roles must exist in this school; privileged roles need ``role.assign`` (see
+    :func:`_guard_invite_roles`). Memberships with
     a time-bound role (``auditor_readonly``) expire after the role's TTL (07 §6.2); privileged
     roles set ``mfa_required`` (FR-IAM-002). Audit: ``user.invited``, ``membership.created``,
     ``membership.role_granted`` per role and ``membership.scope_added`` per scope.
     """
     roles = _roles_by_key(session, data.roles)
-    _guard_grantable(session, ctx, roles.values())
+    _guard_invite_roles(session, ctx, roles.values())
     templates: Mapping[str, RoleDef] = system_roles()
     defs = [templates[k] for k in data.roles if k in templates and roles[k].is_system]
     ttls = [d.membership_ttl for d in defs if d.membership_ttl is not None]
