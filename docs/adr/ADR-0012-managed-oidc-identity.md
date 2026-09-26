@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted (recorded retroactively 2026-09-26) · Amended by [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (separate OIDC client and session for platform operators) |
+| Status | Accepted (recorded retroactively 2026-09-26) · Amended by [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (separate OIDC client and session for platform operators) and [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) (MFA enforcement and step-up with Cognito) |
 | Date | 2026-09-26 |
 | Deciders | Founder |
 | Amends / supersedes | none |
