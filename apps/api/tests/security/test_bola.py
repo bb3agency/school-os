@@ -86,14 +86,19 @@ def _b_ticket(w: Any) -> uuid.UUID:
     ).id
 
 
+def _b_document(w: Any) -> uuid.UUID:
+    """A school B document created through the real upload -> register path."""
+    doc_id: uuid.UUID = D.service_document(w.b.tenant_id, w.b.people["owner"])
+    return doc_id
+
+
 PARAM_TO_B = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
     "class_id": lambda w: w.b.ids["class_ix"],
     "section_id": lambda w: w.b.ids["section_9a"],
     "ticket_id": _b_ticket,
-    # A school B document created through the real upload -> register path.
-    "document_id": lambda w: D.service_document(w.b.tenant_id, w.b.people["owner"]),
+    "document_id": _b_document,
 }
 
 
