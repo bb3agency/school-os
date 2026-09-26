@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, text
@@ -354,7 +355,7 @@ def test_FR_PLT_030_current_subscription_returns_only_own_tenant(
         _issue_raw(inv, f"SOS/90-91/{seq:06d}", seq=seq)
     for t in tenants:
         with tenant_session(t) as s:
-            result = s.execute(text("SELECT core.current_subscription()")).scalar_one()
+            result: Any = s.execute(text("SELECT core.current_subscription()")).scalar_one()
         assert result["subscription_id"] == str(subs[t])
         assert len(result["invoices"]) == 1
         assert result["invoices"][0]["amount_due_inr"] == 118.0
@@ -394,7 +395,7 @@ def test_FR_PLT_002_owner_invite_creates_invited_membership(
             text("SELECT status, mfa_required, user_id FROM core.memberships WHERE id = :m"),
             {"m": membership_id},
         ).one()
-        scopes = c.execute(
+        scopes: Any = c.execute(
             text("SELECT scope_type FROM core.membership_scopes WHERE membership_id = :m"),
             {"m": membership_id},
         ).scalars()
@@ -418,7 +419,7 @@ def test_FR_PLT_002_owner_invite_assigns_owner_role_when_present(
     _user, membership, assigned = _invite(tenant)
     assert assigned is True
     with admin_engine.connect() as c:
-        got = c.execute(
+        got: Any = c.execute(
             text("SELECT role_id FROM core.membership_roles WHERE membership_id = :m"),
             {"m": membership},
         ).scalar_one()

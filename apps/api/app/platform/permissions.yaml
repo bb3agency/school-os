@@ -1,0 +1,71 @@
+# Platform (control-plane) permission catalog and role matrix: docs/16 §6, docs/07 §6.5.
+# These keys can never be granted to tenant roles (core.permissions CHECK; separate tables).
+# step_up: MFA within step_up_max_age_seconds, else 428 step_up_required.
+# two_person: a second, different operator holding the permission must approve (SEC-029).
+# Every change needs a security review; tests pin this file to the documented matrix.
+version: 1
+step_up_max_age_seconds: 300
+
+permissions:
+  platform.tenants.read:            {step_up: false, two_person: false}
+  platform.tenants.provision:       {step_up: true,  two_person: false}
+  platform.tenants.suspend:         {step_up: true,  two_person: false}
+  platform.tenants.offboard:        {step_up: true,  two_person: true}
+  platform.plans.manage:            {step_up: true,  two_person: false}
+  platform.subscriptions.read:      {step_up: false, two_person: false}
+  platform.subscriptions.manage:    {step_up: true,  two_person: false}
+  platform.invoices.read:           {step_up: false, two_person: false}
+  platform.invoices.manage:         {step_up: false, two_person: false}
+  platform.flags.read:              {step_up: false, two_person: false}
+  platform.flags.manage:            {step_up: true,  two_person: false}
+  platform.usage.read:              {step_up: false, two_person: false}
+  platform.fleet.read:              {step_up: false, two_person: false}
+  platform.fleet.manage:            {step_up: true,  two_person: false}
+  platform.announcements.manage:    {step_up: false, two_person: false}
+  platform.support.read:            {step_up: false, two_person: false}
+  platform.support.manage:          {step_up: false, two_person: false}
+  platform.breakglass.request:      {step_up: false, two_person: false}
+  platform.breakglass.emergency:    {step_up: true,  two_person: true}
+  platform.operators.manage:        {step_up: true,  two_person: false}
+  platform.audit.read:              {step_up: false, two_person: false}
+
+roles:
+  platform_owner: ["*"]
+  platform_engineer:
+    - platform.tenants.read
+    - platform.tenants.provision
+    - platform.tenants.suspend
+    - platform.flags.read
+    - platform.flags.manage
+    - platform.usage.read
+    - platform.fleet.read
+    - platform.fleet.manage
+    - platform.support.read
+    - platform.breakglass.request
+    - platform.audit.read
+  support_agent:
+    - platform.tenants.read
+    - platform.usage.read
+    - platform.fleet.read
+    - platform.support.read
+    - platform.support.manage
+    - platform.breakglass.request
+    - platform.announcements.manage
+  billing_admin:
+    - platform.tenants.read
+    - platform.plans.manage
+    - platform.subscriptions.read
+    - platform.subscriptions.manage
+    - platform.invoices.read
+    - platform.invoices.manage
+    - platform.usage.read
+  # every *.read permission
+  platform_viewer:
+    - platform.tenants.read
+    - platform.subscriptions.read
+    - platform.invoices.read
+    - platform.flags.read
+    - platform.usage.read
+    - platform.fleet.read
+    - platform.support.read
+    - platform.audit.read

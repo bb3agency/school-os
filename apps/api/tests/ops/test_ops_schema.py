@@ -7,6 +7,7 @@ import json
 import threading
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, text
@@ -89,7 +90,9 @@ def test_FR_OPS_004_claim_outbox_skip_locked_under_concurrency(
         try:
             while True:
                 with context_free_session() as s:
-                    rows = s.execute(text("SELECT id FROM ops.claim_outbox(7)")).scalars().all()
+                    rows: Any = (
+                        s.execute(text("SELECT id FROM ops.claim_outbox(7)")).scalars().all()
+                    )
                 if not rows:
                     return
                 with lock:
@@ -106,7 +109,7 @@ def test_FR_OPS_004_claim_outbox_skip_locked_under_concurrency(
     assert len(claimed) == len(set(claimed)), "a row was claimed twice"
     assert set(claimed) == expected
     with tenant_session(tenants[0]) as s:
-        pending = s.execute(
+        pending: Any = s.execute(
             text("SELECT count(*) FROM ops.outbox WHERE dispatched_at IS NULL")
         ).scalar_one()
     assert pending == 0
