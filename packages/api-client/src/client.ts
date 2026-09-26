@@ -1,5 +1,5 @@
 import createClient, { type Client } from "openapi-fetch";
-import type { paths } from "./paths";
+import type { paths } from "./generated/schema";
 
 /** Anything shaped like `fetch` for a `Request` (global fetch, a BFF wrapper, a test double). */
 export type FetchLike = (input: Request) => Promise<Response>;

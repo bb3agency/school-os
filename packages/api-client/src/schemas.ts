@@ -1,21 +1,18 @@
 /**
- * API types.
+ * API types, all GENERATED from apps/api/openapi.json (`npm run generate -w
+ * @schoolos/api-client` → src/generated/schema.ts) and re-exported under stable names.
  *
- * - School-side (tenant) types are GENERATED from apps/api/openapi.json
- *   (`make openapi` → src/generated/schema.ts) and re-exported below under stable names.
- * - Control-plane (/platform/*) and school billing types are HAND-WRITTEN placeholders
- *   that mirror the build contract (§5, FR-PLT-001..030) and docs/16 until those API
- *   routes exist; replace each with its generated schema when it appears in the document.
- *
- * Field names follow the API's snake_case JSON. Money is a decimal string (numeric(14,2),
- * INR). Dates are `YYYY-MM-DD`; timestamps are RFC 3339 UTC. No type here carries student
- * data.
+ * The only hand-written types are protocol envelopes the OpenAPI document does not describe
+ * (RFC 9457 problem details) and small unions for status strings the API documents as plain
+ * `string` (the database CHECK constraints in the migrations list the values). Field names are
+ * the API's snake_case JSON. Money is a decimal string (numeric(14,2), INR). No type here
+ * carries student data.
  */
 import type { components } from "./generated/schema";
 
 type Schemas = components["schemas"];
 
-/** RFC 9457 problem details (docs/09 §3). */
+/** RFC 9457 problem details (docs/09 §3). Not described in the OpenAPI document. */
 export interface Problem {
   type: string;
   title: string;
@@ -24,38 +21,180 @@ export interface Problem {
   detail?: string;
   instance?: string;
   request_id?: string;
+  step_up_url?: string;
+  /** Field errors: `field` is the dotted body path (e.g. `billing_account.gstin`). */
   errors?: Array<{ field: string; code: string; message_key: string }>;
 }
 
-/** Cursor pagination envelope (docs/09 §2). */
-export interface Page<T> {
-  data: T[];
-  next_cursor: string | null;
-}
+/* ---------------------------------------------------------------- tenant (school) */
 
-export type DeploymentMode = "shared" | "dedicated";
-export type TenantStatus = "provisioning" | "active" | "suspended" | "offboarding";
-export type SubscriptionStatus = "trial" | "active" | "past_due" | "suspended" | "cancelled";
-export type InvoiceStatus = "draft" | "issued" | "paid" | "void";
-export type DeploymentStatus = "healthy" | "degraded" | "down" | "provisioning" | "unknown";
-export type TicketStatus = "open" | "pending" | "resolved" | "closed";
-export type TicketPriority = "low" | "normal" | "high" | "urgent";
-export type PersonStatus = "invited" | "active" | "deactivated";
-export type PlanStatus = "draft" | "active" | "retired";
-export type AnnouncementStatus = "draft" | "scheduled" | "live" | "ended";
-export type AnnouncementAudience = "all" | "shared" | "dedicated" | "tenants";
+export type AcademicYear = Schemas["AcademicYearOut"];
+/** Class: `code`, `display_en` / `display_te` (show the one for the UI language), `sort_order`. */
+export type SchoolClass = Schemas["ClassOut"];
+export type Section = Schemas["SectionOut"];
+export type TenantUser = Schemas["UserOut"];
+export type MemberStatus = TenantUser["status"];
+export type Scope = Schemas["ScopeOut"];
+export type TenantRole = Schemas["RoleOut"];
+/** Audit event; `summary` is an object of IDs, field names, counts and codes (no PII). */
+export type AuditEvent = Schemas["AuditEventOut"];
+export type AuditVerify = Schemas["app__audit__viewer__AuditVerifyOut"];
+export type Me = Schemas["app__identity__schemas__MeOut"];
+export type TenantProfile = Schemas["TenantOut"];
+export type SchoolChoice = Schemas["SchoolChoiceOut"];
+export type SchoolChoices = Schemas["SchoolChoicesOut"];
+export type AcceptedInvitations = Schemas["AcceptedInvitationsOut"];
+/** GET /tenant/billing via core.current_subscription() (FR-PLT-030). */
+export type TenantBilling = Schemas["TenantBillingOut"];
+export type UsageAgainstLimit = Schemas["UsageAgainstLimit"];
+export type TenantInvoice = Schemas["TenantInvoice"];
+export type AnnouncementBrief = Schemas["AnnouncementBrief"];
+export type SupportTicket = Schemas["TicketOut"];
+export type SupportMessage = Schemas["TicketMessageOut"];
+export type TicketCreateSchool = Schemas["TicketCreateSchool"];
+export type SchoolTicketMessage = Schemas["SchoolTicketMessageIn"];
+export type TicketCategory = TicketCreateSchool["category"];
+export type TicketStatus = SupportTicket["status"];
+export type TicketPriority = NonNullable<Schemas["TicketPatch"]["priority"]>;
+
+/* ---------------------------------------------------------------- platform (C14) */
+
+export type OperatorMe = Schemas["app__platform__schemas__MeOut"];
+export type PlatformDashboard = Schemas["DashboardOut"];
+export type TenantSummary = Schemas["TenantSummaryOut"];
+export type TenantDetail = Schemas["TenantDetailOut"];
+export type TenantStatus = TenantSummary["tenant_status"];
+export type Tier = TenantSummary["tier"];
+export type ProvisionRequest = Schemas["ProvisionIn"];
+export type ProvisionResult = Schemas["ProvisionOut"];
+export type OwnerInvite = Schemas["OwnerIn"];
+export type BillingAccount = Schemas["BillingAccountOut"];
+export type BillingAccountInput = Schemas["BillingAccountIn"];
+export type Plan = Schemas["PlanOut"];
+export type PlanInput = Schemas["PlanIn"];
+export type PlanPatch = Schemas["PlanPatch"];
+export type PlanLimits = Schemas["PlanLimits"];
+export type PlanStatus = Plan["status"];
+export type Subscription = Schemas["SubscriptionOut"];
+export type SubscriptionStatus = Subscription["status"];
+export type Invoice = Schemas["InvoiceOut"];
+export type InvoiceLine = Schemas["InvoiceLineOut"];
+export type InvoiceStatus = Invoice["status"];
+export type Payment = Schemas["PaymentOut"];
+export type PaymentInput = Schemas["PaymentIn"];
+export type PaymentMethod = PaymentInput["method"];
+export type Job = Schemas["JobOut"];
+export type UsageDaily = Schemas["UsageDailyOut"];
+export type FeatureFlag = Schemas["FlagOut"];
+export type Deployment = Schemas["DeploymentOut"];
+export type DeploymentPatch = Schemas["DeploymentPatch"];
+export type HeartbeatKey = Schemas["HeartbeatKeyOut"];
+export type FleetVersion = Schemas["FleetVersionOut"];
+export type Announcement = Schemas["AnnouncementOut"];
+export type AnnouncementInput = Schemas["AnnouncementIn"];
+export type AnnouncementSeverity = NonNullable<AnnouncementInput["severity"]>;
+export type AnnouncementAudience = NonNullable<AnnouncementInput["audience"]>;
+export type BreakGlassRequest = Schemas["BreakGlassOut"];
+export type BreakGlassInput = Schemas["BreakGlassIn"];
+export type Operator = Schemas["OperatorOut"];
+export type OperatorInvite = Schemas["OperatorInvite"];
+export type PlatformRole = Operator["roles"][number];
+export type PersonStatus = Operator["status"];
+export type PlatformAuditEvent = Schemas["PlatformAuditEventOut"];
+export type PlatformAuditVerify = Schemas["app__platform__schemas__AuditVerifyOut"];
+
+/* Status strings the API documents as `string` (values from the 0005_platform CHECKs). */
+export type DeploymentStatus =
+  "provisioning" | "healthy" | "degraded" | "unreachable" | "decommissioned";
+export type AnnouncementStatus = "draft" | "scheduled" | "cancelled";
 export type BreakGlassStatus =
-  "pending" | "approved" | "active" | "expired" | "rejected" | "revoked";
+  "requested" | "approved" | "active" | "expired" | "revoked" | "denied";
 
-export const PLATFORM_ROLES = [
+/* Runtime lists for forms. The `satisfies` checks fail to compile if the API adds a value. */
+
+type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
+
+const platformRoles = [
   "platform_owner",
   "platform_engineer",
   "support_agent",
   "billing_admin",
   "platform_viewer",
-] as const;
-export type PlatformRole = (typeof PLATFORM_ROLES)[number];
+] as const satisfies readonly PlatformRole[];
+export const PLATFORM_ROLES: Exhaustive<PlatformRole, typeof platformRoles> = platformRoles;
 
+const ticketCategories = [
+  "access",
+  "import",
+  "data_quality",
+  "exports",
+  "documents",
+  "ask",
+  "billing",
+  "bug",
+  "other",
+] as const satisfies readonly TicketCategory[];
+export const TICKET_CATEGORIES: Exhaustive<TicketCategory, typeof ticketCategories> =
+  ticketCategories;
+
+const ticketPriorities = ["p1", "p2", "p3", "p4"] as const satisfies readonly TicketPriority[];
+export const TICKET_PRIORITIES: Exhaustive<TicketPriority, typeof ticketPriorities> =
+  ticketPriorities;
+
+const ticketStatuses = [
+  "open",
+  "in_progress",
+  "waiting_on_school",
+  "resolved",
+  "closed",
+] as const satisfies readonly TicketStatus[];
+export const TICKET_STATUSES: Exhaustive<TicketStatus, typeof ticketStatuses> = ticketStatuses;
+
+const subscriptionStatuses = [
+  "trial",
+  "active",
+  "past_due",
+  "suspended",
+  "cancelled",
+] as const satisfies readonly SubscriptionStatus[];
+export const SUBSCRIPTION_STATUSES: Exhaustive<SubscriptionStatus, typeof subscriptionStatuses> =
+  subscriptionStatuses;
+
+const invoiceStatuses = ["draft", "issued", "paid", "void"] as const satisfies readonly InvoiceStatus[];
+export const INVOICE_STATUSES: Exhaustive<InvoiceStatus, typeof invoiceStatuses> = invoiceStatuses;
+
+const tenantStatuses = [
+  "provisioning",
+  "active",
+  "suspended",
+  "offboarding",
+  "deleted",
+] as const satisfies readonly TenantStatus[];
+export const TENANT_STATUSES: Exhaustive<TenantStatus, typeof tenantStatuses> = tenantStatuses;
+
+const paymentMethods = [
+  "bank_transfer",
+  "upi",
+  "cheque",
+  "other",
+] as const satisfies readonly PaymentMethod[];
+export const PAYMENT_METHODS: Exhaustive<PaymentMethod, typeof paymentMethods> = paymentMethods;
+
+const announcementSeverities = [
+  "info",
+  "maintenance",
+  "warning",
+  "critical",
+] as const satisfies readonly AnnouncementSeverity[];
+export const ANNOUNCEMENT_SEVERITIES: Exhaustive<
+  AnnouncementSeverity,
+  typeof announcementSeverities
+> = announcementSeverities;
+
+/**
+ * System role keys of a school (config: apps/api/app/authz/roles). The API sends role keys
+ * as plain strings (schools may add custom roles); this list only drives UI labels.
+ */
 export const TENANT_ROLES = [
   "owner",
   "principal",
@@ -68,270 +207,3 @@ export const TENANT_ROLES = [
   "auditor_readonly",
 ] as const;
 export type TenantRoleKey = (typeof TENANT_ROLES)[number];
-
-/* ---------------------------------------------------------------- platform */
-
-/** FR-PLT dashboard. Every value may be null when not computable yet. */
-export interface PlatformKpis {
-  mrr_inr: string | null;
-  arr_inr: string | null;
-  active_schools: number | null;
-  trial_schools: number | null;
-  past_due_subscriptions: number | null;
-  fleet_healthy: number | null;
-  fleet_total: number | null;
-  ai_spend_month_inr: string | null;
-}
-
-export interface TenantSummary {
-  id: string;
-  name: string;
-  code: string;
-  status: TenantStatus;
-  plan_key: string | null;
-  plan_name: string | null;
-  deployment_mode: DeploymentMode;
-  region: string;
-  created_at: string;
-}
-
-export interface BillingAccount {
-  legal_name: string;
-  gstin: string | null;
-  billing_email: string;
-  state_code: string;
-  address: string | null;
-}
-
-export interface TenantDetail extends TenantSummary {
-  billing_account: BillingAccount | null;
-  subscription: Subscription | null;
-  deployment: Deployment | null;
-}
-
-/** POST /platform/tenants (FR-PLT-001). */
-export interface ProvisionTenantRequest {
-  school_name: string;
-  legal_name: string;
-  state_code: string;
-  billing_email: string;
-  gstin: string | null;
-  plan_key: string;
-  deployment_mode: DeploymentMode;
-  custom_domain: string | null;
-  owner_name: string;
-  owner_email: string;
-}
-
-export interface ProvisionTenantAccepted {
-  tenant_id: string;
-  job_id: string;
-}
-
-export interface PlanLimits {
-  students: number | null;
-  active_users: number | null;
-  storage_bytes: number | null;
-  documents: number | null;
-  ai_questions_per_month: number | null;
-}
-
-export interface Plan {
-  id: string;
-  key: string;
-  name: string;
-  version: number;
-  deployment_mode: DeploymentMode;
-  status: PlanStatus;
-  monthly_price_inr: string;
-  annual_price_inr: string;
-  gst_rate_percent: string;
-  limits: PlanLimits;
-}
-
-export interface Subscription {
-  id: string;
-  tenant_id: string;
-  school_name: string;
-  plan_key: string;
-  plan_name: string;
-  status: SubscriptionStatus;
-  current_period_end: string | null;
-  trial_ends_at: string | null;
-}
-
-export interface Invoice {
-  id: string;
-  number: string | null;
-  tenant_id: string;
-  school_name: string;
-  status: InvoiceStatus;
-  issue_date: string | null;
-  due_date: string | null;
-  subtotal_inr: string;
-  gst_inr: string;
-  total_inr: string;
-}
-
-export interface UsageDaily {
-  tenant_id: string;
-  school_name: string;
-  date: string;
-  active_users: number;
-  students: number;
-  storage_bytes: number;
-  documents: number;
-  ai_tokens: number;
-  ai_cost_inr: string;
-}
-
-export interface FeatureFlag {
-  key: string;
-  description: string;
-  enabled_globally: boolean;
-  rollout_percent: number;
-  tenant_override_count: number;
-}
-
-export interface Deployment {
-  id: string;
-  tenant_id: string;
-  school_name: string;
-  mode: DeploymentMode;
-  region: string;
-  host: string | null;
-  custom_domain: string | null;
-  version: string | null;
-  last_heartbeat_at: string | null;
-  status: DeploymentStatus;
-}
-
-export interface FleetVersion {
-  version: string;
-  deployments: number;
-}
-
-export interface Announcement {
-  id: string;
-  title_en: string;
-  title_te: string;
-  body_en: string;
-  body_te: string;
-  audience: AnnouncementAudience;
-  starts_at: string;
-  ends_at: string | null;
-  status: AnnouncementStatus;
-}
-
-export interface AnnouncementCreate {
-  title_en: string;
-  title_te: string;
-  body_en: string;
-  body_te: string;
-  audience: AnnouncementAudience;
-  starts_at: string;
-  ends_at: string | null;
-}
-
-export interface SupportTicket {
-  id: string;
-  number: string;
-  tenant_id: string;
-  school_name: string;
-  subject: string;
-  status: TicketStatus;
-  priority: TicketPriority;
-  sla_due_at: string | null;
-  updated_at: string;
-}
-
-export interface BreakGlassRequest {
-  id: string;
-  tenant_id: string;
-  school_name: string;
-  requested_by: string;
-  reason: string;
-  duration_hours: number;
-  status: BreakGlassStatus;
-  expires_at: string | null;
-}
-
-export interface Operator {
-  id: string;
-  display_name: string;
-  email: string;
-  roles: PlatformRole[];
-  status: PersonStatus;
-  mfa_enrolled: boolean;
-  last_sign_in_at: string | null;
-}
-
-export interface OperatorInvite {
-  email: string;
-  role: PlatformRole;
-}
-
-export interface PlatformAuditEvent {
-  id: string;
-  seq: number;
-  occurred_at: string;
-  operator_id: string | null;
-  operator_name: string | null;
-  action: string;
-  resource_type: string;
-  resource_id: string | null;
-  summary: string;
-}
-
-export interface AuditVerifyResult {
-  ok: boolean;
-  checked: number;
-  first_bad_seq: number | null;
-}
-
-/* ------------------------------------------------------------------ tenant */
-
-export interface UsageAgainstLimit {
-  used: number;
-  limit: number | null;
-}
-
-/** GET /billing/subscription via core.current_subscription() (FR-PLT-030). */
-export interface CurrentSubscription {
-  plan_name: string;
-  status: SubscriptionStatus;
-  current_period_end: string | null;
-  trial_ends_at: string | null;
-  usage: {
-    students: UsageAgainstLimit;
-    active_users: UsageAgainstLimit;
-    storage_bytes: UsageAgainstLimit;
-    documents: UsageAgainstLimit;
-    ai_questions: UsageAgainstLimit;
-  };
-}
-
-export interface TenantInvoice {
-  id: string;
-  number: string;
-  issue_date: string;
-  due_date: string | null;
-  total_inr: string;
-  status: InvoiceStatus;
-}
-
-/* ------------------------------------------------ tenant (generated from OpenAPI) */
-
-export type AcademicYear = Schemas["AcademicYearOut"];
-/** Class: `code`, `display_en` / `display_te` (show the one for the UI language), `sort_order`. */
-export type SchoolClass = Schemas["ClassOut"];
-export type Section = Schemas["SectionOut"];
-export type TenantUser = Schemas["UserOut"];
-export type MemberStatus = TenantUser["status"];
-export type Scope = Schemas["ScopeOut"];
-export type TenantRole = Schemas["RoleOut"];
-/** Audit event; `summary` is an object of IDs, field names, counts and codes (no PII). */
-export type AuditEvent = Schemas["AuditEventOut"];
-export type AuditVerify = Schemas["AuditVerifyOut"];
-export type Me = Schemas["MeOut"];
-export type TenantProfile = Schemas["TenantOut"];
