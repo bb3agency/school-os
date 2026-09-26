@@ -6,6 +6,9 @@ x-python-app: &python-app
   build:
     context: .
     dockerfile: apps/api/Dockerfile
+    args:
+      # Local compose does not need psql in the app image (the db container runs bootstrap.sql).
+      INSTALL_PSQL: ${SOS_INSTALL_PSQL:-false}
   image: schoolos-python:dev
   env_file: .env
   environment:
