@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-26 |
 | Related | 03-TRD §9, 06-RAG §13, 07-Security §15, 13-Engineering standards, 16-Platform admin panel §18 |
-| Changes | 0.2: Valkey and SeaweedFS in integration tests; RLS catalog test with `definer_access` allowlist and platform exemption (§4.5); new suites §4.8–4.13 (platform privilege separation, definer allowlist, composite FKs, audit sequence concurrency, admin panel authz matrix, heartbeat); `mfa_required` in the authz matrix. 0.1: baseline |
+| Changes | 0.3: implemented suites with file paths (§4.0); §4.1/§4.5/§4.8/§4.12 match the code (catalog files, allowlist keys, grants checked); tools not yet in use marked in §2. 0.2: Valkey and SeaweedFS in integration tests; RLS catalog test with `definer_access` allowlist and platform exemption (§4.5); new suites §4.8–4.13 (platform privilege separation, definer allowlist, composite FKs, audit sequence concurrency, admin panel authz matrix, heartbeat); `mfa_required` in the authz matrix. 0.1: baseline |
 
 ---
 
@@ -23,11 +23,12 @@
 | Integration | Services + real Postgres (pgvector) + Valkey + SeaweedFS (S3), same images as local (ADR-0014) | pytest + testcontainers, factory_boy | Every PR |
 | API | Routes with auth, validation, errors, authz | pytest + httpx TestClient | Every PR |
 | Security suites | Route enumeration, authz matrix, BOLA, cross-tenant, RLS catalog, log redaction | pytest (generated cases) | Every PR |
-| Contract | OpenAPI conformance and fuzzing | Schemathesis | Every PR (fast), nightly (deep) |
+| Contract | OpenAPI freshness (committed `apps/api/openapi.json` equals the app's document) | pytest (`tests/core/test_openapi_fresh.py`) | Every PR |
+| Contract (planned) | OpenAPI conformance and fuzzing | Schemathesis (not yet added) | Every PR (fast), nightly (deep) |
 | Migrations | Upgrade/downgrade on seeded DB; RLS present on new tables | pytest + Alembic | Every PR touching migrations |
 | Frontend | Components, forms, i18n keys | vitest + React Testing Library | Every PR |
-| E2E | Critical journeys in a browser | Playwright (staging) | Merge to main + nightly |
-| Accessibility | Automated WCAG checks on core screens | axe (Playwright integration) | Nightly + release |
+| E2E | Critical journeys in a browser (M0: signed-out smoke only, `apps/web/e2e/smoke.spec.ts`) | Playwright | Nightly (`make e2e`) |
+| Accessibility | Automated WCAG checks on core screens | axe (Playwright integration; not yet added, 14 · M0 status) | Nightly + release |
 | Visual/print | PDF and print views (Telugu rendering) | Playwright screenshots + PDF snapshot diff | Nightly + release |
 | Performance | NFR-PERF targets | k6 or Locust (staging) | Weekly + before release |
 | RAG evaluation | Retrieval, faithfulness, citations, leakage, injection | `evals/` harness | PR subset when knowledge changes; full nightly |
@@ -42,8 +43,35 @@
 
 ## 4. Security test suites (must pass on every PR)
 
+### 4.0 Implemented suites (M0, 2026-09-26)
+
+Test names carry requirement IDs. Paths are relative to `apps/api/tests/`. `make test-security` runs `security/`; `make test-api` runs everything (CI jobs `test (test-api)` and `authz-suite`).
+
+| Suite | File(s) | What it proves |
+|---|---|---|
+| RLS catalog + self-test | `security/test_rls_catalog.py` | Every table in `core`/`sis`/`kb`/`audit`/`ops` with `tenant_id` has ENABLE + FORCE RLS and `tenant_isolation` (or its allowlisted variant); global tables must be listed; `definer_access` only on allowlisted tables; the checker itself flags a deliberately bad table (`test_SEC_001_catalog_check_detects_a_bad_table`); no role is superuser/BYPASSRLS/CREATEROLE/CREATEDB; runtime roles cannot become `sos_owner`/`sos_definer`/`sos_migrator` |
+| Definer allowlist | `security/test_rls_catalog.py`, `security/test_definer_functions.py`, `platform/test_schema_platform.py`, `api/test_accept_invitations.py` | Every `SECURITY DEFINER` function is on `rls_allowlist.yaml`, owned by `sos_definer`, pins `search_path`; `0003` functions have exact EXECUTE grantees and `search_path=pg_catalog, pg_temp`; `sos_definer` is NOLOGIN/NOBYPASSRLS and lost `CREATE` on `core`; behaviour of each function (active-only login, invite guards, legal status transitions, no activation without a key, counts only, own-tenant subscription, owner-invite guards, invitation acceptance rules) |
+| Privilege separation | `security/test_rls_catalog.py`, `platform/test_schema_platform.py`, `tenancy/test_schema.py`, `audit/test_append_only.py` | `sos_platform` has no SELECT/INSERT/UPDATE/DELETE on any tenant table (catalog and live `permission denied`); `sos_app` reads only `platform.feature_flags`, `sos_readonly` nothing in `platform`; narrowed `sos_app` grants on `core.tenants`/`core.users`/`core.tenant_keys`; audit privilege catalog |
+| Composite FKs | `security/test_composite_fks.py` | Every tenant→tenant FK includes `tenant_id`; referenced tables have `UNIQUE (tenant_id, id)`; referencing another tenant's row by known ID fails |
+| Tenant isolation (generic) | `security/test_tenant_isolation.py`, `tenancy/test_schema.py`, `core/test_tenant_session.py`, `audit/test_record.py` | Every tenant table the app can read returns zero rows without context (new tables covered automatically); cross-tenant reads/writes by ID fail; `WITH CHECK` refuses foreign `tenant_id`; concurrent sessions do not leak context |
+| Route enumeration | `security/test_route_enumeration.py`, `platform/test_authz_matrix.py`, `core/test_health.py` | Exactly one guard per route: `require()` with a catalog permission, `require_platform()` only under `/api/v1/platform/`, `require_fleet_signature()` only on `POST /api/v1/fleet/heartbeat`; the tenantless allowlist is exactly `/me/schools`, `/me/accept-invitations`, `/me/active-tenant`, `/me/login-event`; step-up flags agree with the catalog (every mutating use of a step-up permission requires it); guard permissions exist in `core.permissions`; only `/healthz`, `/readyz` and docs are unguarded; dedicated mode mounts no `/platform` or `/fleet` routes |
+| Generated authz matrix | `security/test_authz_matrix.py` | For every (system role, tenant route) pair: 2xx when `roles.yaml` grants the permission, 403 otherwise; the matrix must cover every protected route |
+| MFA on every route | `security/test_authz_matrix.py` (`test_FR_IAM_002_privileged_roles_need_mfa_on_every_route`), `api/test_me.py`, `identity/test_principal.py` | owner/principal/office_admin without the MFA claim get `403 mfa_required` on every tenant route; operators without MFA are refused |
+| Step-up `428` | `security/test_authz_matrix.py` (`test_SEC_005_step_up_routes_need_recent_mfa`), `identity/test_principal.py`, `core/test_errors.py`, `api/test_users.py` | Stale, missing, future or non-MFA `auth_time` → `428 step_up_required` |
+| Platform authz matrix | `platform/test_authz_matrix.py` | Catalog equals the documented matrix (16 §6); every control-plane route × every platform role; staff tokens → 401; unknown/deactivated operators → 403; invited operator activated on first MFA sign-in; beat schedule per deployment mode |
+| BOLA | `security/test_bola.py` | Every ID route is covered; other school's IDs → 404; out-of-scope class/section → 404; lists never show another school; bodies cannot reference another school's IDs |
+| Audit tamper, append-only, concurrency | `audit/test_tamper.py`, `audit/test_append_only.py`, `audit/test_record.py`, `audit/test_platform_chain.py`, `audit/test_partitions.py`, `audit/test_archive.py`, `audit/test_verify_all_and_tasks.py`, `audit/test_verify_all_cli.py`, `audit/test_summary_and_hashing.py` | Modified/deleted/reordered/duplicated/forged events and head mismatches are detected; UPDATE/DELETE/TRUNCATE blocked even for the owner, on parent and partitions; concurrent writers get contiguous `seq` (tenant and platform chains); rollback leaves no event; partitions secured and runway; signed archive; canonical hashing vectors; summary validation |
+| Redaction (incl. property tests) | `core/test_redaction.py` (Hypothesis), `devtools/test_fake_ids.py` | Every valid Verhoeff 12-digit number is masked in any surrounding text (ASCII, Telugu, Devanagari digits); masking is idempotent; invalid numbers without context untouched; phones/emails masked; synthetic Aadhaar-like IDs always fail Verhoeff |
+| Log capture | `core/test_logging.py`, `core/test_telemetry.py`, `api/test_log_redaction.py` | Seeded PII never reaches log output; unknown fields dropped; exceptions log types only outside local; span attributes allowlisted; API calls log no names or emails |
+| Heartbeat HMAC | `platform/test_heartbeat.py` | Valid heartbeat accepted; bad signatures 401 and nothing stored; replay 409, extra fields/oversize 422, id mismatch 401, rate limit 429; key rotation overlap; staleness → `unreachable`; degraded on stale backup; client payload accepted; schema has no free text; fuzzed unknown fields rejected (Hypothesis) |
+| Invoice numbering concurrency | `platform/test_billing.py` (`test_FR_PLT_016_numbers_are_sequential_and_gap_free_under_concurrency`), `platform/test_schema_platform.py` | Concurrent issues produce consecutive, unique, gap-free numbers ≤ 16 characters; issued invoices and published plans frozen |
+| OpenAPI freshness | `core/test_openapi_fresh.py` | Committed `apps/api/openapi.json` equals the generated document |
+| Migrations | `migrations/test_migrations.py`, `authz/test_seed_migration.py` | Upgrade → downgrade → upgrade on a fresh database; `core.permissions` equals the YAML catalog |
+
+Not yet implemented from §4.1–4.13: the log-capture and Aadhaar checks over OCR, ingestion, import and prompt paths (§4.6; those modules arrive in M1/M2), maker-checker tests (§4.7, M1), per-resource BOLA for students, documents and later resources (§4.3, M1+), and `TRUNCATE` in the platform privilege catalog check (§4.8 checks SELECT/INSERT/UPDATE/DELETE).
+
 ### 4.1 Route enumeration
-Iterate FastAPI's route table; assert every route (except allowlisted health checks) has exactly one of: `require()` with a permission that exists in `core.permissions`; `require_platform()` with a permission in `config/platform_permissions.yaml` (control-plane routes, which must live under `/api/v1/platform/`); or `require_fleet_signature()` (only `POST /api/v1/fleet/heartbeat`). Also assert that with `SOS_DEPLOYMENT_MODE=dedicated` no `/api/v1/platform/*` or `/api/v1/fleet/*` route is mounted.
+Iterate FastAPI's route table; assert every route (except allowlisted health checks) has exactly one of: `require()` with a permission that exists in `core.permissions`; `require_platform()` with a permission whose catalog entry has `is_platform: true` in `apps/api/app/authz/permissions.yaml` (control-plane routes, which must live under `/api/v1/platform/`); or `require_fleet_signature()` (only `POST /api/v1/fleet/heartbeat`). Routes that need no resolved school are pinned by a tenantless allowlist (`/me/schools`, `/me/accept-invitations`, `/me/active-tenant`, `/me/login-event`). Also assert that with `SOS_DEPLOYMENT_MODE=dedicated` no `/api/v1/platform/*` or `/api/v1/fleet/*` route is mounted.
 
 ### 4.2 Authorization matrix
 Generated from the role defaults (07 §6.2): for each (role, permission-protected endpoint) pair, call the endpoint as a user with only that role. Expect success for granted permissions, `403`/`404` otherwise. Include step-up cases (`428` when `auth_time` is older than 5 minutes or `sos:mfa` is missing), MFA cases (`403 mfa_required` for owner/principal/office_admin without `sos:mfa`; ADR-0018) and scope cases (class teacher inside vs outside their section).
@@ -55,9 +83,9 @@ For students, guardians, documents, findings, change requests, imports, exports:
 Two synthetic tenants with overlapping names. For every read path (lists, detail, search, exports, knowledge ask, document download URLs, audit viewer): tenant A never sees tenant B data. Also direct SQL tests as `sos_app`: with `app.tenant_id` unset, every tenant table returns zero rows; with tenant A set, inserting a row with tenant B's ID fails the policy's `WITH CHECK`.
 
 ### 4.5 RLS catalog test
-Query `pg_class`/`pg_policies`: every table (and every partition) with a `tenant_id` column in `core`, `sis`, `kb`, `audit`, `ops` has `relrowsecurity` and `relforcerowsecurity` true and a `tenant_isolation` policy, unless it is a reviewed variant in `apps/api/tests/security/rls_allowlist.yaml` (`core.tenants` [id], `core.users` [membership-based], `core.permissions` [global], `sis.attribute_definitions` [global rows]). Also:
-- no role in the database has `rolbypassrls` or `rolsuper` except the bootstrap admin (which the app never uses); `sos_definer` has `NOLOGIN` and `NOBYPASSRLS`;
-- the set of tables carrying the `definer_access` policy equals the pinned allowlist file (05 §3.3), and each such policy is exactly `USING (current_user = 'sos_definer') WITH CHECK (current_user = 'sos_definer')`;
+Query `pg_class`/`pg_policies`: every table (and every partition) with a `tenant_id` column in `core`, `sis`, `kb`, `audit`, `ops` has `relrowsecurity` and `relforcerowsecurity` true and a `tenant_isolation` policy, unless `apps/api/tests/security/rls_allowlist.yaml` lists it: `global_tables` (`ops.alembic_version`, `core.permissions`, `core.users`, `core.tenants`) or `policy_variants` (`core.tenants` → `own_tenant`, `core.users` → `users_in_tenant`, `sis.attribute_definitions` → `attrdef_read`). A self-test runs the checker against a deliberately bad table. Also:
+- no SchoolOS role (`sos_*`) has `rolbypassrls`, `rolsuper`, `rolcreaterole` or `rolcreatedb`; `sos_definer` has `NOLOGIN` and `NOBYPASSRLS`; `sos_app`, `sos_platform` and `sos_readonly` are not members of `sos_owner`, `sos_definer` or `sos_migrator`;
+- every table carrying the `definer_access` policy is in `definer_access_tables` of the allowlist (05 §3.3), and the tables the definer functions need carry it;
 - schema `platform` has no RLS by design; its isolation is checked by §4.8.
 
 ### 4.6 Redaction and logging
@@ -72,12 +100,12 @@ Query `pg_class`/`pg_policies`: every table (and every partition) with a `tenant
 - `TRUNCATE audit.events` (and of a partition) fails even for the table owner role path; UPDATE/DELETE fail; `sos_app` has only INSERT/SELECT.
 
 ### 4.8 Platform privilege separation (SEC-026)
-- Catalog: `sos_platform` has **no** privilege (`has_table_privilege` for SELECT/INSERT/UPDATE/DELETE/TRUNCATE) on any table in `core`, `sis`, `kb`, `audit`, `ops`; `sos_app` and `sos_readonly` have none on `platform` tables except `SELECT` on `platform.feature_flags` for `sos_app`.
-- Live: connected as `sos_platform`, `SELECT 1 FROM sis.students LIMIT 1` fails with `permission denied`; connected as `sos_app`, `SELECT 1 FROM platform.invoices` fails likewise.
-- Code: import-linter forbids `app.platform` from importing tenant modules' repositories/models; every platform repository uses `platform_session()`.
+- Catalog: `sos_platform` has **no** privilege (`has_table_privilege` for SELECT/INSERT/UPDATE/DELETE) on any table in `core`, `sis`, `kb`, `audit`, `ops`; `sos_app` and `sos_readonly` have none on `platform` tables except `SELECT` on `platform.feature_flags` for `sos_app`.
+- Live: connected as `sos_platform`, reading tenant tables (in M0: `core` tables; `sis.students` once it exists) fails with `permission denied`; connected as `sos_app`, `SELECT 1 FROM platform.invoices` fails likewise.
+- Code: import-linter (`.importlinter`) forbids every module from importing another module's `repository`/`models`, and forbids `core`, `identity` and `tenancy` from importing `app.platform`. `app.platform` may import `app.tenancy.service` (definer-function wrappers) and uses `tenant_session()` only for the cases in ADR-0013 Amendment A10.
 
 ### 4.9 Definer function allowlist (ADR-0013)
-- The set of `SECURITY DEFINER` functions (`pg_proc.prosecdef`) equals exactly the pinned list in 05 §3.4; each is owned by `sos_definer`, has `proconfig` containing a `search_path` starting with `pg_catalog`, and has `EXECUTE` revoked from `PUBLIC` and granted only to the listed callers.
+- Every `SECURITY DEFINER` function (`pg_proc.prosecdef`) is on the pinned list in 05 §3.4 (`definer_functions` in the allowlist); each is owned by `sos_definer`, has `proconfig` containing a `search_path` starting with `pg_catalog`, and has `EXECUTE` revoked from `PUBLIC` and granted only to the listed callers.
 - Behaviour: `core.tenant_usage_summary()` returns counts only (schema of the result has no text columns); `core.current_subscription()` called in tenant A's session never returns tenant B's invoices; `core.resolve_login()` returns only active memberships.
 
 ### 4.10 Composite tenant foreign keys (SEC-001, T27)
@@ -91,11 +119,11 @@ Query `pg_class`/`pg_policies`: every table (and every partition) with a `tenant
 - Same for the platform chain (`platform.audit_chain_head`).
 
 ### 4.12 Platform admin panel authz matrix (FR-PLT-028)
-Generated from `config/platform_permissions.yaml` and the role matrix (07 §6.5): for every `/api/v1/platform/*` route and every platform role, expect 2xx when granted, `403` when not, `428` when the permission is ᴿ and step-up is stale. Also: staff (tenant) tokens on platform routes → `401`; operator tokens on tenant routes → `401`; two-person actions by the same operator → `409`; an operator cannot change their own roles; removing the last `platform_owner` → `409`.
+Generated from the `is_platform` entries of `apps/api/app/authz/permissions.yaml` and the role matrix in `apps/api/app/platform/roles.yaml` (07 §6.5): for every `/api/v1/platform/*` route and every platform role, expect 2xx when granted, `403` when not, `428` when the permission is ᴿ and step-up is stale. Also: staff (tenant) tokens on platform routes → `401`; operator tokens on tenant routes → `401`; two-person actions by the same operator → `409`; an operator cannot change their own roles; removing the last `platform_owner` → `409`.
 
 ### 4.13 Fleet heartbeat (FR-PLT-024, SEC-028)
 - Accept a correctly signed payload; reject (without storing anything) a wrong key, an altered body, a timestamp more than 300 s in the past or future, a replayed nonce, an unknown or extra field, a body over 16 KB, and a `tenant_id` that does not match the deployment.
-- Rate limit: more than one heartbeat per minute per deployment → `429`.
+- Replayed nonce → `409 replay`. Rate limit: more than one heartbeat per minute per deployment → `429`.
 - Key rotation: both current and next keys are accepted during the overlap; the old key is rejected after it.
 - Privacy: the JSON schema has no free-text fields; a property test fuzzes payloads and asserts every accepted one matches the schema exactly.
 - Staleness: with the clock advanced 20 minutes and no heartbeat, the deployment becomes `unreachable` and an alert event is emitted.
