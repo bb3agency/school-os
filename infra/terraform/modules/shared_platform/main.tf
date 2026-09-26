@@ -31,37 +31,47 @@ locals {
   kms_data    = module.kms.key_arns["data"]
   kms_logs    = module.kms.key_arns["logs"]
   kms_audit   = module.kms.key_arns["audit"]
+  kms_signing = module.kms.key_arns["audit-signing"]
   master_user = module.rds.master_user_secret_arn
 
+  # Settings for every app container (api, worker, beat, migrate). Names are exactly the ones
+  # apps/api/app/core/config.py reads, and each container gets them all so it passes the staging/prod
+  # start-up guards on its own (no local-dev key wrapper, no dev-only secrets, no placeholder invoice
+  # supplier). apps/api/tests/deploy/test_env_contract.py parses these maps and checks both rules.
   app_env = {
-    SOS_ENV                    = var.env
-    SOS_DEPLOYMENT_MODE        = "shared"
-    AWS_REGION                 = local.region
-    SOS_S3_BUCKET_FILES        = module.s3.files_bucket
-    SOS_S3_BUCKET_AUDIT        = module.s3.audit_bucket
-    SOS_OIDC_ISSUER            = module.cognito.tenant_issuer
-    SOS_OIDC_AUDIENCE          = module.cognito.tenant_client_id
-    SOS_PLATFORM_OIDC_ISSUER   = module.cognito.platform_issuer
-    SOS_PLATFORM_OIDC_AUDIENCE = module.cognito.platform_client_id
-    SOS_KEY_WRAPPER            = "kms"
-    SOS_KMS_KEY_ARN            = local.kms_data
-    SOS_LOG_LEVEL              = var.log_level
+    SOS_ENV                         = var.env
+    SOS_DEPLOYMENT_MODE             = "shared"
+    SOS_VERSION                     = var.release_version
+    AWS_REGION                      = local.region
+    SOS_S3_BUCKET_FILES             = module.s3.files_bucket
+    SOS_S3_BUCKET_AUDIT             = module.s3.audit_bucket
+    SOS_OIDC_ISSUER                 = module.cognito.tenant_issuer
+    SOS_OIDC_AUDIENCE               = module.cognito.tenant_client_id
+    SOS_PLATFORM_OIDC_ISSUER        = module.cognito.platform_issuer
+    SOS_PLATFORM_OIDC_AUDIENCE      = module.cognito.platform_client_id
+    SOS_KEY_WRAPPER                 = "kms"
+    SOS_KMS_DATA_KEY_ARN            = local.kms_data
+    SOS_AUDIT_SIGNING_KEY_ARN       = local.kms_signing
+    SOS_BILLING_SUPPLIER_LEGAL_NAME = var.billing_supplier_legal_name
+    SOS_BILLING_SUPPLIER_GSTIN      = var.billing_supplier_gstin
+    SOS_BILLING_SUPPLIER_STATE_CODE = var.billing_supplier_state_code
+    SOS_LOG_LEVEL                   = var.log_level
   }
 
-  app_secrets = merge(
-    {
-      SOS_DATABASE_URL          = "${local.db_secret["app"]}:url::"
-      SOS_PLATFORM_DATABASE_URL = "${local.db_secret["platform"]}:url::"
-      SOS_REDIS_URL             = "${module.redis.secret_arn}:url::"
-      SOS_SERVICE_TOKEN_KEY     = local.rnd_secret["service_token_key"]
-    },
-    { for env_name, short in var.operator_secret_env : env_name => local.op_secret[short] },
-  )
+  # Secrets every app container needs to start: the guarded settings and the broker.
+  app_base_secrets = {
+    SOS_DATABASE_URL          = "${local.db_secret["app"]}:url::"
+    SOS_PLATFORM_DATABASE_URL = "${local.db_secret["platform"]}:url::"
+    SOS_REDIS_URL             = "${module.redis.secret_arn}:url::"
+    SOS_SERVICE_TOKEN_KEY     = local.rnd_secret["service_token_key"]
+  }
+  app_base_secret_arns = [
+    local.db_secret["app"], local.db_secret["platform"], module.redis.secret_arn, local.rnd_secret["service_token_key"],
+  ]
 
-  app_secret_arns = concat(
-    [local.db_secret["app"], local.db_secret["platform"], module.redis.secret_arn, local.rnd_secret["service_token_key"]],
-    [for short in values(var.operator_secret_env) : local.op_secret[short]],
-  )
+  # Provider API keys: only for the containers that call providers (api, worker).
+  provider_secrets     = { for env_name, short in var.operator_secret_env : env_name => local.op_secret[short] }
+  provider_secret_arns = [for short in values(var.operator_secret_env) : local.op_secret[short]]
 }
 
 # --- Keys ------------------------------------------------------------------------------
@@ -84,6 +94,13 @@ module "kms" {
       description           = "SchoolOS ${var.env}: CloudWatch Logs and alarm topic"
       allow_cloudwatch_logs = true
       service_principals    = ["cloudwatch.amazonaws.com", "budgets.amazonaws.com"]
+    }
+    # Signs the daily audit archives (ECDSA_SHA_256, FR-AUD-004). Asymmetric keys are not rotated
+    # by AWS; see modules/kms for the manual rotation note.
+    audit-signing = {
+      description = "SchoolOS ${var.env}: audit archive signatures (ECC_NIST_P256, SIGN_VERIFY)"
+      key_spec    = "ECC_NIST_P256"
+      key_usage   = "SIGN_VERIFY"
     }
   }
   tags = var.tags
@@ -287,6 +304,14 @@ data "aws_iam_policy_document" "worker" {
     actions   = ["kms:GenerateDataKey", "kms:Decrypt", "kms:DescribeKey"]
     resources = [local.kms_audit]
   }
+
+  # audit.archive_daily runs in the worker and signs each archive (KmsSigner, ECDSA_SHA_256). Beat
+  # only enqueues tasks, so it gets no KMS access.
+  statement {
+    sid       = "AuditSigning"
+    actions   = ["kms:Sign", "kms:GetPublicKey"]
+    resources = [local.kms_signing]
+  }
 }
 
 # --- Services -------------------------------------------------------------------------------
@@ -378,9 +403,9 @@ module "api" {
     client_alias_port = 8000
   }
 
-  environment             = local.app_env
-  secrets                 = local.app_secrets
-  secret_arns             = local.app_secret_arns
+  environment             = merge(local.app_env, { SOS_SERVICE_NAME = "api" })
+  secrets                 = merge(local.app_base_secrets, local.provider_secrets)
+  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
   task_role_policy_json   = data.aws_iam_policy_document.api.json
@@ -411,9 +436,9 @@ module "worker" {
   enable_execute_command = var.enable_execute_command
   service_connect        = { namespace_arn = module.cluster.service_connect_namespace_arn }
 
-  environment             = local.app_env
-  secrets                 = local.app_secrets
-  secret_arns             = local.app_secret_arns
+  environment             = merge(local.app_env, { SOS_SERVICE_NAME = "worker" })
+  secrets                 = merge(local.app_base_secrets, local.provider_secrets)
+  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
   task_role_policy_json   = data.aws_iam_policy_document.worker.json
@@ -439,9 +464,11 @@ module "beat" {
   assign_public_ip = local.assign_public_ip
   egress_vpc_ports = [6379]
 
-  environment          = { SOS_ENV = var.env, SOS_DEPLOYMENT_MODE = "shared", AWS_REGION = local.region, SOS_LOG_LEVEL = var.log_level }
-  secrets              = { SOS_REDIS_URL = "${module.redis.secret_arn}:url::" }
-  secret_arns          = [module.redis.secret_arn]
+  # Beat only talks to Valkey, but it loads the same Settings, so it needs the full base settings to
+  # pass the start-up guards (egress stays limited to 6379).
+  environment          = merge(local.app_env, { SOS_SERVICE_NAME = "beat" })
+  secrets              = local.app_base_secrets
+  secret_arns          = local.app_base_secret_arns
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
   tags                 = var.tags
@@ -466,11 +493,12 @@ module "migrate" {
   assign_public_ip = local.assign_public_ip
   egress_vpc_ports = [5432]
 
-  environment = { SOS_ENV = var.env, SOS_LOG_LEVEL = var.log_level }
-  secrets = {
+  # Alembic and the partition CLI load the same Settings: base settings + the migrator role.
+  environment = merge(local.app_env, { SOS_SERVICE_NAME = "migrate" })
+  secrets = merge(local.app_base_secrets, {
     SOS_MIGRATOR_DATABASE_URL = "${local.db_secret["migrator"]}:url::"
-  }
-  secret_arns          = [local.db_secret["migrator"]]
+  })
+  secret_arns          = concat(local.app_base_secret_arns, [local.db_secret["migrator"]])
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
   tags                 = var.tags

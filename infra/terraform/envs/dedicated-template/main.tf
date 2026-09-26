@@ -91,6 +91,7 @@ module "host" {
 
   school_code            = var.school_code
   deployment_id          = var.deployment_id
+  tenant_id              = var.tenant_id
   vpc_id                 = module.network.vpc_id
   subnet_id              = module.network.public_subnet_ids[0]
   instance_type          = var.instance_type

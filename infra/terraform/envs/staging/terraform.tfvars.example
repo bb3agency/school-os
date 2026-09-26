@@ -10,6 +10,12 @@ admin_domain          = "admin.staging.<your-domain>"
 route53_zone_id       = null
 cognito_domain_prefix = "<globally-unique-prefix>-staging"
 
+# Invoice supplier: STAGING ONLY, synthetic and NOT valid for tax invoices. It only needs to differ
+# from the dev placeholder, which the app refuses in staging/prod. Prod uses the registered values.
+billing_supplier_legal_name = "SchoolOS Staging Synthetic Supplier (not a tax invoice)"
+billing_supplier_gstin      = "37STAGE0000S1Z5"
+billing_supplier_state_code = "37"
+
 alarm_emails       = ["<dev-alerts@your-domain>"]
 monthly_budget_usd = 120
 

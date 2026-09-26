@@ -22,7 +22,7 @@ output "ssm_session_command" {
 }
 
 output "operator_secret_arn" {
-  description = "Set SOS_ANTHROPIC_API_KEY and SOS_FLEET_HMAC_KEY here (put-secret-value)."
+  description = "Set SOS_ANTHROPIC_API_KEY, SOS_HEARTBEAT_KEY_ID and SOS_HEARTBEAT_KEY here (put-secret-value)."
   value       = module.host.operator_secret_arn
 }
 
@@ -37,10 +37,11 @@ output "backup_bucket" {
 }
 
 output "kms_key_arns" {
-  description = "Per-school CMKs; schedule deletion of both to crypto-shred on decommission."
+  description = "Per-school CMKs; schedule deletion of data and backup to crypto-shred on decommission (export the audit_signing public key first)."
   value = {
-    data   = module.kms.key_arns["data"]
-    backup = module.kms_backup.key_arns["backup"]
+    data          = module.kms.key_arns["data"]
+    backup        = module.kms_backup.key_arns["backup"]
+    audit_signing = module.host.audit_signing_key_arn
   }
 }
 

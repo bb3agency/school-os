@@ -76,6 +76,7 @@ variables {
   cost_center           = "school-demo"
   school_code           = "demo-school"
   deployment_id         = "01923f4e-5b6c-7d8e-9f00-112233445566"
+  tenant_id             = "01923f4e-5b6c-7d8e-9f00-aabbccddeeff"
   domain                = "demo-school.example.test"
   custom_domain         = "office.demo-school.example.test"
   acme_email            = "ops@example.test"

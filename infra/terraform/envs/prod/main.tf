@@ -7,6 +7,11 @@ module "platform" {
   env             = "prod"
   release_version = var.release_version
 
+  # Supplier block on GST invoices (FR-PLT-016): the registered legal name and GSTIN.
+  billing_supplier_legal_name = var.billing_supplier_legal_name
+  billing_supplier_gstin      = var.billing_supplier_gstin
+  billing_supplier_state_code = var.billing_supplier_state_code
+
   app_domain             = var.app_domain
   admin_domain           = var.admin_domain
   route53_zone_id        = var.route53_zone_id

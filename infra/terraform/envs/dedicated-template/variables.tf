@@ -55,6 +55,11 @@ variable "deployment_id" {
   type        = string
 }
 
+variable "tenant_id" {
+  description = "Tenant UUID from the platform panel (Provision school -> Dedicated). The host creates its school with this ID (SOS_DEDICATED_TENANT_ID)."
+  type        = string
+}
+
 variable "domain" {
   description = "Platform hostname for this school, e.g. svhs-guntur.schoolos.in."
   type        = string

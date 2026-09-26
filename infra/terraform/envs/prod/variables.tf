@@ -189,3 +189,19 @@ variable "state_kms_key_arn" {
   description = "Terraform state CMK ARN (bootstrap output)."
   type        = string
 }
+
+variable "billing_supplier_legal_name" {
+  description = "Supplier legal name on GST invoices (validated by modules/shared_platform)."
+  type        = string
+}
+
+variable "billing_supplier_gstin" {
+  description = "Supplier GSTIN on GST invoices (validated by modules/shared_platform)."
+  type        = string
+}
+
+variable "billing_supplier_state_code" {
+  description = "Supplier GST state code (37 = Andhra Pradesh)."
+  type        = string
+  default     = "37"
+}
