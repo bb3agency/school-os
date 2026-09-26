@@ -461,14 +461,14 @@ def test_ADR_0019_first_owner_goes_through_invite_and_acceptance(
     """Default path: control-plane owner invite, then acceptance on first sign-in."""
     for tenant in seeded.plan.tenants:
         with admin_engine.connect() as c:
-            accepted = c.execute(
+            accepted: int = c.execute(
                 text(
                     "SELECT count(*) FROM audit.events "
                     "WHERE tenant_id = :t AND action = 'membership.invitation_accepted'"
                 ),
                 {"t": tenant.tenant_id},
             ).scalar_one()
-            invited = c.execute(
+            invited: int = c.execute(
                 text(
                     "SELECT count(*) FROM platform.audit_events "
                     "WHERE subject_tenant_id = :t AND action = 'tenant.owner_invite_created'"
