@@ -28,6 +28,11 @@ output "instance_role_arn" {
   value       = aws_iam_role.host.arn
 }
 
+output "log_group_name" {
+  description = "Host CloudWatch log group (containers + backup/upgrade scripts)."
+  value       = aws_cloudwatch_log_group.host.name
+}
+
 output "data_volume_id" {
   description = "Data EBS volume ID."
   value       = aws_ebs_volume.data.id
@@ -45,6 +50,9 @@ output "posture" {
     root_encrypted       = one(aws_instance.host.root_block_device).encrypted
     data_encrypted       = aws_ebs_volume.data.encrypted
     public_ip_on_launch  = aws_instance.host.associate_public_ip_address
+    tier_tag             = aws_instance.host.tags["schoolos:tier"]
+    deployment_id_tag    = aws_instance.host.tags["schoolos:deployment-id"]
+    log_retention_days   = aws_cloudwatch_log_group.host.retention_in_days
     files_bucket_sse     = module.files.sse_algorithm
     files_bucket_private = module.files.public_access_block
   }

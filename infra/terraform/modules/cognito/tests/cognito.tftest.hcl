@@ -5,6 +5,24 @@ mock_provider "aws" {
   mock_data "aws_region" {
     defaults = { region = "ap-south-1" }
   }
+  mock_data "aws_iam_policy_document" {
+    defaults = { json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" }
+  }
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "111122223333" }
+  }
+  mock_data "aws_partition" {
+    defaults = { partition = "aws" }
+  }
+  mock_resource "aws_iam_role" {
+    defaults = { arn = "arn:aws:iam::111122223333:role/mock" }
+  }
+  mock_resource "aws_cloudwatch_log_group" {
+    defaults = { arn = "arn:aws:logs:ap-south-1:111122223333:log-group:mock" }
+  }
+  mock_resource "aws_lambda_function" {
+    defaults = { arn = "arn:aws:lambda:ap-south-1:111122223333:function:mock" }
+  }
 }
 
 variables {
@@ -17,6 +35,7 @@ variables {
   platform_logout_urls   = ["https://admin.example.test/"]
   secrets_kms_key_arn    = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
   secret_name_prefix     = "sos/test"
+  logs_kms_key_arn       = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000002"
 }
 
 run "pools" {
@@ -33,8 +52,13 @@ run "pools" {
   }
 
   assert {
-    condition     = alltrue([for p in values(output.posture) : p.min_password >= 12 && p.admin_create_only && p.advanced_security == "ENFORCED"])
-    error_message = "Min 12 chars, no self sign-up, threat protection enforced."
+    condition     = alltrue([for p in values(output.posture) : p.min_password >= 12 && p.admin_create_only && p.tier == "ESSENTIALS"])
+    error_message = "Min 12 chars, no self sign-up, Essentials plan (ADR-0018)."
+  }
+
+  assert {
+    condition     = alltrue([for p in values(output.posture) : !p.device_remembering && p.pre_token_version == "V2_0"])
+    error_message = "Device remembering off and the sos:mfa pre-token Lambda (V2_0) attached to every pool (ADR-0018)."
   }
 }
 

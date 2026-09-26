@@ -35,6 +35,7 @@ mock_provider "aws" {
 
 variables {
   school_code            = "demo-school"
+  deployment_id          = "01923f4e-5b6c-7d8e-9f00-112233445566"
   vpc_id                 = "vpc-0123456789abcdef0"
   subnet_id              = "subnet-00000000000000001"
   kms_key_arn            = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
@@ -43,7 +44,7 @@ variables {
   release_version        = "2026.10.1"
   ecr_registry           = "111122223333.dkr.ecr.ap-south-1.amazonaws.com"
   ecr_repository_arns    = ["arn:aws:ecr:ap-south-1:111122223333:repository/schoolos/api"]
-  bundle_s3_uri          = "s3://sos-prod-artifacts-111122223333/dedicated/2026.10.1/schoolos-dedicated.tar.gz"
+  bundle_s3_prefix       = "s3://sos-prod-artifacts-111122223333/dedicated"
   artifacts_bucket_arn   = "arn:aws:s3:::sos-prod-artifacts-111122223333"
   artifacts_kms_key_arn  = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000002"
   backup_bucket_name     = "sos-ded-demo-school-backup-111122223333"
@@ -66,6 +67,20 @@ run "imdsv2_required" {
   assert {
     condition     = aws_instance.host.instance_type == "t4g.medium" && strcontains(data.aws_ssm_parameter.ubuntu.name, "/arm64/")
     error_message = "Graviton default with the arm64 Ubuntu image."
+  }
+}
+
+run "fleet_tags_and_logs" {
+  command = plan
+
+  assert {
+    condition     = aws_instance.host.tags["schoolos:tier"] == "dedicated" && aws_instance.host.tags["schoolos:deployment-id"] == var.deployment_id
+    error_message = "Hosts carry schoolos:tier=dedicated and schoolos:deployment-id for SSM fleet targeting."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_group.host.name == "/schoolos/dedicated/demo-school" && aws_cloudwatch_log_group.host.retention_in_days == 400 && aws_cloudwatch_log_group.host.kms_key_id == var.kms_key_arn
+    error_message = "Host logs go to a KMS-encrypted CloudWatch log group kept 400 days."
   }
 }
 

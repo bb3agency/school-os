@@ -50,6 +50,11 @@ variable "school_code" {
   }
 }
 
+variable "deployment_id" {
+  description = "Deployment UUID from the platform panel (Provision school -> Dedicated)."
+  type        = string
+}
+
 variable "domain" {
   description = "Platform hostname for this school, e.g. svhs-guntur.schoolos.in."
   type        = string
@@ -135,7 +140,7 @@ variable "backup_object_lock_days" {
 }
 
 variable "daily_backup_retention_days" {
-  description = "Retention of nightly dumps (daily/ prefix) and WAL segments (wal/)."
+  description = "Retention of nightly pg_dump files (daily/ prefix). WAL-G base backups and WAL (wal-g/) are pruned by WAL-G itself (retain 14 full)."
   type        = number
   default     = 35
 }

@@ -14,3 +14,6 @@ envs/dedicated-template/schools/
 
 # Root stacks commit their dependency lock (all-platform zh: hashes). Reusable modules do not.
 modules/**/.terraform.lock.hcl
+
+# Lambda build output (archive_file)
+.build/

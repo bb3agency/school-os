@@ -15,10 +15,11 @@ data "aws_subnet" "this" {
 }
 
 locals {
-  name      = "sos-ded-${var.school_code}"
-  partition = data.aws_partition.current.partition
-  account   = data.aws_caller_identity.current.account_id
-  arch      = can(regex("^[a-z]+[0-9]+[a-z]*g[a-z]*\\.", var.instance_type)) ? "arm64" : "amd64"
+  name              = "sos-ded-${var.school_code}"
+  partition         = data.aws_partition.current.partition
+  account           = data.aws_caller_identity.current.account_id
+  arch              = can(regex("^[a-z]+[0-9]+[a-z]*g[a-z]*\\.", var.instance_type)) ? "arm64" : "amd64"
+  bundle_key_prefix = regex("^s3://[^/]+/(.+)$", var.bundle_s3_prefix)[0]
   generated_keys = toset([
     "POSTGRES_PASSWORD",
     "SOS_APP_DB_PASSWORD",
@@ -29,7 +30,13 @@ locals {
     "SOS_SERVICE_TOKEN_KEY",
     "SESSION_SECRET",
   ])
-  tags = merge(var.tags, { school_code = var.school_code, deployment_mode = "dedicated" })
+  log_group = "/schoolos/dedicated/${var.school_code}"
+  tags = merge(var.tags, {
+    school_code              = var.school_code
+    deployment_mode          = "dedicated"
+    "schoolos:tier"          = "dedicated"
+    "schoolos:deployment-id" = var.deployment_id
+  })
 }
 
 # Ubuntu 24.04 LTS (unattended-upgrades, SSM agent preinstalled). The AMI is resolved at create time;
@@ -52,6 +59,16 @@ module "files" {
     { id = "noncurrent-and-multipart", noncurrent_version_expiration_days = 90, abort_incomplete_multipart_days = 7 },
   ]
   tags = local.tags
+}
+
+# --- Logs ----------------------------------------------------------------------------------
+
+# Container logs (Docker awslogs driver; no personal data by the app's logging contract) and host scripts.
+resource "aws_cloudwatch_log_group" "host" {
+  name              = local.log_group
+  retention_in_days = var.log_retention_days
+  kms_key_id        = var.kms_key_arn
+  tags              = local.tags
 }
 
 # --- Secrets (values never in state) ----------------------------------------------------
@@ -128,7 +145,8 @@ data "aws_iam_policy_document" "host" {
     resources = ["${module.files.arn}/*"]
   }
 
-  # Backups: write + read for restore drills; no delete (lifecycle expires old dumps).
+  # Backups: write + read for restore drills. No delete except WAL-G's own retention under wal-g/
+  # (lifecycle expires dumps; Object Lock protects every version for its retention window).
   statement {
     sid       = "BackupBucket"
     actions   = ["s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:AbortMultipartUpload"]
@@ -136,9 +154,21 @@ data "aws_iam_policy_document" "host" {
   }
 
   statement {
+    sid       = "WalgRetention"
+    actions   = ["s3:DeleteObject"]
+    resources = ["${var.backup_bucket_arn}/wal-g/*"]
+  }
+
+  statement {
+    sid       = "HostLogs"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
+    resources = ["${aws_cloudwatch_log_group.host.arn}:*", "arn:${local.partition}:logs:${data.aws_region.current.region}:${local.account}:log-group:${var.fleet_deploy_log_group}:*"]
+  }
+
+  statement {
     sid       = "ReleaseBundles"
     actions   = ["s3:GetObject"]
-    resources = ["${var.artifacts_bucket_arn}/dedicated/*"]
+    resources = ["${var.artifacts_bucket_arn}/${local.bundle_key_prefix}/*"]
   }
 
   statement {
@@ -316,8 +346,11 @@ resource "aws_instance" "host" {
     oidc_issuer            = var.oidc_issuer
     oidc_client_id         = var.oidc_client_id
     control_plane_url      = var.control_plane_url
-    bundle_s3_uri          = var.bundle_s3_uri
+    bundle_s3_prefix       = var.bundle_s3_prefix
     bundle_sha256          = var.bundle_sha256
+    install_dir            = var.install_dir
+    deployment_id          = var.deployment_id
+    log_group              = local.log_group
     walg_enabled           = var.walg_enabled ? "true" : "false"
   })
   user_data_replace_on_change = false

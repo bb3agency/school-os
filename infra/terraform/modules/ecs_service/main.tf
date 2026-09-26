@@ -265,8 +265,9 @@ resource "aws_ecs_service" "this" {
   }
 
   lifecycle {
-    # Autoscaling owns the running count once enabled.
-    ignore_changes = [desired_count]
+    # The deploy pipeline registers new task-definition revisions and updates the service
+    # (docs/10 §8); autoscaling owns the running count. Terraform owns everything else.
+    ignore_changes = [desired_count, task_definition]
   }
 
   tags = var.tags

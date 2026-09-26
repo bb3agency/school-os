@@ -2,7 +2,6 @@
 # Differences from prod are deliberate and listed here:
 #   - no deletion protection, buckets force-destroyable, ECS Exec enabled for debugging
 #   - audit archive Object Lock COMPLIANCE for 30 days (not 3 years) so the account can be torn down
-#   - main-branch deploys without an environment (auto-deploy on merge, docs/10 §8)
 #   - PR plan role may refresh secret versions (staging secrets guard synthetic data only)
 
 module "platform" {
@@ -42,7 +41,7 @@ module "platform" {
   monthly_budget_usd = var.monthly_budget_usd
 
   github_deploy_environment   = "staging"
-  github_allow_main_branch    = true
+  github_allow_main_branch    = false
   create_github_oidc_provider = var.create_github_oidc_provider
   create_plan_role            = true
   plan_can_read_secrets       = true

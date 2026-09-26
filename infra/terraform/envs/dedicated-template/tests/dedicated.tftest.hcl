@@ -19,6 +19,12 @@ mock_provider "aws" {
   mock_resource "aws_kms_key" {
     defaults = { arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-00000000000a" }
   }
+  mock_resource "aws_lambda_function" {
+    defaults = { arn = "arn:aws:lambda:ap-south-1:111122223333:function:mock" }
+  }
+  mock_resource "aws_cognito_user_pool" {
+    defaults = { arn = "arn:aws:cognito-idp:ap-south-1:111122223333:userpool/ap-south-1_mock", id = "ap-south-1_mock" }
+  }
   mock_resource "aws_iam_role" {
     defaults = { arn = "arn:aws:iam::111122223333:role/mock" }
   }
@@ -69,6 +75,7 @@ variables {
   owner                 = "platform@example.test"
   cost_center           = "school-demo"
   school_code           = "demo-school"
+  deployment_id         = "01923f4e-5b6c-7d8e-9f00-112233445566"
   domain                = "demo-school.example.test"
   custom_domain         = "office.demo-school.example.test"
   acme_email            = "ops@example.test"

@@ -3,8 +3,9 @@
 # Tenant (school staff) pool:
 #   - MFA "OPTIONAL" with TOTP. Cognito MFA is pool-wide, so the API enforces MFA for owner, principal
 #     and office_admin (SEC-005, ADR-0018): without the claim sos:mfa="true" it answers 403 mfa_required.
-#   - Password policy: min 12, no composition rules (NIST SP 800-63B), breached-password screening via
-#     threat protection (PLUS tier), admin-created users only (no self sign-up).
+#   - Password policy: min 12, no composition rules (NIST SP 800-63B), admin-created users only.
+#     Breached-password screening needs threat protection (PLUS plan); on ESSENTIALS (ADR-0018 default)
+#     the BFF/identity module must screen new passwords (e.g. k-anonymity HIBP range API) instead.
 #   - BFF app client: confidential (secret kept server side), authorization code flow; the BFF always
 #     sends PKCE (S256). Access/ID tokens 10 min, refresh 12 h with rotation enabled.
 # Platform operator pool: separate pool, MFA "ON" for every operator (contract §5).
@@ -83,7 +84,7 @@ resource "aws_cognito_user_pool" "this" {
   }
 
   user_pool_add_ons {
-    advanced_security_mode = var.advanced_security_mode
+    advanced_security_mode = var.user_pool_tier == "PLUS" ? var.advanced_security_mode : "OFF"
   }
 
   # Device remembering stays OFF (no device_configuration): a remembered device would skip MFA and

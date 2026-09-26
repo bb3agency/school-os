@@ -48,7 +48,6 @@ module "backup_bucket" {
   object_lock = var.backup_object_lock_days > 0 ? { mode = "GOVERNANCE", days = var.backup_object_lock_days } : null
   lifecycle_rules = [
     { id = "daily", prefix = "daily/", expiration_days = var.daily_backup_retention_days },
-    { id = "wal", prefix = "wal/", expiration_days = var.daily_backup_retention_days },
     { id = "monthly", prefix = "monthly/", expiration_days = var.monthly_backup_retention_days },
     { id = "drills", prefix = "restore-drills/", expiration_days = 90 },
     { id = "noncurrent", noncurrent_version_expiration_days = 7, abort_incomplete_multipart_days = 7 },
@@ -82,6 +81,7 @@ module "cognito" {
   create_platform_pool = false
   secrets_kms_key_arn  = module.kms.key_arns["data"]
   secret_name_prefix   = "sos/dedicated/${var.school_code}"
+  logs_kms_key_arn     = module.kms.key_arns["data"]
 }
 
 # --- Host ----------------------------------------------------------------------------------------
@@ -90,6 +90,7 @@ module "host" {
   source = "../../modules/dedicated_host"
 
   school_code            = var.school_code
+  deployment_id          = var.deployment_id
   vpc_id                 = module.network.vpc_id
   subnet_id              = module.network.public_subnet_ids[0]
   instance_type          = var.instance_type
@@ -101,7 +102,7 @@ module "host" {
   release_version        = var.release_version
   ecr_registry           = "${local.ecr_account}.dkr.ecr.${local.ecr_region}.amazonaws.com"
   ecr_repository_arns    = [for r in local.ecr_repos : "arn:aws:ecr:${local.ecr_region}:${local.ecr_account}:repository/schoolos/${r}"]
-  bundle_s3_uri          = "s3://${var.artifacts_bucket}/dedicated/${var.release_version}/schoolos-dedicated.tar.gz"
+  bundle_s3_prefix       = "s3://${var.artifacts_bucket}/dedicated"
   bundle_sha256          = var.bundle_sha256
   artifacts_bucket_arn   = "arn:aws:s3:::${var.artifacts_bucket}"
   artifacts_kms_key_arn  = var.artifacts_kms_key_arn

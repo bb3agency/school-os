@@ -8,6 +8,16 @@ variable "school_code" {
   }
 }
 
+variable "deployment_id" {
+  description = "Control-plane deployment UUID (platform.deployments.id), shown once at provisioning. Tagged on the host as schoolos:deployment-id for fleet targeting."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.deployment_id))
+    error_message = "deployment_id must be a lowercase UUID."
+  }
+}
+
 variable "vpc_id" {
   description = "VPC for the host."
   type        = string
@@ -72,20 +82,38 @@ variable "ecr_repository_arns" {
   type        = list(string)
 }
 
-variable "bundle_s3_uri" {
-  description = "s3:// URI of the deploy/dedicated bundle tarball published by CI."
+variable "bundle_s3_prefix" {
+  description = "s3:// prefix where CI publishes release bundles: <prefix>/<version>/schoolos-dedicated.tar.gz (+ .sha256). upgrade.sh fetches later versions from the same prefix."
   type        = string
 
   validation {
-    condition     = can(regex("^s3://[a-z0-9.-]+/.+\\.tar\\.gz$", var.bundle_s3_uri))
-    error_message = "bundle_s3_uri must look like s3://bucket/dedicated/<version>/schoolos-dedicated.tar.gz."
+    condition     = can(regex("^s3://[a-z0-9.-]+/[A-Za-z0-9._/-]+[^/]$", var.bundle_s3_prefix))
+    error_message = "bundle_s3_prefix must look like s3://bucket/dedicated (no trailing slash)."
   }
 }
 
 variable "bundle_sha256" {
-  description = "Expected SHA-256 of the bundle (verified before extraction; empty skips the check)."
+  description = "Expected SHA-256 of the initial bundle (empty = verify against the published .sha256 object only)."
   type        = string
   default     = ""
+}
+
+variable "install_dir" {
+  description = "Where the active release of deploy/dedicated is linked on the host."
+  type        = string
+  default     = "/opt/schoolos/deploy/dedicated"
+}
+
+variable "fleet_deploy_log_group" {
+  description = "Shared CloudWatch log group for fleet SSM Run Command output (created by the shared prod stack)."
+  type        = string
+  default     = "/schoolos/dedicated/deploy"
+}
+
+variable "log_retention_days" {
+  description = "Retention of the host's CloudWatch log group (400 days: CERT-In/DPDP)."
+  type        = number
+  default     = 400
 }
 
 variable "artifacts_bucket_arn" {

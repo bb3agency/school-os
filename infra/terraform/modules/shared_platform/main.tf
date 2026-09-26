@@ -17,7 +17,7 @@ locals {
 
   image = {
     api    = "${module.ecr.repository_urls["api"]}:${var.release_version}"
-    worker = "${module.ecr.repository_urls["worker"]}:${var.release_version}"
+    worker = "${module.ecr.repository_urls[var.worker_image_repository]}:${var.release_version}"
     web    = "${module.ecr.repository_urls["web"]}:${var.release_version}"
   }
 
@@ -203,6 +203,7 @@ module "cognito" {
   from_email_address     = var.from_email_address
   secrets_kms_key_arn    = local.kms_data
   secret_name_prefix     = local.secret_ns
+  logs_kms_key_arn       = local.kms_logs
   tags                   = var.tags
 }
 
@@ -399,7 +400,7 @@ module "worker" {
   memory                 = var.services["worker"].memory
   desired_count          = var.services["worker"].desired_count
   autoscaling            = var.services["worker"].autoscaling
-  command                = ["celery", "-A", "app.worker", "worker", "--loglevel=INFO", "-Q", var.worker_queues]
+  command                = ["celery", "-A", var.celery_app, "worker", "--loglevel=INFO", "-Q", var.worker_queues]
   stop_timeout           = 120
   user                   = var.container_user
   vpc_id                 = module.network.vpc_id
@@ -430,7 +431,7 @@ module "beat" {
   cpu              = var.services["beat"].cpu
   memory           = var.services["beat"].memory
   desired_count    = 1
-  command          = ["celery", "-A", "app.worker", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+  command          = ["celery", "-A", var.celery_app, "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
   user             = var.container_user
   vpc_id           = module.network.vpc_id
   vpc_cidr         = module.network.vpc_cidr_block
@@ -456,7 +457,8 @@ module "migrate" {
   cluster_arn      = module.cluster.arn
   cluster_name     = module.cluster.name
   image            = local.image.api
-  command          = var.migrate_command
+  entry_point      = ["/bin/sh", "-c"]
+  command          = [var.migrate_command]
   user             = var.container_user
   vpc_id           = module.network.vpc_id
   vpc_cidr         = module.network.vpc_cidr_block
@@ -522,6 +524,16 @@ module "db_bootstrap" {
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
   tags                 = var.tags
+}
+
+# Fleet upgrades (SSM Run Command on dedicated hosts, docs/10 §15.5) write their output here.
+resource "aws_cloudwatch_log_group" "fleet_deploy" {
+  count = var.env == "prod" ? 1 : 0
+
+  name              = "/schoolos/dedicated/deploy"
+  retention_in_days = 400
+  kms_key_id        = local.kms_logs
+  tags              = var.tags
 }
 
 # --- Observability + CI ------------------------------------------------------------------------

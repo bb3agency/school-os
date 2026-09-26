@@ -4,6 +4,7 @@ owner          = "<owner email or team>"
 cost_center    = "<school billing account>"
 
 school_code   = "svhs-guntur"
+deployment_id = "<deployment UUID shown by the platform panel>"
 domain        = "svhs-guntur.<your-domain>"
 custom_domain = "" # e.g. "office.svhs.edu.in" (the school adds an A record to the Elastic IP)
 acme_email    = "<ops@your-domain>"

@@ -53,6 +53,7 @@ output "posture" {
   value = {
     for k, p in aws_cognito_user_pool.this : k => {
       mfa                = p.mfa_configuration
+      tier               = p.user_pool_tier
       min_password       = one(p.password_policy).minimum_length
       advanced_security  = one(p.user_pool_add_ons).advanced_security_mode
       admin_create_only  = one(p.admin_create_user_config).allow_admin_create_user_only

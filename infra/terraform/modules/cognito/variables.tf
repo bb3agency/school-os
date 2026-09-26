@@ -43,9 +43,9 @@ variable "platform_logout_urls" {
 }
 
 variable "user_pool_tier" {
-  description = "Cognito feature plan. PLUS is required for threat protection (advanced security)."
+  description = "Cognito feature plan (ADR-0018: ESSENTIALS for both pools; needed for access-token customisation). PLUS adds threat protection."
   type        = string
-  default     = "PLUS"
+  default     = "ESSENTIALS"
 
   validation {
     condition     = contains(["LITE", "ESSENTIALS", "PLUS"], var.user_pool_tier)
@@ -54,7 +54,7 @@ variable "user_pool_tier" {
 }
 
 variable "advanced_security_mode" {
-  description = "Threat protection mode (ENFORCED blocks risky sign-ins; AUDIT only records)."
+  description = "Threat protection mode on the PLUS plan (ENFORCED | AUDIT). Ignored (OFF) on ESSENTIALS/LITE."
   type        = string
   default     = "ENFORCED"
 }

@@ -203,9 +203,26 @@ variable "db_bootstrap_sql_path" {
 }
 
 variable "migrate_command" {
-  description = "Command of the one-off migration task (runs as sos_migrator)."
-  type        = list(string)
-  default     = ["alembic", "upgrade", "head"]
+  description = "Shell command of the one-off migration task (runs as sos_migrator via SOS_MIGRATOR_DATABASE_URL)."
+  type        = string
+  default     = "alembic -c /app/alembic.ini upgrade head && python -m app.audit.partitions --months-ahead 12"
+}
+
+variable "celery_app" {
+  description = "Celery application module for worker and beat."
+  type        = string
+  default     = "sos_worker.celery_app"
+}
+
+variable "worker_image_repository" {
+  description = "ECR repository (api | worker) whose image runs the worker and beat services. apps/api/Dockerfile builds the api image, which also runs Celery; switch to worker if CI publishes a separate worker image (e.g. with Chromium)."
+  type        = string
+  default     = "api"
+
+  validation {
+    condition     = contains(["api", "worker"], var.worker_image_repository)
+    error_message = "worker_image_repository must be api or worker."
+  }
 }
 
 variable "operator_secrets" {
