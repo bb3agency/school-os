@@ -392,7 +392,7 @@ CREATE TABLE platform.invoices (
   status                      text NOT NULL CHECK (status IN ('draft','issued','paid','void')),
   financial_year              text REFERENCES platform.invoice_sequences(financial_year),
   sequence_no                 int CHECK (sequence_no > 0),
-  invoice_number              text UNIQUE CHECK (invoice_number ~ '^[A-Z0-9/-]{1,20}$'), -- 'SOS/2026-27/000123'
+  invoice_number              text UNIQUE CHECK (invoice_number ~ '^[A-Z0-9/-]{1,20}$'), -- 'SOS/26-27/000123' (≤ 16 chars, CGST Rule 46)
   period_start                date NOT NULL,
   period_end                  date NOT NULL,                     -- exclusive
   issue_date                  date,
@@ -773,7 +773,7 @@ Suspension must not cut off a school during board exams or registration deadline
 
 ### 10.3 Numbering (on issue)
 - Financial year runs 1 April to 31 March (IST): an issue date in April 2026–March 2027 belongs to `2026-27`.
-- In the issuing transaction: `INSERT INTO platform.invoice_sequences (financial_year) VALUES (:fy) ON CONFLICT DO NOTHING`, then `SELECT last_number FROM platform.invoice_sequences WHERE financial_year = :fy FOR UPDATE`, increment, update, and set `invoice_number = 'SOS/' || :fy || '/' || lpad(:n::text, 6, '0')` (e.g., `SOS/2026-27/000123`).
+- In the issuing transaction: `INSERT INTO platform.invoice_sequences (financial_year) VALUES (:fy) ON CONFLICT DO NOTHING`, then `SELECT last_number FROM platform.invoice_sequences WHERE financial_year = :fy FOR UPDATE`, increment, update, and set `invoice_number = 'SOS/' || :fy_short || '/' || lpad(:n::text, 6, '0')` (e.g., `SOS/26-27/000123`, 16 characters).
 - Numbers are **gapless**: drafts have no number; voided invoices keep theirs; numbers are never reused.
 - **Check before the first real invoice:** that format is 18 characters. GST rules (CGST Rule 46) limit invoice serial numbers to 16 characters. A 16-character alternative is `SOS/26-27/000123`. The format is config (`billing.invoice_number_format`), so it can change without a schema change (§19, Q2).
 
