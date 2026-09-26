@@ -1,0 +1,31 @@
+{
+  "name": "schoolos",
+  "private": true,
+  "description": "SchoolOS JavaScript workspaces (web app and generated API client).",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "apps/web",
+    "packages/api-client"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "lint": "npm run lint --workspaces --if-present && npm run format:check",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "e2e": "npm run e2e --workspace @schoolos/web",
+    "format": "prettier --write apps/web packages/api-client",
+    "format:check": "prettier --check apps/web packages/api-client"
+  },
+  "devDependencies": {
+    "prettier": "3.9.9"
+  },
+  "overrides": {
+    "eslint": "10.11.0",
+    "openapi-typescript": {
+      "typescript": "6.0.3"
+    }
+  }
+}

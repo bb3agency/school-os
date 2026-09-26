@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+dist
+coverage
+playwright-report
+test-results
+package-lock.json
+next-env.d.ts
+packages/api-client/src/generated
