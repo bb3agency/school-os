@@ -79,15 +79,18 @@ Every endpoint declares its permission; scope rules from 07 §6 apply.
 |---|---|---|---|
 | GET | `/me` | authenticated | User, active tenant, roles, effective permissions, scopes, language |
 | POST | `/me/active-tenant` | authenticated | Switch tenant (membership required) |
-| GET | `/me/sessions` · DELETE `/me/sessions/{id}` | authenticated | List/revoke own sessions |
+| POST | `/me/login-event` | authenticated (principal) | Called by the BFF after the OIDC callback; writes `auth.login.succeeded`/`auth.login.denied` in the school's audit chain; 10/min per user |
+| GET · DELETE | `/bff/auth/sessions` (BFF, not API) | session | List/revoke own sessions (sessions live in the BFF) |
+
+The active school is sent by the BFF as `X-Active-Tenant`. A user with several memberships and no header gets `409 active_tenant_required`; a member of a suspended school gets `403 tenant_suspended`; a privileged role (owner, principal, office_admin) without MFA gets `403 mfa_required` (ADR-0018).
 
 ### Tenant setup and users
 | Method | Path | Permission |
 |---|---|---|
 | GET/PATCH | `/tenant` | `tenant.settings.manage` (PATCH, step-up) |
-| GET/POST | `/academic-years` · `/classes` · `/sections` (PATCH on items) | read: `student.read_basic`; write: `tenant.structure.manage` (no step-up) |
+| GET/POST | `/academic-years` · `/classes` · `/sections`; GET/PATCH `/{id}` on each; POST `/academic-years/{id}/make-current`; POST `/classes/defaults` (adds Nursery–XII) | read: `student.read_basic` (class teachers see only their sections; out of scope → 404); write: `tenant.structure.manage` (no step-up) |
 | POST | `/academic-years/{id}/promotions:preview` · `:commit` · `:undo` (**M1**, FR-TEN-011) | `tenant.structure.manage` |
-| GET/POST | `/users` (invite) · PATCH `/users/{id}` | `user.manage` (step-up) |
+| GET/POST | `/users` (invite) · GET/PATCH `/users/{id}` | `user.manage` (step-up for changes). Invites need the IdP subject (account created in the IdP first); the membership stays `invited` until activated with PATCH |
 | PUT | `/users/{id}/roles` · `/users/{id}/scopes` | `role.assign` (step-up) |
 | GET | `/roles` · `/permissions` | `user.manage` |
 

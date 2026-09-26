@@ -15,9 +15,7 @@ CELL = {"✓": "school", "S": "scoped", "✓ᴿ": "school_step_up"}
 # Permissions granted in roles.yaml that the 07 §6.2 table does not list yet (with reason).
 SEC_6_2 = "### 6.2 Roles \u00d7 permissions (defaults)"
 SEC_6_5 = "### 6.5 Platform roles \u00d7 permissions"
-NOT_IN_DOC_MATRIX = {
-    "support.ticket.create": "proposed in 16 §19 Q6 / contract §5; all staff except auditor",
-}
+NOT_IN_DOC_MATRIX: dict[str, str] = {}
 TENANT_ROLES = (
     "owner",
     "principal",
