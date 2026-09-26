@@ -81,6 +81,17 @@ class Settings(BaseSettings):
 
     otel_exporter_otlp_endpoint: str | None = None
 
+    # Control plane / fleet (docs/16 §10, §12; ADR-0015). Supplier identity for GST invoices.
+    billing_supplier_legal_name: str = "SchoolOS Synthetic Supplier (dev)"
+    billing_supplier_gstin: str = "37AAAAA0000A1Z5"
+    billing_supplier_state_code: str = Field(default="37", pattern=r"^[0-9]{2}$")
+    # Dedicated hosts: where and as whom the heartbeat client reports (outbound only).
+    control_plane_url: str | None = None
+    deployment_id: str | None = None
+    dedicated_tenant_id: str | None = None
+    heartbeat_key_id: str | None = None
+    heartbeat_key: SecretStr | None = None
+
     @property
     def is_production_like(self) -> bool:
         return self.env in (Environment.STAGING, Environment.PROD)

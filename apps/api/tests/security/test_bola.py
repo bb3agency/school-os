@@ -50,18 +50,38 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/academic-years/{year_id}"): {},
     ("PATCH", "/api/v1/classes/{class_id}"): {},
     ("PATCH", "/api/v1/sections/{section_id}"): {},
+    ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): {"body": "Synthetic follow-up"},
 }
+
+
+def _b_ticket(w: Any) -> uuid.UUID:
+    """A support ticket of school B (control-plane storage, reached via app.platform.service)."""
+    from app.platform import service as platform_service
+
+    return platform_service.open_ticket_from_tenant(
+        w.b.tenant_id,
+        w.b.people["owner"].user_id,
+        platform_service.TicketCreateSchool(
+            category="other", subject="School B ticket", body="Synthetic question"
+        ),
+    ).id
+
+
 PARAM_TO_B = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
     "class_id": lambda w: w.b.ids["class_ix"],
     "section_id": lambda w: w.b.ids["section_9a"],
+    "ticket_id": _b_ticket,
 }
 
 
 def _id_routes() -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for rc in iter_route_contexts(create_app().routes):
+        # Control-plane routes are operator-only and not tenant scoped (tests/platform).
+        if str(rc.path).startswith(("/api/v1/platform/", "/api/v1/fleet/")):
+            continue
         if isinstance(rc.original_route, APIRoute) and "{" in str(rc.path):
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)

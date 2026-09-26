@@ -181,7 +181,45 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/audit/events"): lambda w, r, a: ("/api/v1/audit/events", None, {}),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
+    # School-side routes backed by the control plane (app/platform/tenant_api.py).
+    ("GET", "/api/v1/tenant/billing"): lambda w, r, a: ("/api/v1/tenant/billing", None, {}),
+    ("GET", "/api/v1/tenant/billing/invoices"): lambda w, r, a: (
+        "/api/v1/tenant/billing/invoices",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/announcements"): lambda w, r, a: ("/api/v1/announcements", None, {}),
+    ("POST", "/api/v1/support/tickets"): lambda w, r, a: (
+        "/api/v1/support/tickets",
+        {"category": "other", "subject": "Matrix ticket", "body": "Synthetic question"},
+        {},
+    ),
+    ("GET", "/api/v1/support/tickets"): lambda w, r, a: ("/api/v1/support/tickets", None, {}),
+    ("GET", "/api/v1/support/tickets/{ticket_id}"): lambda w, r, a: (
+        f"/api/v1/support/tickets/{_ticket(w)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): lambda w, r, a: (
+        f"/api/v1/support/tickets/{_ticket(w)}/messages",
+        {"body": "Synthetic follow-up"},
+        {},
+    ),
 }
+
+
+def _ticket(w: Any) -> uuid.UUID:
+    """A ticket of school A (opened through the platform service, as the owner)."""
+    from app.platform import service as platform_service
+
+    ticket = platform_service.open_ticket_from_tenant(
+        w.a.tenant_id,
+        w.a.people["owner"].user_id,
+        platform_service.TicketCreateSchool(
+            category="other", subject="Matrix ticket", body="Synthetic question"
+        ),
+    )
+    return ticket.id
 
 
 def _route_table() -> dict[tuple[str, str], Any]:
@@ -193,6 +231,8 @@ def _route_table() -> dict[tuple[str, str], Any]:
         guard = [d.call for d in route.dependant.dependencies if hasattr(d.call, "sos_permission")]
         if not guard:
             continue  # public health checks
+        if str(rc.path).startswith(("/api/v1/platform/", "/api/v1/fleet/")):
+            continue  # control plane: tests/platform/test_authz_matrix.py (operator roles)
         for method in rc.methods or ():
             table[(method, str(rc.path))] = guard[0]
     return table
@@ -204,7 +244,13 @@ STEP_UP_ROUTES = sorted(k for k, g in ROUTES.items() if g.sos_step_up)
 
 
 def _success(method: str, path: str) -> int:
-    creates = {"/api/v1/users", "/api/v1/academic-years", "/api/v1/classes", "/api/v1/sections"}
+    creates = {
+        "/api/v1/users",
+        "/api/v1/academic-years",
+        "/api/v1/classes",
+        "/api/v1/sections",
+        "/api/v1/support/tickets",
+    }
     return 201 if method == "POST" and path in creates else 200
 
 

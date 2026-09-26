@@ -46,6 +46,7 @@ definer_functions:
   - core.set_tenant_status
   - core.tenant_usage_summary
   - core.current_subscription
+  - core.create_owner_invite
   - ops.claim_outbox
 
 # Schema platform: sos_app may only read these tables.

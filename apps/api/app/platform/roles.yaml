@@ -1,0 +1,53 @@
+# Platform (operator) role matrix: docs/16 §6, docs/07 §6.5.
+# Permission keys, descriptions and step-up flags come from the ONE catalog,
+# app/authz/permissions.yaml (is_platform: true); this file only maps operator roles to those
+# keys and names the two-person permissions. Loading fails on any key that is not a platform
+# permission in that catalog. Every change needs a security review; tests pin the matrix.
+version: 1
+step_up_max_age_seconds: 300
+
+# SEC-029: a second, different operator holding the permission must approve.
+two_person:
+  - platform.tenants.offboard
+  - platform.breakglass.emergency
+
+roles:
+  platform_owner: ["*"]
+  platform_engineer:
+    - platform.tenants.read
+    - platform.tenants.provision
+    - platform.tenants.suspend
+    - platform.flags.read
+    - platform.flags.manage
+    - platform.usage.read
+    - platform.fleet.read
+    - platform.fleet.manage
+    - platform.support.read
+    - platform.breakglass.request
+    - platform.audit.read
+  support_agent:
+    - platform.tenants.read
+    - platform.usage.read
+    - platform.fleet.read
+    - platform.support.read
+    - platform.support.manage
+    - platform.breakglass.request
+    - platform.announcements.manage
+  billing_admin:
+    - platform.tenants.read
+    - platform.plans.manage
+    - platform.subscriptions.read
+    - platform.subscriptions.manage
+    - platform.invoices.read
+    - platform.invoices.manage
+    - platform.usage.read
+  # every *.read permission
+  platform_viewer:
+    - platform.tenants.read
+    - platform.subscriptions.read
+    - platform.invoices.read
+    - platform.flags.read
+    - platform.usage.read
+    - platform.fleet.read
+    - platform.support.read
+    - platform.audit.read

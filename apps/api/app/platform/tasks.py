@@ -1,0 +1,83 @@
+"""Celery tasks for the control plane (shared deployment) and the dedicated-host heartbeat client.
+
+Beat entries come from :func:`beat_schedule`, which registers control-plane jobs only when
+``SOS_DEPLOYMENT_MODE=shared`` and only the heartbeat client when ``dedicated`` (ADR-0017).
+Times are UTC (celery ``timezone=UTC``); IST = UTC + 5:30. Tasks carry IDs/dates only.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+from typing import Any
+
+from celery import shared_task
+from celery.schedules import crontab
+
+from app.core.config import DeploymentMode, Settings, get_settings
+from app.platform import announcements, billing, fleet, heartbeat_client, support, usage
+from app.platform.common import today_ist
+
+
+@shared_task(name="billing.generate_invoices", acks_late=True)
+def generate_invoices(month: str | None = None) -> dict[str, Any]:
+    """Daily at 02:00 IST; only the first run of a month does work (idempotent per month)."""
+    target = month or today_ist().strftime("%Y-%m")
+    job = billing.generate_invoices(target)
+    return {"job_id": str(job.id), "status": job.status}
+
+
+@shared_task(name="billing.daily", acks_late=True)
+def billing_daily() -> dict[str, int]:
+    """06:00 IST: roll ended periods, then mark past-due subscriptions (never suspends)."""
+    return {"rolled": billing.roll_periods(), "past_due": billing.mark_past_due()}
+
+
+@shared_task(name="usage.collect_daily", acks_late=True)
+def collect_usage(day: str | None = None) -> dict[str, int]:
+    return {"tenants": usage.collect_daily(dt.date.fromisoformat(day) if day else None)}
+
+
+@shared_task(name="fleet.check_staleness", acks_late=True)
+def check_staleness() -> dict[str, int]:
+    return {"unreachable": fleet.check_staleness()}
+
+
+@shared_task(name="announcements.publish", acks_late=True, ignore_result=True)
+def publish_announcements() -> dict[str, int]:
+    return {"active": announcements.publish()}
+
+
+@shared_task(name="support.purge_closed", acks_late=True)
+def purge_tickets() -> dict[str, int]:
+    return {"purged": support.purge_closed()}
+
+
+@shared_task(name="fleet.send_heartbeat", acks_late=True, ignore_result=True)
+def send_heartbeat() -> dict[str, Any]:
+    """Dedicated hosts: outbound heartbeat to the control plane every 5 minutes."""
+    return heartbeat_client.send()
+
+
+def beat_schedule(settings: Settings | None = None) -> dict[str, dict[str, Any]]:
+    settings = settings or get_settings()
+    if settings.deployment_mode is DeploymentMode.DEDICATED:
+        return {
+            "fleet-send-heartbeat": {"task": "fleet.send_heartbeat", "schedule": 300.0},
+        }
+    return {
+        "billing-generate-invoices": {
+            "task": "billing.generate_invoices",
+            "schedule": crontab(minute=30, hour=20),  # 02:00 IST
+        },
+        "billing-daily": {"task": "billing.daily", "schedule": crontab(minute=30, hour=0)},
+        "usage-collect-daily": {
+            "task": "usage.collect_daily",
+            "schedule": crontab(minute=0, hour=20),  # 01:30 IST
+        },
+        "fleet-check-staleness": {"task": "fleet.check_staleness", "schedule": 300.0},
+        "announcements-publish": {"task": "announcements.publish", "schedule": 60.0},
+        "support-purge-closed": {
+            "task": "support.purge_closed",
+            "schedule": crontab(minute=15, hour=21),  # 02:45 IST
+        },
+    }

@@ -1,0 +1,38 @@
+# Control-plane business rules (docs/16 §9-12, §15). Versioned config, no secrets.
+# Supplier identity (legal name, GSTIN, state code) comes from settings (SOS_BILLING_SUPPLIER_*).
+version: 1
+billing:
+  payment_terms_days: 15        # due date = issue date + terms
+  grace_days: 15                # suspension possible only after grace, and never automatic
+  default_gst_rate: "18.00"
+  default_sac_code: "998314"    # confirm with a CA before the first real invoice (docs/16 Q3)
+  invoice_prefix: "SOS"
+  # SOS/26-27/000123 = 16 characters (CGST Rule 46; docs/16 Q2)
+  invoice_number_format: "{prefix}/{fy_short}/{seq:06d}"
+  usd_inr_rate: "84.00"         # reviewed monthly
+  usage_thresholds: [80, 100]
+  # Suspension inside a window needs a platform_owner (docs/16 §9.3).
+  # Items: {name, boards: [BOARD, ...] ([] = every board), start: YYYY-MM-DD, end: YYYY-MM-DD}
+  protected_windows: []
+fleet:
+  heartbeat_interval_seconds: 300
+  unreachable_after_minutes: 20
+  key_rotation_overlap_days: 7
+  max_heartbeat_bytes: 16384
+  skew_seconds: 300
+  nonce_ttl_seconds: 600
+  rate_limit_seconds: 55
+  min_supported_version: "0.0.0"
+  degraded_rules:
+    backup_max_age_hours: 26
+    wal_lag_max_seconds: 900
+    disk_used_max_pct: 85
+    cert_min_days: 14
+support:
+  # SLA targets in hours (P3/P4 school days approximated as calendar hours in M0).
+  sla_hours:
+    p1: {first_response: 1, resolution: 8}
+    p2: {first_response: 4, resolution: 48}
+    p3: {first_response: 24, resolution: 120}
+    p4: {first_response: 48, resolution: 720}
+  retention_days_after_close: 365

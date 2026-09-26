@@ -27,6 +27,8 @@ TENANTLESS = {
     ("POST", "/api/v1/me/active-tenant"),
     ("POST", "/api/v1/me/login-event"),
 }
+# Machine-authenticated route (HMAC, require_fleet_signature(); CLAUDE.md §6.2, docs/16 §12).
+FLEET_HEARTBEAT = ("POST", "/api/v1/fleet/heartbeat")
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -62,6 +64,10 @@ def test_SEC_003_every_route_has_exactly_one_known_guard(app: FastAPI) -> None:
         if len(found) != 1:
             problems.append(f"{method} {path}: {len(found)} guards")
             continue
+        if getattr(found[0], "sos_fleet_signature", False) != ((method, path) == FLEET_HEARTBEAT):
+            problems.append(f"{method} {path}: fleet signature guard only on the heartbeat")
+        if (method, path) == FLEET_HEARTBEAT:
+            continue
         perm = found[0].sos_permission
         pdef = catalog.get(perm)
         if pdef is None:
@@ -79,6 +85,8 @@ def test_SEC_005_step_up_flags_match_catalog(app: FastAPI) -> None:
     problems: list[str] = []
     for method, path, route in api_routes(app):
         for guard in guards(route):
+            if getattr(guard, "sos_fleet_signature", False):
+                continue
             pdef = catalog[guard.sos_permission]
             if guard.sos_step_up and not pdef.step_up:
                 problems.append(f"{method} {path}: step-up on a non-step-up permission")
@@ -103,7 +111,12 @@ def test_SEC_003_route_permissions_exist_in_core_permissions(
 ) -> None:
     with app_engine.connect() as conn:
         keys: set[str] = set(conn.execute(text("SELECT key FROM core.permissions")).scalars())
-    used = {g.sos_permission for _, _, r in api_routes(app) for g in guards(r)}
+    used = {
+        g.sos_permission
+        for _, _, r in api_routes(app)
+        for g in guards(r)
+        if not getattr(g, "sos_fleet_signature", False)
+    }
     assert used
     assert used <= keys
 
