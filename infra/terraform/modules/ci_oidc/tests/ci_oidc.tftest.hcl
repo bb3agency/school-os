@@ -1,0 +1,58 @@
+# CI access via GitHub OIDC only, bound to bb3agency/school-os and a GitHub Environment (07 §13).
+
+mock_provider "aws" {
+  mock_data "aws_iam_policy_document" {
+    defaults = { json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" }
+  }
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "111122223333" }
+  }
+  mock_data "aws_partition" {
+    defaults = { partition = "aws" }
+  }
+}
+
+variables {
+  name_prefix         = "sos-test"
+  deploy_environment  = "production"
+  ecr_repository_arns = ["arn:aws:ecr:ap-south-1:111122223333:repository/schoolos/api"]
+  ecs_cluster_arn     = "arn:aws:ecs:ap-south-1:111122223333:cluster/sos-test"
+  passable_role_arns  = ["arn:aws:iam::111122223333:role/sos-test-api-task"]
+}
+
+run "prod_deploy_requires_environment" {
+  command = plan
+
+  assert {
+    condition     = output.deploy_subjects == ["repo:bb3agency/school-os:environment:production"]
+    error_message = "Prod deploy role trusts only the protected production environment of bb3agency/school-os."
+  }
+
+  assert {
+    condition     = aws_iam_openid_connect_provider.github[0].url == "https://token.actions.githubusercontent.com" && aws_iam_openid_connect_provider.github[0].client_id_list == toset(["sts.amazonaws.com"])
+    error_message = "GitHub OIDC provider with sts audience."
+  }
+}
+
+run "staging_may_deploy_from_main" {
+  command = plan
+
+  variables {
+    deploy_environment = "staging"
+    allow_main_branch  = true
+  }
+
+  assert {
+    condition     = contains(output.deploy_subjects, "repo:bb3agency/school-os:ref:refs/heads/main") && length(output.deploy_subjects) == 2
+    error_message = "Staging also trusts main-branch pushes."
+  }
+}
+
+run "apply_role_optional" {
+  command = plan
+
+  assert {
+    condition     = length(aws_iam_role.apply) == 0
+    error_message = "The administrative apply role is opt-in."
+  }
+}

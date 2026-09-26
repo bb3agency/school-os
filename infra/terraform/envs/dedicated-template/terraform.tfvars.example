@@ -1,0 +1,21 @@
+# Copy to schools/<school_code>.tfvars (one per school). No secrets here.
+aws_account_id = "<PROD_ACCOUNT_ID>"
+owner          = "<owner email or team>"
+cost_center    = "<school billing account>"
+
+school_code   = "svhs-guntur"
+domain        = "svhs-guntur.<your-domain>"
+custom_domain = "" # e.g. "office.svhs.edu.in" (the school adds an A record to the Elastic IP)
+acme_email    = "<ops@your-domain>"
+instance_type = "t4g.medium"
+
+release_version = "2026.10.1"
+bundle_sha256   = "<sha256 from the release notes>"
+
+# From the shared prod stack outputs:
+artifacts_bucket      = "sos-prod-artifacts-<PROD_ACCOUNT_ID>"
+artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<DATA_KEY_ID>"
+control_plane_url     = "https://app.<your-domain>"
+
+route53_zone_id = null
+walg_enabled    = false

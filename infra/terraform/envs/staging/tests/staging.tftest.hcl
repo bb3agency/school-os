@@ -1,0 +1,87 @@
+# Staging keeps every encryption/isolation control of prod; only teardown-related protections differ.
+
+mock_provider "aws" {
+  mock_data "aws_iam_policy_document" {
+    defaults = { json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" }
+  }
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "444455556666" }
+  }
+  mock_data "aws_partition" {
+    defaults = { partition = "aws" }
+  }
+  mock_data "aws_region" {
+    defaults = { region = "ap-south-1" }
+  }
+}
+
+mock_provider "aws" {
+  alias = "dr"
+  mock_data "aws_iam_policy_document" {
+    defaults = { json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" }
+  }
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "444455556666" }
+  }
+  mock_data "aws_region" {
+    defaults = { region = "ap-south-2" }
+  }
+}
+
+variables {
+  aws_account_id        = "444455556666"
+  owner                 = "platform@example.test"
+  cost_center           = "schoolos-staging"
+  release_version       = "2026.10.1"
+  app_domain            = "app.staging.example.test"
+  admin_domain          = "admin.staging.example.test"
+  cognito_domain_prefix = "sos-test-staging"
+  alarm_emails          = ["dev@example.test"]
+  state_bucket_arn      = "arn:aws:s3:::sos-tfstate-444455556666"
+  state_kms_key_arn     = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000009"
+}
+
+run "staging_keeps_encryption_and_tls" {
+  command = plan
+
+  assert {
+    condition     = module.platform.security_posture.rds.storage_encrypted && module.platform.security_posture.rds.force_ssl == "1"
+    error_message = "Staging RDS must still be encrypted and TLS-only."
+  }
+
+  assert {
+    condition     = module.platform.security_posture.redis.at_rest_encryption && module.platform.security_posture.redis.transit_encryption
+    error_message = "Staging Valkey must still be encrypted."
+  }
+
+  assert {
+    condition     = module.platform.security_posture.audit_object_lock == "COMPLIANCE"
+    error_message = "Staging audit archive still uses COMPLIANCE mode (short retention)."
+  }
+}
+
+run "staging_is_synthetic_and_disposable" {
+  command = plan
+
+  assert {
+    condition     = var.data_class == "synthetic"
+    error_message = "Staging must be tagged data_class=synthetic (invariant 11)."
+  }
+
+  assert {
+    condition     = !module.platform.security_posture.rds.deletion_protection
+    error_message = "Staging RDS is disposable (no deletion protection)."
+  }
+}
+
+run "staging_containers_hardened" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for c in [module.platform.security_posture.web_container, module.platform.security_posture.api_container, module.platform.security_posture.worker_container] :
+      c.readonlyRootFilesystem && !c.privileged && contains(c.linuxParameters.capabilities.drop, "ALL")
+    ])
+    error_message = "Containers are hardened in every environment (SEC-030)."
+  }
+}

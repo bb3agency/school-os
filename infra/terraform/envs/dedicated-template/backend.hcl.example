@@ -1,0 +1,5 @@
+# Copy to schools/<school_code>.backend.hcl (one per school) and run:
+#   terraform init -reconfigure -backend-config=schools/<school_code>.backend.hcl
+bucket     = "sos-tfstate-<PROD_ACCOUNT_ID>"
+kms_key_id = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<STATE_KEY_ID>"
+key        = "schoolos/dedicated/<school_code>/terraform.tfstate"

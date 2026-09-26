@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and fill in. Staging holds SYNTHETIC data only (make seed-synthetic).
+aws_account_id = "<STAGING_ACCOUNT_ID>"
+owner          = "<owner email or team>"
+cost_center    = "<cost centre>"
+
+release_version = "2026.10.1"
+
+app_domain            = "app.staging.<your-domain>"
+admin_domain          = "admin.staging.<your-domain>"
+route53_zone_id       = null
+cognito_domain_prefix = "<globally-unique-prefix>-staging"
+
+alarm_emails       = ["<dev-alerts@your-domain>"]
+monthly_budget_usd = 120
+
+state_bucket_arn  = "arn:aws:s3:::sos-tfstate-<STAGING_ACCOUNT_ID>"
+state_kms_key_arn = "arn:aws:kms:ap-south-1:<STAGING_ACCOUNT_ID>:key/<STATE_KEY_ID>"
