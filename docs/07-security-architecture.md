@@ -54,7 +54,7 @@ flowchart LR
   end
   subgraph datanet["Data subnets (no internet)"]
     PG[(PostgreSQL)]
-    RD[(Redis)]
+    RD[(Valkey)]
   end
   S3[(S3 via VPC endpoint)]
   KMS[KMS]
@@ -127,7 +127,7 @@ Review the model at each milestone and after any incident.
 - **Throttling:** per-account and per-IP limits; progressive delays; lockout notifications to the user and school admins.
 
 ### 5.2 Sessions (BFF)
-- Server-side session in Redis, referenced by a `__Host-sos_session` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`.
+- Server-side session in Valkey, referenced by a `__Host-sos_session` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`.
 - Tokens stored server-side, encrypted; access token ≤ 10 min; refresh token rotated on every use; reuse detection revokes the whole session family.
 - Idle timeout 15 min (tenant-configurable 5–30), absolute 12 h. Shared-PC mode shows a visible "Lock now" button.
 - **Step-up authentication** (MFA within the last 5 minutes) for: approving identity changes, role/permission changes, waiving blockers, bulk exports, full tenant export, break-glass approval, and every platform permission marked ᴿ (§6.5). The API requires `sos:mfa = "true"` and `auth_time` within 5 minutes, otherwise returns `428 step_up_required`; the BFF re-authenticates with `prompt=login` and retries (ADR-0018).
@@ -264,8 +264,8 @@ Workers never run "for all tenants" in one transaction; batch jobs get tenant ID
 
 ## 8. Data protection and key management
 
-- **In transit:** TLS 1.2+ (prefer 1.3) at the edge; TLS to RDS (`sslmode=verify-full`) and Redis (in-transit encryption); HTTPS to all third parties.
-- **At rest:** RDS, snapshots, S3 and Redis encrypted with KMS customer-managed keys (separate CMKs for data, audit archive, backups).
+- **In transit:** TLS 1.2+ (prefer 1.3) at the edge; TLS to RDS (`sslmode=verify-full`) and Valkey (in-transit encryption); HTTPS to all third parties.
+- **At rest:** RDS, snapshots, S3 and Valkey (ElastiCache) encrypted with KMS customer-managed keys (separate CMKs for data, audit archive, backups).
 - **Application-layer encryption** for C3 fields (05 §9): AES-256-GCM, per-tenant DEK wrapped by KMS, AAD binds ciphertext to tenant/table/column/row.
 - **Key rotation:** CMKs rotated annually (automatic); DEKs rotated on schedule or incident with background re-encryption.
 - **Crypto-shredding:** deleting a tenant's wrapped keys renders remaining ciphertext (including in backups) unreadable.
@@ -341,7 +341,7 @@ Cross-Origin-Resource-Policy: same-origin
 
 - **Accounts:** AWS Organizations with separate `prod` and `staging` accounts (plus `log-archive`/`security` from Stage 1). Humans use IAM Identity Center with MFA; no IAM users with long-lived keys.
 - **Guardrails:** SCPs deny actions outside ap-south-1/ap-south-2 (except global services), deny disabling CloudTrail/GuardDuty/Config, deny public S3.
-- **Network:** RDS and Redis in private data subnets with no internet route; security groups allow only app tasks; S3/KMS/Secrets Manager/ECR via VPC endpoints where cost-justified; egress allowlist to required third-party domains (via proxy or firewall rules at Stage 1).
+- **Network:** RDS and ElastiCache for Valkey in private data subnets with no internet route; security groups allow only app tasks; S3/KMS/Secrets Manager/ECR via VPC endpoints where cost-justified; egress allowlist to required third-party domains (via proxy or firewall rules at Stage 1).
 - **Access to hosts/DB:** no SSH; SSM Session Manager with logging; DB admin access only through a break-glass role with approval and session recording.
 - **Detection:** CloudTrail (org trail to log-archive with Object Lock), GuardDuty, AWS Config conformance rules, Security Hub foundational checks, WAF logs, VPC flow logs (sampled).
 - **CI/CD access:** GitHub Actions assumes deploy roles via OIDC with branch/environment conditions; production deploy requires manual approval.
@@ -380,7 +380,7 @@ Cross-Origin-Resource-Policy: same-origin
 | SEC-008 | Structured logging with redaction; log tests | M0 |
 | SEC-009 | Secrets Manager; gitleaks; push protection | M0 |
 | SEC-010 | Security headers + CSP | M0 |
-| SEC-011 | KMS encryption for RDS/S3/Redis/backups | M0 |
+| SEC-011 | KMS encryption for RDS/S3/Valkey/backups | M0 |
 | SEC-012 | Per-tenant DEKs; C3 field encryption | M1 |
 | SEC-013 | Aadhaar input rejection + Verhoeff redaction in pipelines | M1 |
 | SEC-014 | Maker-checker with DB constraint | M1 |

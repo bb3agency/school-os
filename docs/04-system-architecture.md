@@ -112,7 +112,7 @@ Browser → WAF → ALB → web (BFF)
      for Cognito client_id + token_use —, expiry, signature via JWKS cache; ADR-0018)
   3. resolve tenant: active membership for token subject; reject if suspended
      (except the owner's Plan & billing and full-export routes, 16 §5.5)
-  4. rate limit: per user, per tenant, per route class (Redis token bucket)
+  4. rate limit: per user, per tenant, per route class (Valkey token bucket)
   5. authorize: route's require(permission, scope) → 403 on failure
   6. handler → service → repository inside core.db.tenant_session():
        BEGIN;

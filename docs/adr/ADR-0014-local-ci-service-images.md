@@ -39,7 +39,7 @@ Our licence policy forbids AGPL/SSPL in core runtime without an ADR (07 §14; 13
 | Keep MinIO (older image or build from source) | AGPL-3.0; no maintained community images; supply-chain risk |
 | LocalStack for S3 | Heavier; emulates many services we do not use |
 | Garage (S3-compatible) | AGPL-3.0 |
-| Keep Redis 7.2 (last BSD release) | Unmaintained branch; security fixes stop |
+| Keep Redis 7.2 (last BSD release) | Old branch with a limited support window; no new features or long-term fixes |
 | KeyDB / Dragonfly | Smaller communities (KeyDB) or BSL licence (Dragonfly) |
 
 ## Related requirements

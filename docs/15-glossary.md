@@ -1,5 +1,10 @@
 # 15 · Glossary
 
+| Field | Value |
+|---|---|
+| Version | 0.2 · 2026-09-26 |
+| Changes | 0.2: platform, deployment and billing terms (control plane, data plane, tiers, heartbeat, MRR/ARR, GSTIN, definer function, operator and related). 0.1: baseline |
+
 ## Domain (Indian schools, Andhra Pradesh)
 
 | Term | Meaning |
@@ -64,3 +69,32 @@
 | **SLO** | Service level objective |
 | **Step-up authentication** | Requiring fresh MFA before a sensitive action |
 | **Tenant** | One school's isolated space in SchoolOS |
+| **Composite tenant foreign key** | A foreign key that includes `tenant_id` on both sides, so a row can only reference rows of the same school |
+| **Definer function** | A PostgreSQL `SECURITY DEFINER` function that runs with its owner's rights. In SchoolOS only a pinned list exists, owned by `sos_definer`, and they are the only paths that cross tenants (05 §3.4) |
+| **JCS (RFC 8785)** | JSON Canonicalization Scheme: one exact byte form of a JSON document, used before hashing audit events |
+| **SeaweedFS** | Apache-2.0 object store with an S3 API, used locally and in CI instead of MinIO (ADR-0014) |
+| **Valkey** | BSD-licensed, Redis-protocol key-value store used for queues, sessions and caches (ADR-0014) |
+
+## Platform, deployment and billing
+
+| Term | Meaning |
+|---|---|
+| **Control plane** | The part of SchoolOS that runs the business and the fleet: platform admin panel, billing, fleet registry. Runs only in the shared deployment; never reads student data (16) |
+| **Data plane** | Everything that serves schools day to day: the shared tier's tenant app and every dedicated host |
+| **Shared tier** | Default plan: the school is a tenant on the pooled multi-tenant platform in AWS Mumbai |
+| **Dedicated tier** | Premium plan: the school gets its own isolated host (same software, one tenant), own storage and key, optional custom domain (ADR-0015) |
+| **Deployment** | A place SchoolOS runs for a school: the shared stack or one dedicated host; listed in the fleet registry |
+| **Heartbeat** | A signed message a dedicated host sends to the control plane every 5 minutes with version, health, backup state and counts, never personal data (16 §12) |
+| **HMAC** | Hash-based message authentication code; proves a heartbeat came from the host that holds the shared key and was not changed |
+| **Operator** | A SchoolOS staff member who uses the platform admin panel with a platform role (`platform_owner`, `platform_engineer`, `support_agent`, `billing_admin`, `platform_viewer`); not a school user |
+| **Step-up (operators)** | Fresh MFA within 5 minutes before risky platform actions (marked ᴿ) |
+| **Two-person rule** | An action (offboarding, emergency break-glass) that needs a second, different operator to approve |
+| **MRR / ARR** | Monthly / annual recurring revenue: monthly-equivalent subscription income excluding GST and trials; ARR = MRR × 12 |
+| **Trial / past due / suspended** | Subscription states: free period before paying; unpaid after the due date (15-day grace follows); access paused by a human decision (16 §9) |
+| **GST** | Goods and Services Tax. Within one state: CGST + SGST (9% + 9% at the 18% rate); across states: IGST (18%) |
+| **GSTIN** | 15-character GST identification number; its first two digits are the state code (Andhra Pradesh = 37) |
+| **SAC** | Services Accounting Code printed on each invoice line |
+| **Financial year (FY)** | Indian accounting year, 1 April to 31 March (e.g., FY 2026-27); invoice numbers restart each FY |
+| **TDS** | Tax deducted at source: an amount a school may deduct from a payment and deposit with the tax department on SchoolOS's behalf |
+| **UTR** | Unique transaction reference of a bank transfer (NEFT/RTGS/IMPS), recorded with a manual payment |
+| **Custom domain** | A school's own web address (e.g., `office.<school>.edu.in`) pointing at its dedicated host |

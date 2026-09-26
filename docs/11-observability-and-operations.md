@@ -50,7 +50,7 @@
 
 ## 4. Tracing
 
-- OTel auto-instrumentation for FastAPI, SQLAlchemy, httpx, Celery, Redis; manual spans for `kb.ask`, `llm.call`, `tool.*`, `retrieval.hybrid`, `dq.run`, `pdf.render`.
+- OTel auto-instrumentation for FastAPI, SQLAlchemy, httpx, Celery, Redis client (Valkey); manual spans for `kb.ask`, `llm.call`, `tool.*`, `retrieval.hybrid`, `dq.run`, `pdf.render`.
 - Trace context propagated from BFF → API → Celery tasks (headers) → external calls.
 - Sampling: 100% errors, 20% of successful requests (tune), 100% of `kb.ask` in staging.
 - Span attributes are allowlisted (no PII); SQL statements recorded without bind values.
@@ -132,7 +132,7 @@ Snapshot affected resources, export relevant logs to the log-archive account, pr
 
 | ID | Runbook | Key steps |
 |---|---|---|
-| R1 | API/web down or erroring | Check ALB target health → recent deploys (roll back if correlated) → DB/Redis health → dependency status → scale out → communicate |
+| R1 | API/web down or erroring | Check ALB target health → recent deploys (roll back if correlated) → DB/Valkey health → dependency status → scale out → communicate |
 | R2 | Database pressure | Identify top queries (`pg_stat_statements`) → kill runaway queries → check autovacuum/bloat → scale instance class (maintenance window) → add index via `CONCURRENTLY` |
 | R3 | Queue backlog / DLQ | Identify queue and tenant → check provider errors (OCR/embeddings) → scale workers → inspect DLQ messages → fix and re-drive idempotently |
 | R4 | LLM/embeddings provider outage | Confirm circuit breaker open → ensure search-only mode banner active → pause ingestion embeds → monitor provider status → re-enable gradually |

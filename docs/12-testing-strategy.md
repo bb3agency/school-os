@@ -32,7 +32,7 @@
 | Performance | NFR-PERF targets | k6 or Locust (staging) | Weekly + before release |
 | RAG evaluation | Retrieval, faithfulness, citations, leakage, injection | `evals/` harness | PR subset when knowledge changes; full nightly |
 | Security scanning | SAST, deps, secrets, IaC, images, DAST | Semgrep, pip-audit, npm audit/OSV, gitleaks, Trivy, OWASP ZAP baseline | Every PR / nightly (ZAP) |
-| Resilience | Provider outages, Redis loss, slow DB | Fault injection in staging (toggle-based) | Monthly |
+| Resilience | Provider outages, Valkey loss, slow DB, missed heartbeats, control plane down | Fault injection in staging (toggle-based) | Monthly |
 
 ## 3. Synthetic data
 

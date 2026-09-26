@@ -35,11 +35,11 @@ SCPs: restrict regions to ap-south-1/ap-south-2 (global services excepted), deny
 VPC 10.20.0.0/16 (ap-south-1, two AZs)
 ├── public   10.20.0.0/24, 10.20.1.0/24    ALB, NAT (Stage 1+)
 ├── app      10.20.10.0/24, 10.20.11.0/24  ECS tasks: web, api, worker, beat
-└── data     10.20.20.0/24, 10.20.21.0/24  RDS, Redis (no internet route)
+└── data     10.20.20.0/24, 10.20.21.0/24  RDS, ElastiCache for Valkey (no internet route)
 Endpoints: S3 (gateway), ECR, Secrets Manager, KMS, CloudWatch Logs (interface; add when cost-justified)
 ```
 
-- Security groups: ALB → web (443→3000), web → api (internal port), app → RDS (5432), app → Redis (6379). Nothing else inbound.
+- Security groups: ALB → web (443→3000), web → api (internal port), app → RDS (5432), app → Valkey (6379). Nothing else inbound.
 - Egress: third-party APIs (LLM, embeddings, OCR, IdP) via NAT; Stage 1 adds a domain allowlist (egress proxy or firewall rules).
 - **Cost note (Stage 0):** a NAT gateway is a notable fixed monthly cost. Options: single NAT in one AZ; or tasks in public subnets with public IPs and security groups allowing **only** ALB inbound (acceptable for pilot with strict SGs); revisit at Stage 1.
 
