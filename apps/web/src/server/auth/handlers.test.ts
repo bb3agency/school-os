@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from "vitest";
-import { createHarness, type Harness } from "@/test/bff-harness";
+import { createHarness, defaultApi, type Harness } from "@/test/bff-harness";
 import {
   handleActiveTenant,
   handleCallback,
@@ -12,6 +12,7 @@ import {
 } from "./handlers";
 
 const TENANT = "0192f3a4-0000-7000-8000-000000000001";
+const OTHER_TENANT = "0192f3a4-0000-7000-8000-000000000002";
 const clerk = { sub: "staff-sub-1", name: "Office Clerk" };
 let h: Harness;
 
@@ -226,7 +227,7 @@ describe("GET /bff/auth/session", () => {
       authenticated: true,
       kind: "staff",
       display_name: "Office Clerk",
-      active_tenant_id: null,
+      active_tenant_id: TENANT,
       idle_timeout_ms: 15 * 60_000,
     });
     expect(body.csrf_token).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -436,14 +437,15 @@ describe("POST /bff/auth/active-tenant", () => {
     const response = await handleActiveTenant(
       h.request("/bff/auth/active-tenant", {
         method: "POST",
-        body: JSON.stringify({ tenant_id: TENANT }),
+        body: JSON.stringify({ tenant_id: OTHER_TENANT }),
         headers: { "x-csrf-token": await h.csrf() },
       }),
       h.runtime,
     );
     expect(response.status).toBe(403);
     const session = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
-    expect(session?.activeTenantId).toBeNull();
+    // Still the school chosen at sign-in.
+    expect(session?.activeTenantId).toBe(TENANT);
   });
 
   it("validates the tenant id", async () => {
@@ -457,5 +459,120 @@ describe("POST /bff/auth/active-tenant", () => {
       h.runtime,
     );
     expect(response.status).toBe(422);
+  });
+});
+
+describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", () => {
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  const school = (tenant_id: string, status = "active") => ({
+    tenant_id,
+    name: "Synthetic School",
+    code: tenant_id.slice(-4),
+    status,
+  });
+  const paths = () => h.apiCalls.map((request) => new URL(request.url).pathname);
+  const activeTenant = async () =>
+    (await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false }))
+      ?.activeTenantId;
+
+  it("accepts invitations first, then lists schools; one school becomes active and the login is audited there", async () => {
+    const response = await h.signIn("staff", clerk, "/en/settings/users");
+    expect(response.headers.get("location")).toBe(
+      "https://office.school.example/en/settings/users",
+    );
+    expect(paths()).toEqual([
+      "/api/v1/me/accept-invitations",
+      "/api/v1/me/schools",
+      "/api/v1/me/login-event",
+    ]);
+    const login = h.apiCalls.find((r) => r.url.endsWith("/api/v1/me/login-event"));
+    expect(login?.headers.get("x-active-tenant")).toBe(TENANT);
+    expect(login?.headers.get("x-service-token")).toMatch(/^ey/);
+    const accept = h.apiCalls.find((r) => r.url.endsWith("/api/v1/me/accept-invitations"));
+    expect(accept?.method).toBe("POST");
+    expect(accept?.headers.has("x-active-tenant")).toBe(false);
+    expect(await activeTenant()).toBe(TENANT);
+  });
+
+  it("MFA required at invitation acceptance: no session, the MFA message page", async () => {
+    h.setApi((request) =>
+      request.url.endsWith("/api/v1/me/accept-invitations")
+        ? json({ code: "mfa_required", status: 403 }, 403)
+        : defaultApi(request),
+    );
+    const response = await h.signIn("staff", clerk);
+    expect(response.headers.get("location")).toBe(
+      "https://office.school.example/signed-out?error=mfa_required",
+    );
+    expect(h.jar.has("__Host-sos_session")).toBe(false);
+    expect(paths()).not.toContain("/api/v1/me/login-event");
+  });
+
+  it("several schools: go to the picker; the login is audited once the school is chosen", async () => {
+    h.setApi((request) =>
+      request.url.endsWith("/api/v1/me/schools")
+        ? json({ data: [school(TENANT), school(OTHER_TENANT, "suspended")] })
+        : defaultApi(request),
+    );
+    const response = await h.signIn("staff", clerk, "/te/audit");
+    expect(response.headers.get("location")).toBe(
+      "https://office.school.example/te/choose-school?next=%2Fte%2Faudit",
+    );
+    expect(paths()).not.toContain("/api/v1/me/login-event");
+    expect(await activeTenant()).toBeNull();
+
+    const choose = async (tenant: string) =>
+      handleActiveTenant(
+        h.request("/bff/auth/active-tenant", {
+          method: "POST",
+          body: JSON.stringify({ tenant_id: tenant }),
+          headers: { "x-csrf-token": await h.csrf(), "content-type": "application/json" },
+        }),
+        h.runtime,
+      );
+    expect((await choose(TENANT)).status).toBe(200);
+    const logins = () => h.apiCalls.filter((r) => r.url.endsWith("/api/v1/me/login-event"));
+    expect(logins()).toHaveLength(1);
+    expect(logins()[0]?.headers.get("x-active-tenant")).toBe(TENANT);
+
+    // Switching school later is not a new login.
+    expect((await choose(TENANT)).status).toBe(200);
+    expect(logins()).toHaveLength(1);
+  });
+
+  it("no school at all: the 'no access yet' page in the user's language", async () => {
+    h.setApi((request) =>
+      request.url.endsWith("/api/v1/me/schools") ? json({ data: [] }) : defaultApi(request),
+    );
+    const response = await h.signIn("staff", clerk, "/te/settings/structure");
+    expect(response.headers.get("location")).toBe("https://office.school.example/te/no-access");
+    expect(h.jar.has("__Host-sos_session")).toBe(true);
+  });
+
+  it("one suspended school: the picker explains it; the denial is audited", async () => {
+    h.setApi((request) =>
+      request.url.endsWith("/api/v1/me/schools")
+        ? json({ data: [school(TENANT, "suspended")] })
+        : defaultApi(request),
+    );
+    const response = await h.signIn("staff", clerk);
+    expect(response.headers.get("location")).toBe(
+      "https://office.school.example/en/choose-school?next=%2F",
+    );
+    const login = h.apiCalls.find((r) => r.url.endsWith("/api/v1/me/login-event"));
+    expect(login?.headers.get("x-active-tenant")).toBe(TENANT);
+    expect(await activeTenant()).toBeNull();
+  });
+
+  it("step-up does not repeat invitations or the login event", async () => {
+    await h.signIn("staff", clerk);
+    const before = h.apiCalls.length;
+    const stepUp = h.absorb(
+      await handleStepUp(h.request("/bff/auth/step-up?next=/en/settings/users"), h.runtime, "staff"),
+    );
+    const back = h.idp.staff.authorize(stepUp.headers.get("location") ?? "", clerk);
+    await handleCallback(h.request(back.href), h.runtime, "staff");
+    expect(h.apiCalls.length).toBe(before);
   });
 });

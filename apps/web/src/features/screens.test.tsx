@@ -85,8 +85,9 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     expect(within(sections).getAllByText("6వ తరగతి")).toHaveLength(2);
   });
 
-  it("structure: 'not available yet' for 404 and a plain error for 500", async () => {
+  it("structure: 'not found' for 404, 'not available' for 501 and a plain error for 500", async () => {
     routes["/bff/api/v1/academic-years"] = () => page([YEAR]);
+    routes["/bff/api/v1/classes"] = () => Response.json({ code: "not_implemented" }, { status: 501 });
     routes["/bff/api/v1/sections"] = () =>
       Response.json({ code: "internal_error" }, { status: 500 });
     renderWithIntl(<StructureScreen />, "te");
@@ -213,50 +214,69 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
 });
 
 describe("platform screens wired to the BFF (FR-PLT-001)", () => {
-  it("dashboard: shows KPIs from the API", async () => {
+  it("dashboard: shows the tiles the API returns and hides the ones it leaves out", async () => {
     routes["/bff/api/v1/platform/dashboard"] = () =>
       Response.json({
         mrr_inr: "125000.00",
         arr_inr: "1500000.00",
-        active_schools: 12,
-        trial_schools: 3,
-        past_due_subscriptions: 1,
-        fleet_healthy: 4,
-        fleet_total: 5,
-        ai_spend_month_inr: "3200.50",
+        schools_by_status: { active: 12, suspended: 1 },
+        schools_by_tier: { shared: 11, dedicated: 2 },
+        trials_running: 3,
+        trials_ending_14d: 1,
+        fleet_by_status: { healthy: 4, degraded: 1 },
+        fleet_versions: { "2026.09.1": 5 },
+        // A support-only operator would get these; billing tiles are null (no permission).
+        past_due_count: null,
+        ai_spend_mtd_inr: null,
+        open_tickets_by_priority: null,
       });
     renderWithIntl(<DashboardScreen />);
     const kpis = screen.getByRole("region", { name: messages.en.platform.dashboard.kpisLabel });
-    await waitFor(() => expect(within(kpis).queryAllByText("—")).toHaveLength(0));
-    expect(within(kpis).getByText("12")).toBeInTheDocument();
+    await waitFor(() => expect(within(kpis).getByText("12")).toBeInTheDocument());
+    expect(within(kpis).getByText("4 of 5 healthy")).toBeInTheDocument();
+    expect(within(kpis).getByText("1 suspended · 0 offboarding")).toBeInTheDocument();
+    expect(within(kpis).queryByText(messages.en.platform.dashboard.pastDue)).toBeNull();
+    expect(within(kpis).queryByText(messages.en.platform.dashboard.openTickets)).toBeNull();
   });
 
-  it("dashboard: says 'not available yet' while the API route does not exist", async () => {
+  it("dashboard: explains a missing permission in Telugu", async () => {
+    routes["/bff/api/v1/platform/dashboard"] = () =>
+      Response.json({ code: "forbidden" }, { status: 403 });
     renderWithIntl(<DashboardScreen />, "te");
-    expect(await screen.findByText(messages.te.common.notAvailableYetTitle)).toBeInTheDocument();
+    expect(await screen.findByText(messages.te.errors.load.forbidden)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       messages.te.platform.dashboard.title,
     );
   });
 
-  it("schools: searches with q and lists tenant metadata", async () => {
+  it("schools: passes the URL's filters and lists tenant metadata", async () => {
     routes["/bff/api/v1/platform/tenants"] = () =>
       page([
         {
-          id: "0192f3a4-0000-7000-8000-000000000001",
-          name: "Sri Saraswati High School",
-          code: "SSHS",
-          status: "active",
-          plan_key: "standard",
-          plan_name: "Standard",
-          deployment_mode: "shared",
-          region: "ap-south-1",
+          tenant_id: "0192f3a4-0000-7000-8000-000000000001",
+          school_name: "Sri Saraswati High School",
+          code: "sshs",
+          tier: "dedicated",
+          tenant_status: "active",
+          subscription_status: "past_due",
+          plan_code: "standard",
+          deployment_status: "unreachable",
+          app_version: "2026.09.1",
+          last_heartbeat_at: "2026-09-26T04:30:00Z",
           created_at: "2026-06-01T04:30:00Z",
         },
       ]);
-    renderWithIntl(<SchoolsScreen query=" saraswati " />);
-    expect(await screen.findByText("Sri Saraswati High School")).toBeInTheDocument();
-    const url = seen.find((u) => u.pathname === "/bff/api/v1/platform/tenants");
+    renderWithIntl(
+      <SchoolsScreen filters={{ q: " saraswati ", status: "active", pastDue: true }} />,
+    );
+    const link = await screen.findByRole("link", { name: "Sri Saraswati High School" });
+    expect(link).toHaveAttribute("href", "/en/platform/schools/0192f3a4-0000-7000-8000-000000000001");
+    expect(within(screen.getByRole("table")).getByText(messages.en.status.subscription.past_due)).toBeInTheDocument();
+    expect(screen.getByText(messages.en.status.deployment.unreachable)).toBeInTheDocument();
+    const url = seen.find((u) => u.pathname === "/bff/api/v1/platform/tenants" && u.searchParams.has("q"));
     expect(url?.searchParams.get("q")).toBe("saraswati");
+    expect(url?.searchParams.get("status")).toBe("active");
+    expect(url?.searchParams.get("past_due")).toBe("true");
+    expect(url?.searchParams.has("trial_ending")).toBe(false);
   });
 });

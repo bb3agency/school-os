@@ -39,6 +39,7 @@ import PlatformSchoolsPage from "./[locale]/platform/schools/page";
 import PlatformSubscriptionsPage from "./[locale]/platform/subscriptions/page";
 import PlatformSupportPage from "./[locale]/platform/support/page";
 import PlatformUsagePage from "./[locale]/platform/usage/page";
+import SchoolSupportPage from "./[locale]/(school)/support/page";
 
 type Messages = (typeof messages)["en"];
 type PageCase = {
@@ -66,6 +67,11 @@ const pages: PageCase[] = [
     name: "plan and billing",
     title: (m) => m.school.billing.title,
     render: () => <SchoolBillingPage />,
+  },
+  {
+    name: "school support",
+    title: (m) => m.school.support.title,
+    render: () => <SchoolSupportPage />,
   },
   {
     name: "school audit log",
@@ -102,7 +108,7 @@ const pages: PageCase[] = [
     title: (m) => m.platform.provision.title,
     render: () => <ProvisionSchoolPage />,
   },
-  { name: "plans", title: (m) => m.platform.plans.title, render: () => <PlatformPlansPage /> },
+  { name: "plans", title: (m) => m.platform.plans.title, render: () => PlatformPlansPage({ searchParams: noSearch() }) },
   {
     name: "subscriptions",
     title: (m) => m.platform.subscriptions.title,
@@ -111,11 +117,11 @@ const pages: PageCase[] = [
   {
     name: "invoices",
     title: (m) => m.platform.invoices.title,
-    render: () => <PlatformInvoicesPage />,
+    render: () => PlatformInvoicesPage({ searchParams: noSearch() }),
   },
-  { name: "usage", title: (m) => m.platform.usage.title, render: () => <PlatformUsagePage /> },
+  { name: "usage", title: (m) => m.platform.usage.title, render: () => PlatformUsagePage({ searchParams: noSearch() }) },
   { name: "flags", title: (m) => m.platform.flags.title, render: () => <PlatformFlagsPage /> },
-  { name: "fleet", title: (m) => m.platform.fleet.title, render: () => <PlatformFleetPage /> },
+  { name: "fleet", title: (m) => m.platform.fleet.title, render: () => PlatformFleetPage({ searchParams: noSearch() }) },
   {
     name: "announcements",
     title: (m) => m.platform.announcements.title,
@@ -124,7 +130,7 @@ const pages: PageCase[] = [
   {
     name: "support tickets",
     title: (m) => m.platform.support.title,
-    render: () => <PlatformSupportPage />,
+    render: () => PlatformSupportPage({ searchParams: noSearch() }),
   },
   {
     name: "break-glass",
@@ -139,7 +145,7 @@ const pages: PageCase[] = [
   {
     name: "platform audit",
     title: (m) => m.platform.audit.title,
-    render: () => <PlatformAuditPage />,
+    render: () => PlatformAuditPage({ searchParams: noSearch() }),
   },
 ];
 
@@ -169,16 +175,18 @@ describe("page shells render in both languages (NFR-I18N-001, FR-PLT-001..030)",
     }
   }
 
-  it("support tickets always show the student-data warning", () => {
-    renderWithIntl(<PlatformSupportPage />, "te");
-    expect(screen.getByText(messages.te.platform.support.piiWarningTitle)).toBeVisible();
+  it("support tickets always show the student-data warning (operator and school)", async () => {
+    renderWithIntl(await PlatformSupportPage({ searchParams: noSearch() }), "te");
+    expect(screen.getByText(messages.te.support.piiWarningTitle)).toBeVisible();
+    renderWithIntl(<SchoolSupportPage />, "en");
+    expect(screen.getByText(messages.en.support.piiWarningTitle)).toBeVisible();
   });
 
-  it("dashboard shows — for every unavailable KPI", () => {
+  it("dashboard shows — for every KPI while nothing has loaded", () => {
     renderWithIntl(<PlatformDashboardPage />, "en");
     const kpis = screen.getByRole("region", { name: messages.en.platform.dashboard.kpisLabel });
-    expect(within(kpis).getAllByText("—")).toHaveLength(7);
-    expect(within(kpis).getAllByText(messages.en.common.notAvailable)).toHaveLength(7);
+    expect(within(kpis).getAllByText("—")).toHaveLength(9);
+    expect(within(kpis).getAllByText(messages.en.common.notAvailable)).toHaveLength(9);
   });
 });
 

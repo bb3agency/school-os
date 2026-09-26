@@ -321,7 +321,7 @@ export function ProvisionSchoolForm() {
             error={errors.custom_domain}
             autoComplete="off"
             spellCheck={false}
-            disabled={tier !== "dedicated"}
+            readOnly={tier !== "dedicated"}
           />
         </fieldset>
 
