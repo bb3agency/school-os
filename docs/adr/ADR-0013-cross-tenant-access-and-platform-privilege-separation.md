@@ -89,7 +89,7 @@ It is added **only** to: `core.tenants`, `core.users`, `core.memberships`, `core
 
 Both tenant and platform chains use:
 
-- `seq bigint` per chain, gapless, with `chain_heads.last_seq` (tenant) and `audit_chain_head.last_seq` (platform); `UNIQUE (tenant_id, seq)`. Verification detects missing, duplicated or reordered events.
+- `seq bigint` per chain, gapless, with `chain_heads.last_seq` (tenant) and `audit_chain_head.last_seq` (platform). The locked chain head guarantees `seq = last_seq + 1`; each monthly partition has a unique index on `(tenant_id, seq)` (PostgreSQL cannot enforce uniqueness across partitions without the partition key). Verification detects missing, duplicated or reordered events.
 - **RFC 8785 JSON Canonicalization Scheme** (Python package `rfc8785`) for the hashed event body.
 - `hash = sha256(prev_hash || jcs(event_without_hash))`; the **genesis** `prev_hash` is 32 zero bytes.
 - A `BEFORE TRUNCATE` statement-level trigger that raises, in addition to the row-level UPDATE/DELETE trigger and missing grants.
