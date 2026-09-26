@@ -44,21 +44,23 @@ def _noise_school(admin: Engine) -> None:
     with admin.begin() as c:
         c.execute(
             text(
-                "INSERT INTO core.tenants (id, code, name, status) VALUES (:i, :c, 'Noise', 'active')"
+                "INSERT INTO core.tenants (id, code, name, status) "
+                "VALUES (:i, :c, 'Noise', 'active')"
             ),
             {"i": tid, "c": f"n-{uuid.uuid4().hex[:12]}"},
         )
         c.execute(
             text(
-                "INSERT INTO sis.students (id, tenant_id) SELECT gen_random_uuid(), :t FROM generate_series(1, :n)"
+                "INSERT INTO sis.students (id, tenant_id) "
+                "SELECT gen_random_uuid(), :t FROM generate_series(1, :n)"
             ),
             {"t": tid, "n": N},
         )
         c.execute(
             text(
-                "INSERT INTO sis.student_profiles (tenant_id, student_id, full_name, full_name_norm, "
-                "full_name_translit) SELECT tenant_id, id, 'Noise Venkata Sai', 'NOISE VENKATA SAI', "
-                "'NOIS VENKAT SAI' FROM sis.students WHERE tenant_id = :t"
+                "INSERT INTO sis.student_profiles (tenant_id, student_id, full_name, "
+                "full_name_norm, full_name_translit) SELECT tenant_id, id, 'Noise Venkata Sai', "
+                "'NOISE VENKATA SAI', 'NOIS VENKAT SAI' FROM sis.students WHERE tenant_id = :t"
             ),
             {"t": tid},
         )
@@ -108,8 +110,9 @@ def big(admin_engine: Engine, app_engine: Engine, platform_engine: Engine) -> An
         )
         c.execute(
             text(
-                "INSERT INTO sis.student_profiles (tenant_id, student_id, full_name, full_name_norm, "
-                "full_name_translit, father_name_norm, current_section_id, status, search_tsv) "
+                "INSERT INTO sis.student_profiles (tenant_id, student_id, full_name, "
+                "full_name_norm, full_name_translit, father_name_norm, current_section_id, "
+                "status, search_tsv) "
                 "VALUES (:t, :s, :full, :norm, :translit, :father, :section, 'active', "
                 "to_tsvector('simple', :norm))"
             ),
@@ -167,7 +170,8 @@ def test_FR_STU_011_search_p95_within_budget(big: Any) -> None:
             assert len(page.data) <= 50
     with tenant_session(school.tenant_id, big["admin"].user_id) as db:
         found = students.search(db, big["admin"], SearchFilters(query=big["sample"]), limit=5)
-    assert found.data and found.data[0].display_name == big["sample"]
+    assert found.data
+    assert found.data[0].display_name == big["sample"]
     p95 = statistics.quantiles(timings, n=20)[18]
     assert p95 < BUDGET_MS, f"p95 {p95:.1f} ms over {len(timings)} searches"
 
@@ -176,9 +180,8 @@ def test_FR_STU_011_search_plan_uses_an_index(big: Any, app_engine: Engine) -> N
     school, ctx = big["school"], big["admin"]
     captured: list[tuple[str, Any]] = []
 
-    def capture(
-        conn: Any, cursor: Any, statement: str, params: Any, context: Any, many: bool
-    ) -> None:
+    def capture(*args: Any) -> None:
+        statement, params = args[2], args[3]
         if "word_similarity" in statement:
             captured.append((statement, params))
 
@@ -195,4 +198,5 @@ def test_FR_STU_011_search_plan_uses_an_index(big: Any, app_engine: Engine) -> N
         event.remove(app_engine, "before_cursor_execute", capture)
     assert "Seq Scan on student_profiles" not in plan, plan
     assert "Seq Scan on students" not in plan, plan
-    assert "Index" in plan and ("sp_" in plan or "student_profiles_pkey" in plan), plan
+    assert "Index" in plan, plan
+    assert "sp_" in plan or "student_profiles_pkey" in plan, plan

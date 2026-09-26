@@ -58,13 +58,15 @@ def test_US_301_create_get_and_idempotent_replay(
     assert res.headers["Location"] == f"{BASE}/{sid}"
     assert res.headers["ETag"] == f'W/"{res.json()["version"]}"'
     again = api.call(admin, "POST", BASE, json=body, headers=key)
-    assert again.status_code == 201 and again.json()["id"] == sid
+    assert again.status_code == 201
+    assert again.json()["id"] == sid
     assert again.headers.get("Idempotent-Replayed") == "true"
     assert count_students(admin_engine, world.a.tenant_id) == before + 1
     got = api.call(admin, "GET", f"{BASE}/{sid}")
     assert got.status_code == 200
     data = got.json()
-    assert data["enrollment"]["label"] == "IX-A" and data["enrollment"]["roll_no"] == "17"
+    assert data["enrollment"]["label"] == "IX-A"
+    assert data["enrollment"]["roll_no"] == "17"
     assert data["canonical"]["full_name"]["provisional"] is True
     assert got.headers["ETag"] == f'W/"{data["version"]}"'
 
@@ -73,7 +75,8 @@ def test_US_301_AC3_sensitive_fields_hidden_or_masked(
     world: Any, api: Any, shared: dict[str, Any]
 ) -> None:
     staff = api.call(world.person("office_staff"), "GET", f"{BASE}/{shared['s9a']}").json()
-    assert "health_notes" not in staff["canonical"] and "aadhaar_last4" not in staff["values"]
+    assert "health_notes" not in staff["canonical"]
+    assert "aadhaar_last4" not in staff["values"]
     assert staff["sensitive_revealable"] is False
     admin = api.call(world.person("office_admin"), "GET", f"{BASE}/{shared['s9a']}").json()
     assert admin["sensitive_revealable"] is True
@@ -86,7 +89,8 @@ def test_US_301_AC3_sensitive_fields_hidden_or_masked(
         "conflicts": [],
     }
     assert admin["values"]["aadhaar_last4"][0]["value"] == "••••"
-    assert "4821" not in str(admin) and "asthma" not in str(admin)
+    assert "4821" not in str(admin)
+    assert "asthma" not in str(admin)
     history = api.call(world.person("office_staff"), "GET", f"{BASE}/{shared['s9a']}/values")
     assert {v["attribute_key"] for v in history.json()}.isdisjoint(
         {"health_notes", "aadhaar_last4"}
@@ -128,7 +132,8 @@ def test_US_301_AC3_reveal_route(
         for e in W.audit_events(admin_engine, world.a.tenant_id, "student.sensitive_revealed")
         if e["resource_id"] == shared["s9a"]
     ]
-    assert len(revealed) >= 2 and "Synthetic asthma" not in str(revealed)
+    assert len(revealed) >= 2
+    assert "Synthetic asthma" not in str(revealed)
 
 
 AADHAAR_CASES = [
@@ -188,6 +193,7 @@ AADHAAR_CASES = [
 
 @pytest.mark.parametrize(("method", "suffix", "body", "field"), AADHAAR_CASES)
 def test_FR_STU_012_every_text_input_rejects_full_aadhaar(
+    *,
     world: Any,
     api: Any,
     shared: dict[str, Any],
@@ -216,7 +222,8 @@ def test_FR_STU_012_every_text_input_rejects_full_aadhaar(
             "message_key": "errors.aadhaar_last4_only",
         }
     ]
-    assert n not in res.text and grouped(n) not in res.text
+    assert n not in res.text
+    assert grouped(n) not in res.text
     assert W.audit_events(admin_engine, world.a.tenant_id) == before, "nothing was written"
 
 
@@ -258,18 +265,22 @@ def test_values_etag_verify_and_status_patch(world: Any, api: Any, admin_engine:
         json={"attribute_key": "mother_tongue", "source": "parent_form", "value": "Telugu"},
         headers={"If-Match": f'W/"{version}"'},
     )
-    assert rec.status_code == 201 and rec.headers["ETag"] == f'W/"{version + 1}"'
+    assert rec.status_code == 201
+    assert rec.headers["ETag"] == f'W/"{version + 1}"'
     verify = api.call(
         admin, "POST", f"{BASE}/{sid}/values/{rec.json()['id']}/verify", json={"status": "verified"}
     )
-    assert verify.status_code == 200 and verify.json()["verification_status"] == "verified"
+    assert verify.status_code == 200
+    assert verify.json()["verification_status"] == "verified"
     no_match = api.call(admin, "PATCH", f"{BASE}/{sid}", json={"status": "left"})
-    assert no_match.status_code == 400 and no_match.json()["code"] == "if_match_required"
+    assert no_match.status_code == 400
+    assert no_match.json()["code"] == "if_match_required"
     etag = api.call(admin, "GET", f"{BASE}/{sid}").headers["ETag"]
     patched = api.call(
         admin, "PATCH", f"{BASE}/{sid}", json={"status": "left"}, headers={"If-Match": etag}
     )
-    assert patched.status_code == 200 and patched.json()["status"] == "left"
+    assert patched.status_code == 200
+    assert patched.json()["status"] == "left"
     history = api.call(admin, "GET", f"{BASE}/{sid}/values", params={"attribute": "mother_tongue"})
     assert [v["value"] for v in history.json()] == ["Telugu"]
     unknown = api.call(admin, "GET", f"{BASE}/{sid}/values", params={"attribute": "no_such_key"})
@@ -289,9 +300,8 @@ def test_guardians_and_enrollments_routes(world: Any, api: Any, admin_engine: En
     gid = g.json()["id"]
     listed = api.call(world.person("office_staff"), "GET", f"{BASE}/{sid}/guardians").json()
     assert listed[0]["full_name"] == "Synthetica Mother"
-    assert listed[0]["phone"] is None and listed[0]["has_phone"] is False, (
-        "hidden without read_sensitive"
-    )
+    assert listed[0]["phone"] is None, "hidden without read_sensitive"
+    assert listed[0]["has_phone"] is False, "hidden without read_sensitive"
     stale = api.call(
         admin,
         "PATCH",
@@ -307,14 +317,16 @@ def test_guardians_and_enrollments_routes(world: Any, api: Any, admin_engine: En
         json={"is_primary": True},
         headers={"If-Match": g.headers["ETag"]},
     )
-    assert ok.status_code == 200 and ok.json()["is_primary"] is True
+    assert ok.status_code == 200
+    assert ok.json()["is_primary"] is True
     enrol = api.call(
         admin,
         "POST",
         f"{BASE}/{sid}/enrollments",
         json={"section_id": str(world.a.ids["section_10a"])},
     )
-    assert enrol.status_code == 201 and enrol.json()["status"] == "active"
+    assert enrol.status_code == 201
+    assert enrol.json()["status"] == "active"
     bad = api.call(
         admin,
         "POST",
@@ -328,7 +340,8 @@ def test_attribute_catalog_route(world: Any, api: Any) -> None:
     res = api.call(world.person("teacher"), "GET", "/api/v1/attributes")
     assert res.status_code == 200
     by_key = {a["key"]: a for a in res.json()}
-    assert by_key["full_name"]["is_identity"] is True and by_key["full_name"]["label_te"]
+    assert by_key["full_name"]["is_identity"] is True
+    assert by_key["full_name"]["label_te"]
     assert by_key["aadhaar_last4"]["classification"] == "C3"
     assert by_key["aadhaar_last4"]["allowed_sources"] == ["aadhaar_as_printed"]
 
@@ -346,7 +359,7 @@ def test_attribute_catalog_route(world: Any, api: Any) -> None:
     ],
 )
 def test_SEC_015_student_scope_over_http(
-    world: Any, api: Any, shared: dict[str, Any], role: str, student: str, status: int
+    *, world: Any, api: Any, shared: dict[str, Any], role: str, student: str, status: int
 ) -> None:
     who = world.person(role)
     for path in ("", "/values", "/guardians"):

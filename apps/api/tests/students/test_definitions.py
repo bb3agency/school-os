@@ -166,7 +166,8 @@ def test_name_is_nfc_trimmed_and_keyed_for_matching() -> None:
     assert clean.norm == "K VENKATA SAI"
     telugu = validate_value(NAME, "admission_register", "వెంకట సాయి", today=TODAY)
     assert telugu.text == "వెంకట సాయి"
-    assert telugu.norm is not None and telugu.norm.isascii()
+    assert telugu.norm is not None
+    assert telugu.norm.isascii()
 
 
 @pytest.mark.parametrize(

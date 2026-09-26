@@ -27,7 +27,8 @@ def aadhaar() -> str:
 
 @pytest.fixture
 def fresh(world: Any, app_engine: Engine) -> uuid.UUID:
-    return SW.create(world.a, name="Kommineni Venkata Sai", section_key="section_9a")
+    sid: uuid.UUID = SW.create(world.a, name="Kommineni Venkata Sai", section_key="section_9a")
+    return sid
 
 
 def run(world: Any, fn: Any, *args: Any, ctx: Any = None, **kwargs: Any) -> Any:
@@ -56,7 +57,8 @@ def test_FR_STU_001_create_student_records_sources_and_projection(
         False,
         True,
     )
-    assert out.enrollment is not None and out.enrollment.label == "IX-A"
+    assert out.enrollment is not None
+    assert out.enrollment.label == "IX-A"
     assert [v.source for v in out.values["full_name"]] == ["admission_register"]
     with admin_engine.connect() as c:
         profile = c.execute(
@@ -68,7 +70,8 @@ def test_FR_STU_001_create_student_records_sources_and_projection(
     created = events(admin_engine, world, "student.created", fresh)
     assert len(created) == 1
     summary = created[0]["summary"]
-    assert summary["value_count"] == 5 and "full_name" in summary["attribute_keys"]
+    assert summary["value_count"] == 5
+    assert "full_name" in summary["attribute_keys"]
     assert "Kommineni" not in str(created)
 
 
@@ -85,7 +88,8 @@ def test_FR_STU_005_new_values_supersede_and_history_is_kept(
     assert history[1].superseded_by == second.id
     recorded = events(admin_engine, world, "student.value.recorded", fresh)
     assert [e["summary"]["value_id"] for e in recorded] == [str(first.id), str(second.id)]
-    assert "Urdu" not in str(recorded) and "Telugu" not in str(recorded)
+    assert "Urdu" not in str(recorded)
+    assert "Telugu" not in str(recorded)
 
 
 def test_BR_01_identity_register_value_needs_a_change_request(world: Any, fresh: uuid.UUID) -> None:
@@ -93,7 +97,8 @@ def test_BR_01_identity_register_value_needs_a_change_request(world: Any, fresh:
         run(
             world, students.record_value, fresh, "full_name", "admission_register", "K. Venkata Sai"
         )
-    assert exc.value.status == 403 and exc.value.code == "identity_change_required"
+    assert exc.value.status == 403
+    assert exc.value.code == "identity_change_required"
     with pytest.raises(students.IdentityChangeRequired):
         run(
             world,
@@ -143,9 +148,11 @@ def test_BR_01_approved_change_request_records_a_verified_value(
     assert (dob.value, dob.verified, dob.provisional) == ("2012-03-15", True, False)
     history = run(world, students.value_history, fresh, "dob")
     assert [h.value for h in history] == ["2012-03-15", "2012-03-14"]
-    assert history[0].change_request_id == cr and history[0].verified_by == approver.user_id
+    assert history[0].change_request_id == cr
+    assert history[0].verified_by == approver.user_id
     recorded = events(admin_engine, world, "student.value.recorded", fresh)[-1]["summary"]
-    assert recorded["change_request_id"] == str(cr) and recorded["verification"] == "verified"
+    assert recorded["change_request_id"] == str(cr)
+    assert recorded["verification"] == "verified"
     assert out.superseded == history[1].id
     with pytest.raises(ValidationFailed):
         run(
@@ -164,7 +171,8 @@ def test_FR_STU_003_verify_non_identity_values_only(
 ) -> None:
     rec = run(world, students.record_value, fresh, "nationality", "parent_form", "Indian")
     out = run(world, students.verify_value, fresh, rec.id, "verified")
-    assert out.verification_status == "verified" and out.verified_by is not None
+    assert out.verification_status == "verified"
+    assert out.verified_by is not None
     name_id = SW.current_value_id(admin_engine, fresh, "full_name", "admission_register")
     with pytest.raises(students.IdentityChangeRequired):
         run(world, students.verify_value, fresh, name_id)
@@ -209,7 +217,8 @@ def test_optimistic_version_and_status(world: Any, fresh: uuid.UUID, admin_engin
     )
     assert rec.student_version == v + 1
     out = run(world, students.update_student_status, fresh, "left", expected_version=v + 1)
-    assert out.status == "left" and out.version == v + 2
+    assert out.status == "left"
+    assert out.version == v + 2
     with pytest.raises(PreconditionFailed):
         run(world, students.update_student_status, fresh, "active", expected_version=v)
     changed = events(admin_engine, world, "student.status_changed", fresh)
@@ -235,7 +244,8 @@ def test_enrolment_transfer_within_a_year(
     with admin_engine.connect() as c:
         rows = c.execute(
             text(
-                "SELECT section_id, status FROM sis.enrollments WHERE student_id = :s ORDER BY created_at"
+                "SELECT section_id, status FROM sis.enrollments WHERE student_id = :s "
+                "ORDER BY created_at"
             ),
             {"s": fresh},
         ).all()
@@ -272,7 +282,8 @@ def test_SEC_015_scope_helpers(world: Any, shared: dict[str, Any]) -> None:
     )
     with tenant_session(world.a.tenant_id) as db:
         visible = students.list_students_in_scope(db, ct)
-        assert shared["s9a"] in visible and shared["s9c"] not in visible
+        assert shared["s9a"] in visible
+        assert shared["s9c"] not in visible
         with pytest.raises(NotFound):
             students.get_profile(db, ct, shared["s9c"])
         with pytest.raises(NotFound):
@@ -300,10 +311,13 @@ def test_FR_STU_008_guardians_encrypted_linked_and_updated(
             is_primary=True,
         ),
     )
-    assert g.has_phone and g.phone == "••••" and g.is_primary
+    assert g.has_phone
+    assert g.phone == "••••"
+    assert g.is_primary
     with admin_engine.connect() as c:
         row = c.execute(text("SELECT * FROM sis.guardians WHERE id = :g"), {"g": g.id}).one()
-    assert b"9876511111" not in bytes(row.phone_ciphertext) and row.phone_blind_index is not None
+    assert b"9876511111" not in bytes(row.phone_ciphertext)
+    assert row.phone_blind_index is not None
     sibling = SW.create(world.a, name="Synthetica Sibling", section_key="section_9a")
     linked = run(
         world,
@@ -320,7 +334,8 @@ def test_FR_STU_008_guardians_encrypted_linked_and_updated(
         GuardianPatch(phone="9876522222", address="Synthetic lane"),
         expected_version=g.version,
     )
-    assert updated.version == g.version + 1 and updated.has_address
+    assert updated.version == g.version + 1
+    assert updated.has_address
     with pytest.raises(PreconditionFailed):
         run(
             world,
@@ -336,7 +351,8 @@ def test_FR_STU_008_guardians_encrypted_linked_and_updated(
         fresh,
         RevealIn(attribute_key="guardian_phone", guardian_id=g.id),
     )
-    assert revealed.value == "9876522222" and revealed.display == "+91 98765 22222"
+    assert revealed.value == "9876522222"
+    assert revealed.display == "+91 98765 22222"
     with pytest.raises(ValidationFailed) as exc:
         run(
             world,

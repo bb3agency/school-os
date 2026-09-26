@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -89,17 +90,17 @@ SW = _load_students()
 # Routes whose permission the owner does not hold (docs/07 §6.2: student.update_nonidentity is
 # principal/office_admin/office_staff): probe them as the principal so the request reaches the
 # object lookup instead of stopping at 403.
-ACTOR: dict[tuple[str, str], str] = {
-    (m, p): "principal"
-    for m, p in (
+ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
+    (
         ("PATCH", "/api/v1/students/{student_id}"),
         ("POST", "/api/v1/students/{student_id}/values"),
         ("POST", "/api/v1/students/{student_id}/values/{value_id}/verify"),
         ("POST", "/api/v1/students/{student_id}/guardians"),
         ("PATCH", "/api/v1/students/{student_id}/guardians/{guardian_id}"),
         ("POST", "/api/v1/students/{student_id}/enrollments"),
-    )
-}
+    ),
+    "principal",
+)
 
 
 def _b_ticket(w: Any) -> uuid.UUID:
@@ -115,7 +116,7 @@ def _b_ticket(w: Any) -> uuid.UUID:
     ).id
 
 
-PARAM_TO_B = {
+PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
     "class_id": lambda w: w.b.ids["class_ix"],

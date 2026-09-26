@@ -47,7 +47,7 @@ def test_FR_STU_006_global_definitions_are_seeded_and_read_only(
     world: Any, app_engine: Engine
 ) -> None:
     with tenant_session(world.a.tenant_id) as s:
-        rows = dict(
+        rows: dict[str, str] = dict(
             s.execute(
                 text(
                     "SELECT key, classification FROM sis.attribute_definitions "
@@ -61,13 +61,13 @@ def test_FR_STU_006_global_definitions_are_seeded_and_read_only(
         assert (
             s.execute(
                 text("UPDATE sis.attribute_definitions SET label_en = 'X' WHERE tenant_id IS NULL")
-            ).rowcount
+            ).rowcount  # type: ignore[attr-defined]
             == 0
         )
         assert (
             s.execute(
                 text("DELETE FROM sis.attribute_definitions WHERE tenant_id IS NULL")
-            ).rowcount
+            ).rowcount  # type: ignore[attr-defined]
             == 0
         )
         # Stealing a global row into the tenant is refused too (not visible to UPDATE).
@@ -77,7 +77,7 @@ def test_FR_STU_006_global_definitions_are_seeded_and_read_only(
                     "UPDATE sis.attribute_definitions SET tenant_id = core.current_tenant() "
                     "WHERE key = 'full_name'"
                 )
-            ).rowcount
+            ).rowcount  # type: ignore[attr-defined]
             == 0
         )
     with (
@@ -109,7 +109,7 @@ def test_FR_STU_006_school_attributes_are_private_to_the_school(
             {"k": key},
         )
     with tenant_session(world.b.tenant_id) as s:
-        found = s.execute(
+        found: int = s.execute(
             text("SELECT count(*) FROM sis.attribute_definitions WHERE key = :k"), {"k": key}
         ).scalar_one()
         assert found == 0
@@ -295,7 +295,7 @@ def test_FR_STU_005_superseded_rows_are_frozen(
                 "verified_at = now(), verified_by = :u WHERE id = :i"
             ),
             {"i": second.id, "u": ctx.user_id},
-        ).rowcount
+        ).rowcount  # type: ignore[attr-defined]
     assert n == 1
 
 

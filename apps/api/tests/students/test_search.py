@@ -33,7 +33,7 @@ class SearchSchool:
 
 
 def _student(
-    school: Any, ctx: Any, name: str, section: str, father: str, adm: str | None = None
+    school: Any, ctx: Any, name: str, *, section: str, father: str, adm: str | None = None
 ) -> uuid.UUID:
     values = [
         ValueIn(attribute_key="full_name", source="admission_register", value=name),
@@ -72,17 +72,37 @@ def s(admin_engine: Engine, app_engine: Engine, platform_engine: Engine) -> Sear
         school.tenant_id, ct, "class_teacher", section_ids=frozenset({school.ids["section_9b"]})
     )
     ids = {
-        "vs_9b": _student(school, admin, "VENKATA SAI K.", "section_9b", "Kommineni Ramana"),
-        "vs_9a": _student(school, admin, "Kommineni Venkatasai", "section_9a", "Kommineni Suresh"),
-        "ld_9b": _student(school, admin, "Gorantla Lakshmi Devi", "section_9b", "Gorantla Prasad"),
+        "vs_9b": _student(
+            school, admin, "VENKATA SAI K.", section="section_9b", father="Kommineni Ramana"
+        ),
+        "vs_9a": _student(
+            school, admin, "Kommineni Venkatasai", section="section_9a", father="Kommineni Suresh"
+        ),
+        "ld_9b": _student(
+            school, admin, "Gorantla Lakshmi Devi", section="section_9b", father="Gorantla Prasad"
+        ),
         "vr_10a": _student(
-            school, admin, "Venkata Ramana Duvvuri", "section_10a", "Duvvuri Srinivas"
+            school,
+            admin,
+            "Venkata Ramana Duvvuri",
+            section="section_10a",
+            father="Duvvuri Srinivas",
         ),
         "adm_9c": _student(
-            school, admin, "Addepalli Sita", "section_9c", "Addepalli Rao", "2019/0457"
+            school,
+            admin,
+            "Addepalli Sita",
+            section="section_9c",
+            father="Addepalli Rao",
+            adm="2019/0457",
         ),
         "adm2_9c": _student(
-            school, admin, "Addepalli Gita", "section_9c", "Addepalli Rao", "2019/04571"
+            school,
+            admin,
+            "Addepalli Gita",
+            section="section_9c",
+            father="Addepalli Rao",
+            adm="2019/04571",
         ),
     }
     return SearchSchool(school, ids, admin, teacher)
@@ -122,14 +142,16 @@ def test_US_302_AC1_partial_and_spacing_variants(s: SearchSchool) -> None:
 
 def test_US_302_AC1_telugu_query_finds_latin_record(s: SearchSchool) -> None:
     got = ids_of(find(s, "వెంకట సాయి"))
-    assert s.ids["vs_9b"] in got and s.ids["vs_9a"] in got
+    assert s.ids["vs_9b"] in got
+    assert s.ids["vs_9a"] in got
     assert ids_of(find(s, "లక్ష్మి దేవి"))[0] == s.ids["ld_9b"]
 
 
 def test_FR_STU_010_parent_name_and_admission_number(s: SearchSchool) -> None:
     page = find(s, "kommineni ramana")
     first = page.data[0]
-    assert first.id == s.ids["vs_9b"] and first.match.field == "father_name"
+    assert first.id == s.ids["vs_9b"]
+    assert first.match.field == "father_name"
     adm = find(s, "2019/0457")
     assert ids_of(adm)[:2] == [s.ids["adm_9c"], s.ids["adm2_9c"]], "exact match ranks first"
     assert adm.data[0].match.field == "admission_no"

@@ -288,9 +288,39 @@ def test_BR_09_tenant_views_carry_no_personal_or_student_fields(
     assert "owner@school.example.test" not in detail.text
 
 
+def _refs(node: Any) -> set[str]:
+    """Component names referenced anywhere inside an OpenAPI fragment."""
+    found: set[str] = set()
+    if isinstance(node, dict):
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/components/schemas/"):
+            found.add(ref.rsplit("/", 1)[1])
+        for value in node.values():
+            found |= _refs(value)
+    elif isinstance(node, list):
+        for value in node:
+            found |= _refs(value)
+    return found
+
+
 def test_BR_09_platform_response_schemas_never_describe_students() -> None:
+    """Every schema reachable from a control-plane or fleet route (the school-side student
+    routes legitimately describe students, so the check follows $refs from platform paths)."""
     schema = create_app().openapi()
+    components = schema["components"]["schemas"]
+    pending = set()
+    for path, item in schema["paths"].items():
+        if path.startswith(("/api/v1/platform/", "/api/v1/fleet/")):
+            pending |= _refs(item)
+    seen: set[str] = set()
+    while pending:
+        name = pending.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        pending |= _refs(components[name]) - seen
+    assert len(seen) > 10, "platform schemas were found"
     student_like = ("dob", "date_of_birth", "aadhaar", "guardian", "student_name", "admission_no")
-    for name, component in schema["components"]["schemas"].items():
-        for prop in component.get("properties", {}):
+    for name in sorted(seen):
+        for prop in components[name].get("properties", {}):
             assert not any(s in prop for s in student_like), f"{name}.{prop}"

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -31,9 +30,8 @@ api = W.api
 
 
 @pytest.fixture(autouse=True)
-def _keyring() -> Iterator[None]:
+def _keyring() -> None:
     SW.configure_keyring()
-    yield
 
 
 @pytest.fixture

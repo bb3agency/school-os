@@ -211,7 +211,8 @@ def active_section(admin: Engine, student_id: uuid.UUID) -> uuid.UUID | None:
     with admin.connect() as c:
         value = c.execute(
             text(
-                "SELECT section_id FROM sis.enrollments WHERE student_id = :s AND status = 'active' "
+                "SELECT section_id FROM sis.enrollments "
+                "WHERE student_id = :s AND status = 'active' "
                 "ORDER BY created_at DESC LIMIT 1"
             ),
             {"s": student_id},

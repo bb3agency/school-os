@@ -48,7 +48,8 @@ def test_SEC_012_roundtrip_and_ciphertext_format(world: Any, app_engine: Engine)
             keyring=ring,
         )
         assert version == 1
-        assert blob[0] == 1 and int.from_bytes(blob[1:3], "big") == 1
+        assert blob[0] == 1
+        assert int.from_bytes(blob[1:3], "big") == 1
         assert b"Synthetic" not in blob
         assert (
             crypto.decrypt_value(
@@ -129,7 +130,8 @@ def _c3_rows(admin: Engine, student_id: uuid.UUID) -> list[Any]:
         return list(
             c.execute(
                 text(
-                    "SELECT id, attribute_key, value_text, value_norm, value_date, value_ciphertext, "
+                    "SELECT id, attribute_key, value_text, value_norm, value_date, "
+                    "value_ciphertext, "
                     "key_version FROM sis.attribute_values WHERE student_id = :s "
                     "AND attribute_key IN ('health_notes', 'aadhaar_last4') ORDER BY attribute_key"
                 ),
@@ -144,14 +146,18 @@ def test_FR_STU_007_c3_values_are_stored_only_as_ciphertext(
     rows = _c3_rows(admin_engine, shared["s9a"])
     assert [r.attribute_key for r in rows] == ["aadhaar_last4", "health_notes"]
     for r in rows:
-        assert r.value_text is None and r.value_norm is None and r.value_date is None
-        assert r.value_ciphertext is not None and r.key_version == 1
+        assert r.value_text is None
+        assert r.value_norm is None
+        assert r.value_date is None
+        assert r.value_ciphertext is not None
+        assert r.key_version == 1
         assert b"4821" not in bytes(r.value_ciphertext)
     with admin_engine.connect() as c:
         profile = c.execute(
             text("SELECT * FROM sis.student_profiles WHERE student_id = :s"), {"s": shared["s9a"]}
         ).one()
-    assert "asthma" not in repr(profile).lower() and "4821" not in repr(profile)
+    assert "asthma" not in repr(profile).lower()
+    assert "4821" not in repr(profile)
 
 
 def test_SEC_012_tampered_or_swapped_ciphertext_fails(
