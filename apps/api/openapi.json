@@ -145,6 +145,75 @@
         "title": "AcceptedInvitationsOut",
         "type": "object"
       },
+      "AclEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "principal_ref": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Principal Ref",
+            "type": "string"
+          },
+          "principal_type": {
+            "enum": [
+              "role",
+              "section",
+              "class",
+              "membership"
+            ],
+            "title": "Principal Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principal_type",
+          "principal_ref"
+        ],
+        "title": "AclEntry",
+        "type": "object"
+      },
+      "AclEntryOut": {
+        "properties": {
+          "principal_ref": {
+            "title": "Principal Ref",
+            "type": "string"
+          },
+          "principal_type": {
+            "enum": [
+              "role",
+              "section",
+              "class",
+              "membership"
+            ],
+            "title": "Principal Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principal_type",
+          "principal_ref"
+        ],
+        "title": "AclEntryOut",
+        "type": "object"
+      },
+      "AclUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "acl": {
+            "items": {
+              "$ref": "#/components/schemas/AclEntry"
+            },
+            "maxItems": 50,
+            "title": "Acl",
+            "type": "array"
+          }
+        },
+        "required": [
+          "acl"
+        ],
+        "title": "AclUpdate",
+        "type": "object"
+      },
       "ActiveTenantIn": {
         "additionalProperties": false,
         "properties": {
@@ -1486,6 +1555,507 @@
         "title": "DeploymentPatch",
         "type": "object"
       },
+      "DocumentCreate": {
+        "additionalProperties": false,
+        "description": "Register an uploaded object as a new document (metadata FR-DOC-005 + ACL).",
+        "properties": {
+          "academic_year_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year Id"
+          },
+          "acl": {
+            "items": {
+              "$ref": "#/components/schemas/AclEntry"
+            },
+            "maxItems": 50,
+            "title": "Acl",
+            "type": "array"
+          },
+          "doc_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "circular",
+                  "policy",
+                  "minutes",
+                  "register_scan",
+                  "certificate",
+                  "letter",
+                  "form",
+                  "report",
+                  "verified_answer",
+                  "other",
+                  "evidence",
+                  "import_file"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doc Type"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te",
+                  "mixed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "sensitivity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "C1",
+                  "C2",
+                  "C3"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sensitivity"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "upload_id": {
+            "format": "uuid",
+            "title": "Upload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "title"
+        ],
+        "title": "DocumentCreate",
+        "type": "object"
+      },
+      "DocumentDetail": {
+        "properties": {
+          "academic_year_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year Id"
+          },
+          "acl": {
+            "items": {
+              "$ref": "#/components/schemas/AclEntryOut"
+            },
+            "title": "Acl",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doc_type": {
+            "enum": [
+              "circular",
+              "policy",
+              "minutes",
+              "register_scan",
+              "certificate",
+              "letter",
+              "form",
+              "report",
+              "verified_answer",
+              "other",
+              "evidence",
+              "import_file"
+            ],
+            "title": "Doc Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te",
+                  "mixed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "purpose": {
+            "enum": [
+              "evidence",
+              "register_scan",
+              "circular",
+              "policy",
+              "other",
+              "import_file"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "sensitivity": {
+            "enum": [
+              "C1",
+              "C2",
+              "C3"
+            ],
+            "title": "Sensitivity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionOut"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "purpose",
+          "doc_type",
+          "title",
+          "issuer",
+          "issued_on",
+          "academic_year_id",
+          "language",
+          "sensitivity",
+          "status",
+          "current_version",
+          "acl",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "version",
+          "versions"
+        ],
+        "title": "DocumentDetail",
+        "type": "object"
+      },
+      "DocumentOut": {
+        "properties": {
+          "academic_year_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year Id"
+          },
+          "acl": {
+            "items": {
+              "$ref": "#/components/schemas/AclEntryOut"
+            },
+            "title": "Acl",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doc_type": {
+            "enum": [
+              "circular",
+              "policy",
+              "minutes",
+              "register_scan",
+              "certificate",
+              "letter",
+              "form",
+              "report",
+              "verified_answer",
+              "other",
+              "evidence",
+              "import_file"
+            ],
+            "title": "Doc Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te",
+                  "mixed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "purpose": {
+            "enum": [
+              "evidence",
+              "register_scan",
+              "circular",
+              "policy",
+              "other",
+              "import_file"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "sensitivity": {
+            "enum": [
+              "C1",
+              "C2",
+              "C3"
+            ],
+            "title": "Sensitivity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "purpose",
+          "doc_type",
+          "title",
+          "issuer",
+          "issued_on",
+          "academic_year_id",
+          "language",
+          "sensitivity",
+          "status",
+          "current_version",
+          "acl",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "title": "DocumentOut",
+        "type": "object"
+      },
+      "DownloadUrlOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "version_no",
+          "mime_type",
+          "filename"
+        ],
+        "title": "DownloadUrlOut",
+        "type": "object"
+      },
       "ExtendTrialIn": {
         "additionalProperties": false,
         "properties": {
@@ -2707,6 +3277,34 @@
           "data"
         ],
         "title": "Page[DeploymentOut]",
+        "type": "object"
+      },
+      "Page_DocumentOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[DocumentOut]",
         "type": "object"
       },
       "Page_FlagOut_": {
@@ -5758,6 +6356,137 @@
         "title": "TicketPatch",
         "type": "object"
       },
+      "UploadCreate": {
+        "additionalProperties": false,
+        "description": "Ask for a presigned POST. ``document_id`` asks to upload a new version of that document.",
+        "properties": {
+          "content_type": {
+            "maxLength": 127,
+            "minLength": 3,
+            "title": "Content Type",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "filename": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "evidence",
+              "register_scan",
+              "circular",
+              "policy",
+              "other",
+              "import_file"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "size_bytes": {
+            "maximum": 104857600.0,
+            "minimum": 1.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "content_type",
+          "size_bytes",
+          "purpose"
+        ],
+        "title": "UploadCreate",
+        "type": "object"
+      },
+      "UploadOut": {
+        "properties": {
+          "batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "object"
+          },
+          "max_bytes": {
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "purpose": {
+            "enum": [
+              "evidence",
+              "register_scan",
+              "circular",
+              "policy",
+              "other",
+              "import_file"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "upload_id": {
+            "format": "uuid",
+            "title": "Upload Id",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "url",
+          "fields",
+          "expires_at",
+          "max_bytes",
+          "purpose"
+        ],
+        "title": "UploadOut",
+        "type": "object"
+      },
       "UsageAgainstLimit": {
         "properties": {
           "limit": {
@@ -6049,6 +6778,83 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VersionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "upload_id": {
+            "format": "uuid",
+            "title": "Upload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id"
+        ],
+        "title": "VersionCreate",
+        "type": "object"
+      },
+      "VersionOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "scanning",
+              "extracting",
+              "chunking",
+              "embedding",
+              "ready",
+              "failed",
+              "quarantined"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version_no",
+          "mime_type",
+          "size_bytes",
+          "status",
+          "error",
+          "created_at"
+        ],
+        "title": "VersionOut",
         "type": "object"
       },
       "app__audit__viewer__AuditVerifyOut": {
@@ -7007,6 +7813,495 @@
         "summary": "Update Class",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/documents": {
+      "get": {
+        "description": "Documents you may see, newest first (permission ``document.read``; filtered by the\ndocument ACL and your class/section scopes).",
+        "operationId": "list_documents_api_v1_documents_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "purpose",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "evidence",
+                    "register_scan",
+                    "circular",
+                    "policy",
+                    "other",
+                    "import_file"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Purpose"
+            }
+          },
+          {
+            "in": "query",
+            "name": "doc_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "circular",
+                    "policy",
+                    "minutes",
+                    "register_scan",
+                    "certificate",
+                    "letter",
+                    "form",
+                    "report",
+                    "verified_answer",
+                    "other",
+                    "evidence",
+                    "import_file"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doc Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Academic Year Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "archived"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DocumentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Documents",
+        "tags": [
+          "documents"
+        ]
+      },
+      "post": {
+        "description": "Register an uploaded file with its metadata and ACL (permission ``document.upload``).\n\nThe file is checked by content (not extension): a mismatch answers 415 and the object is\ndeleted; too large answers 413; the same file already visible to you answers 409\n``duplicate_document``. Class teachers must limit the ACL to their own sections/classes.\nAnswers 202: version 1 is ``queued`` for the malware scan. Accepts ``Idempotency-Key``.",
+        "operationId": "register_document_api_v1_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/uploads": {
+      "post": {
+        "description": "Get a presigned POST for one file (permission ``document.upload``).\n\nAccepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,\nPNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10\nminutes with the returned fields; the key, Content-Type and size are fixed by the policy.\nSend ``document_id`` to upload a new version. Accepts ``Idempotency-Key``.",
+        "operationId": "create_upload_api_v1_documents_uploads_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Upload",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}": {
+      "delete": {
+        "description": "Delete the document, all versions and stored files (permission ``document.manage_acl``).\nEvidence still linked to a student record answers 409 ``document_in_use``.",
+        "operationId": "delete_document_api_v1_documents__document_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Document",
+        "tags": [
+          "documents"
+        ]
+      },
+      "get": {
+        "description": "One document with its versions and processing status (permission ``document.read``;\n404 outside your ACL/scopes).",
+        "operationId": "get_document_api_v1_documents__document_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/acl": {
+      "put": {
+        "description": "Replace who can see the document: roles, sections, classes or members (permission\n``document.manage_acl``; ``If-Match``). An empty list limits it to school-wide readers.",
+        "operationId": "set_acl_api_v1_documents__document_id__acl_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AclUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Acl",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/download-url": {
+      "get": {
+        "description": "A download link valid for 5 minutes, always saved as a file (permission\n``document.read``). Only files that passed the malware scan are served (409 otherwise).",
+        "operationId": "get_download_url_api_v1_documents__document_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 999999,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadUrlOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Download Url",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/versions": {
+      "post": {
+        "description": "Register an uploaded file as the next version; history is kept (permission\n``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.\nAccepts ``Idempotency-Key``.",
+        "operationId": "add_version_api_v1_documents__document_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Version",
+        "tags": [
+          "documents"
         ]
       }
     },
