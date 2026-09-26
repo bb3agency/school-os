@@ -169,9 +169,17 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | GET | `/audit/events` (`actor`, `resource`, `action`, `from`, `to`) · `/audit/verify` | `audit.read` |
 | POST | `/admin/tenant-export` → 202 | `tenant.export_all` (step-up) |
 | GET/PUT | `/admin/retention` | `tenant.settings.manage` |
-| POST | `/admin/break-glass/{id}/approve` · `/revoke` | `breakglass.approve` (step-up) |
+| GET · POST | Break-glass: see *Break-glass (support access)* below | `breakglass.approve` |
 | GET | `/jobs/{id}` | job owner or admin |
 | GET | `/healthz` · `/readyz` | public (no data) |
+
+### Break-glass (support access; US-103, FR-OPS-004, 07 §6.4)
+A request pulled from the control plane and the grant it becomes are one object (`ops.break_glass_grants`), so `{request_id}` and `{grant_id}` name the same row. Another school's ID → 404.
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/breakglass/requests` (`status`, `limit`, `cursor`) · `/breakglass/requests/{request_id}` | `breakglass.approve` (the list first pulls new requests) |
+| POST | `/breakglass/requests/{request_id}/approve` · `/deny` | `breakglass.approve` (step-up); approver ≠ the person who gets access |
+| POST | `/breakglass/grants/{grant_id}/revoke` | `breakglass.approve` (step-up); also ends emergency access |
 
 ### Notifications (FR-NOT-001)
 Own notifications only (another person's or school's ID → 404). Titles and bodies are rendered in the `Accept-Language` language (`te` or `en`, default `en`; `Content-Language` says which).

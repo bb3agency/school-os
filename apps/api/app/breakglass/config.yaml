@@ -1,0 +1,11 @@
+# Break-glass workflow settings (US-103, FR-OPS-004, docs/07 §6.4). Versioned configuration
+# (CLAUDE.md §6.13). The 8-hour maximum access window is a database CHECK, not a setting.
+version: 1
+
+# A request the school has not answered within this many hours expires (status expired).
+pending_request_ttl_hours: 24
+
+# How often the worker pulls new requests from the control plane, ends grants whose window has
+# passed and reports outcomes back (seconds). Access itself ends exactly at expires_at: the
+# temporary membership carries the same expiry and sign-in resolution refuses it.
+sweep_interval_seconds: 60

@@ -22,6 +22,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from app.authz import breakglass_guard
 from app.authz.catalog import AUTHENTICATED, CatalogError, tenant_permission
 from app.authz.context import UserContext
 from app.authz.resolver import AuthzResolver
@@ -95,6 +96,7 @@ class Requirement:
 
     def __call__(
         self,
+        request: Request,
         ctx: Annotated[UserContext, Depends(get_user_context)],
         principal: Annotated[Principal, Depends(get_principal)],
     ) -> UserContext:
@@ -104,6 +106,8 @@ class Requirement:
             raise Forbidden()
         if self.sos_step_up:
             require_recent_auth(principal)
+        # Break-glass sessions: read-only and every call recorded for the school (07 §6.4).
+        breakglass_guard.enforce(ctx, request, self.sos_permission)
         return ctx
 
 

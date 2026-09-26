@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app.audit.api import router as audit_router
+from app.breakglass.api import router as breakglass_router
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.errors import install_error_handlers
 from app.core.health import router as health_router
@@ -41,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(audit_router)
     app.include_router(platform_tenant_router)
     app.include_router(notifications_router)
+    app.include_router(breakglass_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

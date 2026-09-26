@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -52,6 +53,9 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/sections/{section_id}"): {},
     ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): {"body": "Synthetic follow-up"},
     ("POST", "/api/v1/notifications/{notification_id}/read"): None,
+    ("POST", "/api/v1/breakglass/requests/{request_id}/approve"): None,
+    ("POST", "/api/v1/breakglass/requests/{request_id}/deny"): None,
+    ("POST", "/api/v1/breakglass/grants/{grant_id}/revoke"): None,
 }
 
 
@@ -91,13 +95,30 @@ def _b_notification(w: Any) -> uuid.UUID:
     return uuid.UUID(str(value))
 
 
-PARAM_TO_B = {
+def _bg() -> ModuleType:
+    """tests/breakglass/objects.py (pending/active grants through the real services)."""
+    name = "sos_test_breakglass_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "breakglass" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
     "class_id": lambda w: w.b.ids["class_ix"],
     "section_id": lambda w: w.b.ids["section_9a"],
     "ticket_id": _b_ticket,
     "notification_id": _b_notification,
+    # Break-glass (US-103): a pending request / an active grant of school B.
+    "request_id": lambda w: _bg().pending_grant(w.b.tenant_id),
+    "grant_id": lambda w: _bg().active_grant(w.b.tenant_id, w.b.people["owner"]),
 }
 
 

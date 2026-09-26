@@ -95,6 +95,7 @@ forbidden_modules =
     app.platform
     app.ops
     app.devtools
+    app.breakglass
     app.notifications
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
@@ -141,7 +142,27 @@ source_modules =
     app.platform
     app.ops
     app.devtools
+    app.breakglass
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
+allow_indirect_imports = True
+
+[importlinter:contract:breakglass-internals]
+name = breakglass: repository/models are private (use app.breakglass.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.notifications
+forbidden_modules =
+    app.breakglass.repository
+    app.breakglass.models
 allow_indirect_imports = True

@@ -11,6 +11,10 @@ School-side (tenant API) routes that the authz owner wires with ``require(...)``
 - GET  /api/v1/support/tickets/{id} (support.ticket.create): ``get_tenant_ticket(...)``
 - POST /api/v1/support/tickets/{id}/messages (support.ticket.create): ``reply_from_tenant``
 
+Break-glass (school side, ``app.breakglass``; US-103, FR-OPS-004):
+``breakglass_requests_for_school``,
+``breakglass_request_for_school`` and ``record_breakglass_outcome`` (see ``platform.breakglass``).
+
 Feature flags for tenant code: ``is_flag_enabled(key, tenant_id, session=tenant_session)``.
 
 Provisioning helpers for dev tooling: ``invite_school_owner(platform_session, ...)``.
@@ -24,7 +28,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.platform import announcements, flags, repository, support
+from app.platform import announcements, breakglass, flags, repository, support
+from app.platform.breakglass import SchoolBreakGlassRequest
 from app.platform.schemas import (
     AnnouncementBrief,
     SchoolTicketMessageIn,
@@ -34,16 +39,20 @@ from app.platform.schemas import (
 
 __all__ = [
     "AnnouncementBrief",
+    "SchoolBreakGlassRequest",
     "SchoolTicketMessageIn",
     "TicketCreateSchool",
     "TicketOut",
     "active_announcements",
+    "breakglass_request_for_school",
+    "breakglass_requests_for_school",
     "current_subscription",
     "get_tenant_ticket",
     "invite_school_owner",
     "is_flag_enabled",
     "list_tenant_tickets",
     "open_ticket_from_tenant",
+    "record_breakglass_outcome",
     "reply_from_tenant",
 ]
 
@@ -118,3 +127,21 @@ def invite_school_owner(
         uuid.UUID(str(row["membership_id"])),
         bool(row["owner_role_assigned"]),
     )
+
+
+def breakglass_requests_for_school(tenant_id: uuid.UUID) -> list[SchoolBreakGlassRequest]:
+    """Open support-access requests for this school (pulled by the school side)."""
+    return breakglass.requests_for_school(tenant_id)
+
+
+def breakglass_request_for_school(
+    tenant_id: uuid.UUID, request_id: uuid.UUID
+) -> SchoolBreakGlassRequest | None:
+    return breakglass.request_for_school(tenant_id, request_id)
+
+
+def record_breakglass_outcome(
+    tenant_id: uuid.UUID, request_id: uuid.UUID, status: str, *, grant_id: uuid.UUID
+) -> bool:
+    """Report the school's decision / the grant's end to the control plane (idempotent)."""
+    return breakglass.record_school_outcome(tenant_id, request_id, status, grant_id=grant_id)

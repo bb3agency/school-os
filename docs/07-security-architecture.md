@@ -205,6 +205,16 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 - Emergency access without approval exists only for legal obligation or active security incident, requires two operator-side confirmations (`platform.breakglass.emergency`, two different operators, step-up), and is reported to the school within 24 hours.
 - Operators request access with `platform.breakglass.request`; the platform admin panel lists requests and their status (16 §5.15). The workflow ships in M1.
 
+**How it works (M1, `app/breakglass`, US-103, FR-OPS-004).** The control plane never writes tenant tables: the school side pulls its open requests (worker every minute, and when the list is opened) into `ops.break_glass_grants`, audits `breakglass.requested` in the school's chain and notifies every holder of `breakglass.approve`. Approval (step-up) runs in the school's own transaction: the operator's account is created or found with `core.create_user_for_invite` (the approver is the inviter; no new definer function) and receives a temporary membership holding only `platform_support`, MFA required, scoped like the request (`section_id` / `class_id`, else the whole school) and expiring with the grant; sign-in resolution refuses it the moment it expires. The approver can never be the person who gets access (service check + DB `CHECK`); unanswered requests expire after 24 h; the school can revoke at any time. Emergency requests confirmed by two different operators are opened when pulled and the owner and principal are notified immediately (in-app notification + audit), which satisfies "reported within 24 hours"; an operator without an existing SchoolOS sign-in gets no access this way (fail closed). Every decision is audited in the school's chain and reported to the control-plane chain. A `platform_support` session is read-only (`require()` refuses non-GET calls, 403 `breakglass_read_only`) and every call it makes is written to the school's audit log as `breakglass.access` with `via_breakglass: true`, the route and the IDs in the path. `platform_support` is not an FR-IAM-010 system role: it is defined in `roles.yaml` (`breakglass_role`), created in a school on first approval, hidden from role assignment and never assignable by staff. Its permissions (all scoped to the membership's scopes):
+
+| Permission | Why support needs it |
+|---|---|
+| `student.read_basic` | See the student records a request is about (C2 only; never C3) |
+| `dq.findings.read` | See the data-quality findings the school asks about |
+| `document.read` | Open the uploaded file or register photo behind an import problem |
+
+Not granted: `student.read_sensitive`, `audit.read` (the audit log is how the school watches support, T17), `kb.ask`, exports and every write permission.
+
 ### 6.5 Platform roles × permissions
 
 Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). Catalog: `config/platform_permissions.yaml`; the authz tests are generated from it. ᴿ = step-up MFA within 5 minutes; 2P = two different operators. This matrix and 16 §6 must stay identical.

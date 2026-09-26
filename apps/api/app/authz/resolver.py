@@ -20,7 +20,7 @@ from collections.abc import Sequence
 
 from app.authz import cache
 from app.authz.cache import PermissionSnapshot
-from app.authz.catalog import implicit_permissions, mfa_roles, system_roles
+from app.authz.catalog import BREAKGLASS_ROLE, implicit_permissions, mfa_roles, system_roles
 from app.authz.context import Scopes, UserContext
 from app.core.errors import Conflict, Forbidden
 from app.identity import service as identity
@@ -127,6 +127,7 @@ class AuthzResolver:
             request_id=request_id,
             session_id=principal.session_id,
             scoped_permissions=snap.scoped_permissions,
+            via_breakglass=BREAKGLASS_ROLE in snap.roles,
         )
 
     def resolve(

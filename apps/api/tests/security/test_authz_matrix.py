@@ -227,7 +227,47 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # Break-glass, school side (US-103, FR-OPS-004): owner and principal, step-up for changes.
+    ("GET", "/api/v1/breakglass/requests"): lambda w, r, a: (
+        "/api/v1/breakglass/requests",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/breakglass/requests/{request_id}"): lambda w, r, a: (
+        f"/api/v1/breakglass/requests/{_bg().pending_grant(w.a.tenant_id)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/breakglass/requests/{request_id}/approve"): lambda w, r, a: (
+        f"/api/v1/breakglass/requests/{_bg().pending_grant(w.a.tenant_id)}/approve",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/breakglass/requests/{request_id}/deny"): lambda w, r, a: (
+        f"/api/v1/breakglass/requests/{_bg().pending_grant(w.a.tenant_id)}/deny",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/breakglass/grants/{grant_id}/revoke"): lambda w, r, a: (
+        f"/api/v1/breakglass/grants/{_bg().active_grant(w.a.tenant_id, w.person('owner'))}/revoke",
+        None,
+        {},
+    ),
 }
+
+
+def _bg() -> ModuleType:
+    """tests/breakglass/objects.py (pending/active grants through the real services)."""
+    name = "sos_test_breakglass_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "breakglass" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
 
 
 def _notification(tenant_id: uuid.UUID, membership_id: uuid.UUID) -> uuid.UUID:

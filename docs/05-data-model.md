@@ -719,8 +719,20 @@ CREATE TABLE ops.break_glass_grants (
   reason text NOT NULL, scope jsonb NOT NULL,
   status text NOT NULL CHECK (status IN ('requested','approved','active','expired','revoked','denied')),
   starts_at timestamptz, expires_at timestamptz, revoked_at timestamptz,
+  -- 0011_breakglass (M1 workflow, US-103): copied from the control-plane request, plus decisions
+  platform_request_id uuid, reason_code text NOT NULL DEFAULT 'support_request',
+  duration_minutes int CHECK (duration_minutes BETWEEN 15 AND 480), emergency boolean NOT NULL DEFAULT false,
+  operator_display_name text, requested_at timestamptz, decided_at timestamptz,
+  membership_id uuid,                               -- the temporary platform_support membership
+  denied_by_membership uuid, revoked_by_membership uuid,
+  platform_status_synced text,                      -- last status reported to the control plane
   CHECK (expires_at IS NULL OR expires_at <= starts_at + interval '8 hours'),
-  FOREIGN KEY (tenant_id, approved_by_membership) REFERENCES core.memberships (tenant_id, id)
+  UNIQUE (tenant_id, platform_request_id),
+  CHECK (approved_by_membership <> membership_id),  -- no self-approval
+  CHECK (NOT emergency OR approved_by_membership IS NULL),
+  FOREIGN KEY (tenant_id, approved_by_membership) REFERENCES core.memberships (tenant_id, id),
+  FOREIGN KEY (tenant_id, membership_id) REFERENCES core.memberships (tenant_id, id)
+  -- (+ composite FKs for denied_by_membership / revoked_by_membership; the app may not DELETE)
 );
 
 -- In-app notifications (C11, FR-NOT-001; migration 0010_notifications). One row per recipient.

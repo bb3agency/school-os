@@ -14,6 +14,7 @@ from celery import Celery, Task, signals
 from celery.schedules import crontab
 from kombu import Queue
 
+from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
 from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
@@ -33,6 +34,7 @@ TASK_MODULES: list[str] = [
     "app.audit.tasks",
     "app.ops.tasks",
     "app.notifications.tasks",
+    "app.breakglass.tasks",
     "app.platform.tasks",
 ]
 
@@ -71,6 +73,8 @@ def create_celery() -> Celery:
             **ops_beat_schedule(),
             # FR-NOT-001: purge read notifications after 90 days (both modes).
             **notifications_beat_schedule(),
+            # FR-OPS-004: break-glass pull, expiry and outcome reporting (every minute).
+            **breakglass_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

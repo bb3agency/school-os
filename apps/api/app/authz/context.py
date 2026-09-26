@@ -51,6 +51,9 @@ class UserContext:
     session_id: str | None = None
     # Permissions held only through scoped ("S") grants.
     scoped_permissions: frozenset[str] = field(default_factory=frozenset)
+    # The membership holds the break-glass ``platform_support`` role (docs/07 §6.4): the session
+    # is read-only and every guarded call is recorded in the school's audit chain.
+    via_breakglass: bool = False
 
     def has(self, permission: str) -> bool:
         return permission in self.permissions

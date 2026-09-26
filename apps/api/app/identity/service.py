@@ -24,8 +24,10 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz import cache
 from app.authz.catalog import (
+    BREAKGLASS_ROLE,
     RoleDef,
     assign_any_roles,
+    breakglass_role,
     implicit_permissions,
     mfa_roles,
     permission_catalog,
@@ -147,6 +149,12 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
 
 
 def _roles_by_key(session: Session, keys: Sequence[str]) -> dict[str, Role]:
+    if BREAKGLASS_ROLE in keys:
+        # 07 §6.4: support access is granted only through the break-glass approval.
+        raise Forbidden(
+            "SchoolOS support access is given only from the Support access page.",
+            code="role_not_grantable",
+        )
     roles = {r.key: r for r in repo.list_roles(session)}
     missing = [k for k in keys if k not in roles]
     if missing:
@@ -187,6 +195,16 @@ def _guard_invite_roles(session: Session, ctx: UserContext, roles: Iterable[Role
     if not ctx.has("role.assign"):
         raise _not_grantable()
     _guard_grantable(session, ctx, sensitive)
+
+
+def _guard_not_breakglass(session: Session, membership: Membership) -> None:
+    """Temporary support memberships change only through the break-glass workflow."""
+    roles = repo.list_roles_for_membership(session, membership.id)
+    if any(r.key == BREAKGLASS_ROLE for r in roles):
+        raise Conflict(
+            "This is temporary SchoolOS support access. End it from the Support access page.",
+            code="breakglass_membership",
+        )
 
 
 def _guard_last_owner(session: Session, membership: Membership) -> None:
@@ -449,6 +467,7 @@ def set_membership_status(
 ) -> UserOut:
     """Activate, suspend or remove (FR-IAM-014). Audit: ``membership.status_changed``."""
     membership = _membership_for_user(session, user_id)
+    _guard_not_breakglass(session, membership)
     if membership.version != expected_version:
         raise PreconditionFailed("This user was changed by someone else. Reload and try again.")
     previous = membership.status
@@ -478,6 +497,7 @@ def set_roles(
 ) -> UserOut:
     """Replace a member's roles (``role.assign``, step-up). Audit per granted/revoked role."""
     membership = _membership_for_user(session, user_id)
+    _guard_not_breakglass(session, membership)
     if membership.status == "removed":
         raise Conflict("This user has been removed.", code="invalid_state")
     wanted = _roles_by_key(session, role_keys)
@@ -533,6 +553,7 @@ def set_scopes(
 ) -> UserOut:
     """Replace a member's class/section scopes (``role.assign``, step-up; FR-IAM-012)."""
     membership = _membership_for_user(session, user_id)
+    _guard_not_breakglass(session, membership)
     if membership.status == "removed":
         raise Conflict("This user has been removed.", code="invalid_state")
     current = {
@@ -560,7 +581,8 @@ def set_scopes(
 
 
 def list_roles(session: Session) -> list[RoleOut]:
-    roles = repo.list_roles(session)
+    """Assignable roles; the break-glass ``platform_support`` role is never offered."""
+    roles = [r for r in repo.list_roles(session) if r.key != BREAKGLASS_ROLE]
     perms = repo.role_permission_keys(session, [r.id for r in roles])
     return [
         RoleOut(
@@ -585,6 +607,168 @@ def list_permissions(session: Session) -> list[PermissionOut]:
         for p in repo.list_permissions(session)
         if not p.is_platform and p.key not in implicit
     ]
+
+
+# --- break-glass support memberships (docs/07 §6.4, FR-OPS-004) ------------------------------
+
+
+class BreakglassIdentityMissing(Conflict):
+    """Emergency access without a school approver: the operator has no SchoolOS sign-in yet."""
+
+
+def _ensure_breakglass_role(session: Session) -> Role:
+    """The school's ``platform_support`` role, created from roles.yaml on first use."""
+    template = breakglass_role()
+    role = repo.get_role_by_key(session, BREAKGLASS_ROLE)
+    if role is None:
+        role = repo.create_role(
+            session,
+            key=BREAKGLASS_ROLE,
+            name_en=template.name_en,
+            name_te=template.name_te,
+            is_system=True,
+        )
+        _record(
+            session,
+            None,
+            action="role.created",
+            resource_type="role",
+            resource_id=role.id,
+            summary={
+                "role_key": BREAKGLASS_ROLE,
+                "is_system": True,
+                "permissions": sorted(template.permission_keys),
+            },
+        )
+    have = repo.role_permission_keys(session, [role.id])[role.id]
+    for perm in sorted(template.permission_keys - have):
+        repo.grant_role_permission(session, role.id, perm)
+        _record(
+            session,
+            None,
+            action="role.permission_granted",
+            resource_type="role",
+            resource_id=role.id,
+            summary={"role_key": BREAKGLASS_ROLE, "permission": perm},
+        )
+    return role
+
+
+def open_breakglass_membership(
+    session: Session,
+    ctx: UserContext | None,
+    *,
+    subject: str,
+    display_name: str,
+    email: str | None,
+    expires_at: dt.datetime,
+    scopes: Sequence[tuple[str, uuid.UUID | None]],
+) -> tuple[uuid.UUID, uuid.UUID]:
+    """Give an operator temporary, read-only ``platform_support`` access until ``expires_at``.
+
+    ``ctx`` is the approving owner/principal (``breakglass.approve``, step-up). The account is
+    created or found with ``core.create_user_for_invite`` (the approver is the inviter), so no
+    new definer function is needed. ``ctx=None`` is the emergency path (two operators confirmed,
+    no school approver): only an existing SchoolOS account can be used, else
+    :class:`BreakglassIdentityMissing` (fail closed).
+
+    Refuses self-approval and people who already hold ordinary access to this school. A past
+    support membership of the same person is reopened (one membership per person and school).
+    The membership holds only ``platform_support``, requires MFA, expires with the grant and
+    carries ``scopes`` (the request scope). Audit: ``membership.breakglass_opened``.
+    Returns (user_id, membership_id).
+    """
+    if ctx is not None:
+        with _db_errors():
+            user_id = repo.create_user_for_invite(
+                session, subject=subject, display_name=display_name, email=email, language="en"
+            )
+        if user_id == ctx.user_id:
+            raise Forbidden("You cannot approve support access for yourself.", code="self_approval")
+    else:
+        found = repo.find_user_id_by_subject(session, subject)
+        if found is None:
+            raise BreakglassIdentityMissing(
+                "The SchoolOS support person has no sign-in for schools yet.",
+                code="breakglass_identity_missing",
+            )
+        user_id = found
+    role = _ensure_breakglass_role(session)
+    existing = repo.list_memberships_for_user(session, user_id)
+    if existing:
+        membership = existing[0]
+        held = {r.key for r in repo.list_roles_for_membership(session, membership.id)}
+        if held != {BREAKGLASS_ROLE}:
+            raise Conflict(
+                "This person already has access to this school; support access is not needed.",
+                code="already_member",
+            )
+        membership = repo.set_membership_window(
+            session, membership.id, status="active", expires_at=expires_at
+        )
+        for old in repo.list_membership_scopes(session, membership.id):
+            repo.remove_membership_scope(session, old.id)
+    else:
+        with _db_errors():
+            membership = repo.create_membership(
+                session,
+                user_id=user_id,
+                status="active",
+                expires_at=expires_at,
+                created_by=ctx.user_id if ctx is not None else None,
+                mfa_required=True,
+            )
+    granted_by = ctx.user_id if ctx is not None else None
+    repo.add_membership_role(session, membership.id, role.id, granted_by=granted_by)
+    for scope_type, ref in scopes:
+        with _db_errors("scope"):
+            repo.add_membership_scope(session, membership.id, scope_type, ref)
+    _record(
+        session,
+        ctx,
+        action="membership.breakglass_opened",
+        resource_type="membership",
+        resource_id=membership.id,
+        summary={
+            "user_id": user_id,
+            "role_key": BREAKGLASS_ROLE,
+            "via_breakglass": True,
+            "scopes": [{"scope_type": t, "scope_ref": r} for t, r in scopes],
+            "approved": ctx is not None,
+        },
+    )
+    cache.invalidate_on_commit(session, membership.tenant_id, membership.id)
+    return user_id, membership.id
+
+
+def close_breakglass_membership(
+    session: Session, ctx: UserContext | None, membership_id: uuid.UUID, *, reason: str
+) -> None:
+    """End a ``platform_support`` membership now (``reason``: revoked | expired).
+
+    The membership is marked removed with ``expires_at`` no later than now, so sign-in
+    resolution (``core.resolve_login``) refuses it immediately; the permission cache is dropped
+    after commit. Audit: ``membership.breakglass_closed``. ``ctx=None`` for the expiry job.
+    """
+    membership = repo.get_membership(session, membership_id)
+    if membership is None:
+        raise NotFound("Membership not found")
+    held = {r.key for r in repo.list_roles_for_membership(session, membership_id)}
+    if held != {BREAKGLASS_ROLE}:
+        raise Conflict("Only support access can be ended here.", code="not_breakglass")
+    now = dt.datetime.now(dt.UTC)
+    ends = min(membership.expires_at, now) if membership.expires_at is not None else now
+    ends = max(ends, membership.created_at + dt.timedelta(microseconds=1))
+    repo.set_membership_window(session, membership_id, status="removed", expires_at=ends)
+    _record(
+        session,
+        ctx,
+        action="membership.breakglass_closed",
+        resource_type="membership",
+        resource_id=membership_id,
+        summary={"user_id": membership.user_id, "reason": reason, "via_breakglass": True},
+    )
+    cache.invalidate_on_commit(session, membership.tenant_id, membership_id)
 
 
 # --- provisioning hook: clone system roles (FR-IAM-011) ---------------------------------------
