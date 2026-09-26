@@ -91,7 +91,8 @@ def test_FR_PLT_002_shared_provisioning_end_to_end(
             ),
             {"t": tid},
         ).one()
-    assert sub.status == "trial" and sub.trial_ends_at is not None
+    assert sub.status == "trial"
+    assert sub.trial_ends_at is not None
     assert tuple(dep) == ("shared", "healthy", "provisioning")
     assert _platform_events(tid) == ["tenant.provisioned", "tenant.owner_invite_created"]
     assert ("tenant.provisioned", "platform") in _tenant_events(admin_engine, tid)
@@ -163,7 +164,8 @@ def test_FR_PLT_003_dedicated_provisioning_records_domain_and_key_once(
     first = api.call("POST", "/tenants", owner, json=body, idem="idem-dedicated-01")
     assert first.status_code == 201, first.text
     out = first.json()
-    assert out["heartbeat_key"] and out["heartbeat_key_id"].startswith("hb-")
+    assert out["heartbeat_key"]
+    assert out["heartbeat_key_id"].startswith("hb-")
     assert out["owner_invite"] == "not_applicable"
     with platform_session() as s:
         dep = s.execute(

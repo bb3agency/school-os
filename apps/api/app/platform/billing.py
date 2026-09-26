@@ -141,7 +141,7 @@ def _period_months(plan: Mapping[Any, Any]) -> int:
 
 
 def _plan_values(data: PlanIn | PlanPatch) -> dict[str, Any]:
-    values = data.model_dump(exclude_unset=True, mode="python")
+    values = data.model_dump(exclude_unset=isinstance(data, PlanPatch), mode="python")
     if "limits" in values and values["limits"] is not None:
         values["limits"] = {
             k: (str(v) if isinstance(v, Decimal) else v)
@@ -395,7 +395,7 @@ def activate_subscription(
             tenant_id=sub["tenant_id"],
         )
         # Billing in advance: the first period's draft invoice.
-        _create_draft(s, SYSTEM, sub, today)
+        create_draft(s, SYSTEM, sub, today)
         return SubscriptionOut.model_validate(dict(sub))
 
 
@@ -825,7 +825,7 @@ def _totals(s: Session, invoice: Mapping[Any, Any]) -> dict[str, Any]:
     }
 
 
-def _create_draft(
+def create_draft(
     s: Session,
     actor: Actor,
     sub: Mapping[Any, Any],
@@ -936,7 +936,7 @@ def create_manual_draft(actor: Actor, sub_id: uuid.UUID, period_start: dt.date) 
             raise Conflict(
                 "Trials and cancelled subscriptions are not invoiced.", code="invalid_state"
             )
-        row = _create_draft(s, actor, sub, period_start)
+        row = create_draft(s, actor, sub, period_start)
         if row is None:
             raise Conflict("An invoice already exists for this period.", code="duplicate")
         return _invoice_out(s, row)
@@ -1240,7 +1240,7 @@ def generate_invoices(month: str, actor: Actor = SYSTEM) -> JobOut:
         try:
             with platform_session() as s, db_errors():
                 locked = repo.get(s, m.subscriptions, sub["id"], for_update=True)
-                if locked is not None and _create_draft(
+                if locked is not None and create_draft(
                     s, SYSTEM, locked, locked["current_period_end"]
                 ):
                     generated += 1

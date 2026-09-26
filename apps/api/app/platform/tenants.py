@@ -37,6 +37,7 @@ from app.platform import billing
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import (
+    SYSTEM,
     Actor,
     audit_platform,
     clamp_limit,
@@ -262,6 +263,8 @@ def provision(actor: Actor, data: ProvisionIn, *, wrapper: KeyWrapper) -> Provis
             override_reason=data.override_reason,
             today=today,
         )
+        if sub["status"] == "active":  # billing in advance: first period's draft invoice
+            billing.create_draft(s, SYSTEM, sub, today)
         audit_platform(
             s,
             actor,
