@@ -1,0 +1,73 @@
+[project]
+name = "schoolos"
+version = "0.1.0"
+description = "SchoolOS monorepo (uv workspace root; not a package)"
+requires-python = ">=3.12,<3.13"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/api", "apps/worker"]
+
+[tool.uv.sources]
+sos-api = { workspace = true }
+sos-worker = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "ruff==0.16.9",
+  "mypy==2.3.1",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "pytest-timeout==2.4.0",
+  "hypothesis==6.168.1",
+  "factory-boy==3.3.3",
+  "testcontainers[postgres]==4.15.0",
+  "import-linter==2.15",
+  "pip-audit==2.10.1",
+  "types-pyyaml==6.0.12.20260906",
+  "boto3-stubs[s3,kms]==1.43.103",
+  "celery-types==0.26.0",
+  "pre-commit==4.6.2",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["apps/web", "node_modules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "N", "C4", "SIM", "RUF", "PT", "T20", "DTZ", "ASYNC", "PL"]
+ignore = ["PLR0913", "PLR2004"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "S608", "PLR2004", "PLC0415"]
+"apps/api/migrations/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = ["apps/api", "apps/worker"]
+explicit_package_bases = true
+exclude = ["apps/web/", "node_modules/"]
+
+[[tool.mypy.overrides]]
+# testcontainers and rfc8785 ship without complete type information
+module = ["testcontainers.*", "rfc8785", "factory.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["apps/api/tests", "apps/worker/tests"]
+addopts = "-ra --strict-markers --import-mode=importlib"
+timeout = 300
+markers = [
+  "db: needs a PostgreSQL test database (testcontainers or SOS_TEST_DATABASE_URL)",
+  "redis: needs Valkey/Redis",
+  "s3: needs an S3-compatible endpoint",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["apps/api/app", "apps/worker/sos_worker"]
