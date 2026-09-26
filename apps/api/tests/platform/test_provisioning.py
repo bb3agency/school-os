@@ -77,7 +77,7 @@ def test_FR_PLT_002_shared_provisioning_end_to_end(
             text("SELECT status, mfa_required FROM core.memberships WHERE tenant_id = :t"),
             {"t": tid},
         ).one()
-        owner_roles = c.execute(
+        owner_roles: Any = c.execute(
             text(
                 "SELECT r.key FROM core.membership_roles mr JOIN core.roles r "
                 "ON r.tenant_id = mr.tenant_id AND r.id = mr.role_id WHERE mr.tenant_id = :t"

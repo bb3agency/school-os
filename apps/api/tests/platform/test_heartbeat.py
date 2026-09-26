@@ -114,10 +114,11 @@ def test_SEC_028_valid_heartbeat_is_accepted_and_recorded(api: Api, dep: dict[st
             text("SELECT source, students_active FROM platform.usage_daily WHERE tenant_id = :t"),
             {"t": dep["tenant_id"]},
         ).one()
-        actions = list(
+        actions: Any = list(
             s.execute(
                 text(
-                    "SELECT action FROM platform.audit_events WHERE subject_tenant_id = :t ORDER BY seq"
+                    "SELECT action FROM platform.audit_events "
+                    "WHERE subject_tenant_id = :t ORDER BY seq"
                 ),
                 {"t": dep["tenant_id"]},
             ).scalars()
@@ -156,7 +157,7 @@ def test_SEC_028_bad_signatures_are_401_and_store_nothing(
     assert res.status_code == 401, (tamper, res.text)
     assert "detail" not in res.json() or res.json()["detail"] == "Heartbeat rejected"
     with platform_session() as s:
-        seen = s.execute(
+        seen: Any = s.execute(
             text("SELECT last_heartbeat_at FROM platform.deployments WHERE id = :d"),
             {"d": dep["deployment_id"]},
         ).scalar_one()
@@ -177,7 +178,7 @@ def test_SEC_028_replay_extra_fields_size_mismatch_and_rate_limit(
     assert (replay.status_code, replay.json()["code"]) == (409, "replay")
     again = _post(api, dep, _payload(dep))
     assert again.status_code == 429
-    fleet_stores.rate._seen.clear()
+    _next_minute(fleet_stores)
     extra = _post(api, dep, _payload(dep, school_name="Leak"))
     assert extra.status_code == 422
     nested = _payload(dep)
@@ -189,6 +190,13 @@ def test_SEC_028_replay_extra_fields_size_mismatch_and_rate_limit(
     other = _dedicated(api, owner, make_plan)
     mismatch = _payload(dep, tenant_id=other["tenant_id"])
     assert _post(api, dep, mismatch).status_code == 401
+
+
+def _next_minute(stores: fleet.FleetStores) -> None:
+    """Forget the per-deployment rate-limit marks (as if a minute had passed)."""
+    rate = stores.rate
+    assert isinstance(rate, InMemoryReplayStore)
+    rate._seen.clear()
 
 
 def _post(api: Api, dep: dict[str, Any], body: dict[str, Any] | bytes) -> Any:
@@ -209,7 +217,7 @@ def test_SEC_028_key_rotation_overlap(
     ):
         raw, headers = _signed(dep, _payload(dep), key=key, key_id=key_id)
         fleet.verify_heartbeat(headers, raw, wrapper=wrapper, stores=stores)
-        stores.rate._seen.clear()
+        _next_minute(stores)
     later = dt.datetime.now(dt.UTC) + dt.timedelta(days=8)
     old_raw, old_headers = _signed(dep, _payload(dep), ts=int(later.timestamp()))
     with pytest.raises(Unauthenticated):
@@ -229,7 +237,7 @@ def test_FR_PLT_025_staleness_marks_unreachable(api: Api, dep: dict[str, Any]) -
     assert api.client.post(URL, content=raw, headers=headers).status_code == 200
     assert fleet.check_staleness(at=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=21)) >= 1
     with platform_session() as s:
-        status = s.execute(
+        status: Any = s.execute(
             text("SELECT status FROM platform.deployments WHERE id = :d"),
             {"d": dep["deployment_id"]},
         ).scalar_one()
