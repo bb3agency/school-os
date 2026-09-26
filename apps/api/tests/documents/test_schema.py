@@ -130,7 +130,8 @@ def test_FR_DOC_008_status_values_are_constrained(world: Any, admin_engine: Engi
     with pytest.raises(IntegrityError), admin_engine.begin() as c:
         c.execute(
             text(
-                "UPDATE kb.document_versions SET error = 'Free text with a name' WHERE document_id = :d"
+                "UPDATE kb.document_versions SET error = 'Free text with a name' "
+                "WHERE document_id = :d"
             ),
             {"d": doc},
         )
@@ -150,7 +151,7 @@ def test_deleting_a_document_cascades_versions_and_acl(world: Any, admin_engine:
         c.execute(text("DELETE FROM kb.documents WHERE id = :d"), {"d": doc})
     with admin_engine.connect() as c:
         for table in ("kb.document_versions", "kb.document_acl"):
-            n = c.execute(
+            n: Any = c.execute(
                 text(f"SELECT count(*) FROM {table} WHERE document_id = :d"), {"d": doc}
             ).scalar_one()
             assert n == 0
@@ -161,7 +162,7 @@ def test_intent_expiry_column_is_timezone_aware(world: Any, admin_engine: Engine
         admin_engine, world.a.tenant_id, world.a.people["owner"].user_id, S.pdf()
     )
     with admin_engine.connect() as c:
-        value = c.execute(
+        value: Any = c.execute(
             text("SELECT expires_at FROM kb.upload_intents WHERE id = :i"), {"i": intent}
         ).scalar_one()
     assert value.tzinfo is not None

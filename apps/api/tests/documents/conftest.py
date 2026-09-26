@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 
@@ -31,5 +30,5 @@ api = W.api
 
 
 @pytest.fixture
-def store() -> Iterator[object]:
-    yield S.memory_store()
+def store() -> object:
+    return S.memory_store()

@@ -333,3 +333,42 @@ def outbox_events(admin: Engine, tenant_id: uuid.UUID, event_type: str) -> list[
             {"t": tenant_id, "e": event_type},
         )
         return [dict(r[0]) for r in rows]
+
+
+def service_document(tenant_id: uuid.UUID, person: Any) -> uuid.UUID:
+    """Create a document through the real service path (upload -> S3 -> register) as a
+    school-wide ``owner`` of ``tenant_id`` (for cross-tenant fixtures)."""
+    from app.authz.context import Scopes, UserContext
+    from app.core.db import tenant_session
+    from app.documents import service
+    from app.documents.schemas import DocumentCreate, UploadCreate
+
+    store = memory_store()
+    ctx = UserContext(
+        user_id=person.user_id,
+        tenant_id=tenant_id,
+        membership_id=person.membership_id,
+        roles=frozenset({"owner"}),
+        permissions=frozenset({"document.upload", "document.read", "document.manage_acl"}),
+        scopes=Scopes(school=True),
+        mfa=True,
+        auth_time=None,
+    )
+    data = pdf()
+    with tenant_session(tenant_id, person.user_id) as s:
+        up = service.create_upload(
+            s,
+            ctx,
+            UploadCreate(
+                filename="other-school.pdf",
+                content_type="application/pdf",
+                size_bytes=len(data),
+                purpose="circular",
+            ),
+        )
+    assert store.browser_post(up.fields, data, "application/pdf") == 204
+    with tenant_session(tenant_id, person.user_id) as s:
+        doc = service.register_document(
+            s, ctx, DocumentCreate(upload_id=up.upload_id, title="Other school circular")
+        )
+    return doc.id

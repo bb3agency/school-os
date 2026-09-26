@@ -42,6 +42,22 @@ W = _load_world()
 world = W.world
 api = W.api
 
+
+def _load_documents_support() -> ModuleType:
+    name = "sos_test_documents_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "documents" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+D = _load_documents_support()
+
 # Minimal valid bodies so the request reaches the object lookup.
 BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/users/{user_id}"): {"status": "active"},
@@ -51,6 +67,9 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/classes/{class_id}"): {},
     ("PATCH", "/api/v1/sections/{section_id}"): {},
     ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): {"body": "Synthetic follow-up"},
+    ("POST", "/api/v1/documents/{document_id}/versions"): {"upload_id": str(uuid.uuid4())},
+    ("PUT", "/api/v1/documents/{document_id}/acl"): {"acl": []},
+    ("DELETE", "/api/v1/documents/{document_id}"): None,
 }
 
 
@@ -73,6 +92,8 @@ PARAM_TO_B = {
     "class_id": lambda w: w.b.ids["class_ix"],
     "section_id": lambda w: w.b.ids["section_9a"],
     "ticket_id": _b_ticket,
+    # A school B document created through the real upload -> register path.
+    "document_id": lambda w: D.service_document(w.b.tenant_id, w.b.people["owner"]),
 }
 
 
