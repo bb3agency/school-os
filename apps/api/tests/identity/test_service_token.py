@@ -76,7 +76,9 @@ def test_SEC_004_service_token_round_trip() -> None:
 def test_SEC_004_token_minted_by_web_side_is_accepted() -> None:
     # Mirrors what the TypeScript BFF produces (uuid jti, 60 s ttl).
     token = raw_token(jti="0192f3c1-7b2a-7c3d-8e4f-0123456789ab")
-    assert verifier().verify(token).token_id == "0192f3c1-7b2a-7c3d-8e4f-0123456789ab"  # gitleaks:allow
+    assert (
+        verifier().verify(token).token_id == "0192f3c1-7b2a-7c3d-8e4f-0123456789ab"
+    )  # gitleaks:allow
 
 
 def test_SEC_004_each_issued_token_has_unique_jti() -> None:
