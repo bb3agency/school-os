@@ -1,0 +1,6 @@
+[Unit]
+Description=SchoolOS monthly maintenance reboot (kernel/libc updates; SEC-030)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl reboot

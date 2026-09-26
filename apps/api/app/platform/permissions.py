@@ -1,6 +1,8 @@
-"""Platform permission catalog and role matrix (docs/16 §6, docs/07 §6.5; FR-PLT-028, SEC-027).
+"""Platform permissions and operator role matrix (docs/16 §6, docs/07 §6.5; FR-PLT-028, SEC-027).
 
-Loaded from ``permissions.yaml`` inside the package (the image does not ship /config).
+Permission keys and step-up flags come from the single catalog ``app/authz/permissions.yaml``
+(``is_platform: true`` entries, seeded into ``core.permissions`` by 0004_authz_seed). This
+module adds only the operator-role matrix and the two-person list from ``roles.yaml``.
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ from typing import Any, Final
 
 import yaml
 
+from app.authz.catalog import permission_catalog
+
 PLATFORM_ROLES: Final[tuple[str, ...]] = (
     "platform_owner",
     "platform_engineer",
@@ -20,9 +24,11 @@ PLATFORM_ROLES: Final[tuple[str, ...]] = (
     "platform_viewer",
 )
 
-# Pseudo-permission for routes any active operator may call (me, dashboard, lists of
-# announcements and break-glass requests). It is not in the catalog and grants nothing else.
-ANY_OPERATOR: Final = "platform.any_operator"
+# Routes any active operator may call (me, dashboard, lists of announcements and break-glass
+# requests, own jobs) are guarded by the one platform permission EVERY platform role holds, so
+# each route still names a real catalog key (route-enumeration test). A test pins that every
+# role in roles.yaml grants it.
+ANY_OPERATOR: Final = "platform.tenants.read"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,15 +53,17 @@ class Catalog:
 
 def _load() -> Catalog:
     raw: dict[str, Any] = yaml.safe_load(
-        resources.files("app.platform").joinpath("permissions.yaml").read_text("utf-8")
+        resources.files("app.platform").joinpath("roles.yaml").read_text("utf-8")
     )
+    two_person = set(raw.get("two_person") or [])
     perms = {
-        key: PermissionSpec(key, bool(spec["step_up"]), bool(spec["two_person"]))
-        for key, spec in raw["permissions"].items()
+        key: PermissionSpec(key, spec.step_up, key in two_person)
+        for key, spec in permission_catalog().items()
+        if spec.is_platform
     }
-    for key in perms:
-        if not key.startswith("platform."):
-            raise ValueError(f"platform permission {key} must start with 'platform.'")
+    unknown_two_person = two_person - set(perms)
+    if unknown_two_person:
+        raise ValueError(f"two_person names unknown permissions {sorted(unknown_two_person)}")
     roles: dict[str, frozenset[str]] = {}
     for role, keys in raw["roles"].items():
         if role not in PLATFORM_ROLES:

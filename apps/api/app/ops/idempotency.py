@@ -4,9 +4,8 @@ Same key + same request hash -> replay the original status and resource (no resp
 stored, so no personal data is duplicated); same key + different hash -> 422
 ``idempotency_key_reused``; key still running -> 409 ``idempotency_in_progress``.
 
-- Control plane: :class:`RedisIdempotencyStore` (Valkey, 24 h, per operator), because
-  ``sos_platform`` cannot use ``ops.idempotency_keys``; :class:`InMemoryIdempotencyStore` for
-  local development and tests.
+- Control plane: :class:`KVIdempotencyStore` on the shared ``app.authz.kv`` store (Valkey,
+  24 h, per operator), because ``sos_platform`` cannot use ``ops.idempotency_keys``.
 - Tenant API: ``app.ops.service.begin_idempotent`` / ``complete_idempotent`` on
   ``ops.idempotency_keys`` inside the request's ``tenant_session``.
 """
@@ -15,16 +14,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import threading
-import time
 import uuid
-from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import timedelta
 from typing import Literal, Protocol
 
-import redis
-
+from app.authz.kv import KVStore, KVUnavailable
 from app.core.errors import Conflict, ServiceUnavailable, ValidationFailed
 
 DEFAULT_TTL = timedelta(hours=24)
@@ -77,74 +72,48 @@ class IdempotencyStore(Protocol):
         ...
 
 
-class InMemoryIdempotencyStore:
+class KVIdempotencyStore:
+    """Idempotency records in the shared key-value store (Valkey; in-process locally/CI).
+
+    Reuses ``app.authz.kv`` (the store behind tenant-route idempotency in ``app.authz.http``) so
+    there is one Valkey client and one key namespace (``sos:idem:``). Records hold a request
+    hash, status, resource type/id and Location only, never a response body.
+    """
+
     def __init__(
-        self, *, ttl: timedelta = DEFAULT_TTL, clock: Callable[[], float] = time.monotonic
+        self, kv: KVStore, *, ttl: timedelta = DEFAULT_TTL, prefix: str = "sos:idem:"
     ) -> None:
-        self._ttl = ttl.total_seconds()
-        self._clock = clock
-        self._data: dict[tuple[str, str], tuple[float, IdempotencyRecord]] = {}
-        self._lock = threading.Lock()
-
-    def begin(self, scope: str, key: str, request_sha256: str) -> IdempotencyRecord | None:
-        with self._lock:
-            current = self._clock()
-            found = self._data.get((scope, key))
-            if found is not None and found[0] > current:
-                return found[1]
-            self._data[(scope, key)] = (
-                current + self._ttl,
-                IdempotencyRecord(request_sha256, "in_progress"),
-            )
-            return None
-
-    def complete(self, scope: str, key: str, record: IdempotencyRecord) -> None:
-        with self._lock:
-            self._data[(scope, key)] = (self._clock() + self._ttl, record)
-
-    def abandon(self, scope: str, key: str) -> None:
-        with self._lock:
-            self._data.pop((scope, key), None)
-
-
-class RedisIdempotencyStore:
-    def __init__(
-        self, client: redis.Redis, *, ttl: timedelta = DEFAULT_TTL, prefix: str = "sos:idem:"
-    ) -> None:
-        self._client = client
+        self._kv = kv
         self._ttl = int(ttl.total_seconds())
         self._prefix = prefix
 
     def _k(self, scope: str, key: str) -> str:
-        return f"{self._prefix}{scope}:{key}"
+        digest = hashlib.sha256(f"{scope}:{key}".encode()).hexdigest()
+        return f"{self._prefix}{scope}:{digest}"
 
     def begin(self, scope: str, key: str, request_sha256: str) -> IdempotencyRecord | None:
+        k = self._k(scope, key)
+        pending = IdempotencyRecord(request_sha256, "in_progress").to_json().encode()
         try:
-            claimed = self._client.set(
-                self._k(scope, key),
-                IdempotencyRecord(request_sha256, "in_progress").to_json(),
-                nx=True,
-                ex=self._ttl,
-            )
-            if claimed:
+            if self._kv.set(k, pending, ttl_s=self._ttl, nx=True):
                 return None
-            raw = self._client.get(self._k(scope, key))
-        except redis.exceptions.RedisError:
+            raw = self._kv.get(k)
+        except KVUnavailable:
             raise ServiceUnavailable() from None
-        if raw is None:  # expired between SET and GET: try once more
+        if raw is None:  # expired in between: claim again
             return self.begin(scope, key, request_sha256)
-        return IdempotencyRecord.from_json(raw)  # type: ignore[arg-type]
+        return IdempotencyRecord.from_json(raw)
 
     def complete(self, scope: str, key: str, record: IdempotencyRecord) -> None:
         try:
-            self._client.set(self._k(scope, key), record.to_json(), ex=self._ttl)
-        except redis.exceptions.RedisError:
+            self._kv.set(self._k(scope, key), record.to_json().encode(), ttl_s=self._ttl)
+        except KVUnavailable:
             raise ServiceUnavailable() from None
 
     def abandon(self, scope: str, key: str) -> None:
         try:
-            self._client.delete(self._k(scope, key))
-        except redis.exceptions.RedisError:
+            self._kv.delete(self._k(scope, key))
+        except KVUnavailable:
             raise ServiceUnavailable() from None
 
 

@@ -10,22 +10,19 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Callable
-from functools import lru_cache
 from typing import Annotated, Any
 
-import redis
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
-from app.core.config import get_settings
+from app.authz.kv import kv_store
 from app.core.crypto import KeyWrapper
 from app.core.errors import BadRequest
 from app.ops.idempotency import (
     IdempotencyRecord,
     IdempotencyStore,
-    InMemoryIdempotencyStore,
-    RedisIdempotencyStore,
+    KVIdempotencyStore,
     check_key,
     request_hash,
     resolve_existing,
@@ -127,15 +124,9 @@ def _etag(response: Response, version: int) -> None:
 # --- dependencies that tests override ---------------------------------------------------------
 
 
-@lru_cache(maxsize=1)
 def get_idempotency_store() -> IdempotencyStore:
-    settings = get_settings()
-    if settings.is_production_like:
-        client = redis.Redis.from_url(
-            settings.redis_url.get_secret_value(), socket_timeout=0.5, socket_connect_timeout=0.5
-        )
-        return RedisIdempotencyStore(client, prefix="sos:idem:platform:")
-    return InMemoryIdempotencyStore()
+    """Per-operator Idempotency-Key records in the shared Valkey store (app.authz.kv)."""
+    return KVIdempotencyStore(kv_store(), prefix="sos:idem:platform:")
 
 
 def get_key_wrapper() -> KeyWrapper:
@@ -300,7 +291,7 @@ def activate_tenant(
 def resend_owner_invite(
     *,
     tenant_id: uuid.UUID,
-    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.provision", step_up=False))],
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.provision"))],
 ) -> dict[str, str]:
     tenants.resend_owner_invite(_actor(ctx), tenant_id)
     return {"status": "queued"}

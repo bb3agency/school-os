@@ -1,0 +1,346 @@
+# SchoolOS dedicated tier: single-host production install (ADR-0015, docs/10 §15, SEC-030).
+#
+# One school per host. tenant_id + RLS stay on; SOS_DEPLOYMENT_MODE=dedicated disables control-plane routes.
+# Only caddy publishes ports (80/443). db and valkey sit on an internal network with no egress.
+# Never run `docker compose` directly: use scripts/compose.sh, which renders /etc/schoolos/compose.env
+# (host config + release image digests + secrets from Secrets Manager) and adds compose.walg.yaml when
+# WAL-G is enabled.
+#
+# One-off services (profile "tools"): db-bootstrap (infra/db/bootstrap.sql), migrate (Alembic).
+
+name: schoolos
+
+x-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  restart: unless-stopped
+  stop_grace_period: 30s
+
+# Container logs go to the host's CloudWatch log group (400 days) with a bounded local cache, so
+# `docker logs` still works and local disk use is capped (rotation). The app never logs personal data.
+x-logging: &logging
+  logging:
+    driver: awslogs
+    options:
+      awslogs-region: ${AWS_REGION:?}
+      awslogs-group: ${SOS_LOG_GROUP:?}
+      tag: "{{.Name}}"
+      mode: non-blocking
+      max-buffer-size: 4m
+      cache-max-size: 20m
+      cache-max-file: "5"
+      cache-compress: "true"
+
+x-app-env: &app-env
+  SOS_ENV: prod
+  SOS_DEPLOYMENT_MODE: dedicated
+  SOS_VERSION: ${SOS_VERSION:?}
+  AWS_REGION: ${AWS_REGION:?}
+  AWS_DEFAULT_REGION: ${AWS_REGION:?}
+  SOS_DATABASE_URL: postgresql+psycopg://sos_app:${SOS_APP_DB_PASSWORD:?}@db:5432/schoolos
+  SOS_PLATFORM_DATABASE_URL: postgresql+psycopg://sos_platform:${SOS_PLATFORM_DB_PASSWORD:?}@db:5432/schoolos
+  SOS_REDIS_URL: redis://:${VALKEY_PASSWORD:?}@valkey:6379/0
+  SOS_S3_BUCKET_FILES: ${SOS_S3_BUCKET_FILES:?}
+  SOS_S3_BUCKET_AUDIT: ${SOS_S3_BUCKET_AUDIT:?}
+  SOS_OIDC_ISSUER: ${SOS_OIDC_ISSUER:?}
+  SOS_OIDC_AUDIENCE: ${SOS_OIDC_AUDIENCE:?}
+  SOS_SERVICE_TOKEN_KEY: ${SOS_SERVICE_TOKEN_KEY:?}
+  SOS_KEY_WRAPPER: kms
+  SOS_KMS_KEY_ARN: ${SOS_KMS_KEY_ARN:?}
+  SOS_ANTHROPIC_API_KEY: ${SOS_ANTHROPIC_API_KEY:-}
+  SOS_FLEET_URL: ${SOS_FLEET_URL:?}
+  SOS_DEPLOYMENT_ID: ${SOS_DEPLOYMENT_ID:?}
+  SOS_FLEET_HMAC_KEY: ${SOS_FLEET_HMAC_KEY:-}
+  SOS_HOST_STATE_DIR: /run/schoolos-state
+  SOS_LOG_LEVEL: ${SOS_LOG_LEVEL:-INFO}
+
+services:
+  caddy:
+    <<: [*hardening, *logging]
+    image: caddy:2.11.4-alpine
+    cap_add:
+      - NET_BIND_SERVICE # binds 80/443 as root with every other capability dropped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SOS_PUBLIC_HOST: ${SOS_PUBLIC_HOST:?}
+      SOS_CUSTOM_DOMAIN: ${SOS_CUSTOM_DOMAIN:-}
+      SOS_ACME_EMAIL: ${SOS_ACME_EMAIL:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /var/lib/schoolos/caddy/data:/data
+      - /var/lib/schoolos/caddy/config:/config
+    tmpfs:
+      - /tmp:size=16m
+    networks: [edge]
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits: { memory: 128m, cpus: "0.50" }
+
+  web:
+    <<: [*hardening, *logging]
+    image: ${SOS_ECR_REGISTRY:?}/${SOS_WEB_IMAGE:?}
+    user: "10001:10001"
+    environment:
+      NODE_ENV: production
+      SOS_ENV: prod
+      SOS_DEPLOYMENT_MODE: dedicated
+      APP_BASE_URL: https://${SOS_PUBLIC_HOST:?}
+      SOS_CUSTOM_DOMAIN: ${SOS_CUSTOM_DOMAIN:-}
+      API_INTERNAL_URL: http://api:8000
+      SESSION_SECRET: ${SESSION_SECRET:?}
+      SOS_SERVICE_TOKEN_KEY: ${SOS_SERVICE_TOKEN_KEY:?}
+      OIDC_ISSUER: ${SOS_OIDC_ISSUER:?}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?}
+      REDIS_URL: redis://:${VALKEY_PASSWORD:?}@valkey:6379/1
+    tmpfs:
+      - /tmp:size=64m,uid=10001,gid=10001
+      - /app/.next/cache:size=128m,uid=10001,gid=10001
+    networks: [edge, app, data]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { memory: "${SOS_MEM_WEB:-512m}", cpus: "1.0" }
+
+  api:
+    <<: [*hardening, *logging]
+    image: ${SOS_ECR_REGISTRY:?}/${SOS_API_IMAGE:?}
+    user: "10001:10001"
+    environment:
+      <<: *app-env
+    volumes:
+      - /var/lib/schoolos/state:/run/schoolos-state:ro
+    tmpfs:
+      - /tmp:size=128m,uid=10001,gid=10001
+    networks: [app, data]
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { memory: "${SOS_MEM_API:-768m}", cpus: "1.0" }
+
+  worker:
+    <<: [*hardening, *logging]
+    image: ${SOS_ECR_REGISTRY:?}/${SOS_WORKER_IMAGE:?}
+    user: "10001:10001"
+    command: ["celery", "-A", "sos_worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=${SOS_WORKER_CONCURRENCY:-2}", "-Q", "${SOS_WORKER_QUEUES:-default,ingest,embed,ocr,dq,exports,pdf,audit}"]
+    stop_grace_period: 120s
+    environment:
+      <<: *app-env
+    tmpfs:
+      - /tmp:size=512m,uid=10001,gid=10001
+    shm_size: 256m # headless Chromium (PDF rendering)
+    networks: [app, data]
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A sos_worker.celery_app inspect ping -d celery@$$HOSTNAME --timeout 10 >/dev/null"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits: { memory: "${SOS_MEM_WORKER:-1280m}", cpus: "1.5" }
+
+  beat:
+    <<: [*hardening, *logging]
+    image: ${SOS_ECR_REGISTRY:?}/${SOS_WORKER_IMAGE:?}
+    user: "10001:10001"
+    command: ["celery", "-A", "sos_worker.celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    environment:
+      <<: *app-env
+    volumes:
+      - /var/lib/schoolos/state:/run/schoolos-state:ro # backup status for the heartbeat
+    tmpfs:
+      - /tmp:size=16m,uid=10001,gid=10001
+    networks: [app, data]
+    depends_on:
+      valkey:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { memory: 256m, cpus: "0.25" }
+
+  migrate:
+    <<: [*hardening, *logging]
+    profiles: [tools]
+    image: ${SOS_ECR_REGISTRY:?}/${SOS_API_IMAGE:?}
+    user: "10001:10001"
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["alembic -c /app/alembic.ini upgrade head && python -m app.audit.partitions --months-ahead 12"]
+    environment:
+      <<: *app-env
+      SOS_MIGRATOR_DATABASE_URL: postgresql+psycopg://sos_migrator:${SOS_MIGRATOR_DB_PASSWORD:?}@db:5432/schoolos
+    tmpfs:
+      - /tmp:size=64m,uid=10001,gid=10001
+    networks: [data]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Runs infra/db/bootstrap.sql (shipped in the bundle as db/bootstrap.sql) as the postgres superuser.
+  # Idempotent: re-run after rotating a role password.
+  db-bootstrap:
+    <<: [*hardening, *logging]
+    profiles: [tools]
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    user: "999:999"
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        exec psql -X -v ON_ERROR_STOP=1
+        -v app_password="$$SOS_APP_DB_PASSWORD"
+        -v migrator_password="$$SOS_MIGRATOR_DB_PASSWORD"
+        -v platform_password="$$SOS_PLATFORM_DB_PASSWORD"
+        -v readonly_password="$$SOS_READONLY_DB_PASSWORD"
+        -f /bootstrap/bootstrap.sql
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGDATABASE: schoolos
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      SOS_APP_DB_PASSWORD: ${SOS_APP_DB_PASSWORD:?}
+      SOS_MIGRATOR_DB_PASSWORD: ${SOS_MIGRATOR_DB_PASSWORD:?}
+      SOS_PLATFORM_DB_PASSWORD: ${SOS_PLATFORM_DB_PASSWORD:?}
+      SOS_READONLY_DB_PASSWORD: ${SOS_READONLY_DB_PASSWORD:?}
+    volumes:
+      - ./db/bootstrap.sql:/bootstrap/bootstrap.sql:ro
+    tmpfs:
+      - /tmp:size=16m
+    networks: [data]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    <<: [*hardening, *logging]
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    user: "999:999" # postgres; the data directory is pre-owned by bootstrap-host.sh
+    shm_size: 256m
+    stop_grace_period: 120s
+    environment:
+      POSTGRES_DB: schoolos
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --data-checksums
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - shared_buffers=${SOS_PG_SHARED_BUFFERS:-512MB}
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - log_parameter_max_length=0
+      - -c
+      - log_parameter_max_length_on_error=0
+      - -c
+      - log_statement=none
+      - -c
+      - log_lock_waits=on
+      - -c
+      - idle_in_transaction_session_timeout=60000
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=${SOS_PG_ARCHIVE_MODE:-off}
+      - -c
+      - archive_command=/opt/walg/archive.sh %p
+      - -c
+      - archive_timeout=300
+    volumes:
+      - /var/lib/schoolos/pg:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp:size=64m,uid=999,gid=999
+      - /var/run/postgresql:size=1m,uid=999,gid=999
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "schoolos", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits: { memory: "${SOS_MEM_DB:-1536m}", cpus: "1.5" }
+
+  valkey:
+    <<: [*hardening, *logging]
+    image: valkey/valkey:8.1.10-alpine
+    user: "999:999"
+    # The password goes into a tmpfs config file, never onto the command line (visible in `ps`).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        umask 077 &&
+        printf 'requirepass %s\nmasterauth %s\n' "$$VALKEY_PASSWORD" "$$VALKEY_PASSWORD" > /tmp/valkey.conf &&
+        unset VALKEY_PASSWORD &&
+        exec valkey-server /tmp/valkey.conf --dir /data --appendonly yes --appendfsync everysec
+        --maxmemory ${SOS_VALKEY_MAXMEMORY:-192mb} --maxmemory-policy noeviction --protected-mode yes
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?}
+    volumes:
+      - /var/lib/schoolos/valkey:/data
+    tmpfs:
+      - /tmp:size=1m,uid=999,gid=999
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(sed -n 's/^requirepass //p' /tmp/valkey.conf)\" valkey-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 256m, cpus: "0.50" }
+
+networks:
+  # caddy <-> web only
+  edge: {}
+  # app tier: outbound internet for S3/KMS/Cognito/LLM providers/heartbeat
+  app: {}
+  # data tier: no route out of the host (internal)
+  data:
+    internal: true

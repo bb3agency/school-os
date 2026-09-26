@@ -1,0 +1,19 @@
+# Terraform working files
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Per-account / per-school inputs (non-secret but environment-specific); commit only the *.example files.
+terraform.tfvars
+*.auto.tfvars
+backend.hcl
+envs/dedicated-template/schools/
+
+# Root stacks commit their dependency lock (all-platform zh: hashes). Reusable modules do not.
+modules/**/.terraform.lock.hcl
+
+# Lambda build output (archive_file)
+.build/

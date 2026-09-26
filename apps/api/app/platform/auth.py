@@ -29,7 +29,7 @@ from app.core.logging import get_logger
 from app.identity.principal import Principal, get_operator_principal, require_recent_auth
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.permissions import ANY_OPERATOR, catalog
+from app.platform.permissions import catalog
 
 log = get_logger(__name__)
 
@@ -102,17 +102,20 @@ class RequirePlatform:
         cat = catalog()
         keys = (permission, *any_of)
         for key in keys:
-            if key != ANY_OPERATOR and key not in cat.permissions:
+            if key not in cat.permissions:
                 raise ValueError(f"unknown platform permission {key}")
         self.permissions = keys
-        self.sos_permission = "|".join(keys)
-        # None = follow the catalog; an explicit False is used by the few read/resend routes
-        # that docs/16 §8 lists without the step-up marker.
-        self.step_up = (
-            step_up
-            if step_up is not None
-            else permission != ANY_OPERATOR and cat.permissions[permission].step_up
-        )
+        # Route-enumeration contract (shared with authz.require): one catalog key per guard.
+        self.sos_permission = permission
+        self.sos_any_of = any_of
+        self.sos_scope = None
+        # None = follow the catalog; an explicit False is only used on read routes that
+        # docs/16 §8 lists without the step-up marker.
+        self.step_up = step_up if step_up is not None else cat.permissions[permission].step_up
+        self.sos_step_up = self.step_up
+
+    def __repr__(self) -> str:
+        return f"require_platform({self.sos_permission!r}, step_up={self.step_up})"
 
     def __call__(
         self,
@@ -120,9 +123,7 @@ class RequirePlatform:
         principal: Annotated[Principal, Depends(get_operator_principal)],
     ) -> OperatorContext:
         ctx = load_operator(principal, _request_id(request))
-        if ANY_OPERATOR not in self.permissions and not ctx.permissions.intersection(
-            self.permissions
-        ):
+        if not ctx.permissions.intersection(self.permissions):
             log.info("platform.authz.denied", action=self.permissions[0], outcome="forbidden")
             raise Forbidden()
         if self.step_up:

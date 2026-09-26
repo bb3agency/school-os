@@ -20,6 +20,10 @@ from app.core.telemetry import setup_telemetry
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
 
+# Importing identity.service registers the system-role cloning hook in
+# tenancy.POST_PROVISION_HOOKS so provisioning behaves the same in workers as in the API.
+import app.identity.service  # noqa: F401  isort: skip
+
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
 
 # Task modules registered as they are built (each module owns its tasks.py).

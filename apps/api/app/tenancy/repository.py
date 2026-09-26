@@ -163,6 +163,23 @@ def insert_tenant_key(
     ).one()
 
 
+def update_tenant_settings(
+    session: Session, *, expected_version: int, settings: dict[str, Any]
+) -> Tenant | None:
+    """Replace the current tenant's settings (optimistic); ``None`` on a stale version.
+
+    ``sos_app`` may update only ``name``, ``settings`` and ``version`` (0003 grants); RLS
+    ``own_tenant`` limits the statement to the current tenant.
+    """
+    return session.scalars(
+        update(Tenant)
+        .where(Tenant.version == expected_version)
+        .values(settings=settings, version=Tenant.version + 1)
+        .returning(Tenant),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+
+
 # --- academic years ------------------------------------------------------------------------
 
 

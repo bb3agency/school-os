@@ -18,6 +18,8 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 
 from app.core.db import context_free_session, platform_session, tenant_session
 
+from .conftest import letters
+
 pytestmark = pytest.mark.db
 
 
@@ -49,7 +51,7 @@ def _deployment(tenant_id: uuid.UUID, mode: str = "shared") -> uuid.UUID:
             {
                 "i": did,
                 "t": tenant_id,
-                "c": f"t-{uuid.uuid4().hex[:12]}",
+                "c": f"t-{letters(12)}",
                 "m": mode,
                 "k": "hb-1" if mode == "dedicated" else None,
                 "kc": b"\x01" * 16 if mode == "dedicated" else None,
@@ -69,7 +71,7 @@ def _plan(operator: uuid.UUID, status: str = "published") -> uuid.UUID:
                 "5000.00, '998314', '{\"students\": 1000}', :st, "
                 "CASE WHEN :st = 'draft' THEN NULL ELSE now() END, :o)"
             ),
-            {"i": pid, "c": f"p-{uuid.uuid4().hex[:10]}", "st": status, "o": operator},
+            {"i": pid, "c": f"p-{letters(10)}", "st": status, "o": operator},
         )
     return pid
 
@@ -144,7 +146,7 @@ def _tenant(admin: Engine, status: str = "provisioning") -> uuid.UUID:
     with admin.begin() as c:
         c.execute(
             text("INSERT INTO core.tenants (id, code, name, status) VALUES (:i, :c, 'School', :s)"),
-            {"i": tid, "c": f"t-{uuid.uuid4().hex[:12]}", "s": status},
+            {"i": tid, "c": f"t-{letters(12)}", "s": status},
         )
     return tid
 

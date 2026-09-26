@@ -110,3 +110,16 @@ def check_partition_runway(
             extra={"covered_until": bound.isoformat() if bound else None},
         )
     return bound
+
+
+def main(*, engine: Engine | None = None, platform_engine: Engine | None = None) -> int:
+    """CLI for restore drills: ``python -m app.audit.verify_all``; exit 1 if any chain is broken."""
+    results = verify_all(list_tenant_ids(engine=engine), engine=engine)
+    ok = all(r.ok for r in results.values())
+    ok = verify_platform(engine=platform_engine).ok and ok
+    logger.info("audit.chain.verify_all_done", extra={"count": len(results)})
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

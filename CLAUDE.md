@@ -66,7 +66,7 @@ apps/api/app/
 apps/worker/     Celery entrypoint (imports app.* tasks)
 apps/web/        Next.js app (app router, BFF route handlers, i18n; operator UI under /[locale]/platform/*)
 evals/           RAG datasets + harness (synthetic data only)
-infra/terraform/ modules/ (incl. dedicated_host) + envs/{staging,prod,dedicated/<tenant_code>}
+infra/terraform/ modules/ (incl. dedicated_host) + envs/{staging,prod,dedicated-template (one tfvars per school)}
 infra/db/        bootstrap.sql: database roles, schemas, extensions (run as DB admin)
 deploy/dedicated/ compose.yaml + Caddy config for dedicated-tier hosts
 config/          models, DQ rules, export profiles, permission catalogs (incl. platform_permissions.yaml), billing

@@ -8,6 +8,7 @@ overridden. Operators are created directly with ``sos_platform`` (the control-pl
 from __future__ import annotations
 
 import json
+import secrets
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -24,6 +25,7 @@ from jwt.algorithms import RSAAlgorithm
 from pydantic import SecretStr
 from sqlalchemy import Engine, text
 
+from app.authz.kv import InMemoryKV
 from app.core.config import Environment, KeyWrapperKind, Settings
 from app.core.crypto import LocalDevKeyWrapper
 from app.core.db import platform_session
@@ -39,7 +41,7 @@ from app.identity.tokens import (
     get_tenant_token_verifier,
 )
 from app.main import create_app
-from app.ops.idempotency import InMemoryIdempotencyStore
+from app.ops.idempotency import KVIdempotencyStore
 from app.platform import api as platform_api
 from app.platform import fleet
 from app.platform.common import Actor
@@ -50,6 +52,13 @@ TENANT_ISSUER = "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_SYNTHUS
 PLATFORM_CLIENT = "synthopsclient"
 TENANT_CLIENT = "synthwebclient"
 SERVICE_KEY = "synthetic-service-token-key-0123456789abcdef"
+
+
+def letters(n: int) -> str:
+    """Random lowercase letters (audit summaries reject long digit runs in codes)."""
+    return "".join(secrets.choice("abcdefghijkmnopqrstuvwxyz") for _ in range(n))
+
+
 ROLES = ("platform_owner", "platform_engineer", "support_agent", "billing_admin", "platform_viewer")
 
 
@@ -212,13 +221,14 @@ class Api:
             key = f"idem-{uuid.uuid4().hex}"
         elif idem != "auto":
             key = idem
-        return self.client.request(
+        res: httpx.Response = self.client.request(
             method,
             "/api/v1/platform" + path,
             headers=self.headers(op, fresh=fresh, idem=key, extra=kw.pop("headers", None)),
             json=json,
             **kw,
         )
+        return res
 
 
 @pytest.fixture
@@ -234,7 +244,7 @@ def api(  # noqa: PLR0917 - pytest fixture
     service = ServiceTokenVerifier(SERVICE_KEY, replay_store=InMemoryReplayStore())
     platform_verifier = platform_idp.verifier(PLATFORM_CLIENT)
     tenant_verifier = tenant_idp.verifier(TENANT_CLIENT)
-    store = InMemoryIdempotencyStore()
+    store = KVIdempotencyStore(InMemoryKV())
     app.dependency_overrides[get_platform_token_verifier] = lambda: platform_verifier
     app.dependency_overrides[get_tenant_token_verifier] = lambda: tenant_verifier
     app.dependency_overrides[get_service_token_verifier] = lambda: service
@@ -253,7 +263,7 @@ def owner(make_operator: MakeOperator) -> Operator:
 
 def plan_payload(**overrides: Any) -> dict[str, Any]:
     body: dict[str, Any] = {
-        "code": f"plan-{uuid.uuid4().hex[:10]}",
+        "code": f"plan-{letters(10)}",
         "name": "Synthetic Standard",
         "tier": "shared",
         "billing_period": "monthly",
@@ -292,7 +302,7 @@ def billing_account_payload(state_code: str = "37", gstin: str | None = None) ->
 
 
 def provision_payload(plan_id: uuid.UUID, **overrides: Any) -> dict[str, Any]:
-    code = f"s-{uuid.uuid4().hex[:12]}"
+    code = f"s-{letters(12)}"
     body: dict[str, Any] = {
         "code": code,
         "school_name": "Synthetic Public School",

@@ -121,7 +121,7 @@ def test_FR_PLT_028_authz_matrix_every_route_every_role(
     op = make_operator(role)
     for method, path, guard in CASES:
         url = _concrete(path).removeprefix("/api/v1/platform")
-        body = {} if method in ("POST", "PUT", "PATCH") else None
+        body: Any = {} if method in ("POST", "PUT", "PATCH") else None
         res = api.call(method, url, op, json=body)
         if _granted(guard, role):
             assert res.status_code not in (401, 403, 428), f"{role} {method} {path}: {res.text}"
@@ -176,7 +176,7 @@ def test_FR_PLT_028_invited_operator_is_activated_on_first_mfa_sign_in(
         status = s.execute(
             text("SELECT status, mfa_enrolled FROM platform.operators WHERE id = :o"), {"o": op.id}
         ).one()
-        events = s.execute(
+        events: Any = s.execute(
             text(
                 "SELECT count(*) FROM platform.audit_events WHERE action = 'operator.activated' "
                 "AND resource_id = :o"
@@ -204,3 +204,15 @@ def test_ADR_0017_beat_schedule_per_deployment_mode() -> None:
     assert {"billing.generate_invoices", "usage.collect_daily", "fleet.check_staleness"} <= {
         v["task"] for v in shared.values()
     }
+
+
+def test_FR_PLT_028_platform_permissions_come_from_the_single_authz_catalog() -> None:
+    """roles.yaml only references platform.* keys of app/authz/permissions.yaml (one catalog),
+    and every operator role holds the key used for "any operator" routes."""
+    from app.authz.catalog import permission_catalog
+
+    authz = {k for k, v in permission_catalog().items() if v.is_platform}
+    assert set(catalog().permissions) == authz
+    for role in ROLES:
+        assert catalog().roles[role] <= authz
+        assert ANY_OPERATOR in catalog().roles[role], role

@@ -739,6 +739,10 @@ class TicketMessageIn(In):
     internal_note: bool = False
 
 
+class SchoolTicketMessageIn(In):
+    body: MessageBody
+
+
 class TicketPatch(In):
     status: TicketStatus | None = None
     priority: TicketPriority | None = None

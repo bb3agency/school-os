@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars and fill in. No secrets belong here (all secrets live in Secrets Manager).
+aws_account_id = "<PROD_ACCOUNT_ID>"
+owner          = "<owner email or team>"
+cost_center    = "<cost centre>"
+
+release_version = "2026.10.1"
+
+app_domain            = "app.<your-domain>"
+admin_domain          = "admin.<your-domain>"
+route53_zone_id       = null # or "Z0123456789ABCDEFGHIJ"
+cognito_domain_prefix = "<globally-unique-prefix>-prod"
+
+# Recommended: a verified SES identity so invite/reset emails are not rate-limited.
+ses_email_identity_arn = null
+from_email_address     = null
+
+alarm_emails       = ["<oncall@your-domain>"]
+monthly_budget_usd = 300
+
+state_bucket_arn  = "arn:aws:s3:::sos-tfstate-<PROD_ACCOUNT_ID>"
+state_kms_key_arn = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<STATE_KEY_ID>"
+
+# Stage 0 defaults; Stage 1: rds_multi_az = true, redis_num_nodes = 2, rds_backup_retention_days = 35,
+# nat_mode = "per_az", interface_endpoints = ["ecr.api", "ecr.dkr", "secretsmanager", "kms", "logs", "sts"].

@@ -25,13 +25,23 @@ RUN --mount=type=cache,target=/root/.cache/uv --mount=type=secret,id=extra_ca,re
     uv sync --frozen --no-dev --all-packages --no-editable
 
 FROM ${PYTHON_IMAGE} AS runtime
-RUN groupadd --system --gid 10001 sos && useradd --system --uid 10001 --gid sos --no-create-home sos
+# postgresql-client provides psql for the db-bootstrap one-off task (infra/db/bootstrap.sql on RDS).
+# Release images (CI) always install it. INSTALL_PSQL=false exists only for sandboxes without
+# Debian mirror access; local compose never needs it (the db container runs bootstrap.sql).
+ARG INSTALL_PSQL=true
+RUN if [ "$INSTALL_PSQL" = "true" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends postgresql-client \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi \
+    && groupadd --system --gid 10001 sos && useradd --system --uid 10001 --gid sos --no-create-home sos
 ENV PATH=/opt/venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY --from=build /opt/venv /opt/venv
 WORKDIR /app
 COPY apps/api/alembic.ini /app/alembic.ini
 COPY apps/api/migrations /app/migrations
-COPY infra/db/bootstrap.sql /app/bootstrap.sql
+COPY infra/db/bootstrap.sql /app/infra/db/bootstrap.sql
+# Amazon RDS global CA bundle (pinned copy; refresh from truststore.pki.rds.amazonaws.com) for sslmode=verify-full.
+COPY infra/certs/rds-global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 USER 10001:10001
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 \

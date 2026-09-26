@@ -21,7 +21,14 @@ from app.platform import billing
 from app.platform.common import config
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
-from .conftest import Api, MakeOperator, Operator, billing_account_payload, provision_payload
+from .conftest import (
+    Api,
+    MakeOperator,
+    Operator,
+    billing_account_payload,
+    letters,
+    provision_payload,
+)
 
 pytestmark = pytest.mark.db
 
@@ -107,7 +114,8 @@ def _drafts(sub_id: str) -> list[dict[str, Any]]:
             dict(r)
             for r in s.execute(
                 text(
-                    "SELECT * FROM platform.invoices WHERE subscription_id = :s AND status = 'draft' "
+                    "SELECT * FROM platform.invoices WHERE subscription_id = :s "
+                    "AND status = 'draft' "
                     "ORDER BY period_start"
                 ),
                 {"s": sub_id},
@@ -210,9 +218,10 @@ def test_FR_PLT_016_numbers_are_sequential_and_gap_free_under_concurrency(
     assert errors == []
     assert sorted(numbers) == [f"SOS/81-82/{n:06d}" for n in range(1, 21)]
     with platform_session() as s:
-        last = s.execute(
+        last: Any = s.execute(
             text(
-                "SELECT last_number FROM platform.invoice_sequences WHERE financial_year = '2081-82'"
+                "SELECT last_number FROM platform.invoice_sequences "
+                "WHERE financial_year = '2081-82'"
             )
         ).scalar_one()
     assert last == 20
@@ -263,7 +272,7 @@ def test_FR_PLT_018_partial_payments_tds_and_reversal(
         "method": "upi",
         "amount_inr": "2000.00",
         "received_on": "2026-09-20",
-        "reference": f"UPI-{uuid.uuid4().hex[:10]}",
+        "reference": f"UPI-{letters(10)}",
     }
     first = api.call("POST", f"/invoices/{inv_id}/payments", billing_admin, json=pay)
     assert first.status_code == 201, first.text
@@ -322,7 +331,7 @@ def test_FR_PLT_015_monthly_generation_is_idempotent(
 ) -> None:
     sub = _school(api, owner, make_plan())["subscription_id"]
     with platform_session() as s:
-        end = s.execute(
+        end: Any = s.execute(
             text("SELECT current_period_end FROM platform.subscriptions WHERE id = :s"), {"s": sub}
         ).scalar_one()
     month = end.strftime("%Y-%m")

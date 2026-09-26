@@ -18,7 +18,7 @@
 Requirements: FR-PLT-001..030, SEC-026, SEC-027, SEC-029.
 
 Revision ID: 0005_platform
-Revises: 0003_core_schema (TEMPORARY: the lead relinks to 0004_authz_seed at merge)
+Revises: 0004_authz_seed
 Create Date: 2026-09-26
 """
 
@@ -27,7 +27,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "0005_platform"
-down_revision = "0003_core_schema"
+down_revision = "0004_authz_seed"
 branch_labels = None
 depends_on = None
 

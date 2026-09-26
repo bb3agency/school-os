@@ -322,7 +322,12 @@ def verify_heartbeat(
 class RequireFleetSignature:
     """Dependency for ``POST /api/v1/fleet/heartbeat`` (machine auth; no user token)."""
 
+    # Machine authentication, not a catalog permission: the route-enumeration test accepts
+    # exactly this guard on POST /api/v1/fleet/heartbeat (CLAUDE.md §6.2).
     sos_permission = "fleet.heartbeat"
+    sos_fleet_signature = True
+    sos_step_up = False
+    sos_scope = None
 
     async def __call__(
         self,

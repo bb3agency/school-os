@@ -18,7 +18,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.main import create_app
 
-from .conftest import Api, MakeOperator, Operator, provision_payload
+from .conftest import Api, MakeOperator, Operator, letters, provision_payload
 
 pytestmark = pytest.mark.db
 
@@ -64,19 +64,27 @@ def test_FR_PLT_002_shared_provisioning_end_to_end(
     tid = out["tenant_id"]
     assert out["tier"] == "shared"
     assert out["tenant_status"] == "provisioning"
-    assert out["owner_invite"] == "pending_role"  # role templates arrive with the authz module
+    assert out["owner_invite"] == "created"  # system roles were cloned by the authz hook
     assert out["heartbeat_key"] is None
     with admin_engine.connect() as c:
         tenant = c.execute(
             text("SELECT status, deployment_mode FROM core.tenants WHERE id = :t"), {"t": tid}
         ).one()
-        keys = c.execute(
+        keys: Any = c.execute(
             text("SELECT count(*) FROM core.tenant_keys WHERE tenant_id = :t"), {"t": tid}
         ).scalar_one()
         membership = c.execute(
             text("SELECT status, mfa_required FROM core.memberships WHERE tenant_id = :t"),
             {"t": tid},
         ).one()
+        owner_roles = c.execute(
+            text(
+                "SELECT r.key FROM core.membership_roles mr JOIN core.roles r "
+                "ON r.tenant_id = mr.tenant_id AND r.id = mr.role_id WHERE mr.tenant_id = :t"
+            ),
+            {"t": tid},
+        ).scalars()
+        assert list(owner_roles) == ["owner"]
     assert tuple(tenant) == ("provisioning", "shared")
     assert keys == 1
     assert tuple(membership) == ("invited", True)
@@ -131,7 +139,7 @@ def test_FR_PLT_002_first_transaction_is_atomic(
         raise RuntimeError("synthetic failure after core.provision_tenant")
 
     monkeypatch.setattr(billing, "insert_subscription", boom)
-    code = f"s-{uuid.uuid4().hex[:12]}"
+    code = f"s-{letters(12)}"
     with pytest.raises(RuntimeError, match="synthetic failure"):
         api.call("POST", "/tenants", owner, json=provision_payload(make_plan(), code=code))
     with admin_engine.connect() as c:

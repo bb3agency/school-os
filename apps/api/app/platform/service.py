@@ -25,15 +25,15 @@ from sqlalchemy.orm import Session
 from app.platform import announcements, flags, support
 from app.platform.schemas import (
     AnnouncementBrief,
+    SchoolTicketMessageIn,
     TicketCreateSchool,
-    TicketMessageIn,
     TicketOut,
 )
 
 __all__ = [
     "AnnouncementBrief",
+    "SchoolTicketMessageIn",
     "TicketCreateSchool",
-    "TicketMessageIn",
     "TicketOut",
     "active_announcements",
     "current_subscription",
@@ -82,6 +82,6 @@ def get_tenant_ticket(tenant_id: uuid.UUID, ticket_id: uuid.UUID) -> TicketOut:
 
 
 def reply_from_tenant(
-    tenant_id: uuid.UUID, user_id: uuid.UUID, ticket_id: uuid.UUID, data: TicketMessageIn
+    tenant_id: uuid.UUID, user_id: uuid.UUID, ticket_id: uuid.UUID, data: SchoolTicketMessageIn
 ) -> TicketOut:
     return support.reply_from_tenant(tenant_id, user_id, ticket_id, data.body)
