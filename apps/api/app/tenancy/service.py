@@ -466,7 +466,7 @@ def create_class(session: Session, data: ClassCreate) -> ClassOut:
         action="class.created",
         resource_type="class",
         resource_id=klass.id,
-        summary={"code": klass.code, "sort_order": klass.sort_order},
+        summary={"sort_order": klass.sort_order},
     )
     return ClassOut.model_validate(klass)
 
