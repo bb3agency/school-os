@@ -10,6 +10,9 @@ import {
 
 const handleI18nRouting = createIntlMiddleware(routing);
 
+/** Same name as PATH_HEADER in src/server/session/rsc.ts (kept here: no server-only import). */
+const PATH_HEADER = "x-sos-path";
+
 /** Paths that are not localised: health check and the BFF (docs/09 §1). */
 const NON_LOCALISED_PREFIXES = ["/bff/", "/healthz"] as const;
 
@@ -37,6 +40,9 @@ export function proxy(request: NextRequest): NextResponse {
   // forwards request.headers on its rewrite/next responses, so set them here first.
   request.headers.set("x-nonce", nonce);
   request.headers.set("Content-Security-Policy", csp);
+  // Current path for the sign-in return address (layouts cannot see the URL). Always
+  // overwritten here, never taken from the client; the login route re-validates it.
+  request.headers.set(PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
 
   const response = isNonLocalised(request.nextUrl.pathname)
     ? NextResponse.next({ request: { headers: request.headers } })

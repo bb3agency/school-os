@@ -1,8 +1,10 @@
 /**
- * HAND-WRITTEN PLACEHOLDER `paths` in the shape openapi-typescript generates, so
- * openapi-fetch can type requests today. Replace with the generated file
- * (`src/generated/schema.ts`) once the API exports its OpenAPI document.
+ * `paths` for openapi-fetch = the GENERATED paths (school-side API, from
+ * apps/api/openapi.json via `make openapi`) plus HAND-WRITTEN placeholders, in the same
+ * shape, for routes the API does not publish yet (control plane /platform/*, school
+ * billing). Remove a placeholder as soon as its route appears in the generated file.
  */
+import type { paths as GeneratedPaths } from "./generated/schema";
 import type * as S from "./schemas";
 
 type Method = "get" | "put" | "post" | "delete" | "options" | "head" | "patch" | "trace";
@@ -52,7 +54,7 @@ type PathItem<TOps extends Partial<Record<Method, unknown>>> = TOps & {
 type ListQuery = { limit?: number; cursor?: string };
 type TenantPath = { tenant_id: string };
 
-export interface paths {
+interface PlaceholderPaths {
   /* ------------------------------------------------------------ platform */
   "/api/v1/platform/dashboard": PathItem<{ get: Operation<S.PlatformKpis> }>;
   "/api/v1/platform/tenants": PathItem<{
@@ -111,17 +113,10 @@ export interface paths {
   /* -------------------------------------------------------------- tenant */
   "/api/v1/billing/subscription": PathItem<{ get: Operation<S.CurrentSubscription> }>;
   "/api/v1/billing/invoices": PathItem<{ get: Operation<S.Page<S.TenantInvoice>, ListQuery> }>;
-  "/api/v1/academic-years": PathItem<{ get: Operation<S.Page<S.AcademicYear>, ListQuery> }>;
-  "/api/v1/classes": PathItem<{ get: Operation<S.Page<S.SchoolClass>, ListQuery> }>;
-  "/api/v1/sections": PathItem<{
-    get: Operation<S.Page<S.Section>, ListQuery & { class_id?: string }>;
-  }>;
-  "/api/v1/users": PathItem<{ get: Operation<S.Page<S.TenantUser>, ListQuery> }>;
-  "/api/v1/roles": PathItem<{ get: Operation<S.Page<S.TenantRole>, ListQuery> }>;
-  "/api/v1/audit/events": PathItem<{
-    get: Operation<
-      S.Page<S.AuditEvent>,
-      ListQuery & { actor?: string; action?: string; from?: string; to?: string }
-    >;
-  }>;
 }
+
+// A placeholder must never shadow a generated route: this fails to compile if one does.
+type NoOverlap<T extends never> = T;
+export type PlaceholderOverlap = NoOverlap<keyof PlaceholderPaths & keyof GeneratedPaths>;
+
+export type paths = GeneratedPaths & PlaceholderPaths;

@@ -71,14 +71,18 @@ export function DataTable<T>({
   captionHidden = false,
 }: DataTableProps<T>) {
   const t = useTranslations("common");
+  const te = useTranslations("errors");
 
   if (state.status === "loading") return <LoadingState label={t("loading")} />;
   if (state.status === "error") {
     return (
       <Alert tone="danger" title={t("loadErrorTitle")}>
-        {t("loadErrorBody")}
+        {state.reason ? te(`load.${state.reason}`) : t("loadErrorBody")}
       </Alert>
     );
+  }
+  if (state.status === "unavailable") {
+    return <EmptyState title={t("notAvailableYetTitle")} body={t("notAvailableYetBody")} />;
   }
   if (state.data.length === 0) {
     return <EmptyState title={emptyTitle} body={emptyBody} action={emptyAction} />;

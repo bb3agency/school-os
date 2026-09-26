@@ -3,6 +3,7 @@ import type {
   BreakGlassStatus,
   DeploymentStatus,
   InvoiceStatus,
+  MemberStatus,
   PersonStatus,
   PlanStatus,
   SubscriptionStatus,
@@ -61,6 +62,14 @@ export const personTone: Record<PersonStatus, BadgeTone> = {
   invited: "info",
   active: "success",
   deactivated: "neutral",
+};
+
+/** School staff membership status (tenant API UserOut.status). */
+export const memberTone: Record<MemberStatus, BadgeTone> = {
+  invited: "info",
+  active: "success",
+  suspended: "warning",
+  removed: "neutral",
 };
 
 export const planTone: Record<PlanStatus, BadgeTone> = {
