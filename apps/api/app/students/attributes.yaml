@@ -1,0 +1,273 @@
+# Global student attribute catalog (docs/05 §5 sis.attribute_definitions, §8 classification,
+# §10 canonical resolution; FR-STU-002, FR-STU-004, FR-STU-006, FR-STU-012, CLAUDE.md §6.13).
+#
+# Seeded as global rows (tenant_id NULL) by migration 0008_sis_students. Schools can add their
+# own attributes later (tenant rows); global rows are read-only for the app (policy attrdef_*).
+# Change this file only together with a migration that re-seeds it.
+#
+# Per attribute
+#   data_type        text | date | enum | digits4
+#   classification   C2 (personal: projection, search) | C3 (restricted: encrypted with the tenant
+#                    DEK, never in value_text/value_norm/profile/logs, revealed only with
+#                    student.read_sensitive and an audit event)
+#   is_identity      identity fields: the admission register value is the legal anchor (BR-01);
+#                    changing it needs a change request (maker-checker, ADR-0010)
+#   validation       max_length, pattern, values (enum), name (normalise as a person name),
+#                    sources (allowed sources; omitted = all), not_future (dates)
+#   canonical_policy precedence (sources in order), require_verified, anchor (identity: the only
+#                    source that makes the canonical value non-provisional), show_conflicts_from
+#   label_en/label_te UI labels
+version: 1
+
+sources: [admission_register, aadhaar_as_printed, udise_plus, board_registration,
+          birth_certificate, parent_form, tc_incoming, manual_entry]
+
+attributes:
+  full_name:
+    data_type: text
+    classification: C2
+    is_identity: true
+    sort_order: 10
+    validation: {max_length: 120, name: true,
+                 sources: [admission_register, udise_plus, board_registration, birth_certificate,
+                           parent_form, tc_incoming, manual_entry]}
+    canonical_policy:
+      precedence: [admission_register, birth_certificate, tc_incoming, parent_form, manual_entry]
+      require_verified: true
+      anchor: admission_register
+      show_conflicts_from: [udise_plus, board_registration]
+    label_en: Full name
+    label_te: పూర్తి పేరు
+  dob:
+    data_type: date
+    classification: C2
+    is_identity: true
+    sort_order: 20
+    validation: {not_future: true,
+                 sources: [admission_register, udise_plus, board_registration, birth_certificate,
+                           parent_form, tc_incoming, manual_entry]}
+    canonical_policy:
+      precedence: [admission_register, birth_certificate, tc_incoming, parent_form, manual_entry]
+      require_verified: true
+      anchor: admission_register
+      show_conflicts_from: [udise_plus, board_registration]
+    label_en: Date of birth
+    label_te: పుట్టిన తేదీ
+  gender:
+    data_type: enum
+    classification: C2
+    is_identity: true
+    sort_order: 30
+    validation: {values: [female, male, transgender],
+                 sources: [admission_register, udise_plus, board_registration, birth_certificate,
+                           parent_form, tc_incoming, manual_entry]}
+    canonical_policy:
+      precedence: [admission_register, birth_certificate, tc_incoming, parent_form, manual_entry]
+      require_verified: true
+      anchor: admission_register
+      show_conflicts_from: [udise_plus, board_registration]
+    label_en: Gender
+    label_te: లింగం
+  father_name:
+    data_type: text
+    classification: C2
+    is_identity: true
+    sort_order: 40
+    validation: {max_length: 120, name: true,
+                 sources: [admission_register, udise_plus, board_registration, birth_certificate,
+                           parent_form, tc_incoming, manual_entry]}
+    canonical_policy:
+      precedence: [admission_register, birth_certificate, tc_incoming, parent_form, manual_entry]
+      require_verified: true
+      anchor: admission_register
+      show_conflicts_from: [udise_plus, board_registration]
+    label_en: Father's name
+    label_te: తండ్రి పేరు
+  mother_name:
+    data_type: text
+    classification: C2
+    is_identity: true
+    sort_order: 50
+    validation: {max_length: 120, name: true,
+                 sources: [admission_register, udise_plus, board_registration, birth_certificate,
+                           parent_form, tc_incoming, manual_entry]}
+    canonical_policy:
+      precedence: [admission_register, birth_certificate, tc_incoming, parent_form, manual_entry]
+      require_verified: true
+      anchor: admission_register
+      show_conflicts_from: [udise_plus, board_registration]
+    label_en: Mother's name
+    label_te: తల్లి పేరు
+  admission_no:
+    data_type: text
+    classification: C2
+    is_identity: true
+    sort_order: 60
+    validation: {max_length: 32, pattern: '^[A-Za-z0-9][A-Za-z0-9/._-]{0,31}$',
+                 sources: [admission_register, tc_incoming, manual_entry]}
+    canonical_policy:
+      precedence: [admission_register, manual_entry]
+      require_verified: true
+      anchor: admission_register
+      show_conflicts_from: []
+    label_en: Admission number
+    label_te: ప్రవేశ సంఖ్య
+  admission_date:
+    data_type: date
+    classification: C2
+    is_identity: true
+    sort_order: 70
+    validation: {not_future: true, sources: [admission_register, tc_incoming, manual_entry]}
+    canonical_policy:
+      precedence: [admission_register, manual_entry]
+      require_verified: true
+      anchor: admission_register
+      show_conflicts_from: []
+    label_en: Date of admission
+    label_te: ప్రవేశ తేదీ
+  mother_tongue:
+    data_type: text
+    classification: C2
+    is_identity: false
+    sort_order: 80
+    validation: {max_length: 40}
+    canonical_policy:
+      precedence: [admission_register, parent_form, udise_plus, manual_entry]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Mother tongue
+    label_te: మాతృభాష
+  nationality:
+    data_type: text
+    classification: C2
+    is_identity: false
+    sort_order: 90
+    validation: {max_length: 40}
+    canonical_policy:
+      precedence: [admission_register, parent_form, udise_plus, manual_entry]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Nationality
+    label_te: జాతీయత
+  # --- Aadhaar (ADR-0007, PRV-013..014, FR-STU-012): last 4 digits and as-printed fields only ---
+  aadhaar_last4:
+    data_type: digits4
+    classification: C3
+    is_identity: false
+    sort_order: 100
+    validation: {pattern: '^[0-9]{4}$', sources: [aadhaar_as_printed]}
+    canonical_policy:
+      precedence: [aadhaar_as_printed]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Aadhaar (last 4 digits)
+    label_te: ఆధార్ (చివరి 4 అంకెలు)
+  aadhaar_name_as_printed:
+    data_type: text
+    classification: C3
+    is_identity: false
+    sort_order: 110
+    validation: {max_length: 120, name: true, sources: [aadhaar_as_printed]}
+    canonical_policy:
+      precedence: [aadhaar_as_printed]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Name as printed on Aadhaar
+    label_te: ఆధార్‌లో ముద్రించిన పేరు
+  aadhaar_dob_as_printed:
+    data_type: date
+    classification: C3
+    is_identity: false
+    sort_order: 120
+    validation: {not_future: true, sources: [aadhaar_as_printed]}
+    canonical_policy:
+      precedence: [aadhaar_as_printed]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Date of birth as printed on Aadhaar
+    label_te: ఆధార్‌లో ముద్రించిన పుట్టిన తేదీ
+  aadhaar_gender_as_printed:
+    data_type: enum
+    classification: C3
+    is_identity: false
+    sort_order: 130
+    validation: {values: [female, male, transgender], sources: [aadhaar_as_printed]}
+    canonical_policy:
+      precedence: [aadhaar_as_printed]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Gender as printed on Aadhaar
+    label_te: ఆధార్‌లో ముద్రించిన లింగం
+  # --- restricted (C3) --------------------------------------------------------------------------
+  category:
+    data_type: enum
+    classification: C3
+    is_identity: false
+    sort_order: 140
+    validation: {values: [general, ews, obc, sc, st]}
+    canonical_policy:
+      precedence: [admission_register, parent_form, udise_plus, manual_entry]
+      require_verified: false
+      show_conflicts_from: [udise_plus, board_registration]
+    label_en: Social category
+    label_te: సామాజిక వర్గం
+  caste:
+    data_type: text
+    classification: C3
+    is_identity: false
+    sort_order: 150
+    validation: {max_length: 80}
+    canonical_policy:
+      precedence: [admission_register, parent_form, manual_entry]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Caste
+    label_te: కులం
+  religion:
+    data_type: text
+    classification: C3
+    is_identity: false
+    sort_order: 160
+    validation: {max_length: 40}
+    canonical_policy:
+      precedence: [admission_register, parent_form, manual_entry]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Religion
+    label_te: మతం
+  health_notes:
+    data_type: text
+    classification: C3
+    is_identity: false
+    sort_order: 170
+    validation: {max_length: 1000, sources: [parent_form, manual_entry]}
+    canonical_policy:
+      precedence: [parent_form, manual_entry]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Health notes
+    label_te: ఆరోగ్య వివరాలు
+  disability:
+    data_type: text
+    classification: C3
+    is_identity: false
+    sort_order: 180
+    validation: {max_length: 200}
+    canonical_policy:
+      precedence: [parent_form, udise_plus, manual_entry]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Disability
+    label_te: వైకల్యం
+  address:
+    data_type: text
+    classification: C3
+    is_identity: false
+    sort_order: 190
+    validation: {max_length: 500}
+    canonical_policy:
+      precedence: [admission_register, parent_form, manual_entry]
+      require_verified: false
+      show_conflicts_from: [udise_plus]
+    label_en: Address
+    label_te: చిరునామా
