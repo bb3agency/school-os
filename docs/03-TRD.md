@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-26 |
 | Scope | Core platform (M0–M2) + platform admin panel (C14) + interfaces for M3–M6 |
 | Related | 02-PRD (stories), 04-Architecture, 05-Data model, 06-RAG, 07-Security, 16-Platform admin panel |
-| Changes | 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
+| Changes | 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
 
 Normative keywords: **MUST / SHOULD / MAY** (RFC 2119). Every requirement has an ID and a verification method: **T** test · **I** inspection · **D** demonstration · **A** analysis.
 
@@ -46,7 +46,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-IAM-010 | The system MUST support these tenant role keys exactly: `owner`, `principal`, `office_admin`, `office_staff`, `accountant`, `exam_coordinator`, `class_teacher`, `teacher`, `auditor_readonly`. Platform roles (`platform_owner`, `platform_engineer`, `support_agent`, `billing_admin`, `platform_viewer`) are a separate set for SchoolOS staff (FR-PLT-028) and MUST NOT appear as tenant roles; `platform_support` is the tenant-side temporary break-glass role (FR-OPS-004). | T |
 | FR-IAM-011 | Permissions MUST be `resource.action` strings; roles map to permission sets; tenants MAY clone and customize roles. | T |
 | FR-IAM-012 | Memberships MUST support scopes: `school`, `classes[]`, `sections[]`; scope applies to every read path including search, exports and AI. | T |
-| FR-IAM-013 | A user MAY hold memberships in multiple tenants; the active tenant is explicit per session. | T |
+| FR-IAM-013 | A user MAY hold memberships in multiple tenants; the active tenant is explicit per session. Before a school is chosen, the user MUST be able to list the schools they can work in (`GET /api/v1/me/schools`, school picker) and accept their own pending invitations (`POST /api/v1/me/accept-invitations`, ADR-0019); these and `POST /me/active-tenant` and `POST /me/login-event` are the only routes that work without an active school. The BFF sends the chosen school as `X-Active-Tenant`; several memberships and no choice → `409 active_tenant_required`; a school the user does not belong to → `403 no_membership`. | T |
 | FR-IAM-014 | Role/permission/scope changes MUST take effect within 60 s and be audited. | T |
 
 ### 3.2 Tenancy & school setup (FR-TEN)
@@ -55,7 +55,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 |---|---|---|
 | FR-TEN-001 | Each school MUST be a tenant with a UUID, and every tenant-owned row MUST carry `tenant_id`. | I/T |
 | FR-TEN-002 | PostgreSQL RLS MUST enforce tenant isolation for every tenant-owned table (ENABLE + FORCE). | T |
-| FR-TEN-003 | Tenant provisioning MUST create default roles, a per-tenant data encryption key (wrapped by KMS), and an owner invite. | T |
+| FR-TEN-003 | Tenant provisioning MUST create default roles (cloned from the system role templates), a per-tenant data encryption key and HMAC key (wrapped by KMS), and an owner invite (`core.create_owner_invite`: an `invited` owner membership with MFA required, only while the school is `provisioning` and has no members). A school MUST NOT go live without an unretired data key (`core.set_tenant_status` refuses `provisioning → active`). Invitees accept on first sign-in within 30 days of the invite, once the school is active (ADR-0019). | T |
 | FR-TEN-010 | Academic years, classes, sections and enrolments MUST be modelled; exactly one current year per tenant. Writes to years, classes and sections require `tenant.structure.manage` (owner, principal, office_admin; no step-up). | T |
 | FR-TEN-011 | **(M1)** Bulk promotion MUST offer preview, commit, and undo within 24 h. | T |
 | FR-TEN-012 | Tenant settings MUST include languages, date format, retention policy, AI features on/off, monthly AI budget. | T |
@@ -193,7 +193,7 @@ All FR-PLT routes are under `/api/v1/platform/*`, use `require_platform()` and t
 | FR-PLT-013 | Plan changes MUST take effect at the next period start (no proration in M0); negotiated prices MUST record a reason. | T |
 | FR-PLT-014 | A subscription MUST become `past_due` automatically when an issued invoice is unpaid after its due date; suspension MUST never be automatic: only `platform.subscriptions.manage` ᴿ, after a 15-day grace period, with a reason, and inside a protected board-exam window only with a `platform_owner` approval. | T |
 | FR-PLT-015 | A monthly job MUST generate draft invoices for billable subscriptions, idempotently (one live invoice per subscription and period). | T |
-| FR-PLT-016 | Issuing MUST assign a gapless sequential number per Indian financial year (`SOS/2026-27/000123`) and freeze the invoice; drafts have no number; numbers are never reused. | T |
+| FR-PLT-016 | Issuing MUST assign a gapless sequential number per Indian financial year of at most 16 characters (`SOS/26-27/000123`, CGST Rule 46) and freeze the invoice; drafts have no number; numbers are never reused. | T |
 | FR-PLT-017 | Invoices MUST carry supplier and recipient GST details (legal names, GSTINs, state codes, place of supply) and compute CGST+SGST (intra-state) or IGST (inter-state) with half-up rounding to paise; billing accounts validate GSTIN format and state code. | T |
 | FR-PLT-018 | Payments MUST go through a provider interface; M0 supports only `manual` (bank transfer, UPI, cheque) with amount, date, reference and TDS; partial payments allowed; errors reversed with a reason, never deleted. | T |
 | FR-PLT-019 | Issued unpaid invoices MAY be voided with a reason (number kept); payment reminders MUST be emailed at issue, 3 days before due, on the due date and 7 and 14 days after. | T |
@@ -208,6 +208,24 @@ All FR-PLT routes are under `/api/v1/platform/*`, use `require_platform()` and t
 | FR-PLT-028 | Operators MUST sign in through a separate OIDC client with MFA; roles come from the fixed platform role set; operators cannot change their own roles; at least one active `platform_owner` remains; platform permissions can never be granted to tenant roles. | T |
 | FR-PLT-029 | Every control-plane change MUST write one event to the hash-chained `platform.audit_events` in the same transaction; operators with `platform.audit.read` can filter, export and verify the chain. | T |
 | FR-PLT-030 | School users with `tenant.billing.read` (owner, principal, accountant) MUST see their own plan, usage vs limits and invoices through `core.current_subscription()`. | T |
+
+### 3.13 Implementation status (M0, 2026-09-26)
+
+Status of the requirements M0 touches. **Built** = implemented with tests named by ID (`apps/api/tests/`); **Partial** = some acceptance points open; open items are tracked in 14 · M0 status. Requirements not listed are not started (M1+).
+
+| Requirements | Status | Notes |
+|---|---|---|
+| FR-IAM-001..004, FR-IAM-006 | Built | BFF (PKCE, encrypted server sessions, CSRF, refresh rotation with reuse detection, timeouts, session list/revoke); API token checks, MFA (`403 mfa_required`) and step-up (`428`) |
+| FR-IAM-005 | Partial | Login rate limits and lockouts rely on the IdP; lockout/reset auditing and breached-password screening (Cognito Essentials) not built |
+| FR-IAM-010..014 | Built | Role keys pinned to 07 §6.2; permission catalog in `core.permissions`; scopes; school picker and invitation acceptance; changes effective within 60 s and audited |
+| FR-TEN-001..003, FR-TEN-010, FR-TEN-012 | Built | Provisioning via the control plane (16 §5.4); academic structure; settings (retention settings are M1) |
+| FR-AUD-001..004 | Built | Tenant and platform chains; daily signed archive and verification. School-chain copies of platform actions are not atomic with the platform change (ADR-0013 Amendment A6) |
+| FR-AUD-005 | Partial | Viewer with filters and chain verification built; CSV export not built |
+| FR-OPS-004 | Partial | `ops.break_glass_grants` and `platform.breakglass_requests` with the 8-hour and two-person rules in the database; workflow M1 |
+| FR-PLT-001, FR-PLT-003, FR-PLT-005, FR-PLT-010..018, FR-PLT-020, FR-PLT-022..030 | Built | 16 §8 route catalog. FR-PLT-005: two-person request/approval built; data deletion, key destruction and certificate are M1. FR-PLT-020: students, storage, documents and AI meters are 0 until `sis`/`kb` exist |
+| FR-PLT-002 | Partial | Built, but not "in one transaction": the first transaction (tenant row, deployment, billing account, subscription) is atomic; keys, roles, owner invite and the school-chain event follow as idempotent, resumable steps (decision pending) |
+| FR-PLT-004 | Partial | Suspend/reactivate built; the owner's Plan & billing and full-export access while suspended is not (every tenant route answers `403 tenant_suspended`) |
+| FR-PLT-019, FR-PLT-021 | Partial | Void built; reminder and threshold emails not built (no email delivery in M0); threshold crossings recorded and audited |
 
 ---
 
