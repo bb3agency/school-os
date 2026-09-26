@@ -108,7 +108,8 @@ Browser → WAF → ALB → web (BFF)
     (X-Service-Token) and a request ID; CSRF check on state-changing requests
 → api middleware chain
   1. request ID + trace context (OpenTelemetry)
-  2. authenticate: verify JWT (issuer, audience, expiry, signature via JWKS cache)
+  2. authenticate: verify the BFF service token (X-Service-Token) and the user JWT (issuer, audience —
+     for Cognito client_id + token_use —, expiry, signature via JWKS cache; ADR-0018)
   3. resolve tenant: active membership for token subject; reject if suspended
      (except the owner's Plan & billing and full-export routes, 16 §5.5)
   4. rate limit: per user, per tenant, per route class (Redis token bucket)

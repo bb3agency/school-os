@@ -2,9 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-09-26 |
+| Version | 0.2 · 2026-09-26 |
 | Target | OWASP ASVS (current version) Level 2 · OWASP API Security Top 10 · OWASP Top 10 for LLM Applications (2025) |
-| Related | 05-Data model (RLS, encryption), 06-RAG, 08-Privacy, 10-Infrastructure, 11-Operations (incident response) |
+| Related | 05-Data model (RLS, encryption), 06-RAG, 08-Privacy, 10-Infrastructure, 11-Operations (incident response), 16-Platform admin panel, ADR-0013, ADR-0015, ADR-0017, ADR-0018 |
+| Changes | 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
 
 ---
 
@@ -31,7 +32,9 @@
 | Compromised staff account | Via phishing/shared password | Same as the user |
 | Other tenant's user | Accidental or deliberate cross-school access | Valid account in another tenant |
 | Malicious document author | Prompt injection via uploaded/circulated files | Content that reaches the knowledge base |
-| Platform operator (founder) or compromised operator account | Error or abuse | Infra access, deploy rights |
+| Platform operator (SchoolOS staff) or compromised operator account | Error or abuse | Platform admin panel (control plane) with platform roles; infra access and deploy rights for engineers |
+| Compromised control-plane code path | Bug or injected code in the `platform` module | Runs as `sos_platform`: no privileges on tenant tables (§6.6) |
+| Attacker targeting a dedicated host | Data theft from one school; pivot to control plane | Internet-facing host (80/443), forged heartbeats |
 | Supply-chain attacker | Backdoor via dependency/CI | Package or action compromise |
 
 ## 3. Trust boundaries
@@ -74,13 +77,16 @@ flowchart LR
 | TB3 API → DB | Least-privileged role, RLS FORCE, parameterized SQL, statement timeouts, no superuser |
 | TB4 App → AWS services | Task IAM roles scoped per resource, VPC endpoints, KMS key policies |
 | TB5 App → third parties | Egress allowlist, API keys in Secrets Manager, minimal data, no Aadhaar, ZDR where available, timeouts/circuit breakers |
+| TB6 Operator browser → control plane (`admin.<domain>`) | Separate OIDC client, MFA for every operator, step-up for ᴿ permissions, own `__Host-` session cookie, WAF, CSP; control plane connects to the DB as `sos_platform` only |
+| TB7 Dedicated host → control plane (heartbeat) | Outbound only; HMAC-SHA256 per deployment, ±5 min timestamp window, nonce replay cache, strict schema without free text, rate limit; the control plane never connects into a host |
+| TB8 Internet → dedicated host | Caddy TLS (ACME), security headers, only 80/443 open, no SSH (SSM), same app controls as the shared tier |
 
 ## 4. Threat model (STRIDE)
 
 | # | Threat | STRIDE | Primary controls | Residual risk |
 |---|---|---|---|---|
 | T1 | Stolen staff credentials used on a shared office PC | S | MFA for privileged roles, 15-min idle lock, session list + revoke, new-device alerts, login throttling | Medium: non-privileged roles without MFA → encourage MFA for all |
-| T2 | Forged or replayed access tokens | S | JWT signature via JWKS, issuer/audience checks, ≤ 10 min expiry, refresh rotation with reuse detection | Low |
+| T2 | Forged or replayed access tokens | S | JWT signature via JWKS, issuer and audience checks (Cognito: `client_id` + `token_use`, ADR-0018), ≤ 10 min expiry, refresh rotation with reuse detection, BFF service token | Low |
 | T3 | Identity data changed without authority | T | Maker-checker (DB CHECK against self-approval), evidence required, step-up MFA, audit | Low |
 | T4 | Audit trail altered to hide actions | T/R | Append-only grants + trigger, per-tenant hash chain, daily signed export to S3 Object Lock | Low |
 | T5 | Malicious upload (malware, parser exploit, polyglot) | T/E | Magic-byte allowlist, size limits, AV scan, parsing in isolated worker containers with no credentials beyond needed, never served inline | Low–medium |
@@ -98,6 +104,14 @@ flowchart LR
 | T17 | Platform operator misuse | E/I | No standing data access, school-approved time-bound break-glass, actions visible to school | Low–medium |
 | T18 | Injection (SQL, template, command) | T/E | Bound parameters only, no dynamic SQL from AI, auto-escaping templates, no shell calls with input | Low |
 | T19 | Dependency or CI compromise | T/E | Pinned deps with hashes, SHA-pinned actions, OIDC to AWS (no stored keys), scans, SBOM, protected branches | Medium |
+| T20 | Control-plane bug or compromise reads or changes student data | I/T | `sos_platform` has no privileges on tenant tables; only allowlisted definer functions; privilege-separation catalog test; alert on `permission denied` from the platform path | Low |
+| T21 | Faulty `SECURITY DEFINER` function leaks across tenants | I/E | Pinned allowlist owned by `sos_definer` (NOBYPASSRLS); `definer_access` only on listed tables; minimal columns; `search_path` pinned; catalog tests | Low |
+| T22 | Operator account takeover (phishing) used to provision, suspend or offboard schools | S/E | MFA for every operator, step-up ≤ 5 min for ᴿ permissions, two-person offboarding, alerts to all owners on risky actions, platform audit chain | Low–medium |
+| T23 | Forged or replayed heartbeat hides an outage or injects false usage | S/T | Per-deployment HMAC keys (KMS-wrapped), timestamp window, nonce cache, schema validation, mismatch alerts | Low |
+| T24 | Heartbeat or support ticket carries personal data to the control plane | I | Heartbeat schema has no free text; ticket form warning, `redact()` before storage, personal-data flag, 1-year retention | Low–medium |
+| T25 | Dedicated host compromised or left unpatched | I/T/E | Hardening baseline (SEC-030), no SSH, monthly OS patching, fleet version tracking, own KMS key and bucket per host, backups off-host in ap-south-2 | Medium |
+| T26 | Wrongful suspension cuts off a school during exams | D | Suspension never automatic; step-up + reason; exam-window rule with owner approval; audited | Low |
+| T27 | Cross-tenant reference via foreign key (FK checks bypass RLS) | I/T | Composite `(tenant_id, x_id)` FKs on every tenant→tenant reference; test | Low |
 
 Review the model at each milestone and after any incident.
 
@@ -107,43 +121,53 @@ Review the model at each milestone and after any incident.
 - OIDC provider (reference: Amazon Cognito in ap-south-1, ADR-0012) behind the `identity` module interface. The BFF runs Authorization Code + PKCE; tokens never reach browser JavaScript.
 - Login identifiers: username or email; phone as recovery where available. School staff without email get admin-created usernames with forced first-login password change.
 - **Passwords** (policy aligned with NIST SP 800-63B principles): minimum 12 characters, no composition rules, screening against breached/common passwords, no periodic forced rotation, rotation on suspicion.
-- **MFA:** mandatory for `owner`, `principal`, `office_admin` and all platform accounts (TOTP authenticator or passkey); optional but encouraged for everyone else. Recovery codes issued once.
+- **MFA:** mandatory for `owner`, `principal`, `office_admin` and every platform operator (TOTP authenticator or passkey); optional but encouraged for everyone else. Recovery codes issued once.
+- **How MFA is enforced with Cognito (ADR-0018):** two user pools on the Essentials plan: operators (MFA ON) and staff (MFA OPTIONAL). A pre-token-generation Lambda adds the claim `sos:mfa = "true"` when the user has MFA (device remembering off; adaptive auth never skips MFA). The API refuses sessions whose active membership holds `owner`, `principal` or `office_admin` unless `sos:mfa` is true (`403 mfa_required`). Cognito access tokens have no `aud`, so the API checks issuer, `token_use = "access"` and `client_id`.
+- **Platform operators** sign in through a separate OIDC client (`SOS_PLATFORM_OIDC_*`) on the admin host, with their own session cookie (`__Host-sos_platform_session`), idle timeout 15 min and absolute 8 h (ADR-0013, ADR-0017).
 - **Throttling:** per-account and per-IP limits; progressive delays; lockout notifications to the user and school admins.
 
 ### 5.2 Sessions (BFF)
 - Server-side session in Redis, referenced by a `__Host-sos_session` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`.
 - Tokens stored server-side, encrypted; access token ≤ 10 min; refresh token rotated on every use; reuse detection revokes the whole session family.
 - Idle timeout 15 min (tenant-configurable 5–30), absolute 12 h. Shared-PC mode shows a visible "Lock now" button.
-- **Step-up authentication** (MFA within the last 5 minutes) for: approving identity changes, role/permission changes, waiving blockers, bulk exports, full tenant export, break-glass approval.
+- **Step-up authentication** (MFA within the last 5 minutes) for: approving identity changes, role/permission changes, waiving blockers, bulk exports, full tenant export, break-glass approval, and every platform permission marked ᴿ (§6.5). The API requires `sos:mfa = "true"` and `auth_time` within 5 minutes, otherwise returns `428 step_up_required`; the BFF re-authenticates with `prompt=login` and retries (ADR-0018).
 - CSRF: synchronizer token on all state-changing BFF routes in addition to SameSite.
 - Users can list and revoke sessions; admins can force sign-out for a user.
 
 ## 6. Authorization
 
 ### 6.1 Model
-- **RBAC:** roles are sets of `resource.action` permissions (catalog in `core.permissions`). System roles are cloned per tenant at provisioning; tenants may create custom roles from the catalog, but cannot grant platform permissions.
+- **RBAC:** roles are sets of `resource.action` permissions (catalog in `core.permissions`). System roles are cloned per tenant at provisioning; tenants may create custom roles from the catalog, but cannot grant platform permissions: `platform.*` keys cannot exist in `core.permissions` (DB CHECK) and platform roles are not tenant roles (§6.5).
 - **Scopes (ABAC):** each membership has scopes (`school`, `class:<id>`, `section:<id>`). Scope is applied by **scoped repositories** on every read path: lists, search, exports and AI tools.
 - **Sensitivity:** C3 data requires `student.read_sensitive` in addition to basic read.
 - **Enforcement points:** (1) route dependency `require(permission, scope)`; (2) service-level checks for object state (e.g., cannot approve own request); (3) scoped repositories; (4) RLS for tenant; (5) retrieval ACL filters; (6) AI tool gating.
 
 ```python
 @router.post("/students/{student_id}/change-requests/{cr_id}/approve")
-def approve(cr_id: UUID, ctx: UserContext = Depends(require("student.identity_change.approve", step_up=True))):
-    return changes.service.approve(ctx, cr_id)   # service re-checks requester != approver, state = pending
+def approve(
+    cr_id: UUID,
+    ctx: UserContext = Depends(require("student.identity_change.approve", step_up=True)),
+):
+    return changes.service.approve(
+        ctx, cr_id
+    )  # service re-checks requester != approver, state = pending
 ```
 
 ### 6.2 Roles × permissions (defaults)
 
-Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = requires step-up MFA · — = no access
+Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = requires step-up MFA · — = no access. Role keys are exactly those of FR-IAM-010.
 
-| Permission | owner | principal | office_admin | office_staff | accountant | exam_coord | class_teacher | teacher | auditor_ro |
+| Permission | owner | principal | office_admin | office_staff | accountant | exam_coordinator | class_teacher | teacher | auditor_readonly |
 |---|---|---|---|---|---|---|---|---|---|
 | tenant.settings.manage | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| tenant.structure.manage (academic years, classes, sections) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| tenant.billing.read (Plan & billing page) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
 | user.manage (invite, deactivate) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
 | role.assign | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | student.read_basic | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | student.read_sensitive | ✓ | ✓ | ✓ | — | — | — | S | — | — |
-| student.create / update_nonidentity | — | ✓ | ✓ | ✓ | — | — | — | — | — |
+| student.create | — | ✓ | ✓ | ✓ | — | — | — | — | — |
+| student.update_nonidentity | — | ✓ | ✓ | ✓ | — | — | — | — | — |
 | student.identity_change.request | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | student.identity_change.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | student.export (bulk) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — |
@@ -154,17 +178,18 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | dq.findings.waive | — | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
 | document.upload | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | — | — |
 | document.read | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
-| document.manage_acl / delete | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| document.manage_acl (also gates document delete) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | kb.ask | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | — |
 | kb.verified_answer.manage | — | ✓ | ✓ | — | — | — | — | — | — |
-| export.board / export.portal | — | ✓ | ✓ | — | — | ✓ | — | — | — |
+| export.board | — | ✓ | ✓ | — | — | ✓ | — | — | — |
+| export.portal | — | ✓ | ✓ | — | — | ✓ | — | — | — |
 | audit.read | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
 | finance.read (M6) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
 | insights.read (M5) | ✓ | ✓ | — | — | — | — | S | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | tenant.export_all | ✓ᴿ | — | — | — | — | — | — | — | — |
 
-`auditor_ro` memberships are time-bound (default 14 days) and read-only.
+`auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
 ### 6.3 Maker-checker (ADR-0010)
 - Applies to identity attributes (`is_identity = true`), waiving blocker findings, and custom-role creation.
@@ -176,18 +201,66 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 - The platform operator has **no standing access** to tenant data. Operator console shows health and usage only.
 - A support request names reason, scope (e.g., "read import batch X") and duration (≤ 8 h). A tenant `owner`/`principal` approves with step-up MFA.
 - Access is implemented as a temporary, scoped membership with a special `platform_support` role; it is visibly flagged in the school's audit viewer and auto-expires; the school can revoke at any time.
-- Emergency access without approval exists only for legal obligation or active security incident, requires two operator-side confirmations, and is reported to the school within 24 hours.
+- Emergency access without approval exists only for legal obligation or active security incident, requires two operator-side confirmations (`platform.breakglass.emergency`, two different operators, step-up), and is reported to the school within 24 hours.
+- Operators request access with `platform.breakglass.request`; the platform admin panel lists requests and their status (16 §5.15). The workflow ships in M1.
+
+### 6.5 Platform roles × permissions
+
+Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). Catalog: `config/platform_permissions.yaml`; the authz tests are generated from it. ᴿ = step-up MFA within 5 minutes; 2P = two different operators. This matrix and 16 §6 must stay identical.
+
+| Permission | platform_owner | platform_engineer | support_agent | billing_admin | platform_viewer |
+|---|---|---|---|---|---|
+| platform.tenants.read | ✓ | ✓ | ✓ | ✓ | ✓ |
+| platform.tenants.provision ᴿ | ✓ | ✓ | — | — | — |
+| platform.tenants.suspend ᴿ | ✓ | ✓ | — | — | — |
+| platform.tenants.offboard ᴿ 2P | ✓ | — | — | — | — |
+| platform.plans.manage ᴿ | ✓ | — | — | ✓ | — |
+| platform.subscriptions.read | ✓ | — | — | ✓ | ✓ |
+| platform.subscriptions.manage ᴿ | ✓ | — | — | ✓ | — |
+| platform.invoices.read | ✓ | — | — | ✓ | ✓ |
+| platform.invoices.manage | ✓ | — | — | ✓ | — |
+| platform.flags.read | ✓ | ✓ | — | — | ✓ |
+| platform.flags.manage ᴿ | ✓ | ✓ | — | — | — |
+| platform.usage.read | ✓ | ✓ | ✓ | ✓ | ✓ |
+| platform.fleet.read | ✓ | ✓ | ✓ | — | ✓ |
+| platform.fleet.manage ᴿ | ✓ | ✓ | — | — | — |
+| platform.announcements.manage | ✓ | — | ✓ | — | — |
+| platform.support.read | ✓ | ✓ | ✓ | — | ✓ |
+| platform.support.manage | ✓ | — | ✓ | — | — |
+| platform.breakglass.request | ✓ | ✓ | ✓ | — | — |
+| platform.breakglass.emergency ᴿ 2P | ✓ | — | — | — | — |
+| platform.operators.manage ᴿ | ✓ | — | — | — | — |
+| platform.audit.read | ✓ | ✓ | — | — | ✓ |
+
+`platform_support` is unrelated: it is the tenant-side temporary role granted by break-glass (§6.4).
+
+### 6.6 Privilege separation (control plane vs tenant data)
+
+| Control | Detail |
+|---|---|
+| Separate DB role | Control-plane code uses `core.db.platform_session()` as `sos_platform`: DML on schema `platform`, **no privileges on any table in `core`, `sis`, `kb`, `audit`, `ops`** |
+| Tenant app cannot read platform data | `sos_app` and `sos_readonly` have no privileges on `platform` except `SELECT platform.feature_flags` (for `sos_app`) |
+| Narrow bridges only | Cross-tenant work goes through the allowlisted `SECURITY DEFINER` functions owned by `sos_definer` (NOLOGIN, NOBYPASSRLS), which reach only tables carrying the `definer_access` policy (05 §3.3–3.4) |
+| No BYPASSRLS anywhere | No role in any environment has `BYPASSRLS` or superuser at runtime |
+| Separate identity | Operators are `platform.operators` rows with platform roles, separate OIDC client, MFA always |
+| Separate audit | Control-plane actions are recorded in the hash-chained `platform.audit_events`; actions changing a school also appear in its own audit log |
+| Dedicated hosts | `SOS_DEPLOYMENT_MODE=dedicated` removes control-plane routes; the control plane never connects into a host |
+| Verified by | Catalog tests (12 §4.8–4.9), platform authz matrix (12 §4.12), alert on any `permission denied` from the platform path (11 §12) |
 
 ## 7. Tenant isolation (four layers)
 
 | Layer | Control | Verified by |
 |---|---|---|
-| Database | RLS ENABLE + FORCE on every tenant table; `sos_app` has no BYPASSRLS; context via `SET LOCAL` per transaction; fail closed when unset | Catalog test in CI; cross-tenant integration suite |
+| Database | RLS ENABLE + FORCE on every tenant table and every audit partition; no role has BYPASSRLS; context via transaction-local `set_config('app.tenant_id', :t, true)` (same effect as `SET LOCAL`, bound parameters); fail closed when unset; composite `(tenant_id, x_id)` foreign keys; cross-tenant reach only through allowlisted definer functions on tables with the `definer_access` policy | RLS catalog test, definer allowlist test, composite-FK test in CI; cross-tenant integration suite |
 | Service | Scoped repositories require `UserContext`; no raw ID lookups | BOLA tests per resource |
 | Retrieval / AI | ACL + scope filters inside retrieval SQL; tools execute under caller context | Leakage eval (hard gate) |
 | Storage & crypto | Tenant-prefixed S3 keys; per-tenant DEKs; exports scoped by tenant | S3 key tests; crypto AAD includes tenant ID |
 
-Workers never run "for all tenants" in one transaction; batch jobs iterate tenants and open a separate `tenant_session()` per tenant.
+Workers never run "for all tenants" in one transaction; batch jobs get tenant IDs from `core.list_tenant_ids()` and open a separate `tenant_session()` per tenant.
+
+**Definer access, not BYPASSRLS.** `sos_definer` is NOLOGIN and NOBYPASSRLS (Amazon RDS restricts granting BYPASSRLS, and a bypass role would open every table). Inside a `SECURITY DEFINER` function `current_user` is `sos_definer`; the permissive policy `definer_access USING (current_user = 'sos_definer') WITH CHECK (current_user = 'sos_definer')` exists only on the tables those functions must touch, pinned by a catalog test (05 §3.3; ADR-0013).
+
+**Dedicated tier.** A dedicated host is a one-tenant install with the same roles, RLS and tests; isolation from other schools is additionally physical (own host, bucket and KMS key).
 
 ## 8. Data protection and key management
 
@@ -273,18 +346,19 @@ Cross-Origin-Resource-Policy: same-origin
 - **Detection:** CloudTrail (org trail to log-archive with Object Lock), GuardDuty, AWS Config conformance rules, Security Hub foundational checks, WAF logs, VPC flow logs (sampled).
 - **CI/CD access:** GitHub Actions assumes deploy roles via OIDC with branch/environment conditions; production deploy requires manual approval.
 - **Containers:** minimal base images, non-root user, read-only root filesystem, no privileged mode, resource limits, image scanning before deploy.
+- **Dedicated hosts (SEC-030):** CIS-aligned OS baseline, IMDSv2 only, encrypted EBS, no SSH (SSM Session Manager with logging), only 80/443 inbound, Postgres and Valkey bound to the internal container network, automatic security updates with a monthly reboot window, clock sync to Amazon Time Sync, logs shipped to CloudWatch in ap-south-1 (400 days), images pulled by digest, own KMS key and buckets (10 §15).
 
 ## 14. Supply chain security
 
 - Lockfiles with hashes (Python via `uv`/pip-tools, npm lockfile); Renovate/Dependabot updates weekly; auto-merge only for patch updates passing CI.
 - Scans: `pip-audit`, `npm audit`/OSV-Scanner, Trivy (images, IaC), Semgrep (SAST), `gitleaks`.
 - SBOM generated per build (Syft) and stored with the release; images tagged by commit SHA and optionally signed (cosign).
-- GitHub Actions pinned to commit SHAs; `GITHUB_TOKEN` least privilege; protected `main` with required checks; CODEOWNERS on `authz/`, `audit/`, `core/`, `knowledge/gateway/`, migrations and `infra/`.
-- Licence policy: permissive licences preferred; no AGPL/SSPL in core runtime without an ADR.
+- GitHub Actions pinned to commit SHAs; `GITHUB_TOKEN` least privilege; protected `main` with required checks; CODEOWNERS on `authz/`, `audit/`, `core/`, `platform/`, `knowledge/gateway/`, migrations, `infra/` (incl. `infra/db/`), `deploy/dedicated/` and `config/platform_permissions.yaml`.
+- Licence policy: permissive licences preferred; no AGPL/SSPL in core runtime without an ADR. Local/CI service images follow the same rule (ADR-0014: SeaweedFS, Valkey).
 
 ## 15. Security monitoring, vulnerability management, testing
 
-**Security events alerted:** repeated login failures / lockouts; MFA reset or disable; privileged role grants; bulk exports; tenant data export; break-glass requests and use; RLS violation errors or tenant-context-missing errors; unusual AI query volume per user; WAF blocks spike; GuardDuty high findings; secrets access anomalies.
+**Security events alerted:** repeated login failures / lockouts; MFA reset or disable; privileged role grants; bulk exports; tenant data export; break-glass requests and use; RLS violation errors or tenant-context-missing errors; unusual AI query volume per user; WAF blocks spike; GuardDuty high findings; secrets access anomalies; operator role changes and new operators; `permission denied` on tenant tables from the platform path; platform audit chain failures; heartbeat signature failures; offboarding approvals; tenant suspensions.
 
 **Vulnerability SLAs:** critical ≤ 7 days, high ≤ 30 days, medium ≤ 90 days; exceptions recorded with compensating controls.
 
@@ -321,3 +395,8 @@ Cross-Origin-Resource-Policy: same-origin
 | SEC-023 | GuardDuty, CloudTrail (Object Lock), Config, Security Hub | Pilot gate |
 | SEC-024 | Restore drill passed; incident runbook rehearsed | Pilot gate |
 | SEC-025 | External penetration test; findings fixed per SLA | Before paid go-live |
+| SEC-026 | Platform privilege separation: `sos_platform` has no privileges on tenant tables; `sos_app`/`sos_readonly` none on `platform` (except flags SELECT); definer functions pinned, owned by `sos_definer` (NOBYPASSRLS), `definer_access` only on listed tables; catalog tests | M0 |
+| SEC-027 | Operator identity: separate OIDC client, MFA for every operator, step-up ≤ 5 min for ᴿ platform permissions, separate session and host | M0 |
+| SEC-028 | Heartbeat authentication: per-deployment HMAC-SHA256 keys (KMS-wrapped, rotatable), ±5 min timestamp window, nonce replay cache, strict schema without personal data, rate limit | M0 |
+| SEC-029 | Two-person rule for tenant offboarding (M0) and emergency break-glass (M1), enforced in service and DB | M0 / M1 |
+| SEC-030 | Dedicated host hardening baseline (§13), patching SLAs, off-host encrypted backups, restore test before go-live | Before first dedicated-tier school |

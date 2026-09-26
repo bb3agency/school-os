@@ -59,7 +59,7 @@ Operators are SchoolOS staff, not school users. One person may hold several role
 | API routes | `/api/v1/platform/*` with `require_platform("platform.<…>")`; heartbeat `POST /api/v1/fleet/heartbeat` with `require_fleet_signature()` |
 | DB access | `core.db.platform_session()` as `sos_platform` (`SOS_PLATFORM_DATABASE_URL`) |
 | Web | Next.js route group `/[locale]/platform/*`; production host `admin.<domain>`; own `__Host-sos_platform_session` cookie; BFF handlers mirror API paths |
-| Identity | Separate OIDC client (`SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE`; web `PLATFORM_OIDC_CLIENT_ID/SECRET`); MFA mandatory for every operator |
+| Identity | Separate OIDC client (`SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE`; web `PLATFORM_OIDC_CLIENT_ID/SECRET`); reference setup: a separate Cognito user pool with MFA ON and the `sos:mfa` claim (ADR-0018); MFA mandatory for every operator |
 | Jobs | Shared `worker`/`beat`; progress in `platform.job_runs` |
 | Dedicated hosts | Routers and web route group not mounted; platform beat schedules not registered |
 
@@ -173,7 +173,7 @@ In the **school** app, for holders of `tenant.billing.read` (owner, principal, a
 
 ## 6. Permissions
 
-Catalog: `config/platform_permissions.yaml`. Platform permissions can never be granted to tenant roles (`core.permissions` has `CHECK (key NOT LIKE 'platform.%')`; platform roles are not `core.roles` rows). ᴿ = step-up MFA within 5 minutes. **2P** = two different operators.
+Catalog: `config/platform_permissions.yaml` (the authz tests are generated from it; this table must stay identical to 07 §6.5). Platform permissions can never be granted to tenant roles (`core.permissions` has `CHECK (key NOT LIKE 'platform.%')`; platform roles are not `core.roles` rows). ᴿ = step-up MFA within 5 minutes. **2P** = two different operators.
 
 | Permission | platform_owner | platform_engineer | support_agent | billing_admin | platform_viewer |
 |---|---|---|---|---|---|
@@ -644,7 +644,7 @@ Platform chain write (inside the action's transaction): `SELECT last_seq, last_h
 
 ## 8. API endpoint catalog
 
-Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs, `ETag`/`If-Match`, cursor pagination). Base path `/api/v1`. "ᴿ" = step-up (`428 step_up_required` otherwise).
+Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs, `ETag`/`If-Match`, cursor pagination). Base path `/api/v1`. "ᴿ" = step-up (`428 step_up_required` otherwise). Control-plane idempotency keys are kept for 24 hours in Valkey (operator ID + key → request hash, status and resource ID; no personal data), because `sos_platform` cannot use `ops.idempotency_keys`.
 
 ### 8.1 Control plane (`/api/v1/platform/*`, operators only)
 

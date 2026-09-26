@@ -2,9 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-09-26 |
+| Version | 0.2 · 2026-09-26 |
 | Laws/regimes | DPDP Act 2023 + DPDP Rules 2025 · IT Act 2000 / CERT-In Directions (Apr 2022) · UIDAI Aadhaar rules |
-| Related | 05-Data model §8–13, 07-Security, 11-Operations §6 (incident response) |
+| Related | 05-Data model §8–13, 07-Security, 11-Operations §7 (incident response), 16-Platform admin panel, ADR-0015, ADR-0016 |
+| Changes | 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
 
 > **Not legal advice.** This document records engineering and product commitments based on public sources checked in September 2026. Have a qualified lawyer review the DPA, notices and incident process before handling real data.
 
@@ -22,10 +23,13 @@
 
 | Sub-processor | Purpose | Data | Location |
 |---|---|---|---|
-| Amazon Web Services | Hosting, storage, backups, KMS, identity (Cognito) | All platform data (encrypted) | India: ap-south-1 (Mumbai), backups ap-south-2 (Hyderabad) |
+| Amazon Web Services | Hosting (shared tier and dedicated-tier hosts), storage, backups, KMS, identity (Cognito), email (SES) | All platform data (encrypted) | India: ap-south-1 (Mumbai), backups ap-south-2 (Hyderabad), for both tiers |
 | Anthropic (Claude API) | Answer generation, extraction, metadata | Minimized question context; record fields needed for the answer; document excerpts | Outside India; commercial API terms; Zero Data Retention requested |
 | Embeddings provider (e.g., Voyage AI) or self-hosted model | Vector embeddings | Document chunk text, queries | Provider-dependent; self-hosted option in India |
 | OCR provider (chosen by evaluation) | Text extraction from scans/photos | Page images (after Aadhaar-region redaction where detectable) | Provider-dependent |
+| Payment provider (Razorpay candidate) | **Proposed, not active** (ADR-0016). Online collection of SchoolOS subscription payments | School billing contact and invoice amounts only; never student data | To confirm in the privacy review before activation |
+
+The register above covers processing of school data. A payment provider would process SchoolOS's own billing data (§14); it is listed so schools see every third party that could receive data about them. It is added to the active register, and schools are notified per the DPA, only if ADR-0016 is accepted after a privacy review.
 
 ## 2. DPDP timeline
 
@@ -73,7 +77,7 @@ The April 2022 CERT-In directions apply to service providers and body corporates
 
 | ID | Requirement | Implementation |
 |---|---|---|
-| PRV-017 | Report specified cyber incidents to CERT-In within **6 hours** of noticing | Incident runbook with a 6-hour clock and pre-drafted report format (11 §6); designated Point of Contact registered with CERT-In |
+| PRV-017 | Report specified cyber incidents to CERT-In within **6 hours** of noticing | Incident runbook with a 6-hour clock and pre-drafted report format (11 §7); designated Point of Contact registered with CERT-In |
 | PRV-018 | Maintain ICT system logs for a rolling **180 days within India** | Security/access/application logs retained **13 months** in ap-south-1 (also covers DPDP's 1-year requirement) |
 | PRV-019 | Synchronize clocks to NIC/NPL NTP servers or traceable sources | Self-managed hosts use NIC/NPL NTP; managed services' time sync documented; all logs in UTC with synchronized clocks |
 
@@ -98,7 +102,7 @@ Offboarding: school exports data → SchoolOS deletes tenant data within 30 days
 4. Sub-processors: current list, advance notice of changes, right to object, equivalent obligations flowed down.
 5. Breach: notice to the school without undue delay (target ≤ 24 h from confirmation), cooperation, facts package, remediation report.
 6. Assistance with Data Principal requests and DPIAs.
-7. Data location: India for storage; disclosed exceptions for AI sub-processors.
+7. Data location: India for storage in both tiers (shared platform and dedicated hosts in ap-south-1, backups in ap-south-2); disclosed exceptions for AI sub-processors.
 8. Return and deletion at termination; certificate of deletion; crypto-shredding.
 9. Audit rights: summary security reports, pen test summaries, reasonable on-site review.
 10. Liability, term, governing law (lawyer to draft).
@@ -116,12 +120,16 @@ Describe processing → necessity and proportionality → risks to children and 
 | Documents & knowledge base | Circulars, minutes, scans | Administration, institutional memory | As above | School policy |
 | Ask the school | Questions, retrieved excerpts | Staff productivity | As above | Encrypted Q/A 180 days |
 | Audit & security logs | User actions, IP hashes | Security, accountability | Legal obligation (DPDP/CERT-In) | ≥ 13 months online |
+| Support tickets (school-opened) | Staff user ID, ticket text (student data not allowed; redacted) | Support | Legitimate use (contract) | 1 year after closing |
+| Fleet heartbeat (dedicated tier) | Versions, health, aggregate counts; no personal data | Operating the service | Not personal data | Last payload + daily counts |
 
 ## 12. Compliance calendar
 
 | When | Task |
 |---|---|
 | Before first real data | DPA signed; school notice issued; DPIA done; sub-processor list shared; ZDR request submitted |
+| Before first dedicated-tier school | Confirm DPA annex describes the dedicated host (location, backups, custom domain); restore test done |
+| Before activating any payment provider | Privacy review, sub-processor register update, advance notice to schools (ADR-0016) |
 | Quarterly | Access reviews per tenant; restore drill; incident drill; sub-processor review |
 | Annually | Penetration test; policy review; DPA review; key rotation review |
 | Before mid-May 2027 | Full DPDP readiness review with counsel; update notices/templates to final rules |
@@ -133,3 +141,23 @@ Describe processing → necessity and proportionality → risks to children and 
 - DPDP Rules explained (Rules 6–8 incl. 72-hour Board report, 1-year logs): https://dpdp.myndsolution.com/wiki/guides/the-dpdp-rules-2025-explained/
 - CERT-In Directions 2022 overview (6-hour reporting, 180-day logs in India): https://www.mondaq.com/india/security/1191962/an-overview-on-the-cert-in-cyber-security-directions-2022
 - Anthropic API and data retention (ZDR): https://platform.claude.com/docs/en/manage-claude/api-and-data-retention
+
+## 14. Platform, billing and support data
+
+SchoolOS's own business data lives in the `platform` schema (16 §7), separate from school data and unreachable by the school app except through narrow functions.
+
+| Data | Examples | Role of SchoolOS | Class | Retention |
+|---|---|---|---|---|
+| Billing accounts | School legal name, GSTIN, PAN, billing address, billing email and phone, billing contact name | **Data Fiduciary** for the contact person's data (its own customer relationship) | C1 (school) / C2 (contact person) | 8 years after the financial year (tax records; confirm with a CA) |
+| Invoices and payments | Amounts, GST, UTR/UPI references, TDS | Own records | C1 | 8 years after the financial year |
+| Operator accounts | SchoolOS staff name, email, roles | Employer / own records | C2 | Life of account + 1 year |
+| Usage aggregates | Counts per school per day (users, students, storage, AI tokens) | Own operations | C1 (no personal data) | 3 years |
+| Support tickets | Subject and messages from school staff | Processor for any school data that slips in; own records otherwise | C2 at most; student data not allowed | 1 year after closing |
+| Deployment records and heartbeats | Versions, health, backup state, counts | Own operations | C1 | Last payload; history in metrics |
+
+Rules:
+- **Billing data is school business data, never student data.** Invoices name the school, not pupils; per-student plans use counts only.
+- **Support tickets must not contain student data.** The form warns in English and Telugu; Aadhaar-like and phone numbers are masked before storage; operators flag and redact anything that slips through; tickets are deleted 1 year after closing. Investigating a school's records uses break-glass, not tickets.
+- **Heartbeats carry no personal data** (16 §12.3); the schema has no free-text fields.
+- **Dedicated tier location:** the school's host runs in ap-south-1; its bucket and backups (encrypted with its own KMS key) are in ap-south-1 and ap-south-2. The control plane receives only heartbeat data from it. A custom domain changes the web address, not where data is stored.
+- **After offboarding**, school data is deleted and keys destroyed (§7); billing records remain for their legal retention period because they contain no student data.

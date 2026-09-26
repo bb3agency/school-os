@@ -38,7 +38,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | ID | Requirement | V |
 |---|---|---|
 | FR-IAM-001 | Users MUST authenticate via the configured OIDC provider using Authorization Code + PKCE through the BFF. | T |
-| FR-IAM-002 | MFA MUST be enforced for roles `owner`, `principal`, `office_admin` and for every platform operator (all platform roles). | T |
+| FR-IAM-002 | MFA MUST be enforced for roles `owner`, `principal`, `office_admin` and for every platform operator (all platform roles). The API enforces it on every request (reference: `sos:mfa` claim; `403 mfa_required`; ADR-0018). | T |
 | FR-IAM-003 | Sessions MUST expire after 15 min idle (configurable 5–30) and 12 h absolute; re-auth required for sensitive actions (exports, role changes, approvals). | T |
 | FR-IAM-004 | Access tokens MUST live ≤ 10 min; refresh tokens MUST rotate on use with reuse detection revoking the session family. | T |
 | FR-IAM-005 | Login attempts MUST be rate-limited per account and per IP; lockouts and resets audited. | T |
