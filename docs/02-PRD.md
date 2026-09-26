@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-26 |
 | Scope | Core capabilities C1–C14 (milestones M0–M2) + extension points |
 | Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security, 16-Platform admin panel |
-| Changes | 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
+| Changes | 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
 
 ---
 
@@ -211,7 +211,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 
 **US-1305** · As a billing admin, I want to generate, issue and record payment for GST invoices so that schools are billed correctly. [FR-PLT-015..019]
 - AC1: Given it is the 1st of the month, when the invoice job runs, then one draft invoice exists per billable subscription for the coming period, and rerunning the job creates no duplicates.
-- AC2: When I issue a draft, then it gets the next number in the financial year (e.g., `SOS/2026-27/000123`), its contents are frozen, and numbers have no gaps.
+- AC2: When I issue a draft, then it gets the next number in the financial year (e.g., `SOS/26-27/000123`, at most 16 characters), its contents are frozen, and numbers have no gaps.
 - AC3: Given the school's state code equals ours, then CGST and SGST are charged equally; otherwise IGST; totals add up to the paisa.
 - AC4: When I record a bank or UPI payment (amount, date, reference, TDS), then the balance updates and the invoice becomes "paid" once covered; a wrong entry is reversed with a reason, never deleted.
 - AC5: Given an issued invoice is unpaid, I can void it with a reason; its number is never reused.

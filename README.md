@@ -1,7 +1,7 @@
 # SchoolOS
 
 > The memory and operations layer for Indian private schools, starting with the admin office.
-> Working name · Documentation v0.2 · M0 (foundations) in progress · Region: Andhra Pradesh, India
+> Working name · Documentation v0.3 · M0 (foundations) code merged, exit criteria pending ([status](docs/14-roadmap.md#m0-status-2026-09-26)) · Region: Andhra Pradesh, India
 
 SchoolOS lets a school office **enter student details once and use them everywhere**: board and government portal submissions, certificates, registers, parent notices, and an **"Ask the school"** assistant that answers questions from the school's own records and documents, always with sources.
 
@@ -31,7 +31,7 @@ The product is built **module by module** on a shared core that does not change 
 | 11 | [Observability & Operations](docs/11-observability-and-operations.md) | Telemetry, SLOs, alerts, runbooks, incident response |
 | 12 | [Testing Strategy](docs/12-testing-strategy.md) | Test layers, authz/RLS tests, RAG evals, security testing |
 | 13 | [Engineering Standards](docs/13-engineering-standards.md) | Repo layout, conventions, reviews, AI-assisted development |
-| 14 | [Roadmap](docs/14-roadmap.md) | Milestones M0–M7 with exit criteria |
+| 14 | [Roadmap](docs/14-roadmap.md) | Milestones M0–M7 with exit criteria; M0 status, remaining work and open decisions |
 | 15 | [Glossary](docs/15-glossary.md) | Domain, technical, platform and billing terms |
 | 16 | [Platform Admin Panel](docs/16-platform-admin-panel.md) | Control plane: provisioning (shared and dedicated tiers), plans, invoices, usage, fleet heartbeat, support, operators |
 | — | [ADRs](docs/adr/README.md) | Architecture decisions and why they were made (process, template, index) |
@@ -54,16 +54,17 @@ The product is built **module by module** on a shared core that does not change 
 | [0010](docs/adr/ADR-0010-maker-checker.md) | Maker-checker for identity changes | Accepted |
 | [0011](docs/adr/ADR-0011-hash-chained-audit.md) | Hash-chained, append-only audit | Accepted, amended by 0013 |
 | [0012](docs/adr/ADR-0012-managed-oidc-identity.md) | Managed OIDC identity | Accepted, amended by 0013, 0018 |
-| [0013](docs/adr/ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths and platform privilege separation | Accepted |
+| [0013](docs/adr/ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths and platform privilege separation | Accepted, amended by 0018, 0019; implementation amendments 2026-09-26 |
 | [0014](docs/adr/ADR-0014-local-ci-service-images.md) | SeaweedFS and Valkey for local/CI | Accepted |
 | [0015](docs/adr/ADR-0015-deployment-and-commercial-model.md) | Managed SaaS: shared and dedicated tiers | Accepted |
 | [0016](docs/adr/ADR-0016-payments-provider.md) | Payments provider | Proposed |
 | [0017](docs/adr/ADR-0017-platform-admin-panel-architecture.md) | Platform admin panel architecture | Accepted |
 | [0018](docs/adr/ADR-0018-mfa-and-step-up-with-cognito.md) | MFA and step-up with Cognito | Accepted |
+| [0019](docs/adr/ADR-0019-invitation-acceptance-on-first-sign-in.md) | Invitation acceptance on first sign-in | Accepted |
 
 ## Reading order
 
-- **Starting to build (with AI):** `CLAUDE.md` → `14-roadmap.md` (M0) → `04` → `05` → `07` → `13` → ADRs 0013–0018
+- **Starting to build (with AI):** `CLAUDE.md` → `14-roadmap.md` (M0 status) → `04` → `05` → `07` → `13` → ADRs 0013–0019
 - **Building the platform admin panel (control plane):** `16` → ADR-0013, ADR-0015, ADR-0017 → `05` §3 → `07` §6.5–6.6 → `12` §4.8–4.13
 - **Setting up a dedicated-tier school:** ADR-0015 → `10` §15 → `16` §12–13 → `11` §11
 - **Building the knowledge core:** `06` → `05` (kb schema) → `07` §LLM security → `12` §RAG evaluation
@@ -74,7 +75,7 @@ The product is built **module by module** on a shared core that does not change 
 
 - IDs: `BO-` business objective · `BR-` business rule · `US-` user story · `FR-` functional req · `NFR-` non-functional req · `SEC-` security control · `PRV-` privacy control · `ADR-` decision
 - Normative keywords per RFC 2119: **MUST**, **SHOULD**, **MAY**
-- Code and docs change in the **same PR** when behaviour changes; ADRs are never edited after acceptance, only superseded
+- Code and docs change in the **same PR** when behaviour changes; ADRs are never rewritten after acceptance, only amended or superseded (an appended, dated Amendments section may record implementation facts; see the ADR process)
 - Facts about laws, portals, boards and vendors were checked in **September 2026**. They change. Re-verify via the References sections before relying on them. Nothing here is legal advice.
 
 ## Getting started
@@ -84,15 +85,15 @@ The product is built **module by module** on a shared core that does not change 
 ```bash
 cp .env.example .env          # dev-only placeholders; never commit .env
 make install                  # uv sync (Python 3.12) + npm ci (web)
-make dev                      # postgres+pgvector, valkey, seaweedfs (S3), api, worker, beat, web
-make migrate                  # alembic upgrade head (as sos_migrator)
-make seed-synthetic           # synthetic tenants only; never real data
+make dev                      # postgres+pgvector, valkey, seaweedfs (S3), migrate, api, worker, beat, web
+make migrate                  # re-run migrations + audit partitions (as sos_migrator); make dev already does this
+make seed-synthetic           # synthetic schools only; never real data (refuses unless SOS_ENV is local/ci)
 make check                    # lint + typecheck + tests + security scans (what CI runs)
 ```
 
-- API: <http://localhost:8000/healthz>, <http://localhost:8000/readyz>, OpenAPI at `/api/v1/docs` (local only)
-- Web: <http://localhost:3000> (school app at `/en` or `/te`, platform admin panel at `/en/platform`)
-- Tests need Docker: they start PostgreSQL 16 + pgvector with testcontainers and run `infra/db/bootstrap.sql` + migrations, then connect as the real `sos_app` role (RLS enforced).
+- API: <http://localhost:8000/healthz>, <http://localhost:8000/readyz>, OpenAPI at `/api/v1/docs` (off in staging/prod); the committed contract is `apps/api/openapi.json` (`make openapi`)
+- Web: <http://localhost:3000> (school app at `/en` or `/te`, platform admin panel at `/en/platform`). Signing in locally needs the dev OIDC stub (`docker compose --profile dev up -d oidc`) and the web app run on the host; see `apps/web/README.md`
+- Tests need Docker: they start PostgreSQL 16 + pgvector with testcontainers and run `infra/db/bootstrap.sql` + migrations, then connect as the real `sos_app` role (RLS enforced). `make test-security` runs only the security suites; `make migration-check` the migration round trips.
 - Run `uv run pre-commit install` once to get ruff, mypy, eslint, prettier and gitleaks on every commit.
 
 ## Version history
@@ -100,3 +101,4 @@ make check                    # lint + typecheck + tests + security scans (what 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-26 | Founder | Initial documentation baseline |
+| 0.3 | 2026-09-26 | Documentation owner | Docs reconciled with the merged M0 code (migrations 0001–0007, OpenAPI, settings); M0 status |

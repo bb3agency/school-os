@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-26 |
 | Target | OWASP ASVS (current version) Level 2 · OWASP API Security Top 10 · OWASP Top 10 for LLM Applications (2025) |
 | Related | 05-Data model (RLS, encryption), 06-RAG, 08-Privacy, 10-Infrastructure, 11-Operations (incident response), 16-Platform admin panel, ADR-0013, ADR-0015, ADR-0017, ADR-0018 |
-| Changes | 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
+| Changes | 0.3: platform catalog files as built (§6.5); non-atomic school-chain copies of platform actions and suspended-school behaviour noted (§6.6); CODEOWNERS paths (§14). 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
 
 ---
 
@@ -207,7 +207,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 
 ### 6.5 Platform roles × permissions
 
-Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). Catalog: `config/platform_permissions.yaml`; the authz tests are generated from it. ᴿ = step-up MFA within 5 minutes; 2P = two different operators. This matrix and 16 §6 must stay identical.
+Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). Catalog: the `platform.*` entries (`is_platform: true`) of `apps/api/app/authz/permissions.yaml` and the role matrix in `apps/api/app/platform/roles.yaml`; the platform authz tests are generated from them. ᴿ = step-up MFA within 5 minutes; 2P = two different operators. This matrix and 16 §6 must stay identical.
 
 | Permission | platform_owner | platform_engineer | support_agent | billing_admin | platform_viewer |
 |---|---|---|---|---|---|
@@ -244,7 +244,7 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | Narrow bridges only | Cross-tenant work goes through the allowlisted `SECURITY DEFINER` functions owned by `sos_definer` (NOLOGIN, NOBYPASSRLS), which reach only tables carrying the `definer_access` policy (05 §3.3–3.4) |
 | No BYPASSRLS anywhere | No role in any environment has `BYPASSRLS` or superuser at runtime |
 | Separate identity | Operators are `platform.operators` rows with platform roles, separate OIDC client, MFA always |
-| Separate audit | Control-plane actions are recorded in the hash-chained `platform.audit_events`; actions changing a school also appear in its own audit log |
+| Separate audit | Control-plane actions are recorded in the hash-chained `platform.audit_events` in the same transaction; actions changing a school also appear in its own audit log, written in a separate `sos_app` transaction committed right after (not atomic; ADR-0013 Amendment A6) |
 | Dedicated hosts | `SOS_DEPLOYMENT_MODE=dedicated` removes control-plane routes; the control plane never connects into a host |
 | Verified by | Catalog tests (12 §4.8–4.9), platform authz matrix (12 §4.12), alert on any `permission denied` from the platform path (11 §12) |
 
@@ -354,7 +354,7 @@ Cross-Origin-Resource-Policy: same-origin
 - Lockfiles with hashes (Python via `uv`/pip-tools, npm lockfile); Renovate/Dependabot updates weekly; auto-merge only for patch updates passing CI.
 - Scans: `pip-audit`, `npm audit`/OSV-Scanner, Trivy (images, IaC), Semgrep (SAST), `gitleaks`.
 - SBOM generated per build (Syft) and stored with the release; images tagged by commit SHA and optionally signed (cosign).
-- GitHub Actions pinned to commit SHAs; `GITHUB_TOKEN` least privilege; protected `main` with required checks; CODEOWNERS on `authz/`, `audit/`, `core/`, `platform/`, `knowledge/gateway/`, migrations, `infra/` (incl. `infra/db/`), `deploy/dedicated/` and `config/platform_permissions.yaml`.
+- GitHub Actions pinned to commit SHAs; `GITHUB_TOKEN` least privilege; protected `main` with required checks; CODEOWNERS on `apps/api/app/{core,authz,audit,platform}/` (which includes the permission and billing YAML), `knowledge/gateway/`, migrations, `apps/api/tests/security/` (incl. `rls_allowlist.yaml`), `infra/`, `deploy/`, `.github/`, `.semgrep/`, `.importlinter`, `Makefile`, `CLAUDE.md` and `SECURITY.md` (owner handle is a placeholder until branch protection is configured).
 - Licence policy: permissive licences preferred; no AGPL/SSPL in core runtime without an ADR. Local/CI service images follow the same rule (ADR-0014: SeaweedFS, Valkey).
 
 ## 15. Security monitoring, vulnerability management, testing
