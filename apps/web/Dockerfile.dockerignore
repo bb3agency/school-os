@@ -1,0 +1,17 @@
+# Build context is the repository root; send only what the web image needs.
+*
+!package.json
+!package-lock.json
+!apps/web
+!packages/api-client
+
+**/node_modules
+**/.next
+**/coverage
+**/playwright-report
+**/test-results
+**/*.tsbuildinfo
+**/.env*
+**/*.log
+apps/web/e2e
+apps/web/Dockerfile*
