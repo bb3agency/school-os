@@ -272,7 +272,7 @@ Names in AP commonly include a surname/house name (often first), initials, and m
 **Normalization pipeline**
 1. Unicode NFC; trim; collapse whitespace; uppercase Latin script.
 2. Tokenize on spaces, dots, hyphens; mark single letters (with or without dot) as initials.
-3. If Telugu script: transliterate to Latin (ISO 15919-based scheme via a maintained library) to produce a comparison key; keep original.
+3. If Telugu script: transliterate to Latin (ISO 15919-based scheme) to produce a comparison key; keep original. **Decision (M1):** the scheme is an in-house, table-driven transliteration in `app.core.textnorm` rather than a library: the Telugu block is small and fixed, the key is for matching only (never displayed), and it adds no runtime dependency; it is property-tested (never fails, removes all Telugu letters). For matching, vowel length is folded before transliteration (ఈ/ీ, ఏ/ే, ఊ/ూ, ఓ/ో, ఆ/ా become short; vocalic r becomes "ri") because Latin school spellings write short vowels ("KOMMINENI" for కొమ్మినేని).
 4. Apply a configurable variant dictionary (e.g., SRI/SREE/SHRI, LAKSHMI/LAXMI, VENKATA/VENKAT) and a light phonetic key (double letters, TH/T, DH/D, V/W, EE/I). The dictionary is per-tenant extensible.
 
 **Match classes** (evaluated in order)
@@ -288,6 +288,14 @@ Names in AP commonly include a surname/house name (often first), initials, and m
 | `DIFFERENT` | Anything else | blocker |
 
 Each class produces a bilingual explanation code (`NM-ORDER`, `NM-SPACING`, …). Thresholds live in config and are tuned with labelled examples from the design partner (with permission).
+
+**Algorithm as implemented (M1, `app.dq.matching.classify`)**
+- Tokens: split on spaces, dots, hyphens, underscores, commas and slashes. A single letter is an initial; a two-letter digraph from config (`CH. SH. TH. KH. GH. BH. PH. DH.`) or a single Telugu syllable (`కె.`) is an initial only when followed by a dot. Zero-width characters are dropped. Empty or punctuation-only input gives a separate class `MISSING` (`NM-MISSING`, no finding: missing values are reported by DQ-005/DQ-009).
+- Across scripts (exactly one side contains Telugu), every comparison uses the phonetic key, so a transliteration difference alone is `EXACT`.
+- `EXACT`, `ORDER` and `SPACING` ("equal after removing spaces") are decided on the whole token lists. Otherwise tokens are aligned: every token on each side is paired once, as equal words, adjacent words joined on one side (up to 3), an initial with a word it starts, words equal on the variant key (dictionary representative, then phonetic key), or words whose Jaro-Winkler **or** trigram similarity reaches the threshold. Each stage allows the pair kinds of the stages before it and any order, so a name with several differences gets the most severe class among them ("VENKATASAI K" vs "KOMMINENI VENKATA SAI" is `INITIALS`). From `INITIALS` on, at least one full word must pair ("K. V. S." alone is `DIFFERENT`).
+- `TYPO` is decided per word, not on the whole name (whole-name scores over-rate a shared surname: "RAVI KUMAR"/"RAJU KUMAR" is 0.92 Jaro-Winkler but `DIFFERENT`). Defaults (`app/dq/config/match_classes.yaml`): Jaro-Winkler ≥ 0.92 (rapidfuzz, prefix weight 0.1) or trigram ≥ 0.80 (same formula as PostgreSQL `pg_trgm` `similarity()`); the finding reports which metric fired. Up to 10 tokens per name get the alignment; longer names are compared as whole strings only.
+- The variant dictionary (`app/dq/config/variants.yaml`, 90+ groups of AP spellings) is looked up by phonetic key and is per-tenant extensible (groups sharing a spelling are joined). Pairs listed as `distinct` (gender markers such as KUMAR/KUMARI, other name forms such as KRISHNA/KRISHNAN, SRINIVASA/SRINIVASULU) are never a variant or a typo of each other.
+- The result is symmetric and carries `details` with token positions, pair kinds and metrics only (no name text), safe to store with findings. Default severities per class are in `match_classes.yaml` and can be overridden per tenant; DQ-004 (parent names) clamps them to medium..high.
 
 ## 7. "Ask the school" behaviour
 
