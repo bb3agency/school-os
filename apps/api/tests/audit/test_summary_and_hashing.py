@@ -88,9 +88,10 @@ def test_FR_AUD_001_summary_strings_are_nfc_normalised() -> None:
     assert sanitize_summary({"code": decomposed})["code"] == "café"
 
 
-def test_INV_4_summary_strings_pass_through_redaction_when_available(
+def test_INV_4_summary_rejects_values_the_redactor_would_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Personal data is rejected outright (never silently masked); clean values pass unchanged."""
     fake = types.ModuleType("app.core.redaction")
     calls: list[str] = []
 
@@ -101,9 +102,18 @@ def test_INV_4_summary_strings_pass_through_redaction_when_available(
     fake.redact = redact  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "app.core.redaction", fake)
     sid = str(uuid.uuid4())
-    out = sanitize_summary({"code": "secret-code", "student_id": sid})
-    assert out == {"code": "[redacted]-code", "student_id": sid}
-    assert calls == ["secret-code"], "UUIDs must never be run through redaction"
+    with pytest.raises(SummaryError, match="personal data"):
+        sanitize_summary({"code": "secret-code", "student_id": sid})
+    out = sanitize_summary({"code": "clean-code", "student_id": sid})
+    assert out == {"code": "clean-code", "student_id": sid}
+    assert "clean-code" in calls
+    assert sid not in calls, "UUIDs must never be run through redaction"
+
+
+def test_INV_4_real_redactor_rejects_aadhaar_phone_and_email() -> None:
+    for value in ("call 9876543210", "mail ravi@example.org", "id 2345 6789 0124"):
+        with pytest.raises(SummaryError):
+            sanitize_summary({"note": value})
 
 
 def test_FR_AUD_001_action_and_summary_validated_by_model() -> None:

@@ -91,15 +91,17 @@ def _clean_string(value: str, path: str) -> str:
     if UUID_RE.match(value):
         # IDs pass unchanged (normalised to lowercase); never run redaction over them.
         return value.lower()
+    # Reject (never silently mask) long digit runs: they look like Aadhaar/phone numbers and
+    # personal values do not belong in audit summaries at all. Checked on the ORIGINAL value.
+    if LONG_DIGIT_RUN_RE.search(value):
+        raise SummaryError(f"{path}: long digit sequences are not allowed in audit summaries")
     redactor = _load_redactor()
     if redactor is not None:
         redacted = redactor(value)
         if not isinstance(redacted, str):
             raise SummaryError(f"{path}: redaction returned a non-string value")
-        value = redacted
-    # Fallback and defence in depth: long digit runs look like Aadhaar/phone numbers.
-    if LONG_DIGIT_RUN_RE.search(value):
-        raise SummaryError(f"{path}: long digit sequences are not allowed in audit summaries")
+        if redacted != value:
+            raise SummaryError(f"{path}: value contains personal data (phone, email or Aadhaar)")
     return value
 
 
