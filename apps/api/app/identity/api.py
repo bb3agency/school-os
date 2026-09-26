@@ -34,7 +34,7 @@ from app.authz.http import (
     paginate,
 )
 from app.authz.resolver import AuthzResolver
-from app.core.errors import ValidationFailed
+from app.core.errors import Forbidden, ValidationFailed
 from app.identity import service as identity
 from app.identity.principal import Principal, get_principal
 from app.identity.schemas import (
@@ -46,6 +46,7 @@ from app.identity.schemas import (
     PermissionOut,
     RoleOut,
     RolesIn,
+    SchoolChoicesOut,
     ScopesIn,
     UserOut,
 )
@@ -78,6 +79,20 @@ def get_me(
     and the schools they can switch to (permission: any active member)."""
     tenant_ids = [c.tenant_id for c in resolver.choices(principal)]
     return identity.me(db, ctx, tenant_ids=tenant_ids)
+
+
+@router.get("/me/schools", response_model=SchoolChoicesOut)
+def list_my_schools(principal: Caller, resolver: Resolver) -> SchoolChoicesOut:
+    """Schools the signed-in user can work in, for the school picker. Works without
+    ``X-Active-Tenant`` (FR-IAM-013; permission: authenticated). A privileged membership
+    without MFA gets 403 ``mfa_required``, as on every other route (FR-IAM-002)."""
+    choices = resolver.choices(principal)
+    if not principal.mfa and any(resolver.snapshot(c).mfa_required for c in choices):
+        raise Forbidden(
+            "Your role needs two-step verification (MFA). Set it up, then sign in again.",
+            code="mfa_required",
+        )
+    return identity.school_choices(choices)
 
 
 @router.post("/me/active-tenant", response_model=MeOut)

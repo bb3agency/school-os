@@ -44,6 +44,8 @@ from app.identity.schemas import (
     PermissionOut,
     RoleAccess,
     RoleOut,
+    SchoolChoiceOut,
+    SchoolChoicesOut,
     ScopeIn,
     ScopeOut,
     UserOut,
@@ -268,6 +270,25 @@ def record_login_event(
 
 
 # --- me ---------------------------------------------------------------------------------------
+
+
+def school_choices(choices: Iterable[LoginChoice]) -> SchoolChoicesOut:
+    """Schools the principal holds an active membership in (FR-IAM-013).
+
+    Works before a school is chosen. Each school is read in its own ``tenant_session`` (RLS
+    ``own_tenant``), so only schools the user belongs to are ever touched. No audit event:
+    this is a read of the caller's own memberships.
+    """
+    out: list[SchoolChoiceOut] = []
+    for choice in choices:
+        with tenant_session(choice.tenant_id, choice.user_id) as session:
+            tenant = tenancy.get_tenant(session)
+        out.append(
+            SchoolChoiceOut(
+                tenant_id=tenant.id, code=tenant.code, name=tenant.name, status=choice.tenant_status
+            )
+        )
+    return SchoolChoicesOut(data=sorted(out, key=lambda s: s.name))
 
 
 def me(session: Session, ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -> MeOut:

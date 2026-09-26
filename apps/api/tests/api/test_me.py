@@ -177,3 +177,33 @@ def test_FR_IAM_005_login_event_is_rate_limited(world: Any, api: Any, admin_engi
     codes = [api.call(person, "POST", "/api/v1/me/login-event").status_code for _ in range(11)]
     assert codes[:10] == [200] * 10
     assert codes[10] == 429
+
+
+def test_FR_IAM_013_schools_listed_without_active_tenant(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A user with several memberships can list them (for the picker) before choosing one."""
+    person = W.add_member(admin_engine, world.a.tenant_id, ["office_staff"])
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.memberships (id, tenant_id, user_id, status) "
+                "VALUES (gen_random_uuid(), :t, :u, 'active')"
+            ),
+            {"t": world.b.tenant_id, "u": person.user_id},
+        )
+    res = api.call(person, "GET", "/api/v1/me/schools")
+    assert res.status_code == 200, res.text
+    schools = {s["tenant_id"]: s for s in res.json()["data"]}
+    assert set(schools) == {str(world.a.tenant_id), str(world.b.tenant_id)}
+    for school in schools.values():
+        assert school["name"]
+        assert school["status"] == "active"
+        assert set(school) == {"tenant_id", "code", "name", "status"}
+
+
+def test_FR_IAM_013_schools_list_is_empty_for_unknown_subject(api: Any) -> None:
+    ghost = W.Person(None, uuid.uuid4(), uuid.uuid4(), "sub-nobody-schools", "x")
+    res = api.call(ghost, "GET", "/api/v1/me/schools")
+    assert res.status_code == 200
+    assert res.json() == {"data": []}

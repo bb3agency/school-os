@@ -22,7 +22,11 @@ from app.core.health import PUBLIC_PATHS
 from app.main import create_app
 
 # Routes that authenticate the caller but do not need a resolved school.
-TENANTLESS = {("POST", "/api/v1/me/active-tenant"), ("POST", "/api/v1/me/login-event")}
+TENANTLESS = {
+    ("GET", "/api/v1/me/schools"),
+    ("POST", "/api/v1/me/active-tenant"),
+    ("POST", "/api/v1/me/login-event"),
+}
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 
 

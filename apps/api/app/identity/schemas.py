@@ -176,6 +176,19 @@ class ActiveTenantIn(_In):
     tenant_id: uuid.UUID
 
 
+class SchoolChoiceOut(_Out):
+    """A school the signed-in user may work in (school picker; no personal data)."""
+
+    tenant_id: uuid.UUID
+    code: str
+    name: str
+    status: str
+
+
+class SchoolChoicesOut(_Out):
+    data: list[SchoolChoiceOut]
+
+
 class MeOut(_Out):
     user_id: uuid.UUID
     tenant_id: uuid.UUID
