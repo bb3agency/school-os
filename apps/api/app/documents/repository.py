@@ -166,13 +166,18 @@ def delete_intents(session: Session, ids: Sequence[uuid.UUID]) -> None:
         session.execute(delete(UploadIntent).where(UploadIntent.id.in_(list(ids))))
 
 
-def purge_consumed_intents(session: Session, before: dt.datetime) -> int:
-    result = session.execute(
-        delete(UploadIntent).where(
-            UploadIntent.consumed_at.is_not(None), UploadIntent.consumed_at < before
+def consumed_intents_before(
+    session: Session, before: dt.datetime, limit: int
+) -> list[UploadIntent]:
+    return list(
+        session.scalars(
+            select(UploadIntent)
+            .where(UploadIntent.consumed_at.is_not(None), UploadIntent.consumed_at < before)
+            .order_by(UploadIntent.consumed_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
         )
     )
-    return int(getattr(result, "rowcount", 0) or 0)
 
 
 # --- documents ------------------------------------------------------------------------------
@@ -378,10 +383,3 @@ def replace_acl(
     ]
     if rows:
         session.execute(insert(DocumentAcl), rows)
-
-
-def intent_by_key(session: Session, key: str) -> UploadIntent | None:
-    return session.scalars(
-        select(UploadIntent).where(UploadIntent.object_key == key).with_for_update(),
-        execution_options={"populate_existing": True},
-    ).one_or_none()

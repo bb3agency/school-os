@@ -46,6 +46,23 @@ class ObjectStoreError(RuntimeError):
     """The object store failed or refused (never carries object contents)."""
 
 
+class ObjectChanged(ObjectStoreError):
+    """The source object no longer has the ETag that was verified (conditional copy failed)."""
+
+
+@dataclass(frozen=True, slots=True)
+class OpenedObject:
+    """One GET of an object: its ETag and a stream of its bytes (close() releases it)."""
+
+    etag: str
+    chunks: Iterator[bytes]
+
+    def close(self) -> None:
+        close = getattr(self.chunks, "close", None)
+        if callable(close):
+            close()
+
+
 @dataclass(frozen=True, slots=True)
 class PresignedPost:
     url: str
@@ -85,6 +102,13 @@ def import_key(tenant_id: uuid.UUID, batch_id: uuid.UUID, ext: str) -> str:
     return f"{tenant_prefix(tenant_id)}imports/{batch_id}/raw.{ext}"
 
 
+def upload_key(tenant_id: uuid.UUID, intent_id: uuid.UUID, ext: str) -> str:
+    """Staging key a presigned POST writes to. Verified bytes are then copied (If-Match on the
+    verified ETag) to the final key, which no presigned POST ever targets, so an uploader
+    cannot replace a file after it was checked."""
+    return f"{tenant_prefix(tenant_id)}uploads/{intent_id}/original.{ext}"
+
+
 def key_in_tenant(key: str, tenant_id: uuid.UUID) -> bool:
     return key.startswith(tenant_prefix(tenant_id)) and ".." not in key.split("/")
 
@@ -109,6 +133,10 @@ class ObjectStore(Protocol):
     def read_range(self, key: str, start: int, length: int) -> bytes: ...
 
     def iter_chunks(self, key: str, chunk_bytes: int = CHUNK_BYTES) -> Iterator[bytes]: ...
+
+    def open(self, key: str, chunk_bytes: int = CHUNK_BYTES) -> OpenedObject: ...
+
+    def copy(self, src: str, dst: str, *, if_match: str, content_type: str) -> None: ...
 
     def put(self, key: str, data: bytes, content_type: str) -> None: ...
 
@@ -231,6 +259,38 @@ class S3ObjectStore:
             yield from body.iter_chunks(chunk_bytes)
         finally:
             body.close()
+
+    def open(self, key: str, chunk_bytes: int = CHUNK_BYTES) -> OpenedObject:
+        try:
+            res = self._client.get_object(Bucket=self._bucket, Key=key)
+        except ClientError as exc:
+            raise ObjectStoreError("read_failed") from exc
+        body = res["Body"]
+
+        def chunks() -> Iterator[bytes]:
+            try:
+                yield from body.iter_chunks(chunk_bytes)
+            finally:
+                body.close()
+
+        return OpenedObject(etag=str(res["ETag"]), chunks=chunks())
+
+    def copy(self, src: str, dst: str, *, if_match: str, content_type: str) -> None:
+        try:
+            self._client.copy_object(
+                Bucket=self._bucket,
+                Key=dst,
+                CopySource={"Bucket": self._bucket, "Key": src},
+                CopySourceIfMatch=if_match,
+                MetadataDirective="REPLACE",
+                ContentType=content_type,
+                **self._sse_args(),  # type: ignore[arg-type]
+            )
+        except ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in ("PreconditionFailed", "412"):
+                raise ObjectChanged("source_changed") from exc
+            raise ObjectStoreError("copy_failed") from exc
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         try:

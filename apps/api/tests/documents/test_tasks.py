@@ -117,7 +117,7 @@ def test_FR_DOC_007_purge_task_removes_import_file_objects(
     doc = api.call(
         who, "POST", "/api/v1/documents", json={"upload_id": up["upload_id"], "title": "Admissions"}
     ).json()
-    key = up["fields"]["key"]
+    key = f"t/{world.a.tenant_id}/imports/{up['batch_id']}/raw.xlsx"
     assert key in store.objects
     assert api.call(who, "DELETE", f"/api/v1/documents/{doc['id']}").status_code == 204
     payload = _dispatch_payload(

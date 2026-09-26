@@ -104,8 +104,8 @@ def test_FR_DOC_001_upload_returns_a_constrained_presigned_post(world: Any, api:
     out = upload(api, who, data, send=False)
     policy = S.memory_store().posts[-1]
     tenant = world.a.tenant_id
-    assert policy["key"].startswith(f"t/{tenant}/docs/")
-    assert policy["key"].endswith("/v1/original.pdf")
+    # Staging key per upload; verified bytes are later copied to the final key.
+    assert policy["key"] == f"t/{tenant}/uploads/{out['upload_id']}/original.pdf"
     assert policy["content_type"] == PDF_CT
     assert policy["max"] == len(data)
     assert policy["ttl"] <= 600
@@ -164,10 +164,11 @@ def test_FR_IMP_import_files_use_the_imports_layout(world: Any, api: Any) -> Non
         api, who, data, purpose="import_file", filename="students.csv", content_type="text/csv"
     )
     assert out["batch_id"]
-    key = S.memory_store().posts[-1]["key"]
-    assert key == f"t/{world.a.tenant_id}/imports/{out['batch_id']}/raw.csv"
     res = register(api, who, out["upload_id"], title="Admissions list")
     assert res.status_code == 202, res.text
+    objects = S.memory_store().objects
+    assert f"t/{world.a.tenant_id}/imports/{out['batch_id']}/raw.csv" in objects
+    assert out["fields"]["key"] not in objects, "staging copy removed"
     body = res.json()
     assert (body["purpose"], body["doc_type"], body["sensitivity"]) == (
         "import_file",
@@ -574,7 +575,6 @@ def test_FR_DOC_006_new_versions_keep_history(world: Any, api: Any) -> None:
     doc = new_document(api, who)
     up = upload(api, who, S.pdf(), document_id=doc["id"])
     assert up["document_id"] == doc["id"]
-    assert S.memory_store().posts[-1]["key"].endswith(f"{doc['id']}/v2/original.pdf")
     res = api.call(
         who, "POST", f"/api/v1/documents/{doc['id']}/versions", json={"upload_id": up["upload_id"]}
     )
@@ -610,34 +610,78 @@ def test_FR_DOC_006_new_versions_keep_history(world: Any, api: Any) -> None:
     assert res.status_code == 422
 
 
-def test_FR_DOC_006_retried_version_upload_reuses_the_slot(world: Any, api: Any) -> None:
+def test_FR_DOC_006_concurrent_version_uploads_first_wins(world: Any, api: Any) -> None:
     who = world.person("office_admin")
     doc = new_document(api, who)
-    upload(api, who, S.pdf(), document_id=doc["id"], send=False)
-    retry = upload(api, who, S.pdf(), document_id=doc["id"])
+    upload(api, who, S.pdf(), document_id=doc["id"], send=False)  # abandoned attempt
+    mine = upload(api, who, S.pdf(), document_id=doc["id"])
+    theirs = upload(api, world.person("principal"), S.pdf(), document_id=doc["id"])
     res = api.call(
         who,
         "POST",
         f"/api/v1/documents/{doc['id']}/versions",
-        json={"upload_id": retry["upload_id"]},
+        json={"upload_id": mine["upload_id"]},
     )
     assert res.status_code == 202, res.text
-    # Someone else's live upload of the same version slot is a conflict.
-    upload(api, who, S.pdf(), document_id=doc["id"], send=False)
+    key = f"t/{world.a.tenant_id}/docs/{doc['id']}/v2/original.pdf"
+    assert key in S.memory_store().objects
     res = api.call(
         world.person("principal"),
         "POST",
-        "/api/v1/documents/uploads",
-        json={
-            "filename": "v.pdf",
-            "content_type": PDF_CT,
-            "size_bytes": 10,
-            "purpose": "circular",
-            "document_id": doc["id"],
-        },
+        f"/api/v1/documents/{doc['id']}/versions",
+        json={"upload_id": theirs["upload_id"]},
     )
     assert res.status_code == 409
-    assert res.json()["code"] == "upload_in_progress"
+    assert res.json()["code"] == "version_conflict"
+
+
+def test_SEC_016_reposting_after_registration_cannot_replace_the_checked_file(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    who = world.person("office_admin")
+    store = S.memory_store()
+    data = S.pdf()
+    up = upload(api, who, data)
+    doc = register(api, who, up["upload_id"]).json()
+    final = f"t/{world.a.tenant_id}/docs/{doc['id']}/v1/original.pdf"
+    assert store.objects[final].data == data
+    # The presigned POST is still valid for a few minutes: re-post different bytes.
+    evil = S.pdf(S.EICAR.decode())[: len(data)].ljust(len(data), b" ")
+    assert store.browser_post(up["fields"], evil, PDF_CT) == 204
+    assert store.objects[final].data == data, "the final key is not writable by the upload"
+    assert scan(world.a.tenant_id, doc) == "ready"
+    with tenant_session(world.a.tenant_id) as s:
+        obj = service.document_object(s, uuid.UUID(doc["id"]))
+        assert obj.object_key == final
+    # Daily purge removes the re-created staging object once the intent is old enough.
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE kb.upload_intents SET consumed_at = now() - interval '2 days' WHERE id = :i"
+            ),
+            {"i": up["upload_id"]},
+        )
+    service.purge_expired_uploads(world.a.tenant_id, store=store)
+    assert up["fields"]["key"] not in store.objects
+
+
+def test_SEC_016_file_swapped_during_checks_is_refused(world: Any, api: Any) -> None:
+    who = world.person("office_admin")
+    store = S.memory_store()
+    data = S.pdf()
+    up = upload(api, who, data)
+
+    def swap(src: str) -> None:
+        store.objects[src] = S.StoredObj(S.pdf("swapped")[: len(data)], PDF_CT)
+
+    store.before_copy = swap
+    try:
+        res = register(api, who, up["upload_id"])
+    finally:
+        store.before_copy = None
+    assert res.status_code == 409
+    assert res.json()["code"] == "upload_changed"
+    assert up["fields"]["key"] not in store.objects
 
 
 # --- scanning -------------------------------------------------------------------------------

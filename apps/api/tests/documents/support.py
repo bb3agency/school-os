@@ -23,7 +23,7 @@ from typing import Any
 from sqlalchemy import Engine, text
 
 from app.documents import storage
-from app.documents.storage import ObjectHead, PresignedPost
+from app.documents.storage import ObjectChanged, ObjectHead, OpenedObject, PresignedPost
 
 EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$" + b"EICAR-STANDARD-" + b"ANTIVIRUS-TEST-FILE!$H+H*"
 PNG_TRAILER = b"\x00\x00\x00\x00IEND\xae\x42\x60\x82"
@@ -103,6 +103,12 @@ class MemoryStore:
     posts: list[dict[str, Any]] = field(default_factory=list)
     gets: list[dict[str, Any]] = field(default_factory=list)
     kms_key_id: str | None = None
+    # Test hook: runs right before a conditional copy (simulates a concurrent re-upload).
+    before_copy: Any = None
+
+    @staticmethod
+    def etag_of(data: bytes) -> str:
+        return '"' + hashlib.md5(data, usedforsecurity=False).hexdigest() + '"'
 
     def presigned_post(
         self, *, key: str, content_type: str, max_bytes: int, expires_s: int
@@ -158,6 +164,19 @@ class MemoryStore:
         data = self.objects[key].data
         for i in range(0, len(data), chunk_bytes):
             yield data[i : i + chunk_bytes]
+
+    def open(self, key: str, chunk_bytes: int = storage.CHUNK_BYTES) -> OpenedObject:
+        data = self.objects[key].data
+        chunks = (data[i : i + chunk_bytes] for i in range(0, len(data), chunk_bytes))
+        return OpenedObject(etag=self.etag_of(data), chunks=chunks)
+
+    def copy(self, src: str, dst: str, *, if_match: str, content_type: str) -> None:
+        if self.before_copy is not None:
+            self.before_copy(src)
+        obj = self.objects[src]
+        if self.etag_of(obj.data) != if_match:
+            raise ObjectChanged("source_changed")
+        self.objects[dst] = StoredObj(obj.data, content_type)
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         self.objects[key] = StoredObj(data, content_type)
@@ -215,14 +234,7 @@ def make_intent(
                         {"d": document_id},
                     ).scalar_one()
                 )
-        if batch_id is not None:
-            key = f"t/{tenant_id}/imports/{batch_id}/raw.{ext}"
-        else:
-            key = f"t/{tenant_id}/docs/{doc_id}/v{version_no}/original.{ext}"
-        c.execute(
-            text("DELETE FROM kb.upload_intents WHERE object_key = :k AND consumed_at IS NULL"),
-            {"k": key},
-        )
+        key = f"t/{tenant_id}/uploads/{intent_id}/original.{ext}"
         now = dt.datetime.now(dt.UTC)
         c.execute(
             text(

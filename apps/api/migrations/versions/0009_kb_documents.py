@@ -6,7 +6,8 @@ Additions agreed for M1 (CONTRACT §8):
   the size limit, the allowed file kinds and the S3 layout (docs/04 §8.2); ``doc_type`` gains
   ``evidence`` and ``import_file``.
 - ``kb.upload_intents``: an object may only be registered if the API issued a presigned POST
-  for exactly that key, to that user, and it has not expired or been used (SEC-016).
+  for exactly that staging key, to that user, and it has not expired or been used (SEC-016).
+  Verified bytes are copied (If-Match on the verified ETag) to the final key.
 - Object keys must live under the tenant's own prefix ``t/<tenant_id>/`` (CHECK constraints).
 - If ``sis.attribute_values.evidence_document_id`` exists (0008_sis_students), its composite
   FK to ``kb.documents`` is added here (docs/05 §3.5: the FK comes with the referenced table).
@@ -42,11 +43,15 @@ MIME_TYPES = (
     "'application/vnd.openxmlformats-officedocument.wordprocessingml.document',"
     "'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','text/csv'"
 )
-# t/<tenant_id>/docs/<document_id>/v<n>/original.<ext> or t/<tenant_id>/imports/<batch_id>/raw.<ext>
+# Final keys: t/<tenant_id>/docs/<document_id>/v<n>/original.<ext> or
+# t/<tenant_id>/imports/<batch_id>/raw.<ext> (docs/04 §8.2).
 KEY_SHAPE = (
     r"^t/[0-9a-f-]{36}/(docs/[0-9a-f-]{36}/v[1-9][0-9]{0,5}/original"
     r"|imports/[0-9a-f-]{36}/raw)\.(pdf|jpg|png|docx|xlsx|csv)$"
 )
+# Staging keys written by presigned POSTs: t/<tenant_id>/uploads/<intent_id>/original.<ext>.
+# Verified bytes are copied to the final key, which no presigned POST can overwrite.
+UPLOAD_KEY_SHAPE = r"^t/[0-9a-f-]{36}/uploads/[0-9a-f-]{36}/original\.(pdf|jpg|png|docx|xlsx|csv)$"
 
 TABLES_SQL = rf"""
 CREATE TABLE kb.documents (
@@ -131,7 +136,7 @@ CREATE TABLE kb.upload_intents (
   document_id            uuid NOT NULL,
   version_no             int NOT NULL CHECK (version_no BETWEEN 1 AND 999999),
   batch_id               uuid,
-  object_key             text NOT NULL CHECK (object_key ~ '{KEY_SHAPE}'),
+  object_key             text NOT NULL CHECK (object_key ~ '{UPLOAD_KEY_SHAPE}'),
   declared_content_type  text NOT NULL CHECK (declared_content_type IN ({MIME_TYPES})),
   declared_size          bigint NOT NULL CHECK (declared_size > 0),
   max_bytes              bigint NOT NULL CHECK (max_bytes > 0),
@@ -147,12 +152,9 @@ CREATE TABLE kb.upload_intents (
   CONSTRAINT upload_intents_short_lived
     CHECK (expires_at > created_at AND expires_at <= created_at + interval '1 hour'),
   CONSTRAINT upload_intents_batch_only_for_imports
-    CHECK ((batch_id IS NOT NULL) = (purpose = 'import_file')),
-  CONSTRAINT upload_intents_imports_layout
-    CHECK ((purpose = 'import_file') = starts_with(object_key, 't/' || tenant_id::text || '/imports/'))
+    CHECK ((batch_id IS NOT NULL) = (purpose = 'import_file'))
 );
-CREATE INDEX upload_intents_expiry ON kb.upload_intents (tenant_id, expires_at)
-  WHERE consumed_at IS NULL;
+CREATE INDEX upload_intents_expiry ON kb.upload_intents (tenant_id, expires_at);
 """
 
 TENANT_TABLES = ("kb.documents", "kb.document_versions", "kb.document_acl", "kb.upload_intents")

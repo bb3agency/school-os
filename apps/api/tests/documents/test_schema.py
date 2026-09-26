@@ -49,10 +49,11 @@ def test_FR_DOC_003_object_keys_must_be_inside_the_tenant_prefix(
     owner = world.a.people["owner"]
     doc = uuid.uuid4()
     for key in (
-        f"t/{b}/docs/{doc}/v1/original.pdf",  # another school's prefix
-        f"t/{a}/../{b}/docs/{doc}/v1/original.pdf",  # traversal
-        f"docs/{doc}/v1/original.pdf",  # no tenant prefix at all
-        f"t/{a}/docs/{doc}/v1/original.exe",  # not an allowlisted extension
+        f"t/{b}/uploads/{doc}/original.pdf",  # another school's prefix
+        f"t/{a}/../{b}/uploads/{doc}/original.pdf",  # traversal
+        f"uploads/{doc}/original.pdf",  # no tenant prefix at all
+        f"t/{a}/uploads/{doc}/original.exe",  # not an allowlisted extension
+        f"t/{a}/docs/{doc}/v1/original.pdf",  # presigned POSTs never target final keys
     ):
         with (
             pytest.raises(IntegrityError),
@@ -68,7 +69,7 @@ def test_SEC_016_intents_are_short_lived_and_size_bounded(world: Any, app_engine
     a = world.a.tenant_id
     owner = world.a.people["owner"]
     doc = uuid.uuid4()
-    key = f"t/{a}/docs/{doc}/v1/original.pdf"
+    key = f"t/{a}/uploads/{uuid.uuid4()}/original.pdf"
     with (
         pytest.raises(IntegrityError, match="upload_intents_short_lived"),
         tenant_session(a, owner.user_id, engine=app_engine) as s,
@@ -167,3 +168,30 @@ def test_intent_expiry_column_is_timezone_aware(world: Any, admin_engine: Engine
         ).scalar_one()
     assert value.tzinfo is not None
     assert value > dt.datetime.now(dt.UTC)
+
+
+def test_FR_DOC_003_version_keys_must_be_inside_the_tenant_prefix(
+    world: Any, admin_engine: Engine, app_engine: Engine
+) -> None:
+    owner = world.a.people["owner"]
+    doc = S.make_document(admin_engine, world.a.tenant_id, owner.user_id)
+    foreign = f"t/{world.b.tenant_id}/docs/{doc}/v2/original.pdf"
+    with (
+        pytest.raises(IntegrityError, match="document_versions_key_in_tenant_prefix"),
+        tenant_session(world.a.tenant_id, owner.user_id, engine=app_engine) as s,
+    ):
+        s.execute(
+            text(
+                "INSERT INTO kb.document_versions (id, tenant_id, document_id, version_no, "
+                "object_key, sha256, mime_type, size_bytes, status, created_by) VALUES "
+                "(:v, :t, :d, 2, :k, :h, 'application/pdf', 10, 'queued', :u)"
+            ),
+            {
+                "v": uuid.uuid4(),
+                "t": world.a.tenant_id,
+                "d": doc,
+                "k": foreign,
+                "h": b"\x00" * 32,
+                "u": owner.user_id,
+            },
+        )

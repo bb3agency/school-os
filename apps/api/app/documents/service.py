@@ -8,12 +8,14 @@ row commits.
 
 Upload flow (docs/04 §8.2, docs/07 §10, SEC-016)::
 
-    create_upload()  -> kb.upload_intents row + presigned POST (exact key, Content-Type, size)
+    create_upload()  -> kb.upload_intents row + presigned POST (exact staging key
+                        t/<tenant>/uploads/<intent>/..., Content-Type, size)
     browser          -> POST file straight to S3
     register_document() / add_version()
                      -> intent checks (same user, unused, unexpired) -> HEAD (size) ->
-                        magic bytes / text sniffing -> streamed SHA-256 -> dedupe ->
-                        document + version (queued) + ACL -> audit -> outbox "scan"
+                        one GET: magic bytes / text sniffing, SHA-256, ETag -> dedupe ->
+                        copy to the final key only if the ETag is unchanged -> document +
+                        version (queued) + ACL -> audit -> outbox "scan"
     worker           -> scan_version(): AV scan -> ready | quarantined (+ audit)
 
 Visibility (docs/05 §6, fail closed): holders of ``document.manage_acl`` see every document;
@@ -69,6 +71,7 @@ from app.documents.schemas import (
     VersionOut,
 )
 from app.documents.storage import (
+    ObjectChanged,
     ObjectStore,
     ObjectStoreError,
     derived_key,
@@ -78,6 +81,7 @@ from app.documents.storage import (
     import_key,
     key_in_tenant,
     tenant_prefix,
+    upload_key,
 )
 from app.identity import service as identity
 from app.ops import service as ops
@@ -431,22 +435,19 @@ def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> Upl
             raise Conflict("Import files cannot get new versions.", code="not_versionable")
         document_id = doc.id
         version_no = repo.max_version_no(session, doc.id) + 1
-        key = document_key(tenant_id, document_id, version_no, kind.ext)
     else:
         document_id, version_no = new_id(), 1
         if data.purpose == "import_file":
             batch_id = new_id()
-            key = import_key(tenant_id, batch_id, kind.ext)
-        else:
-            key = document_key(tenant_id, document_id, version_no, kind.ext)
 
     now = _now()
     ttl = settings.documents_upload_url_ttl_s
+    intent_id = new_id()
+    key = upload_key(tenant_id, intent_id, kind.ext)
     with _db_errors():
-        _release_stale_intent(session, ctx, key, now)
         intent = repo.insert_intent(
             session,
-            id=new_id(),
+            id=intent_id,
             tenant_id=tenant_id,
             purpose=data.purpose,
             document_id=document_id,
@@ -476,22 +477,6 @@ def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> Upl
     )
 
 
-def _release_stale_intent(session: Session, ctx: UserContext, key: str, now: dt.datetime) -> None:
-    """A retried new-version upload reuses its key: drop the caller's own unused intent (or an
-    expired one); another person's live upload of the same version is a conflict."""
-    existing = repo.intent_by_key(session, key)
-    if existing is None:
-        return
-    if existing.consumed_at is None and (
-        existing.created_by == ctx.user_id or existing.expires_at < now
-    ):
-        repo.delete_intents(session, [existing.id])
-        return
-    raise Conflict(
-        "Someone else is uploading a new version of this document.", code="upload_in_progress"
-    )
-
-
 def _claim_intent(
     session: Session, ctx: UserContext, upload_id: uuid.UUID, *, document_id: uuid.UUID | None
 ) -> UploadIntent:
@@ -517,6 +502,7 @@ class _Verified:
     sha256: bytes
     size: int
     kind: FileKind
+    etag: str
 
 
 def _discard(store: ObjectStore, key: str) -> None:
@@ -541,11 +527,8 @@ def _reject(store: ObjectStore, intent: UploadIntent, code: str) -> UnsupportedF
     )
 
 
-def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
-    """HEAD, size, magic bytes (or CSV text), structural tail check and streamed SHA-256."""
-    kind = filetypes.kind_for_content_type(intent.declared_content_type)
-    if kind is None:  # pragma: no cover - CHECK constraint on the column
-        raise UnsupportedFileType()
+def _check_stored_head(store: ObjectStore, intent: UploadIntent) -> int:
+    """HEAD: the object exists, has the declared size within the limit, and is encrypted."""
     try:
         head = store.head(intent.object_key)
     except ObjectStoreError as exc:
@@ -564,31 +547,82 @@ def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
     if kms and head.sse != "aws:kms":
         _discard(store, intent.object_key)
         raise Conflict("The file was not stored encrypted. Upload it again.", code="not_encrypted")
+    return head.size
 
-    first = store.read_range(intent.object_key, 0, filetypes.HEAD_BYTES)
-    code = filetypes.check_head(kind, first)
-    if code is None and kind.key != "csv":
-        tail_start = max(0, head.size - filetypes.TAIL_BYTES)
-        code = filetypes.check_tail(
-            kind, store.read_range(intent.object_key, tail_start, head.size - tail_start)
-        )
-    if code is not None:
-        raise _reject(store, intent, code)
 
+def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
+    """HEAD, size, magic bytes (or CSV text), structural tail check and streamed SHA-256."""
+    kind = filetypes.kind_for_content_type(intent.declared_content_type)
+    if kind is None:  # pragma: no cover - CHECK constraint on the column
+        raise UnsupportedFileType()
+    size = _check_stored_head(store, intent)
+    # One GET: every check below runs on exactly the bytes whose ETag is then copied.
+    opened = store.open(intent.object_key)
     digest = hashlib.sha256()
     csv = filetypes.CsvChecker() if kind.key == "csv" else None
+    first = bytearray()
+    tail = b""
     total = 0
-    for chunk in store.iter_chunks(intent.object_key):
-        total += len(chunk)
-        if total > intent.max_bytes:
-            _discard(store, intent.object_key)
-            raise FileTooLarge("The uploaded file is larger than allowed.")
-        digest.update(chunk)
-        if csv is not None:
-            csv.feed(chunk)
-    if csv is not None and (csv_error := csv.finish()) is not None:
-        raise _reject(store, intent, csv_error)
-    return _Verified(digest.digest(), total, kind)
+    try:
+        for chunk in opened.chunks:
+            total += len(chunk)
+            if total > intent.max_bytes:
+                _discard(store, intent.object_key)
+                raise FileTooLarge("The uploaded file is larger than allowed.")
+            digest.update(chunk)
+            if len(first) < filetypes.HEAD_BYTES:
+                first += chunk[: filetypes.HEAD_BYTES - len(first)]
+            tail = (tail + chunk)[-filetypes.TAIL_BYTES :]
+            if csv is not None:
+                csv.feed(chunk)
+    finally:
+        opened.close()
+    if total != size:
+        _discard(store, intent.object_key)
+        raise _invalid("upload_id", "size_mismatch")
+    code = filetypes.check_head(kind, bytes(first))
+    if code is None and csv is None:
+        code = filetypes.check_tail(kind, tail)
+    if code is None and csv is not None:
+        code = csv.finish()
+    if code is not None:
+        raise _reject(store, intent, code)
+    return _Verified(digest.digest(), total, kind, opened.etag)
+
+
+def _final_key(intent: UploadIntent, kind: FileKind) -> str:
+    if intent.batch_id is not None:
+        return import_key(intent.tenant_id, intent.batch_id, kind.ext)
+    return document_key(intent.tenant_id, intent.document_id, intent.version_no, kind.ext)
+
+
+def _promote(store: ObjectStore, intent: UploadIntent, verified: _Verified) -> str:
+    """Copy the verified bytes to the final key (only if unchanged) and drop the staging copy."""
+    final = _final_key(intent, verified.kind)
+    try:
+        store.copy(
+            intent.object_key, final, if_match=verified.etag, content_type=verified.kind.mime
+        )
+    except ObjectChanged as exc:
+        _discard(store, intent.object_key)
+        raise Conflict(
+            "The file changed while it was being checked. Upload it again.", code="upload_changed"
+        ) from exc
+    except ObjectStoreError as exc:
+        raise Conflict(
+            "The file could not be stored. Try again.", code="storage_unavailable"
+        ) from exc
+    _discard(store, intent.object_key)
+    return final
+
+
+@contextmanager
+def _undo_object_on_error(store: ObjectStore, key: str) -> Iterator[None]:
+    try:
+        yield
+    except BaseException:
+        _discard(store, key)
+        raise
 
 
 def _check_duplicate(
@@ -636,10 +670,11 @@ def register_document(session: Session, ctx: UserContext, data: DocumentCreate) 
     store = get_object_store()
     verified = _verify_object(store, intent)
     _check_duplicate(session, ctx, store, intent, verified.sha256)
+    final_key = _promote(store, intent, verified)
 
     tenant_id = repo.current_tenant_id(session)
     version_id = new_id()
-    with _db_errors():
+    with _undo_object_on_error(store, final_key), _db_errors():
         doc = repo.insert_document(
             session,
             id=intent.document_id,
@@ -655,7 +690,14 @@ def register_document(session: Session, ctx: UserContext, data: DocumentCreate) 
             current_version_id=version_id,
             created_by=ctx.user_id,
         )
-        version = _insert_version(session, ctx, intent, version_id, verified)
+        version = _insert_version(
+            session,
+            ctx=ctx,
+            intent=intent,
+            version_id=version_id,
+            verified=verified,
+            object_key=final_key,
+        )
         repo.replace_acl(session, tenant_id, doc.id, acl)
         repo.consume_intent(session, intent.id, _now())
         _audit(
@@ -680,10 +722,12 @@ def register_document(session: Session, ctx: UserContext, data: DocumentCreate) 
 
 def _insert_version(
     session: Session,
+    *,
     ctx: UserContext,
     intent: UploadIntent,
     version_id: uuid.UUID,
     verified: _Verified,
+    object_key: str,
 ) -> DocumentVersion:
     return repo.insert_version(
         session,
@@ -691,7 +735,7 @@ def _insert_version(
         tenant_id=intent.tenant_id,
         document_id=intent.document_id,
         version_no=intent.version_no,
-        object_key=intent.object_key,
+        object_key=object_key,
         sha256=verified.sha256,
         mime_type=verified.kind.mime,
         size_bytes=verified.size,
@@ -721,9 +765,17 @@ def add_version(
     if latest is not None and latest.sha256 == verified.sha256:
         _discard(store, intent.object_key)
         raise Conflict("This file is the same as the current version.", code="version_unchanged")
+    final_key = _promote(store, intent, verified)
     version_id = new_id()
-    with _db_errors():
-        version = _insert_version(session, ctx, intent, version_id, verified)
+    with _undo_object_on_error(store, final_key), _db_errors():
+        version = _insert_version(
+            session,
+            ctx=ctx,
+            intent=intent,
+            version_id=version_id,
+            verified=verified,
+            object_key=final_key,
+        )
         updated = repo.update_document(
             session, doc.id, expected_version=None, current_version_id=version.id
         )
@@ -1010,9 +1062,14 @@ def purge_expired_uploads(tenant_id: uuid.UUID, *, store: ObjectStore | None = N
         for intent in stale:
             if key_in_tenant(intent.object_key, tenant_id):
                 _discard(store, intent.object_key)
-        repo.delete_intents(s, [i.id for i in stale])
+        # A presigned POST stays usable for a few minutes after registration: drop any staging
+        # object re-created meanwhile, then the used intent rows.
+        used = repo.consumed_intents_before(s, now - dt.timedelta(days=1), limit=500)
+        for intent in used:
+            if key_in_tenant(intent.object_key, tenant_id):
+                _discard(store, intent.object_key)
+        repo.delete_intents(s, [i.id for i in (*stale, *used)])
         purged = len(stale)
-        repo.purge_consumed_intents(s, now - dt.timedelta(days=7))
     return purged
 
 

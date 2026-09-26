@@ -126,6 +126,26 @@ def test_SEC_016_presigned_post_policy_is_enforced_by_the_store(s3_store: S3Obje
     assert b"".join(s3_store.iter_chunks(key, 7)) == data
 
 
+def test_SEC_016_conditional_copy_refuses_a_changed_source(s3_store: S3ObjectStore) -> None:
+    tenant, intent = uuid.uuid4(), uuid.uuid4()
+    staging = storage.upload_key(tenant, intent, "pdf")
+    final = storage.document_key(tenant, uuid.uuid4(), 1, "pdf")
+    data = S.pdf()
+    s3_store.put(staging, data, "application/octet-stream")
+    opened = s3_store.open(staging)
+    assert b"".join(opened.chunks) == data
+    s3_store.put(staging, S.pdf("swapped"), PDF_CT)  # replaced after it was read
+    with pytest.raises(storage.ObjectChanged):
+        s3_store.copy(staging, final, if_match=opened.etag, content_type=PDF_CT)
+    assert s3_store.head(final) is None
+    current = s3_store.open(staging)
+    current.close()
+    s3_store.copy(staging, final, if_match=current.etag, content_type=PDF_CT)
+    head = s3_store.head(final)
+    assert head is not None
+    assert head.content_type == PDF_CT
+
+
 def test_SEC_016_upload_url_lifetime_is_capped(s3_store: S3ObjectStore) -> None:
     with pytest.raises(ValueError, match="600"):
         s3_store.presigned_post(
