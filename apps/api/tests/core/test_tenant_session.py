@@ -7,9 +7,10 @@ import uuid
 from collections.abc import Iterator
 
 import pytest
-from app.core.db import context_free_session, tenant_session
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
+
+from app.core.db import context_free_session, tenant_session
 
 pytestmark = pytest.mark.db
 

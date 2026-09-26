@@ -10,9 +10,10 @@ import uuid
 from typing import Any
 
 import pytest
-from app.core.db import tenant_session
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError
+
+from app.core.db import tenant_session
 
 pytestmark = pytest.mark.db
 

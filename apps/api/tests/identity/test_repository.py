@@ -8,11 +8,12 @@ import uuid
 from collections.abc import Callable
 
 import pytest
+from sqlalchemy import Engine, text
+from sqlalchemy.exc import IntegrityError
+
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Forbidden, PreconditionFailed
 from app.identity import repository as repo
-from sqlalchemy import Engine, text
-from sqlalchemy.exc import IntegrityError
 
 pytestmark = pytest.mark.db
 

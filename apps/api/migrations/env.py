@@ -8,9 +8,10 @@ timeouts keep a migration from stalling production traffic.
 from __future__ import annotations
 
 from alembic import context
-from app.core.config import get_settings
 from sqlalchemy import create_engine, pool, text
 from sqlalchemy.engine import Connection
+
+from app.core.config import get_settings
 
 config = context.config
 

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from app.core.config import Environment, KeyWrapperKind, Settings
 from pydantic import SecretStr, ValidationError
+
+from app.core.config import Environment, KeyWrapperKind, Settings
 
 
 def test_local_defaults_are_allowed() -> None:

@@ -9,6 +9,7 @@ import uuid
 from collections.abc import Callable
 
 import pytest
+
 from app.core.db import tenant_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.tenancy import service

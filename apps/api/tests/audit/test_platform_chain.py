@@ -13,13 +13,14 @@ import uuid
 from typing import Any
 
 import pytest
-from app.audit.schemas import SummaryError
-from app.audit.service import record_platform, verify_platform_chain
-from app.core.db import platform_session, tenant_session
 from pydantic import ValidationError
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 from sqlalchemy.orm import Session
+
+from app.audit.schemas import SummaryError
+from app.audit.service import record_platform, verify_platform_chain
+from app.core.db import platform_session, tenant_session
 
 pytestmark = pytest.mark.db
 

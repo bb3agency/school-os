@@ -43,8 +43,11 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "N", "C4", "SIM", "RUF", "PT", "T2
 # N818: domain exception names are fixed by docs/13 §4 (NotFound, Forbidden, ...).
 ignore = ["PLR0913", "PLR2004", "N818"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["app", "sos_worker"]
+
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101", "S105", "S106", "S603", "S607", "S608", "PLR2004", "PLC0415", "N802"]
+"**/tests/**" = ["S311", "S101", "S105", "S106", "S603", "S607", "S608", "PLR2004", "PLC0415", "N802"]
 "apps/api/migrations/**" = ["E501"]
 
 [tool.mypy]

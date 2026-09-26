@@ -6,6 +6,8 @@ import datetime as dt
 import uuid
 
 import pytest
+from pydantic import ValidationError
+
 from app.tenancy.schemas import (
     AcademicYearCreate,
     AcademicYearUpdate,
@@ -15,7 +17,6 @@ from app.tenancy.schemas import (
     TenantProvisionIn,
 )
 from app.tenancy.service import default_class_catalog, suggested_section_names
-from pydantic import ValidationError
 
 
 def test_unknown_fields_are_forbidden() -> None:

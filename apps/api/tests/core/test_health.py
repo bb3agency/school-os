@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from app.core.health import PUBLIC_PATHS, get_checks
-from app.main import create_app
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+
+from app.core.health import PUBLIC_PATHS, get_checks
+from app.main import create_app
 
 DOC_PATHS = {"/api/v1/openapi.json", "/api/v1/docs", "/api/v1/docs/oauth2-redirect"}
 

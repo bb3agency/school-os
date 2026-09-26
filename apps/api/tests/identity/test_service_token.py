@@ -9,6 +9,9 @@ from typing import Any
 import jwt
 import pytest
 import redis
+from cryptography.hazmat.primitives.asymmetric import rsa
+from pydantic import SecretStr
+
 from app.core.config import Environment, Settings
 from app.core.errors import ServiceUnavailable, Unauthenticated
 from app.identity.service_token import (
@@ -23,8 +26,6 @@ from app.identity.service_token import (
     issue_service_token,
     verify_service_token,
 )
-from cryptography.hazmat.primitives.asymmetric import rsa
-from pydantic import SecretStr
 
 KEY = "synthetic-service-token-key-0123456789abcdef"
 OTHER_KEY = "another-synthetic-service-key-0123456789abcd"

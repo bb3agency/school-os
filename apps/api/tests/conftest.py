@@ -22,9 +22,10 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from app.core import db as core_db
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
+
+from app.core import db as core_db
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BOOTSTRAP_SQL = REPO_ROOT / "infra" / "db" / "bootstrap.sql"

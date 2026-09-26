@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import Engine, Table, inspect
+
 from app.core.model_base import Base
 from app.identity import models as identity_models
 from app.tenancy import models as tenancy_models
-from sqlalchemy import Engine, Table, inspect
 
 pytestmark = pytest.mark.db
 

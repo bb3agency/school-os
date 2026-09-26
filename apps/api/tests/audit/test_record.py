@@ -8,13 +8,14 @@ import uuid
 from collections.abc import Iterator
 
 import pytest
+from pydantic import ValidationError
+from sqlalchemy import Engine, text
+from sqlalchemy.exc import ProgrammingError
+
 from app.audit.hashing import chain_hash, tenant_event_dict
 from app.audit.schemas import ZERO_HASH, AuditEvent, SummaryError
 from app.audit.service import AuditContextError, record, verify_chain
 from app.core.db import context_free_session, tenant_session
-from pydantic import ValidationError
-from sqlalchemy import Engine, text
-from sqlalchemy.exc import ProgrammingError
 
 pytestmark = pytest.mark.db
 

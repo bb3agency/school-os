@@ -7,10 +7,11 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from app.audit.partitions import ensure_partitions, partition_upper_bound
-from app.core.db import context_free_session
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import ProgrammingError
+
+from app.audit.partitions import ensure_partitions, partition_upper_bound
+from app.core.db import context_free_session
 
 MIGRATION = Path(__file__).resolve().parents[2] / "migrations" / "versions" / "0002_audit.py"
 

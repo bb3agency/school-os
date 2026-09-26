@@ -8,11 +8,12 @@ from contextlib import AbstractContextManager, contextmanager
 from typing import Any
 
 import pytest
+from botocore.exceptions import ClientError
+from sqlalchemy import Connection, Engine, create_engine, text
+
 from app.audit.schemas import AuditEvent
 from app.audit.service import record
 from app.core.db import tenant_session
-from botocore.exceptions import ClientError
-from sqlalchemy import Connection, Engine, create_engine, text
 
 
 @pytest.fixture(scope="session")

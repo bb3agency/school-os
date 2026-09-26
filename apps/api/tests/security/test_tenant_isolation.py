@@ -6,8 +6,9 @@ New tables are covered automatically as migrations add them.
 from __future__ import annotations
 
 import pytest
-from app.core.db import context_free_session
 from sqlalchemy import Engine, text
+
+from app.core.db import context_free_session
 
 pytestmark = pytest.mark.db
 

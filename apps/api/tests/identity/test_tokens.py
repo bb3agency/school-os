@@ -18,6 +18,11 @@ from typing import Any
 import httpx
 import jwt
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from jwt.algorithms import ECAlgorithm, RSAAlgorithm
+from pydantic import SecretStr
+
 from app.core.config import Environment, KeyWrapperKind, Settings
 from app.core.errors import ServiceUnavailable, Unauthenticated
 from app.identity.tokens import (
@@ -29,10 +34,6 @@ from app.identity.tokens import (
     build_tenant_verifier,
     is_dev_issuer,
 )
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec, rsa
-from jwt.algorithms import ECAlgorithm, RSAAlgorithm
-from pydantic import SecretStr
 
 ISSUER = "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_SYNTHETIC"
 AUDIENCE = "synthclient0001"

@@ -11,18 +11,6 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
-from app.core.config import Settings
-from app.core.logging import bind_context, clear_context
-from app.core.redaction import verhoeff_check_digit
-from app.core.telemetry import (
-    ALLOWED_SPAN_ATTRIBUTES,
-    SanitizingSpanExporter,
-    add_span_exporter,
-    build_otlp_exporter,
-    sanitize_span,
-    setup_telemetry,
-)
-from app.main import create_app
 from celery import Celery
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -36,6 +24,19 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import SpanKind, Status, StatusCode
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
+
+from app.core.config import Settings
+from app.core.logging import bind_context, clear_context
+from app.core.redaction import verhoeff_check_digit
+from app.core.telemetry import (
+    ALLOWED_SPAN_ATTRIBUTES,
+    SanitizingSpanExporter,
+    add_span_exporter,
+    build_otlp_exporter,
+    sanitize_span,
+    setup_telemetry,
+)
+from app.main import create_app
 
 SYNTHETIC_NAME = "Kommineni Venkata Sai"
 SYNTHETIC_PHONE = "9876543210"

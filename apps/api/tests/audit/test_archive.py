@@ -17,6 +17,13 @@ from typing import Any
 import boto3
 import pytest
 import rfc8785
+from botocore.stub import ANY, Stubber
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
+from pydantic import SecretStr
+from sqlalchemy import text
+
 from app.audit.archive import (
     ArchiveChainError,
     ArchiveConflictError,
@@ -32,12 +39,6 @@ from app.audit.signing import (
     verify_signature,
 )
 from app.core.config import Environment, KeyWrapperKind, Settings
-from botocore.stub import ANY, Stubber
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
-from pydantic import SecretStr
-from sqlalchemy import text
 
 BUCKET = "sos-test-audit-archive"
 

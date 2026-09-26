@@ -9,6 +9,9 @@ from typing import Any
 
 import pytest
 from alembic import command
+from pydantic import SecretStr
+from sqlalchemy import create_engine, text
+
 from app.audit import tasks as audit_tasks
 from app.audit.signing import LocalDevSigner
 from app.audit.verify_all import (
@@ -18,8 +21,6 @@ from app.audit.verify_all import (
     verify_all,
 )
 from app.core.config import Environment, Settings
-from pydantic import SecretStr
-from sqlalchemy import create_engine, text
 
 pytestmark = pytest.mark.db
 

@@ -10,9 +10,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from app.core.db import context_free_session, platform_session, tenant_session
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
+
+from app.core.db import context_free_session, platform_session, tenant_session
 
 pytestmark = pytest.mark.db
 

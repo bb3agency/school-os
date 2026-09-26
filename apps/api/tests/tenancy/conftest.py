@@ -6,10 +6,11 @@ import uuid
 from collections.abc import Callable
 
 import pytest
-from app.core.config import Environment, KeyWrapperKind, Settings
-from app.core.crypto import LocalDevKeyWrapper
 from pydantic import SecretStr
 from sqlalchemy import Engine, text
+
+from app.core.config import Environment, KeyWrapperKind, Settings
+from app.core.crypto import LocalDevKeyWrapper
 
 MakeTenant = Callable[..., uuid.UUID]
 MakeMember = Callable[..., tuple[uuid.UUID, uuid.UUID]]

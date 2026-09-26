@@ -10,12 +10,13 @@ from collections.abc import Mapping
 from contextvars import Token
 from typing import Any
 
-from app.core.config import get_settings
-from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
-from app.core.telemetry import setup_telemetry
 from celery import Celery, Task, signals
 from celery.schedules import crontab
 from kombu import Queue
+
+from app.core.config import get_settings
+from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
+from app.core.telemetry import setup_telemetry
 
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
 

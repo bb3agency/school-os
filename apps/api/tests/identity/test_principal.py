@@ -16,6 +16,11 @@ from uuid import UUID
 import httpx
 import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
+from jwt.algorithms import RSAAlgorithm
+
 from app.core.errors import StepUpRequired, install_error_handlers
 from app.identity.principal import (
     Principal,
@@ -36,10 +41,6 @@ from app.identity.tokens import (
     get_platform_token_verifier,
     get_tenant_token_verifier,
 )
-from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
-from jwt.algorithms import RSAAlgorithm
 
 TENANT_ISSUER = "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_SYNTHUSERS"
 PLATFORM_ISSUER = "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_SYNTHOPS"

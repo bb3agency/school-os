@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from app.core.errors import NotFound, StepUpRequired, install_error_handlers
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+
+from app.core.errors import NotFound, StepUpRequired, install_error_handlers
 
 
 class Payload(BaseModel):

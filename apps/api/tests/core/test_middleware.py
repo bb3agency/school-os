@@ -15,6 +15,10 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from fastapi import Depends, FastAPI, Request
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
 from app.core.config import Settings
 from app.core.errors import NotFound, install_error_handlers
 from app.core.logging import bind_context, setup_logging
@@ -27,9 +31,6 @@ from app.core.middleware import (
     new_request_id,
 )
 from app.main import create_app
-from fastapi import Depends, FastAPI, Request
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
 
 SYNTHETIC_NAME = "Kommineni Venkata Sai"
 SYNTHETIC_TELUGU_NAME = "వెంకట సాయి"

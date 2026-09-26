@@ -10,9 +10,10 @@ import uuid
 from collections.abc import Callable
 
 import pytest
-from app.core.db import tenant_session
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
+
+from app.core.db import tenant_session
 
 pytestmark = pytest.mark.db
 

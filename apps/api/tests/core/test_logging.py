@@ -14,6 +14,9 @@ from datetime import datetime
 from typing import Any
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from pydantic import SecretStr
+
 from app.core import logging as core_logging
 from app.core.config import Environment, Settings
 from app.core.logging import (
@@ -29,8 +32,6 @@ from app.core.logging import (
     setup_logging,
 )
 from app.core.redaction import verhoeff_check_digit
-from opentelemetry.sdk.trace import TracerProvider
-from pydantic import SecretStr
 
 SYNTHETIC_NAME = "Kommineni Venkata Sai"
 SYNTHETIC_TELUGU_NAME = "వెంకట సాయి"

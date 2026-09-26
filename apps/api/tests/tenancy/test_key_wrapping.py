@@ -10,6 +10,9 @@ from typing import Any
 
 import boto3
 import pytest
+from botocore.stub import Stubber
+from pydantic import SecretStr
+
 from app.core.config import Environment, KeyWrapperKind, Settings
 from app.core.crypto import (
     CIPHERTEXT_VERSION,
@@ -24,8 +27,6 @@ from app.core.crypto import (
     generate_tenant_keys,
     get_key_wrapper,
 )
-from botocore.stub import Stubber
-from pydantic import SecretStr
 
 MASTER = SecretStr("synthetic-local-dev-master-key-for-tests-0123456789")
 

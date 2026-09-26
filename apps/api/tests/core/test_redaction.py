@@ -11,6 +11,9 @@ import re
 import unicodedata
 
 import pytest
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
+
 from app.core.redaction import (
     contains_full_aadhaar,
     mask_aadhaar,
@@ -18,8 +21,6 @@ from app.core.redaction import (
     verhoeff_check_digit,
     verhoeff_valid,
 )
-from hypothesis import assume, given, settings
-from hypothesis import strategies as st
 
 TELUGU_DIGITS = str.maketrans("0123456789", "౦౧౨౩౪౫౬౭౮౯")
 DEVANAGARI_DIGITS = str.maketrans("0123456789", "०१२३४५६७८९")
@@ -40,7 +41,7 @@ def make_invalid(number: str) -> str:
     return number[:-1] + str((last + 1) % 10)
 
 
-RNG = random.Random(20260926)  # noqa: S311 (deterministic synthetic fixtures, not crypto)
+RNG = random.Random(20260926)
 VALID = generate_valid_aadhaar_like(RNG)
 VALID_2 = generate_valid_aadhaar_like(RNG)
 INVALID = make_invalid(VALID)
@@ -82,7 +83,7 @@ def test_PRV_015_verhoeff_accepts_telugu_digits() -> None:
 
 
 def test_PRV_015_helper_generates_valid_numbers() -> None:
-    rng = random.Random(1)  # noqa: S311 (synthetic test data)
+    rng = random.Random(1)
     for _ in range(50):
         n = generate_valid_aadhaar_like(rng)
         assert len(n) == 12

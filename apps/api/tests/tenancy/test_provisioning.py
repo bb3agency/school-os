@@ -6,14 +6,15 @@ import uuid
 from collections.abc import Callable, Iterator
 
 import pytest
+from sqlalchemy import Engine, text
+from sqlalchemy.orm import Session
+
 from app.core.crypto import LocalDevKeyWrapper
 from app.core.db import context_free_session, platform_session, tenant_session
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.tenancy import repository as repo
 from app.tenancy import service
 from app.tenancy.schemas import TenantProvisionIn
-from sqlalchemy import Engine, text
-from sqlalchemy.orm import Session
 
 pytestmark = pytest.mark.db
 

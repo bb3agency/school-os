@@ -9,9 +9,10 @@ import uuid
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
+from pydantic import ValidationError
+
 from app.audit.hashing import canonical_bytes, chain_hash, format_timestamp, tenant_event_dict
 from app.audit.schemas import ZERO_HASH, AuditEventInput, SummaryError, sanitize_summary
-from pydantic import ValidationError
 
 # ---- summary validation ------------------------------------------------------------------------
 

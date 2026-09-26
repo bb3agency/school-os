@@ -13,11 +13,12 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 
 import pytest
+from sqlalchemy import Connection, text
+
 from app.audit.hashing import chain_hash, tenant_event_dict
 from app.audit.schemas import ZERO_HASH, VerifyResult
 from app.audit.service import verify_chain
 from app.core.db import tenant_session
-from sqlalchemy import Connection, text
 
 pytestmark = pytest.mark.db
 
