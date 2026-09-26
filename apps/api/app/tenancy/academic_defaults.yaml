@@ -1,0 +1,22 @@
+# Default class catalogue offered when a school sets up its structure (US-202 AC1, FR-TEN-010).
+# Versioned configuration (CLAUDE.md §6.13). Schools may rename, reorder or add classes later.
+# Shipped inside the package so it is present in the API image.
+version: 1
+classes:
+  - {code: NUR,  display_en: Nursery,    display_te: "నర్సరీ",        sort_order: 10}
+  - {code: LKG,  display_en: LKG,        display_te: "ఎల్‌కేజీ",       sort_order: 20}
+  - {code: UKG,  display_en: UKG,        display_te: "యూకేజీ",        sort_order: 30}
+  - {code: I,    display_en: Class I,    display_te: "1వ తరగతి",      sort_order: 40}
+  - {code: II,   display_en: Class II,   display_te: "2వ తరగతి",      sort_order: 50}
+  - {code: III,  display_en: Class III,  display_te: "3వ తరగతి",      sort_order: 60}
+  - {code: IV,   display_en: Class IV,   display_te: "4వ తరగతి",      sort_order: 70}
+  - {code: V,    display_en: Class V,    display_te: "5వ తరగతి",      sort_order: 80}
+  - {code: VI,   display_en: Class VI,   display_te: "6వ తరగతి",      sort_order: 90}
+  - {code: VII,  display_en: Class VII,  display_te: "7వ తరగతి",      sort_order: 100}
+  - {code: VIII, display_en: Class VIII, display_te: "8వ తరగతి",      sort_order: 110}
+  - {code: IX,   display_en: Class IX,   display_te: "9వ తరగతి",      sort_order: 120}
+  - {code: X,    display_en: Class X,    display_te: "10వ తరగతి",     sort_order: 130}
+  - {code: XI,   display_en: Class XI,   display_te: "11వ తరగతి",     sort_order: 140}
+  - {code: XII,  display_en: Class XII,  display_te: "12వ తరగతి",     sort_order: 150}
+# Suggested section names for the setup wizard.
+section_names: [A, B, C, D]

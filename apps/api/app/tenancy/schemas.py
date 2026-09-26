@@ -1,0 +1,209 @@
+"""Pydantic v2 IO models for tenancy (FR-TEN-003, FR-TEN-010).
+
+Inputs forbid unknown fields and NFC-normalise + trim text before validation (docs/05 §1).
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import unicodedata
+import uuid
+from typing import Annotated, Any, Literal, Self
+
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+
+
+def nfc(value: Any) -> Any:
+    """NFC-normalise and trim strings; leave other types for the type validator to reject."""
+    if isinstance(value, str):
+        return unicodedata.normalize("NFC", value).strip()
+    return value
+
+
+_NO_CONTROL = r"^[^\x00-\x1f\x7f]+$"
+
+NfcName = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL)
+]
+NfcLabel = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(min_length=1, max_length=100, pattern=_NO_CONTROL)
+]
+SectionName = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(min_length=1, max_length=16, pattern=_NO_CONTROL)
+]
+TenantCode = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(pattern=r"^[a-z][a-z0-9-]{1,31}$")
+]
+BoardCode = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(pattern=r"^[A-Z][A-Z0-9_]{1,15}$")
+]
+ClassCode = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(pattern=r"^[A-Z0-9][A-Z0-9_-]{0,15}$")
+]
+YearLabel = Annotated[str, BeforeValidator(nfc), StringConstraints(pattern=r"^\d{4}-\d{2}$")]
+SortOrder = Annotated[int, Field(ge=0, le=10000)]
+
+TenantStatus = Literal["provisioning", "active", "suspended", "offboarding", "deleted"]
+Tier = Literal["shared", "dedicated"]
+
+
+class _In(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class _Out(BaseModel):
+    model_config = ConfigDict(from_attributes=True, frozen=True)
+
+
+# --- tenants -------------------------------------------------------------------------------
+
+
+class TenantProvisionIn(_In):
+    code: TenantCode
+    name: NfcName
+    boards: list[BoardCode] = Field(default_factory=list, max_length=8)
+    plan_tier: Tier = "shared"
+    deployment_mode: Tier = "shared"
+
+    @field_validator("boards")
+    @classmethod
+    def _unique_boards(cls, boards: list[str]) -> list[str]:
+        if len(set(boards)) != len(boards):
+            raise ValueError("boards must be unique")
+        return boards
+
+
+class TenantProvisioned(_Out):
+    tenant_id: uuid.UUID
+    code: str
+    status: TenantStatus
+    key_version: int
+    key_id: str
+
+
+class TenantStatusChange(_Out):
+    tenant_id: uuid.UUID
+    previous: TenantStatus
+    current: TenantStatus
+
+
+class TenantUsage(_Out):
+    """Counts only (never personal data) for the control plane."""
+
+    active_memberships: int
+    users: int
+    sections: int
+    academic_years: int
+
+
+# --- academic years ------------------------------------------------------------------------
+
+
+def _check_year(label: str | None, starts_on: dt.date | None, ends_on: dt.date | None) -> None:
+    if starts_on is not None and ends_on is not None and not starts_on < ends_on:
+        raise ValueError("starts_on must be before ends_on")
+    if label is not None:
+        first, second = int(label[:4]), int(label[5:])
+        if second != (first + 1) % 100:
+            raise ValueError("label must name consecutive years, e.g. 2026-27")
+        if starts_on is not None and starts_on.year != first:
+            raise ValueError("label must start with the year of starts_on")
+
+
+class AcademicYearCreate(_In):
+    label: YearLabel
+    starts_on: dt.date
+    ends_on: dt.date
+    is_current: bool = False
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        _check_year(self.label, self.starts_on, self.ends_on)
+        return self
+
+
+class AcademicYearUpdate(_In):
+    label: YearLabel | None = None
+    starts_on: dt.date | None = None
+    ends_on: dt.date | None = None
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        _check_year(self.label, self.starts_on, self.ends_on)
+        return self
+
+
+class AcademicYearOut(_Out):
+    id: uuid.UUID
+    label: str
+    starts_on: dt.date
+    ends_on: dt.date
+    is_current: bool
+    version: int
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+# --- classes -------------------------------------------------------------------------------
+
+
+class ClassCreate(_In):
+    code: ClassCode
+    display_en: NfcLabel
+    display_te: NfcLabel
+    sort_order: SortOrder
+
+
+class ClassUpdate(_In):
+    """The code is immutable (exports and registers refer to it)."""
+
+    display_en: NfcLabel | None = None
+    display_te: NfcLabel | None = None
+    sort_order: SortOrder | None = None
+
+
+class ClassOut(_Out):
+    id: uuid.UUID
+    code: str
+    display_en: str
+    display_te: str
+    sort_order: int
+    version: int
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+# --- sections ------------------------------------------------------------------------------
+
+
+class SectionCreate(_In):
+    academic_year_id: uuid.UUID
+    class_id: uuid.UUID
+    name: SectionName
+    class_teacher_membership_id: uuid.UUID | None = None
+
+
+class SectionUpdate(_In):
+    """Omit a field to keep it; send ``class_teacher_membership_id: null`` to clear it."""
+
+    name: SectionName | None = None
+    class_teacher_membership_id: uuid.UUID | None = None
+
+
+class SectionOut(_Out):
+    id: uuid.UUID
+    academic_year_id: uuid.UUID
+    class_id: uuid.UUID
+    name: str
+    class_teacher_membership_id: uuid.UUID | None
+    version: int
+    created_at: dt.datetime
+    updated_at: dt.datetime
