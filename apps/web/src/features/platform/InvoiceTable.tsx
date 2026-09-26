@@ -86,7 +86,9 @@ export function InvoiceTable({
               schema={z.object({})}
               invalidate={INVALIDATE}
               submit={() =>
-                unwrap(api.POST("/api/v1/platform/invoices/{invoice_id}/issue", { params: { path } }))
+                unwrap(
+                  api.POST("/api/v1/platform/invoices/{invoice_id}/issue", { params: { path } }),
+                )
               }
             />
             <ActionDialog
@@ -218,7 +220,13 @@ export function InvoiceTable({
   const columns: Column<Invoice>[] = [
     { key: "number", header: t("colNumber"), cell: (row) => <InvoiceNumber invoice={row} /> },
     ...(schoolName
-      ? [{ key: "school", header: t("colSchool"), cell: (row: Invoice) => schoolName(row.tenant_id) }]
+      ? [
+          {
+            key: "school",
+            header: t("colSchool"),
+            cell: (row: Invoice) => schoolName(row.tenant_id),
+          },
+        ]
       : []),
     {
       key: "period",
@@ -246,9 +254,7 @@ export function InvoiceTable({
       header: t("colGst"),
       className: "text-right tabular-nums",
       cell: (row) =>
-        money(
-          (Number(row.cgst_inr) + Number(row.sgst_inr) + Number(row.igst_inr)).toFixed(2),
-        ),
+        money((Number(row.cgst_inr) + Number(row.sgst_inr) + Number(row.igst_inr)).toFixed(2)),
     },
     {
       key: "total",

@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  TICKET_CATEGORIES,
-  TICKET_PRIORITIES,
-  type SupportTicket,
-} from "@schoolos/api-client";
+import { TICKET_CATEGORIES, TICKET_PRIORITIES, type SupportTicket } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { z } from "zod";
@@ -223,7 +219,11 @@ export function SupportTicketScreen({ ticketId }: { ticketId: string }) {
       <Card title={t("thread")}>
         <TicketThread ticket={data} />
         {data.status !== "closed" ? (
-          <form noValidate onSubmit={reply.onSubmit} className="mt-6 space-y-3 border-t border-border pt-4">
+          <form
+            noValidate
+            onSubmit={reply.onSubmit}
+            className="mt-6 space-y-3 border-t border-border pt-4"
+          >
             <TextAreaField
               name="body"
               label={t("reply")}

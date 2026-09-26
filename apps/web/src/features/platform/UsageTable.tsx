@@ -21,10 +21,25 @@ export function UsageTable({
   const num = "text-right tabular-nums";
   const columns: Column<UsageDaily>[] = [
     ...(schoolName
-      ? [{ key: "school", header: t("colSchool"), cell: (row: UsageDaily) => schoolName(row.tenant_id) }]
+      ? [
+          {
+            key: "school",
+            header: t("colSchool"),
+            cell: (row: UsageDaily) => schoolName(row.tenant_id),
+          },
+        ]
       : []),
-    { key: "date", header: t("colDate"), cell: (row) => <Value>{formatDate(row.usage_date)}</Value> },
-    { key: "users", header: t("colActiveUsers"), className: num, cell: (row) => n(row.active_users) },
+    {
+      key: "date",
+      header: t("colDate"),
+      cell: (row) => <Value>{formatDate(row.usage_date)}</Value>,
+    },
+    {
+      key: "users",
+      header: t("colActiveUsers"),
+      className: num,
+      cell: (row) => n(row.active_users),
+    },
     { key: "staff", header: t("colStaffUsers"), className: num, cell: (row) => n(row.staff_users) },
     {
       key: "students",

@@ -67,6 +67,14 @@ export function ProvisionSchoolForm() {
       setDone(result);
       setSecretShown(Boolean(result.heartbeat_key));
     },
+    // After a failed submit (client or server), go to the first step with an error.
+    onInvalid: (fields) => {
+      const target = firstStepWith(fields);
+      if (!target) return;
+      hasNavigated.current = true;
+      setStepIndex(PROVISION_STEPS.indexOf(target));
+      requestAnimationFrame(() => summaryRef.current?.focus());
+    },
   });
 
   const errors = { ...form.errors, ...stepOnlyErrors };
@@ -76,16 +84,6 @@ export function ProvisionSchoolForm() {
   useEffect(() => {
     if (hasNavigated.current) stepHeadingRef.current?.focus();
   }, [stepIndex]);
-
-  // After a failed submit (client or server), jump to the first step with an error.
-  useEffect(() => {
-    const target = firstStepWith(Object.keys(form.errors));
-    if (target) {
-      hasNavigated.current = true;
-      setStepIndex(PROVISION_STEPS.indexOf(target));
-      requestAnimationFrame(() => summaryRef.current?.focus());
-    }
-  }, [form.errors]);
 
   function goTo(index: number) {
     hasNavigated.current = true;
@@ -244,7 +242,11 @@ export function ProvisionSchoolForm() {
           <p className="text-sm text-ink-muted">
             {t("stepOf", { current: stepIndex + 1, total: PROVISION_STEPS.length })}
           </p>
-          <h2 ref={stepHeadingRef} tabIndex={-1} className="text-xl font-semibold focus:outline-none">
+          <h2
+            ref={stepHeadingRef}
+            tabIndex={-1}
+            className="text-xl font-semibold focus:outline-none"
+          >
             {stepLabels[step]}
           </h2>
         </div>
@@ -288,7 +290,10 @@ export function ProvisionSchoolForm() {
           >
             <legend className="text-sm font-semibold">{t("fields.deploymentMode")}</legend>
             {(["shared", "dedicated"] as const).map((mode) => (
-              <div key={mode} className="flex items-start gap-3 rounded-md border border-border p-3">
+              <div
+                key={mode}
+                className="flex items-start gap-3 rounded-md border border-border p-3"
+              >
                 <input
                   type="radio"
                   id={mode === "shared" ? fieldId("tier") : `${fieldId("tier")}-${mode}`}

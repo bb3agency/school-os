@@ -38,8 +38,7 @@ export function SubscriptionActions({
   const path = { sub_id: subscription.id };
   const current = plans.find((plan) => plan.id === subscription.plan_id);
   const choices = plans.filter(
-    (plan) =>
-      plan.status === "published" && (!current || plan.tier === current.tier),
+    (plan) => plan.status === "published" && (!current || plan.tier === current.tier),
   );
   const status = subscription.status;
 

@@ -103,7 +103,12 @@ export function DashboardView({
       ? t("versionsHint", { count: Object.keys(kpis.fleet_versions).length })
       : undefined,
   );
-  add("ai", kpis?.ai_spend_mtd_inr != null, t("aiSpend"), formatInr(kpis?.ai_spend_mtd_inr, locale));
+  add(
+    "ai",
+    kpis?.ai_spend_mtd_inr != null,
+    t("aiSpend"),
+    formatInr(kpis?.ai_spend_mtd_inr, locale),
+  );
   add(
     "tickets",
     tickets != null,

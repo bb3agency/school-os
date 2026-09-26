@@ -17,7 +17,14 @@ import { BILLING_FIELDS, billingShape, checkBilling, toBillingAccount } from "./
  * field errors land on the right input. Messages are keys under `validation.*`.
  */
 
-export const PROVISION_STEPS = ["school", "deployment", "owner", "plan", "billing", "review"] as const;
+export const PROVISION_STEPS = [
+  "school",
+  "deployment",
+  "owner",
+  "plan",
+  "billing",
+  "review",
+] as const;
 export type ProvisionStep = (typeof PROVISION_STEPS)[number];
 
 const BA = "billing_account.";
@@ -104,29 +111,27 @@ export const provisionSchema = base
       ctx.addIssue({ code: "custom", path: ["override_reason"], message: "reasonTooShort" });
     }
   })
-  .transform(
-    (value): ProvisionRequest => ({
-      code: value.code,
-      school_name: value.school_name,
-      boards: value.boards,
-      tier: value.tier,
-      custom_domain: value.custom_domain,
-      plan_id: value.plan_id,
-      start_as: value.start_as,
-      price_override_inr: value.price_override_inr,
-      override_reason: value.override_reason,
-      owner:
-        value["owner.display_name"] !== "" && value["owner.idp_subject"] !== ""
-          ? {
-              display_name: value["owner.display_name"],
-              email: value["owner.email"],
-              idp_subject: value["owner.idp_subject"],
-              language: value["owner.language"],
-            }
-          : null,
-      billing_account: toBillingAccount(BA, value),
-    }),
-  );
+  .transform((value): ProvisionRequest => ({
+    code: value.code,
+    school_name: value.school_name,
+    boards: value.boards,
+    tier: value.tier,
+    custom_domain: value.custom_domain,
+    plan_id: value.plan_id,
+    start_as: value.start_as,
+    price_override_inr: value.price_override_inr,
+    override_reason: value.override_reason,
+    owner:
+      value["owner.display_name"] !== "" && value["owner.idp_subject"] !== ""
+        ? {
+            display_name: value["owner.display_name"],
+            email: value["owner.email"],
+            idp_subject: value["owner.idp_subject"],
+            language: value["owner.language"],
+          }
+        : null,
+    billing_account: toBillingAccount(BA, value),
+  }));
 
 /** Client errors of one step only (per-step "Next"). */
 export function stepErrors(

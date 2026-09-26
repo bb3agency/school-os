@@ -25,7 +25,11 @@ export function MinimalShell({
           <LanguageSwitcher />
         </div>
       </header>
-      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 p-6 focus:outline-none">
+      <main
+        id="main"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-3xl flex-1 p-6 focus:outline-none"
+      >
         {children}
       </main>
     </div>

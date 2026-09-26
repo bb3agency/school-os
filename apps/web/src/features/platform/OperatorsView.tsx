@@ -35,25 +35,37 @@ const inviteSchema = z.object({
 const rolesSchema = z.object({ roles });
 const extraRoles = (form: HTMLFormElement) => ({ roles: formList(form, "roles") });
 
-function RoleCheckboxes({ error, selected = [] }: { error?: string | undefined; selected?: readonly PlatformRole[] }) {
+function RoleCheckboxes({
+  error,
+  selected = [],
+}: {
+  error?: string | undefined;
+  selected?: readonly PlatformRole[];
+}) {
   const t = useTranslations("platform.operators");
   return (
     <fieldset className="space-y-2" aria-describedby={error ? "operator-roles-error" : undefined}>
       <legend className="text-sm font-semibold">{t("colRoles")}</legend>
       {PLATFORM_ROLES.map((role) => (
-        <label key={role} className="flex items-start gap-2 text-sm">
+        <div key={role} className="flex items-start gap-2 text-sm">
           <input
+            id={`operator-role-${role}`}
             type="checkbox"
             name="roles"
             value={role}
             defaultChecked={selected.includes(role)}
+            aria-describedby={`operator-role-${role}-hint`}
             className="mt-1 size-4 accent-primary"
           />
-          <span>
-            <span className="font-semibold">{t(`roles.${role}`)}</span>
-            <span className="block text-ink-muted">{t(`roleHints.${role}`)}</span>
-          </span>
-        </label>
+          <div>
+            <label htmlFor={`operator-role-${role}`} className="font-semibold">
+              {t(`roles.${role}`)}
+            </label>
+            <p id={`operator-role-${role}-hint`} className="text-ink-muted">
+              {t(`roleHints.${role}`)}
+            </p>
+          </div>
+        </div>
       ))}
       {error ? (
         <p id="operator-roles-error" className="text-sm font-semibold text-danger">
@@ -72,9 +84,11 @@ export function OperatorsScreen() {
   const locale = useLocale();
   const api = useBffClient("operator");
   const me = useOperatorMe();
-  const operators = useApiQuery([...PK.operators, "list"], async () =>
-    (await unwrap(api.GET("/api/v1/platform/operators", { params: { query: { limit: 200 } } })))
-      .data,
+  const operators = useApiQuery(
+    [...PK.operators, "list"],
+    async () =>
+      (await unwrap(api.GET("/api/v1/platform/operators", { params: { query: { limit: 200 } } })))
+        .data,
   );
 
   const columns: Column<Operator>[] = [
@@ -203,8 +217,19 @@ export function OperatorsScreen() {
           >
             {(errors) => (
               <>
-                <TextField name="display_name" label={t("inviteName")} error={errors.display_name} autoComplete="off" />
-                <TextField name="email" type="email" label={t("inviteEmail")} error={errors.email} autoComplete="off" />
+                <TextField
+                  name="display_name"
+                  label={t("inviteName")}
+                  error={errors.display_name}
+                  autoComplete="off"
+                />
+                <TextField
+                  name="email"
+                  type="email"
+                  label={t("inviteEmail")}
+                  error={errors.email}
+                  autoComplete="off"
+                />
                 <TextField
                   name="idp_subject"
                   label={t("inviteSubject")}

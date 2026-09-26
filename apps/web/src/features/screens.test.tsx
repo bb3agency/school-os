@@ -87,7 +87,8 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
 
   it("structure: 'not found' for 404, 'not available' for 501 and a plain error for 500", async () => {
     routes["/bff/api/v1/academic-years"] = () => page([YEAR]);
-    routes["/bff/api/v1/classes"] = () => Response.json({ code: "not_implemented" }, { status: 501 });
+    routes["/bff/api/v1/classes"] = () =>
+      Response.json({ code: "not_implemented" }, { status: 501 });
     routes["/bff/api/v1/sections"] = () =>
       Response.json({ code: "internal_error" }, { status: 500 });
     renderWithIntl(<StructureScreen />, "te");
@@ -270,10 +271,17 @@ describe("platform screens wired to the BFF (FR-PLT-001)", () => {
       <SchoolsScreen filters={{ q: " saraswati ", status: "active", pastDue: true }} />,
     );
     const link = await screen.findByRole("link", { name: "Sri Saraswati High School" });
-    expect(link).toHaveAttribute("href", "/en/platform/schools/0192f3a4-0000-7000-8000-000000000001");
-    expect(within(screen.getByRole("table")).getByText(messages.en.status.subscription.past_due)).toBeInTheDocument();
+    expect(link).toHaveAttribute(
+      "href",
+      "/en/platform/schools/0192f3a4-0000-7000-8000-000000000001",
+    );
+    expect(
+      within(screen.getByRole("table")).getByText(messages.en.status.subscription.past_due),
+    ).toBeInTheDocument();
     expect(screen.getByText(messages.en.status.deployment.unreachable)).toBeInTheDocument();
-    const url = seen.find((u) => u.pathname === "/bff/api/v1/platform/tenants" && u.searchParams.has("q"));
+    const url = seen.find(
+      (u) => u.pathname === "/bff/api/v1/platform/tenants" && u.searchParams.has("q"),
+    );
     expect(url?.searchParams.get("q")).toBe("saraswati");
     expect(url?.searchParams.get("status")).toBe("active");
     expect(url?.searchParams.get("past_due")).toBe("true");

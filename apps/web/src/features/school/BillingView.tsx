@@ -167,7 +167,9 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
         <Card
           title={t("usageTitle")}
           description={
-            plan?.usage_date ? t("usageAsOf", { date: formatDate(plan.usage_date) ?? "" }) : undefined
+            plan?.usage_date
+              ? t("usageAsOf", { date: formatDate(plan.usage_date) ?? "" })
+              : undefined
           }
         >
           {billing.status === "loading" ? <LoadingState label={tc("loading")} /> : null}
@@ -207,7 +209,9 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
 /** Loads GET /tenant/billing and /tenant/billing/invoices (tenant.billing.read). */
 export function BillingScreen() {
   const api = useBffClient("staff");
-  const billing = useApiQuery(["staff", "billing"], () => unwrap(api.GET("/api/v1/tenant/billing")));
+  const billing = useApiQuery(["staff", "billing"], () =>
+    unwrap(api.GET("/api/v1/tenant/billing")),
+  );
   const invoices = useApiQuery(
     ["staff", "billing", "invoices"],
     async () => (await unwrap(api.GET("/api/v1/tenant/billing/invoices"))).data,

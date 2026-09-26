@@ -44,7 +44,9 @@ export default async function ChooseSchoolPage({ params, searchParams }: Props) 
   if (schools && schools.length === 0) redirect(`/${locale}/no-access`);
 
   return (
-    <MinimalShell headerActions={<SessionControls kind="staff" displayName={session.displayName} />}>
+    <MinimalShell
+      headerActions={<SessionControls kind="staff" displayName={session.displayName} />}
+    >
       {schools ? (
         <ChooseSchoolView schools={schools} next={next} currentTenantId={session.activeTenantId} />
       ) : (

@@ -160,7 +160,12 @@ const subscriptionStatuses = [
 export const SUBSCRIPTION_STATUSES: Exhaustive<SubscriptionStatus, typeof subscriptionStatuses> =
   subscriptionStatuses;
 
-const invoiceStatuses = ["draft", "issued", "paid", "void"] as const satisfies readonly InvoiceStatus[];
+const invoiceStatuses = [
+  "draft",
+  "issued",
+  "paid",
+  "void",
+] as const satisfies readonly InvoiceStatus[];
 export const INVOICE_STATUSES: Exhaustive<InvoiceStatus, typeof invoiceStatuses> = invoiceStatuses;
 
 const tenantStatuses = [

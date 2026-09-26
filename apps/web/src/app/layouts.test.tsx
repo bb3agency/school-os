@@ -124,7 +124,9 @@ describe("school layout", () => {
 
   it("does not accept an operator session", async () => {
     await signInDirect("operator", { sub: "op-1" });
-    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toMatch(/^\/bff\/auth\/login/);
+    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toMatch(
+      /^\/bff\/auth\/login/,
+    );
   });
 
   it("renders the shell with Lock now, and nothing secret reaches the page", async () => {
@@ -168,7 +170,9 @@ describe("school layout: active school and permissions (FR-IAM-013)", () => {
     });
     renderWithIntl(await SchoolLayout({ children: <p>page</p>, params: en }));
     const nav = screen.getByRole("navigation", { name: messages.en.school.nav.label });
-    expect(within(nav).getByRole("link", { name: messages.en.school.nav.audit })).toBeInTheDocument();
+    expect(
+      within(nav).getByRole("link", { name: messages.en.school.nav.audit }),
+    ).toBeInTheDocument();
   });
 });
 

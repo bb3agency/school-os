@@ -2,7 +2,14 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { messages, renderWithIntl } from "@/test/render";
-import { CSRF, installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import {
+  CSRF,
+  installBffStub,
+  page,
+  problem,
+  uninstallBffStub,
+  type BffStub,
+} from "@/test/bff-stub";
 import { provisionSchema } from "./provision-schema";
 import { ProvisionSchoolForm } from "./ProvisionSchoolForm";
 
@@ -190,9 +197,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
     await user.click(next());
     expect(screen.getByRole("heading", { level: 2, name: m.steps.deployment })).toHaveFocus();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent(
-      m.steps.deployment,
-    );
+    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent(m.steps.deployment);
   });
 
   it("provisions a shared school with one Idempotency-Key, CSRF, and shows the result", async () => {

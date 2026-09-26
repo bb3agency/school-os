@@ -58,7 +58,9 @@ export function defaultApi(request: Request): Response {
   const path = new URL(request.url).pathname;
   if (path === "/api/v1/me/schools") {
     return json({
-      data: [{ tenant_id: HARNESS_TENANT, name: "Sample School", code: "sample", status: "active" }],
+      data: [
+        { tenant_id: HARNESS_TENANT, name: "Sample School", code: "sample", status: "active" },
+      ],
     });
   }
   if (path === "/api/v1/me/accept-invitations") return json({ accepted: [] });

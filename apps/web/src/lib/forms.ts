@@ -56,6 +56,8 @@ export interface ApiFormOptions<TSchema extends z.ZodType, TResult> {
   fieldMap?: (serverField: string) => string | undefined;
   invalidate?: readonly QueryKey[];
   onSuccess?: (result: TResult, form: HTMLFormElement) => void;
+  /** Fields that failed validation (client or server), e.g. to move a wizard to that step. */
+  onInvalid?: (fields: string[]) => void;
 }
 
 export interface ApiFormState<TResult> {
@@ -78,68 +80,64 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
   const [error, setError] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<TResult | undefined>(undefined);
-  const keyRef = useRef<string>(newIdempotencyKey());
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
+  const keyRef = useRef<string>("");
 
   const translateClient = useCallback((key: string) => translateOr(tv, key, "invalid"), [tv]);
   const translateServer = useCallback((key: string) => translateOr(tf, key, "invalid"), [tf]);
 
-  const onSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const opts = optionsRef.current;
-      const raw = { ...formValues(form), ...(opts.extra?.(form) ?? {}) };
-      const parsed = opts.schema.safeParse(raw);
-      if (!parsed.success) {
-        const keys = zodErrorKeys(parsed.error);
-        setErrors(
-          Object.fromEntries(Object.entries(keys).map(([f, k]) => [f, translateClient(k)])),
-        );
-        setError(undefined);
-        const first = form.querySelector<HTMLElement>("[aria-invalid='true']");
-        requestAnimationFrame(() =>
-          (form.querySelector<HTMLElement>("[aria-invalid='true']") ?? first)?.focus(),
-        );
-        return;
-      }
-      setErrors({});
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const opts = options;
+    if (!keyRef.current) keyRef.current = newIdempotencyKey();
+    const raw = { ...formValues(form), ...(opts.extra?.(form) ?? {}) };
+    const parsed = opts.schema.safeParse(raw);
+    if (!parsed.success) {
+      const keys = zodErrorKeys(parsed.error);
+      setErrors(Object.fromEntries(Object.entries(keys).map(([f, k]) => [f, translateClient(k)])));
       setError(undefined);
-      setPending(true);
-      opts
-        .submit(parsed.data, keyRef.current)
-        .then(async (value) => {
+      opts.onInvalid?.(Object.keys(keys));
+      const first = form.querySelector<HTMLElement>("[aria-invalid='true']");
+      requestAnimationFrame(() =>
+        (form.querySelector<HTMLElement>("[aria-invalid='true']") ?? first)?.focus(),
+      );
+      return;
+    }
+    setErrors({});
+    setError(undefined);
+    setPending(true);
+    opts
+      .submit(parsed.data, keyRef.current)
+      .then(async (value) => {
+        keyRef.current = newIdempotencyKey();
+        setResult(value);
+        await Promise.all(
+          (opts.invalidate ?? []).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+        );
+        opts.onSuccess?.(value, form);
+      })
+      .catch((failure: unknown) => {
+        const fields = apiFieldErrors(failure);
+        const mapped: FieldErrors = {};
+        let unmapped = fields.length === 0;
+        for (const { field, key } of fields) {
+          const name = opts.fieldMap ? opts.fieldMap(field) : field.split(".").pop();
+          if (name && form.elements.namedItem(name)) {
+            if (!(name in mapped)) mapped[name] = translateServer(key);
+          } else {
+            unmapped = true;
+          }
+        }
+        setErrors(mapped);
+        if (Object.keys(mapped).length > 0) opts.onInvalid?.(Object.keys(mapped));
+        // A 4xx other than validation always means "don't retry with the same key".
+        if (failure instanceof ApiError && failure.status < 500) {
           keyRef.current = newIdempotencyKey();
-          setResult(value);
-          await Promise.all(
-            (opts.invalidate ?? []).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
-          );
-          opts.onSuccess?.(value, form);
-        })
-        .catch((failure: unknown) => {
-          const fields = apiFieldErrors(failure);
-          const mapped: FieldErrors = {};
-          let unmapped = fields.length === 0;
-          for (const { field, key } of fields) {
-            const name = opts.fieldMap ? opts.fieldMap(field) : field.split(".").pop();
-            if (name && form.elements.namedItem(name)) {
-              if (!(name in mapped)) mapped[name] = translateServer(key);
-            } else {
-              unmapped = true;
-            }
-          }
-          setErrors(mapped);
-          // A 4xx other than validation always means "don't retry with the same key".
-          if (failure instanceof ApiError && failure.status < 500) {
-            keyRef.current = newIdempotencyKey();
-          }
-          setError(unmapped || !(failure instanceof ApiError) ? failure : undefined);
-        })
-        .finally(() => setPending(false));
-    },
-    [queryClient, translateClient, translateServer],
-  );
+        }
+        setError(unmapped || !(failure instanceof ApiError) ? failure : undefined);
+      })
+      .finally(() => setPending(false));
+  };
 
   const reset = useCallback(() => {
     setErrors({});

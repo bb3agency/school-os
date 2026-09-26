@@ -55,9 +55,7 @@ export function DeploymentActions({ deployment }: { deployment: Deployment }) {
           unwrap(
             api.PATCH("/api/v1/platform/deployments/{deployment_id}", {
               params: { path, header: { "If-Match": ifMatch(deployment.version) } },
-              body: dedicated
-                ? data
-                : { target_version: data.target_version },
+              body: dedicated ? data : { target_version: data.target_version },
             }),
           )
         }

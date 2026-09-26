@@ -31,11 +31,7 @@ import { SubscriptionActions } from "./SubscriptionActions";
 
 const planSchema = z
   .object({
-    code: z
-      .string()
-      .trim()
-      .toLowerCase()
-      .regex(PLAN_CODE_PATTERN, { error: "invalidCode" }),
+    code: z.string().trim().toLowerCase().regex(PLAN_CODE_PATTERN, { error: "invalidCode" }),
     name: text(100),
     tier: z.enum(["shared", "dedicated"], { error: "chooseOption" }),
     billing_period: z.enum(["monthly", "annual"], { error: "chooseOption" }),
@@ -62,29 +58,27 @@ const planSchema = z
       ctx.addIssue({ code: "custom", path: ["per_student_price_inr"], message: "required" });
     }
   })
-  .transform(
-    (value): PlanInput => ({
-      code: value.code,
-      name: value.name,
-      tier: value.tier,
-      billing_period: value.billing_period,
-      pricing_model: value.pricing_model,
-      base_price_inr: value.base_price_inr,
-      per_student_price_inr: value.per_student_price_inr,
-      included_students: value.included_students,
-      gst_rate: value.gst_rate,
-      sac_code: value.sac_code,
-      trial_days: value.trial_days ?? 30,
-      limits: {
-        students: value["limits.students"],
-        staff_users: value["limits.staff_users"],
-        storage_gb: value["limits.storage_gb"],
-        documents: value["limits.documents"],
-        ai_tokens_month: value["limits.ai_tokens_month"],
-        ai_budget_inr: value["limits.ai_budget_inr"],
-      },
-    }),
-  );
+  .transform((value): PlanInput => ({
+    code: value.code,
+    name: value.name,
+    tier: value.tier,
+    billing_period: value.billing_period,
+    pricing_model: value.pricing_model,
+    base_price_inr: value.base_price_inr,
+    per_student_price_inr: value.per_student_price_inr,
+    included_students: value.included_students,
+    gst_rate: value.gst_rate,
+    sac_code: value.sac_code,
+    trial_days: value.trial_days ?? 30,
+    limits: {
+      students: value["limits.students"],
+      staff_users: value["limits.staff_users"],
+      storage_gb: value["limits.storage_gb"],
+      documents: value["limits.documents"],
+      ai_tokens_month: value["limits.ai_tokens_month"],
+      ai_budget_inr: value["limits.ai_budget_inr"],
+    },
+  }));
 
 const LIMIT_KEYS = [
   "students",
@@ -117,13 +111,21 @@ function PlanFields({ errors, base }: { errors: FieldErrors; base?: Plan | undef
           spellCheck={false}
           autoComplete="off"
         />
-        <TextField name="name" label={t("colName")} error={errors.name} defaultValue={base?.name ?? ""} />
+        <TextField
+          name="name"
+          label={t("colName")}
+          error={errors.name}
+          defaultValue={base?.name ?? ""}
+        />
         <SelectField
           name="tier"
           label={t("colTier")}
           error={errors.tier}
           defaultValue={base?.tier ?? "shared"}
-          options={(["shared", "dedicated"] as const).map((value) => ({ value, label: tmode(value) }))}
+          options={(["shared", "dedicated"] as const).map((value) => ({
+            value,
+            label: tmode(value),
+          }))}
         />
         <SelectField
           name="billing_period"
@@ -222,8 +224,9 @@ export function PlansScreen({ status = "" }: { status?: string }) {
   const can = useCan();
   const manage = can("platform.plans.manage");
   const query = status ? { status } : {};
-  const plans = useApiQuery([...PK.plans, "list", query], async () =>
-    (await unwrap(api.GET("/api/v1/platform/plans", { params: { query } }))).data,
+  const plans = useApiQuery(
+    [...PK.plans, "list", query],
+    async () => (await unwrap(api.GET("/api/v1/platform/plans", { params: { query } }))).data,
   );
 
   const createDialog = (base?: Plan) => (
@@ -259,7 +262,12 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       header: t("code"),
       cell: (row) => <code className="font-mono text-xs">{row.code}</code>,
     },
-    { key: "version", header: t("colVersion"), className: "tabular-nums", cell: (row) => row.version },
+    {
+      key: "version",
+      header: t("colVersion"),
+      className: "tabular-nums",
+      cell: (row) => row.version,
+    },
     { key: "tier", header: t("colTier"), cell: (row) => tmode(row.tier) },
     {
       key: "price",
@@ -399,8 +407,10 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
   const { nameOf: schoolName } = useSchoolDirectory();
   const { nameOf: planName } = usePlanDirectory();
   const query = { limit: 200, ...(status ? { status } : {}) };
-  const subscriptions = useApiQuery([...PK.subscriptions, "list", query], async () =>
-    (await unwrap(api.GET("/api/v1/platform/subscriptions", { params: { query } }))).data,
+  const subscriptions = useApiQuery(
+    [...PK.subscriptions, "list", query],
+    async () =>
+      (await unwrap(api.GET("/api/v1/platform/subscriptions", { params: { query } }))).data,
   );
   const columns: Column<Subscription>[] = [
     { key: "school", header: t("colSchool"), cell: (row) => schoolName(row.tenant_id) },
@@ -501,8 +511,9 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
       : {}),
     ...(filters.tenantId ? { tenant_id: filters.tenantId } : {}),
   };
-  const invoices = useApiQuery([...PK.invoices, "list", query], async () =>
-    (await unwrap(api.GET("/api/v1/platform/invoices", { params: { query } }))).data,
+  const invoices = useApiQuery(
+    [...PK.invoices, "list", query],
+    async () => (await unwrap(api.GET("/api/v1/platform/invoices", { params: { query } }))).data,
   );
 
   return (
@@ -540,7 +551,13 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
               )}
             >
               {(errors) => (
-                <TextField name="month" type="month" label={t("month")} hint={t("monthHint")} error={errors.month} />
+                <TextField
+                  name="month"
+                  type="month"
+                  label={t("month")}
+                  hint={t("monthHint")}
+                  error={errors.month}
+                />
               )}
             </ActionDialog>
           ) : undefined

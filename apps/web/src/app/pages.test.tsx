@@ -108,7 +108,11 @@ const pages: PageCase[] = [
     title: (m) => m.platform.provision.title,
     render: () => <ProvisionSchoolPage />,
   },
-  { name: "plans", title: (m) => m.platform.plans.title, render: () => PlatformPlansPage({ searchParams: noSearch() }) },
+  {
+    name: "plans",
+    title: (m) => m.platform.plans.title,
+    render: () => PlatformPlansPage({ searchParams: noSearch() }),
+  },
   {
     name: "subscriptions",
     title: (m) => m.platform.subscriptions.title,
@@ -119,9 +123,17 @@ const pages: PageCase[] = [
     title: (m) => m.platform.invoices.title,
     render: () => PlatformInvoicesPage({ searchParams: noSearch() }),
   },
-  { name: "usage", title: (m) => m.platform.usage.title, render: () => PlatformUsagePage({ searchParams: noSearch() }) },
+  {
+    name: "usage",
+    title: (m) => m.platform.usage.title,
+    render: () => PlatformUsagePage({ searchParams: noSearch() }),
+  },
   { name: "flags", title: (m) => m.platform.flags.title, render: () => <PlatformFlagsPage /> },
-  { name: "fleet", title: (m) => m.platform.fleet.title, render: () => PlatformFleetPage({ searchParams: noSearch() }) },
+  {
+    name: "fleet",
+    title: (m) => m.platform.fleet.title,
+    render: () => PlatformFleetPage({ searchParams: noSearch() }),
+  },
   {
     name: "announcements",
     title: (m) => m.platform.announcements.title,

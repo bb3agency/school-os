@@ -116,7 +116,12 @@ export async function chooseSchool(tenantId: string): Promise<string | null> {
   };
   let response = await send();
   if (response.status === 403) {
-    const code = ((await response.clone().json().catch(() => ({}))) as { code?: string }).code;
+    const code = (
+      (await response
+        .clone()
+        .json()
+        .catch(() => ({}))) as { code?: string }
+    ).code;
     if (code === "csrf_failed") {
       forgetSessionInfo("staff");
       response = await send();

@@ -24,7 +24,11 @@ export function PlatformShell({
   const t = useTranslations();
   const all: Array<NavItem & { anyOf?: readonly string[] }> = [
     { href: "/platform", label: t("platform.nav.dashboard"), exact: true },
-    { href: "/platform/schools", label: t("platform.nav.schools"), anyOf: ["platform.tenants.read"] },
+    {
+      href: "/platform/schools",
+      label: t("platform.nav.schools"),
+      anyOf: ["platform.tenants.read"],
+    },
     {
       href: "/platform/provision",
       label: t("platform.nav.provision"),
@@ -40,12 +44,20 @@ export function PlatformShell({
       label: t("platform.nav.subscriptions"),
       anyOf: ["platform.subscriptions.read"],
     },
-    { href: "/platform/invoices", label: t("platform.nav.invoices"), anyOf: ["platform.invoices.read"] },
+    {
+      href: "/platform/invoices",
+      label: t("platform.nav.invoices"),
+      anyOf: ["platform.invoices.read"],
+    },
     { href: "/platform/usage", label: t("platform.nav.usage"), anyOf: ["platform.usage.read"] },
     { href: "/platform/flags", label: t("platform.nav.flags"), anyOf: ["platform.flags.read"] },
     { href: "/platform/fleet", label: t("platform.nav.fleet"), anyOf: ["platform.fleet.read"] },
     { href: "/platform/announcements", label: t("platform.nav.announcements") },
-    { href: "/platform/support", label: t("platform.nav.support"), anyOf: ["platform.support.read"] },
+    {
+      href: "/platform/support",
+      label: t("platform.nav.support"),
+      anyOf: ["platform.support.read"],
+    },
     { href: "/platform/break-glass", label: t("platform.nav.breakGlass") },
     {
       href: "/platform/operators",

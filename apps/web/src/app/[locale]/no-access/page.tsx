@@ -9,6 +9,8 @@ import { getSession } from "@/server/session/rsc";
 
 export const generateMetadata = pageMetadata((t) => t("noAccess.title"));
 
+const SIGN_IN = "/bff/auth/login";
+
 function NoAccessBody({ signedIn }: { signedIn: boolean }) {
   const t = useTranslations("noAccess");
   return (
@@ -21,7 +23,8 @@ function NoAccessBody({ signedIn }: { signedIn: boolean }) {
         <CheckInvitationsButton />
       ) : (
         <p>
-          <a href="/bff/auth/login" className="font-semibold text-primary underline">
+          {/* Plain link: the BFF route starts the OIDC redirect (not a client navigation). */}
+          <a href={SIGN_IN} className="font-semibold text-primary underline">
             {t("signIn")}
           </a>
         </p>

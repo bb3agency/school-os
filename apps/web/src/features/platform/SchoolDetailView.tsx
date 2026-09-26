@@ -12,12 +12,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { TabNav } from "@/components/ui/TabNav";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
-import {
-  deploymentTone,
-  known,
-  schoolTone,
-  subscriptionTone,
-} from "@/features/status";
+import { deploymentTone, known, schoolTone, subscriptionTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
@@ -80,7 +75,8 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
 
   function actions(data: TenantDetail) {
     const status = data.tenant_status;
-    const offboardPending = data.offboard_requested_at !== null && data.offboard_approved_at === null;
+    const offboardPending =
+      data.offboard_requested_at !== null && data.offboard_approved_at === null;
     return (
       <>
         {status === "provisioning" && can("platform.tenants.provision") ? (
@@ -95,7 +91,9 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
               schema={z.object({})}
               invalidate={invalidate}
               submit={() =>
-                unwrap(api.POST("/api/v1/platform/tenants/{tenant_id}/activate", { params: { path } }))
+                unwrap(
+                  api.POST("/api/v1/platform/tenants/{tenant_id}/activate", { params: { path } }),
+                )
               }
             />
             <ActionDialog
@@ -226,9 +224,7 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
       case "subscription":
         return <SubscriptionTab school={school} />;
       case "invoices":
-        return (
-          <InvoiceTable invoices={ready(school.invoices)} caption={t("tabs.invoices")} />
-        );
+        return <InvoiceTable invoices={ready(school.invoices)} caption={t("tabs.invoices")} />;
       case "usage":
         return <UsageTab schoolId={schoolId} />;
       case "deployment":
@@ -379,9 +375,7 @@ function BillingAccountCard({ schoolId }: { schoolId: string }) {
       }
     >
       {account.status === "loading" ? <LoadingState label={tc("loading")} /> : null}
-      {account.status === "error" ? (
-        <Alert tone="danger">{tc("loadErrorBody")}</Alert>
-      ) : null}
+      {account.status === "error" ? <Alert tone="danger">{tc("loadErrorBody")}</Alert> : null}
       {account.status === "ready" && data === null ? (
         <p className="text-sm text-ink-muted">{t("none")}</p>
       ) : null}
@@ -466,8 +460,9 @@ function DeploymentTab({ schoolId }: { schoolId: string }) {
   const tdep = useTranslations("status.deployment");
   const tmode = useTranslations("deploymentMode");
   const api = useBffClient("operator");
-  const deployments = useApiQuery([...PK.deployments, "list", {}], async () =>
-    (await unwrap(api.GET("/api/v1/platform/deployments"))).data,
+  const deployments = useApiQuery(
+    [...PK.deployments, "list", {}],
+    async () => (await unwrap(api.GET("/api/v1/platform/deployments"))).data,
   );
   if (deployments.status !== "ready") {
     return <FleetTableState state={deployments} />;
@@ -531,8 +526,9 @@ function FlagsTab({ school }: { school: TenantDetail }) {
   const tc = useTranslations("common");
   const api = useBffClient("operator");
   const can = useCan();
-  const flags = useApiQuery([...PK.flags, "list"], async () =>
-    (await unwrap(api.GET("/api/v1/platform/flags"))).data,
+  const flags = useApiQuery(
+    [...PK.flags, "list"],
+    async () => (await unwrap(api.GET("/api/v1/platform/flags"))).data,
   );
   const manage = can("platform.flags.manage");
   const invalidate = [PK.flags, PK.tenant(school.tenant_id)] as const;
@@ -562,7 +558,9 @@ function FlagsTab({ school }: { school: TenantDetail }) {
         return value === undefined ? (
           <span className="text-ink-muted">{t("noOverride")}</span>
         ) : (
-          <Badge tone={value ? "success" : "neutral"}>{value ? t("forcedOn") : t("forcedOff")}</Badge>
+          <Badge tone={value ? "success" : "neutral"}>
+            {value ? t("forcedOn") : t("forcedOff")}
+          </Badge>
         );
       },
     },
@@ -658,8 +656,10 @@ function TicketsTab({ schoolId }: { schoolId: string }) {
   const t = useTranslations("platform.support");
   const api = useBffClient("operator");
   const query = { tenant_id: schoolId, limit: 100 };
-  const tickets = useApiQuery([...PK.tickets, "list", query], async () =>
-    (await unwrap(api.GET("/api/v1/platform/support/tickets", { params: { query } }))).data,
+  const tickets = useApiQuery(
+    [...PK.tickets, "list", query],
+    async () =>
+      (await unwrap(api.GET("/api/v1/platform/support/tickets", { params: { query } }))).data,
   );
   return <TicketTable tickets={tickets} caption={t("title")} />;
 }

@@ -10,6 +10,19 @@ import { Alert } from "./Alert";
 import { ApiErrorAlert } from "./ApiErrorAlert";
 import { Button, type ButtonSize, type ButtonVariant } from "./Button";
 
+/** Renders a one-time result (e.g. a secret) with a way to close the dialog. */
+function ResultSlot<TResult>({
+  render,
+  result,
+  onDone,
+}: {
+  render: (result: TResult, close: () => void) => ReactNode;
+  result: TResult;
+  onDone: () => void;
+}) {
+  return <>{render(result, onDone)}</>;
+}
+
 export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
   /** Text of the button that opens the dialog. */
   triggerLabel: ReactNode;
@@ -160,7 +173,9 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
               </button>
             </div>
             {renderResult !== undefined && result !== undefined ? (
-              <div className="space-y-4 p-5">{renderResult(result, close)}</div>
+              <div className="space-y-4 p-5">
+                <ResultSlot render={renderResult} result={result} onDone={close} />
+              </div>
             ) : (
               <form noValidate onSubmit={form.onSubmit}>
                 <div className="max-h-[60vh] space-y-4 overflow-y-auto p-5">

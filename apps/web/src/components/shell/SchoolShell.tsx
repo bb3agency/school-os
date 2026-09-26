@@ -44,7 +44,9 @@ export function SchoolShell({
     { href: "/audit", label: t("school.nav.audit"), permission: "audit.read" },
   ];
   const items: NavItem[] = all
-    .filter((item) => !item.permission || permissions === null || permissions.includes(item.permission))
+    .filter(
+      (item) => !item.permission || permissions === null || permissions.includes(item.permission),
+    )
     .map(({ href, label, exact }) => ({ href, label, ...(exact ? { exact } : {}) }));
   return (
     <div className="flex min-h-screen flex-col">

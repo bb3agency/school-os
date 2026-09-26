@@ -24,8 +24,9 @@ export function AnnouncementsScreen() {
   const api = useBffClient("operator");
   const can = useCan();
   const manage = can("platform.announcements.manage");
-  const announcements = useApiQuery([...PK.announcements, "list"], async () =>
-    (await unwrap(api.GET("/api/v1/platform/announcements"))).data,
+  const announcements = useApiQuery(
+    [...PK.announcements, "list"],
+    async () => (await unwrap(api.GET("/api/v1/platform/announcements"))).data,
   );
 
   const audienceLabel = (row: Announcement) => {

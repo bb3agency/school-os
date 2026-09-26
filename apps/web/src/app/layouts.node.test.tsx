@@ -203,7 +203,10 @@ describe("school picker page (ADR-0019)", () => {
     );
     expect(
       await redirectOf(() =>
-        ChooseSchoolPage({ params: Promise.resolve({ locale: "te" }), searchParams: Promise.resolve({}) }),
+        ChooseSchoolPage({
+          params: Promise.resolve({ locale: "te" }),
+          searchParams: Promise.resolve({}),
+        }),
       ),
     ).toBe("/te/no-access");
   });

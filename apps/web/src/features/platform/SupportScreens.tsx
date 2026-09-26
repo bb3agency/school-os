@@ -95,7 +95,13 @@ export function TicketTable({
     {
       key: "sla",
       header: t("colSla"),
-      cell: (row) => <Value>{formatDateTime(row.first_responded_at ? row.resolution_due_at : row.first_response_due_at)}</Value>,
+      cell: (row) => (
+        <Value>
+          {formatDateTime(
+            row.first_responded_at ? row.resolution_due_at : row.first_response_due_at,
+          )}
+        </Value>
+      ),
     },
     {
       key: "updated",
@@ -219,8 +225,19 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
                       options={TICKET_PRIORITIES.map((value) => ({ value, label: tprio(value) }))}
                     />
                   </div>
-                  <TextField name="subject" label={t("colSubject")} error={errors.subject} maxLength={200} />
-                  <TextAreaField name="body" label={t("message")} error={errors.body} maxLength={4000} rows={5} />
+                  <TextField
+                    name="subject"
+                    label={t("colSubject")}
+                    error={errors.subject}
+                    maxLength={200}
+                  />
+                  <TextAreaField
+                    name="body"
+                    label={t("message")}
+                    error={errors.body}
+                    maxLength={4000}
+                    rows={5}
+                  />
                 </>
               )}
             </ActionDialog>
@@ -339,7 +356,9 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
   if (ticket.status !== "ready") {
     return (
       <Alert tone="danger" title={tc("loadErrorTitle")}>
-        {ticket.status === "error" && ticket.reason ? te(`load.${ticket.reason}`) : tc("loadErrorBody")}
+        {ticket.status === "error" && ticket.reason
+          ? te(`load.${ticket.reason}`)
+          : tc("loadErrorBody")}
       </Alert>
     );
   }
@@ -368,7 +387,11 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
         <Card title={t("thread")}>
           <TicketThread ticket={data} />
           {manage && data.status !== "closed" ? (
-            <form noValidate onSubmit={reply.onSubmit} className="mt-6 space-y-3 border-t border-border pt-4">
+            <form
+              noValidate
+              onSubmit={reply.onSubmit}
+              className="mt-6 space-y-3 border-t border-border pt-4"
+            >
               <TextAreaField
                 name="body"
                 label={t("reply")}
@@ -412,7 +435,11 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
             </dd>
           </dl>
           {manage ? (
-            <form noValidate onSubmit={update.onSubmit} className="mt-6 space-y-3 border-t border-border pt-4">
+            <form
+              noValidate
+              onSubmit={update.onSubmit}
+              className="mt-6 space-y-3 border-t border-border pt-4"
+            >
               <SelectField
                 name="status"
                 label={t("colStatus")}

@@ -45,13 +45,13 @@ export function installBffStub(kind: "staff" | "operator" = "operator"): BffStub
     routes: {},
     calls: [],
     navigate,
-    callsTo: (key) =>
-      stub.calls.filter((call) => `${call.method} ${call.url.pathname}` === key),
+    callsTo: (key) => stub.calls.filter((call) => `${call.method} ${call.url.pathname}` === key),
   };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: Request | string, init?: RequestInit) => {
-      const request = typeof input === "string" ? new Request(new URL(input, "http://localhost"), init) : input;
+      const request =
+        typeof input === "string" ? new Request(new URL(input, "http://localhost"), init) : input;
       const url = new URL(request.url);
       const body = request.method === "GET" ? "" : await request.clone().text();
       stub.calls.push({ method: request.method, url, headers: request.headers, body });

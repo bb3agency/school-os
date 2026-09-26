@@ -19,8 +19,7 @@ export const VERSION_PATTERN = /^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$/;
 export const HOST_REF_PATTERN = /^i-[0-9a-f]{8,17}$/;
 export const PAYMENT_REFERENCE_PATTERN = /^[A-Za-z0-9/_.-]{1,64}$/;
 export const MONEY_PATTERN = /^\d{1,12}(\.\d{1,2})?$/;
-export const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const text = (max: number, min = 1) =>
   z

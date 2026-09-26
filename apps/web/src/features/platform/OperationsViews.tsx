@@ -70,8 +70,20 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
     <div className="space-y-6">
       <PageHeader title={t("title")} description={t("description")} />
       <form method="get" className="flex flex-wrap items-end gap-3">
-        <TextField name="from" type="date" label={t("from")} defaultValue={filters.from ?? ""} className="w-44" />
-        <TextField name="to" type="date" label={t("to")} defaultValue={filters.to ?? ""} className="w-44" />
+        <TextField
+          name="from"
+          type="date"
+          label={t("from")}
+          defaultValue={filters.from ?? ""}
+          className="w-44"
+        />
+        <TextField
+          name="to"
+          type="date"
+          label={t("to")}
+          defaultValue={filters.to ?? ""}
+          className="w-44"
+        />
         <SelectField
           name="school"
           label={t("colSchool")}
@@ -95,7 +107,11 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
 /* ------------------------------------------------------------------ flags */
 
 const flagSchema = z.object({
-  key: z.string().trim().max(100, { error: "tooLong" }).regex(FLAG_KEY_PATTERN, { error: "invalidFlagKey" }),
+  key: z
+    .string()
+    .trim()
+    .max(100, { error: "tooLong" })
+    .regex(FLAG_KEY_PATTERN, { error: "invalidFlagKey" }),
   description: optionalText(300),
   enabled: checkbox,
   rollout_percent: z
@@ -161,8 +177,9 @@ export function FlagsScreen() {
   const can = useCan();
   const manage = can("platform.flags.manage");
   const { nameOf, schools } = useSchoolDirectory();
-  const flags = useApiQuery([...PK.flags, "list"], async () =>
-    (await unwrap(api.GET("/api/v1/platform/flags"))).data,
+  const flags = useApiQuery(
+    [...PK.flags, "list"],
+    async () => (await unwrap(api.GET("/api/v1/platform/flags"))).data,
   );
   const all = flags.status === "ready" ? flags.data : [];
   const globals: Loadable<readonly FeatureFlag[]> =
@@ -188,7 +205,11 @@ export function FlagsScreen() {
       header: t("colKey"),
       cell: (row) => <code className="font-mono text-xs">{row.key}</code>,
     },
-    { key: "description", header: t("colDescription"), cell: (row) => <Value>{row.description}</Value> },
+    {
+      key: "description",
+      header: t("colDescription"),
+      cell: (row) => <Value>{row.description}</Value>,
+    },
     {
       key: "global",
       header: t("colGlobal"),
@@ -211,7 +232,10 @@ export function FlagsScreen() {
       className: "text-right tabular-nums",
       cell: (row) => (
         <Value>
-          {formatCount(all.filter((flag) => flag.key === row.key && flag.tenant_id !== null).length, locale)}
+          {formatCount(
+            all.filter((flag) => flag.key === row.key && flag.tenant_id !== null).length,
+            locale,
+          )}
         </Value>
       ),
     },
@@ -391,8 +415,9 @@ export function FleetScreen({ status = "" }: { status?: string }) {
   const locale = useLocale();
   const api = useBffClient("operator");
   const query = status ? { status } : {};
-  const deployments = useApiQuery([...PK.deployments, "list", query], async () =>
-    (await unwrap(api.GET("/api/v1/platform/deployments", { params: { query } }))).data,
+  const deployments = useApiQuery(
+    [...PK.deployments, "list", query],
+    async () => (await unwrap(api.GET("/api/v1/platform/deployments", { params: { query } }))).data,
   );
   const versions = useApiQuery(PK.versions, () =>
     unwrap(api.GET("/api/v1/platform/fleet/versions")),
@@ -529,8 +554,9 @@ export function BreakGlassScreen() {
   const api = useBffClient("operator");
   const can = useCan();
   const { nameOf, schools } = useSchoolDirectory();
-  const requests = useApiQuery([...PK.breakGlass, "list"], async () =>
-    (await unwrap(api.GET("/api/v1/platform/break-glass-requests"))).data,
+  const requests = useApiQuery(
+    [...PK.breakGlass, "list"],
+    async () => (await unwrap(api.GET("/api/v1/platform/break-glass-requests"))).data,
   );
   const columns: Column<BreakGlassRequest>[] = [
     { key: "school", header: t("colSchool"), cell: (row) => nameOf(row.tenant_id) },
@@ -539,7 +565,9 @@ export function BreakGlassScreen() {
       header: t("colReason"),
       cell: (row) => (
         <span>
-          <span className="block font-semibold">{t(`reasonCodes.${row.reason_code as "support_request"}`)}</span>
+          <span className="block font-semibold">
+            {t(`reasonCodes.${row.reason_code as "support_request"}`)}
+          </span>
           <span className="text-ink-muted">{row.reason}</span>
         </span>
       ),
@@ -607,10 +635,9 @@ export function BreakGlassScreen() {
             invalidate={[PK.breakGlass]}
             submit={() =>
               unwrap(
-                api.POST(
-                  "/api/v1/platform/break-glass-requests/{request_id}/emergency-confirm",
-                  { params: { path: { request_id: row.id } } },
-                ),
+                api.POST("/api/v1/platform/break-glass-requests/{request_id}/emergency-confirm", {
+                  params: { path: { request_id: row.id } },
+                }),
               )
             }
           />
@@ -658,9 +685,9 @@ export function BreakGlassScreen() {
                     label={t("reasonCode")}
                     error={errors.reason_code}
                     defaultValue="support_request"
-                    options={(["support_request", "security_incident", "legal_obligation"] as const).map(
-                      (value) => ({ value, label: t(`reasonCodes.${value}`) }),
-                    )}
+                    options={(
+                      ["support_request", "security_incident", "legal_obligation"] as const
+                    ).map((value) => ({ value, label: t(`reasonCodes.${value}`) }))}
                   />
                   <TextAreaField
                     name="reason"
@@ -679,7 +706,11 @@ export function BreakGlassScreen() {
                     error={errors.duration_minutes}
                   />
                   <label className="flex items-start gap-2 text-sm">
-                    <input type="checkbox" name="emergency" className="mt-1 size-4 accent-primary" />
+                    <input
+                      type="checkbox"
+                      name="emergency"
+                      className="mt-1 size-4 accent-primary"
+                    />
                     {t("emergencyLabel")}
                   </label>
                 </>
@@ -743,8 +774,10 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
     ...(dayBound(filters.from, false) ? { from: dayBound(filters.from, false) as string } : {}),
     ...(dayBound(filters.to, true) ? { to: dayBound(filters.to, true) as string } : {}),
   };
-  const events = useApiQuery([...PK.audit, "list", query], async () =>
-    (await unwrap(api.GET("/api/v1/platform/audit/events", { params: { query } }))).data,
+  const events = useApiQuery(
+    [...PK.audit, "list", query],
+    async () =>
+      (await unwrap(api.GET("/api/v1/platform/audit/events", { params: { query } }))).data,
   );
   const verify = useApiMutation<void, PlatformAuditVerify>(() =>
     unwrap(api.POST("/api/v1/platform/audit/verify")),
@@ -811,7 +844,8 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
     {
       key: "resource",
       header: t("colResource"),
-      cell: (row) => `${row.resource_type}${row.resource_id ? ` · ${row.resource_id.slice(0, 8)}` : ""}`,
+      cell: (row) =>
+        `${row.resource_type}${row.resource_id ? ` · ${row.resource_id.slice(0, 8)}` : ""}`,
     },
     { key: "summary", header: t("colSummary"), cell: (row) => summaryText(row.summary) },
   ];
@@ -855,7 +889,12 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
           className="w-80"
           spellCheck={false}
         />
-        <TextField name="action" label={t("colAction")} defaultValue={filters.action ?? ""} className="w-56" />
+        <TextField
+          name="action"
+          label={t("colAction")}
+          defaultValue={filters.action ?? ""}
+          className="w-56"
+        />
         <SelectField
           name="school"
           label={t("colSchool")}
@@ -867,8 +906,20 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
           }))}
           className="w-64"
         />
-        <TextField name="from" type="date" label={t("from")} defaultValue={filters.from ?? ""} className="w-44" />
-        <TextField name="to" type="date" label={t("to")} defaultValue={filters.to ?? ""} className="w-44" />
+        <TextField
+          name="from"
+          type="date"
+          label={t("from")}
+          defaultValue={filters.from ?? ""}
+          className="w-44"
+        />
+        <TextField
+          name="to"
+          type="date"
+          label={t("to")}
+          defaultValue={filters.to ?? ""}
+          className="w-44"
+        />
         <Button type="submit" variant="secondary">
           {tc("applyFilters")}
         </Button>

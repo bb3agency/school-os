@@ -39,22 +39,21 @@ export const announcementSchema = z
       ctx.addIssue({ code: "custom", path: ["ends_at"], message: "endAfterStart" });
     }
   })
-  .transform(
-    (value): AnnouncementInput => ({
-      title_en: value.title_en,
-      title_te: value.title_te,
-      body_en: value.body_en,
-      body_te: value.body_te,
-      severity: value.severity,
-      audience: value.audience === "shared" || value.audience === "dedicated" ? "tier" : value.audience,
-      audience_tier:
-        value.audience === "shared" || value.audience === "dedicated" ? value.audience : null,
-      audience_tenant_ids: value.audience === "tenants" ? value.audience_tenant_ids : [],
-      starts_at: value.starts_at,
-      ends_at: value.ends_at,
-      status: value.status,
-    }),
-  );
+  .transform((value): AnnouncementInput => ({
+    title_en: value.title_en,
+    title_te: value.title_te,
+    body_en: value.body_en,
+    body_te: value.body_te,
+    severity: value.severity,
+    audience:
+      value.audience === "shared" || value.audience === "dedicated" ? "tier" : value.audience,
+    audience_tier:
+      value.audience === "shared" || value.audience === "dedicated" ? value.audience : null,
+    audience_tenant_ids: value.audience === "tenants" ? value.audience_tenant_ids : [],
+    starts_at: value.starts_at,
+    ends_at: value.ends_at,
+    status: value.status,
+  }));
 
 /**
  * FR-PLT-026 (docs/16 §5.13, §14): bilingual banner editor. English and Telugu title and

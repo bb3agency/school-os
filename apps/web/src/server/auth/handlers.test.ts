@@ -473,8 +473,7 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
   });
   const paths = () => h.apiCalls.map((request) => new URL(request.url).pathname);
   const activeTenant = async () =>
-    (await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false }))
-      ?.activeTenantId;
+    (await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false }))?.activeTenantId;
 
   it("accepts invitations first, then lists schools; one school becomes active and the login is audited there", async () => {
     const response = await h.signIn("staff", clerk, "/en/settings/users");
@@ -569,7 +568,11 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
     await h.signIn("staff", clerk);
     const before = h.apiCalls.length;
     const stepUp = h.absorb(
-      await handleStepUp(h.request("/bff/auth/step-up?next=/en/settings/users"), h.runtime, "staff"),
+      await handleStepUp(
+        h.request("/bff/auth/step-up?next=/en/settings/users"),
+        h.runtime,
+        "staff",
+      ),
     );
     const back = h.idp.staff.authorize(stepUp.headers.get("location") ?? "", clerk);
     await handleCallback(h.request(back.href), h.runtime, "staff");
