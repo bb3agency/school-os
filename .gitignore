@@ -45,3 +45,4 @@ crash.log
 .DS_Store
 .idea/
 .vscode/
+.claude/worktrees/

@@ -1,0 +1,52 @@
+# Install once: `uv run pre-commit install`. Mirrors `make lint typecheck` (plus gitleaks).
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-toml
+      - id: check-json
+        exclude: (tsconfig.*\.json|\.vscode/)
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict
+        entry: uv run mypy apps/api apps/worker
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: eslint
+        name: eslint (web)
+        entry: npm run lint --workspaces --if-present
+        language: system
+        files: ^(apps/web|packages)/.*\.(ts|tsx|js|mjs)$
+        pass_filenames: false
+      - id: prettier
+        name: prettier
+        entry: npx --no-install prettier --check --ignore-unknown
+        language: system
+        files: ^(apps/web|packages)/

@@ -51,14 +51,23 @@ The product is built **module by module** on a shared core that does not change 
 - Code and docs change in the **same PR** when behaviour changes; ADRs are never edited after acceptance, only superseded
 - Facts about laws, portals, boards and vendors were checked in **September 2026**. They change. Re-verify via the References sections before relying on them. Nothing here is legal advice.
 
-## Quick start (once code exists)
+## Getting started
+
+**Prerequisites:** Docker (with Compose v2), [uv](https://docs.astral.sh/uv/) ≥ 0.8, Node 24 LTS (22.12+ works), GNU make.
 
 ```bash
-cp .env.example .env          # never commit .env
-make dev                      # docker compose: postgres+pgvector, redis, api, worker, web
-make migrate && make seed-synthetic
-make check                    # lint + typecheck + tests + security scans
+cp .env.example .env          # dev-only placeholders; never commit .env
+make install                  # uv sync (Python 3.12) + npm ci (web)
+make dev                      # postgres+pgvector, valkey, seaweedfs (S3), api, worker, beat, web
+make migrate                  # alembic upgrade head (as sos_migrator)
+make seed-synthetic           # synthetic tenants only; never real data
+make check                    # lint + typecheck + tests + security scans (what CI runs)
 ```
+
+- API: <http://localhost:8000/healthz>, <http://localhost:8000/readyz>, OpenAPI at `/api/v1/docs` (local only)
+- Web: <http://localhost:3000> (school app at `/en` or `/te`, platform admin panel at `/en/platform`)
+- Tests need Docker: they start PostgreSQL 16 + pgvector with testcontainers and run `infra/db/bootstrap.sql` + migrations, then connect as the real `sos_app` role (RLS enforced).
+- Run `uv run pre-commit install` once to get ruff, mypy, eslint, prettier and gitleaks on every commit.
 
 ## Version history
 

@@ -128,8 +128,13 @@ Review the model at each milestone and after any incident.
 
 ```python
 @router.post("/students/{student_id}/change-requests/{cr_id}/approve")
-def approve(cr_id: UUID, ctx: UserContext = Depends(require("student.identity_change.approve", step_up=True))):
-    return changes.service.approve(ctx, cr_id)   # service re-checks requester != approver, state = pending
+def approve(
+    cr_id: UUID,
+    ctx: UserContext = Depends(require("student.identity_change.approve", step_up=True)),
+):
+    return changes.service.approve(
+        ctx, cr_id
+    )  # service re-checks requester != approver, state = pending
 ```
 
 ### 6.2 Roles × permissions (defaults)
