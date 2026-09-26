@@ -49,7 +49,8 @@ seed-synthetic: ## Create synthetic tenants (NEVER real data)
 	$(UV) run python -m app.devtools.seed_synthetic
 
 openapi: ## Export the OpenAPI document and regenerate the TS client
-	$(UV) run python -c "import json; from app.main import create_app; print(json.dumps(create_app().openapi(), indent=2))" > apps/api/openapi.json
+	$(UV) sync --locked --all-packages
+	$(UV) run python -m app.openapi_export > apps/api/openapi.json
 ifneq ($(HAS_WEB),)
 	npm run generate -w @schoolos/api-client
 endif
