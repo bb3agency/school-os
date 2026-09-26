@@ -37,5 +37,9 @@ def handler(event: dict[str, Any], _context: object) -> dict[str, Any]:
         "accessTokenGeneration": {"claimsToAddOrOverride": {CLAIM: value}},
         "idTokenGeneration": {"claimsToAddOrOverride": {CLAIM: value}},
     }
-    logger.info(json.dumps({"event": "pre_token_generation", "trigger": event.get("triggerSource"), "mfa": mfa}))
+    logger.info(
+        json.dumps(
+            {"event": "pre_token_generation", "trigger": event.get("triggerSource"), "mfa": mfa}
+        )
+    )
     return event
