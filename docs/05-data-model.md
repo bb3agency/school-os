@@ -509,6 +509,19 @@ CREATE TABLE sis.extraction_items (
 );
 ```
 
+### 5.1 As built in M1 (migration `0008_sis_students`)
+
+The DDL above is the model; migration `0008_sis_students` implements `students`, `enrollments`, `attribute_definitions`, `attribute_values`, `student_profiles`, `guardians` and `student_guardians` with these refinements (the other `sis` tables arrive with their modules):
+
+- **Global attribute catalog** lives in `apps/api/app/students/attributes.yaml` and is seeded with deterministic ids (UUIDv5) before RLS is forced (FORCE applies to the owning role too). Extra columns: `sort_order`, `created_at`. `validation` carries `max_length`, `pattern`, `values`, `name` (normalise as a person name), `not_future` and `sources` (allowed sources). `canonical_policy` adds `anchor`: the only source that makes an identity value non-provisional (`admission_register`, BR-01).
+- **Aadhaar-as-printed values are separate C3 attributes** (`aadhaar_last4` (`digits4`), `aadhaar_name_as_printed`, `aadhaar_dob_as_printed`, `aadhaar_gender_as_printed`), accepted only from source `aadhaar_as_printed`; `full_name`/`dob`/`gender` refuse that source, so as-printed data is never stored in C2 columns (08 PRV-014).
+- **`attribute_definitions` policies** (reviewed variant, `rls_allowlist.yaml`): `attrdef_read` (SELECT only) returns global rows plus the school's own rows, and nothing at all without a tenant context; `attrdef_write` (ALL) is limited to the school's own rows. A single `FOR ALL` policy with `USING (tenant_id IS NULL OR …)` would have let a school UPDATE or DELETE global rows.
+- **`attribute_values`**: `superseded_by` FK is `DEFERRABLE INITIALLY DEFERRED` (the old row is retired before its successor is inserted because `av_current` admits one current row). Trigger `attribute_values_immutable` forbids changing any value column; only `superseded_by` (once), verification fields on the current row, and re-encryption to a newer `key_version` are allowed. `sos_app` has column-level UPDATE on exactly those columns and no DELETE. Extra CHECKs: `value_date` is also excluded for C3, `key_version` present iff ciphertext, `(verification_status = 'unverified') = (verified_at IS NULL)`.
+- **`student_profiles`**: primary key `(tenant_id, student_id)` (tenant first; a probe with another school's id meets only the composite FK). `full_name_norm` = `core.textnorm.comparison_key`; `full_name_translit` = phonetic keys of every current C2 spelling of the name (`" | "`-joined) so Telugu-script queries and spelling variants match. **Under RLS the pg_trgm GIN indexes are not used by `sos_app`**: trigram operators are not leakproof, so the planner cannot evaluate them before the RLS qual; it reaches a school's rows through a `tenant_id`-leading btree (`sp_section`, `sp_tenant_name`) and filters by `word_similarity`. Measured p95 ≈ 60 ms for 2,000 students (FR-STU-011 budget 300 ms); the GIN indexes stay for reporting roles and a future per-tenant partitioning.
+- **`enrollments`** add `created_by`, `created_at`, `updated_at`, `version` and index `enrollments_section_active_idx (tenant_id, academic_year_id, section_id) WHERE status = 'active'`. Scope (SEC-015) is decided on active enrolments in the **current** academic year.
+- **`guardians`** add `updated_at` and `version` (ETag); phone (C3) is stored as 10 digits, encrypted, with a blind index (`guardians_phone_bidx`); `student_guardians_one_primary` allows one primary guardian per student.
+- **Encryption**: AAD `tenant_id|sis.attribute_values|value_ciphertext|<row id>` and `tenant_id|sis.guardians|phone_ciphertext|<guardian id>` (likewise `address_ciphertext`); blind index = HMAC-SHA256(tenant HMAC key, `schoolos/blind-index/v1|<purpose>|<value>`).
+
 ## 6. Knowledge schema (`kb`)
 
 ```sql
