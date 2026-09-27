@@ -15,9 +15,10 @@ import datetime as dt
 import uuid
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
@@ -826,6 +827,205 @@ def clone_system_roles(session: Session, tenant_id: uuid.UUID) -> None:
                     summary={"role_key": key, "permission": perm},
                 )
     cache.invalidate_on_commit(session, tenant_id)
+
+
+# --- system-role sync for existing schools (ADR-0022; FR-IAM-011, SEC-003, SEC-007) ----------
+
+SYSTEM_ROLE_SYNC_VIA = "system_role_sync"
+
+
+@dataclass(frozen=True, slots=True)
+class SystemRoleSyncPlan:
+    """What bringing one school's system roles in line with ``roles.yaml`` does (keys only).
+
+    ``create_roles``: (role key, permission keys) for system roles missing in the school;
+    ``add_grants`` / ``remove_grants``: (role key, permission key) pairs (removals only with
+    prune); ``extra_grants``: grants roles.yaml no longer lists that are kept (no prune);
+    ``update_names``: system roles whose display names differ from roles.yaml;
+    ``conflicts``: roles.yaml keys held by a school's custom role (never touched);
+    ``unknown_system_roles``: system roles roles.yaml no longer defines (never deleted).
+    """
+
+    tenant_id: uuid.UUID
+    applied: bool
+    prune: bool
+    create_roles: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    add_grants: tuple[tuple[str, str], ...] = ()
+    remove_grants: tuple[tuple[str, str], ...] = ()
+    extra_grants: tuple[tuple[str, str], ...] = ()
+    update_names: tuple[str, ...] = ()
+    conflicts: tuple[str, ...] = ()
+    unknown_system_roles: tuple[str, ...] = ()
+
+    @property
+    def pending(self) -> bool:
+        """True when the school differs from roles.yaml in a way this run would change."""
+        return bool(self.create_roles or self.add_grants or self.remove_grants or self.update_names)
+
+
+def missing_catalog_permissions(*, engine: Engine | None = None) -> list[str]:
+    """System-role grants in roles.yaml that ``core.permissions`` lacks (migration not applied).
+
+    Reads only the global catalog (no tenant rows) in a ``context_free_session``.
+    """
+    wanted = {p for r in system_roles().values() for p in r.permission_keys}
+    with context_free_session(engine=engine) as session:
+        have = {p.key for p in repo.list_permissions(session)}
+    return sorted(wanted - have)
+
+
+def database_role(*, engine: Engine | None = None) -> repo.DatabaseRole:
+    """The database role the app engine connects as, with its RLS-relevant attributes."""
+    with context_free_session(engine=engine) as session:
+        return repo.database_role(session)
+
+
+def sync_system_roles(
+    session: Session, tenant_id: uuid.UUID, *, apply: bool, prune: bool = False
+) -> SystemRoleSyncPlan:
+    """Bring one school's SYSTEM roles in line with ``roles.yaml`` (ADR-0022).
+
+    Runs in that school's own ``tenant_session`` as ``sos_app`` (RLS applies; no definer
+    function). Only roles with ``is_system`` whose key roles.yaml defines are touched: missing
+    roles are created, missing grants added and display names updated; grants roles.yaml no
+    longer lists are removed only with ``prune``. Custom roles, the break-glass
+    ``platform_support`` role and system roles roles.yaml no longer defines are never changed.
+    Scope (school/scoped) and step-up are not stored per grant: the resolver reads them from
+    roles.yaml and ``core.permissions`` at request time, so they need no reconciliation here.
+
+    ``apply=False`` (dry run) makes the transaction read-only and writes nothing. With
+    ``apply=True`` every change is audited in this transaction (actor ``system``, keys only):
+    ``role.created``, ``role.permission_granted``, ``role.permission_revoked``, ``role.updated``,
+    then one ``role.system_sync_applied`` with the counts. A school already in line gets no
+    events (idempotent). Concurrent runs for one school are serialised by an advisory lock.
+    """
+    if repo.current_tenant_id(session) != tenant_id:
+        raise RuntimeError("sync_system_roles needs the school's own tenant_session")
+    if apply:
+        repo.lock_system_role_sync(session, tenant_id)
+    else:
+        repo.set_transaction_read_only(session)
+    templates = system_roles()
+    catalog = permission_catalog()
+    roles = repo.list_roles(session)
+    by_key = {r.key: r for r in roles}
+    grants = repo.role_permission_keys(session, [r.id for r in roles])
+
+    create: list[tuple[str, tuple[str, ...]]] = []
+    add: list[tuple[str, str]] = []
+    extra: list[tuple[str, str]] = []
+    names: list[str] = []
+    conflicts: list[str] = []
+    for key in sorted(templates):
+        template = templates[key]
+        wanted = sorted(template.permission_keys)
+        if any(catalog[p].is_platform for p in wanted):  # pragma: no cover - catalog validated
+            raise RuntimeError("platform permission in a system role template")
+        role = by_key.get(key)
+        if role is None:
+            create.append((key, tuple(wanted)))
+            continue
+        if not role.is_system:
+            conflicts.append(key)
+            continue
+        have = grants.get(role.id, set())
+        add.extend((key, p) for p in wanted if p not in have)
+        extra.extend((key, p) for p in sorted(have - template.permission_keys))
+        if (role.name_en, role.name_te) != (template.name_en, template.name_te):
+            names.append(key)
+    unknown = sorted(
+        r.key for r in roles if r.is_system and r.key not in templates and r.key != BREAKGLASS_ROLE
+    )
+    plan = SystemRoleSyncPlan(
+        tenant_id=tenant_id,
+        applied=False,
+        prune=prune,
+        create_roles=tuple(create),
+        add_grants=tuple(add),
+        remove_grants=tuple(extra) if prune else (),
+        extra_grants=() if prune else tuple(extra),
+        update_names=tuple(names),
+        conflicts=tuple(conflicts),
+        unknown_system_roles=tuple(unknown),
+    )
+    if not apply or not plan.pending:
+        return plan
+    _apply_system_role_plan(session, plan, by_key)
+    cache.invalidate_on_commit(session, tenant_id)
+    return replace(plan, applied=True)
+
+
+def _apply_system_role_plan(
+    session: Session, plan: SystemRoleSyncPlan, by_key: Mapping[str, Role]
+) -> None:
+    """Write ``plan`` with one audit event per change, then the per-school summary event."""
+    templates = system_roles()
+    tenant_id, prune = plan.tenant_id, plan.prune
+    via = SYSTEM_ROLE_SYNC_VIA
+    for key, perms in plan.create_roles:
+        template = templates[key]
+        role = repo.create_role(
+            session, key=key, name_en=template.name_en, name_te=template.name_te, is_system=True
+        )
+        for perm in perms:
+            repo.grant_role_permission(session, role.id, perm)
+        _record(
+            session,
+            None,
+            action="role.created",
+            resource_type="role",
+            resource_id=role.id,
+            summary={"role_key": key, "is_system": True, "permissions": list(perms), "via": via},
+        )
+    for key, perm in plan.add_grants:
+        role_id = by_key[key].id
+        repo.grant_role_permission(session, role_id, perm)
+        _record(
+            session,
+            None,
+            action="role.permission_granted",
+            resource_type="role",
+            resource_id=role_id,
+            summary={"role_key": key, "permission": perm, "via": via},
+        )
+    for key, perm in plan.remove_grants:
+        role_id = by_key[key].id
+        if repo.revoke_role_permission(session, role_id, perm):
+            _record(
+                session,
+                None,
+                action="role.permission_revoked",
+                resource_type="role",
+                resource_id=role_id,
+                summary={"role_key": key, "permission": perm, "via": via},
+            )
+    for key in plan.update_names:
+        template = templates[key]
+        role_id = by_key[key].id
+        repo.update_role_names(session, role_id, name_en=template.name_en, name_te=template.name_te)
+        _record(
+            session,
+            None,
+            action="role.updated",
+            resource_type="role",
+            resource_id=role_id,
+            summary={"role_key": key, "fields": ["name_en", "name_te"], "via": via},
+        )
+    _record(
+        session,
+        None,
+        action="role.system_sync_applied",
+        resource_type="tenant",
+        resource_id=tenant_id,
+        summary={
+            "roles_created": len(plan.create_roles),
+            "grants_added": len(plan.add_grants),
+            "grants_removed": len(plan.remove_grants),
+            "roles_updated": len(plan.update_names),
+            "prune": prune,
+            "via": via,
+        },
+    )
 
 
 def _register_hooks() -> None:

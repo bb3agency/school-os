@@ -326,6 +326,63 @@ def grant_role_permission(session: Session, role_id: uuid.UUID, permission_key: 
     )
 
 
+def revoke_role_permission(session: Session, role_id: uuid.UUID, permission_key: str) -> bool:
+    """Remove one grant; ``True`` if a row was deleted. Audit: ``role.permission_revoked``."""
+    result = session.execute(
+        delete(RolePermission).where(
+            RolePermission.role_id == role_id, RolePermission.permission_key == permission_key
+        )
+    )
+    return bool(getattr(result, "rowcount", 0))
+
+
+def update_role_names(session: Session, role_id: uuid.UUID, *, name_en: str, name_te: str) -> None:
+    """Set a role's display names (system-role sync). Audit: ``role.updated`` {fields}."""
+    session.execute(
+        update(Role)
+        .where(Role.id == role_id)
+        .values(name_en=_nfc(name_en), name_te=_nfc(name_te), version=Role.version + 1)
+        .execution_options(synchronize_session=False)
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class DatabaseRole:
+    """The connected database role (operator commands refuse roles that could bypass RLS)."""
+
+    name: str
+    superuser: bool
+    bypass_rls: bool
+
+
+def database_role(session: Session) -> DatabaseRole:
+    row = session.execute(
+        text(
+            "SELECT r.rolname, r.rolsuper, r.rolbypassrls FROM pg_catalog.pg_roles AS r "
+            "WHERE r.rolname = current_user"
+        )
+    ).one()
+    return DatabaseRole(name=str(row[0]), superuser=bool(row[1]), bypass_rls=bool(row[2]))
+
+
+def current_tenant_id(session: Session) -> uuid.UUID:
+    """The tenant of the open ``tenant_session`` (RuntimeError when none is set)."""
+    return _current_tenant_id(session)
+
+
+def lock_system_role_sync(session: Session, tenant_id: uuid.UUID) -> None:
+    """Serialise system-role syncs of one school (transaction-level advisory lock)."""
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+        {"k": f"sos:system_role_sync:{tenant_id}"},
+    )
+
+
+def set_transaction_read_only(session: Session) -> None:
+    """Make the current transaction read-only (dry runs: any write fails in the database)."""
+    session.execute(text("SET TRANSACTION READ ONLY"))
+
+
 def add_membership_role(
     session: Session,
     membership_id: uuid.UUID,
