@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import inspect
 from pathlib import Path
 
 import app
@@ -36,6 +37,20 @@ def test_FR_OPS_004_every_outbox_route_names_a_registered_task_on_a_consumed_que
         for event, task in ops.OUTBOX_ROUTES.items()
         if task not in tasks or _queue(task) not in QUEUES
     ]
+    assert problems == []
+
+
+def test_FR_OPS_004_outbox_consumers_accept_the_dispatcher_kwargs() -> None:
+    """ops.dispatch_outbox sends tenant_id, event_id and payload to every consumer."""
+    _loaded()
+    problems = []
+    for task in sorted(set(ops.OUTBOX_ROUTES.values())):
+        try:
+            inspect.signature(celery_app.tasks[task].run).bind(
+                tenant_id="t", event_id="e", payload={}
+            )
+        except TypeError as exc:
+            problems.append(f"{task}: {exc}")
     assert problems == []
 
 
