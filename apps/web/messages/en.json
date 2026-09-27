@@ -188,7 +188,7 @@
       "colName": "Name",
       "colEmail": "Email",
       "colRoles": "Roles",
-      "colScope": "Can see",
+      "colScope": "Classes and sections",
       "colStatus": "Status",
       "colLastSignIn": "Last sign-in",
       "emptyTitle": "No users yet",
@@ -210,6 +210,136 @@
         "class_teacher": "Class teacher",
         "teacher": "Teacher",
         "auditor_readonly": "Auditor (read only)"
+      },
+      "scopeNone": "None chosen",
+      "noRoles": "No roles",
+      "noAccessTitle": "You can't manage users",
+      "noAccessBody": "Only people with the \"manage users\" permission (for example the principal or office admin) can see this page. Ask them if you need someone added.",
+      "pagesLabel": "Pages of users",
+      "colRoleKind": "Type",
+      "roleBuiltIn": "Built in",
+      "roleSchool": "Made for this school",
+      "rolesEmpty": "No roles found",
+      "rolesForm": {
+        "hint": "Changes take effect within a minute.",
+        "needsMfa": "Needs two-step sign-in (MFA).",
+        "schoolRole": "Made for this school: works only in the classes and sections chosen below.",
+        "notGrantable": "You can't give or take away this role: it has more access than your own."
+      },
+      "scopeForm": {
+        "legend": "Classes and sections",
+        "hint": "Class teachers, teachers and roles made for this school see only the students in the classes and sections chosen here. Other roles work across the whole school anyway.",
+        "mode": {
+          "none": "None chosen",
+          "chosen": "Only some classes or sections",
+          "school": "Whole school"
+        },
+        "noneHint": "Class teachers, teachers and roles made for this school will not see any students.",
+        "schoolHint": "Every role this person holds reaches every class and section.",
+        "noStructure": "No classes or sections for the current year yet. Add them in School structure first, or choose \"Whole school\".",
+        "classesLegend": "Whole classes",
+        "classesHint": "Choosing a class includes all its sections.",
+        "sectionsLegend": "Single sections",
+        "otherClass": "A class not in this year's list",
+        "otherSection": "A section from another year"
+      },
+      "detail": {
+        "title": "Staff member",
+        "back": "Back to users",
+        "notFoundTitle": "We couldn't find this person",
+        "notFoundBody": "They may not work in this school, or the link is wrong. Go back to the list and choose them again.",
+        "noAccessTitle": "You can't manage users",
+        "noAccessBody": "Ask the principal or office admin to give you the permission to manage users.",
+        "loadErrorTitle": "We couldn't load this person",
+        "loadErrorBody": "Check your internet connection and reload the page. If it keeps happening, contact support.",
+        "you": "This is you",
+        "breakGlassTitle": "Temporary SchoolOS support access",
+        "breakGlassBody": "This account is SchoolOS support with time-limited access. It can't be changed here; check it or end it on the Support access page.",
+        "breakGlassLink": "Go to Support access",
+        "invitedTitle": "Waiting for them to sign in",
+        "invitedBody": "The invitation becomes active the first time this person signs in with their sign-in ID.",
+        "removedTitle": "This person has been removed",
+        "removedBody": "They can no longer sign in to this school. To give them access again, send a new invitation.",
+        "aboutTitle": "About",
+        "language": "Language",
+        "invitedOn": "Invited on",
+        "accessEnds": "Access ends",
+        "noEnd": "No end date",
+        "detailsNote": "Name, email and language can't be changed here yet. Contact support if they are wrong.",
+        "rolesTitle": "Roles",
+        "rolesDescription": "What this person can do. Changes are recorded in the audit log.",
+        "rolesLegend": "Roles for this person",
+        "saveRoles": "Save roles",
+        "assignNeeded": "Only people who can assign roles (for example the principal) can change this.",
+        "scopeTitle": "Classes and sections",
+        "scopeDescription": "Which students the class-based roles reach. Changes are recorded in the audit log.",
+        "saveScope": "Save classes and sections",
+        "saved": "Saved. It takes effect within a minute.",
+        "loadingRoles": "Loading roles…",
+        "status": {
+          "selfNote": "This is your own account. You will lose access to this school.",
+          "activate": {
+            "button": "Give access back",
+            "title": "Give {name} access again?",
+            "body": "They can sign in to this school again with the same roles and classes."
+          },
+          "suspend": {
+            "button": "Suspend",
+            "title": "Suspend {name}?",
+            "body": "They can't sign in to this school until someone gives access back. Their roles and classes are kept."
+          },
+          "remove": {
+            "button": "Remove",
+            "title": "Remove {name}?",
+            "body": "They lose access to this school for good. This can't be undone; to add them again you must send a new invitation.",
+            "invitedBody": "The invitation is cancelled and can't be used. To add them later, send a new invitation."
+          }
+        }
+      },
+      "errors": {
+        "role_not_grantable": {
+          "title": "You can't give or take away this role",
+          "body": "One of the roles has more access than your own. Untick it, or ask the owner to make this change."
+        },
+        "last_owner": {
+          "title": "At least one owner must remain",
+          "body": "Give someone else the owner role first, then try again."
+        },
+        "breakglass_membership": {
+          "title": "This is temporary SchoolOS support access",
+          "body": "Change or end it on the Support access page."
+        },
+        "duplicate": {
+          "title": "This person already has access",
+          "body": "Someone with this sign-in ID is already in this school's list of users. Find them in the list instead."
+        },
+        "invalid_state": {
+          "title": "This can't be done in their current status",
+          "body": "Their status changed. Reload the page to see it, then try again."
+        },
+        "precondition_failed": {
+          "title": "Someone else changed this person first",
+          "body": "Reload the page to see their change, then make yours again."
+        }
+      },
+      "inviteForm": {
+        "title": "Invite user",
+        "description": "Add a staff member and choose what they can do. They get access when they first sign in.",
+        "stepUpTitle": "You may need to sign in again",
+        "stepUpBody": "Inviting staff is a sensitive action. SchoolOS may ask you to confirm it's you with your second step (MFA) before it sends the invitation.",
+        "personTitle": "Who",
+        "name": "Name",
+        "nameHint": "As the staff will see it, for example \"Lakshmi K\".",
+        "email": "Email (optional)",
+        "emailHint": "Leave it empty if they have no email address.",
+        "subject": "Sign-in ID",
+        "subjectHint": "The user ID of their account in the school's sign-in service, exactly as it is there (no spaces). Create the account there first.",
+        "language": "Language",
+        "languageHint": "The language SchoolOS uses for this person.",
+        "rolesTitle": "Roles",
+        "rolesLegend": "Roles for this person",
+        "scopeTitle": "Classes and sections",
+        "submit": "Send invitation"
       }
     },
     "billing": {
@@ -1221,7 +1351,11 @@
     "chooseColumns": "Choose at least one column.",
     "tooManyColumns": "Choose at most 60 columns.",
     "tooManyClasses": "Choose at most 50 classes, or choose \"All students I can see\".",
-    "tooManySections": "Choose at most 100 sections, or choose some classes instead."
+    "tooManySections": "Choose at most 100 sections, or choose some classes instead.",
+    "chooseScope": "Choose at least one class or section, or choose another option.",
+    "tooManyScopes": "Choose at most 200 classes and sections, or choose \"Whole school\".",
+    "tooManyRoles": "Choose at most 20 roles.",
+    "invalidSubject": "Use only letters, digits and . _ : @ | + = - in the sign-in ID."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
