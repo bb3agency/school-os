@@ -353,3 +353,88 @@ def test_FR_IMP_005_revert_takes_the_dq_findings_of_removed_students_along(
     assert _revert(world.a, batch_id).status == "reverted"
     assert _students_with(admin_engine, world.a.tenant_id, numbers) == 0
     assert S.count(admin_engine, findings, s=sids) == 0
+
+
+def test_FR_IMP_005_revert_refreshes_the_profile_of_students_whose_values_are_withdrawn(
+    world: Any, admin_engine: Engine
+) -> None:
+    """A withdrawn value no longer counts, so the searchable profile and the ETag change with it
+    (the students module owns that projection; imports only asks it to revert the batch)."""
+    rows, numbers = S.class_list(1)
+    S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, numbers[0])
+    assert sid is not None
+    parent = [["Admission Number", "Mother Name", "Remarks"], [numbers[0], "Synthetica Mother", ""]]
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(parent), source="parent_form")
+    profile_sql = "SELECT count(*) FROM sis.student_profiles WHERE student_id = :s AND {}"
+    assert S.count(admin_engine, profile_sql.format("mother_name_norm IS NOT NULL"), s=sid) == 1
+    version_before = S.SW.version(admin_engine, "sis.students", sid)
+    _revert(world.a, batch_id)
+    assert S.count(admin_engine, profile_sql.format("mother_name_norm IS NULL"), s=sid) == 1
+    assert S.SW.version(admin_engine, "sis.students", sid) > version_before
+    withdrawn = [
+        e
+        for e in W.audit_events(admin_engine, world.a.tenant_id, "student.values.withdrawn")
+        if str(e["resource_id"]) == str(sid)
+    ]
+    assert len(withdrawn) == 1
+    assert withdrawn[0]["resource_type"] == "student"
+    assert withdrawn[0]["summary"] == {
+        "import_batch_id": str(batch_id),
+        "attribute_keys": ["mother_name"],
+        "value_count": 1,
+        "reason": "import_reverted",
+    }
+
+
+def test_FR_IMP_005_imports_never_write_student_record_tables_directly() -> None:
+    """Module ownership (CLAUDE.md §4): the revert goes through students.service."""
+    from pathlib import Path
+
+    import app.imports as imports_pkg
+
+    package = Path(imports_pkg.__file__).resolve().parent
+    for path in (package / "repository.py", package / "service.py"):
+        source = path.read_text("utf-8")
+        for table in ("sis.students", "sis.attribute_values", "sis.enrollments"):
+            assert table not in source, f"{path.name} names {table}"
+    service_source = (package / "service.py").read_text("utf-8")
+    assert "app.students import crypto" not in service_source
+
+
+def _reverted_notices(admin: Engine, batch_id: uuid.UUID) -> list[Any]:
+    with admin.connect() as c:
+        return list(
+            c.execute(
+                text(
+                    "SELECT recipient_membership_id, params, resource_type FROM ops.notifications "
+                    "WHERE resource_id = :b AND template_key = 'import.reverted'"
+                ),
+                {"b": batch_id},
+            )
+        )
+
+
+def test_FR_NOT_001_importer_is_told_when_someone_else_reverts_their_import(
+    world: Any, admin_engine: Engine
+) -> None:
+    rows, _ = S.class_list(2)
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))  # by the office admin
+    _revert(world.a, batch_id, role="principal")
+    notices = _reverted_notices(admin_engine, batch_id)
+    assert [(n.recipient_membership_id, n.params, n.resource_type) for n in notices] == [
+        (
+            world.a.people["office_admin"].membership_id,
+            {"import_id": str(batch_id), "rows": 2},
+            "import_batch",
+        )
+    ]
+
+
+def test_FR_NOT_001_no_notice_when_the_importer_reverts_their_own_import(
+    world: Any, admin_engine: Engine
+) -> None:
+    rows, _ = S.class_list(1)
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    _revert(world.a, batch_id)
+    assert _reverted_notices(admin_engine, batch_id) == []

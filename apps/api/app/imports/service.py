@@ -40,7 +40,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
-from app.authz.context import Scopes, UserContext
+from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
 from app.core.db import tenant_session
@@ -92,7 +92,6 @@ from app.imports.validation import (
 from app.imports.values import ClassInfo, ClassResolver, cell_text
 from app.notifications import service as notifications
 from app.ops import service as ops
-from app.students import crypto as student_crypto
 from app.students import service as students
 from app.students.schemas import StudentCreate, ValueIn
 from app.tenancy import service as tenancy
@@ -122,8 +121,6 @@ MIME_KINDS: Final[dict[str, FileKind]] = {
     "text/csv": "csv",
 }
 _BATCH_IN_KEY: Final = re.compile(r"^t/[0-9a-f-]{36}/imports/([0-9a-f-]{36})/raw\.(?:xlsx|csv)$")
-VALUES_TABLE: Final = "sis.attribute_values"
-VALUE_COLUMN: Final = "value_ciphertext"
 EDITABLE: Final = ("parsed", "validated")
 
 
@@ -312,16 +309,21 @@ def _template_out(t: ImportMappingTemplate) -> TemplateOut:
 
 
 def _specs(session: Session) -> dict[str, AttributeSpec]:
+    """The student catalog's attributes with their validation rules (students.attribute_rules):
+    imports check cells with the same limits and formats the student service enforces."""
     return {
         a.key: AttributeSpec(
             key=a.key,
             data_type=a.data_type,
             classification=a.classification,
             is_identity=a.is_identity,
-            allowed_sources=tuple(a.allowed_sources) if a.allowed_sources else None,
-            allowed_values=tuple(a.allowed_values) if a.allowed_values else None,
+            allowed_sources=a.allowed_sources,
+            allowed_values=a.allowed_values,
+            max_length=a.max_length,
+            pattern=a.pattern,
+            not_future=a.not_future,
         )
-        for a in students.attribute_catalog(session)
+        for a in students.attribute_rules(session)
     }
 
 
@@ -1305,40 +1307,40 @@ def run_commit(  # noqa: PLR0911 - one outcome code per exit path
 # --- revert ---------------------------------------------------------------------------------------
 
 
-def _plain(session: Session, prior: repo.PriorValue) -> str:
-    if prior.value_ciphertext is not None:
-        return student_crypto.decrypt_value(
-            session,
-            prior.value_ciphertext,
-            table=VALUES_TABLE,
-            column=VALUE_COLUMN,
-            row_id=prior.id,
-        )
-    if prior.value_date is not None:
-        return prior.value_date.isoformat()
-    return prior.value_text or ""
-
-
-def _dependents() -> Conflict:
-    return Conflict(
-        "Records from this import were changed after it was added, so it cannot be reverted. "
-        "Correct the records instead.",
-        code="import_has_dependents",
+def _notify_reverted(session: Session, ctx: UserContext, batch: ImportBatch, rows: int) -> None:
+    """Tell the person who uploaded the file that someone else undid it (FR-NOT-001). No
+    notice when they reverted it themselves, or when they are no longer an active member."""
+    if batch.created_by == ctx.user_id:
+        return
+    try:
+        importer = identity.get_user(session, batch.created_by)
+    except NotFound:
+        return
+    if importer.status != "active":
+        return
+    notifications.notify(
+        session,
+        tenant_id=batch.tenant_id,
+        recipients=[importer.membership_id],
+        template_key="import.reverted",
+        params={"import_id": str(batch.id), "rows": rows},
+        resource_id=batch.id,
+        dedupe_key=f"import.reverted:{batch.id}",
     )
 
 
 def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut:
     """Undo a committed batch within 24 hours (``import.commit``; FR-IMP-005).
 
-    Refused (409 ``import_has_dependents``) when anything was recorded on top of it: a student
-    it created was changed since (version), one of its values was superseded, a value it replaced
-    is a verified or register identity value, or other records point at its students (change
-    requests: foreign keys). Data-quality findings about removed students are derived data and
-    go with them (``ON DELETE CASCADE``). Otherwise, in one transaction: students it created are
-    removed (with their values, enrolment and profile), values it added to existing students are
-    withdrawn (marked rejected; history kept) and any value they replaced becomes current again
-    (re-recorded through students.service). Audit: ``student.removed`` per student,
-    ``import.reverted``; outbox ``import.reverted``.
+    The student records are the students module's: :func:`students.plan_import_revert` refuses
+    (409 ``import_has_dependents``) when anything was recorded on top of the batch (a student it
+    created was changed since, one of its values was superseded, a value it replaced is a
+    verified or register identity value), and :func:`students.revert_import` then, in this
+    transaction, withdraws its values, restores the values they replaced, refreshes the
+    profiles and removes the students it created (other records pointing at them, such as
+    change requests, refuse the revert). Data-quality findings about removed students are
+    derived data and go with them (``ON DELETE CASCADE``). Audit: ``import.reverted`` (the
+    student events are the students module's); outbox ``import.reverted``.
     """
     batch = _visible(session, ctx, batch_id, COMMIT, lock=True)
     if batch.status != "committed":
@@ -1348,47 +1350,10 @@ def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut
         raise Conflict("Imports can be reverted only within 24 hours.", code="revert_window_closed")
     rows = repo.committed_rows(session, batch.id)
     created = {r.student_id: r.student_version for r in rows if r.created_student and r.student_id}
-    versions = repo.student_versions(session, list(created))
-    if any(versions.get(sid) != version for sid, version in created.items()):
-        raise _dependents()
-    values = repo.batch_values(session, batch.id)
-    if any(v.superseded_by is not None for v in values):
-        raise _dependents()
-    priors = repo.prior_values(session, [v.id for v in values])
-    specs = _specs(session)
-    for prior in priors:
-        spec = specs.get(prior.attribute_key)
-        if spec is None or (
-            spec.is_identity
-            and (prior.source == ANCHOR_SOURCE or prior.verification_status != "unverified")
-        ):
-            raise _dependents()
-    replaced = {p.successor_id for p in priors}
+    plan = students.plan_import_revert(session, batch.id, created)
     with _db_errors():
         repo.update_batch(session, batch.id, status="reverting")
-        withdrawn = repo.withdraw_values(
-            session, [v.id for v in values if v.id not in replaced], ctx.user_id
-        )
-        for prior in priors:
-            students.record_value(
-                session,
-                ctx,
-                prior.student_id,
-                prior.attribute_key,
-                prior.source,
-                _plain(session, prior),
-                evidence_document_id=prior.evidence_document_id,
-                verification=prior.verification_status,  # type: ignore[arg-type]
-            )
-        removed = repo.delete_created_students(session, list(created))
-    for student_id in created:
-        _audit(
-            session,
-            "student.removed",
-            student_id,
-            {"import_batch_id": batch.id, "reason": "import_reverted"},
-            resource_type="student",
-        )
+        result = students.revert_import(session, ctx, plan)
     repo.mark_rows_reverted(session, batch.id)
     updated = repo.update_batch(
         session, batch.id, status="reverted", reverted_at=now, reverted_by=ctx.user_id
@@ -1399,13 +1364,19 @@ def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut
         "import.reverted",
         batch.id,
         {
-            "students_removed": removed,
-            "values_withdrawn": withdrawn,
-            "values_restored": len(priors),
+            "students_removed": result.students_removed,
+            "values_withdrawn": result.values_withdrawn,
+            "values_restored": result.values_restored,
         },
     )
     ops.enqueue_event(session, REVERTED_EVENT, {"batch_id": batch.id})
-    log.info("imports.reverted", resource_type="import_batch", resource_id=batch.id, count=removed)
+    _notify_reverted(session, ctx, batch, len(rows))
+    log.info(
+        "imports.reverted",
+        resource_type="import_batch",
+        resource_id=batch.id,
+        count=result.students_removed,
+    )
     return _out(session, updated)
 
 
@@ -1436,20 +1407,6 @@ if _retention_guard not in documents.DELETE_GUARDS:
     documents.DELETE_GUARDS.append(_retention_guard)
 
 
-def _retention_context(tenant_id: uuid.UUID, user_id: uuid.UUID) -> UserContext:
-    """Just enough authority for documents.delete_document (school-wide ACL management)."""
-    return UserContext(
-        user_id=user_id,
-        tenant_id=tenant_id,
-        membership_id=uuid.UUID(int=0),
-        roles=frozenset({"system"}),
-        permissions=frozenset({"document.read", "document.manage_acl"}),
-        scopes=Scopes(school=True),
-        mfa=True,
-        auth_time=None,
-    )
-
-
 def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> int:
     """Delete raw import files kept past the retention period (daily job, FR-IMP-007); the
     parsed rows stay. Returns the number of documents deleted."""
@@ -1463,11 +1420,15 @@ def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> 
             if batch.document_id is not None:
                 by_document.setdefault(batch.document_id, []).append(batch)
         for document_id, batches in by_document.items():
-            ctx = _retention_context(tenant_id, batches[0].created_by)
             try:
-                documents.delete_document(s, ctx, document_id)
-            except (Conflict, NotFound):
-                continue  # kept by another batch, or already gone
+                with s.begin_nested():  # a refused delete must not abort the other documents
+                    deleted_now = documents.delete_for_retention(
+                        s, document_id, reason="import_raw_file"
+                    )
+            except Conflict:
+                continue  # kept by another batch, or still evidence for a record
+            if not deleted_now:
+                continue  # already gone
             repo.mark_raw_file_deleted(s, [b.id for b in batches], moment)
             for batch in batches:
                 audit.record(

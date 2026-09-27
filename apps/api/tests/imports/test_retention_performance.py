@@ -105,6 +105,50 @@ def test_FR_IMP_007_uncommitted_file_can_be_deleted_and_the_batch_then_fails(
     assert (batch["status"], batch["error_code"]) == ("validated", "file_missing")
 
 
+def test_FR_IMP_007_purge_is_a_system_delete_and_one_refusal_does_not_stop_the_rest(
+    world: Any, admin_engine: Engine
+) -> None:
+    """documents.delete_for_retention (no user): a raw file still linked as evidence is kept
+    (409 document_in_use inside a savepoint) and the other due files are still deleted."""
+    from sqlalchemy import text
+
+    from app.students import service as students
+
+    kept_rows, kept_numbers = S.class_list(1)
+    kept_batch = S.imported(admin_engine, world.a, S.xlsx_bytes(kept_rows))
+    gone_rows, _ = S.class_list(1)
+    gone_batch = S.imported(admin_engine, world.a, S.xlsx_bytes(gone_rows))
+    kept_doc = S.batch(admin_engine, kept_batch)["document_id"]
+    gone_doc = S.batch(admin_engine, gone_batch)["document_id"]
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, kept_numbers[0])
+    ctx = S.SW.admin_ctx(world.a)
+    with tenant_session(world.a.tenant_id, ctx.user_id) as s:
+        students.record_value(
+            s, ctx, sid, "mother_tongue", "parent_form", "Telugu", evidence_document_id=kept_doc
+        )
+    for batch_id in (kept_batch, gone_batch):
+        S.age_batch(
+            admin_engine,
+            batch_id,
+            committed_at=dt.timedelta(days=91),
+            revert_deadline=dt.timedelta(days=91),
+            created_at=dt.timedelta(days=91),
+        )
+    assert service.purge_raw_files(world.a.tenant_id) >= 1
+    assert S.batch(admin_engine, kept_batch)["document_id"] == kept_doc
+    assert S.batch(admin_engine, kept_batch)["raw_file_deleted_at"] is None
+    assert S.batch(admin_engine, gone_batch)["document_id"] is None
+    with admin_engine.connect() as c:
+        actors = c.execute(
+            text(
+                "SELECT actor_type, summary FROM audit.events WHERE tenant_id = :t "
+                "AND action = 'document.deleted' AND resource_id = :d"
+            ),
+            {"t": world.a.tenant_id, "d": gone_doc},
+        ).all()
+    assert [(a.actor_type, a.summary["reason"]) for a in actors] == [("system", "import_raw_file")]
+
+
 def test_FR_IMP_006_2000_rows_validate_well_within_60_seconds(
     world: Any, admin_engine: Engine
 ) -> None:

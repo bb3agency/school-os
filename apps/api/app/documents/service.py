@@ -952,20 +952,47 @@ def delete_document(session: Session, ctx: UserContext, document_id: uuid.UUID) 
     )
     if doc is None:
         raise _not_found()
+    _delete(session, doc, reason=None)
+
+
+RETENTION_REASONS: Final = frozenset({"import_raw_file"})
+"""Retention categories with a deletion job (docs/05 §13): import raw files, 90 days after
+commit (FR-IMP-007). Other categories get a code when their trigger is specified."""
+
+
+def delete_for_retention(session: Session, document_id: uuid.UUID, *, reason: str) -> bool:
+    """System deletion of a document whose retention period ended (docs/05 §13, FR-DOC-007).
+
+    For retention jobs, in the caller's ``tenant_session`` (RLS: this school's documents only;
+    no user, so no visibility filter). Same effect as :func:`delete_document`: the document, its
+    versions and ACL go now, every stored object after commit (outbox ``document.deleted`` ->
+    ``documents.purge_objects``). ``DELETE_GUARDS`` and evidence still linked to a student
+    record refuse it (409 with the guard's code / ``document_in_use``). Audit
+    ``document.deleted`` with the system as actor and ``reason``. Returns False if the document
+    does not exist (already deleted, or not this school's).
+    """
+    if reason not in RETENTION_REASONS:
+        raise ValueError(f"unknown retention reason: {reason}")
+    doc = repo.get_document(session, document_id, for_update=True)
+    if doc is None:
+        return False
+    _delete(session, doc, reason=reason)
+    return True
+
+
+def _delete(session: Session, doc: Document, *, reason: str | None) -> None:
     for guard in DELETE_GUARDS:
         code = guard(session, doc.id)
         if code is not None:
             raise Conflict("This document must be kept (retention rules).", code=code)
     keys = repo.object_keys_of(session, doc.id)
     batch_ids = sorted({k.split("/")[3] for k in keys if k.split("/")[2] == "imports"})
+    summary: dict[str, Any] = {"purpose": doc.purpose, "versions": len(keys)}
+    if reason is not None:
+        summary["reason"] = reason
     with _db_errors():
         repo.delete_document(session, doc.id)
-        _audit(
-            session,
-            "document.deleted",
-            doc.id,
-            {"purpose": doc.purpose, "versions": len(keys)},
-        )
+        _audit(session, "document.deleted", doc.id, summary, system=reason is not None)
         ops.enqueue_event(session, DELETED_EVENT, {"document_id": doc.id, "batch_ids": batch_ids})
 
 
@@ -1167,49 +1194,6 @@ def read_document_object(
     if hashlib.sha256(data).hexdigest() != obj.sha256_hex:
         raise Conflict("The stored file changed after upload.", code="integrity_mismatch")
     return data
-
-
-WITHHOLD_REASONS: Final = frozenset({"aadhaar_detected"})
-
-
-def withhold_version(
-    session: Session, document_id: uuid.UUID, version_no: int, reason_code: str
-) -> bool:
-    """Withhold a version from every download path. The version becomes ``quarantined`` with
-    ``error`` = ``reason_code``; download URLs are only issued for ``ready`` versions. Returns
-    True if the version changed, False if it was already withheld/unusable. Audited once
-    (``document.version_withheld``, system actor) in the caller's transaction.
-
-    The stored object is kept. For a file that must not be kept at all (PRV-016: a page that
-    showed a full Aadhaar number) use :func:`discard_version` or :func:`replace_with_redacted`.
-
-    No production caller since PRV-016 (extraction now redacts or discards the page instead);
-    kept as a public documents primitive for withholding a version without deleting its file.
-    """
-    if reason_code not in WITHHOLD_REASONS:
-        raise ValueError(f"unknown withhold reason: {reason_code}")
-    version = repo.get_version(session, document_id, version_no)
-    if version is None:
-        raise _not_found()
-    if version.status in UNUSABLE_STATUSES:
-        return False
-    updated = repo.set_version_status(
-        session,
-        version.id,
-        "quarantined",
-        error=reason_code,
-        from_statuses=tuple({"queued", "scanning", "ready"}),
-    )
-    if updated is None:
-        return False
-    _audit(
-        session,
-        "document.version_withheld",
-        document_id,
-        {"version_no": version_no, "reason": reason_code},
-        system=True,
-    )
-    return True
 
 
 DISCARD_REASONS: Final = frozenset({"aadhaar_redacted", "aadhaar_unredactable"})
@@ -1484,7 +1468,7 @@ __all__ = [
     "DISCARD_TASK",
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
-    "WITHHOLD_REASONS",
+    "RETENTION_REASONS",
     "FileTooLarge",
     "StoredObject",
     "UnsupportedFileType",
@@ -1492,6 +1476,7 @@ __all__ = [
     "create_upload",
     "delete_document",
     "delete_export_files",
+    "delete_for_retention",
     "discard_object",
     "discard_version",
     "document_object",
@@ -1513,5 +1498,4 @@ __all__ = [
     "store_page_image",
     "sweep_discarded_objects",
     "validate_acl",
-    "withhold_version",
 ]

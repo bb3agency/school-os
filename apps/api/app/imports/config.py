@@ -36,7 +36,6 @@ class ImportConfig:
     required_create: tuple[str, ...]
     required_create_by_source: Mapping[str, tuple[str, ...]]
     text_max_length: Mapping[str, int]
-    admission_no_pattern: str
     synonyms: Mapping[str, tuple[str, ...]]
     enum_synonyms: Mapping[str, Mapping[str, tuple[str, ...]]]
     class_aliases: Mapping[str, tuple[str, ...]]
@@ -65,7 +64,6 @@ def parse_config(raw: Mapping[str, Any]) -> ImportConfig:
             str(k): _strs(v) for k, v in (required.get("create_by_source") or {}).items()
         },
         text_max_length={str(k): int(v) for k, v in raw["text_max_length"].items()},
-        admission_no_pattern=str(raw["admission_no_pattern"]),
         synonyms={str(k): _strs(v) for k, v in raw["synonyms"].items()},
         enum_synonyms={
             str(attr): {str(value): _strs(words) for value, words in options.items()}

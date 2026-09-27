@@ -1,23 +1,15 @@
 """Database access for imports. Only ``app.imports.service`` calls this module.
 
 Every function takes a ``core.db.tenant_session()``: RLS limits each statement to that school.
-Bound parameters only.
-
-The last section ("revert") touches student-record tables of ``app.students``: the revert of a
-batch (FR-IMP-005) must remove the students the batch created and withdraw the values it
-recorded, and ``students.service`` has no function for that yet (reported to its owner). The
-statements are narrow and guarded by the database itself (migration 0012): a student can only be
-deleted while the batch that created it is ``reverting``; values are never deleted directly
-(the app has no DELETE grant on ``sis.attribute_values``) but go with their student through the
-``ON DELETE CASCADE`` foreign key; withdrawn values are marked ``rejected`` (history is kept).
+Bound parameters only. Student-record tables belong to ``app.students``: the revert of a batch
+(FR-IMP-005) goes through ``students.plan_import_revert`` / ``students.revert_import``.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import delete, func, insert, select, text, update
@@ -244,109 +236,3 @@ def touch_template(session: Session, template_id: uuid.UUID) -> None:
         .values(last_used_at=func.now())
         .execution_options(synchronize_session=False)
     )
-
-
-# --- revert (student-record tables; see module docstring) -----------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class BatchValue:
-    id: uuid.UUID
-    student_id: uuid.UUID
-    attribute_key: str
-    source: str
-    superseded_by: uuid.UUID | None
-
-
-@dataclass(frozen=True, slots=True)
-class PriorValue:
-    """A value that one of the batch's values superseded (restored on revert)."""
-
-    id: uuid.UUID
-    successor_id: uuid.UUID
-    student_id: uuid.UUID
-    attribute_key: str
-    source: str
-    value_text: str | None
-    value_date: dt.date | None
-    value_ciphertext: bytes | None
-    verification_status: str
-    evidence_document_id: uuid.UUID | None
-
-
-def student_versions(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, int]:
-    if not student_ids:
-        return {}
-    rows = session.execute(
-        text("SELECT id, version FROM sis.students WHERE id = ANY(:ids)"),
-        {"ids": list(student_ids)},
-    ).all()
-    return {r.id: int(r.version) for r in rows}
-
-
-def batch_values(session: Session, batch_id: uuid.UUID) -> list[BatchValue]:
-    rows = session.execute(
-        text(
-            "SELECT id, student_id, attribute_key, source, superseded_by "
-            "FROM sis.attribute_values WHERE import_batch_id = :b ORDER BY id"
-        ),
-        {"b": batch_id},
-    ).all()
-    return [
-        BatchValue(r.id, r.student_id, r.attribute_key, r.source, r.superseded_by) for r in rows
-    ]
-
-
-def prior_values(session: Session, successor_ids: Collection[uuid.UUID]) -> list[PriorValue]:
-    if not successor_ids:
-        return []
-    rows = session.execute(
-        text(
-            "SELECT id, superseded_by, student_id, attribute_key, source, value_text, value_date, "
-            "value_ciphertext, verification_status, evidence_document_id "
-            "FROM sis.attribute_values WHERE superseded_by = ANY(:ids) ORDER BY id"
-        ),
-        {"ids": list(successor_ids)},
-    ).all()
-    return [
-        PriorValue(
-            id=r.id,
-            successor_id=r.superseded_by,
-            student_id=r.student_id,
-            attribute_key=r.attribute_key,
-            source=r.source,
-            value_text=r.value_text,
-            value_date=r.value_date,
-            value_ciphertext=bytes(r.value_ciphertext) if r.value_ciphertext is not None else None,
-            verification_status=r.verification_status,
-            evidence_document_id=r.evidence_document_id,
-        )
-        for r in rows
-    ]
-
-
-def withdraw_values(session: Session, value_ids: Collection[uuid.UUID], user_id: uuid.UUID) -> int:
-    """Mark current values of a reverted batch ``rejected`` (kept in history, never canonical)."""
-    if not value_ids:
-        return 0
-    result = session.execute(
-        text(
-            "UPDATE sis.attribute_values SET verification_status = 'rejected', "
-            "verified_by = :u, verified_at = now() "
-            "WHERE id = ANY(:ids) AND superseded_by IS NULL RETURNING id"
-        ),
-        {"ids": list(value_ids), "u": user_id},
-    )
-    return len(result.all())
-
-
-def delete_created_students(session: Session, student_ids: Collection[uuid.UUID]) -> int:
-    """Remove students created by a batch that is ``reverting`` (values and profile cascade)."""
-    if not student_ids:
-        return 0
-    ids = list(student_ids)
-    session.execute(text("DELETE FROM sis.enrollments WHERE student_id = ANY(:ids)"), {"ids": ids})
-    result = session.execute(
-        text("DELETE FROM sis.students WHERE id = ANY(:ids) RETURNING id"), {"ids": ids}
-    )
-    return len(result.all())

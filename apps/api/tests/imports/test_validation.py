@@ -356,3 +356,21 @@ def test_FR_IMP_002_mapping_problems() -> None:
     }
     both = mapping_problems({"0": "class_section", "1": "class"}, 7, SPECS, "admission_register")
     assert [p["code"] for p in both] == ["class_section_conflict"]
+
+
+def test_FR_IMP_003_length_format_and_date_rules_come_from_the_attribute_spec() -> None:
+    """The student catalog's rules (students.attribute_rules) drive the cell checks."""
+    specs = {
+        **SPECS,
+        "admission_no": dataclasses.replace(
+            SPECS["admission_no"], max_length=32, pattern="^[A-Za-z0-9][A-Za-z0-9/._-]{0,31}$"
+        ),
+        "full_name": dataclasses.replace(SPECS["full_name"], max_length=12),
+        "dob": dataclasses.replace(SPECS["dob"], not_future=False),
+    }
+    sheet = _rows(
+        ["A 1!", "Synthetica Far Too Long", "", "14/03/2012", "M", "9", "A"],
+        ["A-2", "Synthetica", "", "01/01/2031", "F", "9", "A"],
+    )
+    result = validate_sheet(sheet, MAPPING, _ctx(specs=specs))
+    assert _codes(result) == [{"admission_no:invalid_format", "full_name:too_long"}, set()]
