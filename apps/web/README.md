@@ -6,26 +6,27 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 
 ## Layout
 
-| Path                               | What                                                                                                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/server/config.ts`             | Env parsing; refuses short secrets, plain http outside localhost, dev placeholders on https                                                                              |
-| `src/server/session/`              | Session store (Valkey, `sos:web:sess:*`), AES-256-GCM token sealing, cookies, RSC helpers (`getSession`, `requireStaff`, `requireOperator`)                              |
-| `src/server/auth/`                 | OIDC (openid-client v6: code + PKCE S256, refresh, end session), `next` validation, refresh rotation + reuse detection, route handlers                                   |
-| `src/server/bff/`                  | `/bff/api/v1/*` proxy, service token (jose HS256), CSRF checks, upstream call                                                                                            |
-| `src/app/bff/**/route.ts`          | Thin route files that call the handlers above                                                                                                                            |
-| `src/lib/bff/`                     | Browser side: session info, typed BFF client (CSRF header, 401 → sign-in, 428 → step-up), TanStack Query hooks                                                           |
-| `src/components/session/`          | "Lock now" button and the idle-timeout `<dialog>`                                                                                                                        |
-| `src/instrumentation.ts`           | Validates the BFF config once at server start                                                                                                                            |
-| `src/features/platform/`           | Platform admin panel screens (C14): TanStack Query + `ActionDialog` forms against `/api/v1/platform/*`, incl. a school's provisioning state and "Resume provisioning"    |
-| `src/features/school/`             | School console screens (audit log and chain check, plan & billing, support, home, announcements banner)                                                                  |
-| `src/features/academic-structure/` | Academic structure (US-202, FR-TEN-010): years, classes and sections with add/edit for `tenant.structure.manage`, If-Match (412 → reload) (`/settings/structure`)        |
-| `src/features/settings/`           | School profile and settings (FR-TEN-012): languages, date format, idle timeout, AI switch and budget for `tenant.settings.manage`; step-up per call (`/settings/school`) |
-| `src/features/users/`              | Users and roles (US-102): staff list, invite, status, roles and class/section scopes (`/settings/users/*`; step-up per call)                                             |
-| `src/features/documents/`          | Documents (US-701, FR-DOC-001..008): list with filters in the URL, presigned upload straight to storage, versions, who can see it (`/documents/*`)                       |
-| `src/features/auth/`               | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                                              |
-| `src/lib/forms.ts`                 | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                                                    |
-| `src/lib/api-errors.ts`            | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                                                 |
-| `src/lib/school-class.ts`          | `classLabel`: a class's name in the UI language (Telugu name in `te`, else English)                                                                                      |
+| Path                               | What                                                                                                                                                                         |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/server/config.ts`             | Env parsing; refuses short secrets, plain http outside localhost, dev placeholders on https                                                                                  |
+| `src/server/session/`              | Session store (Valkey, `sos:web:sess:*`), AES-256-GCM token sealing, cookies, RSC helpers (`getSession`, `requireStaff`, `requireOperator`)                                  |
+| `src/server/auth/`                 | OIDC (openid-client v6: code + PKCE S256, refresh, end session), `next` validation, refresh rotation + reuse detection, route handlers                                       |
+| `src/server/bff/`                  | `/bff/api/v1/*` proxy, service token (jose HS256), CSRF checks, upstream call                                                                                                |
+| `src/app/bff/**/route.ts`          | Thin route files that call the handlers above                                                                                                                                |
+| `src/lib/bff/`                     | Browser side: session info, typed BFF client (CSRF header, 401 → sign-in, 428 → step-up), TanStack Query hooks                                                               |
+| `src/components/session/`          | "Lock now" button and the idle-timeout `<dialog>`                                                                                                                            |
+| `src/instrumentation.ts`           | Validates the BFF config once at server start                                                                                                                                |
+| `src/features/platform/`           | Platform admin panel screens (C14): TanStack Query + `ActionDialog` forms against `/api/v1/platform/*`, incl. a school's provisioning state and "Resume provisioning"        |
+| `src/features/school/`             | School console screens (audit log and chain check, plan & billing, support, home, announcements banner)                                                                      |
+| `src/features/academic-structure/` | Academic structure (US-202, FR-TEN-010): years, classes and sections with add/edit for `tenant.structure.manage`, If-Match (412 → reload) (`/settings/structure`)            |
+| `src/features/settings/`           | School profile and settings (FR-TEN-012): languages, date format, idle timeout, AI switch and budget for `tenant.settings.manage`; step-up per call (`/settings/school`)     |
+| `src/features/users/`              | Users and roles (US-102): staff list, invite, status, roles and class/section scopes (`/settings/users/*`; step-up per call)                                                 |
+| `src/features/documents/`          | Documents (US-701, FR-DOC-001..008): list with filters in the URL, presigned upload straight to storage, versions, who can see it (`/documents/*`)                           |
+| `src/features/auth/`               | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                                                  |
+| `src/lib/forms.ts`                 | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                                                        |
+| `src/lib/api-errors.ts`            | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                                                     |
+| `src/lib/date-format.ts`           | Display dates in the school's `date_format` from GET /me (FR-TEN-012); `formatDate`/`formatDateTime` in `lib/format.ts` use it (browser only; the server renders DD/MM/YYYY) |
+| `src/lib/school-class.ts`          | `classLabel`: a class's name in the UI language (Telugu name in `te`, else English)                                                                                          |
 
 ## Sessions and security (summary)
 
@@ -37,6 +38,10 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
   AES-256-GCM (HKDF-SHA256 key from `SESSION_SECRET`, AAD binds each ciphertext to its session).
 - Idle timeout 15 min (sliding on each authenticated request; the session-info GET does not
   slide it), absolute 12 h for staff, 8 h for operators. Warning dialog 1 min before idle expiry.
+  Staff sessions take the active school's `idle_timeout_minutes` (5–30, clamped; FR-IAM-003)
+  from the API's answer to `POST /me/active-tenant` and from `GET /me` in the school layout;
+  a new school starts at the 15-minute default until its value is known, step-up keeps it,
+  and it never runs past the absolute limit. Operators always have 15 min.
 - CSRF: synchronizer token (from `GET /bff/auth/session`, memory only) in `X-CSRF-Token` on
   every POST/PUT/PATCH/DELETE, compared in constant time; plus SameSite=Lax and Origin /
   `Sec-Fetch-Site` checks.

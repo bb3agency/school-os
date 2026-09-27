@@ -7,6 +7,8 @@ import { IDLE_WARNING_MS, SessionControls } from "./SessionControls";
 const CSRF = "k".repeat(43);
 const MINUTE = 60_000;
 let expiresInMs: number;
+let idleTimeoutMs: number;
+let absoluteInMs: number;
 let logoutRedirect: string;
 let requests: Request[];
 
@@ -18,9 +20,9 @@ function info() {
     active_tenant_id: null,
     mfa: false,
     csrf_token: CSRF,
-    idle_timeout_ms: 15 * MINUTE,
+    idle_timeout_ms: idleTimeoutMs,
     idle_expires_at: new Date(Date.now() + expiresInMs).toISOString(),
-    absolute_expires_at: new Date(Date.now() + 12 * 60 * MINUTE).toISOString(),
+    absolute_expires_at: new Date(Date.now() + absoluteInMs).toISOString(),
     expires_in_ms: expiresInMs,
   });
 }
@@ -29,6 +31,8 @@ beforeEach(() => {
   forgetSessionInfo();
   requests = [];
   expiresInMs = 15 * MINUTE;
+  idleTimeoutMs = 15 * MINUTE;
+  absoluteInMs = 12 * 60 * MINUTE;
   logoutRedirect = "/signed-out";
   vi.stubGlobal(
     "fetch",
@@ -37,7 +41,7 @@ beforeEach(() => {
       requests.push(request);
       const path = new URL(request.url).pathname;
       if (path === "/bff/auth/session") {
-        if (request.method === "POST") expiresInMs = 15 * MINUTE;
+        if (request.method === "POST") expiresInMs = idleTimeoutMs;
         return info();
       }
       if (path === "/bff/auth/logout") return Response.json({ redirect_to: logoutRedirect });
@@ -150,5 +154,46 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
     });
     expect(screen.getByRole("dialog", { hidden: true })).not.toHaveAttribute("open");
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("follows the school's idle timeout from the session info (FR-IAM-003)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    idleTimeoutMs = 5 * MINUTE;
+    expiresInMs = 5 * MINUTE;
+    const navigate = vi.fn();
+    renderWithIntl(<SessionControls kind="staff" navigate={navigate} />);
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2 * MINUTE);
+    });
+    // Activity slides the deadline by the school's 5 minutes, not the 15 minute default.
+    act(() => {
+      window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * MINUTE - IDLE_WARNING_MS + 1_000);
+    });
+    expect(screen.getByRole("dialog")).toHaveAttribute("open");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(IDLE_WARNING_MS);
+    });
+    expect(navigate).toHaveBeenCalledWith("/signed-out?reason=idle");
+  });
+
+  it("never counts activity past the absolute session limit", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    idleTimeoutMs = 30 * MINUTE;
+    expiresInMs = 10 * MINUTE;
+    absoluteInMs = 10 * MINUTE;
+    const navigate = vi.fn();
+    renderWithIntl(<SessionControls kind="staff" navigate={navigate} />);
+    await flush();
+    act(() => {
+      window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * MINUTE);
+    });
+    expect(navigate).toHaveBeenCalledWith("/signed-out?reason=idle");
   });
 });

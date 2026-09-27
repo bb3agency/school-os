@@ -1,47 +1,32 @@
 import type { Locale } from "@/i18n/routing";
+import {
+  formatDisplayDate,
+  formatDisplayDateTime,
+  schoolDateFormat,
+  type DateFormat,
+} from "./date-format";
 
 /**
- * Indian conventions (PRD §8): dates as DD/MM/YYYY, times in IST, rupees with lakh/crore
- * grouping. Digits stay Latin in both languages, as on school registers.
+ * Indian conventions (PRD §8): dates in the school's date format (DD/MM/YYYY by default,
+ * FR-TEN-012), times in IST, rupees with lakh/crore grouping. Digits stay Latin in both
+ * languages, as on school registers.
  */
-const TIME_ZONE = "Asia/Kolkata";
 const NUMBER_LOCALE: Record<Locale, string> = { en: "en-IN", te: "te-IN" };
 
-const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-/** `2026-06-01` or an RFC 3339 timestamp → `01/06/2026` (IST). */
-export function formatDate(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const dateOnly = DATE_ONLY.exec(value);
-  if (dateOnly) {
-    const [, y, m, d] = dateOnly;
-    return `${d}/${m}/${y}`;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TIME_ZONE,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("day")}/${get("month")}/${get("year")}`;
+/** `2026-06-01` or an RFC 3339 timestamp → `01/06/2026` (IST; the school's date format). */
+export function formatDate(
+  value: string | null | undefined,
+  format: DateFormat = schoolDateFormat(),
+): string | null {
+  return formatDisplayDate(value, format);
 }
 
-/** RFC 3339 timestamp → `01/06/2026 14:05` (IST, 24-hour). */
-export function formatDateTime(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TIME_ZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-  return `${formatDate(value) ?? ""} ${time}`;
+/** RFC 3339 timestamp → `01/06/2026 14:05` (IST, 24-hour; the school's date format). */
+export function formatDateTime(
+  value: string | null | undefined,
+  format: DateFormat = schoolDateFormat(),
+): string | null {
+  return formatDisplayDateTime(value, format);
 }
 
 /** Decimal string from the API (numeric(14,2)) → `₹1,23,456.00`. */

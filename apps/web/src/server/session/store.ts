@@ -16,8 +16,14 @@ import type { KeyValue } from "./kv";
  */
 
 export const SESSION_KEY_PREFIX = "sos:web:sess:";
-/** Idle timeout (docs/07 §5.2). Tenant-configurable 5–30 min later; default for now. */
-export const IDLE_TIMEOUT_MS = 15 * 60_000;
+/**
+ * Idle timeout (docs/07 §5.2, FR-IAM-003): 15 minutes unless the active school set its own
+ * value between 5 and 30 minutes (GET /me `settings.idle_timeout_minutes`, FR-TEN-012).
+ * Operators always get 15 minutes (docs/07 §5.1).
+ */
+export const IDLE_TIMEOUT_MINUTES = { min: 5, max: 30, fallback: 15 } as const;
+/** The secure default, used whenever the school's value is not known. */
+export const IDLE_TIMEOUT_MS = IDLE_TIMEOUT_MINUTES.fallback * 60_000;
 /** Absolute lifetime: 12 h for school staff, 8 h for operators (docs/16 §2). */
 export const ABSOLUTE_TIMEOUT_MS: Record<SessionKind, number> = {
   staff: 12 * 60 * 60_000,
@@ -25,6 +31,22 @@ export const ABSOLUTE_TIMEOUT_MS: Record<SessionKind, number> = {
 };
 
 const SESSION_ID = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * A school's idle timeout in minutes to milliseconds, clamped to 5–30 minutes (fractions are
+ * cut down to whole minutes). Anything that is not a finite number gives null: use the default.
+ */
+export function idleTimeoutMsFromMinutes(minutes: unknown): number | null {
+  if (typeof minutes !== "number" || !Number.isFinite(minutes)) return null;
+  const whole = Math.trunc(minutes);
+  return Math.min(IDLE_TIMEOUT_MINUTES.max, Math.max(IDLE_TIMEOUT_MINUTES.min, whole)) * 60_000;
+}
+
+function clampIdleMs(ms: unknown): number | null {
+  return typeof ms === "number" && Number.isFinite(ms)
+    ? idleTimeoutMsFromMinutes(Math.trunc(ms / 60_000))
+    : null;
+}
 
 export interface TokenSet {
   accessToken: string;
@@ -52,6 +74,9 @@ export interface Session {
   /** The API has not audited this sign-in yet (the user still has to choose a school). */
   loginEventPending: boolean;
   accessExpiresAt: number;
+  /** This session's idle timeout (the active school's setting, or the default). */
+  idleTimeoutMs: number;
+  /** Never later than `absoluteExpiresAt`. */
   idleExpiresAt: number;
   absoluteExpiresAt: number;
 }
@@ -71,6 +96,8 @@ interface StoredMeta {
   csrf: string;
   /** Login event pending (set at sign-in when several schools are offered). */
   lp?: boolean;
+  /** Idle timeout in ms from the active school's settings (staff only; absent: default). */
+  idle?: number;
 }
 
 interface StoredTokens {
@@ -93,6 +120,8 @@ export interface NewSession {
   handle?: string;
   csrfToken?: string;
   loginEventPending?: boolean;
+  /** Keep the school's idle timeout (step-up of the same session); clamped to 5–30 min. */
+  idleTimeoutMs?: number;
 }
 
 export interface SessionStoreOptions {
@@ -116,6 +145,7 @@ export const sessionKeys = key;
 export class SessionStore {
   private readonly tokenKey: Buffer;
   private readonly now: () => number;
+  /** Default idle timeout for sessions without a school setting (and for operators). */
   readonly idleTimeoutMs: number;
 
   constructor(
@@ -136,9 +166,17 @@ export class SessionStore {
     return sha256(cookieValue);
   }
 
-  private ttl(meta: StoredMeta, now: number): number {
+  /** The idle timeout that applies to this session (docs/07 §5.1, §5.2). */
+  private idleOf(meta: StoredMeta): number {
+    const school = meta.kind === "staff" ? clampIdleMs(meta.idle) : null;
+    return Math.min(school ?? this.idleTimeoutMs, ABSOLUTE_TIMEOUT_MS[meta.kind]);
+  }
+
+  /** Key lifetime: the rest of the idle window from `seen`, never past the absolute limit. */
+  private ttl(meta: StoredMeta, now: number, seen: number = now): number {
+    const idleLeft = seen + this.idleOf(meta) - now;
     const absoluteLeft = meta.created + ABSOLUTE_TIMEOUT_MS[meta.kind] - now;
-    return Math.max(1, Math.min(this.idleTimeoutMs, absoluteLeft));
+    return Math.max(1, Math.min(idleLeft, absoluteLeft));
   }
 
   private toSession(id: string, meta: StoredMeta, seen: number, accessExp: number): Session {
@@ -158,7 +196,11 @@ export class SessionStore {
       csrfToken: meta.csrf,
       loginEventPending: meta.lp === true,
       accessExpiresAt: accessExp,
-      idleExpiresAt: seen + this.idleTimeoutMs,
+      idleTimeoutMs: this.idleOf(meta),
+      idleExpiresAt: Math.min(
+        seen + this.idleOf(meta),
+        meta.created + ABSOLUTE_TIMEOUT_MS[meta.kind],
+      ),
       absoluteExpiresAt: meta.created + ABSOLUTE_TIMEOUT_MS[meta.kind],
     };
   }
@@ -170,6 +212,7 @@ export class SessionStore {
   async create(input: NewSession): Promise<{ cookieValue: string; session: Session }> {
     const now = this.now();
     const cookieValue = randomToken(32);
+    const carriedIdle = input.kind === "staff" ? clampIdleMs(input.idleTimeoutMs) : null;
     const id = this.storageId(cookieValue);
     const meta: StoredMeta = {
       v: 1,
@@ -185,6 +228,7 @@ export class SessionStore {
       mfa: input.mfa,
       csrf: input.csrfToken ?? randomToken(32),
       ...(input.loginEventPending ? { lp: true } : {}),
+      ...(carriedIdle !== null ? { idle: carriedIdle } : {}),
     };
     const pxMs = this.ttl(meta, now);
     const stored: StoredTokens = {
@@ -227,7 +271,7 @@ export class SessionStore {
     if (
       meta.v !== 1 ||
       !Number.isFinite(seen) ||
-      now - seen >= this.idleTimeoutMs ||
+      now - seen >= this.idleOf(meta) ||
       now - meta.created >= ABSOLUTE_TIMEOUT_MS[meta.kind]
     ) {
       await this.revoke(id, meta);
@@ -252,7 +296,12 @@ export class SessionStore {
 
   /** Replace tokens after a refresh (caller holds the refresh lock). */
   async saveTokens(session: Session, tokens: TokenSet, accessExpiresAt: number): Promise<void> {
-    const pxMs = Math.max(1, Math.min(this.idleTimeoutMs, session.absoluteExpiresAt - this.now()));
+    // Read the stored settings: the school's idle timeout may have changed since `session`.
+    const raw = await this.kv.get(key.meta(session.id));
+    const now = this.now();
+    const pxMs = raw
+      ? this.ttl(JSON.parse(raw) as StoredMeta, now)
+      : Math.max(1, Math.min(session.idleTimeoutMs, session.absoluteExpiresAt - now));
     const stored: StoredTokens = {
       sealed: this.sealTokens(session.id, tokens),
       accessExp: accessExpiresAt,
@@ -260,10 +309,15 @@ export class SessionStore {
     await this.kv.set(key.tokens(session.id), JSON.stringify(stored), { pxMs });
   }
 
+  /**
+   * Set the active school. Its idle timeout replaces the previous school's: the value from
+   * the API's answer (`settings.idle_timeout_minutes`) when given, otherwise the default, so a
+   * school never inherits another school's longer timeout.
+   */
   async setActiveTenant(
     session: Session,
     tenantId: string | null,
-    options: { loginEventPending?: boolean } = {},
+    options: { loginEventPending?: boolean; idleTimeoutMinutes?: unknown } = {},
   ): Promise<void> {
     const raw = await this.kv.get(key.meta(session.id));
     if (!raw) return;
@@ -271,9 +325,45 @@ export class SessionStore {
     meta.tenant = tenantId;
     if (options.loginEventPending === true) meta.lp = true;
     if (options.loginEventPending === false) delete meta.lp;
-    await this.kv.set(key.meta(session.id), JSON.stringify(meta), {
-      pxMs: this.ttl(meta, this.now()),
-    });
+    this.setIdle(meta, options.idleTimeoutMinutes);
+    await this.rearm(session.id, meta);
+  }
+
+  /**
+   * Apply the idle timeout from GET /me `settings` (FR-TEN-012) when the session is still in
+   * `tenantId`. Returns the updated session, or null when it is in another school, is gone,
+   * or has already been idle longer than the new timeout (then it is revoked).
+   */
+  async applySchoolIdleTimeout(
+    session: Pick<Session, "id">,
+    tenantId: string,
+    idleTimeoutMinutes: unknown,
+  ): Promise<Session | null> {
+    const raw = await this.kv.get(key.meta(session.id));
+    if (!raw) return null;
+    const meta = JSON.parse(raw) as StoredMeta;
+    if (meta.kind !== "staff" || meta.tenant === null) return null;
+    if (meta.tenant.toLowerCase() !== tenantId.toLowerCase()) return null;
+    const before = meta.idle;
+    this.setIdle(meta, idleTimeoutMinutes);
+    if (meta.idle !== before) await this.rearm(session.id, meta);
+    return this.get(session.id);
+  }
+
+  private setIdle(meta: StoredMeta, minutes: unknown): void {
+    const idle = meta.kind === "staff" ? idleTimeoutMsFromMinutes(minutes) : null;
+    if (idle === null) delete meta.idle;
+    else meta.idle = idle;
+  }
+
+  /** Save metadata and give every session key the lifetime of the (new) idle window. */
+  private async rearm(id: string, meta: StoredMeta): Promise<void> {
+    const now = this.now();
+    const seen = Number(await this.kv.get(key.seen(id)));
+    const pxMs = this.ttl(meta, now, Number.isFinite(seen) && seen > 0 ? seen : now);
+    await this.kv.set(key.meta(id), JSON.stringify(meta), { pxMs });
+    await this.kv.pexpire(key.seen(id), pxMs);
+    await this.kv.pexpire(key.tokens(id), pxMs);
   }
 
   async revoke(id: string, knownMeta?: StoredMeta): Promise<void> {

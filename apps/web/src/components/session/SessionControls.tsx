@@ -101,7 +101,10 @@ export function SessionControls({
 export function IdleWarning({ kind, navigate }: { kind: SessionKind; navigate: Navigate }) {
   const t = useTranslations("auth.idle");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // The session's own idle timeout (the school's setting) arrives with the session info; the
+  // server enforces it on every request, this only times the warning.
   const idleTimeoutRef = useRef(15 * 60_000);
+  const absoluteRef = useRef(Number.POSITIVE_INFINITY);
   const [deadline, setDeadline] = useState<number | null>(null);
   const titleId = useId();
   const bodyId = useId();
@@ -112,12 +115,14 @@ export function IdleWarning({ kind, navigate }: { kind: SessionKind; navigate: N
       .then((info) => {
         if (cancelled || !info.authenticated) return;
         idleTimeoutRef.current = info.idle_timeout_ms;
+        const absolute = Date.parse(info.absolute_expires_at);
+        if (Number.isFinite(absolute)) absoluteRef.current = absolute;
         setDeadline(Date.now() + info.expires_in_ms);
       })
       .catch(() => undefined);
     const onActivity = (event: Event) => {
       if ((event as CustomEvent<{ kind?: string }>).detail?.kind !== kind) return;
-      setDeadline(Date.now() + idleTimeoutRef.current);
+      setDeadline(Math.min(Date.now() + idleTimeoutRef.current, absoluteRef.current));
     };
     window.addEventListener(ACTIVITY_EVENT, onActivity);
     return () => {
