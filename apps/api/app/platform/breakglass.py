@@ -2,23 +2,153 @@
 
 M0: operators can list and record requests. Emergency access (legal obligation or active
 security incident, no school approval) needs two confirmations by two DIFFERENT operators who
-hold ``platform.breakglass.emergency`` (service check + DB CHECK). Creating the temporary
-tenant-side grant (``ops.break_glass_grants``) and the school approval flow ship in M1.
+hold ``platform.breakglass.emergency`` (service check + DB CHECK).
+
+M1 (US-103, FR-OPS-004): the school side (``app.breakglass``) PULLS this school's open requests
+(:func:`requests_for_school`) into its own ``ops.break_glass_grants``, decides there (approval
+with step-up, denial, revocation, expiry) and reports each outcome back with
+:func:`record_school_outcome`, which updates the request status and writes the control-plane
+audit chain. The control plane never writes tenant tables.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
+from typing import Any, Final
 
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound
 from app.core.ids import new_id
+from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import Actor, audit_platform, db_errors, now
+from app.platform.common import SYSTEM, Actor, audit_platform, db_errors, now
 from app.platform.schemas import BreakGlassIn, BreakGlassOut
+
+log = get_logger(__name__)
+
+# Status changes the school side may report (request status -> allowed next statuses).
+_SCHOOL_TRANSITIONS: Final[dict[str, frozenset[str]]] = {
+    "requested": frozenset({"active", "denied", "expired"}),
+    "approved": frozenset({"active", "expired", "revoked"}),  # emergency (two operators)
+    "active": frozenset({"expired", "revoked"}),
+}
+
+
+class SchoolBreakGlassRequest(BaseModel):
+    """What the school needs to decide on a request: the request and who would get access.
+
+    ``operator_*`` identify the requesting operator (an adult SchoolOS employee): the school
+    sees who asks, and an approval gives that IdP subject a temporary membership.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    requested_by: uuid.UUID
+    reason_code: str
+    reason: str
+    scope: dict[str, Any]
+    duration_minutes: int
+    emergency: bool
+    status: str
+    created_at: dt.datetime
+    emergency_confirmed_at: dt.datetime | None
+    operator_subject: str | None
+    operator_display_name: str
+    operator_email: str | None
+    operator_status: str
+
+
+def _school_requests(
+    tenant_id: uuid.UUID, request_id: uuid.UUID | None = None
+) -> list[SchoolBreakGlassRequest]:
+    r, o = m.breakglass_requests, m.operators
+    stmt = (
+        select(
+            r.c.id,
+            r.c.tenant_id,
+            r.c.requested_by,
+            r.c.reason_code,
+            r.c.reason,
+            r.c.scope,
+            r.c.duration_minutes,
+            r.c.emergency,
+            r.c.status,
+            r.c.created_at,
+            r.c.emergency_confirmed_at,
+            o.c.idp_subject.label("operator_subject"),
+            o.c.display_name.label("operator_display_name"),
+            o.c.email.label("operator_email"),
+            o.c.status.label("operator_status"),
+        )
+        .join(o, o.c.id == r.c.requested_by)
+        .where(r.c.tenant_id == tenant_id)
+        .order_by(r.c.created_at, r.c.id)
+    )
+    if request_id is not None:
+        stmt = stmt.where(r.c.id == request_id)
+    else:
+        stmt = stmt.where(r.c.status.in_(("requested", "approved"))).limit(200)
+    with platform_session() as s:
+        return [
+            SchoolBreakGlassRequest.model_validate(dict(row)) for row in s.execute(stmt).mappings()
+        ]
+
+
+def requests_for_school(tenant_id: uuid.UUID) -> list[SchoolBreakGlassRequest]:
+    """This school's requests awaiting it: ``requested`` (needs the school's approval) and
+    ``approved`` emergency requests (two operators confirmed; the school is told)."""
+    return _school_requests(tenant_id)
+
+
+def request_for_school(
+    tenant_id: uuid.UUID, request_id: uuid.UUID
+) -> SchoolBreakGlassRequest | None:
+    """One request of this school (another school's ID answers ``None``)."""
+    found = _school_requests(tenant_id, request_id)
+    return found[0] if found else None
+
+
+def record_school_outcome(
+    tenant_id: uuid.UUID, request_id: uuid.UUID, status: str, *, grant_id: uuid.UUID
+) -> bool:
+    """Mirror the school's decision or the grant's end onto the request (idempotent).
+
+    Returns True when the status changed (and ``breakglass.<status>`` was written to the
+    control-plane audit chain); False when it already had that status, the request is not this
+    school's, or the transition is not allowed.
+    """
+    with platform_session() as s, db_errors():
+        row = repo.get(s, m.breakglass_requests, request_id, for_update=True)
+        if row is None or row["tenant_id"] != tenant_id or row["status"] == status:
+            return False
+        if status not in _SCHOOL_TRANSITIONS.get(row["status"], frozenset()):
+            log.warning(
+                "breakglass.outcome_ignored",
+                resource_type="breakglass_request",
+                resource_id=request_id,
+                outcome=status,
+            )
+            return False
+        repo.update_row(
+            s, m.breakglass_requests, request_id, {"status": status, "updated_at": now()}
+        )
+        audit_platform(
+            s,
+            SYSTEM,
+            f"breakglass.{status}",
+            "breakglass_request",
+            request_id,
+            {"grant_id": grant_id, "status": status, "source": "school"},
+            tenant_id=tenant_id,
+        )
+        return True
 
 
 def list_requests(tenant_id: uuid.UUID | None = None) -> list[BreakGlassOut]:

@@ -1,0 +1,162 @@
+# In-app notification templates (C11, FR-NOT-001). Versioned configuration shipped inside the
+# package (the API image does not copy /config). Rendered server-side in the reader's language
+# (Accept-Language: en or te); the stored notification keeps only the key and its params.
+#
+# Per template
+#   params         every placeholder the template may use, and nothing else. Values are IDs,
+#                  counts and codes only (validated like audit summaries): never names, dates of
+#                  birth, phone numbers or free text.
+#   resource_type  what the notification links to (resource_id is passed by the caller)
+#   en / te        title + body. ICU-style placeholders:
+#                    {count}                                     the value
+#                    {count, plural, =0 {...} one {# row} other {# rows}}   # = the number
+#                    {code, select, a {...} b {...} other {...}}            by code
+#
+# Writing rules (CLAUDE.md §10): plain language, sentence case, say what to do next. Telugu is
+# written for office staff, not translated word for word.
+version: 1
+
+retention:
+  # Read notifications are deleted after this many days (daily job notifications.purge_read).
+  read_days: 90
+
+templates:
+  change_request.submitted:
+    params: [change_request_id, student_id]
+    resource_type: change_request
+    en:
+      title: Correction waiting for your approval
+      body: A correction to a student's record is waiting for your approval. Open it to see the evidence and approve or reject it.
+    te:
+      title: మీ ఆమోదం కోసం సవరణ వేచి ఉంది
+      body: ఒక విద్యార్థి రికార్డులో సవరణ మీ ఆమోదం కోసం వేచి ఉంది. ఆధారం చూసి ఆమోదించడానికి లేదా తిరస్కరించడానికి దాన్ని తెరవండి.
+
+  change_request.approved:
+    params: [change_request_id, student_id]
+    resource_type: change_request
+    en:
+      title: Correction approved
+      body: Your correction request was approved and the student's record is updated.
+    te:
+      title: సవరణ ఆమోదించబడింది
+      body: మీ సవరణ అభ్యర్థన ఆమోదించబడింది. విద్యార్థి రికార్డు నవీకరించబడింది.
+
+  change_request.rejected:
+    params: [change_request_id, student_id]
+    resource_type: change_request
+    en:
+      title: Correction not approved
+      body: Your correction request was not approved. Open it to see why.
+    te:
+      title: సవరణ ఆమోదించబడలేదు
+      body: మీ సవరణ అభ్యర్థన ఆమోదించబడలేదు. కారణం తెలుసుకోవడానికి దాన్ని తెరవండి.
+
+  dq.run.completed:
+    params: [run_id, blockers, warnings]
+    resource_type: dq_run
+    en:
+      title: Data check finished
+      body: "The data check found {blockers, plural, =0 {no problems that block submission} one {# problem that blocks submission} other {# problems that block submission}} and {warnings, plural, =0 {no warnings} one {# warning} other {# warnings}}."
+    te:
+      title: డేటా తనిఖీ పూర్తయింది
+      body: "డేటా తనిఖీలో {blockers, plural, =0 {సమర్పణను ఆపే సమస్యలు ఏవీ లేవు} one {సమర్పణను ఆపే # సమస్య ఉంది} other {సమర్పణను ఆపే # సమస్యలు ఉన్నాయి}}, {warnings, plural, =0 {హెచ్చరికలు ఏవీ లేవు} one {# హెచ్చరిక ఉంది} other {# హెచ్చరికలు ఉన్నాయి}}."
+
+  import.validated:
+    params: [import_id, valid_rows, error_rows]
+    resource_type: import_batch
+    en:
+      title: Your file has been checked
+      body: "{valid_rows, plural, =0 {No rows are} one {# row is} other {# rows are}} ready to add. {error_rows, plural, =0 {Nothing needs fixing.} one {# row needs fixing before you add the file.} other {# rows need fixing before you add the file.}}"
+    te:
+      title: మీ ఫైల్ తనిఖీ పూర్తయింది
+      body: "{valid_rows, plural, =0 {జోడించడానికి సిద్ధంగా ఉన్న వరుసలు లేవు.} one {# వరుస జోడించడానికి సిద్ధంగా ఉంది.} other {# వరుసలు జోడించడానికి సిద్ధంగా ఉన్నాయి.}} {error_rows, plural, =0 {సరిచేయాల్సింది ఏమీ లేదు.} one {ఫైల్ జోడించే ముందు # వరుసను సరిచేయాలి.} other {ఫైల్ జోడించే ముందు # వరుసలను సరిచేయాలి.}}"
+
+  import.committed:
+    params: [import_id, rows]
+    resource_type: import_batch
+    en:
+      title: Records added
+      body: "{rows, plural, one {# row was} other {# rows were}} added to the student records."
+    te:
+      title: రికార్డులు జోడించబడ్డాయి
+      body: "{rows, plural, one {# వరుస} other {# వరుసలు}} విద్యార్థి రికార్డులకు జోడించబడ్డాయి."
+
+  document.quarantined:
+    params: [document_id]
+    resource_type: document
+    en:
+      title: A file was blocked
+      body: A file you uploaded failed the virus check and was not saved. Check the file on your computer and upload a clean copy.
+    te:
+      title: ఒక ఫైల్ నిలిపివేయబడింది
+      body: మీరు అప్‌లోడ్ చేసిన ఫైల్ వైరస్ తనిఖీలో విఫలమైంది, కాబట్టి అది సేవ్ కాలేదు. మీ కంప్యూటర్‌లో ఫైల్‌ను తనిఖీ చేసి, సురక్షితమైన ప్రతిని మళ్లీ అప్‌లోడ్ చేయండి.
+
+  breakglass.requested:
+    params: [grant_id, minutes, reason_code]
+    resource_type: breakglass_grant
+    en:
+      title: SchoolOS support asks for access
+      body: "SchoolOS support asks to see your school's records for {minutes} minutes {reason_code, select, support_request {to answer your support request} security_incident {because of a security incident} legal_obligation {because the law requires it} other {}}. Review the request and approve or deny it."
+    te:
+      title: SchoolOS సపోర్ట్ అనుమతి కోరుతోంది
+      body: "{reason_code, select, support_request {మీ సపోర్ట్ అభ్యర్థనకు సమాధానం ఇవ్వడానికి} security_incident {భద్రతా సంఘటన కారణంగా} legal_obligation {చట్టపరమైన అవసరం కారణంగా} other {}} SchoolOS సపోర్ట్ మీ పాఠశాల రికార్డులను {minutes} నిమిషాల పాటు చూడటానికి అనుమతి కోరుతోంది. అభ్యర్థనను పరిశీలించి ఆమోదించండి లేదా తిరస్కరించండి."
+
+  breakglass.approved:
+    params: [grant_id, minutes]
+    resource_type: breakglass_grant
+    en:
+      title: Support access approved
+      body: SchoolOS support can now see your school's records (read-only). Access ends by itself after {minutes} minutes, and you can end it earlier from the Support access page.
+    te:
+      title: సపోర్ట్ అనుమతి ఆమోదించబడింది
+      body: SchoolOS సపోర్ట్ ఇప్పుడు మీ పాఠశాల రికార్డులను చూడగలదు (చూడటానికి మాత్రమే; మార్పులు చేయడం సాధ్యం కాదు). {minutes} నిమిషాల తర్వాత అనుమతి దానంతట అదే ముగుస్తుంది. ముందే ముగించాలంటే 'సపోర్ట్ అనుమతి' పేజీని తెరవండి.
+
+  breakglass.denied:
+    params: [grant_id]
+    resource_type: breakglass_grant
+    en:
+      title: Support access denied
+      body: The request from SchoolOS support to see your school's records was denied. SchoolOS support has no access.
+    te:
+      title: సపోర్ట్ అనుమతి తిరస్కరించబడింది
+      body: మీ పాఠశాల రికార్డులను చూడటానికి SchoolOS సపోర్ట్ చేసిన అభ్యర్థన తిరస్కరించబడింది. SchoolOS సపోర్ట్‌కు ఎలాంటి అనుమతి లేదు.
+
+  breakglass.revoked:
+    params: [grant_id]
+    resource_type: breakglass_grant
+    en:
+      title: Support access ended
+      body: Your school ended SchoolOS support access. Support can no longer see your records.
+    te:
+      title: సపోర్ట్ అనుమతి ముగిసింది
+      body: మీ పాఠశాల SchoolOS సపోర్ట్ అనుమతిని ముగించింది. సపోర్ట్ ఇకపై మీ రికార్డులను చూడలేదు.
+
+  breakglass.expired:
+    params: [grant_id]
+    resource_type: breakglass_grant
+    en:
+      title: Support access time is over
+      body: The time for SchoolOS support access is over. Support can no longer see your records. Everything they looked at is in the audit log.
+    te:
+      title: సపోర్ట్ అనుమతి సమయం ముగిసింది
+      body: SchoolOS సపోర్ట్ అనుమతి సమయం ముగిసింది. సపోర్ట్ ఇకపై మీ రికార్డులను చూడలేదు. వారు చూసినవన్నీ ఆడిట్ లాగ్‌లో ఉన్నాయి.
+
+  breakglass.emergency:
+    params: [grant_id, minutes, reason_code]
+    resource_type: breakglass_grant
+    en:
+      title: Emergency support access opened
+      body: "SchoolOS opened emergency access to your school's records {reason_code, select, security_incident {because of a security incident} legal_obligation {because the law requires it} other {}}. Two SchoolOS staff confirmed it. Access is read-only and ends after {minutes} minutes. You can end it now from the Support access page; everything support looks at is in the audit log."
+    te:
+      title: అత్యవసర సపోర్ట్ అనుమతి తెరవబడింది
+      body: "{reason_code, select, security_incident {భద్రతా సంఘటన కారణంగా} legal_obligation {చట్టపరమైన అవసరం కారణంగా} other {అత్యవసర కారణంగా}} SchoolOS మీ పాఠశాల రికార్డులకు అత్యవసర అనుమతి తెరిచింది. ఇద్దరు SchoolOS సిబ్బంది దీన్ని నిర్ధారించారు. అనుమతి చూడటానికి మాత్రమే, {minutes} నిమిషాల తర్వాత ముగుస్తుంది. 'సపోర్ట్ అనుమతి' పేజీ నుండి మీరు దీన్ని ఇప్పుడే ముగించవచ్చు. సపోర్ట్ చూసినవన్నీ ఆడిట్ లాగ్‌లో ఉంటాయి."
+
+  announcement.new:
+    params: [announcement_id]
+    resource_type: announcement
+    en:
+      title: New message from SchoolOS
+      body: There is a new message from SchoolOS. Read it in the banner at the top of the page.
+    te:
+      title: SchoolOS నుండి కొత్త సందేశం
+      body: SchoolOS నుండి కొత్త సందేశం వచ్చింది. పేజీ పైభాగంలోని బ్యానర్‌లో దాన్ని చదవండి.

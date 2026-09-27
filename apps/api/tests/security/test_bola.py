@@ -87,6 +87,10 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/documents/{document_id}/versions"): {"upload_id": str(uuid.uuid4())},
     ("PUT", "/api/v1/documents/{document_id}/acl"): {"acl": []},
     ("DELETE", "/api/v1/documents/{document_id}"): None,
+    ("POST", "/api/v1/notifications/{notification_id}/read"): None,
+    ("POST", "/api/v1/breakglass/requests/{request_id}/approve"): None,
+    ("POST", "/api/v1/breakglass/requests/{request_id}/deny"): None,
+    ("POST", "/api/v1/breakglass/grants/{grant_id}/revoke"): None,
 }
 
 
@@ -141,6 +145,43 @@ def _b_document(w: Any) -> uuid.UUID:
     return doc_id
 
 
+def _b_notification(w: Any) -> uuid.UUID:
+    """A notification of school B's owner (FR-NOT-001; created via notifications.service)."""
+    from sqlalchemy import text
+
+    from app.core.db import tenant_session
+    from app.notifications import service as notifications
+
+    key = f"bola:{uuid.uuid4()}"
+    with tenant_session(w.b.tenant_id) as s:
+        notifications.notify(
+            s,
+            tenant_id=w.b.tenant_id,
+            recipients=[w.b.people["owner"].membership_id],
+            template_key="import.committed",
+            params={"import_id": str(uuid.uuid4()), "rows": 1},
+            dedupe_key=key,
+        )
+        value: object = s.execute(
+            text("SELECT id FROM ops.notifications WHERE dedupe_key = :k"), {"k": key}
+        ).scalar_one()
+    return uuid.UUID(str(value))
+
+
+def _bg() -> ModuleType:
+    """tests/breakglass/objects.py (pending/active grants through the real services)."""
+    name = "sos_test_breakglass_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "breakglass" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -152,6 +193,10 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "value_id": lambda w: SW.ensure_students(w)["b_sb"],
     "guardian_id": lambda w: SW.ensure_students(w)["b_gb"],
     "document_id": _b_document,
+    "notification_id": _b_notification,
+    # Break-glass (US-103): a pending request / an active grant of school B.
+    "request_id": lambda w: _bg().pending_grant(w.b.tenant_id),
+    "grant_id": lambda w: _bg().active_grant(w.b.tenant_id, w.b.people["owner"]),
 }
 
 

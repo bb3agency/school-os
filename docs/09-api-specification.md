@@ -189,9 +189,25 @@ Document errors: 413 `file_too_large`; 415 `unsupported_file_type` / `polyglot_s
 | GET | `/audit/events` (`actor`, `resource_type`, `resource_id`, `action`, `from`, `to`; newest first) · `/audit/verify` | `audit.read` (**built**; CSV export not yet) |
 | POST | `/admin/tenant-export` → 202 | `tenant.export_all` (step-up) |
 | GET/PUT | `/admin/retention` | `tenant.settings.manage` |
-| POST | `/admin/break-glass/{id}/approve` · `/revoke` | `breakglass.approve` (step-up) |
+| GET · POST | Break-glass: see *Break-glass (support access)* below | `breakglass.approve` |
 | GET | `/jobs/{id}` | job owner or admin |
 | GET | `/healthz` · `/readyz` (not under `/api/v1`) | public (no data) (**built**) |
+
+### Break-glass (support access; US-103, FR-OPS-004, 07 §6.4)
+A request pulled from the control plane and the grant it becomes are one object (`ops.break_glass_grants`), so `{request_id}` and `{grant_id}` name the same row. Another school's ID → 404.
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/breakglass/requests` (`status`, `limit`, `cursor`) · `/breakglass/requests/{request_id}` | `breakglass.approve` (the list first pulls new requests) |
+| POST | `/breakglass/requests/{request_id}/approve` · `/deny` | `breakglass.approve` (step-up); approver ≠ the person who gets access |
+| POST | `/breakglass/grants/{grant_id}/revoke` | `breakglass.approve` (step-up); also ends emergency access |
+
+### Notifications (FR-NOT-001)
+Own notifications only (another person's or school's ID → 404). Titles and bodies are rendered in the `Accept-Language` language (`te` or `en`, default `en`; `Content-Language` says which).
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/notifications` (`unread`, `limit`, `cursor`) | authenticated |
+| GET | `/notifications/unread-count` | authenticated |
+| POST | `/notifications/{id}/read` · `/notifications/read-all` | authenticated |
 
 ### Control plane and fleet (shared deployment only)
 Full catalog with permissions: [16 §8](16-platform-admin-panel.md#8-api-endpoint-catalog). Summary:

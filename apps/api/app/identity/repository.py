@@ -241,6 +241,27 @@ def set_membership_status(
     return membership
 
 
+def set_membership_window(
+    session: Session, membership_id: uuid.UUID, *, status: str, expires_at: dt.datetime | None
+) -> Membership:
+    """Set status and expiry together (break-glass memberships only; docs/07 §6.4).
+
+    Used by ``identity.service`` to open or close a temporary ``platform_support`` membership,
+    whose window is set by the grant rather than by the staff-management transitions.
+    Audit: ``membership.breakglass_opened`` / ``membership.breakglass_closed``.
+    """
+    membership = session.scalars(
+        update(Membership)
+        .where(Membership.id == membership_id)
+        .values(status=status, expires_at=expires_at, version=Membership.version + 1)
+        .returning(Membership),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+    if membership is None:
+        raise NotFound("Membership not found")
+    return membership
+
+
 # --- roles and permissions -----------------------------------------------------------------
 
 

@@ -398,7 +398,87 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"body": "Synthetic follow-up"},
         {},
     ),
+    # Notifications (FR-NOT-001): every member, own notifications only.
+    ("GET", "/api/v1/notifications"): lambda w, r, a: ("/api/v1/notifications", None, {}),
+    ("GET", "/api/v1/notifications/unread-count"): lambda w, r, a: (
+        "/api/v1/notifications/unread-count",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/notifications/read-all"): lambda w, r, a: (
+        "/api/v1/notifications/read-all",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/notifications/{notification_id}/read"): lambda w, r, a: (
+        f"/api/v1/notifications/{_notification(w.a.tenant_id, w.person(r).membership_id)}/read",
+        None,
+        {},
+    ),
+    # Break-glass, school side (US-103, FR-OPS-004): owner and principal, step-up for changes.
+    ("GET", "/api/v1/breakglass/requests"): lambda w, r, a: (
+        "/api/v1/breakglass/requests",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/breakglass/requests/{request_id}"): lambda w, r, a: (
+        f"/api/v1/breakglass/requests/{_bg().pending_grant(w.a.tenant_id)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/breakglass/requests/{request_id}/approve"): lambda w, r, a: (
+        f"/api/v1/breakglass/requests/{_bg().pending_grant(w.a.tenant_id)}/approve",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/breakglass/requests/{request_id}/deny"): lambda w, r, a: (
+        f"/api/v1/breakglass/requests/{_bg().pending_grant(w.a.tenant_id)}/deny",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/breakglass/grants/{grant_id}/revoke"): lambda w, r, a: (
+        f"/api/v1/breakglass/grants/{_bg().active_grant(w.a.tenant_id, w.person('owner'))}/revoke",
+        None,
+        {},
+    ),
 }
+
+
+def _bg() -> ModuleType:
+    """tests/breakglass/objects.py (pending/active grants through the real services)."""
+    name = "sos_test_breakglass_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "breakglass" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _notification(tenant_id: uuid.UUID, membership_id: uuid.UUID) -> uuid.UUID:
+    """A notification for ``membership_id`` (created through app.notifications.service)."""
+    from sqlalchemy import text
+
+    from app.core.db import tenant_session
+    from app.notifications import service as notifications
+
+    key = f"matrix:{uuid.uuid4()}"
+    with tenant_session(tenant_id) as s:
+        notifications.notify(
+            s,
+            tenant_id=tenant_id,
+            recipients=[membership_id],
+            template_key="import.committed",
+            params={"import_id": str(uuid.uuid4()), "rows": 1},
+            dedupe_key=key,
+        )
+        value: object = s.execute(
+            text("SELECT id FROM ops.notifications WHERE dedupe_key = :k"), {"k": key}
+        ).scalar_one()
+    return uuid.UUID(str(value))
 
 
 def _ticket(w: Any) -> uuid.UUID:

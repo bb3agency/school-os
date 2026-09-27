@@ -1002,6 +1002,30 @@ CREATE TABLE ops.break_glass_grants (
     REFERENCES core.memberships (tenant_id, id)
 );
 
+-- 0011_breakglass (M1 workflow, US-103) adds to ops.break_glass_grants: reason_code,
+-- duration_minutes (15..480), emergency, operator_display_name, requested_at, decided_at,
+-- membership_id (the temporary platform_support membership), denied_by_membership,
+-- revoked_by_membership, platform_status_synced; UNIQUE (tenant_id, platform_request_id);
+-- CHECKs: no self-approval (approved_by_membership <> membership_id) and emergency grants
+-- have no school approver; composite FKs for every membership column; REVOKE DELETE from
+-- sos_app.
+
+-- In-app notifications (C11, FR-NOT-001; migration 0010_notifications). One row per recipient.
+-- template_key + params are rendered in EN/TE at read time (app/notifications/templates.yaml);
+-- params hold IDs, counts and codes only (validated like audit summaries). The app may only
+-- UPDATE read_at. Read notifications are purged after 90 days.
+CREATE TABLE ops.notifications (
+  id uuid PRIMARY KEY, tenant_id uuid NOT NULL REFERENCES core.tenants (id),
+  recipient_membership_id uuid NOT NULL,
+  template_key text NOT NULL, params jsonb NOT NULL DEFAULT '{}',
+  resource_type text, resource_id uuid,             -- deep link (both or neither)
+  dedupe_key text,                                  -- UNIQUE per recipient when set
+  created_at timestamptz NOT NULL DEFAULT now(), read_at timestamptz,
+  UNIQUE (tenant_id, id),
+  FOREIGN KEY (tenant_id, recipient_membership_id) REFERENCES core.memberships (tenant_id, id)
+    ON DELETE CASCADE
+);
+
 -- Outbox rows are written by the app and only claimed by the dispatcher (never edited):
 REVOKE UPDATE, DELETE ON ops.outbox FROM sos_app;
 GRANT SELECT, UPDATE (dispatched_at) ON ops.outbox TO sos_definer;
@@ -1071,6 +1095,7 @@ Identity attributes resolve to the verified admission-register value (BR-01). If
 | Security/ICT logs | ≥ 1 year, stored in India | See 08 §6 |
 | Tenant offboarding | Export → delete within 30 days → crypto-shred | Certificate of deletion issued |
 | `ops.idempotency_keys` | 24 hours | Purged daily |
+| `ops.notifications` | 90 days after being read | Purged daily (`notifications.purge_read`); unread ones are kept |
 | Invoices, invoice lines, payments, billing accounts (`platform`) | 8 years after the financial year ends | Tax and accounting records; kept after offboarding (no student data); confirm period with a CA |
 | Support tickets and messages (`platform`) | 1 year after closing | 16 §15 |
 | Usage aggregates (`platform.usage_daily`) | 3 years | Counts only |

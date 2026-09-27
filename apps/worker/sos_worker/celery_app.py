@@ -14,9 +14,12 @@ from celery import Celery, Task, signals
 from celery.schedules import crontab
 from kombu import Queue
 
+from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
 from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
+from app.documents.tasks import beat_schedule as documents_beat_schedule
+from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
 
@@ -31,7 +34,10 @@ TASK_MODULES: list[str] = [
     "sos_worker.tasks",
     "app.audit.tasks",
     "app.ops.tasks",
+    "app.notifications.tasks",
+    "app.breakglass.tasks",
     "app.platform.tasks",
+    "app.documents.tasks",
 ]
 
 
@@ -54,7 +60,11 @@ def create_celery() -> Celery:
         timezone="UTC",
         enable_utc=True,
         broker_connection_retry_on_startup=True,
-        task_routes={"maintenance.*": {"queue": "maintenance"}},
+        task_routes={
+            "maintenance.*": {"queue": "maintenance"},
+            # FR-DOC-002: AV scans run on the ingest queue (send_task honours routes only).
+            "documents.scan": {"queue": "ingest"},
+        },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
             "audit-archive-daily": {
@@ -67,6 +77,12 @@ def create_celery() -> Celery:
             },
             # FR-OPS-004: outbox relay and idempotency-key purge (both modes).
             **ops_beat_schedule(),
+            # FR-NOT-001: purge read notifications after 90 days (both modes).
+            **notifications_beat_schedule(),
+            # FR-OPS-004: break-glass pull, expiry and outcome reporting (every minute).
+            **breakglass_beat_schedule(),
+            # FR-DOC-007: purge expired upload intents and staging objects.
+            **documents_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

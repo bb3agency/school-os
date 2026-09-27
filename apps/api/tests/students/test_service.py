@@ -144,8 +144,9 @@ def _evidence_document(admin: Engine, tenant_id: uuid.UUID, created_by: uuid.UUI
     with admin.begin() as c:
         c.execute(
             text(
-                "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, sensitivity, "
-                "created_by) VALUES (:d, :t, 'evidence', 'evidence', 'Synthetic evidence', 'C3', :u)"
+                "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, "
+                "sensitivity, created_by) "
+                "VALUES (:d, :t, 'evidence', 'evidence', 'Synthetic evidence', 'C3', :u)"
             ),
             {"d": doc_id, "t": tenant_id, "u": created_by},
         )

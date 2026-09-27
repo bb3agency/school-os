@@ -29,6 +29,13 @@ _MODES: Final = ("school", "scoped", "school_step_up")
 AUTHENTICATED: Final = "session.authenticated"
 """Implicit permission of every active member (routes such as ``GET /me``)."""
 
+BREAKGLASS_ROLE: Final = "platform_support"
+"""The tenant-side temporary role of break-glass support access (docs/07 §6.4, FR-OPS-004).
+
+Not one of the FR-IAM-010 system roles: it is defined in roles.yaml ``breakglass_role``, created
+in a school only when support access is first granted there, never assignable by staff, and
+limited to plain read permissions (validated at load)."""
+
 
 class CatalogError(ValueError):
     """The YAML catalog is inconsistent (raised at load time)."""
@@ -115,13 +122,20 @@ def _parse_permissions(raw: dict[str, Any]) -> dict[str, PermissionDef]:
     return out
 
 
-def _parse_roles(raw: dict[str, Any], permissions: dict[str, PermissionDef]) -> dict[str, RoleDef]:
-    items = raw.get("roles")
+def _parse_roles(
+    raw: dict[str, Any], permissions: dict[str, PermissionDef], *, section: str = "roles"
+) -> dict[str, RoleDef]:
+    items = raw.get(section)
     if not isinstance(items, dict) or not items:
-        raise CatalogError("roles.yaml: 'roles' must be a non-empty mapping")
+        raise CatalogError(f"roles.yaml: '{section}' must be a non-empty mapping")
     out: dict[str, RoleDef] = {}
     for key, spec in items.items():
-        if not isinstance(key, str) or not _ROLE_RE.match(key) or key.startswith("platform"):
+        platform_ok = section == "breakglass_role" and key == BREAKGLASS_ROLE
+        if (
+            not isinstance(key, str)
+            or not _ROLE_RE.match(key)
+            or (key.startswith("platform") and not platform_ok)
+        ):
             raise CatalogError(f"roles.yaml: bad role key {key!r}")
         if not isinstance(spec, dict):
             raise CatalogError(f"roles.yaml: {key} must be a mapping")
@@ -171,6 +185,40 @@ def permission_catalog() -> MappingProxyType[str, PermissionDef]:
 def system_roles() -> MappingProxyType[str, RoleDef]:
     """The system role templates, keyed by role key (FR-IAM-010)."""
     return MappingProxyType(_parse_roles(_load_yaml("roles.yaml"), dict(permission_catalog())))
+
+
+@lru_cache(maxsize=1)
+def breakglass_role() -> RoleDef:
+    """The ``platform_support`` template (roles.yaml ``breakglass_role``; docs/07 §6.4).
+
+    Load-time rules: exactly one role named :data:`BREAKGLASS_ROLE`; every grant is ``scoped``
+    (reach comes from the temporary membership's scopes, which mirror the request scope) and
+    names a normal-sensitivity, non-step-up ``*.read*`` permission, so support access can never
+    change data or see C3 fields.
+    """
+    roles = _parse_roles(
+        _load_yaml("roles.yaml"), dict(permission_catalog()), section="breakglass_role"
+    )
+    if set(roles) != {BREAKGLASS_ROLE}:
+        raise CatalogError(f"roles.yaml: breakglass_role must define only {BREAKGLASS_ROLE}")
+    role = roles[BREAKGLASS_ROLE]
+    catalog = permission_catalog()
+    for grant in role.grants:
+        pdef = catalog[grant.permission]
+        action = grant.permission.rsplit(".", 1)[1]
+        if (
+            not grant.scoped
+            or pdef.step_up
+            or pdef.sensitivity != "normal"
+            or not action.startswith("read")
+        ):
+            raise CatalogError(
+                f"roles.yaml: {BREAKGLASS_ROLE} may only hold scoped, normal read permissions "
+                f"({grant.permission})"
+            )
+    if role.membership_ttl is not None or role.assign_any_role:
+        raise CatalogError(f"roles.yaml: {BREAKGLASS_ROLE} window comes from the grant")
+    return role
 
 
 def tenant_permission(key: str) -> PermissionDef:

@@ -190,3 +190,26 @@ roles:
       document.read: school
       audit.read: school
       finance.read: school
+
+# Break-glass support access (docs/07 §6.4, US-103, FR-OPS-004). NOT a system role: it is not
+# cloned at provisioning, not listed for assignment and never assignable by staff. It is created
+# in a school the first time the school approves support access, and only the break-glass
+# workflow gives it to the operator's temporary membership (expires with the grant, at most 8 h).
+# Every grant is "scoped": its reach is the membership's scopes, copied from the request scope
+# (the whole school, or one class/section). Read-only by construction (validated at load, and
+# require() refuses non-GET calls from break-glass sessions):
+#   student.read_basic  see the records a support request is about (C2 only; never C3)
+#   dq.findings.read    see the data-quality findings the school asks about
+#   document.read       open the uploaded file / register photo behind an import problem
+# Deliberately NOT granted: student.read_sensitive (C3), audit.read (the school's audit log is
+# how the school watches the operator; the watched never reads the watch log, docs/07 T17),
+# kb.ask (AI queries), exports, and every write permission.
+breakglass_role:
+  platform_support:
+    name_en: SchoolOS support (temporary)
+    name_te: SchoolOS సపోర్ట్ (తాత్కాలికం)
+    mfa_required: true
+    grants:
+      student.read_basic: scoped
+      dq.findings.read: scoped
+      document.read: scoped
