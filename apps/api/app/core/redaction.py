@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 __all__ = [
     "EMAIL_MASK",
@@ -326,7 +326,7 @@ class AadhaarMatch:
 
     start: int
     end: int
-    digits: str
+    digits: str = field(repr=False)  # never in a log line or traceback (invariants 4, 5)
     verhoeff: bool
 
 

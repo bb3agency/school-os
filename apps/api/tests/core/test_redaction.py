@@ -407,6 +407,15 @@ def test_PRV_016_find_aadhaar_reports_windows_not_merged_regions() -> None:
     assert found[0].start < found[1].start < found[0].end
 
 
+def test_PRV_016_aadhaar_match_repr_never_shows_the_digits() -> None:
+    # A match that ends up in a log line, an assertion message or a traceback must not carry
+    # the number (invariants 4 and 5).
+    match = find_aadhaar(f"{VALID[:4]} {VALID[4:8]} {VALID[8:]}")[0]
+    for shown in (repr(match), str(match), f"{match!r}"):
+        assert VALID not in shown
+        assert VALID[:4] not in shown
+
+
 def test_PRV_016_find_aadhaar_ignores_phones_uuids_and_long_blocks() -> None:
     assert find_aadhaar("+91 98765 43210") == []
     assert find_aadhaar(str(KNOWN_COLLISION)) == []
