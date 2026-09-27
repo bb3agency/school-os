@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from app.authz import breakglass_guard
 from app.authz.catalog import AUTHENTICATED, CatalogError, tenant_permission
 from app.authz.context import UserContext
-from app.authz.resolver import AuthzResolver
+from app.authz.resolver import AuthzResolver, RouteKey
 from app.core.db import tenant_session
 from app.core.errors import BadRequest, Forbidden
 from app.core.logging import bind_context
@@ -57,6 +57,15 @@ def request_id_of(request: Request) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def route_of(request: Request) -> RouteKey | None:
+    """The matched route template (e.g. ``/api/v1/tenant/billing``); ``None`` if unknown.
+
+    Used only for the suspended-school allowlist (``resolver.SUSPENDED_SCHOOL_ALLOWLIST``);
+    an unknown route is refused there (fails closed)."""
+    path = getattr(request.scope.get("route"), "path", None)
+    return RouteKey(request.method, path) if isinstance(path, str) else None
+
+
 async def get_user_context(
     request: Request,
     principal: Annotated[Principal, Depends(get_principal)],
@@ -72,6 +81,7 @@ async def get_user_context(
         principal,
         tenant_hint=tenant_hint(request),
         request_id=request_id_of(request),
+        route=route_of(request),
     )
     bind_context(tenant_id=ctx.tenant_id, user_id=ctx.user_id)
     return ctx

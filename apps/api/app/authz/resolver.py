@@ -6,8 +6,10 @@
 2. Choose the tenant: the BFF's ``X-Active-Tenant`` hint, else the only membership. Several
    memberships and no hint: 409 ``active_tenant_required``. A hint that is not one of the user's
    schools: 403 ``no_membership`` (never reveal whether that school exists).
-3. Refuse schools that are not active: 403 ``tenant_suspended`` (suspended/offboarding) or
-   ``tenant_unavailable``.
+3. Refuse schools that are not active: 403 ``tenant_unavailable`` (e.g. still provisioning);
+   a suspended or offboarding school answers 403 ``tenant_suspended`` unless the matched route
+   and one of the member's roles are on :data:`SUSPENDED_SCHOOL_ALLOWLIST` (BR-08: the owner and
+   principal keep "who am I", Plan & billing and, once built, the full data export).
 4. Load the permission snapshot (cached 60 s per tenant + membership, invalidated on change).
 5. FR-IAM-002: a membership holding a privileged role (roles.yaml ``mfa_required``) or flagged
    ``mfa_required`` needs the MFA claim, else 403 ``mfa_required``.
@@ -17,6 +19,8 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Final
 
 from app.authz import cache
 from app.authz.cache import PermissionSnapshot
@@ -28,6 +32,68 @@ from app.identity.principal import Principal
 from app.identity.schemas import LoginChoice, MembershipAccess
 
 _SUSPENDED = frozenset({"suspended", "offboarding"})
+
+
+@dataclass(frozen=True, slots=True)
+class RouteKey:
+    """The matched route of a request: HTTP method and path template (``{param}`` form)."""
+
+    method: str
+    path: str
+
+
+@dataclass(frozen=True, slots=True)
+class SuspendedAccess:
+    """One route that members holding one of ``roles`` may still use in a suspended school."""
+
+    method: str
+    path: str
+    roles: frozenset[str]
+
+    @property
+    def key(self) -> RouteKey:
+        return RouteKey(self.method, self.path)
+
+
+SUSPENDED_ROLES: Final = frozenset({"owner", "principal"})
+"""System roles that keep billing and export access while a school is suspended (BR-08)."""
+
+ME_ACTIVE_TENANT: Final = RouteKey("POST", "/api/v1/me/active-tenant")
+ME_LOGIN_EVENT: Final = RouteKey("POST", "/api/v1/me/login-event")
+
+SUSPENDED_SCHOOL_ALLOWLIST: Final[tuple[SuspendedAccess, ...]] = (
+    # Who am I, choosing the school and the sign-in event (the BFF's session flow).
+    SuspendedAccess("GET", "/api/v1/me", SUSPENDED_ROLES),
+    SuspendedAccess(ME_ACTIVE_TENANT.method, ME_ACTIVE_TENANT.path, SUSPENDED_ROLES),
+    SuspendedAccess(ME_LOGIN_EVENT.method, ME_LOGIN_EVENT.path, SUSPENDED_ROLES),
+    # Plan & billing (FR-PLT-030): what is owed, so the school can pay and be reactivated.
+    SuspendedAccess("GET", "/api/v1/tenant/billing", SUSPENDED_ROLES),
+    SuspendedAccess("GET", "/api/v1/tenant/billing/invoices", SUSPENDED_ROLES),
+    # FR-ADM-001 full data export (not built yet): add its route here when it lands, e.g.
+    # SuspendedAccess("POST", "/api/v1/admin/tenant-export", SUSPENDED_ROLES),
+)
+"""The only (method, route template, roles) a suspended or offboarding school may still use.
+
+Product decision of 2026-09-27 (BR-08, FR-PLT-004, docs/16 §5.5). Every other school route
+answers 403 ``tenant_suspended`` for every role. Routes that never resolve a school
+(``GET /me/schools``, ``POST /me/accept-invitations``) are not affected. The route permission
+check still applies on top (e.g. ``tenant.billing.read``). Pinned by
+``tests/authz/test_suspended_allowlist.py``: change both together."""
+
+SUSPENDED_MESSAGE: Final = (
+    "This school's access is suspended. The owner and principal can still open Plan & billing "
+    "and download the school's data export. Contact SchoolOS support to restore access."
+)
+
+
+def suspended_access_allowed(route: RouteKey | None, roles: frozenset[str]) -> bool:
+    """True when ``route`` is allowlisted for at least one of ``roles`` (unknown route: False)."""
+    if route is None:
+        return False
+    return any(
+        entry.key == route and not entry.roles.isdisjoint(roles)
+        for entry in SUSPENDED_SCHOOL_ALLOWLIST
+    )
 
 
 class AccessDenied(Forbidden):
@@ -96,19 +162,26 @@ class AuthzResolver:
         return snap
 
     def context_for(
-        self, principal: Principal, choice: LoginChoice, *, request_id: str | None = None
+        self,
+        principal: Principal,
+        choice: LoginChoice,
+        *,
+        request_id: str | None = None,
+        route: RouteKey | None = None,
     ) -> UserContext:
-        if choice.tenant_status in _SUSPENDED:
-            raise AccessDenied(
-                "This school's access is suspended. Contact SchoolOS support.",
-                code="tenant_suspended",
-                choice=choice,
-            )
-        if choice.tenant_status != "active":
+        """The request context in ``choice``'s school. ``route`` (the matched route) matters only
+        for a suspended school: it must be on :data:`SUSPENDED_SCHOOL_ALLOWLIST` for one of the
+        member's roles; ``None`` is refused."""
+        suspended = choice.tenant_status in _SUSPENDED
+        if not suspended and choice.tenant_status != "active":
             raise AccessDenied(
                 "This school is not available.", code="tenant_unavailable", choice=choice
             )
+        if suspended and route is None:
+            raise AccessDenied(SUSPENDED_MESSAGE, code="tenant_suspended", choice=choice)
         snap = self.snapshot(choice)
+        if suspended and not suspended_access_allowed(route, snap.roles):
+            raise AccessDenied(SUSPENDED_MESSAGE, code="tenant_suspended", choice=choice)
         if snap.mfa_required and not principal.mfa:
             raise AccessDenied(
                 "Your role needs two-step verification (MFA). Set it up, then sign in again.",
@@ -131,7 +204,12 @@ class AuthzResolver:
         )
 
     def resolve(
-        self, principal: Principal, *, tenant_hint: uuid.UUID | None, request_id: str | None = None
+        self,
+        principal: Principal,
+        *,
+        tenant_hint: uuid.UUID | None,
+        request_id: str | None = None,
+        route: RouteKey | None = None,
     ) -> UserContext:
         choice = self.choose(self.choices(principal), tenant_hint)
-        return self.context_for(principal, choice, request_id=request_id)
+        return self.context_for(principal, choice, request_id=request_id, route=route)

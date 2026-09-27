@@ -16,7 +16,7 @@ from typing import Final
 
 from app.authz.context import UserContext
 from app.authz.kv import KVUnavailable, kv_store
-from app.authz.resolver import AccessDenied, AuthzResolver
+from app.authz.resolver import ME_ACTIVE_TENANT, ME_LOGIN_EVENT, AccessDenied, AuthzResolver
 from app.core.errors import RateLimited
 from app.core.logging import get_logger
 from app.identity import service as identity
@@ -46,7 +46,10 @@ def switch_active_tenant(
 ) -> tuple[UserContext, list[uuid.UUID]]:
     choices = resolver.choices(principal)
     ctx = resolver.context_for(
-        principal, resolver.choose(choices, tenant_id), request_id=request_id
+        principal,
+        resolver.choose(choices, tenant_id),
+        request_id=request_id,
+        route=ME_ACTIVE_TENANT,
     )
     return ctx, [c.tenant_id for c in choices]
 
@@ -61,7 +64,7 @@ def record_login(
     _rate_limit(principal.subject, limit=LOGIN_EVENTS_PER_MINUTE, window_s=60)
     choice = resolver.choose(resolver.choices(principal), tenant_hint)
     try:
-        ctx = resolver.context_for(principal, choice, request_id=request_id)
+        ctx = resolver.context_for(principal, choice, request_id=request_id, route=ME_LOGIN_EVENT)
     except AccessDenied as denied:
         identity.record_login_event(
             choice.tenant_id,
