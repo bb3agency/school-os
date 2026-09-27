@@ -43,7 +43,7 @@ describe("server/client boundary", () => {
   it("pages and layouts import only components (or types) from client modules", () => {
     const offenders: string[] = [];
     const serverFiles = files(join(src, "app")).filter((file) =>
-      /\/(page|layout|not-found)\.tsx$/.test(file),
+      /[\\/](page|layout|not-found)\.tsx$/.test(file),
     );
     expect(serverFiles.length).toBeGreaterThan(20);
     for (const file of serverFiles) {
