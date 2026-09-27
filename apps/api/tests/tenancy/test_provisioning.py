@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+import time
 import uuid
 from collections.abc import Callable, Iterator
 
@@ -94,6 +96,46 @@ def test_FR_TEN_003_initialise_is_idempotent_and_keeps_the_key(
     again = service.initialise_tenant(result.tenant_id, wrapper=local_wrapper)
     assert again == (1, local_wrapper.key_id)
     with tenant_session(result.tenant_id) as s:
+        assert len(repo.list_tenant_keys(s)) == 1
+
+
+def test_FR_PLT_002_concurrent_initialise_creates_one_key(
+    local_wrapper: LocalDevKeyWrapper, platform_engine: Engine, app_engine: Engine
+) -> None:
+    """Two provisioning retries racing: the second waits for the first and keeps its key."""
+    with platform_session() as p:
+        tenant_id = service.register_tenant(p, TenantProvisionIn(code=_code(), name="School"))
+    first_in_hook = threading.Event()
+    hook_calls: list[uuid.UUID] = []
+
+    def slow_hook(_session: Session, tid: uuid.UUID) -> None:
+        hook_calls.append(tid)
+        if len(hook_calls) == 1:
+            first_in_hook.set()
+            time.sleep(1.0)  # the first runner holds its transaction open here
+
+    service.POST_PROVISION_HOOKS.append(slow_hook)
+    results: list[tuple[int, str] | BaseException] = []
+
+    def run() -> None:
+        try:
+            results.append(service.initialise_tenant(tenant_id, wrapper=local_wrapper))
+        except BaseException as exc:  # asserted below
+            results.append(exc)
+
+    try:
+        first = threading.Thread(target=run)
+        first.start()
+        assert first_in_hook.wait(timeout=20)
+        second = threading.Thread(target=run)
+        second.start()
+        first.join(timeout=30)
+        second.join(timeout=30)
+    finally:
+        service.POST_PROVISION_HOOKS.remove(slow_hook)
+    assert results == [(1, local_wrapper.key_id), (1, local_wrapper.key_id)]
+    assert hook_calls == [tenant_id, tenant_id]
+    with tenant_session(tenant_id) as s:
         assert len(repo.list_tenant_keys(s)) == 1
 
 
