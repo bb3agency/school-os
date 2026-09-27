@@ -981,7 +981,15 @@
       "literal_error": "Choose one of the options.",
       "enum": "Choose one of the options.",
       "greater_than_equal": "This number is too small.",
-      "less_than_equal": "This number is too large."
+      "less_than_equal": "This number is too large.",
+      "exports": {
+        "no_students": "No students match this choice. Choose other classes or sections.",
+        "too_many_students": "This is more than 2,000 students. Choose fewer classes or sections and make more than one export.",
+        "column_not_exportable": "One of these columns can't be exported (for example Aadhaar details as printed). Untick it and try again."
+      },
+      "dq": {
+        "unknown_profile": "This format no longer exists. Reload the page and choose again."
+      }
     },
     "api": {
       "generic": {
@@ -1206,7 +1214,14 @@
     "invalidPercent": "Enter a percentage from 0 to 100.",
     "chooseSchools": "Choose at least one school.",
     "endAfterStart": "The end must be after the start.",
-    "chooseRole": "Choose at least one role."
+    "chooseRole": "Choose at least one role.",
+    "chooseClasses": "Choose at least one class, or choose \"All students I can see\".",
+    "chooseSections": "Choose at least one section, or choose \"All students I can see\".",
+    "chooseFormats": "Choose at least one file type.",
+    "chooseColumns": "Choose at least one column.",
+    "tooManyColumns": "Choose at most 60 columns.",
+    "tooManyClasses": "Choose at most 50 classes, or choose \"All students I can see\".",
+    "tooManySections": "Choose at most 100 sections, or choose some classes instead."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -2572,6 +2587,197 @@
       "revokeTitle": "End support access now",
       "revokeBody": "Support loses access immediately. You will be asked to confirm it's you.",
       "backToList": "Back to support access"
+    }
+  },
+  "exports": {
+    "nav": "Exports",
+    "title": "Exports",
+    "description": "Pre-check reports for boards and portals, and student lists. Files are deleted 7 days after they are ready.",
+    "you": "You",
+    "formerStaff": "A former staff member",
+    "restrictedIncluded": "Includes restricted details",
+    "noAccessTitle": "You can't see exports",
+    "noAccessBody": "Exports are for staff who make board or portal pre-checks or student lists. Ask your school's office admin if you need this.",
+    "newPrecheck": "New pre-check",
+    "newStudentList": "New student list",
+    "status": {
+      "queued": "Waiting to start",
+      "running": "Being made",
+      "ready": "Ready",
+      "failed": "Could not be made",
+      "expired": "Deleted"
+    },
+    "kind": {
+      "board_precheck": "Board pre-check",
+      "portal_precheck": "Portal pre-check",
+      "student_list": "Student list"
+    },
+    "format": {
+      "xlsx": "Excel (XLSX)",
+      "pdf": "PDF",
+      "csv": "CSV"
+    },
+    "language": {
+      "en": "English",
+      "te": "Telugu"
+    },
+    "columns": {
+      "class": "Class",
+      "section": "Section",
+      "roll_no": "Roll number"
+    },
+    "list": {
+      "colWhat": "Export",
+      "colBy": "Requested by",
+      "colStudents": "Students",
+      "colFormats": "Files",
+      "colStatus": "Status",
+      "colCreated": "Made on",
+      "colExpires": "Files deleted on",
+      "deleted": "Already deleted",
+      "viewsLabel": "Whose exports",
+      "mine": "My exports",
+      "wholeSchool": "Whole school",
+      "mineHint": "Exports you asked for, newest first.",
+      "wholeSchoolHint": "Every export made in this school, newest first. You can see who made each one; downloading someone else's file needs separate permission.",
+      "updating": "Some exports are still being made. This list updates by itself.",
+      "emptyTitle": "No exports yet",
+      "emptyBody": "Exports made in this school will be listed here.",
+      "emptyBodyMaker": "Make a pre-check or a student list with the buttons above.",
+      "pagesLabel": "Pages of exports"
+    },
+    "scope": {
+      "legend": "Which students",
+      "hint": "Only students you are allowed to see are included, from the current academic year. One export can have up to 2,000 students.",
+      "mode": {
+        "all": "All students I can see",
+        "classes": "Some classes",
+        "sections": "Some sections"
+      },
+      "noStructure": "No classes or sections are set up for the current academic year.",
+      "chooseClasses": "Choose classes",
+      "chooseSections": "Choose sections",
+      "sectionsCount": "{count, plural, one {# section} other {# sections}}",
+      "classesCount": "{count, plural, one {# class} other {# classes}}",
+      "everyone": "All students the requester could see"
+    },
+    "new": {
+      "stepUpTitle": "You will be asked to confirm it's you",
+      "stepUpBody": "Exports carry many students' personal details. When you press the button at the end, SchoolOS asks you to sign in again with your second step (MFA) if you have not done so in the last 5 minutes. Your choices on this page are kept, and the export starts as soon as you have confirmed.",
+      "language": "Language of the file",
+      "languageHint": "Headings and labels in the file use this language. Student details stay as recorded.",
+      "studentsTitle": "Students",
+      "fileTitle": "File",
+      "formats": "File types",
+      "backToList": "Back to exports",
+      "profileKind": {
+        "board": "board",
+        "portal": "portal"
+      }
+    },
+    "precheck": {
+      "title": "New pre-check",
+      "description": "Check students against a board or portal format before you submit. The report lists the problems to fix first and a \"ready to enter\" sheet in the portal's field order.",
+      "noPermissionTitle": "You can't make pre-checks",
+      "noPermissionBody": "Board and portal pre-checks are for staff with export permission, such as the exam coordinator. Ask your school's office admin if you need this.",
+      "profilesErrorTitle": "We couldn't load the formats",
+      "profilesErrorBody": "Check your internet connection and reload the page. If it keeps happening, contact support.",
+      "noProfilesTitle": "No format you can use",
+      "noProfilesBody": "None of the board or portal formats is open to your role. Ask your school's office admin if you need one.",
+      "profileTitle": "Board or portal",
+      "profile": "Format",
+      "profileHint": "Choose the board registration or portal you are preparing for.",
+      "fieldsIntro": "The \"ready to enter\" sheet has these fields, in this order:",
+      "formatsHint": "Choose at least one. The Excel file has the full findings and the \"ready to enter\" sheet; the PDF is for printing.",
+      "sensitiveTitle": "Restricted details",
+      "sensitiveFields": "This format has restricted details: {fields}. They are hidden (••••) in the file unless you include them.",
+      "sensitiveGeneric": "Some formats have restricted details, such as category. They are hidden (••••) in the file unless you include them.",
+      "sensitiveLabel": "Include restricted details (for example category) in the file",
+      "sensitiveWarning": "Include them only if you must enter them in the portal. Your choice and the restricted columns included are recorded in the audit log, and the file must be kept safe.",
+      "submit": "Make the pre-check"
+    },
+    "studentList": {
+      "title": "New student list",
+      "description": "Choose the columns and students for a spreadsheet of student details.",
+      "noPermissionTitle": "You can't make student lists",
+      "noPermissionBody": "Student lists are for staff allowed to export student details. Ask your school's office admin if you need this.",
+      "columnsTitle": "Columns",
+      "columnsLegend": "Columns in the file",
+      "columnsHint": "Choose only what you need, up to {max}. Columns appear in this order.",
+      "columnsPartial": "Only class, section and roll number can be offered right now. Reload the page to see the other columns.",
+      "restricted": "Restricted",
+      "aadhaarNote": "Aadhaar details as printed are never exported. The Aadhaar reference shows only the last 4 digits.",
+      "restrictedWarning": "Columns marked restricted are recorded in the audit log when you include them. Keep the file safe.",
+      "format": "File type",
+      "formatHint": "Excel (XLSX) for working in a spreadsheet; CSV for uploading to other systems.",
+      "submit": "Make the student list"
+    },
+    "detail": {
+      "title": "Export",
+      "back": "Back to exports",
+      "notFoundTitle": "We couldn't find this export",
+      "notFoundBody": "It may belong to someone else, or the link is wrong. Open it from your exports list.",
+      "loadErrorTitle": "We couldn't load this export",
+      "loadErrorBody": "Check your internet connection and reload the page. If it keeps happening, contact support.",
+      "filesTitle": "Files",
+      "aboutTitle": "About this export",
+      "requestedBy": "Requested by",
+      "created": "Made on",
+      "finished": "Finished on",
+      "expires": "Files deleted on",
+      "deletedOn": "Files deleted on",
+      "students": "Students",
+      "scope": "Which students",
+      "formats": "File types",
+      "language": "Language",
+      "restricted": "Restricted details",
+      "restrictedYes": "Included",
+      "restrictedNo": "Hidden",
+      "columns": "Columns",
+      "retentionNote": "Files are deleted 7 days after they are ready. This record of who exported what stays.",
+      "download": "Download {format}",
+      "linkNote": "Each download uses a new link that works for a few minutes only. Every download is recorded in the audit log.",
+      "makeNew": "Make a new export",
+      "queuedTitle": "Waiting to start",
+      "runningTitle": "Being made",
+      "busyBody": "This can take a few minutes for a large batch. You can leave this page: you will get a notification when the files are ready.",
+      "failedTitle": "This export could not be made",
+      "expiredTitle": "The files have been deleted",
+      "expiredBody": "Files are deleted 7 days after they are ready. Make a new export to get up-to-date files.",
+      "noLongerTitle": "You can no longer download this export",
+      "noLongerBody": "Your permissions have changed since you made it. Ask your school's office admin if you still need it.",
+      "notOwnTitle": "Only the person who made it can download this",
+      "notOwnBody": "You can see that this export exists, but not its files. Ask the person who made it, or make a new one yourself.",
+      "statusNow": "Status: {status}"
+    },
+    "failure": {
+      "no_students": "No students matched when the file was being made. Check the classes or sections and make a new export.",
+      "permission_revoked": "The requester's permissions changed before the file was ready. Make a new export if you still need it.",
+      "sensitive_not_allowed": "Restricted details were asked for by someone no longer allowed to see them. Make a new export without them.",
+      "worker_error": "Something went wrong on our side. Make a new export; if it fails again, contact support.",
+      "other": "Something went wrong. Make a new export; if it fails again, contact support."
+    },
+    "errors": {
+      "not_own_export": {
+        "title": "Only the person who made it can download this",
+        "body": "Ask the person who made the export, or make a new one yourself."
+      },
+      "export_not_ready": {
+        "title": "The files are not ready yet",
+        "body": "Wait until the status says ready, then try again. This page updates by itself."
+      },
+      "export_failed": {
+        "title": "This export could not be made",
+        "body": "There are no files to download. Make a new export."
+      },
+      "export_expired": {
+        "title": "The files have been deleted",
+        "body": "Files are deleted 7 days after they are ready. Make a new export."
+      },
+      "sensitive_not_allowed": {
+        "title": "Restricted details are not allowed for you",
+        "body": "Only staff allowed to see restricted details (such as category) can include or download them. Leave them out, or ask your school's office admin."
+      }
     }
   }
 }
