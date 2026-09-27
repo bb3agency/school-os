@@ -32,16 +32,19 @@ mock_provider "aws" {
 }
 
 variables {
-  aws_account_id        = "111122223333"
-  owner                 = "platform@example.test"
-  cost_center           = "schoolos-prod"
-  release_version       = "2026.10.1"
-  app_domain            = "app.example.test"
-  admin_domain          = "admin.example.test"
-  cognito_domain_prefix = "sos-test-prod"
-  alarm_emails          = ["oncall@example.test"]
-  state_bucket_arn      = "arn:aws:s3:::sos-tfstate-111122223333"
-  state_kms_key_arn     = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000009"
+  aws_account_id  = "111122223333"
+  owner           = "platform@example.test"
+  cost_center     = "schoolos-prod"
+  release_version = "2026.10.1"
+  # Synthetic supplier (test only).
+  billing_supplier_legal_name = "Synthetic Test Supplier Private Limited"
+  billing_supplier_gstin      = "37ABCDE1234F1Z5"
+  app_domain                  = "app.example.test"
+  admin_domain                = "admin.example.test"
+  cognito_domain_prefix       = "sos-test-prod"
+  alarm_emails                = ["oncall@example.test"]
+  state_bucket_arn            = "arn:aws:s3:::sos-tfstate-111122223333"
+  state_kms_key_arn           = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000009"
 }
 
 run "rds_encrypted_and_deletion_protected" {
@@ -110,6 +113,11 @@ run "audit_archive_compliance_lock" {
     condition     = module.platform.security_posture.audit_object_lock == "COMPLIANCE" && module.platform.security_posture.audit_object_lock_yrs == 3
     error_message = "Prod audit archive must be Object Lock COMPLIANCE for 3 years."
   }
+
+  assert {
+    condition     = module.platform.security_posture.audit_signing_key.key_spec == "ECC_NIST_P256" && module.platform.security_posture.audit_signing_key.key_usage == "SIGN_VERIFY"
+    error_message = "Daily audit archives are signed with an asymmetric KMS key (FR-AUD-004)."
+  }
 }
 
 run "containers_hardened" {
@@ -117,14 +125,14 @@ run "containers_hardened" {
 
   assert {
     condition = alltrue([
-      for c in [module.platform.security_posture.web_container, module.platform.security_posture.api_container, module.platform.security_posture.worker_container] :
+      for c in [module.platform.security_posture.web_container, module.platform.security_posture.api_container, module.platform.security_posture.worker_container, module.platform.security_posture.beat_container, module.platform.security_posture.migrate_container] :
       c.readonlyRootFilesystem && !c.privileged && c.user != "root" && c.user != "0" && contains(c.linuxParameters.capabilities.drop, "ALL")
     ])
     error_message = "Every container runs non-root with a read-only root FS and all capabilities dropped (SEC-030)."
   }
 
   assert {
-    condition     = alltrue([for c in [module.platform.security_posture.api_container, module.platform.security_posture.worker_container] : length([for e in c.environment : e if can(regex("(?i)(password|secret|api_key|token)", e.name))]) == 0])
+    condition     = alltrue([for c in [module.platform.security_posture.api_container, module.platform.security_posture.worker_container, module.platform.security_posture.beat_container, module.platform.security_posture.migrate_container] : length([for e in c.environment : e if can(regex("(?i)(password|secret|api_key|token)", e.name))]) == 0])
     error_message = "No secret may be passed as a plain environment variable; use Secrets Manager injection (SEC-009)."
   }
 }

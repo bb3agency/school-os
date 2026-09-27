@@ -34,6 +34,9 @@ x-logging: &logging
       cache-max-file: "5"
       cache-compress: "true"
 
+# Settings for every app container (api, worker, beat, migrate). Names are exactly the ones
+# apps/api/app/core/config.py reads, and each container gets them all so it passes the prod start-up
+# guards on its own. apps/api/tests/deploy/test_env_contract.py checks both rules.
 x-app-env: &app-env
   SOS_ENV: prod
   SOS_DEPLOYMENT_MODE: dedicated
@@ -49,11 +52,15 @@ x-app-env: &app-env
   SOS_OIDC_AUDIENCE: ${SOS_OIDC_AUDIENCE:?}
   SOS_SERVICE_TOKEN_KEY: ${SOS_SERVICE_TOKEN_KEY:?}
   SOS_KEY_WRAPPER: kms
-  SOS_KMS_KEY_ARN: ${SOS_KMS_KEY_ARN:?}
+  SOS_KMS_DATA_KEY_ARN: ${SOS_KMS_DATA_KEY_ARN:?}
+  SOS_AUDIT_SIGNING_KEY_ARN: ${SOS_AUDIT_SIGNING_KEY_ARN:?}
   SOS_ANTHROPIC_API_KEY: ${SOS_ANTHROPIC_API_KEY:-}
-  SOS_FLEET_URL: ${SOS_FLEET_URL:?}
+  # Heartbeat (docs/16 §12): identity from host.env (Terraform), key from the operator secret.
+  SOS_CONTROL_PLANE_URL: ${SOS_CONTROL_PLANE_URL:?}
   SOS_DEPLOYMENT_ID: ${SOS_DEPLOYMENT_ID:?}
-  SOS_FLEET_HMAC_KEY: ${SOS_FLEET_HMAC_KEY:-}
+  SOS_DEDICATED_TENANT_ID: ${SOS_DEDICATED_TENANT_ID:?}
+  SOS_HEARTBEAT_KEY_ID: ${SOS_HEARTBEAT_KEY_ID:?}
+  SOS_HEARTBEAT_KEY: ${SOS_HEARTBEAT_KEY:?}
   SOS_HOST_STATE_DIR: /run/schoolos-state
   SOS_LOG_LEVEL: ${SOS_LOG_LEVEL:-INFO}
 
@@ -130,6 +137,7 @@ services:
     user: "10001:10001"
     environment:
       <<: *app-env
+      SOS_SERVICE_NAME: api
     volumes:
       - /var/lib/schoolos/state:/run/schoolos-state:ro
     tmpfs:
@@ -154,10 +162,11 @@ services:
     <<: [*hardening, *logging]
     image: ${SOS_ECR_REGISTRY:?}/${SOS_WORKER_IMAGE:?}
     user: "10001:10001"
-    command: ["celery", "-A", "sos_worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=${SOS_WORKER_CONCURRENCY:-2}", "-Q", "${SOS_WORKER_QUEUES:-default,ingest,embed,ocr,dq,exports,pdf,audit}"]
+    command: ["celery", "-A", "sos_worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=${SOS_WORKER_CONCURRENCY:-2}", "-Q", "${SOS_WORKER_QUEUES:-ingest,embed,ocr,dq,exports,pdf,maintenance}"]
     stop_grace_period: 120s
     environment:
       <<: *app-env
+      SOS_SERVICE_NAME: worker
     tmpfs:
       - /tmp:size=512m,uid=10001,gid=10001
     shm_size: 256m # headless Chromium (PDF rendering)
@@ -184,6 +193,7 @@ services:
     command: ["celery", "-A", "sos_worker.celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
     environment:
       <<: *app-env
+      SOS_SERVICE_NAME: beat
     volumes:
       - /var/lib/schoolos/state:/run/schoolos-state:ro # backup status for the heartbeat
     tmpfs:
@@ -206,6 +216,7 @@ services:
     command: ["alembic -c /app/alembic.ini upgrade head && python -m app.audit.partitions --months-ahead 12"]
     environment:
       <<: *app-env
+      SOS_SERVICE_NAME: migrate
       SOS_MIGRATOR_DATABASE_URL: postgresql+psycopg://sos_migrator:${SOS_MIGRATOR_DB_PASSWORD:?}@db:5432/schoolos
     tmpfs:
       - /tmp:size=64m,uid=10001,gid=10001

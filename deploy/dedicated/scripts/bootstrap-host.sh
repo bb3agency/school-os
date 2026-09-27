@@ -134,4 +134,4 @@ install_units
 wait_for_secrets
 install_walg
 start_stack
-info "bootstrap complete. Next: provision the tenant and send the owner invite (README: Provisioning step 6)."
+info "bootstrap complete. Next: scripts/compose.sh run --rm api python -m app.platform.provision_dedicated (README: Provisioning step 6)."

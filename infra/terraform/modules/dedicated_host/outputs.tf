@@ -28,6 +28,11 @@ output "operator_secret_arn" {
   value       = aws_secretsmanager_secret.operator.arn
 }
 
+output "audit_signing_key_arn" {
+  description = "Asymmetric KMS key that signs this school's audit archives (SOS_AUDIT_SIGNING_KEY_ARN)."
+  value       = module.audit_signing_key.key_arns["audit-signing"]
+}
+
 output "instance_role_arn" {
   description = "Instance role (grant cross-account ECR pull to this ARN if images live in another account)."
   value       = aws_iam_role.host.arn
@@ -61,5 +66,6 @@ output "posture" {
     files_bucket_sse     = module.files.sse_algorithm
     files_bucket_private = module.files.public_access_block
     audit_lock_mode      = module.audit_archive.object_lock_mode
+    audit_signing_key    = module.audit_signing_key.key_properties["audit-signing"]
   }
 }

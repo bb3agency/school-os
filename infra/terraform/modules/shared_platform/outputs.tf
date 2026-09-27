@@ -112,6 +112,9 @@ output "security_posture" {
     web_container         = module.web.container_definition
     api_container         = module.api.container_definition
     worker_container      = module.worker.container_definition
+    beat_container        = module.beat.container_definition
+    migrate_container     = module.migrate.container_definition
+    audit_signing_key     = module.kms.key_properties["audit-signing"]
     audit_object_lock     = var.audit_object_lock_mode
     audit_object_lock_yrs = var.audit_object_lock_days == null ? var.audit_object_lock_years : null
   }

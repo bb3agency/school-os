@@ -45,6 +45,25 @@ data "aws_ssm_parameter" "ubuntu" {
   name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/${local.arch}/hvm/ebs-gp3/ami-id"
 }
 
+# --- Audit signing key ------------------------------------------------------------------
+
+# Signs this school's daily audit archives (KmsSigner, ECDSA_SHA_256; FR-AUD-004). Asymmetric keys are
+# not rotated by AWS (see modules/kms). It encrypts nothing, so deleting it shreds no data; on
+# decommission export its public key first so archived signatures stay verifiable (README).
+module "audit_signing_key" {
+  source = "../kms"
+
+  name_prefix = local.name
+  keys = {
+    audit-signing = {
+      description = "SchoolOS dedicated ${var.school_code}: audit archive signatures (ECC_NIST_P256, SIGN_VERIFY)"
+      key_spec    = "ECC_NIST_P256"
+      key_usage   = "SIGN_VERIFY"
+    }
+  }
+  tags = local.tags
+}
+
 # --- Files bucket ---------------------------------------------------------------------
 
 module "files" {
@@ -108,7 +127,7 @@ resource "aws_secretsmanager_secret_version" "generated" {
 
 resource "aws_secretsmanager_secret" "operator" {
   name        = "sos/dedicated/${var.school_code}/operator"
-  description = "Operator-supplied values for ${var.school_code} (API keys, fleet HMAC key). Set with put-secret-value."
+  description = "Operator-supplied values for ${var.school_code} (API keys, heartbeat key ID and key). Set with put-secret-value."
   kms_key_id  = var.kms_key_arn
   tags        = merge(local.tags, { value_source = "operator" })
 }
@@ -194,6 +213,12 @@ data "aws_iam_policy_document" "host" {
     sid       = "SchoolKeys"
     actions   = ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey"]
     resources = [var.kms_key_arn, var.backup_kms_key_arn]
+  }
+
+  statement {
+    sid       = "AuditSigning"
+    actions   = ["kms:Sign", "kms:GetPublicKey"]
+    resources = [module.audit_signing_key.key_arns["audit-signing"]]
   }
 
   statement {
@@ -360,6 +385,7 @@ resource "aws_instance" "host" {
     backup_bucket          = var.backup_bucket_name
     backup_kms_key_arn     = var.backup_kms_key_arn
     kms_key_arn            = var.kms_key_arn
+    audit_signing_key_arn  = module.audit_signing_key.key_arns["audit-signing"]
     data_volume_id         = aws_ebs_volume.data.id
     secret_json_ids        = "${aws_secretsmanager_secret.generated.arn} ${aws_secretsmanager_secret.operator.arn}"
     oidc_client_secret_arn = var.oidc_client_secret_arn
@@ -370,6 +396,7 @@ resource "aws_instance" "host" {
     bundle_sha256          = var.bundle_sha256
     install_dir            = var.install_dir
     deployment_id          = var.deployment_id
+    tenant_id              = var.tenant_id
     log_group              = local.log_group
     walg_enabled           = var.walg_enabled ? "true" : "false"
   })

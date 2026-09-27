@@ -29,16 +29,19 @@ mock_provider "aws" {
 }
 
 variables {
-  aws_account_id        = "444455556666"
-  owner                 = "platform@example.test"
-  cost_center           = "schoolos-staging"
-  release_version       = "2026.10.1"
-  app_domain            = "app.staging.example.test"
-  admin_domain          = "admin.staging.example.test"
-  cognito_domain_prefix = "sos-test-staging"
-  alarm_emails          = ["dev@example.test"]
-  state_bucket_arn      = "arn:aws:s3:::sos-tfstate-444455556666"
-  state_kms_key_arn     = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000009"
+  aws_account_id  = "444455556666"
+  owner           = "platform@example.test"
+  cost_center     = "schoolos-staging"
+  release_version = "2026.10.1"
+  # Same synthetic values as terraform.tfvars.example (staging only, not valid for tax invoices).
+  billing_supplier_legal_name = "SchoolOS Staging Synthetic Supplier (not a tax invoice)"
+  billing_supplier_gstin      = "37STAGE0000S1Z5"
+  app_domain                  = "app.staging.example.test"
+  admin_domain                = "admin.staging.example.test"
+  cognito_domain_prefix       = "sos-test-staging"
+  alarm_emails                = ["dev@example.test"]
+  state_bucket_arn            = "arn:aws:s3:::sos-tfstate-444455556666"
+  state_kms_key_arn           = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000009"
 }
 
 run "staging_keeps_encryption_and_tls" {

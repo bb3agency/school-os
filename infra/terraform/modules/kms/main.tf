@@ -1,5 +1,6 @@
 # Customer-managed KMS keys (SEC-011): separate CMKs for data, audit archive and backups,
-# automatic annual rotation, least-privilege key policies.
+# automatic annual rotation, least-privilege key policies. Asymmetric SIGN_VERIFY keys (audit archive
+# signatures, FR-AUD-004) are supported too; AWS KMS does not rotate those automatically.
 
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
@@ -9,6 +10,9 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   partition  = data.aws_partition.current.partition
   region     = data.aws_region.current.region
+
+  # Automatic rotation exists only for symmetric encryption keys.
+  rotating = { for k, v in var.keys : k => v.key_spec == "SYMMETRIC_DEFAULT" }
 }
 
 data "aws_iam_policy_document" "key" {
@@ -87,14 +91,15 @@ data "aws_iam_policy_document" "key" {
 resource "aws_kms_key" "this" {
   for_each = var.keys
 
-  description             = each.value.description
-  key_usage               = "ENCRYPT_DECRYPT"
-  enable_key_rotation     = true
-  rotation_period_in_days = var.rotation_period_in_days
-  deletion_window_in_days = var.deletion_window_in_days
-  multi_region            = false
-  policy                  = data.aws_iam_policy_document.key[each.key].json
-  tags                    = merge(var.tags, { key_purpose = each.key })
+  description              = each.value.description
+  customer_master_key_spec = each.value.key_spec
+  key_usage                = each.value.key_usage
+  enable_key_rotation      = local.rotating[each.key]
+  rotation_period_in_days  = local.rotating[each.key] ? var.rotation_period_in_days : null
+  deletion_window_in_days  = var.deletion_window_in_days
+  multi_region             = false
+  policy                   = data.aws_iam_policy_document.key[each.key].json
+  tags                     = merge(var.tags, { key_purpose = each.key })
 }
 
 resource "aws_kms_alias" "this" {

@@ -36,6 +36,7 @@ mock_provider "aws" {
 variables {
   school_code            = "demo-school"
   deployment_id          = "01923f4e-5b6c-7d8e-9f00-112233445566"
+  tenant_id              = "01923f4e-5b6c-7d8e-9f00-aabbccddeeff"
   vpc_id                 = "vpc-0123456789abcdef0"
   subnet_id              = "subnet-00000000000000001"
   kms_key_arn            = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
@@ -139,6 +140,68 @@ run "user_data_disables_ssh_and_has_no_secrets" {
     condition     = aws_secretsmanager_secret_version.generated.secret_string == null
     error_message = "Generated credentials are written write-only."
   }
+}
+
+# The host env uses exactly the names apps/api/app/core/config.py reads (SEC-009); the compose side
+# is checked by apps/api/tests/deploy/test_env_contract.py.
+run "host_env_uses_settings_names" {
+  command = apply
+
+  assert {
+    condition = alltrue([
+      for line in [
+        "SOS_KMS_DATA_KEY_ARN=${var.kms_key_arn}",
+        "SOS_AUDIT_SIGNING_KEY_ARN=${output.audit_signing_key_arn}",
+        "SOS_CONTROL_PLANE_URL=https://app.example.test",
+        "SOS_DEPLOYMENT_ID=${var.deployment_id}",
+        "SOS_DEDICATED_TENANT_ID=${var.tenant_id}",
+        "SOS_KEY_WRAPPER=kms",
+      ] : strcontains(aws_instance.host.user_data, line)
+    ])
+    error_message = "host.env carries the KMS keys, control-plane URL and heartbeat identity under their Settings names."
+  }
+
+  assert {
+    condition     = !can(regex("SOS_(KMS_KEY_ARN|FLEET_URL|FLEET_HMAC_KEY)=", aws_instance.host.user_data))
+    error_message = "Old names that config.py never read are gone."
+  }
+}
+
+run "audit_signing_key_for_the_host" {
+  command = plan
+
+  assert {
+    condition     = output.posture.audit_signing_key.key_spec == "ECC_NIST_P256" && output.posture.audit_signing_key.key_usage == "SIGN_VERIFY" && !output.posture.audit_signing_key.rotation
+    error_message = "Each host signs its audit archives with its own ECC_NIST_P256 SIGN_VERIFY key (FR-AUD-004)."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.host.statement :
+      s.sid == "AuditSigning" && toset(s.actions) == toset(["kms:Sign", "kms:GetPublicKey"]) && length(s.resources) == 1
+    ])
+    error_message = "The instance role may kms:Sign and kms:GetPublicKey with the signing key only."
+  }
+}
+
+run "heartbeat_key_is_operator_supplied" {
+  command = plan
+
+  variables {
+    operator_secret_keys = ["SOS_ANTHROPIC_API_KEY"]
+  }
+
+  expect_failures = [var.operator_secret_keys]
+}
+
+run "tenant_id_must_be_a_uuid" {
+  command = plan
+
+  variables {
+    tenant_id = "demo-school"
+  }
+
+  expect_failures = [var.tenant_id]
 }
 
 run "x86_instances_use_amd64_image" {

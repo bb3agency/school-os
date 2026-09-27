@@ -10,6 +10,12 @@ module "platform" {
   env             = "staging"
   release_version = var.release_version
 
+  # Staging invoices are synthetic: the tfvars example uses a made-up supplier that is not valid
+  # for tax invoices (the app only refuses the dev placeholder).
+  billing_supplier_legal_name = var.billing_supplier_legal_name
+  billing_supplier_gstin      = var.billing_supplier_gstin
+  billing_supplier_state_code = var.billing_supplier_state_code
+
   app_domain             = var.app_domain
   admin_domain           = var.admin_domain
   route53_zone_id        = var.route53_zone_id

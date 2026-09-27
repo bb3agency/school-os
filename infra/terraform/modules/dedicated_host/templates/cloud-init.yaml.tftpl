@@ -40,7 +40,8 @@ write_files:
       SOS_S3_BUCKET_AUDIT=${audit_bucket}
       SOS_BACKUP_BUCKET=${backup_bucket}
       SOS_BACKUP_KMS_KEY_ARN=${backup_kms_key_arn}
-      SOS_KMS_KEY_ARN=${kms_key_arn}
+      SOS_KMS_DATA_KEY_ARN=${kms_key_arn}
+      SOS_AUDIT_SIGNING_KEY_ARN=${audit_signing_key_arn}
       SOS_KEY_WRAPPER=kms
       SOS_DATA_VOLUME_ID=${data_volume_id}
       SOS_SECRET_JSON_IDS="${secret_json_ids}"
@@ -48,8 +49,9 @@ write_files:
       SOS_OIDC_ISSUER=${oidc_issuer}
       SOS_OIDC_AUDIENCE=${oidc_client_id}
       OIDC_CLIENT_ID=${oidc_client_id}
-      SOS_FLEET_URL=${control_plane_url}
+      SOS_CONTROL_PLANE_URL=${control_plane_url}
       SOS_DEPLOYMENT_ID=${deployment_id}
+      SOS_DEDICATED_TENANT_ID=${tenant_id}
       SOS_LOG_GROUP=${log_group}
       SOS_INSTALL_DIR=${install_dir}
       SOS_BUNDLE_S3_PREFIX=${bundle_s3_prefix}

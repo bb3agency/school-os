@@ -14,6 +14,11 @@ cognito_domain_prefix = "<globally-unique-prefix>-prod"
 ses_email_identity_arn = null
 from_email_address     = null
 
+# Supplier block on GST invoices (FR-PLT-016): the company's registered legal name and GSTIN.
+billing_supplier_legal_name = "<registered legal name>"
+billing_supplier_gstin      = "<15-character GSTIN>"
+billing_supplier_state_code = "37"
+
 alarm_emails       = ["<oncall@your-domain>"]
 monthly_budget_usd = 300
 

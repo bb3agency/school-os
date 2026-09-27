@@ -18,6 +18,16 @@ variable "deployment_id" {
   }
 }
 
+variable "tenant_id" {
+  description = "Tenant UUID chosen by the control plane at provisioning (SOS_DEDICATED_TENANT_ID). The host creates its one school with this ID (python -m app.platform.provision_dedicated) and sends it in every heartbeat."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.tenant_id))
+    error_message = "tenant_id must be a lowercase UUID."
+  }
+}
+
 variable "vpc_id" {
   description = "VPC for the host."
   type        = string
@@ -179,9 +189,14 @@ variable "control_plane_url" {
 }
 
 variable "operator_secret_keys" {
-  description = "Keys of the operator-supplied JSON secret (placeholders __SET_ME__ until set)."
+  description = "Keys of the operator-supplied JSON secret (placeholders __SET_ME__ until set). SOS_HEARTBEAT_KEY_ID and SOS_HEARTBEAT_KEY are shown once by the panel."
   type        = list(string)
-  default     = ["SOS_ANTHROPIC_API_KEY", "SOS_FLEET_HMAC_KEY"]
+  default     = ["SOS_ANTHROPIC_API_KEY", "SOS_HEARTBEAT_KEY_ID", "SOS_HEARTBEAT_KEY"]
+
+  validation {
+    condition     = alltrue([for k in ["SOS_HEARTBEAT_KEY_ID", "SOS_HEARTBEAT_KEY"] : contains(var.operator_secret_keys, k)])
+    error_message = "The operator secret must hold the heartbeat key ID and key (docs/16 §12.2)."
+  }
 }
 
 variable "generated_secret_version" {

@@ -43,15 +43,23 @@ only on the internal network, where the BFF calls it with the signed service tok
 | Input | Where |
 |---|---|
 | AWS account (normally prod) and region guard | `aws_account_id` in `schools/<code>.tfvars` |
-| `school_code`, `deployment_id` (from the platform panel: Provision school → Dedicated) | tfvars |
+| `school_code`, `deployment_id`, `tenant_id` (from the platform panel: Provision school → Dedicated) | tfvars |
 | Platform host name (`domain`), optional school `custom_domain`, `acme_email` | tfvars |
 | Release `release_version` + `bundle_sha256` (from CI release notes) | tfvars |
 | Shared prod outputs: `artifacts_bucket`, `artifacts_kms_key_arn`, `control_plane_url` | tfvars |
-| Anthropic API key (ZDR organisation) and the heartbeat HMAC key (shown once by the panel) | Secrets Manager, after apply |
+| Anthropic API key (ZDR organisation) and the heartbeat key ID + key (shown once by the panel) | Secrets Manager, after apply |
+
+Terraform writes the non-secret host settings to `/etc/schoolos/host.env` under the names the app reads
+(`apps/api/app/core/config.py`; list in `.env.template`): `SOS_KMS_DATA_KEY_ARN` (the school's CMK, wraps
+the tenant keys), `SOS_AUDIT_SIGNING_KEY_ARN` (the host's asymmetric key that signs the daily audit
+archives), `SOS_CONTROL_PLANE_URL`, `SOS_DEPLOYMENT_ID` and `SOS_DEDICATED_TENANT_ID` (heartbeat identity).
+The api, worker, beat and migrate containers all get the same settings, so each passes the production
+start-up checks. `apps/api/tests/deploy/test_env_contract.py` fails CI if a name drifts.
 
 ## Provisioning
 
-1. **Panel:** Provision school → Dedicated (step-up). Note the deployment ID and the one-time heartbeat key.
+1. **Panel:** Provision school → Dedicated (step-up). Note the tenant ID, the deployment ID and the one-time
+   heartbeat key ID and key.
 2. **Terraform** (from `infra/terraform/envs/dedicated-template`):
    ```bash
    cp backend.hcl.example schools/<code>.backend.hcl   # set key = schoolos/dedicated/<code>/terraform.tfstate
@@ -62,7 +70,8 @@ only on the internal network, where the BFF calls it with the signed service tok
 3. **Operator secrets** (the host waits up to 2 h for them):
    ```bash
    aws secretsmanager put-secret-value --secret-id "$(terraform output -raw operator_secret_arn)" \
-     --secret-string file://operator.json   # {"SOS_ANTHROPIC_API_KEY":"...","SOS_FLEET_HMAC_KEY":"..."}
+     --secret-string file://operator.json
+   # operator.json: {"SOS_ANTHROPIC_API_KEY":"...","SOS_HEARTBEAT_KEY_ID":"hb-...","SOS_HEARTBEAT_KEY":"..."}
    shred -u operator.json
    ```
 4. **DNS:** `terraform output dns_instructions`. Create the platform A record, or let Route 53 do it.
@@ -73,9 +82,21 @@ only on the internal network, where the BFF calls it with the signed service tok
    the systemd units, fetches secrets, runs `db-bootstrap` (`infra/db/bootstrap.sql`) and `migrate`, and starts
    `schoolos.service`. Follow it with
    `aws ssm start-session --target <instance-id>` → `sudo journalctl -t schoolos-bootstrap -f`.
-6. **Tenant:** provision the tenant with the deployment's tenant ID and send the owner invite (the
-   platform/tenancy owners' command, e.g.
-   `sudo scripts/compose.sh run --rm api python -m app.tenancy.provision_dedicated ...`). The owner enrols MFA.
+6. **School and owner:** create the owner's account in this host's user pool first (its `sub` is the
+   `--owner-subject`), then, on the host:
+   ```bash
+   cd /opt/schoolos/deploy/dedicated
+   sudo scripts/compose.sh run --rm api python -m app.platform.provision_dedicated \
+     --tenant-id <tenant ID from the panel> --code <school code> --name "<school name>" \
+     [--boards CISCE] --owner-subject <sub> --owner-name "<display name>" \
+     --owner-email <email> [--owner-language en|te]
+   ```
+   It refuses unless the host runs `SOS_DEPLOYMENT_MODE=dedicated` and `--tenant-id` equals
+   `SOS_DEDICATED_TENANT_ID`, and it refuses a second school on the same host. It creates the school with
+   that ID, its keys (KMS) and system roles, the invited owner (MFA required, `owner` role), and makes the
+   school `active`; every step is audited (platform chain `actor_type = system` and the school's own chain).
+   It prints IDs and states only, and a re-run resumes an interrupted run or reports `already_active`.
+   The owner then signs in, enrols MFA and accepts the invite.
 7. **Verify:** the first heartbeat turns the deployment `healthy`; smoke tests pass; run a restore drill
    (`sudo scripts/restore.sh --latest`) **before go-live**.
 
@@ -162,10 +183,10 @@ NFR-AVL-002 (RPO ≤ 15 min) is met only with WAL-G. docs/10 §15.3 lists WAL-G 
 | Secret | How |
 |---|---|
 | Generated credentials (DB roles, Valkey, service token key, session secret) | Bump `generated_secret_version` in Terraform and apply (a new value is written to Secrets Manager, never to state). On the host: `systemctl stop schoolos`, `scripts/fetch-secrets.sh`, `scripts/compose.sh up -d --wait db valkey`, `scripts/compose.sh run --rm db-bootstrap` (sets the role passwords), then `systemctl start schoolos`. Changing `POSTGRES_PASSWORD` also needs `ALTER ROLE postgres PASSWORD …` inside the db container first. Users must sign in again after a `SESSION_SECRET` change. |
-| Anthropic API key / heartbeat key | `put-secret-value` on the operator secret, then `systemctl restart schoolos`. For the heartbeat key, follow the panel's 7-day overlap. |
+| Anthropic API key / heartbeat key | `put-secret-value` on the operator secret (for the heartbeat, both `SOS_HEARTBEAT_KEY_ID` and `SOS_HEARTBEAT_KEY`), then `systemctl restart schoolos`. For the heartbeat key, follow the panel's 7-day overlap. |
 | OIDC client secret | Recreate the Cognito app client (taint it), apply, restart. |
 | TLS certificates | Automatic (Caddy/ACME). Expiry is reported in the heartbeat. |
-| KMS | Annual automatic rotation. |
+| KMS | Data and backup keys: annual automatic rotation. The audit signing key is asymmetric (ECC_NIST_P256), which AWS KMS cannot rotate: to replace it, create a new key, point `SOS_AUDIT_SIGNING_KEY_ARN` at it, and keep the old key (or its exported public key) to verify older archives. |
 
 ## Decommission (crypto-shredding)
 
@@ -178,6 +199,8 @@ After offboarding approval (docs/16 §13.4):
    ap-south-2) with a 30-day window:
    `aws kms schedule-key-deletion --key-id <arn> --pending-window-in-days 30`. Once the keys are deleted,
    the EBS snapshots, backups, files, audit archive and secrets encrypted with them can never be read again.
+   The audit signing key (`terraform output kms_key_arns`, `audit_signing`) encrypts nothing: export its
+   public key (`aws kms get-public-key`) with the certificate of deletion, then schedule its deletion too.
 4. Empty and remove the buckets after their retention windows (backup Object Lock 30 days; the audit archive
    stays under COMPLIANCE for 3 years and is unreadable after step 3). Mark the deployment `decommissioned`
    and issue the certificate of deletion.

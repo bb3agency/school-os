@@ -1,4 +1,4 @@
-# SEC-011: separate CMKs with automatic annual rotation.
+# SEC-011: separate CMKs with automatic annual rotation; FR-AUD-004: asymmetric audit-signing keys.
 
 mock_provider "aws" {
   mock_data "aws_iam_policy_document" {
@@ -47,4 +47,59 @@ run "separate_rotating_keys" {
     condition     = aws_kms_alias.this["audit"].name == "alias/sos-test-audit"
     error_message = "Aliases follow alias/<prefix>-<purpose>."
   }
+}
+
+run "asymmetric_signing_key" {
+  command = plan
+
+  variables {
+    keys = {
+      data          = { description = "data" }
+      audit-signing = { description = "audit signing", key_spec = "ECC_NIST_P256", key_usage = "SIGN_VERIFY" }
+    }
+  }
+
+  assert {
+    condition     = aws_kms_key.this["audit-signing"].customer_master_key_spec == "ECC_NIST_P256" && aws_kms_key.this["audit-signing"].key_usage == "SIGN_VERIFY"
+    error_message = "Audit archives are signed with an ECC_NIST_P256 SIGN_VERIFY key (ECDSA_SHA_256)."
+  }
+
+  assert {
+    condition     = !aws_kms_key.this["audit-signing"].enable_key_rotation
+    error_message = "AWS KMS cannot rotate asymmetric keys; rotation stays off for them."
+  }
+
+  assert {
+    condition     = aws_kms_key.this["data"].enable_key_rotation && aws_kms_key.this["data"].key_usage == "ENCRYPT_DECRYPT" && aws_kms_key.this["data"].customer_master_key_spec == "SYMMETRIC_DEFAULT"
+    error_message = "Symmetric keys keep annual rotation."
+  }
+
+  assert {
+    condition     = aws_kms_alias.this["audit-signing"].name == "alias/sos-test-audit-signing"
+    error_message = "Signing keys get an alias like every other CMK."
+  }
+}
+
+run "signing_keys_are_not_shared_with_services" {
+  command = plan
+
+  variables {
+    keys = {
+      bad = { description = "bad", key_spec = "ECC_NIST_P256", key_usage = "SIGN_VERIFY", allow_cloudwatch_logs = true }
+    }
+  }
+
+  expect_failures = [var.keys]
+}
+
+run "symmetric_spec_cannot_sign" {
+  command = plan
+
+  variables {
+    keys = {
+      bad = { description = "bad", key_usage = "SIGN_VERIFY" }
+    }
+  }
+
+  expect_failures = [var.keys]
 }

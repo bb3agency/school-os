@@ -179,9 +179,9 @@ variable "services" {
 }
 
 variable "worker_queues" {
-  description = "Celery queues consumed by the worker service."
+  description = "Celery queues consumed by the worker service: all of sos_worker.celery_app.QUEUES (beat jobs such as audit archiving, billing and the outbox run on maintenance)."
   type        = string
-  default     = "default,ingest,embed,ocr,dq,exports,pdf,audit"
+  default     = "ingest,embed,ocr,dq,exports,pdf,maintenance"
 }
 
 variable "container_user" {
@@ -247,6 +247,51 @@ variable "log_level" {
   description = "SOS_LOG_LEVEL."
   type        = string
   default     = "INFO"
+}
+
+# --- Billing supplier (GST invoices, FR-PLT-016) ------------------------------------------
+# Only the shared tier runs the control plane and issues invoices. The app refuses to start in
+# staging/prod with the dev placeholder supplier, so these have no defaults.
+
+variable "billing_supplier_legal_name" {
+  description = "Supplier legal name printed on GST invoices (SOS_BILLING_SUPPLIER_LEGAL_NAME)."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.billing_supplier_legal_name)) >= 3 && var.billing_supplier_legal_name != "SchoolOS Synthetic Supplier (dev)"
+    error_message = "billing_supplier_legal_name must be the registered legal name, not the dev placeholder."
+  }
+}
+
+variable "billing_supplier_gstin" {
+  description = "Supplier GSTIN (SOS_BILLING_SUPPLIER_GSTIN): 15 characters, starting with the state code."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$", var.billing_supplier_gstin))
+    error_message = "billing_supplier_gstin must be a valid Indian GSTIN (e.g. 37ABCDE1234F1Z5)."
+  }
+
+  validation {
+    condition     = var.billing_supplier_gstin != "37AAAAA0000A1Z5"
+    error_message = "billing_supplier_gstin is the dev placeholder; the app refuses it in staging/prod."
+  }
+
+  validation {
+    condition     = substr(var.billing_supplier_gstin, 0, 2) == var.billing_supplier_state_code
+    error_message = "The GSTIN's first two digits must equal billing_supplier_state_code."
+  }
+}
+
+variable "billing_supplier_state_code" {
+  description = "Supplier GST state code (SOS_BILLING_SUPPLIER_STATE_CODE); 37 = Andhra Pradesh."
+  type        = string
+  default     = "37"
+
+  validation {
+    condition     = can(regex("^[0-9]{2}$", var.billing_supplier_state_code))
+    error_message = "billing_supplier_state_code is two digits, e.g. 37."
+  }
 }
 
 variable "enable_execute_command" {
