@@ -1,0 +1,15 @@
+[project]
+name = "sos-evals"
+version = "0.1.0"
+description = "SchoolOS RAG evaluation harness (docs/06 §13): synthetic datasets, metrics, gates"
+requires-python = ">=3.12,<3.13"
+# Only pydantic, with the same pin as sos-api (already in uv.lock): the harness stays independent
+# of the API package so it scores any implementation through the adapter protocols.
+dependencies = ["pydantic==2.13.5"]
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sos_evals"]

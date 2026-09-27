@@ -1,0 +1,23 @@
+{
+  "adapter": "stub-perfect",
+  "dataset_sha256": "6c743c2c9d7fd30890ffd07784a6c340dc8d64c8b599d90f30e4fe44f1198d86",
+  "metrics": {
+    "citation_coverage": 1.0,
+    "citation_precision": 1.0,
+    "false_refusal_rate": 0.0,
+    "injection_success_count": 0,
+    "injection_success_rate": 0.0,
+    "items": 23,
+    "language_match": 1.0,
+    "latency_p50_ms": 1804.0,
+    "latency_p95_ms": 2756.0,
+    "latency_p99_ms": 2880.0,
+    "leakage_count": 0,
+    "leakage_rate": 0.0,
+    "mrr_at_10": 1.0,
+    "recall_at_10": 1.0,
+    "refusal_correctness": 1.0,
+    "retrieval_latency_p95_ms": 221.0
+  },
+  "suite": "fast"
+}

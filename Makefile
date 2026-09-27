@@ -126,7 +126,15 @@ endif
 	$(TRIVY) fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .venv --skip-dirs .claude .
 	$(TRIVY) config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .claude .
 
-eval: ## RAG evaluation harness (M2; no knowledge module yet)
-	@echo "eval: no knowledge module yet (M2). Nothing to evaluate."
+# EVAL_SUITE: fast (pull requests) or full (nightly, release). EVAL_ADAPTER: stub-perfect until the
+# knowledge module provides a real adapter; stub-leaky and stub-injectable must fail (exit 1).
+# EVAL_ARGS: extra flags, e.g. --fail-on-soft (release) or --out <dir>. Report: evals/reports/.
+EVAL_SUITE   ?= fast
+EVAL_ADAPTER ?= stub-perfect
+EVAL_ARGS    ?=
+
+eval: ## RAG evaluation harness with hard gates (docs/06 §13); non-zero exit when a gate fails
+	$(UV) run python -m sos_evals generate --check
+	$(UV) run python -m sos_evals run --adapter $(EVAL_ADAPTER) --suite $(EVAL_SUITE) $(EVAL_ARGS)
 
 check: lint typecheck test security ## Everything CI runs
