@@ -9,11 +9,12 @@ package = false
 required-version = "==0.12.19"
 
 [tool.uv.workspace]
-members = ["apps/api", "apps/worker"]
+members = ["apps/api", "apps/worker", "evals"]
 
 [tool.uv.sources]
 sos-api = { workspace = true }
 sos-worker = { workspace = true }
+sos-evals = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -45,7 +46,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "N", "C4", "SIM", "RUF", "PT", "T2
 ignore = ["PLR0913", "PLR2004", "N818"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "sos_worker"]
+known-first-party = ["app", "sos_worker", "sos_evals"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S311", "S101", "S105", "S106", "S603", "S607", "S608", "PLR2004", "PLC0415", "N802"]
@@ -57,7 +58,7 @@ known-first-party = ["app", "sos_worker"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-mypy_path = ["apps/api", "apps/worker"]
+mypy_path = ["apps/api", "apps/worker", "evals"]
 explicit_package_bases = true
 exclude = ["apps/web/", "node_modules/"]
 
@@ -67,7 +68,7 @@ module = ["testcontainers.*", "rfc8785", "factory.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["apps/api/tests", "apps/worker/tests"]
+testpaths = ["apps/api/tests", "apps/worker/tests", "evals/tests"]
 addopts = "-ra --strict-markers --import-mode=importlib"
 timeout = 300
 markers = [
