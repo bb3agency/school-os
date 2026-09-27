@@ -2103,11 +2103,17 @@ def _promotion_plan(
     ``no_target_section``).
     """
     from_year, to_year = _promotion_years(session, year_id, data.to_academic_year_id)
-    classes = sorted(tenancy.list_classes(session), key=lambda c: (c.sort_order, c.code))
+    # Archived classes and sections are never targets (US-202): the last active class graduates.
+    classes = sorted(
+        tenancy.list_classes(session, include_archived=False), key=lambda c: (c.sort_order, c.code)
+    )
     next_class = {a.id: b.id for a, b in itertools.pairwise(classes)}
-    class_code = {c.id: c.code for c in classes}
+    class_code = {c.id: c.code for c in tenancy.list_classes(session)}
     sources = {s.id: s for s in tenancy.list_sections(session, academic_year_id=from_year.id)}
-    targets = {s.id: s for s in tenancy.list_sections(session, academic_year_id=to_year.id)}
+    targets = {
+        s.id: s
+        for s in tenancy.list_sections(session, academic_year_id=to_year.id, include_archived=False)
+    }
     by_name = {(s.class_id, s.name.casefold()): s.id for s in targets.values()}
     labels = {
         s.id: f"{class_code.get(s.class_id, '?')}-{s.name}"

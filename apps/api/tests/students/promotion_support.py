@@ -67,7 +67,8 @@ def year_pair(
     first = next(_years)
     owner = school.people["owner"]
     with tenant_session(school.tenant_id, owner.user_id) as db:
-        classes = {c.code: c.id for c in tenancy.list_classes(db)}
+        # Active classes only: other tests may archive classes in the shared school.
+        classes = {c.code: c.id for c in tenancy.list_classes(db, include_archived=False)}
         years = []
         for y in (first, first + 1):
             out = tenancy.create_academic_year(

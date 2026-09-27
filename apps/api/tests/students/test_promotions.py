@@ -20,7 +20,7 @@ from sqlalchemy import Engine, text
 
 from app.core.db import tenant_session
 from app.tenancy import service as tenancy
-from app.tenancy.schemas import ClassCreate
+from app.tenancy.schemas import ClassCreate, SectionCreate
 
 pytestmark = pytest.mark.db
 SW = sys.modules["sos_test_student_world"]
@@ -435,3 +435,47 @@ def test_SEC_001_other_schools_years_are_not_found(
     )
     assert random.status_code == 404
     assert _target_count(admin_engine, pair) == 0
+
+
+def test_FR_TEN_011_archived_classes_and_sections_are_not_targets(
+    admin_engine: Engine, app_engine: Engine, platform_engine: Engine, api: Any
+) -> None:
+    """Archived structure is never a promotion target (US-202, 0023_api_gaps): the last active
+    class graduates even when an archived class sorts after it, and an archived target section
+    is not used (the student cannot be placed until a section is mapped)."""
+    s = W.School(W.provision_school())
+    for role in ("owner", "office_admin"):
+        s.people[role] = W.add_member(admin_engine, s.tenant_id, [role])
+    with tenant_session(s.tenant_id, s.people["owner"].user_id) as db:
+        for code, order in (("IX", 120), ("X", 130)):
+            tenancy.create_class(
+                db,
+                ClassCreate(
+                    code=code, display_en=f"Class {code}", display_te=code, sort_order=order
+                ),
+            )
+    pair = P.year_pair(s)
+    nine = P.enrolled(s, pair.section("from", "IX"), name="Synthetica Nine")
+    ten = P.enrolled(s, pair.section("from", "X"), name="Synthetica Ten")
+    with tenant_session(s.tenant_id, s.people["owner"].user_id) as db:
+        eleven = tenancy.create_class(
+            db, ClassCreate(code="XI", display_en="Class XI", display_te="XI", sort_order=140)
+        )
+        tenancy.create_section(
+            db,
+            SectionCreate(academic_year_id=pair.to_year, class_id=eleven.id, name="A"),
+        )
+        tenancy.archive_class(
+            db, eleven.id, archived=True, expected_version=tenancy.get_class(db, eleven.id).version
+        )
+        target = pair.section("to", "X")
+        section = next(x for x in tenancy.list_sections(db) if x.id == target)
+        tenancy.archive_section(db, target, archived=True, expected_version=section.version)
+    res = _call(api, s, "preview", pair, json=P.body(pair))
+    assert res.status_code == 200, res.text
+    by_student = {x["student_id"]: x for x in res.json()["students"]}
+    assert by_student[str(ten)]["outcome"] == "graduated"
+    assert by_student[str(ten)]["to_section_id"] is None
+    assert by_student[str(nine)]["outcome"] == "promoted"
+    assert by_student[str(nine)]["to_section_id"] is None
+    assert by_student[str(nine)]["reason"] == "no_target_section"
