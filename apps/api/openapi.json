@@ -15321,7 +15321,7 @@
     },
     "/api/v1/documents/uploads": {
       "post": {
-        "description": "Get a presigned POST for one file (permission ``document.upload``).\n\nAccepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,\nPNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10\nminutes with the returned fields; the key, Content-Type and size are fixed by the policy.\nSend ``document_id`` to upload a new version. Accepts ``Idempotency-Key``.",
+        "description": "Get a presigned POST for one file (permission ``document.upload``).\n\nAccepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,\nPNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10\nminutes with the returned fields; the key, Content-Type and size are fixed by the policy.\nSend ``document_id`` to upload a new version (409 ``document_archived`` for an archived\ndocument). Accepts ``Idempotency-Key``.",
         "operationId": "create_upload_api_v1_documents_uploads_post",
         "requestBody": {
           "content": {
@@ -15698,7 +15698,7 @@
     },
     "/api/v1/documents/{document_id}/versions": {
       "post": {
-        "description": "Register an uploaded file as the next version; history is kept (permission\n``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.\nAccepts ``Idempotency-Key``.",
+        "description": "Register an uploaded file as the next version; history is kept (permission\n``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.\nAccepts ``Idempotency-Key``. An archived document answers 409 ``document_archived``.",
         "operationId": "add_version_api_v1_documents__document_id__versions_post",
         "parameters": [
           {

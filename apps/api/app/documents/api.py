@@ -74,7 +74,8 @@ def create_upload(
     Accepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,
     PNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10
     minutes with the returned fields; the key, Content-Type and size are fixed by the policy.
-    Send ``document_id`` to upload a new version. Accepts ``Idempotency-Key``.
+    Send ``document_id`` to upload a new version (409 ``document_archived`` for an archived
+    document). Accepts ``Idempotency-Key``.
     """
     return idem.run(db, body, lambda: service.create_upload(db, ctx, body))
 
@@ -192,7 +193,7 @@ def add_version(
 ) -> Response:
     """Register an uploaded file as the next version; history is kept (permission
     ``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.
-    Accepts ``Idempotency-Key``."""
+    Accepts ``Idempotency-Key``. An archived document answers 409 ``document_archived``."""
     return idem.run(
         db,
         body,

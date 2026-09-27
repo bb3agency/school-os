@@ -157,6 +157,14 @@ STATUS_CHANGED_HOOKS: list[StatusChangedHook] = []
 """``hook(session, document_id, status)`` after archive/unarchive, in the same transaction
 (M2: keep archived documents out of retrieval)."""
 
+MetadataChangedHook = Callable[[Session, uuid.UUID, frozenset[str]], None]
+METADATA_CHANGED_HOOKS: list[MetadataChangedHook] = []
+"""``hook(session, document_id, fields)`` after ``PATCH /documents/{id}`` changed metadata
+(``fields``: the changed field NAMES from :data:`METADATA_FIELDS`), after the update and its
+audit event, in the same transaction: whatever a hook writes (e.g. an outbox event for
+knowledge to refresh chunk titles and facets once the change commits) commits or rolls back
+with the change. Not called for a no-op or refused PATCH."""
+
 
 # --- purpose rules --------------------------------------------------------------------------
 
@@ -263,6 +271,12 @@ def _error(field: str, code: str) -> dict[str, str]:
 
 def _invalid(field: str, code: str) -> ValidationFailed:
     return ValidationFailed([_error(field, code)])
+
+
+def _refuse_archived(doc: Document) -> None:
+    """Archived documents are read-only until unarchived (FR-DOC-005, FR-DOC-006)."""
+    if doc.status == "archived":
+        raise Conflict("This document is archived. Unarchive it first.", code="document_archived")
 
 
 def _not_found() -> NotFound:
@@ -482,6 +496,7 @@ def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> Upl
         )
         if doc is None:
             raise _not_found()
+        _refuse_archived(doc)
         if doc.purpose != data.purpose:
             raise _invalid("purpose", "purpose_mismatch")
         if not purpose_rule(doc.purpose, settings).versionable:
@@ -801,12 +816,15 @@ def add_version(
     session: Session, ctx: UserContext, document_id: uuid.UUID, data: VersionCreate
 ) -> DocumentOut:
     """Register an uploaded object as the next version (permission ``document.upload``; the
-    document must be visible to the caller). History is kept (FR-DOC-006)."""
+    document must be visible to the caller). History is kept (FR-DOC-006). An archived
+    document answers 409 ``document_archived`` (the row lock orders this against a concurrent
+    archive or unarchive)."""
     doc = repo.get_document(
         session, document_id, visibility=_visibility(session, ctx), for_update=True
     )
     if doc is None:
         raise _not_found()
+    _refuse_archived(doc)
     intent = _claim_intent(session, ctx, data.upload_id, document_id=doc.id)
     if intent.version_no != repo.max_version_no(session, doc.id) + 1:
         raise Conflict(
@@ -1013,8 +1031,7 @@ def update_document(
         raise _not_found()
     if doc.version != expected_version:
         raise PreconditionFailed()
-    if doc.status == "archived":
-        raise Conflict("This document is archived. Unarchive it first.", code="document_archived")
+    _refuse_archived(doc)
     values = {
         k: getattr(data, k)
         for k in METADATA_FIELDS
@@ -1029,6 +1046,9 @@ def update_document(
         if updated is None:  # pragma: no cover - row locked above
             raise PreconditionFailed()
         _audit(session, "document.metadata_updated", doc.id, {"fields": sorted(values)})
+    changed = frozenset(values)
+    for hook in METADATA_CHANGED_HOOKS:
+        hook(session, doc.id, changed)
     return _load_out(session, ctx, updated)
 
 
