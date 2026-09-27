@@ -14,10 +14,10 @@ SEMGREP_VERSION ?= 1.178.0
 GITLEAKS = $(if $(shell command -v gitleaks 2>/dev/null),gitleaks,docker run --rm -v "$(CURDIR):/repo" -w /repo $(GITLEAKS_IMAGE))
 TRIVY    = $(if $(shell command -v trivy 2>/dev/null),trivy,docker run --rm -v "$(CURDIR):/repo" -w /repo $(TRIVY_IMAGE))
 
-# ARGS: extra flags for dev-host (--raw, --no-seed).
+# ARGS: extra flags for dev-host (--raw, --no-seed) and sync-system-roles (--apply, --prune, --tenant).
 ARGS ?=
 
-.PHONY: help install dev dev-host dev-stop down logs migrate seed-synthetic test test-api test-web test-security \
+.PHONY: help install dev dev-host dev-stop down logs migrate seed-synthetic sync-system-roles test test-api test-web test-security \
         migration-check e2e lint format typecheck security eval check db-shell openapi
 
 help: ## List targets
@@ -56,6 +56,9 @@ db-shell: ## psql into the local database as the admin
 
 seed-synthetic: ## Create synthetic tenants (NEVER real data)
 	$(UV) run python -m app.devtools.seed_synthetic
+
+sync-system-roles: ## Sync every school's system roles with roles.yaml (dry run; ARGS="--apply [--prune] [--tenant <id>]")
+	$(UV) run python -m app.identity.sync_system_roles $(ARGS)
 
 openapi: ## Export the OpenAPI document and regenerate the TS client
 	$(UV) sync --locked --all-packages

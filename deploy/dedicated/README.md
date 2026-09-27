@@ -135,6 +135,11 @@ school hours (after 18:00 IST or on Sundays), with 48 h notice.
 
 If a release changes `systemd/`, run `scripts/bootstrap-host.sh` afterwards. It is idempotent.
 
+If the release notes say the system roles changed (`app/authz/roles.yaml`, ADR-0022), bring this school's
+roles in line after the upgrade: `sudo scripts/sync-system-roles.sh` (dry run: prints the grants it would add),
+then `sudo scripts/sync-system-roles.sh --apply`. Add `--prune` only when the release notes ask for removals.
+It is idempotent and audited in the school's own chain; exit code 3 means a dry run found changes (docs/10 §8).
+
 ## Backup and restore
 
 | What | How | Where | Retention |
@@ -213,6 +218,6 @@ After offboarding approval (docs/16 §13.4):
 | `compose.walg.yaml` | WAL-G overlay for db |
 | `Caddyfile` | TLS, security headers, edge path blocks, log redaction of OIDC `code`/`state` |
 | `.env.template` | every variable the stack reads (no secrets) |
-| `scripts/` | `bootstrap-host.sh`, `fetch-secrets.sh`, `compose.sh`, `upgrade.sh`, `backup.sh`, `restore.sh`, `package.sh` (CI), `lib.sh` |
+| `scripts/` | `bootstrap-host.sh`, `fetch-secrets.sh`, `compose.sh`, `upgrade.sh`, `sync-system-roles.sh`, `backup.sh`, `restore.sh`, `package.sh` (CI), `lib.sh` |
 | `systemd/` | `schoolos.service`, `schoolos-backup.{service,timer}`, `schoolos-monthly-reboot.{service,timer}`, unattended-upgrades schedule drop-in |
 | `walg/` | archive wrapper and pinned WAL-G version |
