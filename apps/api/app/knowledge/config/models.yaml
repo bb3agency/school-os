@@ -1,33 +1,54 @@
 # Model roles, prices, limits and budget thresholds for the knowledge module.
 # Sources: docs/06 §4.4, §5, §6, §9, §10.2, §12; ADR-0005 (Anthropic via the gateway only); FR-KB-008,
-# FR-KB-011, SEC-020, NFR-CST-001. CLAUDE.md invariant 13: model IDs live here, never in code.
-# Changing a model, limit or threshold needs a passing `make eval` (docs/06 §13); re-check model IDs
-# and prices against the provider's current documentation whenever they change.
+# FR-KB-009, FR-KB-011, SEC-020, NFR-AVL-004, NFR-CST-001. CLAUDE.md invariant 13: model IDs, limits
+# and thresholds live here, never in code. Changing a model, limit or threshold needs a passing
+# `make eval` (docs/06 §13); re-check model IDs, prices and capabilities against the provider's
+# current documentation whenever they change.
 version: 1
 provider: anthropic
 # Anthropic list prices (first-party API), checked on this date.
 prices_checked_on: 2026-09-27
 
+# Per role: model, output cap and how thinking is configured (K4 gateway, docs/06 §12).
+# thinking: `disabled` sends {"type": "disabled"}; `provider_default` omits the parameter (the model
+# then decides; models that cannot turn thinking off must use this). The answer role MUST be
+# `disabled`: a replayed tool-use turn carries no thinking blocks (ModelTurn has none), and a
+# thinking model would reject that history. effort: output_config.effort, only where supported.
 roles:
   # kb.answer_model: tool-use loop and cited answer (mid tier, docs/06 §5 step 3, §12).
   answer:
     model: claude-sonnet-5
+    max_output_tokens: 1500
+    thinking: disabled
   # kb.router_model: optional fast path for trivial cases; enable only if evals show no loss (§5).
   router:
     model: claude-haiku-4-5-20251001
+    max_output_tokens: 300
+    thinking: disabled
   # kb.metadata_model: strict-JSON document metadata (§4.4).
   metadata:
     model: claude-haiku-4-5-20251001
+    max_output_tokens: 500
+    thinking: disabled
   # Translated-query fusion for code-mixed / cross-language questions (§6).
   translation:
     model: claude-haiku-4-5-20251001
+    max_output_tokens: 1500
+    thinking: disabled
   # Register-row extraction from page images (§10.2; FR-IMP-024 provider via the gateway).
   extraction:
     model: claude-haiku-4-5-20251001
-  # Offline evaluation judge (top tier, §12, §13). Never used for product traffic.
+    max_output_tokens: 2000
+    thinking: disabled
+  # Offline evaluation judge (top tier, §12, §13). Never used for product traffic. Opus 5.5 cannot
+  # turn thinking off and rejects forced tool_choice: thinking left to the model, effort kept low
+  # (its default is medium), JSON through structured outputs, never a forced tool.
   eval_judge:
     model: claude-opus-5-5
     offline_only: true
+    max_output_tokens: 2000
+    thinking: provider_default
+    effort: low
 
 prices:
   claude-sonnet-5:
@@ -40,15 +61,57 @@ prices:
     input_usd_per_mtok: "4.00"
     output_usd_per_mtok: "20.00"
 
+# Prompt-cache writes and reads, as multiples of the model's input price (5-minute entries).
+cache_price_multipliers:
+  write: "1.25"
+  read: "0.10"
+
+# What each model accepts (provider docs, checked on prices_checked_on). The loader refuses a role
+# that asks a model for something it rejects with a 400.
+capabilities:
+  claude-sonnet-5:
+    can_disable_thinking: true
+    forced_tool_choice: true
+    effort: true
+  claude-haiku-4-5-20251001:
+    can_disable_thinking: true
+    forced_tool_choice: true
+    effort: false
+  claude-opus-5-5:
+    can_disable_thinking: false        # {"type": "disabled"} is a 400 at every effort level
+    forced_tool_choice: false          # tool_choice any/tool is a 400; the gateway never forces
+    effort: true
+
 limits:
   max_tool_rounds: 3                  # ADR-0008, §5 step 3
   tool_result_context_tokens: 12000   # §12 context budget
+  chars_per_token_estimate: 3         # conservative (Telugu costs more tokens per character)
   first_token_p95_ms: 3000            # FR-KB-008
   full_answer_p95_ms: 10000           # FR-KB-008
+
+# Provider client behaviour (ADR-0005: timeouts, retries with jitter, circuit breaker; NFR-AVL-004).
+# Chosen by the lead on 2026-09-27 (docs/06 §12 as built); tune with production metrics.
+client:
+  api_base_url: https://api.anthropic.com   # explicit, so ANTHROPIC_BASE_URL can never redirect
+  request_timeout_s: 60
+  max_retries: 2                      # only on 429, 5xx and 529 overloaded
+  backoff_base_s: 0.5                 # delay = min(max, base * 2^attempt) + jitter(0..base)
+  backoff_max_s: 8
+  circuit_failure_threshold: 5        # consecutive failed attempts open the breaker
+  circuit_open_s: 60                  # then one trial call (half-open)
+
+# Per tenant and feature, provider calls per minute (docs/07 T15, LLM10; each tool round is a call).
+rate_limit:
+  requests_per_minute_per_tenant: 30
 
 budget:
   alert_fraction: 0.8                 # §12: 80% alert
   degrade_fraction: 1.0               # §12: at 100% -> search-only until reset or top-up
+  # The amount is the school's setting ai_monthly_budget_inr (tenant settings, FR-TEN-012), read
+  # by the composition root through tenancy.service. Spend is metered in USD at list price and
+  # converted at this rate; keep it equal to app/platform/billing.yaml usd_inr_rate (a test pins it).
+  usd_inr_rate: "84.00"
+  # Budget months are calendar months in IST (Asia/Kolkata).
 
 answer_checks:
   max_uncited_factual_fraction: 0.30  # §9 rule 3
