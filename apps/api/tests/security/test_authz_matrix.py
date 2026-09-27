@@ -601,6 +601,12 @@ SPECS: dict[tuple[str, str], Builder] = {
     # Students (app/students/api.py; docs/09 Students).
     ("GET", "/api/v1/attributes"): lambda w, r, a: ("/api/v1/attributes", None, {}),
     ("GET", "/api/v1/students"): lambda w, r, a: ("/api/v1/students", None, {}),
+    # Name/admission-number search in the body, never the URL (SEC-008, FR-STU-010).
+    ("POST", "/api/v1/students/search"): lambda w, r, a: (
+        "/api/v1/students/search",
+        {"query": "Synthetica", "limit": 20},
+        {},
+    ),
     ("POST", "/api/v1/students"): lambda w, r, a: (
         "/api/v1/students",
         {

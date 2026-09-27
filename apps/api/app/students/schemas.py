@@ -16,6 +16,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
+from app.authz.http import DEFAULT_LIMIT, MAX_LIMIT
+
 
 def nfc(value: Any) -> Any:
     if isinstance(value, str):
@@ -223,6 +225,38 @@ class SearchFilters(_In):
     class_id: uuid.UUID | None = None
     status: StudentStatus | None = None
     admission_no: str | None = None
+
+
+class StudentSearchIn(_In):
+    """``POST /students/search`` body (SEC-008): names and admission numbers are personal data
+    and never travel in the URL, where proxies and load balancers log them. Same filters, page
+    size and cursor as ``GET /students``."""
+
+    query: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Partial name (English or Telugu), parent name, admission number or "
+        "class/section token such as 9b or IX-B.",
+    )
+    section_id: uuid.UUID | None = None
+    class_id: uuid.UUID | None = None
+    status: StudentStatus | None = None
+    admission_no: str | None = Field(default=None, max_length=32)
+    limit: int = Field(
+        default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="Page size (max 200)."
+    )
+    cursor: str | None = Field(
+        default=None, max_length=512, description="Opaque cursor from next_cursor."
+    )
+
+    def filters(self) -> SearchFilters:
+        return SearchFilters(
+            query=self.query,
+            section_id=self.section_id,
+            class_id=self.class_id,
+            status=self.status,
+            admission_no=self.admission_no,
+        )
 
 
 # --- sensitive reveal ---------------------------------------------------------------------------
