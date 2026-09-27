@@ -1338,6 +1338,150 @@ def student_ids_for_import_batch(session: Session, batch_id: uuid.UUID) -> list[
     return repo.student_ids_with_batch(session, batch_id)
 
 
+# --- import revert (FR-IMP-005; called by app.imports only) ------------------------------------
+
+ANCHOR_SOURCE: Final = "admission_register"  # BR-01: the legal anchor of identity values
+
+
+def _import_has_dependents() -> Conflict:
+    return Conflict(
+        "Records from this import were changed after it was added, so it cannot be reverted. "
+        "Correct the records instead.",
+        code="import_has_dependents",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ImportRevertPlan:
+    """What reverting one import batch changes (built by :func:`plan_import_revert`)."""
+
+    batch_id: uuid.UUID
+    created: tuple[uuid.UUID, ...]  # students the batch created: removed
+    withdraw: tuple[uuid.UUID, ...]  # batch values with no predecessor: marked rejected
+    replaced: tuple[uuid.UUID, ...]  # batch values that replaced one: the predecessor returns
+
+
+@dataclass(frozen=True, slots=True)
+class ImportRevertResult:
+    students_removed: int
+    values_withdrawn: int
+    values_restored: int
+
+
+def plan_import_revert(
+    session: Session, batch_id: uuid.UUID, created_students: Mapping[uuid.UUID, int | None]
+) -> ImportRevertPlan:
+    """Check that import batch ``batch_id`` can still be undone (FR-IMP-005); read-only.
+
+    ``created_students`` maps each student the batch created to the version the batch left it
+    at. Refused (409 ``import_has_dependents``) when anything was recorded on top of the batch:
+    a student it created was changed since (version), one of its values was superseded, or a
+    value it replaced is a verified or admission-register identity value (BR-01: those change
+    only through a change request, never by a revert).
+    """
+    versions = repo.student_versions(session, list(created_students))
+    if any(versions.get(sid) != version for sid, version in created_students.items()):
+        raise _import_has_dependents()
+    values = repo.batch_values(session, batch_id)
+    if any(v.superseded_by is not None for v in values):
+        raise _import_has_dependents()
+    priors = repo.superseded_by_any(session, [v.id for v in values])
+    defs = _definitions(session)
+    for prior in priors:
+        definition = defs.get(prior.attribute_key)
+        if definition is None or (
+            definition.is_identity
+            and (
+                prior.source in (ANCHOR_SOURCE, definition.policy.anchor)
+                or prior.verification_status != "unverified"
+            )
+        ):
+            raise _import_has_dependents()
+    replaced = {p.superseded_by for p in priors if p.superseded_by is not None}
+    return ImportRevertPlan(
+        batch_id=batch_id,
+        created=tuple(created_students),
+        withdraw=tuple(v.id for v in values if v.id not in replaced),
+        replaced=tuple(sorted(replaced, key=str)),
+    )
+
+
+def revert_import(session: Session, ctx: UserContext, plan: ImportRevertPlan) -> ImportRevertResult:
+    """Undo an import batch checked by :func:`plan_import_revert`, in the caller's transaction.
+
+    The caller (``app.imports``) must already have moved the batch to ``reverting`` in this
+    transaction: the database lets a student be deleted only then. In order: values the batch
+    added to existing students are withdrawn (marked ``rejected``; history kept), any value they
+    replaced becomes current again (re-recorded with :func:`record_value`, same source, evidence
+    and verification), the profile and version of every other student that lost a value are
+    refreshed, and the students the batch created are removed with their values, enrolment,
+    profile and derived data (``ON DELETE CASCADE``). Other records pointing at those students
+    (e.g. change requests) refuse the delete: 409 ``import_has_dependents``.
+
+    Audit (same transaction): ``student.values.withdrawn`` per existing student,
+    ``student.value.recorded`` per restored value, ``student.removed`` per removed student.
+    Values keep their batch tag, so the batch's own ``import.reverted`` event (queued by the
+    caller) drives the data-quality re-run instead of ``student.values.changed``.
+    """
+    withdrawn = repo.reject_current_values(session, plan.withdraw, ctx.user_id)
+    created = set(plan.created)
+    lost: dict[uuid.UUID, list[AttributeValue]] = {}
+    for row in withdrawn:
+        if row.student_id not in created:
+            lost.setdefault(row.student_id, []).append(row)
+    for student_id, rows in lost.items():
+        _audit(
+            session,
+            action="student.values.withdrawn",
+            resource_type="student",
+            resource_id=student_id,
+            summary={
+                "import_batch_id": plan.batch_id,
+                "attribute_keys": sorted({r.attribute_key for r in rows}),
+                "value_count": len(rows),
+                "reason": "import_reverted",
+            },
+        )
+    priors = repo.superseded_by_any(session, plan.replaced)
+    for prior in priors:
+        record_value(
+            session,
+            ctx,
+            prior.student_id,
+            prior.attribute_key,
+            prior.source,
+            _plain(session, prior) or "",
+            evidence_document_id=prior.evidence_document_id,
+            verification=prior.verification_status,  # type: ignore[arg-type]
+        )
+    restored = {p.student_id for p in priors}
+    if lost.keys() - restored:
+        defs = _definitions(session)
+        for student_id in sorted(lost.keys() - restored, key=str):
+            student = repo.get_student(session, student_id, lock=True)
+            if student is not None:
+                _touch(session, student, defs)
+    try:
+        removed = repo.delete_students(session, plan.created)
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "23503":
+            raise _import_has_dependents() from exc
+        raise
+    for student_id in plan.created:
+        _audit(
+            session,
+            action="student.removed",
+            resource_type="student",
+            resource_id=student_id,
+            summary={"import_batch_id": plan.batch_id, "reason": "import_reverted"},
+        )
+    return ImportRevertResult(
+        students_removed=removed,
+        values_withdrawn=len(withdrawn),
+        values_restored=len(priors),
+    )
+
+
 # --- sensitive reveal --------------------------------------------------------------------------
 
 

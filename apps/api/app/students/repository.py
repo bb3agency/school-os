@@ -20,6 +20,7 @@ from sqlalchemy import (
     and_,
     case,
     cast,
+    delete,
     false,
     func,
     insert,
@@ -202,6 +203,80 @@ def student_ids_with_batch(session: Session, batch_id: uuid.UUID) -> list[uuid.U
         .order_by(AttributeValue.student_id)
     )
     return list(session.scalars(stmt))
+
+
+# --- import revert (FR-IMP-005) ---------------------------------------------------------------
+# Guarded by the database (migration 0012): a student can only be deleted while the import batch
+# that created it is ``reverting`` in the same transaction; values are never deleted directly
+# (``sos_app`` has no DELETE on ``sis.attribute_values``) but go with their student through the
+# ``ON DELETE CASCADE`` foreign key.
+
+
+def student_versions(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, int]:
+    if not student_ids:
+        return {}
+    rows = session.execute(
+        select(Student.id, Student.version).where(Student.id.in_(list(student_ids)))
+    ).all()
+    return {r.id: int(r.version) for r in rows}
+
+
+def batch_values(session: Session, batch_id: uuid.UUID) -> list[AttributeValue]:
+    """Every value recorded by import batch ``batch_id`` (current or not)."""
+    stmt = (
+        select(AttributeValue)
+        .where(AttributeValue.import_batch_id == batch_id)
+        .order_by(AttributeValue.id)
+    )
+    return list(session.scalars(stmt, execution_options={"populate_existing": True}))
+
+
+def superseded_by_any(
+    session: Session, successor_ids: Collection[uuid.UUID]
+) -> list[AttributeValue]:
+    """Values that one of ``successor_ids`` replaced."""
+    if not successor_ids:
+        return []
+    stmt = (
+        select(AttributeValue)
+        .where(AttributeValue.superseded_by.in_(list(successor_ids)))
+        .order_by(AttributeValue.id)
+    )
+    return list(session.scalars(stmt, execution_options={"populate_existing": True}))
+
+
+def reject_current_values(
+    session: Session, value_ids: Collection[uuid.UUID], user_id: uuid.UUID
+) -> list[AttributeValue]:
+    """Mark current values ``rejected`` (kept in history, never canonical); returns them."""
+    if not value_ids:
+        return []
+    return list(
+        session.scalars(
+            update(AttributeValue)
+            .where(AttributeValue.id.in_(list(value_ids)), AttributeValue.superseded_by.is_(None))
+            .values(verification_status="rejected", verified_by=user_id, verified_at=func.now())
+            .returning(AttributeValue),
+            execution_options={"populate_existing": True, "synchronize_session": False},
+        )
+    )
+
+
+def delete_students(session: Session, student_ids: Collection[uuid.UUID]) -> int:
+    """Delete students (enrolments first; values, profile and derived rows cascade). The
+    database refuses unless an import batch that created them is ``reverting``."""
+    if not student_ids:
+        return 0
+    ids = list(student_ids)
+    session.execute(
+        delete(Enrollment).where(Enrollment.student_id.in_(ids)),
+        execution_options={"synchronize_session": False},
+    )
+    result = session.execute(
+        delete(Student).where(Student.id.in_(ids)).returning(Student.id),
+        execution_options={"synchronize_session": False},
+    )
+    return len(result.all())
 
 
 # --- enrolments -----------------------------------------------------------------------------
