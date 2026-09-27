@@ -222,6 +222,53 @@ def test_FR_DOC_003_sse_kms_is_required_by_policy_and_sent_on_writes() -> None:
         stub.assert_no_pending_responses()
 
 
+def test_FR_EXP_003_export_files_carry_the_7_day_lifecycle_tag_on_upload() -> None:
+    """docs/05 §13: exports are kept 7 days. S3 lifecycle filters match a literal prefix only,
+    and the key starts with the tenant (t/<tenant_id>/exports/...), so the rule ``exports-7d``
+    (infra/terraform) selects by the tag ``sos-lifecycle=export-7d``, set in the same PUT."""
+    client = boto3.client(
+        "s3",
+        region_name="ap-south-1",
+        aws_access_key_id="synthetic-access",
+        aws_secret_access_key="synthetic-secret",
+        config=Config(signature_version="s3v4"),
+    )
+    kms = "arn:aws:kms:ap-south-1:000000000000:key/synthetic"
+    store = S3ObjectStore(client, BUCKET, kms_key_id=kms)
+    key = "t/a/exports/b/precheck.pdf"
+    with Stubber(client) as stub:
+        stub.add_response(
+            "put_object",
+            {},
+            {
+                "Bucket": BUCKET,
+                "Key": key,
+                "Body": b"%PDF-",
+                "ContentType": PDF_CT,
+                "ServerSideEncryption": "aws:kms",
+                "SSEKMSKeyId": kms,
+                "Tagging": "sos-lifecycle=export-7d",
+            },
+        )
+        store.put(key, b"%PDF-", PDF_CT, lifecycle=storage.LIFECYCLE_EXPORT)
+        stub.assert_no_pending_responses()
+    with pytest.raises(ValueError, match="lifecycle"):
+        store.put(key, b"%PDF-", PDF_CT, lifecycle="forever")
+
+
+def test_FR_EXP_003_lifecycle_tag_is_stored_with_the_object(
+    s3_store: S3ObjectStore, s3_endpoint: str
+) -> None:
+    client = _client(s3_endpoint)
+    key = storage.export_key(uuid.uuid4(), uuid.uuid4(), "precheck.pdf")
+    s3_store.put(key, S.pdf(), PDF_CT, lifecycle=storage.LIFECYCLE_EXPORT)
+    tags = client.get_object_tagging(Bucket=BUCKET, Key=key)["TagSet"]
+    assert tags == [{"Key": "sos-lifecycle", "Value": "export-7d"}]
+    plain = storage.document_key(uuid.uuid4(), uuid.uuid4(), 1, "pdf")
+    s3_store.put(plain, S.pdf(), PDF_CT)
+    assert client.get_object_tagging(Bucket=BUCKET, Key=plain)["TagSet"] == []
+
+
 def test_PRV_016_discard_tags_then_deletes_and_is_idempotent(s3_store: S3ObjectStore) -> None:
     key = storage.document_key(uuid.uuid4(), uuid.uuid4(), 1, "png")
     s3_store.put(key, S.png(), "image/png")

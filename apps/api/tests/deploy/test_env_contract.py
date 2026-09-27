@@ -425,3 +425,61 @@ def test_NFR_AVL_002_workers_consume_every_celery_queue() -> None:
     assert _queues(compose_queues) == set(QUEUES)
     tf_default = shared_hcl().var_defaults["worker_queues"]
     assert _queues(tf_default.strip().strip('"')) == set(QUEUES)
+
+
+# --- files bucket: SSE-KMS key and lifecycle tags (SEC-011, FR-EXP-003) ---------------------------
+
+WRITERS = ("api", "worker")  # the containers that put objects into the files bucket
+
+
+@pytest.mark.parametrize("module", WRITERS)
+def test_SEC_011_shared_tier_uploads_use_the_files_bucket_key(module: str) -> None:
+    """CLAUDE.md §3 (SSE-KMS): uploads name the files bucket's CMK, so presigned POST policies
+    require it and server-side writes send it (app/documents/storage.py)."""
+    hcl = shared_hcl()
+    assert hcl.container_env(module).get("SOS_S3_KMS_KEY_ID") == "local.kms_data"
+    assert hcl.block("module", "s3")["data_kms_key_arn"] == "local.kms_data"
+
+
+@pytest.mark.parametrize("env", ["staging", "prod"])
+@pytest.mark.parametrize("module", WRITERS)
+def test_SEC_011_shared_tier_settings_carry_the_s3_kms_key(
+    module: str, env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = build_settings(monkeypatch, terraform_container_env(module, env))
+    assert settings.s3_kms_key_id
+
+
+@pytest.mark.parametrize("service", WRITERS)
+def test_SEC_011_dedicated_uploads_use_the_host_key(
+    service: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dedicated files bucket is encrypted with the host key (dedicated_host: module "files"
+    kms_key_arn = var.kms_key_arn), which host.env carries as SOS_KMS_DATA_KEY_ARN."""
+    assert host_hcl().block("module", "files")["kms_key_arn"] == "var.kms_key_arn"
+    assert "SOS_KMS_DATA_KEY_ARN=${kms_key_arn}" in CLOUD_INIT.read_text(encoding="utf-8")
+    host_env = dedicated_host_env()
+    env = {k: interpolate(v, host_env) for k, v in compose_env(service).items()}
+    settings = build_settings(monkeypatch, env)
+    assert settings.s3_kms_key_id == host_env["SOS_KMS_DATA_KEY_ARN"]
+
+
+def _lifecycle_rule(text: str, rule_id: str) -> str:
+    m = re.search(r'id\s*=\s*"' + re.escape(rule_id) + r'"[^}]*\}[^}]*\}?', text)
+    assert m, f"lifecycle rule {rule_id} not found"
+    return m.group(0)
+
+
+@pytest.mark.parametrize("module_dir", [REPO / "infra/terraform/modules/s3", HOST])
+def test_FR_EXP_003_export_lifecycle_rule_matches_the_tag_the_app_sets(module_dir: Path) -> None:
+    """docs/05 §13: export files are deleted after 7 days. Keys start with the tenant
+    (t/<tenant_id>/exports/...), and lifecycle filters match only a literal prefix, so the rule
+    selects the tag app/documents/storage.py puts on every export file. The bucket is versioned:
+    the rule also expires the noncurrent version, so no copy outlives the 7 days by the 90-day
+    recovery window meant for documents."""
+    from app.documents.storage import LIFECYCLE_EXPORT, LIFECYCLE_TAG
+
+    rule = _lifecycle_rule((module_dir / "main.tf").read_text(encoding="utf-8"), "exports-7d")
+    assert f'"{LIFECYCLE_TAG}" = "{LIFECYCLE_EXPORT}"' in rule
+    assert re.search(r"\bexpiration_days\s*=\s*7\b", rule)
+    assert re.search(r"\bnoncurrent_version_expiration_days\s*=\s*1\b", rule)

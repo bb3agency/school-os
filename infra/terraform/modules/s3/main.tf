@@ -3,7 +3,8 @@
 # Lifecycle note: the per-tenant layout puts the tenant ID before the category
 # (t/<tenant_id>/exports/...), and S3 lifecycle filters only match a literal prefix. The expiring
 # categories are therefore selected by object tag, which the app sets on upload:
-#   sos-lifecycle=export-7d         -> t/<tenant_id>/exports/<export_id>/<file>
+#   sos-lifecycle=export-7d         -> t/<tenant_id>/exports/<export_id>/<file> (set on upload by
+#                                      app/documents/storage.py put(lifecycle=...))
 #   sos-lifecycle=tenant-export-2d  -> t/<tenant_id>/tenant-export/<job_id>.zip
 #   sos-lifecycle=import-raw-90d    -> t/<tenant_id>/imports/<batch_id>/raw.<ext> (optional, retention setting)
 # Documents (t/<tenant_id>/docs/...) are never expired by lifecycle; retention purges are app jobs.
@@ -100,9 +101,12 @@ module "files" {
   cors_rules             = local.files_cors_rules
   lifecycle_rules = [
     {
-      id              = "exports-7d"
-      tags            = { "sos-lifecycle" = "export-7d" }
-      expiration_days = 7
+      # docs/05 §13: exports are kept 7 days. The tag is set in the PUT (documents.storage); the
+      # noncurrent version (left by the purge job's delete) goes after 1 day, not the 90-day window.
+      id                                 = "exports-7d"
+      tags                               = { "sos-lifecycle" = "export-7d" }
+      expiration_days                    = 7
+      noncurrent_version_expiration_days = 1
     },
     {
       id              = "tenant-export-2d"
