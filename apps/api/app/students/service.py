@@ -417,6 +417,43 @@ def attribute_catalog(session: Session) -> list[AttributeOut]:
     ]
 
 
+@dataclass(frozen=True, slots=True)
+class AttributeRules:
+    """How :func:`record_value` validates one attribute (FR-STU-006, the ``validation`` of
+    ``sis.attribute_definitions``), for modules that check input before recording it (imports
+    show row-level errors). The student service still re-validates every value it records."""
+
+    key: str
+    data_type: str
+    classification: str
+    is_identity: bool
+    is_name: bool
+    allowed_sources: tuple[str, ...] | None  # None = every source
+    allowed_values: tuple[str, ...] | None  # enum values
+    max_length: int | None  # after cleaning (NFC, single spaces); None for dates
+    pattern: str | None  # full-match regular expression
+    not_future: bool  # dates
+
+
+def attribute_rules(session: Session) -> list[AttributeRules]:
+    """Validation rules of the global and school attributes (same order as the catalog)."""
+    return [
+        AttributeRules(
+            key=d.key,
+            data_type=d.data_type,
+            classification=d.classification,
+            is_identity=d.is_identity,
+            is_name=d.is_name,
+            allowed_sources=d.allowed_sources,
+            allowed_values=d.allowed_values,
+            max_length=d.max_length,
+            pattern=d.pattern,
+            not_future=d.not_future,
+        )
+        for d in _definitions(session).values()
+    ]
+
+
 # --- profile projection (same transaction as every write) -------------------------------------
 
 

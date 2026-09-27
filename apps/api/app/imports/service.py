@@ -309,16 +309,21 @@ def _template_out(t: ImportMappingTemplate) -> TemplateOut:
 
 
 def _specs(session: Session) -> dict[str, AttributeSpec]:
+    """The student catalog's attributes with their validation rules (students.attribute_rules):
+    imports check cells with the same limits and formats the student service enforces."""
     return {
         a.key: AttributeSpec(
             key=a.key,
             data_type=a.data_type,
             classification=a.classification,
             is_identity=a.is_identity,
-            allowed_sources=tuple(a.allowed_sources) if a.allowed_sources else None,
-            allowed_values=tuple(a.allowed_values) if a.allowed_values else None,
+            allowed_sources=a.allowed_sources,
+            allowed_values=a.allowed_values,
+            max_length=a.max_length,
+            pattern=a.pattern,
+            not_future=a.not_future,
         )
-        for a in students.attribute_catalog(session)
+        for a in students.attribute_rules(session)
     }
 
 

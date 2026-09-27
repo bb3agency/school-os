@@ -360,3 +360,15 @@ def test_SEC_015_scoped_importer_cannot_write_other_sections(
     other = S.start(admin_engine, world.a, S.xlsx_bytes(S.class_list(1)[0]), role="principal")
     with pytest.raises(NotFound), tenant_session(world.a.tenant_id) as s:
         service.get_import(s, scoped, other)
+
+
+def test_FR_IMP_003_cells_are_checked_with_the_student_catalog_rules(
+    world: Any, admin_engine: Engine
+) -> None:
+    """Lengths and formats come from students.attribute_rules (no copies in imports)."""
+    rows, _ = S.class_list(2)
+    rows[1][0] = "A 1!"  # admission number outside the catalog pattern
+    rows[2][1] = "Synthetica " + "N" * 120  # longer than full_name's 120 characters
+    batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
+    codes = [{e["code"] for e in r["errors"]} for r in S.rows(admin_engine, batch_id)]
+    assert codes == [{"invalid_format"}, {"too_long"}]

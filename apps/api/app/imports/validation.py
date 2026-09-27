@@ -78,6 +78,10 @@ class AttributeSpec:
     is_identity: bool
     allowed_sources: tuple[str, ...] | None
     allowed_values: tuple[str, ...] | None
+    # From the student catalog (students.attribute_rules); None = the import's own limits only.
+    max_length: int | None = None
+    pattern: str | None = None
+    not_future: bool = True
 
     @property
     def sensitive(self) -> bool:
@@ -229,7 +233,9 @@ class _RowValidator:
             for key, spec in ctx.specs.items()
             if spec.data_type == "enum"
         }
-        self.admission_re = re.compile(self.cfg.admission_no_pattern)
+        self.patterns: dict[str, re.Pattern[str]] = {
+            key: re.compile(spec.pattern) for key, spec in ctx.specs.items() if spec.pattern
+        }
 
     # -- cells --------------------------------------------------------------------------------
 
@@ -260,14 +266,18 @@ class _RowValidator:
 
     # -- values -------------------------------------------------------------------------------
 
-    def _text(self, key: str, cell: Cell, result: RowResult) -> str | None:
+    def _text(
+        self, key: str, cell: Cell, result: RowResult, max_length: int | None = None
+    ) -> str | None:
+        """Cleaned cell text; ``max_length`` is the attribute's own limit (student catalog),
+        else the import's limit for ``key`` (``text_max_length`` in config.yaml)."""
         text = cell_text(cell.value)
         if text is None:
             return None
         if has_control_chars(text):
             result.errors.append(issue(key, "invalid"))
             return None
-        if len(text) > self.cfg.max_length(key):
+        if len(text) > (max_length if max_length is not None else self.cfg.max_length(key)):
             result.errors.append(issue(key, "too_long"))
             return None
         return text
@@ -284,13 +294,13 @@ class _RowValidator:
             if parsed.value < MIN_DATE:
                 result.errors.append(issue(key, "date_too_early"))
                 return None
-            if parsed.value > self.ctx.today:
+            if spec.not_future and parsed.value > self.ctx.today:
                 result.errors.append(issue(key, "date_in_future"))
                 return None
             if parsed.ambiguous:
                 result.warnings.append(issue(key, "ambiguous_date"))
             return parsed.value.isoformat()
-        text = self._text(key, cell, result)
+        text = self._text(key, cell, result, spec.max_length)
         if text is None:
             return None
         if spec.data_type == "enum":
@@ -308,7 +318,8 @@ class _RowValidator:
             if re.fullmatch(r"[0-9]{4}", text) is None:
                 result.errors.append(issue(key, "digits4_required", AADHAAR_MESSAGE_KEY))
                 return None
-        if key == "admission_no" and self.admission_re.fullmatch(text) is None:
+        pattern = self.patterns.get(key)
+        if pattern is not None and pattern.fullmatch(text) is None:
             result.errors.append(issue(key, "invalid_format"))
             return None
         return text

@@ -443,3 +443,27 @@ def test_US_301_AC3_reveal_is_audited_without_the_value(
         run(world, students.reveal_sensitive, shared["s9a"], RevealIn(attribute_key="full_name"))
     with pytest.raises(NotFound):
         run(world, students.reveal_sensitive, shared["s9c"], RevealIn(attribute_key="health_notes"))
+
+
+def test_FR_STU_006_attribute_rules_expose_the_catalog_validation_to_other_modules(
+    world: Any,
+) -> None:
+    """Imports validate cells with the student catalog's own rules (no copies in imports)."""
+    with tenant_session(world.a.tenant_id, SW.admin_ctx(world.a).user_id) as db:
+        rules = {r.key: r for r in students.attribute_rules(db)}
+    assert rules["full_name"].max_length == 120
+    assert rules["full_name"].is_name is True
+    assert rules["admission_no"].pattern == "^[A-Za-z0-9][A-Za-z0-9/._-]{0,31}$"
+    assert rules["admission_no"].allowed_sources == (
+        "admission_register",
+        "tc_incoming",
+        "manual_entry",
+    )
+    assert rules["gender"].allowed_values == ("female", "male", "transgender")
+    assert rules["dob"].data_type == "date"
+    assert rules["dob"].not_future is True
+    assert rules["dob"].max_length is None
+    assert rules["mother_tongue"].allowed_sources is None
+    assert rules["caste"].classification == "C3"
+    assert rules["aadhaar_last4"].pattern == "^[0-9]{4}$"
+    assert rules["health_notes"].max_length == 1000

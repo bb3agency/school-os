@@ -74,6 +74,27 @@ class AttributeDef:
         sources = self.validation.get("sources")
         return tuple(str(s) for s in sources) if sources else None
 
+    @property
+    def allowed_values(self) -> tuple[str, ...] | None:
+        values = self.validation.get("values")
+        return tuple(str(v) for v in values) if values else None
+
+    @property
+    def max_length(self) -> int | None:
+        """Longest accepted value after cleaning (:func:`validate_value`); ``None`` for dates."""
+        if self.data_type == "date":
+            return None
+        return int(self.validation.get("max_length", _MAX_TEXT))
+
+    @property
+    def pattern(self) -> str | None:
+        pattern = self.validation.get("pattern")
+        return pattern if isinstance(pattern, str) else None
+
+    @property
+    def not_future(self) -> bool:
+        return bool(self.validation.get("not_future", False))
+
 
 @dataclass(frozen=True, slots=True)
 class CleanValue:

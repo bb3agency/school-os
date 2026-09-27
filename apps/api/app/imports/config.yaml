@@ -37,24 +37,12 @@ required:
   create_by_source:
     admission_register: [dob]
 
-# Maximum lengths for text attributes the student catalog does not expose (the student service
-# re-validates everything at commit).
+# Maximum lengths of cells that are not student attributes (enrolment roll number, and the
+# default for any other text). Attribute values use the student catalog's own rules
+# (students.attribute_rules: max_length, pattern, values, not_future), never copies here.
 text_max_length:
   default: 1000
-  full_name: 120
-  father_name: 120
-  mother_name: 120
-  aadhaar_name_as_printed: 120
-  admission_no: 32
-  mother_tongue: 40
-  nationality: 40
-  religion: 40
-  caste: 80
-  disability: 200
-  address: 500
-  roll_no: 16
-
-admission_no_pattern: '^[A-Za-z0-9][A-Za-z0-9/._-]{0,31}$'
+  roll_no: 16                       # sis.enrollments roll_no (1..16 characters)
 
 # Header synonyms (English and Telugu) per mapping target. Headers are compared after
 # normalisation: NFC, lower case, punctuation removed, spaces collapsed. Special targets:
