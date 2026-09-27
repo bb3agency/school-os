@@ -181,3 +181,98 @@ def test_SEC_001_other_school_rows_are_invisible(world: Any, admin_engine: Engin
             ).scalar_one()
             == 1
         )
+
+
+# --- 0018_extraction_redaction (PRV-016) ----------------------------------------------------
+
+REDACTION = "0018_extraction_redaction"
+
+
+def _page_flags(admin: Engine) -> tuple[Any, ...]:
+    with admin.connect() as c:
+        return tuple(
+            c.execute(
+                text(
+                    "SELECT p.aadhaar_detected, p.image_withheld, b.pages_withheld "
+                    "FROM sis.extraction_pages p JOIN sis.extraction_batches b "
+                    "ON b.tenant_id = p.tenant_id AND b.id = p.batch_id"
+                )
+            ).one()
+        )
+
+
+def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_otherwise(
+    populated: tuple[Config, Engine],
+) -> None:
+    from sqlalchemy.exc import DBAPIError
+
+    cfg, admin = populated
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "UPDATE sis.extraction_pages SET aadhaar_detected = true, image_redacted = true"
+            )
+        )
+    assert _page_flags(admin) == (True, False, 0)
+    with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
+        command.downgrade(cfg, "0017_exports")
+    assert _scalar(admin, "SELECT version_num FROM ops.alembic_version") == REDACTION
+    assert _scalar(admin, "SELECT image_redacted FROM sis.extraction_pages") is True
+
+    # Without redacted pages (a withheld one here) the walk is clean.
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "UPDATE sis.extraction_pages SET image_redacted = false, image_withheld = true"
+            )
+        )
+    command.downgrade(cfg, "0017_exports")
+    assert _page_flags(admin) == (True, True, 0)
+    assert (
+        _scalar(
+            admin,
+            "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'sis' "
+            "AND table_name = 'extraction_pages' AND column_name = 'image_redacted'",
+        )
+        == 0
+    )
+    command.upgrade(cfg, "head")
+    assert _scalar(admin, "SELECT image_redacted FROM sis.extraction_pages") is False
+    assert _page_flags(admin) == (True, True, 0)
+
+
+@pytest.mark.parametrize(
+    ("detected", "withheld", "redacted", "ok"),
+    [
+        (False, False, False, True),
+        (True, True, False, True),
+        (True, False, True, True),
+        (True, False, False, False),  # a page that showed a number is withheld or redacted
+        (True, True, True, False),  # ... not both
+        (False, True, False, False),
+        (False, False, True, False),
+    ],
+)
+def test_PRV_016_page_image_state_follows_detection(
+    world: Any,
+    admin_engine: Engine,
+    detected: bool,
+    withheld: bool,
+    redacted: bool,
+    ok: bool,
+) -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    item = X.pending_item(admin_engine, world.a)
+    page_id = X.row_of(admin_engine, "sis.extraction_items", item)["page_id"]
+    stmt = text(
+        "UPDATE sis.extraction_pages SET aadhaar_detected = :d, image_withheld = :w, "
+        "image_redacted = :r WHERE id = :p"
+    )
+    params = {"d": detected, "w": withheld, "r": redacted, "p": page_id}
+    if ok:
+        with admin_engine.begin() as c:
+            c.execute(stmt, params)
+    else:
+        with pytest.raises(IntegrityError), admin_engine.begin() as c:
+            c.execute(stmt, params)
