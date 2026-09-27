@@ -1,62 +1,16 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import {
+  expectNoAxeViolations,
+  expectNoHorizontalOverflow,
+  expectVisibleFocusOnEveryStop,
+  signIn,
+} from "./support/a11y-helpers";
 
 /**
  * Accessibility (WCAG 2.2 AA via axe-core) and keyboard-only paths at 1366×768 (PRD §8,
  * CLAUDE.md §8, §10). The signed-out page is always checked; signed-in school and platform
  * pages need E2E_STAND_IN=1 (scripted IdP + canned API, e2e/support/stand-in.ts) and Valkey.
  */
-
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
-
-async function expectNoAxeViolations(page: Page, label: string) {
-  const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  const summary = results.violations.map(
-    (violation) =>
-      `${violation.id} (${violation.impact ?? "?"}): ${violation.nodes
-        .slice(0, 3)
-        .map((node) => node.target.join(" "))
-        .join(" | ")}`,
-  );
-  expect(summary, label).toEqual([]);
-}
-
-/**
- * Keyboard only (WCAG 2.4.7): Tab through the page from the top and require a visible focus
- * indicator (outline or box shadow) on every stop, including the parts of native controls
- * such as the date picker button.
- */
-async function expectVisibleFocusOnEveryStop(page: Page, label: string, maxStops = 60) {
-  await page.locator("body").focus();
-  const missing: string[] = [];
-  let first: string | null = null;
-  for (let i = 0; i < maxStops; i += 1) {
-    await page.keyboard.press("Tab");
-    const stop = await page.evaluate((index) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (!el || el === document.body) return null;
-      const style = getComputedStyle(el);
-      const ring =
-        (style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0) ||
-        style.boxShadow !== "none";
-      const text = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
-      return { id: `${index}:${el.tagName.toLowerCase()}[${text}]`, ring };
-    }, i);
-    if (!stop) break;
-    const key = stop.id.replace(/^\d+:/, "");
-    if (first === key) break;
-    first ??= key;
-    if (!stop.ring) missing.push(stop.id);
-  }
-  expect(missing, `${label}: focus stops without a visible indicator`).toEqual([]);
-}
-
-async function signIn(page: Page, path: string, subject: string) {
-  await page.goto(path);
-  // The stand-in IdP's login form (plain HTML; not part of SchoolOS).
-  await page.getByLabel("Subject").fill(subject);
-  await page.getByRole("button", { name: "Sign in" }).click();
-}
 
 test.describe("accessibility: public pages", () => {
   for (const locale of ["en", "te"] as const) {
@@ -134,10 +88,7 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
       await expect(page.getByText("Loading…")).toHaveCount(0);
       await expectNoAxeViolations(page, path);
       // 1366×768: no horizontal page scroll.
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow, `${path} horizontal overflow`).toBeLessThanOrEqual(0);
+      await expectNoHorizontalOverflow(page, path);
       if (path.startsWith("/en/")) await expectVisibleFocusOnEveryStop(page, path);
     }
 
@@ -181,10 +132,7 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
       page.getByRole("region", { name: "Setup stopped before it finished" }),
     ).toBeVisible();
     await expectNoAxeViolations(page, "school detail provisioning en");
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow, "school detail horizontal overflow").toBeLessThanOrEqual(0);
+    await expectNoHorizontalOverflow(page, "school detail");
     await expectVisibleFocusOnEveryStop(page, "school detail");
 
     const resume = page.getByRole("button", { name: "Resume provisioning" });
