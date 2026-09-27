@@ -69,6 +69,32 @@ describe("loadAuthConfig (SEC-004, SEC-006)", () => {
     );
   });
 
+  it("accepts the compose dev issuer on *.localhost (browser and containers resolve it), only locally", () => {
+    const local = loadAuthConfig(
+      testEnv({
+        APP_BASE_URL: "http://localhost:3000",
+        OIDC_ISSUER: "http://oidc.localhost:8080/schoolos",
+        PLATFORM_OIDC_ISSUER: "http://oidc.localhost:8080/platform",
+      }),
+    );
+    expect(local.staff.issuer.href).toBe("http://oidc.localhost:8080/schoolos");
+    expect(local.operator.allowInsecureIssuer).toBe(true);
+    expect(problemsOf(testEnv({ OIDC_ISSUER: "http://oidc.localhost:8080/schoolos" }))).toContain(
+      "OIDC_ISSUER must use https",
+    );
+    expect(
+      problemsOf(
+        testEnv({
+          APP_BASE_URL: "http://localhost:3000",
+          OIDC_ISSUER: "http://oidc.localhost.evil.example/schoolos",
+        }),
+      ),
+    ).toContain("OIDC_ISSUER must use https");
+    expect(problemsOf(testEnv({ APP_BASE_URL: "http://app.localhost:3000" }))).toContain(
+      "APP_BASE_URL must use https (plain http is allowed only for localhost)",
+    );
+  });
+
   it("refuses an http issuer when the app itself is served over https", () => {
     expect(problemsOf(testEnv({ OIDC_ISSUER: "http://localhost:8080/schoolos" }))).toContain(
       "OIDC_ISSUER must use https",

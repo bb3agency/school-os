@@ -1,11 +1,11 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomBytes } from "node:crypto";
 import type { SessionKind } from "@/server/config";
 import { setAuthRuntimeForTesting } from "@/server/runtime";
 import { sessionCookieName } from "@/server/session/cookies";
-import { createHarness, type Harness } from "@/test/bff-harness";
+import { createHarness, HARNESS_TENANT, type Harness } from "@/test/bff-harness";
 import { messages, renderWithIntl } from "@/test/render";
 
 /**
@@ -47,10 +47,12 @@ vi.mock("next/navigation", async (importOriginal) => {
   };
 });
 
+import ChooseSchoolPage from "./[locale]/choose-school/page";
 import PlatformLayout from "./[locale]/platform/layout";
 import SchoolLayout from "./[locale]/(school)/layout";
 
 let h: Harness;
+const en = Promise.resolve({ locale: "en" });
 
 /** A JWT-shaped token (the layout must never render any of these). */
 function fakeJwt(): string {
@@ -62,7 +64,11 @@ function fakeJwt(): string {
  * Create a session straight in the store (jsdom cannot run openid-client's WebCrypto
  * calls; the full OIDC flow is covered by src/server/auth/handlers.test.ts).
  */
-async function signInDirect(kind: SessionKind, user: { sub: string; name?: string }) {
+async function signInDirect(
+  kind: SessionKind,
+  user: { sub: string; name?: string },
+  activeTenantId: string | null = kind === "staff" ? HARNESS_TENANT : null,
+) {
   const created = await h.runtime.store.create({
     kind,
     subject: user.sub,
@@ -76,6 +82,7 @@ async function signInDirect(kind: SessionKind, user: { sub: string; name?: strin
       idToken: fakeJwt(),
     },
     accessExpiresAt: Date.now() + 600_000,
+    activeTenantId,
   });
   cookieJar.set(sessionCookieName(kind, true), created.cookieValue);
   return created;
@@ -110,14 +117,16 @@ async function redirectOf(render: () => Promise<unknown>): Promise<string | null
 describe("school layout", () => {
   it("sends visitors without a staff session to staff sign-in, returning here", async () => {
     requestPath = "/en/settings/users?page=2";
-    expect(await redirectOf(() => SchoolLayout({ children: "x" }))).toBe(
+    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toBe(
       "/bff/auth/login?next=%2Fen%2Fsettings%2Fusers%3Fpage%3D2",
     );
   });
 
   it("does not accept an operator session", async () => {
     await signInDirect("operator", { sub: "op-1" });
-    expect(await redirectOf(() => SchoolLayout({ children: "x" }))).toMatch(/^\/bff\/auth\/login/);
+    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toMatch(
+      /^\/bff\/auth\/login/,
+    );
   });
 
   it("renders the shell with Lock now, and nothing secret reaches the page", async () => {
@@ -127,7 +136,7 @@ describe("school layout", () => {
     });
     const tokens = (await h.runtime.store.tokens(session.id))!.tokens;
 
-    const { container } = renderWithIntl(await SchoolLayout({ children: <p>page</p> }));
+    const { container } = renderWithIntl(await SchoolLayout({ children: <p>page</p>, params: en }));
     expect(screen.getByRole("button", { name: messages.en.auth.lockNow })).toBeVisible();
     expect(screen.getByText("Signed in as Office Clerk")).toBeInTheDocument();
 
@@ -142,6 +151,37 @@ describe("school layout", () => {
       expect(html).not.toContain(secret);
     }
     expect(html).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
+  });
+});
+
+describe("school layout: active school and permissions (FR-IAM-013)", () => {
+  it("without an active school, sends the user to the school picker, returning here", async () => {
+    requestPath = "/en/settings/users";
+    await signInDirect("staff", { sub: "staff-1" }, null);
+    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toBe(
+      "/en/choose-school?next=%2Fen%2Fsettings%2Fusers",
+    );
+  });
+
+  it("shows every item when /me cannot be read (the API still checks each call)", async () => {
+    await signInDirect("staff", { sub: "staff-1" });
+    h.setApi(() => {
+      throw new TypeError("fetch failed");
+    });
+    renderWithIntl(await SchoolLayout({ children: <p>page</p>, params: en }));
+    const nav = screen.getByRole("navigation", { name: messages.en.school.nav.label });
+    expect(
+      within(nav).getByRole("link", { name: messages.en.school.nav.audit }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("school picker page (FR-IAM-013, ADR-0019)", () => {
+  it("needs a staff session", async () => {
+    requestPath = "/en/choose-school";
+    expect(
+      await redirectOf(() => ChooseSchoolPage({ params: en, searchParams: Promise.resolve({}) })),
+    ).toBe("/bff/auth/login?next=%2Fen%2Fchoose-school");
   });
 });
 

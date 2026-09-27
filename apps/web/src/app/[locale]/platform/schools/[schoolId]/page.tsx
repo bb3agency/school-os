@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
-import { parseSchoolTab, SchoolDetailView } from "@/features/platform/SchoolDetailView";
-import { ready } from "@/lib/loadable";
+import { SchoolDetailScreen } from "@/features/platform/SchoolDetailView";
+import { parseSchoolTab } from "@/features/platform/school-tabs";
 import { pageMetadata } from "@/lib/metadata";
+import { UUID_PATTERN } from "@/lib/validation";
 
 export const generateMetadata = pageMetadata((t) => t("platform.schoolDetail.title"));
 
@@ -10,12 +11,10 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** GET /api/v1/platform/tenants/{tenant_id} once the BFF is wired. */
+/** FR-PLT-001..005: GET /api/v1/platform/tenants/{tenant_id} and its tabs. */
 export default async function PlatformSchoolDetailPage({ params, searchParams }: Props) {
   const { schoolId } = await params;
-  if (!UUID.test(schoolId)) notFound();
+  if (!UUID_PATTERN.test(schoolId)) notFound();
   const { tab } = await searchParams;
-  return <SchoolDetailView schoolId={schoolId} tab={parseSchoolTab(tab)} detail={ready(null)} />;
+  return <SchoolDetailScreen schoolId={schoolId} tab={parseSchoolTab(tab)} />;
 }

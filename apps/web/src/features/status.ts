@@ -30,11 +30,11 @@ export const invoiceTone: Record<InvoiceStatus, BadgeTone> = {
 };
 
 export const deploymentTone: Record<DeploymentStatus, BadgeTone> = {
+  provisioning: "info",
   healthy: "success",
   degraded: "warning",
-  down: "danger",
-  provisioning: "info",
-  unknown: "neutral",
+  unreachable: "danger",
+  decommissioned: "neutral",
 };
 
 export const schoolTone: Record<TenantStatus, BadgeTone> = {
@@ -42,20 +42,22 @@ export const schoolTone: Record<TenantStatus, BadgeTone> = {
   active: "success",
   suspended: "danger",
   offboarding: "warning",
+  deleted: "neutral",
 };
 
 export const ticketTone: Record<TicketStatus, BadgeTone> = {
   open: "info",
-  pending: "warning",
+  in_progress: "info",
+  waiting_on_school: "warning",
   resolved: "success",
   closed: "neutral",
 };
 
 export const priorityTone: Record<TicketPriority, BadgeTone> = {
-  low: "neutral",
-  normal: "neutral",
-  high: "warning",
-  urgent: "danger",
+  p1: "danger",
+  p2: "warning",
+  p3: "neutral",
+  p4: "neutral",
 };
 
 export const personTone: Record<PersonStatus, BadgeTone> = {
@@ -74,22 +76,29 @@ export const memberTone: Record<MemberStatus, BadgeTone> = {
 
 export const planTone: Record<PlanStatus, BadgeTone> = {
   draft: "neutral",
-  active: "success",
+  published: "success",
   retired: "neutral",
 };
 
 export const announcementTone: Record<AnnouncementStatus, BadgeTone> = {
   draft: "neutral",
   scheduled: "info",
-  live: "success",
-  ended: "neutral",
+  cancelled: "neutral",
 };
 
 export const breakGlassTone: Record<BreakGlassStatus, BadgeTone> = {
-  pending: "warning",
+  requested: "warning",
   approved: "info",
   active: "danger",
   expired: "neutral",
-  rejected: "neutral",
   revoked: "neutral",
+  denied: "neutral",
 };
+
+/**
+ * For statuses the API documents as plain strings: the known value, or null so the UI
+ * shows the raw code in a neutral badge instead of crashing on something new.
+ */
+export function known<T extends string>(table: Record<T, BadgeTone>, value: string): T | null {
+  return Object.prototype.hasOwnProperty.call(table, value) ? (value as T) : null;
+}

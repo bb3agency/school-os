@@ -49,6 +49,8 @@ export interface Session {
   authTime: number | null;
   mfa: boolean;
   csrfToken: string;
+  /** The API has not audited this sign-in yet (the user still has to choose a school). */
+  loginEventPending: boolean;
   accessExpiresAt: number;
   idleExpiresAt: number;
   absoluteExpiresAt: number;
@@ -67,6 +69,8 @@ interface StoredMeta {
   authTime: number | null;
   mfa: boolean;
   csrf: string;
+  /** Login event pending (set at sign-in when several schools are offered). */
+  lp?: boolean;
 }
 
 interface StoredTokens {
@@ -88,6 +92,7 @@ export interface NewSession {
   familyId?: string;
   handle?: string;
   csrfToken?: string;
+  loginEventPending?: boolean;
 }
 
 export interface SessionStoreOptions {
@@ -151,6 +156,7 @@ export class SessionStore {
       authTime: meta.authTime,
       mfa: meta.mfa,
       csrfToken: meta.csrf,
+      loginEventPending: meta.lp === true,
       accessExpiresAt: accessExp,
       idleExpiresAt: seen + this.idleTimeoutMs,
       absoluteExpiresAt: meta.created + ABSOLUTE_TIMEOUT_MS[meta.kind],
@@ -178,6 +184,7 @@ export class SessionStore {
       authTime: input.authTime,
       mfa: input.mfa,
       csrf: input.csrfToken ?? randomToken(32),
+      ...(input.loginEventPending ? { lp: true } : {}),
     };
     const pxMs = this.ttl(meta, now);
     const stored: StoredTokens = {
@@ -253,11 +260,17 @@ export class SessionStore {
     await this.kv.set(key.tokens(session.id), JSON.stringify(stored), { pxMs });
   }
 
-  async setActiveTenant(session: Session, tenantId: string | null): Promise<void> {
+  async setActiveTenant(
+    session: Session,
+    tenantId: string | null,
+    options: { loginEventPending?: boolean } = {},
+  ): Promise<void> {
     const raw = await this.kv.get(key.meta(session.id));
     if (!raw) return;
     const meta = JSON.parse(raw) as StoredMeta;
     meta.tenant = tenantId;
+    if (options.loginEventPending === true) meta.lp = true;
+    if (options.loginEventPending === false) delete meta.lp;
     await this.kv.set(key.meta(session.id), JSON.stringify(meta), {
       pxMs: this.ttl(meta, this.now()),
     });

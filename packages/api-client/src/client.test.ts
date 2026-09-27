@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -56,6 +57,61 @@ describe("createApiClient", () => {
 
     expect(data).toBeUndefined();
     expect(error).toMatchObject({ code: "not_found" });
+  });
+
+  it("sends typed bodies and headers for control-plane writes", async () => {
+    const { calls, fetchImpl } = recordingFetch({}, 201);
+    const client = createApiClient("http://api.internal:8000", fetchImpl);
+
+    await client.POST("/api/v1/platform/tenants/{tenant_id}/offboarding", {
+      params: { path: { tenant_id: "0192f3a4-0000-7000-8000-000000000001" } },
+      body: { reason: "School asked in writing to leave" },
+    });
+    await client.POST("/api/v1/platform/plans", {
+      params: { header: { "Idempotency-Key": "plan-standard-v2" } },
+      body: {
+        code: "standard",
+        name: "Standard",
+        tier: "shared",
+        billing_period: "monthly",
+        pricing_model: "flat",
+        base_price_inr: "4999.00",
+        gst_rate: "18",
+        trial_days: 30,
+      },
+    });
+
+    expect(calls[0]?.url).toBe(
+      "http://api.internal:8000/api/v1/platform/tenants/0192f3a4-0000-7000-8000-000000000001/offboarding",
+    );
+    expect(await calls[0]?.json()).toEqual({ reason: "School asked in writing to leave" });
+    expect(calls[1]?.headers.get("idempotency-key")).toBe("plan-standard-v2");
+  });
+});
+
+describe("generated types", () => {
+  it("match apps/api/openapi.json (run `npm run generate -w @schoolos/api-client`)", async () => {
+    const { default: openapiTS, astToString } = await import("openapi-typescript");
+    const spec = resolve(here, "../../../apps/api/openapi.json");
+    const ast = await openapiTS(new URL(`file://${spec}`), {
+      alphabetize: true,
+      exportType: false,
+      immutable: false,
+    });
+    const committed = readFileSync(resolve(here, "generated/schema.ts"), "utf8");
+    expect(committed.endsWith(astToString(ast))).toBe(true);
+  });
+
+  it("cover every path of the API, and nothing hand-written", () => {
+    const spec = JSON.parse(
+      readFileSync(resolve(here, "../../../apps/api/openapi.json"), "utf8"),
+    ) as { paths: Record<string, unknown> };
+    const committed = readFileSync(resolve(here, "generated/schema.ts"), "utf8");
+    for (const path of Object.keys(spec.paths)) {
+      expect(committed).toContain(`"${path}": {`);
+    }
+    const index = readFileSync(resolve(here, "index.ts"), "utf8");
+    expect(index).toContain('from "./generated/schema"');
   });
 });
 

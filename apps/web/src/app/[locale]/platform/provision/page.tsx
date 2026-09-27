@@ -5,13 +5,13 @@ import { pageMetadata } from "@/lib/metadata";
 
 export const generateMetadata = pageMetadata((t) => t("platform.provision.title"));
 
-/** FR-PLT-001: provision wizard. Plan options come from GET /platform/plans once wired. */
+/** FR-PLT-001..003: provision wizard → POST /api/v1/platform/tenants (step-up MFA). */
 export default function ProvisionSchoolPage() {
   const t = useTranslations("platform.provision");
   return (
     <>
       <PageHeader title={t("title")} description={t("description")} />
-      <ProvisionSchoolForm plans={[]} />
+      <ProvisionSchoolForm />
     </>
   );
 }

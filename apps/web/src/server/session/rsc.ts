@@ -2,6 +2,7 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isHttpsDeployment } from "@/lib/security-headers";
+import { callApi } from "@/server/bff/upstream";
 import type { SessionKind } from "@/server/config";
 import { getAuthRuntime } from "@/server/runtime";
 import { sessionCookieName } from "./cookies";
@@ -70,4 +71,54 @@ export function requireOperator(): Promise<SessionView> {
 /** SOS_DEPLOYMENT_MODE=dedicated switches the control plane off (contract §1). */
 export function platformEnabled(): boolean {
   return (process.env.SOS_DEPLOYMENT_MODE ?? "shared").trim() !== "dedicated";
+}
+
+export interface RscApiResult<T> {
+  status: number;
+  data: T | null;
+  code: string | null;
+}
+
+/**
+ * GET an API route as the signed-in user from a Server Component (layouts use it for the
+ * shell: effective permissions, number of schools). Same path as the BFF proxy (fresh access
+ * token + service token + X-Active-Tenant); the result is data only, never tokens.
+ * Returns null when there is no session or the API cannot be reached.
+ */
+export async function apiGetAsSession<T>(
+  kind: SessionKind,
+  path: `/api/v1/${string}`,
+): Promise<RscApiResult<T> | null> {
+  const secure = isHttpsDeployment(process.env.APP_BASE_URL);
+  const value = (await cookies()).get(sessionCookieName(kind, secure))?.value;
+  if (!value) return null;
+  try {
+    const runtime = await getAuthRuntime();
+    const current = await runtime.store.load(value, { touch: false });
+    if (!current || current.kind !== kind) return null;
+    const session = await runtime.refresher.ensureFresh(current);
+    const stored = await runtime.store.tokens(session.id);
+    if (!stored) return null;
+    const response = await callApi(runtime, {
+      session,
+      accessToken: stored.tokens.accessToken,
+      method: "GET",
+      path,
+      requestId: `req_${crypto.randomUUID()}`,
+      headersTimeoutMs: 5_000,
+    });
+    let body: unknown = null;
+    if ((response.headers.get("content-type") ?? "").includes("json")) {
+      body = await response.json().catch(() => null);
+    } else {
+      await response.body?.cancel();
+    }
+    const code =
+      body && typeof body === "object" && typeof (body as { code?: unknown }).code === "string"
+        ? (body as { code: string }).code
+        : null;
+    return { status: response.status, data: response.ok ? (body as T) : null, code };
+  } catch {
+    return null;
+  }
 }

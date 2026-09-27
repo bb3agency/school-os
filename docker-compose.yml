@@ -136,6 +136,11 @@ services:
     environment:
       API_INTERNAL_URL: http://api:8000
       REDIS_URL: redis://valkey:6379/1
+      # Dev OIDC stub: one issuer name for the browser (*.localhost is loopback, RFC 6761)
+      # and for this container (the oidc service's network alias). Must equal the API's
+      # SOS_OIDC_ISSUER / SOS_PLATFORM_OIDC_ISSUER (see .env.example).
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://oidc.localhost:8080/schoolos}
+      PLATFORM_OIDC_ISSUER: ${PLATFORM_OIDC_ISSUER:-http://oidc.localhost:8080/platform}
     depends_on:
       api: { condition: service_healthy }
     ports: ["127.0.0.1:3000:3000"]
@@ -155,6 +160,14 @@ services:
     volumes:
       - ./infra/docker/oidc.json:/config/oidc.json:ro
     ports: ["127.0.0.1:8080:8080"]
+    # Containers (web, api) reach the stub as oidc.localhost:8080; browsers reach the same
+    # name on 127.0.0.1:8080. The stub derives `iss` from the Host header, so both see
+    # http://oidc.localhost:8080/<issuer>. A network alias is used instead of
+    # extra_hosts: host-gateway, because the port is published on 127.0.0.1 only and
+    # host-gateway cannot reach loopback-bound ports on Linux.
+    networks:
+      default:
+        aliases: [oidc.localhost]
 
 volumes:
   pgdata:

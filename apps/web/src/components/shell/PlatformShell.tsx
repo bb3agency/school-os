@@ -13,28 +13,67 @@ import { SkipLink } from "./SkipLink";
 export function PlatformShell({
   children,
   headerActions,
+  permissions = null,
 }: {
   children: ReactNode;
   /** Session controls (operator name, sign out). */
   headerActions?: ReactNode;
+  /** Effective permissions from GET /platform/me; null shows every item. UX only. */
+  permissions?: readonly string[] | null;
 }) {
   const t = useTranslations();
-  const items: NavItem[] = [
+  const all: Array<NavItem & { anyOf?: readonly string[] }> = [
     { href: "/platform", label: t("platform.nav.dashboard"), exact: true },
-    { href: "/platform/schools", label: t("platform.nav.schools") },
-    { href: "/platform/provision", label: t("platform.nav.provision") },
-    { href: "/platform/plans", label: t("platform.nav.plans") },
-    { href: "/platform/subscriptions", label: t("platform.nav.subscriptions") },
-    { href: "/platform/invoices", label: t("platform.nav.invoices") },
-    { href: "/platform/usage", label: t("platform.nav.usage") },
-    { href: "/platform/flags", label: t("platform.nav.flags") },
-    { href: "/platform/fleet", label: t("platform.nav.fleet") },
+    {
+      href: "/platform/schools",
+      label: t("platform.nav.schools"),
+      anyOf: ["platform.tenants.read"],
+    },
+    {
+      href: "/platform/provision",
+      label: t("platform.nav.provision"),
+      anyOf: ["platform.tenants.provision"],
+    },
+    {
+      href: "/platform/plans",
+      label: t("platform.nav.plans"),
+      anyOf: ["platform.subscriptions.read", "platform.plans.manage"],
+    },
+    {
+      href: "/platform/subscriptions",
+      label: t("platform.nav.subscriptions"),
+      anyOf: ["platform.subscriptions.read"],
+    },
+    {
+      href: "/platform/invoices",
+      label: t("platform.nav.invoices"),
+      anyOf: ["platform.invoices.read"],
+    },
+    { href: "/platform/usage", label: t("platform.nav.usage"), anyOf: ["platform.usage.read"] },
+    { href: "/platform/flags", label: t("platform.nav.flags"), anyOf: ["platform.flags.read"] },
+    { href: "/platform/fleet", label: t("platform.nav.fleet"), anyOf: ["platform.fleet.read"] },
     { href: "/platform/announcements", label: t("platform.nav.announcements") },
-    { href: "/platform/support", label: t("platform.nav.support") },
+    {
+      href: "/platform/support",
+      label: t("platform.nav.support"),
+      anyOf: ["platform.support.read"],
+    },
     { href: "/platform/break-glass", label: t("platform.nav.breakGlass") },
-    { href: "/platform/operators", label: t("platform.nav.operators") },
-    { href: "/platform/audit", label: t("platform.nav.audit") },
+    {
+      href: "/platform/operators",
+      label: t("platform.nav.operators"),
+      anyOf: ["platform.operators.manage"],
+    },
+    { href: "/platform/audit", label: t("platform.nav.audit"), anyOf: ["platform.audit.read"] },
   ];
+  const items: NavItem[] = all
+    .filter(
+      (item) =>
+        !item.anyOf ||
+        permissions === null ||
+        item.anyOf.some((permission) => permissions.includes(permission)),
+    )
+    .map(({ href, label, exact }) => ({ href, label, ...(exact ? { exact } : {}) }));
   return (
     <div className="flex min-h-screen flex-col">
       <SkipLink label={t("common.skipToContent")} />

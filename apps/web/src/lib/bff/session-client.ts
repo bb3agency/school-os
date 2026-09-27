@@ -95,6 +95,47 @@ export async function keepAlive(kind: SessionKind): Promise<SessionInfo> {
 }
 
 /**
+ * Make `tenantId` the active school of this staff session (POST /bff/auth/active-tenant,
+ * CSRF). The BFF checks it with the API first. Resolves to null on success, otherwise
+ * to the problem code (`tenant_not_available`, `csrf_failed`, …).
+ */
+export async function chooseSchool(tenantId: string): Promise<string | null> {
+  const send = async () => {
+    const token = await csrfToken("staff").catch(() => null);
+    return fetch("/bff/auth/active-tenant", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        ...(token ? { "x-csrf-token": token } : {}),
+      },
+      body: JSON.stringify({ tenant_id: tenantId }),
+    });
+  };
+  let response = await send();
+  if (response.status === 403) {
+    const code = (
+      (await response
+        .clone()
+        .json()
+        .catch(() => ({}))) as { code?: string }
+    ).code;
+    if (code === "csrf_failed") {
+      forgetSessionInfo("staff");
+      response = await send();
+    }
+  }
+  if (response.ok) {
+    forgetSessionInfo("staff");
+    return null;
+  }
+  const problem = (await response.json().catch(() => ({}))) as { code?: string };
+  return problem.code ?? `http_${response.status}`;
+}
+
+/**
  * Sign out on the server (revokes the session and, when the IdP supports it, ends the
  * IdP session), then leave the page. Used by "Lock now" and the idle timeout.
  */

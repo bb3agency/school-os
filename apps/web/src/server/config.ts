@@ -60,6 +60,15 @@ export function isLoopbackHost(hostname: string): boolean {
   return LOOPBACK_HOSTS.has(hostname.toLowerCase());
 }
 
+/**
+ * Hosts a local dev OIDC stub may use: loopback, or a `*.localhost` name (RFC 6761), which
+ * browsers resolve to loopback and the compose network resolves to the stub container.
+ */
+export function isLocalDevHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return isLoopbackHost(host) || (host.endsWith(".localhost") && host.length > ".localhost".length);
+}
+
 function parseUrl(value: string | undefined): URL | null {
   if (!value) return null;
   try {
@@ -133,8 +142,8 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     if (!issuer) {
       problems.push(`${issuerVar} must be an absolute URL`);
     } else if (issuer.protocol === "http:") {
-      // The dev stub only: http issuer on loopback, and only when the app itself is local.
-      if (secureCookies || !isLoopbackHost(issuer.hostname)) {
+      // The dev stub only: http issuer on loopback/*.localhost, and only when the app is local.
+      if (secureCookies || !isLocalDevHost(issuer.hostname)) {
         problems.push(`${issuerVar} must use https`);
       }
       allowInsecureIssuer = true;

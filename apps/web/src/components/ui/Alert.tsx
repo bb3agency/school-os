@@ -21,7 +21,7 @@ export interface AlertProps {
   tone?: AlertTone;
   title?: ReactNode;
   children?: ReactNode;
-  className?: string;
+  className?: string | undefined;
   /**
    * Announce to screen readers when the alert appears after an action
    * (e.g. a form result). Leave false for alerts present on page load.

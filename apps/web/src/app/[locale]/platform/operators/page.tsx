@@ -1,9 +1,9 @@
-import { OperatorsView } from "@/features/platform/OperatorsView";
-import { ready } from "@/lib/loadable";
+import { OperatorsScreen } from "@/features/platform/OperatorsView";
 import { pageMetadata } from "@/lib/metadata";
 
 export const generateMetadata = pageMetadata((t) => t("platform.operators.title"));
 
+/** FR-PLT-028: GET/POST /platform/operators. */
 export default function PlatformOperatorsPage() {
-  return <OperatorsView operators={ready([])} />;
+  return <OperatorsScreen />;
 }

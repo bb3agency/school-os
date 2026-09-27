@@ -2,27 +2,52 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { SidebarNav, type NavItem } from "@/components/ui/SidebarNav";
+import { Link } from "@/i18n/navigation";
 import { SkipLink } from "./SkipLink";
+
+interface SchoolNavItem extends NavItem {
+  /** Effective permission needed to see the item (UX only: the API checks every call). */
+  permission?: string;
+}
 
 /**
  * School office console chrome: light header, sidebar navigation, main landmark.
  * `headerActions` holds the session controls (who is signed in, "Lock now").
+ * `permissions` (from GET /me) hides menu items the user cannot use; null shows all.
+ * Hiding is never a security control: every API route checks its permission.
  */
 export function SchoolShell({
   children,
   headerActions,
+  permissions = null,
+  canSwitchSchool = false,
+  banner,
 }: {
   children: ReactNode;
   headerActions?: ReactNode;
+  permissions?: readonly string[] | null;
+  canSwitchSchool?: boolean;
+  /** Platform announcements (FR-PLT-026), shown above the page. */
+  banner?: ReactNode;
 }) {
   const t = useTranslations();
-  const items: NavItem[] = [
+  const all: SchoolNavItem[] = [
     { href: "/", label: t("school.nav.home"), exact: true },
     { href: "/settings/structure", label: t("school.nav.structure") },
-    { href: "/settings/users", label: t("school.nav.users") },
-    { href: "/settings/billing", label: t("school.nav.billing") },
-    { href: "/audit", label: t("school.nav.audit") },
+    { href: "/settings/users", label: t("school.nav.users"), permission: "user.manage" },
+    {
+      href: "/settings/billing",
+      label: t("school.nav.billing"),
+      permission: "tenant.billing.read",
+    },
+    { href: "/support", label: t("school.nav.support"), permission: "support.ticket.create" },
+    { href: "/audit", label: t("school.nav.audit"), permission: "audit.read" },
   ];
+  const items: NavItem[] = all
+    .filter(
+      (item) => !item.permission || permissions === null || permissions.includes(item.permission),
+    )
+    .map(({ href, label, exact }) => ({ href, label, ...(exact ? { exact } : {}) }));
   return (
     <div className="flex min-h-screen flex-col">
       <SkipLink label={t("common.skipToContent")} />
@@ -32,6 +57,14 @@ export function SchoolShell({
       >
         <p className="text-lg font-bold text-primary">{t("common.appName")}</p>
         <div className="flex flex-wrap items-center justify-end gap-4">
+          {canSwitchSchool ? (
+            <Link
+              href="/choose-school"
+              className="rounded-md px-2 py-1 text-sm font-semibold text-primary underline"
+            >
+              {t("school.switchSchool")}
+            </Link>
+          ) : null}
           {headerActions}
           <LanguageSwitcher />
         </div>
@@ -44,6 +77,7 @@ export function SchoolShell({
           <SidebarNav label={t("school.nav.label")} items={items} />
         </aside>
         <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-6 focus:outline-none print:p-0">
+          {banner}
           {children}
         </main>
       </div>

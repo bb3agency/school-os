@@ -27,6 +27,48 @@ export interface Harness {
   base: string;
 }
 
+/** The school every harness user belongs to by default (synthetic). */
+export const HARNESS_TENANT = "0192f3a4-0000-7000-8000-000000000001";
+
+export const HARNESS_ME = {
+  user_id: "0192f3a4-0000-7000-8000-0000000000d1",
+  membership_id: "0192f3a4-0000-7000-8000-0000000000e1",
+  tenant_id: HARNESS_TENANT,
+  tenant_ids: [HARNESS_TENANT],
+  display_name: "Office Clerk",
+  preferred_language: "en",
+  roles: ["office_staff"],
+  permissions: ["session.authenticated"],
+  scopes: [{ type: "school", ref: null }],
+  mfa: false,
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/**
+ * Default fake API: a staff user with one active school (so sign-in lands on `next`),
+ * nothing to accept, and empty pages for every list.
+ */
+export function defaultApi(request: Request): Response {
+  const path = new URL(request.url).pathname;
+  if (path === "/api/v1/me/schools") {
+    return json({
+      data: [
+        { tenant_id: HARNESS_TENANT, name: "Sample School", code: "sample", status: "active" },
+      ],
+    });
+  }
+  if (path === "/api/v1/me/accept-invitations") return json({ accepted: [] });
+  if (path === "/api/v1/me/login-event") return json({ recorded: true, tenant_id: HARNESS_TENANT });
+  if (path === "/api/v1/me") return json(HARNESS_ME);
+  return json({ data: [], next_cursor: null });
+}
+
 export async function createHarness(
   envOverrides: Record<string, string | undefined> = {},
 ): Promise<Harness> {
@@ -49,10 +91,7 @@ export async function createHarness(
       : idp.staff.fetch(url, init);
 
   const apiCalls: Request[] = [];
-  let api: ApiHandler = () =>
-    new Response(JSON.stringify({ data: [], next_cursor: null }), {
-      headers: { "content-type": "application/json" },
-    });
+  let api: ApiHandler = defaultApi;
   const apiFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     apiCalls.push(request.clone());
