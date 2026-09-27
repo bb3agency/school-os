@@ -2812,5 +2812,76 @@
       "title": "Platform operators",
       "body": "Operators are not seeded. Create the first one with app.platform.bootstrap_owner, then sign in at /en/platform with that subject."
     }
+  },
+  "academicStructure": {
+    "readOnlyNote": "You can see the school structure. Only the owner, principal or office admin can add or change academic years, classes and sections.",
+    "colActions": "Actions",
+    "edit": "Edit",
+    "save": "Save changes",
+    "years": {
+      "add": "Add academic year",
+      "addDescription": "Add one academic year at a time. Academic years cannot share any days.",
+      "addConfirm": "Add year",
+      "labelField": "Year",
+      "labelHint": "The year it starts, a hyphen, then the last two digits of the next year. For example 2026-27.",
+      "startsField": "Starts on",
+      "endsField": "Ends on",
+      "makeCurrentField": "Make this the current year",
+      "makeCurrentHint": "Only one year can be current. The year that is current now will stop being current.",
+      "editTitle": "Change academic year {label}",
+      "editDescribe": "Change academic year {label}",
+      "makeCurrent": "Make current",
+      "makeCurrentDescribe": "Make {label} the current year",
+      "makeCurrentTitle": "Make {label} the current year?",
+      "makeCurrentBody": "Only one year can be current. The year that is current now will stop being current, and {label} will be shown as the current year everywhere."
+    },
+    "classes": {
+      "add": "Add class",
+      "addDescription": "Add a class with its name in English and Telugu.",
+      "codeField": "Class code",
+      "codeHint": "Capital letters, digits, _ or -, for example NUR, LKG, 1 or 10. Exports and registers use this code, so it cannot be changed later.",
+      "enField": "Name in English",
+      "teField": "Name in Telugu",
+      "orderField": "Position in lists",
+      "orderHint": "Classes with smaller numbers come first. Use a whole number from 0 to 10000.",
+      "colCode": "Code",
+      "colSectionsThisYear": "Sections in the chosen year",
+      "editTitle": "Change {name}",
+      "editDescribe": "Change class {name}",
+      "codeFixed": "Class code {code}. The code cannot be changed.",
+      "defaults": "Add standard classes",
+      "defaultsTitle": "Add standard classes?",
+      "defaultsBody": "This adds any missing classes from Nursery to Class XII, with English and Telugu names. Classes you already have stay as they are.",
+      "defaultsConfirm": "Add missing classes"
+    },
+    "sections": {
+      "description": "Sections belong to one class in one academic year.",
+      "yearLabel": "Academic year",
+      "currentYearOption": "{label} (current)",
+      "add": "Add section",
+      "addTitle": "Add a section to {year}",
+      "addDescription": "Choose the class, then type the section name.",
+      "classField": "Class",
+      "nameField": "Section name",
+      "nameHint": "Up to 16 characters, for example A or Rose.",
+      "editTitle": "Rename section {name} of {className}",
+      "editDescribe": "Rename section {name} of {className}",
+      "needYear": "Add an academic year first. Sections are set up for each academic year.",
+      "needClass": "Add classes first, then add sections to them."
+    },
+    "errors": {
+      "academic_year_overlap": {
+        "title": "These dates overlap another academic year",
+        "body": "Academic years cannot share any days. Change the start or end date so they do not overlap, then try again."
+      },
+      "precondition_failed": {
+        "title": "Someone else changed this first",
+        "body": "The list now shows their change. Close this window, open it again and make your change."
+      },
+      "duplicate": {
+        "title": "This already exists",
+        "body": "There is already a class with this code, or a section with this name in the same class and year. Check the list before adding it again."
+      }
+    }
   }
 }
