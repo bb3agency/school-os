@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Any
 
@@ -393,6 +393,15 @@ def list_users(
     page = memberships[:limit]
     more = len(memberships) > limit
     return [_user_out(session, m) for m in page], (page[-1].id if more and page else None)
+
+
+def member_display_names(
+    session: Session, membership_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """Display names of this school's members, for showing who did something (e.g. who
+    requested an export). Unknown ids are left out. No permission check: callers show names
+    only next to records the caller may already see."""
+    return repo.display_names(session, sorted(set(membership_ids)))
 
 
 def get_user(session: Session, user_id: uuid.UUID) -> UserOut:
