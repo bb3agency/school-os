@@ -14,14 +14,11 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Response
 
-from app.authz import breakglass_guard
-from app.authz.catalog import tenant_permission
 from app.authz.context import UserContext
-from app.authz.dependencies import Requirement, TenantDB, get_user_context, require
+from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import Cursor, IdempotencyDep, Limit, Page
-from app.core.errors import Forbidden
 from app.exports import service
 from app.exports.schemas import (
     ExportDownloadOut,
@@ -31,39 +28,8 @@ from app.exports.schemas import (
     PrecheckCreate,
     StudentListCreate,
 )
-from app.identity.principal import Principal, get_principal
 
 router = APIRouter(prefix="/api/v1", tags=["exports"])
-
-
-class AnyOfRequirement(Requirement):
-    """Route guard satisfied by ``permission`` or any of ``any_of`` (the export permissions).
-    The route-enumeration and authorization-matrix tests read ``sos_any_of``."""
-
-    def __init__(self, permission: str, *, any_of: tuple[str, ...]) -> None:
-        super().__init__(permission, scope=None, step_up=False)
-        for alternative in any_of:
-            tenant_permission(alternative)  # unknown or platform permissions fail at import
-        self.sos_any_of = any_of
-
-    def __repr__(self) -> str:
-        return f"require_any({self.sos_permission!r}, {', '.join(map(repr, self.sos_any_of))})"
-
-    def __call__(
-        self,
-        request: Request,
-        ctx: Annotated[UserContext, Depends(get_user_context)],
-        principal: Annotated[Principal, Depends(get_principal)],
-    ) -> UserContext:
-        held = next((p for p in (self.sos_permission, *self.sos_any_of) if ctx.has(p)), None)
-        if held is None:
-            raise Forbidden()
-        breakglass_guard.enforce(ctx, request, held)
-        return ctx
-
-
-def require_any(permission: str, *alternatives: str) -> AnyOfRequirement:
-    return AnyOfRequirement(permission, any_of=alternatives)
 
 
 PrecheckMaker = Annotated[UserContext, Depends(require_any(service.BOARD, service.PORTAL))]
