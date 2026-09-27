@@ -1,16 +1,23 @@
 "use client";
 
-import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
+import type {
+  AcademicYear,
+  ApiClient,
+  SchoolClass,
+  Section,
+  components,
+} from "@schoolos/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
-import { isoDate, requiredInt, text, uuid } from "@/lib/validation";
+import { UUID_PATTERN, isoDate, requiredInt, text, uuid } from "@/lib/validation";
 
 /**
  * Academic structure (US-202, FR-TEN-010): academic years, classes and sections through the
  * BFF. Reads need `student.read_basic`; writes need `tenant.structure.manage` (no step-up).
- * Showing or hiding controls is UX only: the API checks every call.
+ * Showing or hiding controls is UX only: the API checks every call. Archived rows are hidden
+ * unless the screen asks for them (`include_archived=true`).
  */
 
 export const STRUCTURE_MANAGE = "tenant.structure.manage";
@@ -23,10 +30,18 @@ export const STRUCTURE_KEYS = {
   years: ["staff", "academic-years"] as const,
   classes: ["staff", "classes"] as const,
   sections: ["staff", "sections"] as const,
-  allYears: ["staff", "academic-years", "all"] as const,
-  allClasses: ["staff", "classes", "all"] as const,
-  sectionsForYear: (yearId: string) => ["staff", "sections", "year", yearId] as const,
+  allYears: (archived: boolean) =>
+    ["staff", "academic-years", "all", archivedKey(archived)] as const,
+  allClasses: (archived: boolean) => ["staff", "classes", "all", archivedKey(archived)] as const,
+  sectionsForYear: (yearId: string, archived = false) =>
+    ["staff", "sections", "year", yearId, archivedKey(archived)] as const,
+  /** Staff directory for the class teacher picker (GET /staff). */
+  staff: ["staff", "staff-directory"] as const,
 };
+
+function archivedKey(archived: boolean): string {
+  return archived ? "with-archived" : "in-use";
+}
 
 /** Every structure list (after a write, or after a 412 so the next edit starts fresh). */
 export const ALL_STRUCTURE_KEYS = [
@@ -61,8 +76,12 @@ export async function fetchAllPages<T>(
   return rows;
 }
 
-function pageQuery(cursor: string | undefined) {
-  return { limit: PAGE_SIZE, ...(cursor ? { cursor } : {}) };
+function pageQuery(cursor: string | undefined, archived = false) {
+  return {
+    limit: PAGE_SIZE,
+    ...(cursor ? { cursor } : {}),
+    ...(archived ? { include_archived: true } : {}),
+  };
 }
 
 export interface StructureLists {
@@ -70,36 +89,119 @@ export interface StructureLists {
   classes: Loadable<readonly SchoolClass[]>;
 }
 
-/** Academic years (newest first) and classes (display order), every page. */
-export function useStructureLists(): StructureLists {
+/**
+ * Academic years (newest first) and classes (display order), every page. Archived rows come
+ * only when `archived` is true (the "Show archived" switch).
+ */
+export function useStructureLists(archived = false): StructureLists {
   const api = useBffClient("staff");
-  const years = useApiQuery(STRUCTURE_KEYS.allYears, () =>
+  const years = useApiQuery(STRUCTURE_KEYS.allYears(archived), () =>
     fetchAllPages((cursor) =>
-      unwrap(api.GET("/api/v1/academic-years", { params: { query: pageQuery(cursor) } })),
+      unwrap(api.GET("/api/v1/academic-years", { params: { query: pageQuery(cursor, archived) } })),
     ),
   );
-  const classes = useApiQuery(STRUCTURE_KEYS.allClasses, () =>
+  const classes = useApiQuery(STRUCTURE_KEYS.allClasses(archived), () =>
     fetchAllPages((cursor) =>
-      unwrap(api.GET("/api/v1/classes", { params: { query: pageQuery(cursor) } })),
+      unwrap(api.GET("/api/v1/classes", { params: { query: pageQuery(cursor, archived) } })),
     ),
   );
   return { years, classes };
 }
 
 /** Sections of one academic year (server-side filter), every page. */
-export function useYearSections(yearId: string | null): Loadable<readonly Section[]> {
+export function useYearSections(
+  yearId: string | null,
+  archived = false,
+): Loadable<readonly Section[]> {
   const api = useBffClient("staff");
   return useApiQuery(
-    STRUCTURE_KEYS.sectionsForYear(yearId ?? "none"),
+    STRUCTURE_KEYS.sectionsForYear(yearId ?? "none", archived),
     () =>
       fetchAllPages((cursor) =>
         unwrap(
           api.GET("/api/v1/sections", {
-            params: { query: { ...pageQuery(cursor), academic_year_id: yearId ?? "" } },
+            params: { query: { ...pageQuery(cursor, archived), academic_year_id: yearId ?? "" } },
           }),
         ),
       ),
     { enabled: yearId !== null },
+  );
+}
+
+/** Archived rows are kept for old records but hidden from lists (US-202). */
+export function isArchived(row: { archived_at?: string | null }): boolean {
+  return Boolean(row.archived_at);
+}
+
+/* ------------------------------------------------------------------- archive / unarchive */
+
+export type StructureKind = "year" | "class" | "section";
+
+/**
+ * POST .../archive or .../unarchive with If-Match (US-202, FR-TEN-010). The current year
+ * answers 409 `academic_year_current`; a row with active enrolments 409 `structure_in_use`.
+ */
+export function setArchived(
+  api: ApiClient,
+  kind: StructureKind,
+  row: { id: string; version: number },
+  archive: boolean,
+): Promise<unknown> {
+  const headers = { "If-Match": ifMatch(row.version) };
+  switch (kind) {
+    case "year": {
+      const params = { path: { year_id: row.id } };
+      return archive
+        ? unwrap(api.POST("/api/v1/academic-years/{year_id}/archive", { params, headers }))
+        : unwrap(api.POST("/api/v1/academic-years/{year_id}/unarchive", { params, headers }));
+    }
+    case "class": {
+      const params = { path: { class_id: row.id } };
+      return archive
+        ? unwrap(api.POST("/api/v1/classes/{class_id}/archive", { params, headers }))
+        : unwrap(api.POST("/api/v1/classes/{class_id}/unarchive", { params, headers }));
+    }
+    case "section": {
+      const params = { path: { section_id: row.id } };
+      return archive
+        ? unwrap(api.POST("/api/v1/sections/{section_id}/archive", { params, headers }))
+        : unwrap(api.POST("/api/v1/sections/{section_id}/unarchive", { params, headers }));
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ class teacher picker */
+
+export type StaffMember = components["schemas"]["StaffMemberOut"];
+
+/**
+ * Staff directory (GET /staff: membership id, display name and role keys only; needs
+ * `tenant.structure.manage` or `user.manage`), every page, sorted by name for the picker.
+ */
+export function useStaffDirectory(
+  enabled: boolean,
+  locale: string,
+): Loadable<readonly StaffMember[]> {
+  const api = useBffClient("staff");
+  return useApiQuery(
+    [...STRUCTURE_KEYS.staff, locale],
+    async () =>
+      sortStaff(
+        await fetchAllPages((cursor) =>
+          unwrap(api.GET("/api/v1/staff", { params: { query: pageQuery(cursor) } })),
+        ),
+        locale,
+      ),
+    { enabled },
+  );
+}
+
+/** By display name (case-insensitive, in the UI language), then id so the order is stable. */
+export function sortStaff(rows: readonly StaffMember[], locale = "en"): StaffMember[] {
+  return [...rows].sort(
+    (a, b) =>
+      a.display_name.localeCompare(b.display_name, locale, { sensitivity: "base" }) ||
+      a.membership_id.localeCompare(b.membership_id),
   );
 }
 
@@ -208,13 +310,30 @@ export const classEditSchema = z.object({
   sort_order: requiredInt(0, 10000),
 });
 
+/**
+ * The class teacher picker: "" means no class teacher (null); absent (undefined) means the
+ * picker was not shown, so the field is left as it is.
+ */
+const classTeacher = z
+  .string()
+  .trim()
+  .optional()
+  .refine((value) => value === undefined || value === "" || UUID_PATTERN.test(value), {
+    error: "chooseOption",
+  })
+  .transform((value) => (value === undefined ? undefined : value === "" ? null : value));
+
 export const sectionCreateSchema = z.object({
   academic_year_id: uuid,
   class_id: uuid,
   name: text(16),
+  class_teacher_membership_id: classTeacher,
 });
 
-export const sectionEditSchema = z.object({ name: text(16) });
+export const sectionEditSchema = z.object({
+  name: text(16),
+  class_teacher_membership_id: classTeacher,
+});
 
 /** Next free display position after the last class (for a new class). */
 export function nextSortOrder(classes: readonly SchoolClass[]): number {

@@ -49,6 +49,9 @@ export const KNOWN_API_CODES = [
   "provisioning_incomplete",
   "provisioning_failed",
   "resume_needs_request",
+  // Academic structure (US-202, FR-TEN-010): archived rows and rows still in use.
+  "structure_archived",
+  "structure_in_use",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 
