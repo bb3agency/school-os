@@ -229,6 +229,16 @@ Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of te
 
 **Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`.
 
+`FILES_ORIGIN` is the origin of presigned upload and preview URLs, added to the CSP `connect-src` and `img-src` (docs/07 §10, §11; https only, except a loopback http origin under `next dev`). It must equal the origin the API presigns with, which the files bucket's CORS rule allows the app to `POST` to:
+
+| Where | `FILES_ORIGIN` | Set by |
+|---|---|---|
+| Local (`make dev-host`) | `http://localhost:8333` (SeaweedFS, = `SOS_S3_PRESIGN_ENDPOINT_URL`) | `scripts/dev.py` |
+| Shared tier (staging/prod) | `https://sos-<env>-files-<account>.s3.ap-south-1.amazonaws.com` | Terraform `shared_platform` web task (`module.s3.files_browser_origin`; also output `files_browser_origin`); CORS allows `https://<app_domain>` |
+| Dedicated tier | `https://sos-ded-<school>-files-<account>.s3.ap-south-1.amazonaws.com` | `deploy/dedicated/compose.yaml` web service, from `SOS_S3_BUCKET_FILES` and `AWS_REGION` in host.env (Terraform output `files_browser_origin` shows the same value); CORS allows `https://<public_host>` and `https://<custom_domain>` |
+
+In staging/prod `SOS_S3_ENDPOINT_URL` and `SOS_S3_PRESIGN_ENDPOINT_URL` stay unset: the API then signs virtual-hosted, regional URLs (`documents/storage.py`). A school's custom domain added after the host was created needs a Terraform apply of its `dedicated_host` stack so the files bucket's CORS rule includes it.
+
 - Local identity: the dev OIDC stub serves both staff and operator logins; the stub's `http://localhost:8080` issuer is not reachable from inside the web container, so for browser sign-in run the web app on the host (`apps/web/README.md`). `SOS_KEY_WRAPPER=local-dev` replaces KMS locally only.
 - LLM calls in local/CI will default to recorded fixtures unless `LIVE_LLM=1` (M2, with the knowledge module).
 - To try the dedicated tier locally, run `deploy/dedicated/compose.yaml` with `SOS_DEPLOYMENT_MODE=dedicated` against a separate project name.
