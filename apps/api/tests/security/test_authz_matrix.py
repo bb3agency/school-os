@@ -550,6 +550,7 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/roles"): lambda w, r, a: ("/api/v1/roles", None, {}),
     ("GET", "/api/v1/permissions"): lambda w, r, a: ("/api/v1/permissions", None, {}),
+    ("GET", "/api/v1/staff"): lambda w, r, a: ("/api/v1/staff", None, {}),
     ("GET", "/api/v1/tenant"): lambda w, r, a: ("/api/v1/tenant", None, {}),
     ("PATCH", "/api/v1/tenant"): lambda w, r, a: (
         "/api/v1/tenant",

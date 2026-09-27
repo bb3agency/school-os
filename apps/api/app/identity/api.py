@@ -19,6 +19,7 @@ from app.authz.dependencies import (
     get_resolver,
     request_id_of,
     require,
+    require_any,
     require_principal,
     tenant_hint,
 )
@@ -42,14 +43,15 @@ from app.identity.schemas import (
     ActiveTenantIn,
     InviteIn,
     LoginEventOut,
-    MembershipStatusIn,
     MeOut,
     PermissionOut,
     RoleOut,
     RolesIn,
     SchoolChoicesOut,
     ScopesIn,
+    StaffMemberOut,
     UserOut,
+    UserUpdateIn,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["identity"])
@@ -60,6 +62,7 @@ Resolver = Annotated[AuthzResolver, Depends(get_resolver)]
 UserManager = Annotated[UserContext, Depends(require("user.manage"))]
 UserManagerStepUp = Annotated[UserContext, Depends(require("user.manage", step_up=True))]
 RoleAssigner = Annotated[UserContext, Depends(require("role.assign", step_up=True))]
+DirectoryReader = Annotated[UserContext, Depends(require_any(*identity.DIRECTORY_PERMISSIONS))]
 
 
 def _user_headers(user: UserOut) -> dict[str, str]:
@@ -76,8 +79,9 @@ def get_me(
     principal: Annotated[Principal, Depends(get_principal)],
     resolver: Resolver,
 ) -> MeOut:
-    """The signed-in user in the active school: roles, effective permissions, scopes, language
-    and the schools they can switch to (permission: any active member)."""
+    """The signed-in user in the active school: roles, effective permissions, scopes, language,
+    the schools they can switch to and the school's session settings (idle timeout, date format,
+    languages) the web applies (permission: any active member)."""
     tenant_ids = [c.tenant_id for c in resolver.choices(principal)]
     return identity.me(db, ctx, tenant_ids=tenant_ids)
 
@@ -178,20 +182,20 @@ def invite_user(
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
-def update_user_status(
+def update_user(
     *,
     ctx: UserManagerStepUp,
     db: TenantDB,
     user_id: uuid.UUID,
-    body: MembershipStatusIn,
+    body: UserUpdateIn,
     version: IfMatch,
     response: Response,
 ) -> UserOut:
-    """Activate, suspend or remove a staff member (permission ``user.manage``, step-up;
-    ``If-Match`` required). The last active owner cannot be suspended (409 ``last_owner``)."""
-    user = identity.set_membership_status(
-        db, ctx, user_id, status=body.status, expected_version=version
-    )
+    """Activate, suspend or remove a staff member, and/or change their display name, email or
+    language (permission ``user.manage``, step-up; ``If-Match`` required). The last active
+    owner cannot be suspended (409 ``last_owner``); a removed member's profile cannot be
+    edited (409 ``invalid_state``). Audited with the changed field names only."""
+    user = identity.update_user(db, ctx, user_id, body, expected_version=version)
     response.headers["ETag"] = etag(user.version)
     return user
 
@@ -201,7 +205,8 @@ def replace_user_roles(
     ctx: RoleAssigner, db: TenantDB, user_id: uuid.UUID, body: RolesIn
 ) -> UserOut:
     """Replace a staff member's roles (permission ``role.assign``, step-up). Effective within
-    60 s (FR-IAM-014)."""
+    60 s (FR-IAM-014). An empty list answers 422 ``roles_required``: suspend or remove the
+    member instead."""
     return identity.set_roles(db, ctx, user_id, body.roles)
 
 
@@ -220,8 +225,11 @@ def replace_user_scopes(
 def list_roles(
     ctx: UserManager, db: TenantDB, limit: Limit = 50, cursor: Cursor = None
 ) -> Page[RoleOut]:
-    """Roles of this school with their permissions (permission ``user.manage``)."""
-    return paginate(identity.list_roles(db), key=lambda r: r.key, cursor=cursor, limit=limit)
+    """Roles of this school with their permissions, whether you may give each one
+    (``grantable``) and whether it is limited to classes/sections (``scoped``) (permission
+    ``user.manage``)."""
+    roles = identity.list_roles(db, ctx)
+    return paginate(roles, key=lambda r: r.key, cursor=cursor, limit=limit)
 
 
 @router.get("/permissions", response_model=Page[PermissionOut])
@@ -230,3 +238,17 @@ def list_permissions(
 ) -> Page[PermissionOut]:
     """The grantable permission catalog (permission ``user.manage``)."""
     return paginate(identity.list_permissions(db), key=lambda p: p.key, cursor=cursor, limit=limit)
+
+
+# --- staff directory ------------------------------------------------------------------------------
+
+
+@router.get("/staff", response_model=Page[StaffMemberOut])
+def list_staff(
+    ctx: DirectoryReader, db: TenantDB, limit: Limit = 200, cursor: Cursor = None
+) -> Page[StaffMemberOut]:
+    """Active and invited staff with display name and role keys only, e.g. to choose a class
+    teacher (permission ``tenant.structure.manage`` or ``user.manage``, school-wide; no
+    step-up). No emails, phone numbers or sign-in details."""
+    staff = identity.staff_directory(db, ctx)
+    return paginate(staff, key=lambda m: str(m.membership_id), cursor=cursor, limit=limit)

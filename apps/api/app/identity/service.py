@@ -57,11 +57,17 @@ from app.identity.schemas import (
     SchoolChoicesOut,
     ScopeIn,
     ScopeOut,
+    SessionSettingsOut,
+    StaffMemberOut,
     UserOut,
+    UserUpdateIn,
 )
 from app.tenancy import service as tenancy
 
 OWNER_ROLE = "owner"
+PROFILE_FIELDS = ("display_name", "email", "preferred_language")
+# Permissions that open the staff directory (GET /staff); either must reach the whole school.
+DIRECTORY_PERMISSIONS = ("tenant.structure.manage", "user.manage")
 # Allowed membership status transitions (PATCH /users/{id}).
 _TRANSITIONS: Mapping[str, frozenset[str]] = {
     "invited": frozenset({"active", "removed"}),
@@ -168,6 +174,12 @@ def _roles_by_key(session: Session, keys: Sequence[str]) -> dict[str, Role]:
             [{"field": "roles", "code": "unknown_role", "message_key": "errors.unknown_role"}]
         )
     return {k: roles[k] for k in keys}
+
+
+class RolesRequired(ValidationFailed):
+    """PUT roles with an empty list: a member keeps at least one role (use suspend/remove)."""
+
+    code = "roles_required"
 
 
 def _not_grantable() -> Forbidden:
@@ -360,6 +372,7 @@ def me(session: Session, ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -
     scopes = [ScopeOut(type="school", ref=None)] if ctx.scopes.school else []
     scopes += [ScopeOut(type="class", ref=c) for c in sorted(ctx.scopes.class_ids, key=str)]
     scopes += [ScopeOut(type="section", ref=s) for s in sorted(ctx.scopes.section_ids, key=str)]
+    settings = tenancy.session_settings(session)
     return MeOut(
         user_id=ctx.user_id,
         tenant_id=ctx.tenant_id,
@@ -372,6 +385,11 @@ def me(session: Session, ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -
         mfa=ctx.mfa,
         tenant_ids=sorted(set(tenant_ids), key=str),
         tenant_status=ctx.tenant_status,
+        settings=SessionSettingsOut(
+            idle_timeout_minutes=settings.idle_timeout_minutes,
+            date_format=settings.date_format,
+            languages=list(settings.languages),
+        ),
     )
 
 
@@ -508,10 +526,96 @@ def set_membership_status(
     return _user_out(session, updated)
 
 
+def _same(field: str, old: object, new: object) -> bool:
+    if field == "email" and isinstance(old, str) and isinstance(new, str):
+        return old.casefold() == new.casefold()  # citext: case-insensitive
+    return old == new
+
+
+def update_user(
+    session: Session,
+    ctx: UserContext,
+    user_id: uuid.UUID,
+    data: UserUpdateIn,
+    *,
+    expected_version: int,
+) -> UserOut:
+    """``PATCH /users/{id}`` (``user.manage``, step-up, ``If-Match`` on the membership version).
+
+    ``status`` follows :func:`set_membership_status` (transitions, last owner). Profile fields
+    (display name, email, language) change the person's account (visible only through their
+    membership here, RLS ``users_in_tenant_update``); a removed member's profile is not edited
+    (409 ``invalid_state``). Unchanged values are ignored; with nothing to change the member
+    is returned as is. Otherwise the membership version is bumped once (the ETag changes).
+    Audit: ``user.profile_updated`` with the changed field NAMES only (never values) and
+    ``membership.status_changed`` {from, to}.
+    """
+    membership = _membership_for_user(session, user_id)
+    _guard_not_breakglass(session, membership)
+    if membership.version != expected_version:
+        raise PreconditionFailed("This user was changed by someone else. Reload and try again.")
+    user = repo.get_user(session, user_id)
+    if user is None:  # pragma: no cover - RLS shows users with a membership here
+        raise NotFound("User not found")
+    fields = data.model_fields_set
+    profile = {
+        k: getattr(data, k)
+        for k in PROFILE_FIELDS
+        if k in fields and not _same(k, getattr(user, k), getattr(data, k))
+    }
+    previous = membership.status
+    status = data.status if data.status is not None else previous
+    if not profile and status == previous:
+        return _user_out(session, membership)
+    if profile and previous == "removed":
+        raise Conflict("This user has been removed.", code="invalid_state")
+    if status != previous:
+        if status not in _TRANSITIONS[previous]:
+            raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
+        if previous == "active":
+            _guard_last_owner(session, membership)
+    if profile:
+        with _db_errors():
+            repo.update_user_profile(
+                session, user_id, expected_version=user.version, values=profile
+            )
+        _record(
+            session,
+            ctx,
+            action="user.profile_updated",
+            resource_type="user",
+            resource_id=user_id,
+            summary={"membership_id": membership.id, "fields": sorted(profile)},
+        )
+    updated = repo.set_membership_status(
+        session, membership.id, status=status, expected_version=expected_version
+    )
+    if status != previous:
+        _record(
+            session,
+            ctx,
+            action="membership.status_changed",
+            resource_type="membership",
+            resource_id=membership.id,
+            summary={"user_id": user_id, "from": previous, "to": status},
+        )
+        cache.invalidate_on_commit(session, ctx.tenant_id, membership.id)
+    return _user_out(session, updated)
+
+
 def set_roles(
     session: Session, ctx: UserContext, user_id: uuid.UUID, role_keys: Sequence[str]
 ) -> UserOut:
-    """Replace a member's roles (``role.assign``, step-up). Audit per granted/revoked role."""
+    """Replace a member's roles (``role.assign``, step-up). Audit per granted/revoked role.
+
+    An empty list is refused (422 ``roles_required``): suspend or remove the member instead.
+    """
+    if not role_keys:
+        raise RolesRequired(
+            [{"field": "roles", "code": "roles_required", "message_key": "errors.roles_required"}],
+            detail="A staff member needs at least one role. To stop their access, suspend or "
+            "remove them instead.",
+        )
     membership = _membership_for_user(session, user_id)
     _guard_not_breakglass(session, membership)
     if membership.status == "removed":
@@ -596,8 +700,34 @@ def set_scopes(
 # --- roles and permissions ----------------------------------------------------------------------
 
 
-def list_roles(session: Session) -> list[RoleOut]:
-    """Assignable roles; the break-glass ``platform_support`` role is never offered."""
+def _role_grantable(ctx: UserContext, role: Role, perms: Collection[str]) -> bool:
+    """Whether ``ctx`` may give this role: the rules of :func:`_guard_invite_roles` and, for
+    ``role.assign`` holders, :func:`_guard_grantable` (which implies the invite rule)."""
+    if ctx.roles & assign_any_roles():
+        return True
+    if ctx.has("role.assign"):
+        return set(perms) <= ctx.permissions
+    return role.is_system and role.key not in mfa_roles()
+
+
+def _role_scoped(role: Role, perms: Collection[str]) -> bool:
+    """True when some permission of the role reaches only the member's scopes: the resolver
+    treats a grant as school-wide only when roles.yaml grants it school-wide to that system
+    role (``build_snapshot``); custom roles and extra grants are scoped."""
+    template = system_roles().get(role.key) if role.is_system else None
+    for perm in perms:
+        grant = template.grant(perm) if template is not None else None
+        if grant is None or grant.scoped:
+            return True
+    return False
+
+
+def list_roles(session: Session, ctx: UserContext | None = None) -> list[RoleOut]:
+    """Assignable roles; the break-glass ``platform_support`` role is never offered.
+
+    ``grantable`` is computed for ``ctx`` (always False without a caller); ``scoped`` says
+    whether the role's grants are limited to classes/sections.
+    """
     roles = [r for r in repo.list_roles(session) if r.key != BREAKGLASS_ROLE]
     perms = repo.role_permission_keys(session, [r.id for r in roles])
     return [
@@ -608,8 +738,39 @@ def list_roles(session: Session) -> list[RoleOut]:
             name_te=r.name_te,
             is_system=r.is_system,
             permissions=sorted(perms[r.id]),
+            grantable=ctx is not None and _role_grantable(ctx, r, perms[r.id]),
+            scoped=_role_scoped(r, perms[r.id]),
         )
         for r in roles
+    ]
+
+
+def staff_directory(session: Session, ctx: UserContext) -> list[StaffMemberOut]:
+    """Staff who can be picked for a job such as class teacher: active or invited, unexpired
+    members of this school with their display name and role keys only (no email, phone or
+    sign-in details). Temporary support (break-glass) memberships are left out.
+
+    Permission: ``tenant.structure.manage`` or ``user.manage`` reaching the whole school
+    (a scoped grant of either is refused, 403). No step-up, no audit (a read of names staff
+    already see next to records).
+    """
+    if not any(ctx.has(p) and ctx.scope_for(p).school_wide for p in DIRECTORY_PERMISSIONS):
+        raise Forbidden()
+    now = dt.datetime.now(dt.UTC)
+    members = [
+        m
+        for m in repo.list_memberships(session)
+        if m.status in ("active", "invited") and (m.expires_at is None or m.expires_at > now)
+    ]
+    ids = [m.id for m in members]
+    names = repo.display_names(session, ids)
+    roles = repo.role_keys_by_membership(session, ids)
+    return [
+        StaffMemberOut(
+            membership_id=m.id, display_name=names[m.id], roles=sorted(roles.get(m.id, ()))
+        )
+        for m in members
+        if m.id in names and BREAKGLASS_ROLE not in roles.get(m.id, ())
     ]
 
 
