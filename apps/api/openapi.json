@@ -6429,6 +6429,7 @@
         "type": "object"
       },
       "PageOut": {
+        "description": "One register page. ``aadhaar_detected``: its text showed a full Aadhaar number (PRV-016);\nthe image is then either ``image_redacted`` (number blacked out; ``document_version_no`` is\nthe redacted copy) or ``image_withheld`` (could not be redacted: the original was discarded\nand the page's rows cannot be confirmed).",
         "properties": {
           "aadhaar_detected": {
             "title": "Aadhaar Detected",
@@ -6458,6 +6459,10 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "image_redacted": {
+            "title": "Image Redacted",
+            "type": "boolean"
           },
           "image_withheld": {
             "title": "Image Withheld",
@@ -6511,6 +6516,7 @@
           "error_code",
           "aadhaar_detected",
           "image_withheld",
+          "image_redacted",
           "row_count",
           "low_confidence_count",
           "processed_at"

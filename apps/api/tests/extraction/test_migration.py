@@ -209,9 +209,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
     cfg, admin = populated
     with admin.begin() as c:
         c.execute(
-            text(
-                "UPDATE sis.extraction_pages SET aadhaar_detected = true, image_redacted = true"
-            )
+            text("UPDATE sis.extraction_pages SET aadhaar_detected = true, image_redacted = true")
         )
     assert _page_flags(admin) == (True, False, 0)
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
@@ -222,9 +220,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
     # Without redacted pages (a withheld one here) the walk is clean.
     with admin.begin() as c:
         c.execute(
-            text(
-                "UPDATE sis.extraction_pages SET image_redacted = false, image_withheld = true"
-            )
+            text("UPDATE sis.extraction_pages SET image_redacted = false, image_withheld = true")
         )
     command.downgrade(cfg, "0017_exports")
     assert _page_flags(admin) == (True, True, 0)
@@ -253,7 +249,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         (False, False, True, False),
     ],
 )
-def test_PRV_016_page_image_state_follows_detection(
+def test_PRV_016_page_image_state_follows_detection(  # noqa: PLR0917 - parametrized
     world: Any,
     admin_engine: Engine,
     detected: bool,

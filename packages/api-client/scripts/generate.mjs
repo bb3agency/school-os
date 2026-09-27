@@ -3,7 +3,7 @@
 // Input:  apps/api/openapi.json (override with OPENAPI_SPEC=/path/to/openapi.json)
 // Output: packages/api-client/src/generated/schema.ts
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -35,7 +35,7 @@ try {
   const header = [
     "/* eslint-disable */",
     "// GENERATED FILE: do not edit by hand.",
-    `// Source: ${relative(packageRoot, specPath)} via openapi-typescript.`,
+    `// Source: ${relative(packageRoot, specPath).split(sep).join("/")} via openapi-typescript.`,
     "",
   ].join("\n");
   mkdirSync(dirname(outFile), { recursive: true });

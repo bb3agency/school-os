@@ -20,9 +20,12 @@ Rules:
   :func:`confirm_item`, with the values the reviewer sent (``import.commit``).
 - **Aadhaar (FR-IMP-022, PRV-015/016, invariant 4).** Provider output is masked in memory before
   the first write or log line; the page text is never stored. A page whose text held a full
-  number is ``aadhaar_detected`` and its image is withheld from every reviewer: images cannot be
-  redacted yet (no imaging library is approved), so the original is never served through this
-  module and ``documents.withhold_version`` quarantines that version for every download path.
+  number is ``aadhaar_detected`` and its original image is never kept (ADR-0007):
+  :func:`app.extraction.imaging.redact_page` blacks the number out and checks the copy, which
+  ``documents.replace_with_redacted`` stores as the page's new version (``image_redacted``; the
+  page shows and cites the copy). When that is not possible the original is discarded
+  (``documents.discard_version``) and the page is ``image_withheld``: no image, and its rows
+  cannot be confirmed (``evidence_unavailable``).
 - **Evidence (FR-IMP-023).** Every confirmed value carries ``evidence_document_id`` = the page.
 - **Identity fields (BR-01, ADR-0010).** ``app.students.service`` records a first
   admission-register identity value only as ``unverified`` (verifying it needs a change
@@ -49,16 +52,18 @@ from app.authz.context import UserContext
 from app.authz.http import Page, encode_cursor
 from app.core.config import Settings, get_settings
 from app.core.db import tenant_session
-from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
+from app.core.errors import Conflict, DomainError, Forbidden, NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.documents import service as documents
+from app.extraction import imaging, sanitize
 from app.extraction import repository as repo
-from app.extraction import sanitize
 from app.extraction.models import ExtractionBatch, ExtractionItem, ExtractionPage
 from app.extraction.providers import (
     ExtractionFailed,
     ExtractionProvider,
+    ExtractionUnavailable,
+    PageExtraction,
     ProviderNotConfigured,
     ProviderRefused,
     build_provider,
@@ -399,29 +404,74 @@ def _page_failed(tenant_id: uuid.UUID, batch_id: uuid.UUID, page_id: uuid.UUID, 
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _Redaction:
+    """Outcome of :func:`_redact` for a flagged page: the copy, or why there is none."""
+
+    image: imaging.RedactedImage | None
+    cause: str | None
+
+
+def _redact(
+    image: bytes, result: PageExtraction, provider: ExtractionProvider, hints: tuple[str, ...]
+) -> _Redaction:
+    try:
+        return _Redaction(imaging.redact_page(image, result, provider, language_hints=hints), None)
+    except imaging.Unredactable as exc:
+        return _Redaction(None, exc.code)
+
+
+def _replace_with_redacted(s: Session, page: _PageRef, copy: imaging.RedactedImage) -> int | None:
+    """Store the redacted copy as the page's new version; None if it cannot be used."""
+    try:
+        return documents.replace_with_redacted(
+            s, page.document_id, page.version_no, copy.data, copy.mime_type, regions=copy.regions
+        )
+    except Conflict as exc:
+        if exc.code == "storage_unavailable":
+            # Transient: the transaction rolls back and the task retries the page.
+            raise ExtractionUnavailable("storage_unavailable") from exc
+        return None
+    except DomainError:
+        return None
+
+
 def _store_page(
-    tenant_id: uuid.UUID, batch_id: uuid.UUID, page: _PageRef, clean: sanitize.CleanPage
+    tenant_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    page: _PageRef,
+    clean: sanitize.CleanPage,
+    redaction: _Redaction | None,
 ) -> None:
-    """Items + page outcome + counters in one transaction (a retry never duplicates)."""
+    """Items + page outcome + counters (+ the PRV-016 image outcome) in one transaction (a
+    retry never duplicates)."""
     with tenant_session(tenant_id) as s:
         batch = repo.get_batch(s, batch_id, for_update=True)
         if batch is None:
             return
-        withheld = clean.aadhaar_detected
+        current = repo.get_page(s, page.id)
+        if current is None or current.status != "queued":
+            return  # finished by an earlier delivery (the batch lock serialises workers)
+        detected = clean.aadhaar_detected
+        copy = redaction.image if detected and redaction is not None else None
+        redacted_no = _replace_with_redacted(s, page, copy) if copy is not None else None
+        withheld = detected and redacted_no is None
         done = repo.finish_page(
             s,
             page.id,
             {
                 "status": "done",
-                "aadhaar_detected": clean.aadhaar_detected,
+                "aadhaar_detected": detected,
                 "image_withheld": withheld,
+                "image_redacted": redacted_no is not None,
+                "document_version_no": redacted_no or page.version_no,
                 "row_count": len(clean.rows),
                 "low_confidence_count": clean.low_confidence_rows,
                 "dropped_field_count": clean.dropped_fields,
                 "processed_at": func.now(),
             },
         )
-        if done is None:
+        if done is None:  # pragma: no cover - checked above under the batch lock
             return
         repo.insert_items(
             s,
@@ -453,10 +503,27 @@ def _store_page(
                 "items_low_confidence": batch.items_low_confidence + clean.low_confidence_rows,
             },
         )
-        if withheld:
-            # PRV-016: the page image showed a full Aadhaar number. It is never served from here,
-            # and the stored original is withheld from every download path (same transaction).
-            documents.withhold_version(s, page.document_id, page.version_no, "aadhaar_detected")
+        if not detected:
+            return
+        # PRV-016: the page image showed a full Aadhaar number; its original is not kept.
+        if copy is not None and redacted_no is not None:
+            _audit(
+                s,
+                "extraction.page.image_redacted",
+                "extraction_page",
+                page.id,
+                {
+                    "batch_id": batch_id,
+                    "document_id": page.document_id,
+                    "version_no": page.version_no,
+                    "redacted_version_no": redacted_no,
+                    "regions": copy.regions,
+                },
+                system=True,
+            )
+        else:
+            documents.discard_version(s, page.document_id, page.version_no, "aadhaar_unredactable")
+            cause = redaction.cause if redaction is not None else None
             _audit(
                 s,
                 "extraction.page.image_withheld",
@@ -466,14 +533,16 @@ def _store_page(
                     "batch_id": batch_id,
                     "document_id": page.document_id,
                     "reason": "sensitive_number_detected",
+                    "cause": cause or "not_replaceable",
                 },
                 system=True,
             )
-            log.warning(
-                "extraction.page.sensitive_number_detected",
-                resource_type="document",
-                resource_id=page.document_id,
-            )
+    log.warning(
+        "extraction.page.sensitive_number_detected",
+        resource_type="document",
+        resource_id=page.document_id,
+        outcome="redacted" if redacted_no is not None else "discarded",
+    )
 
 
 def fail_batch(tenant_id: uuid.UUID, batch_id: uuid.UUID, code: str) -> None:
@@ -596,18 +665,24 @@ def process_batch(
             continue
         try:
             result = chosen.extract(image, language_hints=cfg.language_hints)
+            # Masking happens here, in memory, before the first write (FR-IMP-022, PRV-015).
+            clean = sanitize.clean_page(
+                result, cfg, threshold=settings.extraction_low_confidence_threshold
+            )
+            # PRV-016: black the number out and read the copy again (same provider).
+            redaction = (
+                _redact(image, result, chosen, cfg.language_hints)
+                if clean.aadhaar_detected
+                else None
+            )
         except (ProviderNotConfigured, ProviderRefused) as exc:
             fail_batch(tenant_id, batch_id, exc.code)
             raise
         except ExtractionFailed as exc:
             _page_failed(tenant_id, batch_id, page.id, exc.code)
             continue
-        # Masking happens here, in memory, before the first write (FR-IMP-022, PRV-015).
-        clean = sanitize.clean_page(
-            result, cfg, threshold=settings.extraction_low_confidence_threshold
-        )
         del result, image
-        _store_page(tenant_id, batch_id, page, clean)
+        _store_page(tenant_id, batch_id, page, clean, redaction)
     return _finish(tenant_id, batch_id)
 
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import dataclasses
 import io
 import sys
+from collections.abc import Sequence
 
 import pytest
 from PIL import Image
@@ -39,7 +40,9 @@ NUMBER = X.valid_aadhaar_like(7)
 CFG = extraction_config().redaction
 
 
-def _png(size: tuple[int, int] = (300, 120), colour: tuple[int, int, int] = (200, 200, 200)) -> bytes:
+def _png(
+    size: tuple[int, int] = (300, 120), colour: tuple[int, int, int] = (200, 200, 200)
+) -> bytes:
     out = io.BytesIO()
     Image.new("RGB", size, colour).save(out, "PNG")
     return out.getvalue()
@@ -59,11 +62,13 @@ def _split_spans() -> list[TextSpan]:
 class _Stub:
     """A provider that reads the redacted copy as ``again`` (or raises it)."""
 
+    name = "stub"
+
     def __init__(self, again: PageExtraction | Exception) -> None:
         self.again = again
         self.calls: list[bytes] = []
 
-    def extract(self, page_image: bytes, *, language_hints: tuple[str, ...]) -> PageExtraction:
+    def extract(self, page_image: bytes, *, language_hints: Sequence[str]) -> PageExtraction:
         self.calls.append(page_image)
         if isinstance(self.again, Exception):
             raise self.again
@@ -164,7 +169,9 @@ def test_PRV_016_jpeg_is_turned_upright_and_stripped_of_exif() -> None:
         assert img.size == (100, 200)
         assert not img.getexif()
         region = img.convert("L").crop((12, 12, 58, 38))
-        assert region.getextrema()[1] < 16, "the box is black (JPEG noise allowed)"
+        high = region.getextrema()[1]
+        assert isinstance(high, int)
+        assert high < 16, "the box is black (JPEG noise allowed)"
 
 
 # --- decode ---------------------------------------------------------------------------------
@@ -218,7 +225,10 @@ def test_PRV_016_redact_page_with_the_fake_provider_end_to_end() -> None:
 @pytest.mark.parametrize(
     ("again", "code"),
     [
-        (PageExtraction(raw_text=f"still {NUMBER[:4]} {NUMBER[4:8]} {NUMBER[8:]}"), "still_legible"),
+        (
+            PageExtraction(raw_text=f"still {NUMBER[:4]} {NUMBER[4:8]} {NUMBER[8:]}"),
+            "still_legible",
+        ),
         (PageExtraction(spans=[TextSpan(NUMBER, (0, 0, 1, 1))]), "still_legible"),
         (PageExtraction(rows=[{"x": FieldReading(NUMBER)}]), "still_legible"),
         (ExtractionFailed("scripted unreadable page"), "reread_failed"),
@@ -238,9 +248,7 @@ def test_PRV_016_a_copy_that_still_shows_a_number_is_unredactable(
 def test_PRV_016_transient_provider_errors_on_the_second_read_propagate() -> None:
     png, first = _script_page()
     with pytest.raises(ExtractionUnavailable):
-        imaging.redact_page(
-            png, first, _Stub(ExtractionUnavailable("busy")), language_hints=HINTS
-        )
+        imaging.redact_page(png, first, _Stub(ExtractionUnavailable("busy")), language_hints=HINTS)
 
 
 def test_PRV_016_nothing_to_place_is_unredactable_not_a_silent_pass() -> None:
