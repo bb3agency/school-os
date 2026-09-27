@@ -365,6 +365,7 @@ def me(session: Session, ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -
         scopes=scopes,
         mfa=ctx.mfa,
         tenant_ids=sorted(set(tenant_ids), key=str),
+        tenant_status=ctx.tenant_status,
     )
 
 

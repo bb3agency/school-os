@@ -208,6 +208,11 @@ class MeOut(_Out):
     tenant_ids: list[uuid.UUID] = Field(
         description="Schools this user can switch to (active memberships)."
     )
+    tenant_status: Literal["active", "suspended", "offboarding"] = Field(
+        default="active",
+        description="Status of the active school. While it is suspended or offboarding only "
+        "the owner and principal can use SchoolOS, for Plan & billing (BR-08).",
+    )
 
 
 class LoginEventOut(_Out):

@@ -201,6 +201,7 @@ class AuthzResolver:
             session_id=principal.session_id,
             scoped_permissions=snap.scoped_permissions,
             via_breakglass=BREAKGLASS_ROLE in snap.roles,
+            tenant_status=choice.tenant_status,
         )
 
     def resolve(

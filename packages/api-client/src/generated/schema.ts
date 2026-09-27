@@ -3136,6 +3136,13 @@ export interface components {
              */
             tenant_ids: string[];
             /**
+             * Tenant Status
+             * @description Status of the active school. While it is suspended or offboarding only the owner and principal can use SchoolOS, for Plan & billing (BR-08).
+             * @default active
+             * @enum {string}
+             */
+            tenant_status: "active" | "suspended" | "offboarding";
+            /**
              * User Id
              * Format: uuid
              */

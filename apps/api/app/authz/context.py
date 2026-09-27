@@ -54,6 +54,9 @@ class UserContext:
     # The membership holds the break-glass ``platform_support`` role (docs/07 §6.4): the session
     # is read-only and every guarded call is recorded in the school's audit chain.
     via_breakglass: bool = False
+    # core.tenants.status of the resolved school (a suspended school reaches only the BR-08
+    # allowlist; /me reports it so the web can explain why).
+    tenant_status: str = "active"
 
     def has(self, permission: str) -> bool:
         return permission in self.permissions

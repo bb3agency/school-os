@@ -92,6 +92,8 @@ def test_BR_08_owner_and_principal_keep_me_and_billing(suspended: Any, api: Any,
     me = api.call(person, "GET", "/api/v1/me")
     assert me.status_code == 200, me.text
     assert me.json()["tenant_id"] == str(tid)
+    # The web shows the "suspended" banner from this (FR-PLT-004).
+    assert me.json()["tenant_status"] == "suspended"
     billing = api.call(person, "GET", "/api/v1/tenant/billing")
     assert billing.status_code == 200, billing.text
     invoices = api.call(person, "GET", "/api/v1/tenant/billing/invoices")
@@ -201,4 +203,6 @@ def test_BR_08_reactivated_school_is_open_again(api: Any, admin_engine: Engine) 
     assert api.call(staff, "GET", "/api/v1/me").status_code == 403
     with platform_session() as pdb:
         tenancy.reactivate_tenant(pdb, tid)
-    assert api.call(staff, "GET", "/api/v1/me").status_code == 200
+    me = api.call(staff, "GET", "/api/v1/me")
+    assert me.status_code == 200
+    assert me.json()["tenant_status"] == "active"

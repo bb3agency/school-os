@@ -11609,6 +11609,17 @@
             "title": "Tenant Ids",
             "type": "array"
           },
+          "tenant_status": {
+            "default": "active",
+            "description": "Status of the active school. While it is suspended or offboarding only the owner and principal can use SchoolOS, for Plan & billing (BR-08).",
+            "enum": [
+              "active",
+              "suspended",
+              "offboarding"
+            ],
+            "title": "Tenant Status",
+            "type": "string"
+          },
           "user_id": {
             "format": "uuid",
             "title": "User Id",
