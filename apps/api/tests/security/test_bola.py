@@ -84,6 +84,17 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/students/{student_id}/enrollments"): {
         "section_id": "01a0df6d-0000-7000-8000-000000000001"
     },
+    ("PATCH", "/api/v1/students/{student_id}/enrollments/{enrollment_id}"): {"roll_no": "5"},
+    ("POST", "/api/v1/students/{student_id}/enrollments/{enrollment_id}/end"): {},
+    ("DELETE", "/api/v1/students/{student_id}/guardians/{guardian_id}"): None,
+    # Promotions (FR-TEN-011): the year in the path decides; the target year is never reached.
+    ("POST", "/api/v1/academic-years/{year_id}/promotions:preview"): {
+        "to_academic_year_id": "01a0df6d-0000-7000-8000-000000000002"
+    },
+    ("POST", "/api/v1/academic-years/{year_id}/promotions:commit"): {
+        "to_academic_year_id": "01a0df6d-0000-7000-8000-000000000002"
+    },
+    ("POST", "/api/v1/academic-years/{year_id}/promotions:undo"): None,
     ("POST", "/api/v1/documents/{document_id}/versions"): {"upload_id": str(uuid.uuid4())},
     ("PUT", "/api/v1/documents/{document_id}/acl"): {"acl": []},
     ("DELETE", "/api/v1/documents/{document_id}"): None,
@@ -138,6 +149,9 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/students/{student_id}/guardians"),
         ("PATCH", "/api/v1/students/{student_id}/guardians/{guardian_id}"),
         ("POST", "/api/v1/students/{student_id}/enrollments"),
+        ("PATCH", "/api/v1/students/{student_id}/enrollments/{enrollment_id}"),
+        ("POST", "/api/v1/students/{student_id}/enrollments/{enrollment_id}/end"),
+        ("DELETE", "/api/v1/students/{student_id}/guardians/{guardian_id}"),
         # Imports (import.run / import.commit are not owner permissions, docs/07 §6.2).
         ("GET", "/api/v1/imports/{import_id}"),
         ("GET", "/api/v1/imports/{import_id}/rows"),
@@ -343,6 +357,7 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "student_id": lambda w: SW.ensure_students(w)["b_sb"],
     "value_id": lambda w: SW.ensure_students(w)["b_sb"],
     "guardian_id": lambda w: SW.ensure_students(w)["b_gb"],
+    "enrollment_id": lambda w: SW.ensure_students(w)["b_sb"],
     "document_id": _b_document,
     "notification_id": _b_notification,
     # Break-glass (US-103): a pending request / an active grant of school B.

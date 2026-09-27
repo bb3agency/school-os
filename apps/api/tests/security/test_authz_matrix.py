@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.authz.catalog import AUTHENTICATED, system_roles
 from app.main import create_app
@@ -123,6 +123,23 @@ def _load_extraction_support() -> ModuleType:
 
 X = _load_extraction_support()
 
+
+def _load_promotion_support() -> ModuleType:
+    """tests/students/promotion_support.py (fresh year pairs and promotions, real services)."""
+    name = "sos_test_promotion_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "students" / "promotion_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+PR = _load_promotion_support()
+
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
 _years = itertools.count(2100)
@@ -176,6 +193,60 @@ def _guardian_patch(w: Any, r: str, a: Engine) -> Request:
     ids = SW.ensure_students(w)
     path = f"/api/v1/students/{ids['s9a']}/guardians/{ids['g9a']}"
     return path, {"relationship": "father"}, _if_match(SW.version(a, "sis.guardians", ids["g9a"]))
+
+
+def _fresh_enrolment(w: Any, r: str, a: Engine) -> tuple[uuid.UUID, uuid.UUID, int]:
+    """A new student in the role's scope (9A / class X) and its enrolment (id, version)."""
+    section = "section_10a" if r == "teacher" else "section_9a"
+    sid: uuid.UUID = SW.create(w.a, name="Synthetica Matrix Enrolment", section_key=section)
+    with a.connect() as c:
+        row = c.execute(
+            text("SELECT id, version FROM sis.enrollments WHERE student_id = :s"), {"s": sid}
+        ).one()
+    return sid, row.id, int(row.version)
+
+
+def _enrolment_patch(w: Any, r: str, a: Engine) -> Request:
+    sid, eid, version = _fresh_enrolment(w, r, a)
+    return f"/api/v1/students/{sid}/enrollments/{eid}", {"roll_no": "5"}, _if_match(version)
+
+
+def _enrolment_end(w: Any, r: str, a: Engine) -> Request:
+    sid, eid, version = _fresh_enrolment(w, r, a)
+    return f"/api/v1/students/{sid}/enrollments/{eid}/end", {}, _if_match(version)
+
+
+def _guardian_delete(w: Any, r: str, a: Engine) -> Request:
+    sid, _, _ = _fresh_enrolment(w, r, a)
+    gid = SW.add_guardian(w.a, sid, full_name="Synthetica Matrix Unlinked Guardian")
+    return f"/api/v1/students/{sid}/guardians/{gid}", None, _if_match(1)
+
+
+# --- promotions (FR-TEN-011): tenant.structure.manage, fresh year pairs per request ---------
+
+
+def _promotion_pair(w: Any, *, committed: bool) -> Any:
+    PR.SW.configure_keyring()
+    if committed:
+        return PR.committed(w.a)
+    pair = PR.year_pair(w.a)
+    PR.enrolled(w.a, pair.section("from", "IX"))
+    return pair
+
+
+def _promotion(action: str, *, committed: bool = False) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        pair = _promotion_pair(w, committed=committed)
+        path = f"/api/v1/academic-years/{pair.from_year}/promotions:{action}"
+        body = None if action == "undo" else PR.body(pair)
+        return path, body, {}
+
+    return build
+
+
+def _promotion_list(w: Any, r: str, a: Engine) -> Request:
+    pair = _promotion_pair(w, committed=False)
+    return f"/api/v1/academic-years/{pair.from_year}/promotions", None, {}
 
 
 def _enrol(w: Any, r: str, a: Engine) -> Request:
@@ -650,6 +721,21 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("PATCH", "/api/v1/students/{student_id}/guardians/{guardian_id}"): _guardian_patch,
     ("POST", "/api/v1/students/{student_id}/enrollments"): _enrol,
+    ("GET", "/api/v1/students/{student_id}/enrollments"): lambda w, r, a: (
+        _st(w, r, "/enrollments"),
+        None,
+        {},
+    ),
+    ("PATCH", "/api/v1/students/{student_id}/enrollments/{enrollment_id}"): _enrolment_patch,
+    ("POST", "/api/v1/students/{student_id}/enrollments/{enrollment_id}/end"): _enrolment_end,
+    ("DELETE", "/api/v1/students/{student_id}/guardians/{guardian_id}"): _guardian_delete,
+    # Promotions (FR-TEN-011, US-202 AC2): tenant.structure.manage, school-wide.
+    ("POST", "/api/v1/academic-years/{year_id}/promotions:preview"): _promotion("preview"),
+    ("POST", "/api/v1/academic-years/{year_id}/promotions:commit"): _promotion("commit"),
+    ("POST", "/api/v1/academic-years/{year_id}/promotions:undo"): _promotion(
+        "undo", committed=True
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/promotions"): _promotion_list,
     ("GET", "/api/v1/support/tickets/{ticket_id}"): lambda w, r, a: (
         f"/api/v1/support/tickets/{_ticket(w)}",
         None,
@@ -916,6 +1002,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/documents/uploads",
         "/api/v1/import-templates",
         "/api/v1/change-requests",
+        "/api/v1/academic-years/{year_id}/promotions:commit",
     }
     accepted = {
         "/api/v1/documents",
@@ -930,7 +1017,10 @@ def _success(method: str, path: str) -> int:
     }
     if method == "POST" and path in accepted:
         return 202
-    if method == "DELETE" and path == "/api/v1/documents/{document_id}":
+    if method == "DELETE" and path in (
+        "/api/v1/documents/{document_id}",
+        "/api/v1/students/{student_id}/guardians/{guardian_id}",
+    ):
         return 204
     return 201 if method == "POST" and path in creates else 200
 
