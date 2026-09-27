@@ -1,4 +1,4 @@
-# Generic hardened Fargate service / one-off task (docs/10 §6, 07 §13):
+# Generic hardened Fargate (or, with capacity_provider_name, EC2) service / one-off task (docs/10 §6, 07 §13):
 # non-root user, read-only root filesystem, writable scratch via ephemeral volumes (Fargate has no tmpfs),
 # all Linux capabilities dropped, init process, logs to CloudWatch (400 days, KMS), secrets injected from
 # Secrets Manager by the execution role, least-privilege task role, circuit-breaker rollback.
@@ -6,7 +6,14 @@
 data "aws_region" "current" {}
 
 locals {
-  volumes = { for i, p in var.writable_paths : "scratch-${i}" => p }
+  fargate = var.capacity_provider_name == null
+  # Fargate: task-scoped ephemeral volumes. EC2: tmpfs mounts (never on the instance disk).
+  volumes = local.fargate ? { for i, p in var.writable_paths : "scratch-${i}" => p } : {}
+  tmpfs = local.fargate ? [] : [for p in var.writable_paths : {
+    containerPath = p
+    size          = var.tmpfs_size_mib
+    mountOptions  = ["nosuid", "nodev", "noexec", "mode=1777"]
+  }]
 
   container = merge(
     {
@@ -17,10 +24,13 @@ locals {
       readonlyRootFilesystem = true
       privileged             = false
       stopTimeout            = var.stop_timeout
-      linuxParameters = {
-        initProcessEnabled = true
-        capabilities       = { drop = ["ALL"], add = [] }
-      }
+      linuxParameters = merge(
+        {
+          initProcessEnabled = true
+          capabilities       = { drop = ["ALL"], add = [] }
+        },
+        local.fargate ? {} : { tmpfs = local.tmpfs },
+      )
       environment = [for k in sort(keys(var.environment)) : { name = k, value = var.environment[k] }]
       secrets     = [for k in sort(keys(var.secrets)) : { name = k, valueFrom = var.secrets[k] }]
       mountPoints = [for v, p in local.volumes : { sourceVolume = v, containerPath = p, readOnly = false }]
@@ -42,6 +52,8 @@ locals {
       }
       ulimits = [{ name = "nofile", softLimit = 65536, hardLimit = 65536 }]
     },
+    # Fargate always runs with no-new-privileges; on EC2 the task definition asks for it.
+    local.fargate ? {} : { dockerSecurityOptions = ["no-new-privileges"] },
     var.command == null ? {} : { command = var.command },
     var.entry_point == null ? {} : { entryPoint = var.entry_point },
     var.health_check == null ? {} : {
@@ -176,7 +188,7 @@ resource "aws_vpc_security_group_egress_rule" "vpc" {
 
 resource "aws_ecs_task_definition" "this" {
   family                   = var.name
-  requires_compatibilities = ["FARGATE"]
+  requires_compatibilities = [local.fargate ? "FARGATE" : "EC2"]
   network_mode             = "awsvpc"
   cpu                      = var.cpu
   memory                   = var.memory
@@ -215,14 +227,31 @@ resource "aws_ecs_service" "this" {
   cluster                = var.cluster_arn
   task_definition        = aws_ecs_task_definition.this.arn
   desired_count          = var.desired_count
-  launch_type            = "FARGATE"
-  platform_version       = "LATEST"
+  launch_type            = local.fargate ? "FARGATE" : null
+  platform_version       = local.fargate ? "LATEST" : null
   propagate_tags         = "SERVICE"
   enable_execute_command = var.enable_execute_command
 
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
   health_check_grace_period_seconds  = var.attach_load_balancer ? 60 : null
+
+  dynamic "capacity_provider_strategy" {
+    for_each = local.fargate ? [] : [var.capacity_provider_name]
+    content {
+      capacity_provider = capacity_provider_strategy.value
+      weight            = 1
+      base              = 0
+    }
+  }
+
+  dynamic "placement_constraints" {
+    for_each = !local.fargate && var.placement_constraint != null ? [var.placement_constraint] : []
+    content {
+      type       = "memberOf"
+      expression = placement_constraints.value
+    }
+  }
 
   deployment_circuit_breaker {
     enable   = true
@@ -268,6 +297,11 @@ resource "aws_ecs_service" "this" {
     # The deploy pipeline registers new task-definition revisions and updates the service
     # (docs/10 §8); autoscaling owns the running count. Terraform owns everything else.
     ignore_changes = [desired_count, task_definition]
+
+    precondition {
+      condition     = local.fargate || !var.assign_public_ip
+      error_message = "awsvpc tasks on EC2 capacity cannot get a public IP (assign_public_ip must be false)."
+    }
   }
 
   tags = var.tags

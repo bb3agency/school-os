@@ -18,6 +18,20 @@ output "cluster_name" {
   value       = module.cluster.name
 }
 
+output "ecs_services" {
+  description = "Long-running ECS services the deploy pipeline rolls (e.g. the STAGING_ECS_SERVICES variable)."
+  value       = [module.web.service_name, module.api.service_name, module.worker.service_name, module.worker_pdf.service_name, module.beat.service_name]
+}
+
+output "pdf_capacity" {
+  description = "The worker-pdf EC2 capacity (ADR-0025): Auto Scaling group (instance refresh history) and capacity provider."
+  value = {
+    autoscaling_group = module.pdf_capacity.autoscaling_group_name
+    capacity_provider = module.pdf_capacity.capacity_provider_name
+    posture           = module.pdf_capacity.posture
+  }
+}
+
 output "one_off_tasks" {
   description = "Task families for `aws ecs run-task` plus the network settings to use."
   value = {
@@ -117,6 +131,7 @@ output "security_posture" {
     web_container         = module.web.container_definition
     api_container         = module.api.container_definition
     worker_container      = module.worker.container_definition
+    worker_pdf_container  = module.worker_pdf.container_definition
     beat_container        = module.beat.container_definition
     migrate_container     = module.migrate.container_definition
     audit_signing_key     = module.kms.key_properties["audit-signing"]

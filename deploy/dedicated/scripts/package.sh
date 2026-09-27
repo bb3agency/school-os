@@ -35,7 +35,7 @@ repo="$(cd "$src/../.." && pwd)"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 cp -R "$src/compose.yaml" "$src/compose.walg.yaml" "$src/Caddyfile" "$src/.env.template" "$src/README.md" \
-  "$src/scripts" "$src/systemd" "$src/walg" "$stage/"
+  "$src/scripts" "$src/systemd" "$src/walg" "$src/security" "$stage/"
 install -d "$stage/db"
 cp "$repo/infra/db/bootstrap.sql" "$stage/db/bootstrap.sql"
 cat >"$stage/release.env" <<EOF

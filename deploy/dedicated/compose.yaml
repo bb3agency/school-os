@@ -169,6 +169,16 @@ services:
     image: ${SOS_ECR_REGISTRY:?}/${SOS_WORKER_IMAGE:?}
     user: "10001:10001"
     command: ["celery", "-A", "sos_worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=${SOS_WORKER_CONCURRENCY:-2}", "-Q", "${SOS_WORKER_QUEUES:-ingest,embed,ocr,dq,exports,pdf,maintenance}"]
+    # Chromium renders PDFs with its sandbox on (docs/07 §10, ADR-0025 option D). Its namespace
+    # sandbox needs a user namespace, which docker-default's seccomp and Ubuntu 24.04's AppArmor
+    # userns restriction both refuse, so the worker alone runs under two host profiles that
+    # scripts/lib.sh install_host_profiles installs from security/: docker-default's seccomp rules
+    # plus chroot/clone/unshare, and docker-default's AppArmor rules plus `userns,`. Every other
+    # service keeps docker-default. cap_drop ALL and no-new-privileges stay.
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=/etc/schoolos/security/seccomp-worker.json
+      - apparmor=schoolos-worker
     stop_grace_period: 120s
     environment:
       <<: *app-env

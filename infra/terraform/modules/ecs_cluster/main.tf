@@ -1,4 +1,4 @@
-# ECS cluster (Fargate) with Container Insights, audited ECS Exec and a Service Connect namespace
+# ECS cluster (Fargate, plus optional EC2 capacity providers) with Container Insights, audited ECS Exec and a Service Connect namespace
 # so the web BFF reaches the API at http://api:8000 on the private network only (TB2).
 
 variable "name" {
@@ -21,6 +21,12 @@ variable "fargate_spot_weight" {
   description = "Default capacity provider weight for FARGATE_SPOT (0 = on-demand only)."
   type        = number
   default     = 0
+}
+
+variable "ec2_capacity_providers" {
+  description = "EC2 capacity providers to associate with the cluster (e.g. the pdf capacity, ADR-0025). Services opt in by name; the default strategy stays Fargate."
+  type        = list(string)
+  default     = []
 }
 
 variable "tags" {
@@ -70,7 +76,7 @@ resource "aws_ecs_cluster" "this" {
 
 resource "aws_ecs_cluster_capacity_providers" "this" {
   cluster_name       = aws_ecs_cluster.this.name
-  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
+  capacity_providers = concat(["FARGATE", "FARGATE_SPOT"], var.ec2_capacity_providers)
 
   default_capacity_provider_strategy {
     capacity_provider = "FARGATE"
@@ -95,6 +101,11 @@ output "arn" {
 output "name" {
   description = "Cluster name."
   value       = aws_ecs_cluster.this.name
+}
+
+output "ec2_capacity_providers" {
+  description = "EC2 capacity providers associated with the cluster (reference these, not the provider module, so services wait for the association)."
+  value       = [for cp in aws_ecs_cluster_capacity_providers.this.capacity_providers : cp if !contains(["FARGATE", "FARGATE_SPOT"], cp)]
 }
 
 output "service_connect_namespace_arn" {

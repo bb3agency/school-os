@@ -13,6 +13,8 @@ dropped and no network:
 Without ``--sandbox`` Chromium runs unsandboxed: Docker's default seccomp profile (like ECS
 Fargate's) blocks the user namespace the sandbox needs (ADR-0025). Staging and prod keep
 ``pdf.chromium_sandbox`` required, so a render there fails instead of running unsandboxed.
+``infra/docker/worker-pdf-sandbox-check.sh`` runs it with ``--sandbox`` under the worker's
+seccomp (and, in CI, AppArmor) profile, as dedicated hosts and the shared tier's pdf capacity do.
 Synthetic text only.
 """
 

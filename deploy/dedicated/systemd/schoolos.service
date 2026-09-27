@@ -2,7 +2,8 @@
 Description=SchoolOS dedicated stack (docker compose)
 Documentation=file://@INSTALL_DIR@/README.md
 Requires=docker.service
-After=docker.service network-online.target
+# apparmor.service loads /etc/apparmor.d/schoolos-worker (the worker's profile, ADR-0025).
+After=docker.service network-online.target apparmor.service
 Wants=network-online.target
 RequiresMountsFor=/var/lib/schoolos
 

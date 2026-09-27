@@ -278,6 +278,17 @@ jobs:
             --security-opt no-new-privileges:true --network none \
             -v "$PWD/infra/docker/worker-pdf-smoke.py:/smoke/worker-pdf-smoke.py:ro" \
             --entrypoint python "$IMAGE" /smoke/worker-pdf-smoke.py
+      - name: Sandboxed PDF render (worker image, ADR-0025, FR-EXP-002)
+        if: matrix.image == 'worker'
+        # The same render with the Chromium sandbox ON, as on dedicated hosts and the shared tier's
+        # pdf capacity: must fail under Docker's default seccomp profile and succeed under
+        # deploy/dedicated/security/seccomp-worker.json + the schoolos-worker AppArmor profile.
+        # The runner is Ubuntu 24.04 like a dedicated host; userns is restricted explicitly so the
+        # AppArmor profile's `userns,` rule is really exercised.
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
+          sudo apparmor_parser --replace deploy/dedicated/security/apparmor-schoolos-worker
+          bash infra/docker/worker-pdf-sandbox-check.sh "$IMAGE" --apparmor schoolos-worker
       - name: SBOM (syft, SPDX JSON)
         env:
           NAME: ${{ matrix.image }}

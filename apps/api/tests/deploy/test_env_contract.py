@@ -36,6 +36,8 @@ HOST = REPO / "infra" / "terraform" / "modules" / "dedicated_host"
 CLOUD_INIT = HOST / "templates" / "cloud-init.yaml.tftpl"
 
 APP_CONTAINERS = ("api", "worker", "beat", "migrate")
+# Shared tier: the same, plus worker_pdf (queue pdf on the sandbox capacity, ADR-0025).
+SHARED_TASKS = (*APP_CONTAINERS, "worker_pdf")
 
 # Names app containers receive that are NOT Settings fields, and who reads them. Keep it short:
 # anything else must be a Settings field (or be removed from the deploy files).
@@ -291,7 +293,7 @@ def test_SEC_009_dedicated_compose_passes_only_settings_names(service: str) -> N
     assert not unknown, f"compose service {service} sets names config.py never reads: {unknown}"
 
 
-@pytest.mark.parametrize("module", APP_CONTAINERS)
+@pytest.mark.parametrize("module", SHARED_TASKS)
 def test_SEC_009_shared_tier_tasks_pass_only_settings_names(module: str) -> None:
     names = set(shared_hcl().container_env(module))
     assert names, f"no environment parsed for module {module}"
@@ -303,7 +305,7 @@ def test_SEC_009_allowlist_entries_are_really_used() -> None:
     used: set[str] = set()
     for service in APP_CONTAINERS:
         used |= set(compose_env(service))
-    for module in APP_CONTAINERS:
+    for module in SHARED_TASKS:
         used |= set(shared_hcl().container_env(module))
     stale = set(NOT_SETTINGS) - used
     assert not stale, f"remove stale NOT_SETTINGS entries: {stale}"
@@ -337,7 +339,7 @@ def test_NFR_AVL_002_dedicated_containers_start_in_prod(
 
 
 @pytest.mark.parametrize("env", ["staging", "prod"])
-@pytest.mark.parametrize("module", APP_CONTAINERS)
+@pytest.mark.parametrize("module", SHARED_TASKS)
 def test_NFR_AVL_002_shared_tier_tasks_start(
     module: str, env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -420,16 +422,27 @@ def test_NFR_AVL_002_workers_consume_every_celery_queue() -> None:
     command = worker["command"]
     compose_queues = interpolate(command[command.index("-Q") + 1], {})
     assert _queues(compose_queues) == set(QUEUES)
-    tf_default = shared_hcl().var_defaults["worker_queues"]
-    assert _queues(tf_default.strip().strip('"')) == set(QUEUES)
+    # Shared tier: the Fargate worker takes every queue but pdf; worker-pdf (EC2 sandbox capacity,
+    # ADR-0025) takes exactly pdf. Together: every queue, each consumed by one service.
+    hcl = shared_hcl()
+    fargate = _queues(hcl.var_defaults["worker_queues"].strip().strip('"'))
+    pdf = _queues(hcl.locals["pdf_worker_queues"].strip().strip('"'))
+    assert fargate | pdf == set(QUEUES)
+    assert not fargate & pdf
+    assert pdf == {"pdf"}, "only the sandbox capacity renders PDFs (Chromium sandbox on)"
+    worker_pdf = hcl.block("module", "worker_pdf")
+    assert "local.pdf_worker_queues" in worker_pdf["command"]
+    assert worker_pdf["capacity_provider_name"] == "one(module.cluster.ec2_capacity_providers)"
+    assert "var.worker_queues" in hcl.block("module", "worker")["command"]
 
 
 # --- files bucket: SSE-KMS key and lifecycle tags (SEC-011, FR-EXP-003) ---------------------------
 
 WRITERS = ("api", "worker")  # the containers that put objects into the files bucket
+SHARED_WRITERS = (*WRITERS, "worker_pdf")  # worker_pdf stores the rendered PDFs
 
 
-@pytest.mark.parametrize("module", WRITERS)
+@pytest.mark.parametrize("module", SHARED_WRITERS)
 def test_SEC_011_shared_tier_uploads_use_the_files_bucket_key(module: str) -> None:
     """CLAUDE.md §3 (SSE-KMS): uploads name the files bucket's CMK, so presigned POST policies
     require it and server-side writes send it (app/documents/storage.py)."""
@@ -439,7 +452,7 @@ def test_SEC_011_shared_tier_uploads_use_the_files_bucket_key(module: str) -> No
 
 
 @pytest.mark.parametrize("env", ["staging", "prod"])
-@pytest.mark.parametrize("module", WRITERS)
+@pytest.mark.parametrize("module", SHARED_WRITERS)
 def test_SEC_011_shared_tier_settings_carry_the_s3_kms_key(
     module: str, env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
