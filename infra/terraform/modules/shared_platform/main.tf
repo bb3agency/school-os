@@ -129,7 +129,10 @@ module "s3" {
   audit_object_lock_years = var.audit_object_lock_years
   audit_object_lock_days  = var.audit_object_lock_days
   force_destroy           = var.force_destroy_buckets
-  tags                    = var.tags
+  # Browsers upload (presigned POST) only from the school-facing app; the operator panel on
+  # admin_domain never handles school files (docs/07 §10).
+  files_upload_origins = ["https://${var.app_domain}"]
+  tags                 = var.tags
 }
 
 module "ecr" {
@@ -352,6 +355,8 @@ module "web" {
     OIDC_CLIENT_ID          = module.cognito.tenant_client_id
     PLATFORM_OIDC_ISSUER    = module.cognito.platform_issuer
     PLATFORM_OIDC_CLIENT_ID = module.cognito.platform_client_id
+    # Origin of presigned upload/preview URLs (CSP connect-src + img-src, SEC-010/SEC-016).
+    FILES_ORIGIN = module.s3.files_browser_origin
   }
   secrets = {
     SESSION_SECRET              = local.rnd_secret["session_secret"]

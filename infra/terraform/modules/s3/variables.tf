@@ -49,6 +49,12 @@ variable "logs_retention_days" {
   default     = 400
 }
 
+variable "files_upload_origins" {
+  description = "Browser origins that upload to the files bucket with presigned POST (the school-facing app, e.g. https://app.schoolos.in). Exact https origins; empty = no CORS rule (browsers cannot upload)."
+  type        = list(string)
+  default     = []
+}
+
 variable "force_destroy" {
   description = "Allow destroying non-empty buckets (staging only; never prod)."
   type        = bool

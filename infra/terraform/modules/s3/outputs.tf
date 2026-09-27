@@ -3,6 +3,16 @@ output "files_bucket" {
   value       = module.files.id
 }
 
+output "files_browser_origin" {
+  description = "Origin of presigned POST/GET URLs on the files bucket (web FILES_ORIGIN: CSP img-src + connect-src)."
+  value       = module.files.browser_origin
+}
+
+output "files_cors_rules" {
+  description = "Rendered CORS rules of the files bucket (asserted by tests)."
+  value       = module.files.cors_rules
+}
+
 output "files_bucket_arn" {
   description = "Files bucket ARN."
   value       = module.files.arn

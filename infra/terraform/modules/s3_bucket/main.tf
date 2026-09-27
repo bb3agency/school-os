@@ -158,6 +158,26 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
   depends_on = [aws_s3_bucket_versioning.this]
 }
 
+# Browser CORS (SEC-016, docs/07 §10): only rendered when cors_rules is non-empty. The files bucket
+# allows presigned POST uploads from the app origin(s); every other bucket has no CORS configuration.
+resource "aws_s3_bucket_cors_configuration" "this" {
+  count  = length(var.cors_rules) == 0 ? 0 : 1
+  bucket = aws_s3_bucket.this.id
+
+  dynamic "cors_rule" {
+    for_each = var.cors_rules
+    content {
+      allowed_origins = cors_rule.value.allowed_origins
+      allowed_methods = cors_rule.value.allowed_methods
+      allowed_headers = length(cors_rule.value.allowed_headers) == 0 ? null : cors_rule.value.allowed_headers
+      expose_headers  = length(cors_rule.value.expose_headers) == 0 ? null : cors_rule.value.expose_headers
+      max_age_seconds = cors_rule.value.max_age_seconds
+    }
+  }
+}
+
+data "aws_region" "current" {}
+
 data "aws_iam_policy_document" "baseline" {
   source_policy_documents = var.additional_policy_json == null ? [] : [var.additional_policy_json]
 

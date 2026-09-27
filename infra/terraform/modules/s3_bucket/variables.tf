@@ -97,6 +97,40 @@ variable "force_destroy" {
   default     = false
 }
 
+variable "cors_rules" {
+  description = "Browser CORS rules (SEC-016, docs/07 §10). Empty (the default) renders no CORS configuration, so browsers cannot call the bucket cross-origin. Only a files bucket sets one, for presigned POST uploads from the app origin. Origins are exact https origins: no wildcard, no path."
+  type = list(object({
+    allowed_origins = list(string)
+    allowed_methods = list(string)
+    allowed_headers = optional(list(string), [])
+    expose_headers  = optional(list(string), [])
+    max_age_seconds = optional(number)
+  }))
+  default = []
+
+  validation {
+    condition = alltrue(flatten([
+      for r in var.cors_rules : [
+        for o in r.allowed_origins : can(regex("^https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?$", o))
+      ]
+    ]))
+    error_message = "cors_rules: every allowed origin must be https://<host>[:port] in lowercase, with no path, trailing slash or wildcard."
+  }
+
+  validation {
+    condition = alltrue([
+      for r in var.cors_rules :
+      length(r.allowed_origins) > 0 && length(r.allowed_methods) > 0 && length(setsubtract(r.allowed_methods, ["GET", "HEAD", "POST", "PUT", "DELETE"])) == 0
+    ])
+    error_message = "cors_rules: each rule needs at least one origin, and methods from GET, HEAD, POST, PUT, DELETE."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for r in var.cors_rules : [for h in concat(r.allowed_headers, r.expose_headers) : !strcontains(h, "*")]]))
+    error_message = "cors_rules: list headers explicitly (no wildcard)."
+  }
+}
+
 variable "tags" {
   description = "Extra tags (default_tags from the provider apply as well)."
   type        = map(string)

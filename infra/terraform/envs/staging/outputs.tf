@@ -23,6 +23,11 @@ output "buckets" {
   value       = module.platform.buckets
 }
 
+output "files_browser_origin" {
+  description = "Origin of presigned upload/preview URLs (the web task's FILES_ORIGIN)."
+  value       = module.platform.files_browser_origin
+}
+
 output "oidc" {
   description = "OIDC settings (non-secret)."
   value       = module.platform.oidc

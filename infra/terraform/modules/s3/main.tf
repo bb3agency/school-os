@@ -19,6 +19,22 @@ locals {
     logs      = "${var.name_prefix}-logs${local.suffix}"
     artifacts = "${var.name_prefix}-artifacts${local.suffix}"
   }
+
+  # Browser uploads (SEC-016, docs/07 §10): the web app posts files straight to a presigned POST URL
+  # on this bucket. Only POST is allowed cross-origin: previews use <img src> and downloads are
+  # navigations to presigned GET URLs, neither of which needs CORS; the web never reads an object
+  # (or the ETag) with fetch/XHR. XHR with an upload-progress listener always sends a preflight;
+  # multipart/form-data is a CORS-safelisted Content-Type, so content-type is the only header
+  # allowed, and only as a safety margin. Browsers cap preflight caching at <= 2 h.
+  files_cors_rules = length(var.files_upload_origins) == 0 ? [] : [
+    {
+      allowed_origins = var.files_upload_origins
+      allowed_methods = ["POST"]
+      allowed_headers = ["content-type"]
+      expose_headers  = []
+      max_age_seconds = 3600
+    },
+  ]
 }
 
 # --- Logs bucket (ALB access logs + S3 server access logs) --------------------
@@ -81,6 +97,7 @@ module "files" {
   access_logging_enabled = true
   access_log_bucket      = module.logs.id
   force_destroy          = var.force_destroy
+  cors_rules             = local.files_cors_rules
   lifecycle_rules = [
     {
       id              = "exports-7d"
