@@ -1,0 +1,11 @@
+# Student search tuning (FR-STU-010, FR-STU-011, US-302; CLAUDE.md §6.13: thresholds live in
+# versioned config). Scores are pg_trgm word_similarity values in [0, 1].
+version: 1
+# A name (or parent name) matches when word_similarity(query, stored key) reaches this value.
+name_threshold: 0.5
+# Parent-name matches rank below student-name matches of the same similarity.
+parent_weight: 0.8
+# Added to the score of an exact admission-number match (ranks it first).
+admission_exact_bonus: 1.0
+# Largest offset a cursor may carry (limit is capped at 200 by the HTTP layer).
+max_offset: 10000

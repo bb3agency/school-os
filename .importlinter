@@ -17,7 +17,7 @@
 # import-linter fails on modules that do not exist, so only modules that exist today are
 # listed. When a new module lands, add it to every `source_modules` list below and add its
 # own "<module>-internals" contract. Future modules (CLAUDE.md §4):
-#   students, imports, changes, documents, knowledge, exports, notifications, admin
+#   imports, changes, documents, knowledge, exports, notifications, admin
 # Note for knowledge: also forbid app.knowledge.gateway internals once it exists, and keep
 # the semgrep rule `sos-llm-sdk-outside-gateway` for third-party SDK imports.
 
@@ -41,6 +41,7 @@ source_modules =
     app.ops
     app.devtools
     app.dq
+    app.students
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -59,6 +60,7 @@ source_modules =
     app.ops
     app.devtools
     app.dq
+    app.students
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -77,6 +79,7 @@ source_modules =
     app.ops
     app.devtools
     app.dq
+    app.students
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -98,6 +101,7 @@ forbidden_modules =
     app.ops
     app.devtools
     app.dq
+    app.students
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
@@ -109,6 +113,7 @@ source_modules =
     app.identity
     app.tenancy
     app.dq
+    app.students
 forbidden_modules =
     app.platform
 
@@ -125,6 +130,7 @@ source_modules =
     app.platform
     app.devtools
     app.dq
+    app.students
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -146,6 +152,25 @@ source_modules =
 forbidden_modules =
     app.dq.repository
     app.dq.models
+allow_indirect_imports = True
+
+[importlinter:contract:students-internals]
+name = students: repository/models are private (use app.students.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+forbidden_modules =
+    app.students.repository
+    app.students.models
 allow_indirect_imports = True
 
 # The name-matching library, rule types and explanation catalog stay pure (no database, web or

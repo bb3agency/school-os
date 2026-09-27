@@ -401,6 +401,92 @@
         "title": "AnnouncementOut",
         "type": "object"
       },
+      "AttributeOut": {
+        "properties": {
+          "allowed_sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Sources"
+          },
+          "allowed_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Values"
+          },
+          "classification": {
+            "title": "Classification",
+            "type": "string"
+          },
+          "data_type": {
+            "title": "Data Type",
+            "type": "string"
+          },
+          "is_global": {
+            "title": "Is Global",
+            "type": "boolean"
+          },
+          "is_identity": {
+            "title": "Is Identity",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "precedence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Precedence",
+            "type": "array"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "data_type",
+          "classification",
+          "is_identity",
+          "label_en",
+          "label_te",
+          "sort_order",
+          "allowed_sources",
+          "allowed_values",
+          "precedence",
+          "is_global"
+        ],
+        "title": "AttributeOut",
+        "type": "object"
+      },
       "AuditEventOut": {
         "properties": {
           "action": {
@@ -918,6 +1004,61 @@
         "title": "BreakGlassOut",
         "type": "object"
       },
+      "CanonicalOut": {
+        "properties": {
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "value",
+          "source",
+          "verified",
+          "provisional",
+          "masked",
+          "conflicts"
+        ],
+        "title": "CanonicalOut",
+        "type": "object"
+      },
       "ChangePlanIn": {
         "additionalProperties": false,
         "properties": {
@@ -1017,6 +1158,48 @@
           "updated_at"
         ],
         "title": "ClassOut",
+        "type": "object"
+      },
+      "ClassSection": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "roll_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_id",
+          "class_id",
+          "academic_year_id",
+          "label"
+        ],
+        "title": "ClassSection",
         "type": "object"
       },
       "ClassUpdate": {
@@ -1486,6 +1669,127 @@
         "title": "DeploymentPatch",
         "type": "object"
       },
+      "EnrollmentIn": {
+        "additionalProperties": false,
+        "description": "Enrol in a section; an active enrolment in the same academic year becomes ``transferred``.",
+        "properties": {
+          "roll_no": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          },
+          "started_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started On"
+          }
+        },
+        "required": [
+          "section_id"
+        ],
+        "title": "EnrollmentIn",
+        "type": "object"
+      },
+      "EnrollmentOut": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "ended_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended On"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "roll_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          },
+          "started_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started On"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "section_id",
+          "academic_year_id",
+          "roll_no",
+          "status",
+          "started_on",
+          "ended_on",
+          "version"
+        ],
+        "title": "EnrollmentOut",
+        "type": "object"
+      },
       "ExtendTrialIn": {
         "additionalProperties": false,
         "properties": {
@@ -1643,6 +1947,229 @@
           "deployments"
         ],
         "title": "FleetVersionOut",
+        "type": "object"
+      },
+      "GuardianCreate": {
+        "additionalProperties": false,
+        "description": "Add a new guardian (``full_name`` ...) or link an existing one (``guardian_id``).",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "is_primary": {
+            "default": false,
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "relationship": {
+            "enum": [
+              "father",
+              "mother",
+              "guardian"
+            ],
+            "title": "Relationship",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relationship"
+        ],
+        "title": "GuardianCreate",
+        "type": "object"
+      },
+      "GuardianOut": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "has_address": {
+            "title": "Has Address",
+            "type": "boolean"
+          },
+          "has_phone": {
+            "title": "Has Phone",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_primary": {
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "relationship": {
+            "title": "Relationship",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "full_name",
+          "relationship",
+          "is_primary",
+          "has_phone",
+          "has_address",
+          "phone",
+          "address",
+          "masked",
+          "version"
+        ],
+        "title": "GuardianOut",
+        "type": "object"
+      },
+      "GuardianPatch": {
+        "additionalProperties": false,
+        "description": "Omit a field to keep it; ``phone``/``address`` ``null`` clears it.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "is_primary": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Primary"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "enum": [
+                  "father",
+                  "mother",
+                  "guardian"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          }
+        },
+        "title": "GuardianPatch",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2928,6 +3455,34 @@
         "title": "Page[SectionOut]",
         "type": "object"
       },
+      "Page_StudentSummary_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StudentSummary"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[StudentSummary]",
+        "type": "object"
+      },
       "Page_SubscriptionOut_": {
         "properties": {
           "data": {
@@ -4050,6 +4605,121 @@
         "title": "Reasoned",
         "type": "object"
       },
+      "RevealIn": {
+        "additionalProperties": false,
+        "description": "Reveal one C3 field (audited). ``guardian_phone``/``guardian_address`` need\n``guardian_id``; ``value_id`` reveals a specific (possibly historical) value.",
+        "properties": {
+          "attribute_key": {
+            "pattern": "^[a-z][a-z0-9_]{1,63}$",
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "value_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Id"
+          }
+        },
+        "required": [
+          "attribute_key"
+        ],
+        "title": "RevealIn",
+        "type": "object"
+      },
+      "RevealOut": {
+        "properties": {
+          "attribute_key": {
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Id"
+          }
+        },
+        "required": [
+          "attribute_key",
+          "source",
+          "value",
+          "display",
+          "value_id",
+          "guardian_id"
+        ],
+        "title": "RevealOut",
+        "type": "object"
+      },
       "RoleOut": {
         "properties": {
           "id": {
@@ -4383,6 +5053,270 @@
           }
         },
         "title": "SectionUpdate",
+        "type": "object"
+      },
+      "StudentCreate": {
+        "additionalProperties": false,
+        "description": "New student with its first values (docs/09: source required per value).\n\n``values`` must include ``full_name``. ``section_id`` enrols the student in that section's\nacademic year.",
+        "properties": {
+          "roll_no": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "status": {
+            "default": "active",
+            "enum": [
+              "provisional",
+              "active",
+              "left",
+              "graduated"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/ValueIn"
+            },
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "title": "StudentCreate",
+        "type": "object"
+      },
+      "StudentMatch": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "field",
+          "score"
+        ],
+        "title": "StudentMatch",
+        "type": "object"
+      },
+      "StudentOut": {
+        "description": "Canonical profile + current per-source values (US-301).",
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "canonical": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CanonicalOut"
+            },
+            "title": "Canonical",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "enrollment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClassSection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "sensitive_revealable": {
+            "title": "Sensitive Revealable",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/ValueOut"
+              },
+              "type": "array"
+            },
+            "title": "Values",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "admission_no",
+          "version",
+          "created_at",
+          "updated_at",
+          "enrollment",
+          "canonical",
+          "values",
+          "sensitive_revealable"
+        ],
+        "title": "StudentOut",
+        "type": "object"
+      },
+      "StudentPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "provisional",
+              "active",
+              "left",
+              "graduated"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StudentPatch",
+        "type": "object"
+      },
+      "StudentSummary": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "match": {
+            "$ref": "#/components/schemas/StudentMatch"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "admission_no",
+          "status",
+          "class_section",
+          "section_id",
+          "match"
+        ],
+        "title": "StudentSummary",
         "type": "object"
       },
       "SubscriptionOut": {
@@ -6051,6 +6985,266 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValueIn": {
+        "additionalProperties": false,
+        "description": "One observed value from one source (FR-STU-002). Identity attributes from the admission\nregister cannot be changed here once recorded: use a change request.",
+        "properties": {
+          "attribute_key": {
+            "pattern": "^[a-z][a-z0-9_]{1,63}$",
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Document Id"
+          },
+          "source": {
+            "enum": [
+              "admission_register",
+              "aadhaar_as_printed",
+              "udise_plus",
+              "board_registration",
+              "birth_certificate",
+              "parent_form",
+              "tc_incoming",
+              "manual_entry"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attribute_key",
+          "source",
+          "value"
+        ],
+        "title": "ValueIn",
+        "type": "object"
+      },
+      "ValueOut": {
+        "properties": {
+          "attribute_key": {
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "change_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Request Id"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Document Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "import_batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Batch Id"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "format": "uuid",
+            "title": "Recorded By",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "superseded_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "verification_status": {
+            "enum": [
+              "unverified",
+              "verified",
+              "rejected"
+            ],
+            "title": "Verification Status",
+            "type": "string"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "verified_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified By"
+          }
+        },
+        "required": [
+          "id",
+          "attribute_key",
+          "source",
+          "value",
+          "masked",
+          "verification_status",
+          "verified_by",
+          "verified_at",
+          "recorded_by",
+          "recorded_at",
+          "evidence_document_id",
+          "import_batch_id",
+          "change_request_id",
+          "superseded_by",
+          "current"
+        ],
+        "title": "ValueOut",
+        "type": "object"
+      },
+      "ValueRecorded": {
+        "properties": {
+          "attribute_key": {
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_version": {
+            "title": "Student Version",
+            "type": "integer"
+          },
+          "superseded": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "attribute_key",
+          "source",
+          "superseded",
+          "student_version"
+        ],
+        "title": "ValueRecorded",
+        "type": "object"
+      },
+      "VerifyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "default": "verified",
+            "enum": [
+              "verified",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "VerifyIn",
+        "type": "object"
+      },
       "app__audit__viewer__AuditVerifyOut": {
         "properties": {
           "checked": {
@@ -6588,6 +7782,32 @@
         "summary": "List Announcements",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/attributes": {
+      "get": {
+        "description": "Student attributes with classification (C2/C3), identity flag, allowed sources and\nEnglish/Telugu labels (permission ``student.read_basic``).",
+        "operationId": "list_attributes_api_v1_attributes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AttributeOut"
+                  },
+                  "title": "Response List Attributes Api V1 Attributes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Attributes",
+        "tags": [
+          "students"
         ]
       }
     },
@@ -11318,6 +12538,759 @@
         "summary": "Update Section",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/students": {
+      "get": {
+        "description": "Find students by partial name in English or Telugu, admission number, class/section\n(``9b``, ``IX-B``) or parent name (permission ``student.read_basic``; class and subject\nteachers see only students in their sections/classes this year).",
+        "operationId": "search_students_api_v1_students_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "provisional",
+                    "active",
+                    "left",
+                    "graduated"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "admission_no",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Admission No"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_StudentSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Students",
+        "tags": [
+          "students"
+        ]
+      },
+      "post": {
+        "description": "Add a student with first values, each with its source; optionally enrol in a section\n(permission ``student.create``). Accepts ``Idempotency-Key``.",
+        "operationId": "create_student_api_v1_students_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Student",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}": {
+      "get": {
+        "description": "Canonical profile and current per-source values (permission ``student.read_basic``).\nSensitive fields are hidden without ``student.read_sensitive`` and masked with it.",
+        "operationId": "get_student_api_v1_students__student_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Student",
+        "tags": [
+          "students"
+        ]
+      },
+      "patch": {
+        "description": "Change the record status, e.g. ``left`` (permission ``student.update_nonidentity``;\n``If-Match`` required).",
+        "operationId": "update_student_api_v1_students__student_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Student",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/enrollments": {
+      "post": {
+        "description": "Enrol in a section; an active enrolment in the same year becomes ``transferred``\n(permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``.",
+        "operationId": "enrol_student_api_v1_students__student_id__enrollments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enrol Student",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/guardians": {
+      "get": {
+        "description": "Parents and guardians (permission ``student.read_basic``); phone and address masked.",
+        "operationId": "list_guardians_api_v1_students__student_id__guardians_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GuardianOut"
+                  },
+                  "title": "Response List Guardians Api V1 Students  Student Id  Guardians Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Guardians",
+        "tags": [
+          "students"
+        ]
+      },
+      "post": {
+        "description": "Add a guardian, or link an existing one by ``guardian_id`` (permission\n``student.update_nonidentity``). Accepts ``Idempotency-Key``.",
+        "operationId": "add_guardian_api_v1_students__student_id__guardians_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Guardian",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/guardians/{guardian_id}": {
+      "patch": {
+        "description": "Change a guardian's name, phone, address, relationship or primary flag (permission\n``student.update_nonidentity``; ``If-Match`` with the guardian's ETag).",
+        "operationId": "update_guardian_api_v1_students__student_id__guardians__guardian_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guardian_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Guardian Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Guardian",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/sensitive-reveal": {
+      "post": {
+        "description": "Show one sensitive (C3) value; every reveal is audited (permission\n``student.read_sensitive``, class teachers only for their sections).",
+        "operationId": "reveal_sensitive_api_v1_students__student_id__sensitive_reveal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevealIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Sensitive",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/values": {
+      "get": {
+        "description": "Full value history, newest first, for one attribute or all (permission\n``student.read_basic``).",
+        "operationId": "list_values_api_v1_students__student_id__values_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attribute",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9_]{1,63}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attribute"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ValueOut"
+                  },
+                  "title": "Response List Values Api V1 Students  Student Id  Values Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Values",
+        "tags": [
+          "students"
+        ]
+      },
+      "post": {
+        "description": "Record a value from a source; the previous value of that source stays in history\n(permission ``student.update_nonidentity``). Identity fields from the admission register\nneed a change request (403 ``identity_change_required``). Optional ``If-Match``.",
+        "operationId": "record_value_api_v1_students__student_id__values_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValueIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValueRecorded"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Value",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/values/{value_id}/verify": {
+      "post": {
+        "description": "Mark the current value of a non-identity attribute verified or rejected (permission\n``student.update_nonidentity``). Identity values are verified by change requests.",
+        "operationId": "verify_value_api_v1_students__student_id__values__value_id__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "value_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Value Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/VerifyIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValueOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Value",
+        "tags": [
+          "students"
         ]
       }
     },

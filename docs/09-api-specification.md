@@ -117,6 +117,19 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | POST | `/students/{id}/values` | `student.update_nonidentity` | Non-identity attributes, or adding a source observation; identity changes → change requests |
 | POST | `/students/{id}/sensitive-reveal` | `student.read_sensitive` | Returns one C3 field; audited |
 | GET/POST | `/students/{id}/guardians` | read_basic / update_nonidentity | |
+| PATCH | `/students/{id}` | `student.update_nonidentity` | Record status (`active`, `left`, `graduated`, `provisional`); `If-Match` required |
+| POST | `/students/{id}/values/{value_id}/verify` | `student.update_nonidentity` | `{"status": "verified"\|"rejected"}` for the current value of a non-identity attribute; identity values → change requests (`403 identity_change_required`); superseded value → `409 value_superseded` |
+| PATCH | `/students/{id}/guardians/{guardian_id}` | `student.update_nonidentity` | Name, phone, address (C3, encrypted), relationship, primary flag; `If-Match` with the guardian's ETag |
+| POST | `/students/{id}/enrollments` | `student.update_nonidentity` | Enrol in a section (its academic year); an active enrolment in that year becomes `transferred` |
+| GET | `/attributes` | `student.read_basic` | Attribute catalog: classification, identity flag, allowed sources/values, EN/TE labels |
+
+Students notes (M1, as built):
+- **Scope:** scoped holders (class teacher, subject teacher) reach only students actively enrolled in their sections/classes in the **current** academic year; everything else, including other schools' ids, is `404`.
+- **Sensitive (C3) values** are omitted for callers without `student.read_sensitive` and shown as `"••••"` with `masked: true` for holders (`sensitive_revealable: true`); `POST …/sensitive-reveal` with `{"attribute_key": …, "value_id"?: …}` or `{"attribute_key": "guardian_phone"|"guardian_address", "guardian_id": …}` returns one value (`display` e.g. `XXXX XXXX 1234`, `+91 98765 43210`), is audited (`student.sensitive_revealed`) and sent with `Cache-Control: no-store`.
+- **Aadhaar (US-303):** any request body field (and the `query` parameter) holding a full Aadhaar number is refused before other validation: `422` with `{"field": "<path>", "code": "aadhaar_full_number_rejected", "message_key": "errors.aadhaar_last4_only"}` per field. `aadhaar_last4` accepts exactly 4 digits.
+- **Identity attributes:** the admission-register value can be recorded once (unverified, so the canonical value is `provisional`); replacing or verifying it needs a change request (`403 identity_change_required`). Observations from other sources are accepted and appear as `conflicts`. Re-sending an identical value is a no-op (same id).
+- `POST /students`, `POST …/values`, `POST …/guardians`, `POST …/enrollments` accept `Idempotency-Key`; `GET /students/{id}` returns `ETag` (student version), which `POST …/values` accepts as an optional `If-Match`.
+- Search: `query` tokens are name text (EN/TE), class/section (`9b`, `9-B`, `IX-B`), class number (`9`) or admission number (prefix, exact first); results carry `class_section` and `match: {field, score}`; cursor pagination.
 
 ### Change requests (maker-checker)
 | Method | Path | Permission |

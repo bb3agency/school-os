@@ -15,6 +15,7 @@ from app.identity.api import router as identity_router
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
 from app.platform.tenant_api import router as platform_tenant_router
+from app.students.api import router as students_router
 from app.tenancy.api import router as tenancy_router
 
 API_PREFIX = "/api/v1"
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Tenant (school-side) routes stay mounted in both shared and dedicated deployments.
     app.include_router(identity_router)
     app.include_router(tenancy_router)
+    app.include_router(students_router)
     app.include_router(audit_router)
     app.include_router(platform_tenant_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
