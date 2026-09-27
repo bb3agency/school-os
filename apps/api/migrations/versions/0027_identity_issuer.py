@@ -26,17 +26,24 @@ Expand (this revision, backward compatible):
     ``expires_at`` in the future; ``false`` (staff) never returns a membership holding
     ``platform_support``. Without an issuer (an older API image) it behaves as before.
   * ``core.find_user_id_by_subject(p_subject, p_issuer DEFAULT NULL)``.
-  * ``core.create_user_for_invite(p_subject, p_display_name, p_email, p_language,
-    p_issuer DEFAULT NULL)``: with an issuer, creates or finds exactly that identity; if the
-    subject is taken by ANOTHER issuer it fails with ``unique_violation`` (never returns the
-    other identity).
+  * ``core.create_user_for_invite(p_subject, p_display_name, p_email, p_language, p_issuer)``
+    (issuer required): creates or finds exactly that identity; if the subject is taken by
+    ANOTHER issuer it fails with ``unique_violation`` (never returns the other identity).
+  * Backward compatibility (CLAUDE.md §6.12): the pre-0027 four-argument
+    ``core.create_user_for_invite(text, text, citext, text)`` stays, as a thin SQL wrapper owned
+    by ``sos_definer`` (EXECUTE ``sos_app`` only, as before) that calls the new function with the
+    staff issuer of this environment, so an older API image keeps inviting staff during a
+    rolling deploy and after a rollback. The one-argument ``resolve_login`` and
+    ``find_user_id_by_subject`` calls keep working through the parameter defaults. The new
+    five-argument function has no default, so the four-argument call is never ambiguous.
 
   ``sos_definer`` gains ``SELECT`` on ``core.membership_roles`` (the table already carries the
   ``definer_access`` policy) for the ``platform_support`` filter.
 
-Contract (a later release, after every API image passes the issuer): drop the parameter
-defaults, backfill any remaining NULL, ``SET NOT NULL``, drop ``UNIQUE (idp_subject)`` and give
-``core.create_owner_invite`` the issuer. Not part of this revision.
+Contract (a later release, after every API image passes the issuer): DROP the four-argument
+``core.create_user_for_invite`` wrapper, drop the parameter defaults, backfill any remaining
+NULL, ``SET NOT NULL``, drop ``UNIQUE (idp_subject)`` and give ``core.create_owner_invite`` the
+issuer. Not part of this revision.
 
 Downgrade restores the 0003 functions, revokes the extra grant and drops the constraints and the
 column (the issuer of each identity is lost; subjects stay unique, so nothing else changes).
@@ -68,6 +75,8 @@ NEW_SIGNATURES = (
     "core.resolve_login(text, text, boolean)",
     "core.find_user_id_by_subject(text, text)",
     "core.create_user_for_invite(text, text, public.citext, text, text)",
+    # Expand-phase wrapper with the pre-0027 signature; the contract migration drops it.
+    "core.create_user_for_invite(text, text, public.citext, text)",
 )
 OLD_SIGNATURES = (
     "core.resolve_login(text)",
@@ -134,7 +143,7 @@ $$;
 
 CREATE FUNCTION core.create_user_for_invite(
     p_subject text, p_display_name text, p_email public.citext, p_language text,
-    p_issuer text DEFAULT NULL)
+    p_issuer text)
   RETURNS uuid
   LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
@@ -161,17 +170,7 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF p_issuer IS NULL THEN
-    -- Older API image (expand phase): the column default (staff issuer) applies.
-    INSERT INTO core.users AS u (id, idp_subject, display_name, email, preferred_language,
-                                 status)
-    VALUES (__UUID7__, p_subject, p_display_name, p_email, COALESCE(p_language, 'en'),
-            'active')
-    ON CONFLICT (idp_subject) DO NOTHING
-    RETURNING u.id INTO v_id;
-    IF v_id IS NULL THEN
-      SELECT u.id INTO v_id FROM core.users AS u WHERE u.idp_subject = p_subject;
-    END IF;
-    RETURN v_id;
+    RAISE EXCEPTION 'an identity issuer is required' USING ERRCODE = 'invalid_parameter_value';
   END IF;
   INSERT INTO core.users AS u (id, idp_issuer, idp_subject, display_name, email,
                                preferred_language, status)
@@ -191,6 +190,18 @@ BEGIN
   RETURN v_id;
 END
 $$;
+
+-- Expand phase only (CLAUDE.md §6.12): the pre-0027 signature for older API images. It calls
+-- the new function with this environment's staff issuer; the contract migration drops it.
+CREATE FUNCTION core.create_user_for_invite(
+    p_subject text, p_display_name text, p_email public.citext, p_language text)
+  RETURNS uuid
+  LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
+    SELECT core.create_user_for_invite(p_subject, p_display_name, p_email, p_language,
+                                       '__STAFF_ISSUER__')
+$$;
+COMMENT ON FUNCTION core.create_user_for_invite(text, text, public.citext, text) IS
+  'Expand-phase wrapper (ADR-0023, migration 0027): dropped by the contract migration';
 """.replace("__UUID7__", _UUID7)
     .replace("__SYSTEM_SUPPORT_ROLE__", _SYSTEM_SUPPORT_ROLE)
     .replace("__OTHER_ROLE__", _OTHER_ROLE)
@@ -323,7 +334,8 @@ def upgrade() -> None:
         op.execute(f"DROP FUNCTION {signature}")
     op.execute("GRANT CREATE ON SCHEMA core TO sos_definer")
     op.execute("SET ROLE sos_definer")
-    op.execute(NEW_FUNCTIONS_SQL)
+    # The staff issuer passed _checked (URL characters only, no quote), so it is a safe literal.
+    op.execute(NEW_FUNCTIONS_SQL.replace("__STAFF_ISSUER__", staff))
     for signature in NEW_SIGNATURES:
         op.execute(f"REVOKE ALL ON FUNCTION {signature} FROM PUBLIC")
         op.execute(f"GRANT EXECUTE ON FUNCTION {signature} TO sos_app")
@@ -332,7 +344,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for signature in NEW_SIGNATURES:
+    # The four-argument wrapper first (it depends on the five-argument function).
+    for signature in reversed(NEW_SIGNATURES):
         op.execute(f"DROP FUNCTION IF EXISTS {signature}")
     op.execute("GRANT CREATE ON SCHEMA core TO sos_definer")
     op.execute("SET ROLE sos_definer")

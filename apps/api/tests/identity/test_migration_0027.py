@@ -42,11 +42,25 @@ NEW = (
     "core.create_user_for_invite(text,text,public.citext,text,text)",
     "core.user_membership_count(uuid)",
 )
+# Pre-0027 one-argument lookups: replaced (their calls resolve through parameter defaults).
 OLD = (
     "core.resolve_login(text)",
     "core.find_user_id_by_subject(text)",
-    "core.create_user_for_invite(text,text,public.citext,text)",
 )
+# Pre-0027 four-argument invite: present before AND after 0027 (a wrapper after it).
+LEGACY_INVITE = "core.create_user_for_invite(text,text,public.citext,text)"
+
+
+def _is_wrapper(admin: Engine) -> bool:
+    with admin.connect() as c:
+        lang: str = c.execute(
+            text(
+                "SELECT l.lanname FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang "
+                "WHERE p.oid = to_regprocedure(:s)"
+            ),
+            {"s": LEGACY_INVITE},
+        ).scalar_one()
+    return lang == "sql"
 
 
 @pytest.fixture
@@ -149,7 +163,7 @@ def test_ADR_0023_expand_backfills_issuers_and_swaps_functions(
     cfg, admin = populated
     command.downgrade(cfg, BEFORE)
     assert "idp_issuer" not in {c["name"] for c in inspect(admin).get_columns("users", "core")}
-    assert all(_functions(admin, OLD).values())
+    assert all(_functions(admin, (*OLD, LEGACY_INVITE)).values())
     operator_user, _ = _legacy_breakglass_identity(admin)
     users = _user_count(admin)
     assert users > 2
@@ -157,6 +171,8 @@ def test_ADR_0023_expand_backfills_issuers_and_swaps_functions(
     command.upgrade(cfg, "head")
     assert all(_functions(admin, NEW).values())
     assert not any(_functions(admin, OLD).values())
+    assert _functions(admin, (LEGACY_INVITE,))[LEGACY_INVITE]
+    assert _is_wrapper(admin), "0027 keeps the four-argument invite as a wrapper"
     issuers = _issuers(admin)
     settings = get_settings()
     assert issuers.pop(operator_user) == settings.resolved_support_issuer
@@ -177,7 +193,8 @@ def test_ADR_0023_expand_backfills_issuers_and_swaps_functions(
     assert {"users_idp_subject_key", "users_idp_issuer_subject_key"} <= unique
 
     command.downgrade(cfg, BEFORE)
-    assert all(_functions(admin, OLD).values())
+    assert all(_functions(admin, (*OLD, LEGACY_INVITE)).values())
+    assert not _is_wrapper(admin), "downgrade restores the 0003 function"
     assert not any(_functions(admin, NEW).values())
     assert "idp_issuer" not in {c["name"] for c in inspect(admin).get_columns("users", "core")}
     assert _user_count(admin) == users, "no rows lost"

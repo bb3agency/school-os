@@ -26,17 +26,19 @@ EXPECTED: dict[str, set[str]] = {
     "core.resolve_login(text,text,boolean)": {"sos_app"},
     "core.find_user_id_by_subject(text,text)": {"sos_app"},
     "core.create_user_for_invite(text,text,citext,text,text)": {"sos_app"},
+    # Expand-phase wrapper for API images older than 0027 (dropped by the contract migration).
+    "core.create_user_for_invite(text,text,citext,text)": {"sos_app"},
     "core.user_membership_count(uuid)": {"sos_app"},
     "core.list_tenant_ids(text[])": {"sos_app", "sos_platform"},
     "core.provision_tenant(uuid,text,text,text[],text,text)": {"sos_platform"},
     "core.set_tenant_status(uuid,text)": {"sos_platform"},
     "core.tenant_usage_summary(uuid)": {"sos_platform"},
 }
-# Replaced by ADR-0023 (0027): no subject-only overload may remain.
+# Replaced by ADR-0023 (0027): the one-argument forms now resolve to the new functions
+# through parameter defaults (no separate overload may exist).
 REMOVED = (
     "core.resolve_login(text)",
     "core.find_user_id_by_subject(text)",
-    "core.create_user_for_invite(text,text,citext,text)",
 )
 ROLES = ("sos_app", "sos_platform", "sos_readonly", "sos_owner", "sos_migrator")
 STAFF = get_settings().oidc_issuer
@@ -541,6 +543,79 @@ def test_ADR_0023_invite_never_hands_out_another_issuers_identity(
             text("SELECT idp_issuer FROM core.users WHERE id = :u"), {"u": created}
         ).scalar_one()
     assert issuer == OPERATOR
+
+
+LEGACY_INVITE = text("SELECT core.create_user_for_invite(:s, :n, CAST(:e AS public.citext), :l)")
+
+
+def test_CLAUDE_6_12_four_argument_invite_behaves_as_before_0027(
+    admin_engine: Engine, engines: None
+) -> None:
+    """Exactly the pre-0027 call (repository before ADR-0023): creates the staff identity,
+    returns the same id again without overwriting, and still needs an active inviter."""
+    tid = make_tenant(admin_engine)
+    inviter, _ = make_user(admin_engine)
+    make_membership(admin_engine, tid, inviter)
+    args = {"s": f"sub-{uuid.uuid4().hex}", "n": "Legacy Teacher", "e": "L@Example.test", "l": "te"}
+    with tenant_session(tid, inviter) as s:
+        first: uuid.UUID = s.execute(LEGACY_INVITE, args).scalar_one()
+    with tenant_session(tid, inviter) as s:
+        again: uuid.UUID = s.execute(LEGACY_INVITE, {**args, "n": "Changed"}).scalar_one()
+    assert again == first
+    assert first.version == 7
+    with admin_engine.connect() as c:
+        row = c.execute(text("SELECT * FROM core.users WHERE id = :i"), {"i": first}).one()
+    assert (row.idp_issuer, row.idp_subject, row.display_name, row.preferred_language) == (
+        STAFF,
+        args["s"],
+        "Legacy Teacher",
+        "te",
+    )
+    # Same answer as the new form with the staff issuer.
+    with tenant_session(tid, inviter) as s:
+        assert s.execute(INVITE, {**args, "i": STAFF}).scalar_one() == first
+    with (
+        pytest.raises(ProgrammingError, match="tenant and inviter context"),
+        context_free_session() as s,
+    ):
+        s.execute(LEGACY_INVITE, args)
+    # A staff-issuer call never hands out an operator identity with that subject.
+    op_user, op_subject = make_user(admin_engine, issuer=OPERATOR)
+    with (
+        pytest.raises(IntegrityError, match="another identity provider"),
+        tenant_session(tid, inviter) as s,
+    ):
+        s.execute(LEGACY_INVITE, {**args, "s": op_subject})
+    assert op_user
+
+
+def test_ADR_0023_new_invite_requires_an_issuer(admin_engine: Engine, engines: None) -> None:
+    tid = make_tenant(admin_engine)
+    inviter, _ = make_user(admin_engine)
+    make_membership(admin_engine, tid, inviter)
+    with pytest.raises(DBAPIError, match="issuer is required"), tenant_session(tid, inviter) as s:
+        s.execute(INVITE, {**_invite_args(), "i": None})
+
+
+def test_CLAUDE_6_12_one_argument_lookups_behave_as_before_0027(
+    admin_engine: Engine, engines: None
+) -> None:
+    uid, subject = make_user(admin_engine)
+    tid = make_tenant(admin_engine)
+    mid = make_membership(admin_engine, tid, uid)
+    with context_free_session() as s:
+        assert (
+            s.execute(text("SELECT core.find_user_id_by_subject(:s)"), {"s": subject}).scalar_one()
+            == uid
+        )
+        assert (
+            s.execute(text("SELECT core.find_user_id_by_subject(:s)"), {"s": "nobody"}).scalar_one()
+            is None
+        )
+        rows = s.execute(text("SELECT * FROM core.resolve_login(:s)"), {"s": subject}).all()
+    assert [(r.user_id, r.tenant_id, r.membership_id, r.tenant_status) for r in rows] == [
+        (uid, tid, mid, "active")
+    ]
 
 
 def test_ADR_0023_older_callers_without_issuer_still_work(

@@ -38,7 +38,8 @@ definer_access_tables:
 definer_functions:
   - core.resolve_login
   - core.find_user_id_by_subject
-  - core.create_user_for_invite
+  - core.create_user_for_invite  # (text,text,citext,text,text) + the 4-argument expand-phase
+                                 # wrapper of 0027 (dropped by the contract migration)
   - core.list_tenant_ids
   - core.provision_tenant
   - core.set_tenant_status

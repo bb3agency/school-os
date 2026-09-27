@@ -213,8 +213,12 @@ Implementation facts (the decision is unchanged).
   (fail closed).
 - **Definer signatures.** `core.resolve_login(p_subject, p_issuer DEFAULT NULL,
   p_support_only DEFAULT false)`, `core.find_user_id_by_subject(p_subject, p_issuer DEFAULT
-  NULL)`, `core.create_user_for_invite(..., p_issuer DEFAULT NULL)`. NULL issuer = an API image
-  older than 0027 (rolling deploy/rollback; subject-only, as before). `p_support_only` selects
+  NULL)`, `core.create_user_for_invite(..., p_issuer)` (issuer required). The one-argument
+  lookups of an API image older than 0027 (rolling deploy/rollback) resolve through the
+  defaults (NULL issuer: subject-only, as before); its four-argument
+  `core.create_user_for_invite(text, text, citext, text)` is kept as a thin `sos_definer` SQL
+  wrapper (EXECUTE `sos_app` only) that calls the new function with the staff issuer; the
+  contract migration drops the wrapper and the defaults. `p_support_only` selects
   the support filter of item 3 (exactly `platform_support`, system role, `expires_at` in the
   future); without it `platform_support` memberships are never returned (a staff token never
   reaches a support membership). `sos_definer` got `SELECT` on `core.membership_roles` (already
