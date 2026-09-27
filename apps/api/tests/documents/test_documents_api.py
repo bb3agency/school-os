@@ -989,3 +989,187 @@ def test_PRV_016_withhold_rejects_unknown_reason_codes(world: Any, api: Any) -> 
     doc = new_document(api, world.person("office_admin"))
     with pytest.raises(ValueError, match="reason"), tenant_session(world.a.tenant_id) as s:
         service.withhold_version(s, uuid.UUID(doc["id"]), 1, "because I said so")
+
+
+# --- PRV-016: redacted copies and discarded originals ---------------------------------------
+
+PNG_CT = "image/png"
+
+
+def _page_document(api: Any, who: Any, tenant_id: uuid.UUID) -> dict[str, Any]:
+    """A scanned register page (PNG) uploaded through the API."""
+    up = upload(
+        api, who, S.png(), purpose="register_scan", filename="page.png", content_type=PNG_CT
+    )
+    res = register(api, who, up["upload_id"], title="Register page")
+    assert res.status_code == 202, res.text
+    doc: dict[str, Any] = res.json()
+    assert scan(tenant_id, doc) == "ready"
+    return doc
+
+
+def _versions(admin: Engine, document_id: uuid.UUID) -> list[Any]:
+    with admin.connect() as c:
+        return list(
+            c.execute(
+                text(
+                    "SELECT id, version_no, status, error, object_key, mime_type, size_bytes "
+                    "FROM kb.document_versions WHERE document_id = :d ORDER BY version_no"
+                ),
+                {"d": document_id},
+            )
+        )
+
+
+def _discard_payload(admin: Engine, tenant_id: uuid.UUID, document_id: uuid.UUID) -> Any:
+    return next(
+        p
+        for p in S.outbox_events(admin, tenant_id, service.DISCARDED_EVENT)
+        if p["document_id"] == str(document_id)
+    )
+
+
+def _run_discard(tenant_id: uuid.UUID, payload: Any) -> Any:
+    from app.documents import tasks
+
+    return tasks.discard_object.apply(
+        kwargs={"tenant_id": str(tenant_id), "event_id": str(uuid.uuid4()), "payload": payload}
+    ).get()
+
+
+def test_PRV_016_redacted_copy_replaces_the_version_and_the_original_is_discarded(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc = _page_document(api, who, tenant)
+    doc_id = uuid.UUID(doc["id"])
+    original_key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
+    assert original_key in store.objects
+    redacted = S.png("redacted-copy")
+    with tenant_session(tenant) as s:
+        new_no = service.replace_with_redacted(s, doc_id, 1, redacted, PNG_CT, regions=2)
+        # The copy is usable evidence at once (queued counts, like any new version).
+        assert service.evidence_exists(s, doc_id) is True
+    assert new_no == 2
+
+    v1, v2 = _versions(admin_engine, doc_id)
+    assert (v1.status, v1.error) == ("quarantined", "aadhaar_redacted")
+    assert (v2.status, v2.error, v2.mime_type) == ("queued", None, PNG_CT)
+    assert v2.object_key == f"t/{tenant}/docs/{doc_id}/v2/original.png"
+    assert store.objects[v2.object_key].data == redacted
+    assert v2.size_bytes == len(redacted)
+    detail = api.call(who, "GET", f"/api/v1/documents/{doc_id}").json()
+    assert detail["current_version"]["version_no"] == 2
+
+    # The copy is scanned like every other version (outbox), then it can be downloaded.
+    scans = [
+        p
+        for p in S.outbox_events(admin_engine, tenant, service.SCAN_EVENT)
+        if p["document_id"] == str(doc_id)
+    ]
+    assert {p["version_id"] for p in scans} == {str(v1.id), str(v2.id)}
+    assert service.scan_version(tenant, doc_id, v2.id, scanner=DEV_SCANNER) == "ready"
+    path = f"/api/v1/documents/{doc_id}/download-url"
+    assert api.call(who, "GET", path, params={"version": 2}).status_code == 200
+    assert api.call(who, "GET", path, params={"version": 1}).status_code == 409
+    assert api.call(who, "GET", path).json()["version_no"] == 2
+
+    # The original's bytes are deleted after commit by the outbox task (idempotent).
+    payload = _discard_payload(admin_engine, tenant, doc_id)
+    assert set(payload) == {"document_id", "version_id", "object_key"}
+    assert original_key in store.objects, "never before the transaction committed"
+    assert _run_discard(tenant, payload) is True
+    assert original_key not in store.objects
+    assert original_key in store.discarded, "tagged for the short lifecycle rule, not deleted"
+    assert _run_discard(tenant, payload) is True
+    assert v2.object_key in store.objects
+
+    events = W.audit_events(admin_engine, tenant)
+    mine = [e for e in events if str(e["resource_id"]) == str(doc_id)]
+    by_action = {e["action"]: e["summary"] for e in mine}
+    assert by_action["document.version_redacted"] == {
+        "version_no": 1,
+        "redacted_version_no": 2,
+        "regions": 2,
+        "mime_type": PNG_CT,
+        "size_bytes": len(redacted),
+    }
+    assert by_action["document.version_discarded"] == {
+        "version_no": 1,
+        "reason": "aadhaar_redacted",
+    }
+
+
+def test_PRV_016_discarded_version_without_a_copy_is_gone_for_good(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc = _page_document(api, who, tenant)
+    doc_id = uuid.UUID(doc["id"])
+    key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, doc_id, 1, "aadhaar_unredactable") is True
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, doc_id, 1, "aadhaar_unredactable") is False
+        assert service.evidence_exists(s, doc_id) is False
+    (v1,) = _versions(admin_engine, doc_id)
+    assert (v1.status, v1.error) == ("quarantined", "aadhaar_unredactable")
+    path = f"/api/v1/documents/{doc_id}/download-url"
+    assert api.call(who, "GET", path, params={"version": 1}).status_code == 409
+    assert _run_discard(tenant, _discard_payload(admin_engine, tenant, doc_id)) is True
+    assert key not in store.objects
+    events = W.audit_events(admin_engine, tenant, "document.version_discarded")
+    mine = [e for e in events if str(e["resource_id"]) == str(doc_id)]
+    assert [e["summary"] for e in mine] == [{"version_no": 1, "reason": "aadhaar_unredactable"}]
+
+
+def test_PRV_016_daily_sweep_discards_what_the_task_missed(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
+    key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
+    with tenant_session(tenant) as s:
+        service.discard_version(s, doc_id, 1, "aadhaar_unredactable")
+    assert key in store.objects  # the outbox task never ran (e.g. retries exhausted)
+    assert service.sweep_discarded_objects(tenant, store=store) >= 1
+    assert key not in store.objects
+
+
+def test_PRV_016_discard_task_never_deletes_a_usable_version(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc = _page_document(api, who, tenant)
+    doc_id = uuid.UUID(doc["id"])
+    key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
+    forged = {"document_id": str(doc_id), "version_id": doc["current_version"]["id"]}
+    assert _run_discard(tenant, {**forged, "object_key": key}) is False
+    other = f"t/{world.b.tenant_id}/docs/{doc_id}/v1/original.png"
+    assert _run_discard(tenant, {**forged, "object_key": other}) is False
+    assert key in store.objects
+
+
+def test_PRV_016_replace_with_redacted_checks_its_input(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
+    with tenant_session(tenant) as s, pytest.raises(service.UnsupportedFileType):
+        service.replace_with_redacted(s, doc_id, 1, S.pdf(), PNG_CT, regions=1)
+    with tenant_session(tenant) as s, pytest.raises(service.UnsupportedFileType):
+        service.replace_with_redacted(s, doc_id, 1, S.png(), PDF_CT, regions=1)
+    with tenant_session(tenant) as s, pytest.raises(ValueError, match="reason"):
+        service.discard_version(s, doc_id, 1, "because I said so")
+    with tenant_session(world.b.tenant_id) as s, pytest.raises(Exception, match="not found"):
+        service.replace_with_redacted(s, doc_id, 1, S.png(), PNG_CT, regions=1)
+    with tenant_session(tenant) as s:
+        service.discard_version(s, doc_id, 1, "aadhaar_unredactable")
+    with tenant_session(tenant) as s, pytest.raises(Exception, match="no longer available"):
+        service.replace_with_redacted(s, doc_id, 1, S.png(), PNG_CT, regions=1)
+    assert [v.version_no for v in _versions(admin_engine, doc_id)] == [1]

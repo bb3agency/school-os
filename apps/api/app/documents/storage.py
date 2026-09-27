@@ -13,6 +13,10 @@ per school)::
   policy also requires SSE-KMS with that key (the bucket default encrypts as well).
 - Downloads are presigned GETs valid at most 5 minutes that force
   ``Content-Disposition: attachment`` and the verified content type. Nothing is ever public.
+- The bucket is versioned (90-day recovery window for overwrites and deletes). Objects that must
+  not be kept at all (PRV-016: an image that showed a full Aadhaar number) are removed with
+  :meth:`ObjectStore.discard`, which tags them ``sos-lifecycle=discarded`` before deleting; the
+  lifecycle rule ``discarded-1d`` (infra/terraform) expires such versions after one day.
 
 ``ObjectStore`` is a Protocol so tests can swap in an in-memory store; the real implementation
 is :class:`S3ObjectStore` (boto3; SeaweedFS locally and in CI via an endpoint override).
@@ -43,6 +47,8 @@ MAX_DOWNLOAD_URL_TTL_S: Final = 300
 CHUNK_BYTES: Final = 1024 * 1024
 SSE_KMS: Final = "aws:kms"
 _EXPORT_FILENAME_RE: Final = re.compile(r"[a-z0-9][a-z0-9._-]{0,79}")
+LIFECYCLE_TAG: Final = "sos-lifecycle"
+DISCARDED: Final = "discarded"
 
 
 class ObjectStoreError(RuntimeError):
@@ -155,6 +161,10 @@ class ObjectStore(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> None: ...
 
     def delete(self, key: str) -> None: ...
+
+    def discard(self, key: str) -> None:
+        """Delete an object that must not be kept (see module docstring); idempotent."""
+        ...
 
     def delete_prefix(self, prefix: str) -> int: ...
 
@@ -323,6 +333,26 @@ class S3ObjectStore:
             self._client.delete_object(Bucket=self._bucket, Key=key)
         except ClientError as exc:
             raise ObjectStoreError("delete_failed") from exc
+
+    def discard(self, key: str) -> None:
+        """Tag the current version ``sos-lifecycle=discarded``, then delete it. The versioned
+        bucket keeps the bytes as a noncurrent version, which the lifecycle rule
+        ``discarded-1d`` expires after one day instead of the 90-day recovery window. A key that
+        is gone already (no object, or only a delete marker) is fine: retries are safe."""
+        if not key.startswith("t/") or ".." in key.split("/"):
+            raise ValueError("refusing to discard outside a tenant prefix")
+        try:
+            self._client.put_object_tagging(
+                Bucket=self._bucket,
+                Key=key,
+                Tagging={"TagSet": [{"Key": LIFECYCLE_TAG, "Value": DISCARDED}]},
+            )
+        except ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in ("404", "NoSuchKey", "NotFound", "405", "MethodNotAllowed"):
+                return
+            raise ObjectStoreError("tag_failed") from exc
+        self.delete(key)
 
     def delete_prefix(self, prefix: str) -> int:
         """Delete every object under ``prefix`` (must be inside a tenant prefix)."""

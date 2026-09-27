@@ -72,6 +72,9 @@ def create_celery() -> Celery:
             "maintenance.*": {"queue": "maintenance"},
             # FR-DOC-002: AV scans run on the ingest queue (send_task honours routes only).
             "documents.scan": {"queue": "ingest"},
+            # PRV-016: deleting the files of discarded versions (outbox consumer + daily sweep).
+            "documents.discard_object": {"queue": "maintenance"},
+            "documents.sweep_discarded_objects": {"queue": "maintenance"},
             # FR-IMP-001..004: spreadsheet parsing, checking and commit (outbox consumers).
             "imports.parse": {"queue": "ingest"},
             "imports.validate": {"queue": "ingest"},

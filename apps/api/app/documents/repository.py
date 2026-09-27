@@ -337,6 +337,25 @@ def set_version_status(
     ).one_or_none()
 
 
+def discarded_versions(
+    session: Session, errors: Sequence[str], *, since: dt.datetime, limit: int
+) -> list[DocumentVersion]:
+    """Quarantined versions whose file must be gone (``error`` in ``errors``), changed since
+    ``since``, newest first (PRV-016 daily sweep)."""
+    return list(
+        session.scalars(
+            select(DocumentVersion)
+            .where(
+                DocumentVersion.status == "quarantined",
+                DocumentVersion.error.in_(list(errors)),
+                DocumentVersion.updated_at >= since,
+            )
+            .order_by(DocumentVersion.updated_at.desc())
+            .limit(limit)
+        )
+    )
+
+
 def object_keys_of(session: Session, document_id: uuid.UUID) -> list[str]:
     return list(
         session.scalars(
