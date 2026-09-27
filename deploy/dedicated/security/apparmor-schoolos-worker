@@ -1,0 +1,57 @@
+# SchoolOS worker container profile (ADR-0025 option D; docs/10 §15). Ubuntu 24.04 (AppArmor 4).
+#
+# Docker's `docker-default` rules (github.com/moby/profiles apparmor/template.go) plus `userns,`:
+# Ubuntu 24.04 sets kernel.apparmor_restrict_unprivileged_userns=1, so a process may create a user
+# namespace only if its profile allows it, and Chromium's namespace sandbox needs one. Only the
+# worker container runs under this profile (compose.yaml security_opt apparmor=schoolos-worker);
+# every other container keeps docker-default. Installed and loaded by scripts/lib.sh
+# install_host_profiles (bootstrap-host.sh and upgrade.sh), before the worker starts.
+abi <abi/4.0>,
+
+include <tunables/global>
+
+profile schoolos-worker flags=(attach_disconnected,mediate_deleted) {
+  include <abstractions/base>
+
+  network,
+  # Disallow AF_ALG (Linux kernel crypto API) and AF_VSOCK, as docker-default does.
+  deny network alg,
+  deny network vsock,
+  # AppArmor 4 mediates Unix sockets separately; Chromium's IPC uses socketpairs.
+  unix,
+  capability,
+  file,
+  umount,
+  # The only addition to docker-default: Chromium's sandbox creates a user namespace (no host
+  # capabilities are gained; cap_drop ALL and no-new-privileges still apply to the container).
+  userns,
+  # Host (privileged) processes, runc, crun and dockerd may signal container processes.
+  signal (receive) peer=unconfined,
+  signal (receive) peer=runc,
+  signal (receive) peer=crun,
+  signal (receive) peer=dockerd,
+  # Container processes may signal each other.
+  signal (send,receive) peer=schoolos-worker,
+
+  deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+  # deny write to files not in /proc/<number>/** or /proc/sys/**
+  deny @{PROC}/{[^1-9/],[^1-9/][^0-9/],[^1-9s/][^0-9y/][^0-9s/],[^1-9/][^0-9/][^0-9/][^0-9/]*}/** w,
+  deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+
+  deny mount,
+
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+
+  # Processes in the container may trace each other, if every other LSM and yama setting allows it.
+  ptrace (trace,tracedby,read,readby) peer=schoolos-worker,
+}

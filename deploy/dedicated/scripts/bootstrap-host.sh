@@ -6,7 +6,8 @@
 #   3. install systemd units (stack, nightly backup, monthly reboot, unattended-upgrades schedule)
 #   4. fetch secrets (waits until operator-supplied secrets are set)
 #   5. optional WAL-G install
-#   6. pull images, start db/valkey, run db-bootstrap (infra/db/bootstrap.sql) and migrations, start stack
+#   6. worker sandbox profiles (seccomp + AppArmor for Chromium, ADR-0025)
+#   7. pull images, start db/valkey, run db-bootstrap (infra/db/bootstrap.sql) and migrations, start stack
 set -euo pipefail
 export SOS_SCRIPT=bootstrap
 here="$(dirname "$(readlink -f "$0")")"
@@ -113,7 +114,7 @@ install_walg() {
   chmod 0755 "$SOS_DATA_DIR/walg/wal-g"
 }
 
-# --- 6. stack ---------------------------------------------------------------------------------
+# --- 7. stack ---------------------------------------------------------------------------------
 start_stack() {
   render_compose_env "$release_dir"
   info "pulling images for $SOS_VERSION"
@@ -133,5 +134,6 @@ make_dirs
 install_units
 wait_for_secrets
 install_walg
+install_host_profiles "$release_dir"
 start_stack
 info "bootstrap complete. Next: scripts/compose.sh run --rm api python -m app.platform.provision_dedicated (README: Provisioning step 6)."

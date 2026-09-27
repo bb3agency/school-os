@@ -5,6 +5,7 @@
 package_update: true
 package_upgrade: true
 packages:
+  - apparmor # apparmor_parser loads the worker's Chromium sandbox profile (ADR-0025)
   - docker.io
   - docker-compose-v2
   - amazon-ecr-credential-helper
@@ -104,6 +105,7 @@ write_files:
       -w /etc/schoolos/ -p wa -k schoolos-config
       -w /opt/schoolos/ -p wa -k schoolos-bundle
       -w /etc/docker/ -p wa -k docker-config
+      -w /etc/apparmor.d/ -p wa -k apparmor-config
       -w /usr/bin/docker -p x -k docker-exec
       -w /etc/sudoers -p wa -k sudoers
       -w /etc/sudoers.d/ -p wa -k sudoers

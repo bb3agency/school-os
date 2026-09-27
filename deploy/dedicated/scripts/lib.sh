@@ -178,6 +178,36 @@ upgrade_sync_system_roles() {
   return 1
 }
 
+# Chromium sandbox profiles for the worker container (ADR-0025 option D, docs/10 §15). compose.yaml
+# names both for the worker only: security_opt seccomp=$SOS_SECCOMP_DIR/seccomp-worker.json and
+# apparmor=schoolos-worker. Install them from <release dir>/security and (re)load the AppArmor
+# profile before the worker (re)starts. A release without the files (older than the profiles) is
+# skipped, so a rollback to it still works. Returns 1 (never exits, so upgrade.sh's ERR trap rolls
+# back) if a file is wrong or AppArmor cannot load the profile: the worker would not start anyway.
+SOS_SECCOMP_DIR="${SOS_SECCOMP_DIR:-$SOS_ETC/security}"
+SOS_APPARMOR_DIR="${SOS_APPARMOR_DIR:-/etc/apparmor.d}"
+SOS_APPARMOR_PARSER="${SOS_APPARMOR_PARSER:-apparmor_parser}"
+install_host_profiles() {
+  local release_dir="$1" src
+  src="$release_dir/security"
+  if [[ ! -f $src/seccomp-worker.json || ! -f $src/apparmor-schoolos-worker ]]; then
+    warn "release $(basename "$release_dir") has no worker sandbox profiles; leaving the installed ones"
+    return 0
+  fi
+  if ! jq -e '.defaultAction == "SCMP_ACT_ERRNO"' "$src/seccomp-worker.json" >/dev/null; then
+    log ERR "security/seccomp-worker.json is not a deny-by-default seccomp profile"
+    return 1
+  fi
+  install -d -m 0755 "$SOS_SECCOMP_DIR" "$SOS_APPARMOR_DIR" || return 1
+  install -m 0644 "$src/seccomp-worker.json" "$SOS_SECCOMP_DIR/seccomp-worker.json" || return 1
+  install -m 0644 "$src/apparmor-schoolos-worker" "$SOS_APPARMOR_DIR/schoolos-worker" || return 1
+  if ! "$SOS_APPARMOR_PARSER" --replace --write-cache "$SOS_APPARMOR_DIR/schoolos-worker"; then
+    log ERR "could not load the AppArmor profile schoolos-worker (is AppArmor enabled? aa-status)"
+    return 1
+  fi
+  info "worker sandbox profiles installed (seccomp $SOS_SECCOMP_DIR/seccomp-worker.json, AppArmor schoolos-worker)"
+}
+
 activate_release() {
   local version="$1"
   ln -sfn "$SOS_RELEASES_DIR/$version" "$SOS_INSTALL_DIR.new"

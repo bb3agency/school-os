@@ -31,6 +31,13 @@ only on the internal network, where the BFF calls it with the signed service tok
 - Containers: `read_only` root filesystem, `tmpfs` scratch space, `no-new-privileges`, `cap_drop: ALL`
   (caddy adds only `NET_BIND_SERVICE`), non-root UIDs (app 10001, postgres/valkey 999), memory/CPU limits and
   health checks. The Valkey password lives in a tmpfs config file, never on a command line.
+- Chromium renders PDFs with its sandbox on (ADR-0025 option D). Only the `worker` container leaves
+  Docker's defaults, for two profiles shipped in `security/`: `seccomp-worker.json` (docker-default plus
+  `chroot`, `clone` and `unshare`, installed at `/etc/schoolos/security/`) and the AppArmor profile
+  `schoolos-worker` (docker-default plus `userns,`, since Ubuntu 24.04 restricts unprivileged user
+  namespaces). `bootstrap-host.sh` and `upgrade.sh` install and load them (`lib.sh install_host_profiles`)
+  before the worker starts; a rollback reinstalls the previous release's copies. Check on a host:
+  `sudo aa-status | grep schoolos-worker` and `docker inspect schoolos-worker-1 --format '{{.HostConfig.SecurityOpt}}'`.
 - Docker daemon: `live-restore`, `no-new-privileges`, `icc=false`. Logs go to CloudWatch
   (`/schoolos/dedicated/<school_code>`, 400 days) with a bounded local cache.
 - Security patches: `unattended-upgrades` runs daily at 00:45 IST and reboots at 02:30 IST if needed.

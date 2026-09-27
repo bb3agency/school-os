@@ -4,7 +4,8 @@
 #   upgrade.sh <version> [--sha256 <bundle sha256>] [--force]
 #
 # Steps: fetch + verify the release bundle (compose, Caddyfile, scripts, image digests) from the artifacts
-# bucket -> pre-upgrade backup -> pull new images -> switch release -> db-bootstrap + migrations
+# bucket -> pre-upgrade backup -> pull new images -> switch release -> worker sandbox profiles
+# (seccomp + AppArmor, ADR-0025) -> db-bootstrap + migrations
 # (backward-compatible expand-only migrations, so the previous code keeps working) -> system-role sync
 # (sync-system-roles.sh --apply, ADR-0022; never --prune) -> rolling restart ->
 # health check through Caddy -> on any failure re-link the previous release and restart it.
@@ -58,6 +59,7 @@ render_compose_env # back to the active release for the backup
 rollback() {
   warn "upgrade to $version failed; rolling back to $previous"
   activate_release "$previous"
+  install_host_profiles "$(active_release_dir)" || warn "could not reinstall the worker sandbox profiles of $previous"
   render_compose_env
   sos_compose up -d --remove-orphans || true
   if wait_healthy 300 && edge_health_check; then
@@ -71,6 +73,8 @@ rollback() {
 trap rollback ERR
 
 activate_release "$version"
+# The worker's Chromium sandbox profiles (ADR-0025) must match the release before it restarts.
+install_host_profiles "$(active_release_dir)"
 render_compose_env
 
 sos_compose run --rm db-bootstrap
