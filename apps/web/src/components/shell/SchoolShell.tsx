@@ -49,6 +49,11 @@ export function SchoolShell({
       label: t("changeRequests.nav"),
       permission: ["student.identity_change.request", "student.identity_change.approve"],
     },
+    {
+      href: "/exports",
+      label: t("exports.nav"),
+      permission: ["export.board", "export.portal", "student.export", "export.read_all"],
+    },
     { href: "/break-glass", label: t("breakGlass.nav"), permission: "breakglass.approve" },
     { href: "/support", label: t("school.nav.support"), permission: "support.ticket.create" },
     { href: "/audit", label: t("school.nav.audit"), permission: "audit.read" },
