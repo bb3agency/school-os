@@ -129,29 +129,35 @@ def store_ports(env: dict[str, str]) -> dict[str, int]:
 
 
 def host_env(dotenv: dict[str, str]) -> dict[str, str]:
-    """``.env`` plus the URLs docker-compose.yml builds for the containers, pointed at localhost."""
+    """``.env`` plus the URLs docker-compose.yml builds for the containers, pointed at this machine.
+
+    Server-to-server URLs use ``127.0.0.1``: the containers publish on IPv4 loopback only, and on
+    Windows a Python/libpq connection to ``localhost`` tries ``::1`` first and waits about two
+    seconds for the refusal, which pushed BFF-to-API calls past their 5-second timeout. URLs a
+    browser sees or a token names (issuers, presigned file URLs, FILES_ORIGIN) keep ``localhost``.
+    """
     env = {**os.environ, **dotenv}
     ports = store_ports(env)
     pg, valkey = ports["Postgres"], ports["Valkey"]
 
     def db(role: str, password_key: str) -> str:
-        return f"postgresql+psycopg://{role}:{dotenv[password_key]}@localhost:{pg}/schoolos"
+        return f"postgresql+psycopg://{role}:{dotenv[password_key]}@127.0.0.1:{pg}/schoolos"
 
     env.update(
         {
             "SOS_DATABASE_URL": db("sos_app", "SOS_DB_APP_PASSWORD"),
             "SOS_PLATFORM_DATABASE_URL": db("sos_platform", "SOS_DB_PLATFORM_PASSWORD"),
             "SOS_MIGRATOR_DATABASE_URL": db("sos_migrator", "SOS_DB_MIGRATOR_PASSWORD"),
-            "SOS_REDIS_URL": f"redis://localhost:{valkey}/0",
-            "SOS_S3_ENDPOINT_URL": "http://localhost:8333",
+            "SOS_REDIS_URL": f"redis://127.0.0.1:{valkey}/0",
+            "SOS_S3_ENDPOINT_URL": "http://127.0.0.1:8333",
             "SOS_S3_PRESIGN_ENDPOINT_URL": "http://localhost:8333",
             "SOS_OIDC_ISSUER": "http://localhost:8080/schoolos",
-            "SOS_OIDC_JWKS_URI": "http://localhost:8080/schoolos/jwks",
+            "SOS_OIDC_JWKS_URI": "http://127.0.0.1:8080/schoolos/jwks",
             "SOS_PLATFORM_OIDC_ISSUER": "http://localhost:8080/platform",
-            "SOS_PLATFORM_OIDC_JWKS_URI": "http://localhost:8080/platform/jwks",
+            "SOS_PLATFORM_OIDC_JWKS_URI": "http://127.0.0.1:8080/platform/jwks",
             # Web (BFF) side.
-            "API_INTERNAL_URL": "http://localhost:8000",
-            "REDIS_URL": f"redis://localhost:{valkey}/1",
+            "API_INTERNAL_URL": "http://127.0.0.1:8000",
+            "REDIS_URL": f"redis://127.0.0.1:{valkey}/1",
             "OIDC_ISSUER": "http://localhost:8080/schoolos",
             "PLATFORM_OIDC_ISSUER": "http://localhost:8080/platform",
             # Browser uploads go straight to presigned SeaweedFS URLs; next dev accepts this
