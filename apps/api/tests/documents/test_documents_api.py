@@ -960,3 +960,32 @@ def test_SEC_008_titles_and_file_names_never_reach_logs(
     assert "documents.registered" in logs
     for secret in (NAME, "Venkata", "Synthetica"):
         assert secret not in logs, secret
+
+
+# --- PRV-016: withholding a version (e.g. a register page showing a full Aadhaar number) -----
+
+
+def test_PRV_016_withheld_version_can_never_be_downloaded(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    who = world.person("office_admin")
+    doc = new_document(api, who)
+    scan(world.a.tenant_id, doc)
+    path = f"/api/v1/documents/{doc['id']}/download-url"
+    assert api.call(who, "GET", path).status_code == 200
+    with tenant_session(world.a.tenant_id) as s:
+        assert service.withhold_version(s, uuid.UUID(doc["id"]), 1, "aadhaar_detected") is True
+    with tenant_session(world.a.tenant_id) as s:
+        assert service.withhold_version(s, uuid.UUID(doc["id"]), 1, "aadhaar_detected") is False
+    res = api.call(who, "GET", path)
+    assert res.status_code == 409
+    events = W.audit_events(admin_engine, world.a.tenant_id, "document.version_withheld")
+    mine = [e for e in events if str(e["resource_id"]) == doc["id"]]
+    assert len(mine) == 1
+    assert mine[0]["summary"] == {"version_no": 1, "reason": "aadhaar_detected"}
+
+
+def test_PRV_016_withhold_rejects_unknown_reason_codes(world: Any, api: Any) -> None:
+    doc = new_document(api, world.person("office_admin"))
+    with pytest.raises(ValueError, match="reason"), tenant_session(world.a.tenant_id) as s:
+        service.withhold_version(s, uuid.UUID(doc["id"]), 1, "because I said so")

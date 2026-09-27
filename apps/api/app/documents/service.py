@@ -1157,6 +1157,44 @@ def read_document_object(
     return data
 
 
+WITHHOLD_REASONS: Final = frozenset({"aadhaar_detected"})
+
+
+def withhold_version(
+    session: Session, document_id: uuid.UUID, version_no: int, reason_code: str
+) -> bool:
+    """Withhold a version from every download path (PRV-016; e.g. a register page whose text
+    showed a full Aadhaar number). The version becomes ``quarantined`` with ``error`` =
+    ``reason_code``; download URLs are only issued for ``ready`` versions. Returns True if the
+    version changed, False if it was already withheld/unusable. Audited once
+    (``document.version_withheld``, system actor) in the caller's transaction.
+    """
+    if reason_code not in WITHHOLD_REASONS:
+        raise ValueError(f"unknown withhold reason: {reason_code}")
+    version = repo.get_version(session, document_id, version_no)
+    if version is None:
+        raise _not_found()
+    if version.status in UNUSABLE_STATUSES:
+        return False
+    updated = repo.set_version_status(
+        session,
+        version.id,
+        "quarantined",
+        error=reason_code,
+        from_statuses=tuple({"queued", "scanning", "ready"}),
+    )
+    if updated is None:
+        return False
+    _audit(
+        session,
+        "document.version_withheld",
+        document_id,
+        {"version_no": version_no, "reason": reason_code},
+        system=True,
+    )
+    return True
+
+
 def store_page_image(
     session: Session,
     document_id: uuid.UUID,
@@ -1184,6 +1222,7 @@ __all__ = [
     "DELETE_GUARDS",
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
+    "WITHHOLD_REASONS",
     "FileTooLarge",
     "StoredObject",
     "UnsupportedFileType",
@@ -1205,4 +1244,5 @@ __all__ = [
     "set_acl",
     "store_page_image",
     "validate_acl",
+    "withhold_version",
 ]
