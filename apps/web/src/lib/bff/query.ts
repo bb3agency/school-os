@@ -20,6 +20,7 @@ import {
 } from "@/lib/loadable";
 import { AuthRedirectError, createBffClient } from "./fetch";
 import type { Navigate, SessionKind } from "./session-client";
+import { StepUpCancelledError } from "./step-up";
 
 /** The API does not offer this endpoint on this deployment (405/501). */
 export class NotAvailableError extends Error {
@@ -134,6 +135,7 @@ export function useApiQuery<T>(
       count < 1 &&
       !(error instanceof NotAvailableError) &&
       !(error instanceof AuthRedirectError) &&
+      !(error instanceof StepUpCancelledError) &&
       !(error instanceof ApiError && error.status < 500),
   });
   return toLoadable(query);

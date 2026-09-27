@@ -1122,7 +1122,25 @@
       },
       "redirecting": "Taking you to sign in so you can confirm it's you…",
       "unavailable": "This isn't available on this deployment.",
-      "reference": "Reference: {id}"
+      "reference": "Reference: {id}",
+      "step_up_cancelled": {
+        "title": "Not done: we still need to confirm it's you",
+        "body": "This action needs a fresh sign-in with your second step (MFA). Try again and choose \"Sign in again\"."
+      }
+    },
+    "stepUp": {
+      "title": "Confirm it's you",
+      "body": "For your security, this action needs you to sign in again with your second step (MFA). A small window will open. What you typed on this page is kept.",
+      "signIn": "Sign in again",
+      "openAgain": "Open the sign-in window again",
+      "waiting": "Finish signing in in the other window. This page continues by itself when you are done.",
+      "done": "I have signed in",
+      "blockedTitle": "The sign-in window was blocked",
+      "blockedBody": "Allow pop-up windows for SchoolOS in your browser and try again, or continue in this tab. If you continue in this tab, what you typed on this page is lost.",
+      "continueHere": "Continue in this tab",
+      "completeTitle": "You have signed in again",
+      "completeBody": "Go back to the SchoolOS window. Your action continues there. You can close this window.",
+      "closeWindow": "Close this window"
     }
   },
   "auth": {
@@ -1237,5 +1255,20 @@
     "stillNone": "Still no access. Ask the office to send the invitation again.",
     "checkFailed": "We couldn't check right now. Try again in a minute.",
     "signIn": "Sign in"
+  },
+  "suspended": {
+    "label": "School status",
+    "nothingDeleted": "No school data has been deleted.",
+    "billingLink": "Open Plan and billing",
+    "suspended": {
+      "title": "This school's SchoolOS access is paused",
+      "leaderBody": "Only the owner and the principal can still sign in, to see Plan and billing. Other screens stay closed until access is restored. To restore it, contact SchoolOS support by phone or email.",
+      "staffBody": "You can't use SchoolOS for this school right now. Ask your school's owner or principal: they can contact SchoolOS support to restore access."
+    },
+    "offboarding": {
+      "title": "This school is leaving SchoolOS",
+      "leaderBody": "Only the owner and the principal can still sign in, to see Plan and billing. Make sure you have the school's data export before the data is deleted. Contact SchoolOS support if this is a mistake.",
+      "staffBody": "SchoolOS is being closed for this school, so you can't use it any more. Ask your school's owner or principal if you have questions."
+    }
   }
 }

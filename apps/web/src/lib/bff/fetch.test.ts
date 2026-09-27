@@ -7,6 +7,7 @@ import {
   TENANT_SUSPENDED_EVENT,
 } from "./fetch";
 import { ACTIVITY_EVENT, forgetSessionInfo } from "./session-client";
+import { registerStepUpHandler, StepUpCancelledError, stepUpWindowUrl } from "./step-up";
 
 const CSRF = "c".repeat(43);
 
@@ -196,11 +197,99 @@ describe("background polls and suspended schools (FR-NOT-001, BR-08)", () => {
     const suspended = setup(() =>
       Response.json({ code: "tenant_suspended", status: 403 }, { status: 403 }),
     );
-    const response = await suspended.bffFetch(new Request("http://localhost:3000/bff/api/v1/users"));
+    const response = await suspended.bffFetch(
+      new Request("http://localhost:3000/bff/api/v1/users"),
+    );
     expect(response.status).toBe(403);
-    const forbidden = setup(() => Response.json({ code: "forbidden", status: 403 }, { status: 403 }));
+    const forbidden = setup(() =>
+      Response.json({ code: "forbidden", status: 403 }, { status: 403 }),
+    );
     await forbidden.bffFetch(new Request("http://localhost:3000/bff/api/v1/users"));
     window.removeEventListener(TENANT_SUSPENDED_EVENT, listener);
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("step-up and retry (ADR-0018, SEC-005)", () => {
+  const stepUp = () =>
+    Response.json(
+      { code: "step_up_required", step_up_url: "/bff/auth/step-up?next=%2Fte%2Ffindings" },
+      { status: 428 },
+    );
+
+  it("asks the page's step-up handler, then sends the same request once more", async () => {
+    let first = true;
+    const { calls, navigate, bffFetch } = setup(() => {
+      if (first) {
+        first = false;
+        return stepUp();
+      }
+      return Response.json({ ok: true });
+    });
+    const handler = vi.fn(async () => true);
+    const unregister = registerStepUpHandler("staff", handler);
+    try {
+      const response = await bffFetch(
+        new Request("http://localhost:3000/bff/api/v1/dq/findings/x/waive", {
+          method: "POST",
+          body: '{"reason":"Checked with the register"}',
+        }),
+      );
+      expect(response.status).toBe(200);
+    } finally {
+      unregister();
+    }
+    expect(handler).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fte%2Ffindings");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(2);
+    await expect(calls[1]?.text()).resolves.toBe('{"reason":"Checked with the register"}');
+    expect(calls[1]?.headers.get("x-csrf-token")).toBe(CSRF);
+  });
+
+  it("cancelling the prompt fails the call without leaving the page", async () => {
+    const { calls, navigate, bffFetch } = setup(() => stepUp());
+    const unregister = registerStepUpHandler("staff", async () => false);
+    try {
+      await expect(
+        bffFetch(new Request("http://localhost:3000/bff/api/v1/users")),
+      ).rejects.toBeInstanceOf(StepUpCancelledError);
+    } finally {
+      unregister();
+    }
+    expect(navigate).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("falls back to the full-page step-up when the retry still needs it", async () => {
+    const { calls, navigate, bffFetch } = setup(() => stepUp());
+    const unregister = registerStepUpHandler("staff", async () => true);
+    try {
+      await expect(
+        bffFetch(new Request("http://localhost:3000/bff/api/v1/users")),
+      ).rejects.toBeInstanceOf(AuthRedirectError);
+    } finally {
+      unregister();
+    }
+    expect(calls).toHaveLength(2);
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fte%2Ffindings");
+  });
+
+  it("a handler registered for operators is not used for staff calls", async () => {
+    const { navigate, bffFetch } = setup(() => stepUp());
+    const handler = vi.fn(async () => true);
+    const unregister = registerStepUpHandler("operator", handler);
+    try {
+      await expect(
+        bffFetch(new Request("http://localhost:3000/bff/api/v1/users")),
+      ).rejects.toBeInstanceOf(AuthRedirectError);
+    } finally {
+      unregister();
+    }
+    expect(handler).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("the step-up window returns to the completion page, never elsewhere", () => {
+    expect(stepUpWindowUrl("te")).toBe("/bff/auth/step-up?next=%2Fte%2Fstep-up-complete");
   });
 });

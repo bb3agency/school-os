@@ -14,6 +14,7 @@ import {
   type Navigate,
   type SessionKind,
 } from "./session-client";
+import { StepUpCancelledError, stepUpHandler } from "./step-up";
 
 /**
  * Typed browser client for the BFF (`/bff/api/v1/*`) built on @schoolos/api-client.
@@ -21,11 +22,13 @@ import {
  * - Adds X-CSRF-Token on state-changing requests (token from /bff/auth/session, memory only).
  * - Sends the UI language as Accept-Language.
  * - 401: the session has ended → go to sign-in and come back here afterwards.
- * - 428 step_up_required → go to the problem's `step_up_url` (re-authentication).
+ * - 428 step_up_required → the page's step-up handler (StepUpHost) confirms the user in a
+ *   separate window and the request is sent once more (ADR-0018); without a handler, or if the
+ *   API still answers 428, go to the problem's `step_up_url` (full-page re-authentication).
  * - 403 tenant_suspended → tell the page (TENANT_SUSPENDED_EVENT) so the suspended-school
  *   banner can explain it, whatever screen made the call (BR-08).
  * - Passive calls (PASSIVE_HEADER, e.g. the notification bell's polling) do not count as
- *   activity: the BFF does not slide the idle timeout and a 401 does not leave the page.
+ *   activity: the BFF does not slide the idle timeout, and a 401 or 428 does not leave the page.
  */
 
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -89,19 +92,40 @@ export function createBffFetch(options: BffFetchOptions): FetchLike {
       const token = await csrfToken(options.kind).catch(() => null);
       if (token) headers.set("x-csrf-token", token);
     }
-    // Keep a copy of the body for one CSRF retry (constructing a Request consumes it).
-    const spare = unsafe ? input.clone() : null;
-    const request = new Request(input, { headers, credentials: "same-origin" });
-    let response = await send(request);
+    // Keep a copy of the body for the retries below (constructing a Request consumes it).
+    const spare = input.clone();
+    const again = async (): Promise<Response> => {
+      const retry = new Request(spare.clone(), { headers, credentials: "same-origin" });
+      if (unsafe) {
+        const token = await csrfToken(options.kind).catch(() => null);
+        if (token) retry.headers.set("x-csrf-token", token);
+      }
+      return send(retry);
+    };
+    let response = await send(new Request(input, { headers, credentials: "same-origin" }));
 
     if (response.status === 403 && unsafe && (await readProblem(response)).code === "csrf_failed") {
       // The token may be stale (new session after step-up): re-read it once and retry.
       forgetSessionInfo(options.kind);
-      const token = await csrfToken(options.kind).catch(() => null);
-      if (token && spare) {
-        const retry = new Request(spare, { headers, credentials: "same-origin" });
-        retry.headers.set("x-csrf-token", token);
-        response = await send(retry);
+      response = await again();
+    }
+
+    if (response.status === 428 && !passive) {
+      const problem = await readProblem(response);
+      const target =
+        safeStepUpUrl(problem.step_up_url) ??
+        `${options.kind === "operator" ? "/bff/auth/platform/step-up" : "/bff/auth/step-up"}?next=${encodeURIComponent(currentPath())}`;
+      const handler = stepUpHandler(options.kind);
+      if (handler) {
+        // Confirm it's you in a separate window, then send the same request once more. The
+        // form on this page (and whatever was typed) stays as it is (ADR-0018).
+        if (!(await handler(target))) throw new StepUpCancelledError();
+        forgetSessionInfo(options.kind);
+        response = await again();
+      }
+      if (response.status === 428) {
+        navigate(target);
+        throw new AuthRedirectError(target);
       }
     }
 
@@ -113,14 +137,6 @@ export function createBffFetch(options: BffFetchOptions): FetchLike {
       // A background poll never takes the user away: the idle-timeout dialog handles that.
       if (passive) return response;
       const target = loginUrl(options.kind, currentPath());
-      navigate(target);
-      throw new AuthRedirectError(target);
-    }
-    if (response.status === 428) {
-      const problem = await readProblem(response);
-      const target =
-        safeStepUpUrl(problem.step_up_url) ??
-        `${options.kind === "operator" ? "/bff/auth/platform/step-up" : "/bff/auth/step-up"}?next=${encodeURIComponent(currentPath())}`;
       navigate(target);
       throw new AuthRedirectError(target);
     }

@@ -1,5 +1,6 @@
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError } from "@/lib/bff/query";
+import { StepUpCancelledError } from "@/lib/bff/step-up";
 
 /**
  * Turn an error from a BFF call into message keys the UI translates (en/te). Screens never
@@ -42,6 +43,7 @@ export const KNOWN_API_CODES = [
   "bad_gateway",
   "service_unavailable",
   "tenant_not_available",
+  "step_up_cancelled",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 
@@ -69,6 +71,10 @@ function isKnown(code: string | undefined): code is KnownApiCode {
 export function describeApiError(error: unknown): ApiErrorKind {
   if (error instanceof AuthRedirectError) return { kind: "redirecting" };
   if (error instanceof NotAvailableError) return { kind: "unavailable" };
+  // The user closed "confirm it's you": nothing was done (ADR-0018).
+  if (error instanceof StepUpCancelledError) {
+    return { kind: "api", key: "step_up_cancelled", status: 428, requestId: null };
+  }
   if (error instanceof ApiError) {
     const key = isKnown(error.code) ? error.code : (STATUS_FALLBACK[error.status] ?? "generic");
     return {
