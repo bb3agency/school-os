@@ -537,6 +537,8 @@ forbidden_modules =
     app.knowledge.interfaces
     app.knowledge.domain
     app.knowledge.sources
+    app.knowledge.repository
+    app.knowledge.models
 allow_indirect_imports = True
 
 # Top to bottom: a package may import only packages below it. Consequences that matter:
