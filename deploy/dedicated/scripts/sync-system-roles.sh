@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Bring this host's school's system roles in line with roles.yaml (ADR-0022; docs/10 §15.5).
-# Run after an upgrade whose release notes say the system roles changed:
+# upgrade.sh runs it with --apply after every release's migrations (never --prune). By hand, for a
+# dry run, a re-run after fixing a conflict, or a reviewed --prune:
 #   sudo /opt/schoolos/deploy/dedicated/scripts/sync-system-roles.sh            # dry run
 #   sudo /opt/schoolos/deploy/dedicated/scripts/sync-system-roles.sh --apply    # write (audited)
 #   ... [--prune]   also remove grants roles.yaml no longer lists (can remove access; dry run first)

@@ -2,9 +2,10 @@
 # Build the dedicated-tier release bundle (run by CI from the repository root after images are pushed).
 #   deploy/dedicated/scripts/package.sh <version> <out-dir>
 # Env (image references WITHOUT registry host, pinned by digest):
-#   SOS_API_IMAGE     e.g. schoolos/api:2026.10.1@sha256:...   (also runs worker and beat)
+#   SOS_API_IMAGE     e.g. schoolos/api:2026.10.1@sha256:...     (api, migrate)
 #   SOS_WEB_IMAGE     e.g. schoolos/web:2026.10.1@sha256:...
-#   SOS_WORKER_IMAGE  optional, defaults to SOS_API_IMAGE
+#   SOS_WORKER_IMAGE  e.g. schoolos/worker:2026.10.1@sha256:...  (worker, beat; the Dockerfile's
+#                     `worker` target with headless Chromium for PDF exports)
 # Output: <out-dir>/schoolos-dedicated.tar.gz and .sha256, to upload to
 #   s3://<artifacts bucket>/dedicated/<version>/
 set -euo pipefail
@@ -16,8 +17,7 @@ out="${2:?usage: package.sh <version> <out-dir>}"
   exit 1
 }
 digest_re='^schoolos/[a-z-]+:[0-9A-Za-z._-]+@sha256:[0-9a-f]{64}$'
-: "${SOS_API_IMAGE:?}" "${SOS_WEB_IMAGE:?}"
-SOS_WORKER_IMAGE="${SOS_WORKER_IMAGE:-$SOS_API_IMAGE}"
+: "${SOS_API_IMAGE:?}" "${SOS_WEB_IMAGE:?}" "${SOS_WORKER_IMAGE:?}"
 for ref in "$SOS_API_IMAGE" "$SOS_WEB_IMAGE" "$SOS_WORKER_IMAGE"; do
   [[ $ref =~ $digest_re ]] || {
     echo "image must be pinned by digest: $ref" >&2

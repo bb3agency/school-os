@@ -240,13 +240,17 @@ jobs:
         include:
           - image: api
             dockerfile: apps/api/Dockerfile
+            target: api
           - image: worker
-            dockerfile: apps/api/Dockerfile  # api, worker and beat share one image
+            dockerfile: apps/api/Dockerfile  # worker + beat: api image + headless Chromium (pdf queue)
+            target: worker
           - image: web
             dockerfile: apps/web/Dockerfile
+            target: ""
     env:
       IMAGE: schoolos-${{ matrix.image }}:${{ github.sha }}
       DOCKERFILE: ${{ matrix.dockerfile }}
+      TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -260,10 +264,20 @@ jobs:
             echo "::error file=${DOCKERFILE}::Dockerfile not found (expected ${DOCKERFILE}, build context = repo root)"
             exit 1
           fi
-          docker build --pull -f "$DOCKERFILE" -t "$IMAGE" \
+          docker build --pull -f "$DOCKERFILE" ${TARGET:+--target "$TARGET"} -t "$IMAGE" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             .
+      - name: PDF render smoke (worker image, FR-EXP-002)
+        if: matrix.image == 'worker'
+        # Renders a synthetic Telugu page with the baked Chromium as UID 10001 on a read-only root,
+        # all capabilities dropped, no network. Unsandboxed only here: Docker's default seccomp
+        # profile blocks the sandbox (ADR-0025); staging/prod keep it required.
+        run: |
+          docker run --rm --read-only --tmpfs /tmp:size=256m,uid=10001,gid=10001 --cap-drop ALL \
+            --security-opt no-new-privileges:true --network none \
+            -v "$PWD/infra/docker/worker-pdf-smoke.py:/smoke/worker-pdf-smoke.py:ro" \
+            --entrypoint python "$IMAGE" /smoke/worker-pdf-smoke.py
       - name: SBOM (syft, SPDX JSON)
         env:
           NAME: ${{ matrix.image }}

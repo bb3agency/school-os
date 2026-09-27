@@ -5,7 +5,8 @@
 #
 # Steps: fetch + verify the release bundle (compose, Caddyfile, scripts, image digests) from the artifacts
 # bucket -> pre-upgrade backup -> pull new images -> switch release -> db-bootstrap + migrations
-# (backward-compatible expand-only migrations, so the previous code keeps working) -> rolling restart ->
+# (backward-compatible expand-only migrations, so the previous code keeps working) -> system-role sync
+# (sync-system-roles.sh --apply, ADR-0022; never --prune) -> rolling restart ->
 # health check through Caddy -> on any failure re-link the previous release and restart it.
 set -Eeuo pipefail
 export SOS_SCRIPT=upgrade
@@ -74,6 +75,9 @@ render_compose_env
 
 sos_compose run --rm db-bootstrap
 sos_compose run --rm migrate
+# ADR-0022 (amended 2026-09-27): system roles follow roles.yaml after the migrations (--apply, never
+# --prune; audited in the school's chain). A refusal, a failure or a conflict fails the upgrade.
+upgrade_sync_system_roles "$(active_release_dir)/scripts"
 
 # Rolling restart: background services first, then the API, then the web/BFF and the edge.
 for svc in db valkey worker beat api web caddy; do

@@ -88,7 +88,9 @@ infra/terraform/
 └── scripts/validate.sh
 ```
 
-Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs `terraform fmt -check`, `init -backend=false` + `validate`, `tflint` and `trivy config` on every root; **no plan or apply has run against AWS yet** (14 · M0 status).
+Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs `terraform fmt -check`, `init -backend=false` + `validate`, `tflint` and `trivy config` on every root; **no plan or apply has run against AWS yet** (14 · M0 status). Locally, `make tf-validate` runs fmt, init, validate and `terraform test` on every root in the official `hashicorp/terraform` image at CI's version (1.16.4, pinned by digest; `ONLY="modules/s3 …"` limits the roots).
+
+- **Files-bucket lifecycle.** Keys start with the tenant (`t/<tenant_id>/…`) and S3 lifecycle filters match only a literal prefix, so expiring categories are selected by the object tag `sos-lifecycle`, which the app sets in the upload itself (`ObjectStore.put(…, lifecycle=…)`). Export files get `export-7d`: rule `exports-7d` expires them after 7 days and their noncurrent versions after 1 day (docs/05 §13), as a backstop to the daily purge job. `discarded` is set by `ObjectStore.discard` (PRV-016). The rules `tenant-export-2d` and `import-raw-90d` exist but no upload sets their tags yet.
 
 - Remote state in S3 (versioned, encrypted) with locking; separate state per env.
 - Planned: `terraform plan` on PR (posted as comment); `apply` only from the pipeline with approval. Today CI validates only (§7).
@@ -102,7 +104,7 @@ Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs 
 
 - Multi-stage Dockerfiles; slim/distroless bases; pinned digests. Base and service images per ADR-0014 (`python:3.12-slim-bookworm`, `node:24-bookworm-slim`, `pgvector/pgvector:0.8.6-pg16-bookworm`, `valkey/valkey:8.1-alpine`, pinned `chrislusf/seaweedfs`, pinned `caddy:2`).
 - Run as non-root; read-only root FS; `/tmp` as tmpfs; drop Linux capabilities.
-- API, worker and beat share one image (`apps/api/Dockerfile`: `python:3.12-slim-bookworm`, uv-built venv, UID 10001, `INSTALL_PSQL=true` for release images, RDS CA bundle). Chromium (Playwright) with Noto Sans/Serif Telugu for PDF rendering and a ClamAV service arrive with the modules that need them (M1/M3).
+- `apps/api/Dockerfile` builds two Python images from one base (`python:3.12-slim-bookworm`, uv-built venv, UID 10001, `INSTALL_PSQL=true` for release images, RDS CA bundle): target `api` (default; api, migrate, db-bootstrap) and target `worker` (worker and beat; ECR repository `worker`, Terraform `worker_image_repository`, dedicated `SOS_WORKER_IMAGE`). The worker adds chrome-headless-shell at the revision the locked Playwright expects (1194 for 1.56.0; `tests/deploy/test_worker_image.py` fails when they diverge) with its Debian libraries, read-only under `/opt/ms-playwright`; the renderer never downloads a browser and serves the bundled Noto Sans Telugu itself. CI renders a synthetic Telugu PDF in the built worker image as UID 10001 on a read-only root with all capabilities dropped and no network (`infra/docker/worker-pdf-smoke.py`). The Chromium **sandbox** cannot run on Fargate (no seccomp or capability changes allowed); staging and prod keep it required, so PDF renders fail closed there until [ADR-0025](adr/ADR-0025-chromium-sandbox-for-pdf-rendering.md) (Proposed) is decided. A ClamAV service arrives with the module that needs it (M3).
 - Health endpoints: `/healthz` (liveness), `/readyz` (DB, Valkey reachable).
 - Images tagged with git SHA; SBOM attached; Trivy scan must pass (no critical CVEs) before push to ECR.
 
@@ -141,16 +143,16 @@ Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs 
    - **Dry run first** (default; read-only): it prints one line per school (`tenant=<id> result=in_line|pending|failed` with counts) and one line per change (`+ <role> <permission>`, `- …` with `--prune`, `= …` stale grant kept, `~ <role> display names`, `! <role>` conflict with a custom role, `? <role>` unknown system role), IDs and keys only. Check that the grants match the release notes.
    - **Apply:** `--apply` adds missing system roles and grants and updates display names; `--prune` also removes grants roles.yaml no longer lists (removing access can lock staff out: only when the release notes ask for it, after a `--prune` dry run). Custom roles and `platform_support` are never changed. Every change is audited in the school's chain (`role.permission_granted`, `role.permission_revoked`, `role.created`, `role.updated`, `role.system_sync_applied`; actor `system`). A second `--apply` changes nothing. `--tenant <id>` limits the run to one school.
    - **Exit codes:** `0` in line or applied · `1` refused (nothing done) · `2` invalid arguments · `3` dry run found changes · `4` a school failed or has a conflict (the others were still processed; re-run after fixing, it is idempotent).
-   - **Shared tier (staging, then production):** a one-off ECS task from the current **worker** task definition (its `SOS_DATABASE_URL` is `sos_app`; the migrate task's `sos_migrator` is refused) with a command override, in the same network configuration as the services; output goes to the task's CloudWatch log stream:
+   - **Shared tier (staging, then production):** a one-off ECS task from the current **worker** task definition (its `SOS_DATABASE_URL` is `sos_app`; the migrate task's `sos_migrator` is refused) with a command override, in the same network configuration as the services. The container is named `app` in every task definition (`modules/ecs_service` `container_name`); output goes to the task's CloudWatch log stream (`/schoolos/ecs/sos-<env>-worker`, stream prefix `app`):
      ```bash
      td=$(aws ecs describe-services --cluster "$CLUSTER" --services "$WORKER_SERVICE" --query 'services[0].taskDefinition' --output text)
      net=$(aws ecs describe-services --cluster "$CLUSTER" --services "$WORKER_SERVICE" --query 'services[0].networkConfiguration' --output json)
      aws ecs run-task --cluster "$CLUSTER" --task-definition "$td" --launch-type FARGATE \
        --network-configuration "$net" --started-by "ops-role-sync" \
-       --overrides '{"containerOverrides":[{"name":"<worker container>","command":["python","-m","app.identity.sync_system_roles"]}]}'
+       --overrides '{"containerOverrides":[{"name":"app","command":["python","-m","app.identity.sync_system_roles"]}]}'
      # read the log, then repeat with "command":["python","-m","app.identity.sync_system_roles","--apply"]
      ```
-   - **Dedicated tier:** on each host after its upgrade (§15.5), `sudo /opt/schoolos/deploy/dedicated/scripts/sync-system-roles.sh` (dry run), then `… --apply` (SSM Run Command for the fleet). It runs the command in a one-off `api` container of the active release and handles only `SOS_DEDICATED_TENANT_ID`.
+   - **Dedicated tier:** automatic (ADR-0026). `upgrade.sh` runs `scripts/sync-system-roles.sh --apply` after the release's migrations on every upgrade (§15.5), never `--prune`; any exit other than `0` fails the upgrade and rolls the host back. By hand (`sudo /opt/schoolos/deploy/dedicated/scripts/sync-system-roles.sh`, dry run by default) only for a dry run, a reviewed `--prune`, or a re-run after fixing a conflict. It runs the command in a one-off `api` container of the active release and handles only `SOS_DEDICATED_TENANT_ID`.
    - **Local:** `make sync-system-roles` (dry run) or `make sync-system-roles ARGS="--apply"`.
 
 ## 9. Database operations
@@ -225,7 +227,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_REDIS_URL` | `redis://localhost:6379/0` | Valkey |
 | `SOS_S3_ENDPOINT_URL`, `SOS_S3_BUCKET_FILES`, `SOS_S3_BUCKET_AUDIT` | none, `sos-local-files`, `sos-local-audit-archive` | Object storage (endpoint only for SeaweedFS) |
 | `SOS_S3_PRESIGN_ENDPOINT_URL` | none | Endpoint used only to sign browser-facing presigned URLs (locally `http://localhost:8333`); unset in staging/prod |
-| `SOS_S3_KMS_KEY_ID` | none | KMS key for SSE-KMS on uploaded files (FR-DOC-003); unset locally (SeaweedFS) |
+| `SOS_S3_KMS_KEY_ID` | none | KMS key for SSE-KMS on uploaded files (FR-DOC-003): presigned POST policies require it and server writes send it. Shared tier: the data CMK (the files bucket's key); dedicated: `SOS_KMS_DATA_KEY_ARN` (the host key). Unset locally (SeaweedFS) |
 | `SOS_DOCUMENTS_MAX_UPLOAD_BYTES`, `SOS_DOCUMENTS_IMPORT_MAX_UPLOAD_BYTES` | 25 MiB, 10 MiB (at most 100 MiB) | Largest document / spreadsheet import upload (FR-DOC-001, SEC-016) |
 | `SOS_DOCUMENTS_UPLOAD_URL_TTL_S`, `SOS_DOCUMENTS_DOWNLOAD_URL_TTL_S` | 600, 300 (at most 600, 300) | Presigned POST and GET lifetimes (FR-DOC-004) |
 | `SOS_DOCUMENTS_ALLOWED_KINDS`, `SOS_DOCUMENTS_IMPORT_ALLOWED_KINDS` | `pdf,jpg,png,docx,xlsx`, `xlsx,csv` | File kinds accepted by content sniffing (never by extension) |
@@ -336,8 +338,8 @@ Targets: RPO ≤ 15 min, RTO ≤ 8 h (NFR-AVL-005). The RPO needs continuous WAL
 
 ### 15.5 Fleet upgrades
 
-- The `deploy-dedicated` GitHub Actions workflow runs after a shared-tier production release: it reads the fleet list, then upgrades hosts in waves (canary host first, then the rest) via SSM Run Command: pull new digests → run `migrate` (backward-compatible migrations only) → `docker compose up -d` → smoke test → confirm the next heartbeat reports the new version.
-- When the release changes the system roles (§8 item 7, ADR-0022), run `scripts/sync-system-roles.sh` (dry run, then `--apply`) on each upgraded host; the upgrade itself does not change role grants.
+- The `deploy-dedicated` GitHub Actions workflow runs after a shared-tier production release: it reads the fleet list, then upgrades hosts in waves (canary host first, then the rest) via SSM Run Command: pull new digests → run `migrate` (backward-compatible migrations only) → system-role sync → `docker compose up -d` → smoke test → confirm the next heartbeat reports the new version.
+- System-role sync (§8 item 7, ADR-0022, ADR-0026): after `migrate`, `upgrade.sh` runs `scripts/sync-system-roles.sh --apply` (never `--prune`), so the school's system roles follow the release's roles.yaml. Exit `1` (refused), `4` (the school failed, or a custom role holds a system role key) or any other non-zero code fails the upgrade loudly and rolls the host back; grants already added stay (additive, audited). Removing grants roles.yaml no longer lists stays manual: `--prune` dry run, then `--apply --prune`.
 - A failed wave stops the rollout and rolls the host back to the previous digests. Upgrades run outside school hours (after 18:00 IST or Sundays) with 48-hour notice via announcements.
 - Target: every host no more than one release behind 14 days after a release (NFR-FLT-002).
 

@@ -39,12 +39,14 @@ locals {
   # start-up guards on its own (no local-dev key wrapper, no dev-only secrets, no placeholder invoice
   # supplier). apps/api/tests/deploy/test_env_contract.py parses these maps and checks both rules.
   app_env = {
-    SOS_ENV                         = var.env
-    SOS_DEPLOYMENT_MODE             = "shared"
-    SOS_VERSION                     = var.release_version
-    AWS_REGION                      = local.region
-    SOS_S3_BUCKET_FILES             = module.s3.files_bucket
-    SOS_S3_BUCKET_AUDIT             = module.s3.audit_bucket
+    SOS_ENV             = var.env
+    SOS_DEPLOYMENT_MODE = "shared"
+    SOS_VERSION         = var.release_version
+    AWS_REGION          = local.region
+    SOS_S3_BUCKET_FILES = module.s3.files_bucket
+    SOS_S3_BUCKET_AUDIT = module.s3.audit_bucket
+    # SSE-KMS with the files bucket's CMK on every write and presigned POST (FR-DOC-003, SEC-011).
+    SOS_S3_KMS_KEY_ID               = local.kms_data
     SOS_OIDC_ISSUER                 = module.cognito.tenant_issuer
     SOS_OIDC_AUDIENCE               = module.cognito.tenant_client_id
     SOS_PLATFORM_OIDC_ISSUER        = module.cognito.platform_issuer

@@ -117,6 +117,64 @@ run "audit_archives_are_signed_by_the_worker" {
   }
 }
 
+# FR-EXP-002 (docs/04 §6): worker and beat run the worker image (Chromium for the pdf queue); the api,
+# migrate and db-bootstrap tasks keep the smaller api image. SEC-011 / FR-DOC-003: every container that
+# writes the files bucket names the data CMK for SSE-KMS.
+run "worker_image_and_upload_encryption" {
+  command = plan
+
+  override_module {
+    target = module.ecr
+    outputs = {
+      repository_urls = {
+        api    = "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/api"
+        worker = "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/worker"
+        web    = "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/web"
+      }
+      repository_arns = {
+        api    = "arn:aws:ecr:ap-south-1:444455556666:repository/schoolos/api"
+        worker = "arn:aws:ecr:ap-south-1:444455556666:repository/schoolos/worker"
+        web    = "arn:aws:ecr:ap-south-1:444455556666:repository/schoolos/web"
+      }
+      posture = {}
+    }
+  }
+
+  override_module {
+    target = module.kms
+    outputs = {
+      key_arns = {
+        data          = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000da7a"
+        audit         = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-0000000a0d17"
+        backup        = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000bac0"
+        logs          = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000109"
+        audit-signing = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000519e"
+      }
+      key_properties = {
+        audit-signing = { key_spec = "ECC_NIST_P256", key_usage = "SIGN_VERIFY", rotation = false }
+      }
+    }
+  }
+
+  assert {
+    condition = (
+      module.worker.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/worker:2026.10.1"
+      && module.beat.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/worker:2026.10.1"
+      && module.api.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/api:2026.10.1"
+      && module.migrate.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/api:2026.10.1"
+    )
+    error_message = "worker and beat run the worker image (Chromium); api and migrate run the api image."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_S3_KMS_KEY_ID"] == ["arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000da7a"]
+    ])
+    error_message = "api and worker encrypt uploads with the data CMK, the files bucket's key (SOS_S3_KMS_KEY_ID)."
+  }
+}
+
 # SEC-016, SEC-010 (docs/07 §10, §11): browsers upload with presigned POST straight to the files bucket,
 # so the bucket allows exactly the app origin to POST, and the web task's CSP gets the bucket origin.
 run "browser_uploads_reach_the_files_bucket" {

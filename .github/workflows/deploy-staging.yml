@@ -94,13 +94,17 @@ jobs:
         include:
           - image: api
             dockerfile: apps/api/Dockerfile
+            target: api
           - image: worker
-            dockerfile: apps/api/Dockerfile  # api, worker and beat share one image
+            dockerfile: apps/api/Dockerfile  # worker + beat: api image + headless Chromium (pdf queue)
+            target: worker
           - image: web
             dockerfile: apps/web/Dockerfile
+            target: ""
     env:
       NAME: ${{ matrix.image }}
       DOCKERFILE: ${{ matrix.dockerfile }}
+      TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -112,7 +116,7 @@ jobs:
         run: |
           image="${ECR_REGISTRY}/${ECR_NAMESPACE}/${NAME}:${IMAGE_TAG}"
           echo "IMAGE=${image}" >> "$GITHUB_ENV"
-          docker build --pull -f "$DOCKERFILE" -t "$image" \
+          docker build --pull -f "$DOCKERFILE" ${TARGET:+--target "$TARGET"} -t "$image" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             .

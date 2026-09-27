@@ -215,9 +215,9 @@ variable "celery_app" {
 }
 
 variable "worker_image_repository" {
-  description = "ECR repository (api | worker) whose image runs the worker and beat services. apps/api/Dockerfile builds the api image, which also runs Celery; switch to worker if CI publishes a separate worker image (e.g. with Chromium)."
+  description = "ECR repository (api | worker) whose image runs the worker and beat services. CI publishes the `worker` target of apps/api/Dockerfile (api + headless Chromium for the pdf queue) to the worker repository; `api` only for an environment whose release has no worker image (PDF exports then fail)."
   type        = string
-  default     = "api"
+  default     = "worker"
 
   validation {
     condition     = contains(["api", "worker"], var.worker_image_repository)

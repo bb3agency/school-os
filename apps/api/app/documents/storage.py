@@ -8,6 +8,11 @@ per school)::
     t/<tenant_id>/imports/<batch_id>/raw.<ext>
     t/<tenant_id>/exports/<export_id>/<file>                  (exports; deleted after 7 days)
 
+- Lifecycle rules (infra/terraform, files bucket) can only filter on a literal prefix, and every
+  key starts with the tenant, so expiring categories are selected by the object tag
+  ``sos-lifecycle``, set in the same PUT (``put(..., lifecycle=...)``): export files carry
+  ``export-7d`` (rule ``exports-7d``: current and noncurrent versions expire after 7 days / 1 day).
+
 - Browsers upload with a presigned POST that pins the exact key, the exact Content-Type and a
   content-length-range, and expires in at most 10 minutes. With ``SOS_S3_KMS_KEY_ID`` set the
   policy also requires SSE-KMS with that key (the bucket default encrypts as well).
@@ -49,6 +54,10 @@ SSE_KMS: Final = "aws:kms"
 _EXPORT_FILENAME_RE: Final = re.compile(r"[a-z0-9][a-z0-9._-]{0,79}")
 LIFECYCLE_TAG: Final = "sos-lifecycle"
 DISCARDED: Final = "discarded"
+# ``sos-lifecycle`` values a PUT may set; each has a rule of the same tag in infra/terraform
+# (modules/s3 and modules/dedicated_host). ``discarded`` is set only by :meth:`discard`.
+LIFECYCLE_EXPORT: Final = "export-7d"
+LIFECYCLE_TAG_VALUES: Final = frozenset({LIFECYCLE_EXPORT, "tenant-export-2d", "import-raw-90d"})
 
 
 class ObjectStoreError(RuntimeError):
@@ -158,7 +167,12 @@ class ObjectStore(Protocol):
 
     def copy(self, src: str, dst: str, *, if_match: str, content_type: str) -> None: ...
 
-    def put(self, key: str, data: bytes, content_type: str) -> None: ...
+    def put(
+        self, key: str, data: bytes, content_type: str, *, lifecycle: str | None = None
+    ) -> None:
+        """Write an object; ``lifecycle`` (one of :data:`LIFECYCLE_TAG_VALUES`) tags it
+        ``sos-lifecycle=<value>`` in the same request so the bucket's lifecycle rule expires it."""
+        ...
 
     def delete(self, key: str) -> None: ...
 
@@ -316,14 +330,22 @@ class S3ObjectStore:
                 raise ObjectChanged("source_changed") from exc
             raise ObjectStoreError("copy_failed") from exc
 
-    def put(self, key: str, data: bytes, content_type: str) -> None:
+    def put(
+        self, key: str, data: bytes, content_type: str, *, lifecycle: str | None = None
+    ) -> None:
+        extra: dict[str, str] = dict(self._sse_args())
+        if lifecycle is not None:
+            if lifecycle not in LIFECYCLE_TAG_VALUES:
+                raise ValueError("unknown lifecycle tag value")
+            # URL-encoded query string; both parts are fixed ASCII tokens.
+            extra["Tagging"] = f"{LIFECYCLE_TAG}={lifecycle}"
         try:
             self._client.put_object(
                 Bucket=self._bucket,
                 Key=key,
                 Body=data,
                 ContentType=content_type,
-                **self._sse_args(),  # type: ignore[arg-type]
+                **extra,  # type: ignore[arg-type]
             )
         except ClientError as exc:
             raise ObjectStoreError("put_failed") from exc

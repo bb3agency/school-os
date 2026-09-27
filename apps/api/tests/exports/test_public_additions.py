@@ -82,6 +82,8 @@ def test_export_files_are_stored_under_the_school_prefix(school: Any, world: Any
     with tenant_session(school.tenant_id) as db:
         key = documents.store_export_file(db, export_id, "students.csv", b"a,b\r\n", "text/csv")
         assert key == f"t/{school.tenant_id}/exports/{export_id}/students.csv"
+        # FR-EXP-003, docs/05 §13: tagged for the 7-day lifecycle rule (infra/terraform).
+        assert store.objects[key].lifecycle == "export-7d"
         url, _ = documents.export_download_url(
             db, export_id, key, content_type="text/csv", filename="x.csv", ttl_s=3600
         )

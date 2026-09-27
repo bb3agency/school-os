@@ -78,6 +78,7 @@ from app.documents.schemas import (
     VersionOut,
 )
 from app.documents.storage import (
+    LIFECYCLE_EXPORT,
     ObjectChanged,
     ObjectStore,
     ObjectStoreError,
@@ -1423,7 +1424,8 @@ def store_export_file(
     if not data:
         raise ValueError("export files are never empty")
     key = export_key(repo.current_tenant_id(session), export_id, filename)
-    (store or get_object_store()).put(key, data, content_type)
+    # Tagged for the bucket's 7-day lifecycle rule (docs/05 §13), a backstop to the purge job.
+    (store or get_object_store()).put(key, data, content_type, lifecycle=LIFECYCLE_EXPORT)
     return key
 
 

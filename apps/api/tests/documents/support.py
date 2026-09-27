@@ -93,6 +93,7 @@ def csv_text(nonce: str | None = None) -> bytes:
 class StoredObj:
     data: bytes
     content_type: str
+    lifecycle: str | None = None
 
 
 @dataclass
@@ -179,8 +180,12 @@ class MemoryStore:
             raise ObjectChanged("source_changed")
         self.objects[dst] = StoredObj(obj.data, content_type)
 
-    def put(self, key: str, data: bytes, content_type: str) -> None:
-        self.objects[key] = StoredObj(data, content_type)
+    def put(
+        self, key: str, data: bytes, content_type: str, *, lifecycle: str | None = None
+    ) -> None:
+        if lifecycle is not None and lifecycle not in storage.LIFECYCLE_TAG_VALUES:
+            raise ValueError("unknown lifecycle tag value")
+        self.objects[key] = StoredObj(data, content_type, lifecycle)
 
     def delete(self, key: str) -> None:
         self.objects.pop(key, None)

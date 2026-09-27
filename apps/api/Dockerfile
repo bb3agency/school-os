@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
-# Shared image for api, worker and beat (docs/10 §6). Build from the repo root:
-#   docker build -f apps/api/Dockerfile -t schoolos-api .
+# Python images (docs/10 §6). Build from the repo root:
+#   docker build -f apps/api/Dockerfile --target api    -t schoolos-api .     (api, migrate, db-bootstrap)
+#   docker build -f apps/api/Dockerfile --target worker -t schoolos-worker .  (worker and beat: + Chromium)
+# The default target (no --target) is `api`.
 ARG PYTHON_IMAGE=python:3.12-slim-bookworm
 
 FROM ${PYTHON_IMAGE} AS build
@@ -24,7 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/uv --mount=type=secret,id=extra_ca,re
     if [ -s /run/secrets/extra_ca ]; then export SSL_CERT_FILE=/run/secrets/extra_ca; fi; \
     uv sync --frozen --no-dev --all-packages --no-editable
 
-FROM ${PYTHON_IMAGE} AS runtime
+FROM ${PYTHON_IMAGE} AS base
 # postgresql-client provides psql for the db-bootstrap one-off task (infra/db/bootstrap.sql on RDS).
 # Release images (CI) always install it. INSTALL_PSQL=false exists only for sandboxes without
 # Debian mirror access; local compose never needs it (the db container runs bootstrap.sql).
@@ -43,6 +45,32 @@ COPY infra/db/bootstrap.sql /app/infra/db/bootstrap.sql
 # Amazon RDS global CA bundle (pinned copy; refresh from truststore.pki.rds.amazonaws.com) for sslmode=verify-full.
 COPY infra/certs/rds-global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 USER 10001:10001
+
+# --- worker: base + headless Chromium for the `pdf` queue (FR-EXP-002..004, docs/04 §6) -------------
+# Only chrome-headless-shell (what Playwright launches headless) at the revision pinned by the locked
+# playwright package (1.56.0 -> Chromium 141.0.7390.37, revision 1194), plus its Debian runtime
+# libraries (`--with-deps`). Browsers live read-only under /opt/ms-playwright; the renderer never
+# downloads one (app/exports/pdf.py). The sandbox policy is ADR-0023 (docs/07 §10).
+FROM base AS worker
+USER root
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+# Must match the revision in playwright's browsers.json for the locked playwright version (checked below).
+ARG CHROMIUM_REVISION=1194
+RUN --mount=type=secret,id=extra_ca,required=false \
+    if [ -s /run/secrets/extra_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/extra_ca; fi; \
+    playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb /tmp/* \
+    && test -x "$PLAYWRIGHT_BROWSERS_PATH/chromium_headless_shell-${CHROMIUM_REVISION}/chrome-linux/headless_shell" \
+    && chmod -R a+rX,go-w "$PLAYWRIGHT_BROWSERS_PATH"
+# Chromium writes its profile and crash data under $HOME; the root filesystem is read-only, /tmp is not.
+ENV HOME=/tmp
+USER 10001:10001
+HEALTHCHECK --interval=60s --timeout=20s --retries=3 --start-period=60s \
+  CMD celery -A sos_worker.celery_app inspect ping -d "celery@$HOSTNAME" --timeout 10 >/dev/null || exit 1
+CMD ["celery", "-A", "sos_worker.celery_app", "worker", "--loglevel=INFO", "-Q", "ingest,embed,ocr,dq,exports,pdf,maintenance"]
+
+# --- api (default target): base + the HTTP entrypoint --------------------------------------------------
+FROM base AS api
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"
