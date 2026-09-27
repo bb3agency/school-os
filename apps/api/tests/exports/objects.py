@@ -182,26 +182,36 @@ def run(school: Any, export_id: uuid.UUID) -> str:
     return exports.run_export(school.tenant_id, export_id, renderer=FAKE)
 
 
-def ready_export(school: Any, role: str, person: Any = None) -> uuid.UUID:
+def ready_export(
+    school: Any,
+    role: str,
+    person: Any = None,
+    *,
+    section_keys: tuple[str, ...] = ("section_9a",),
+) -> uuid.UUID:
     """A ready export of ``school`` requested by ``role``: a pre-check (XLSX) for holders of
-    ``export.board``, else a student list (CSV) for holders of ``student.export``."""
-    who = person or school.people[role]
-    c = ctx(school, who, role)
-    if c.has("export.board"):
-        out = request_precheck(school, who, role, formats=("xlsx",), as_ctx=c)
-    else:
-        out = request_list(school, who, role, as_ctx=c)
-    status = run(school, out.id)
+    ``export.board``, else a student list (CSV) for holders of ``student.export``. The caller
+    makes the students of ``section_keys`` first (never rely on another test's students)."""
+    out_id = queued_export(school, role, person, section_keys=section_keys)
+    status = run(school, out_id)
     assert status == "ready", status
-    return out.id
+    return out_id
 
 
-def queued_export(school: Any, role: str, person: Any = None) -> uuid.UUID:
+def queued_export(
+    school: Any,
+    role: str,
+    person: Any = None,
+    *,
+    section_keys: tuple[str, ...] = ("section_9a",),
+) -> uuid.UUID:
     who = person or school.people[role]
     c = ctx(school, who, role)
     if c.has("export.board"):
-        return request_precheck(school, who, role, formats=("xlsx",), as_ctx=c).id
-    return request_list(school, who, role, as_ctx=c).id
+        return request_precheck(
+            school, who, role, formats=("xlsx",), section_keys=section_keys, as_ctx=c
+        ).id
+    return request_list(school, who, role, section_keys=section_keys, as_ctx=c).id
 
 
 def export_row(admin: Engine, export_id: uuid.UUID) -> dict[str, Any]:
