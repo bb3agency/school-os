@@ -40,3 +40,8 @@ support:
 tenant_audit:
   stuck_after_attempts: 5       # log platform.tenant_audit.stuck from this attempt on
   backlog_alert_minutes: 15     # log platform.tenant_audit.backlog when the oldest waits longer
+# Resumable shared-tier provisioning (platform.provisioning_runs; FR-PLT-002, docs/16 §5.4).
+provisioning:
+  # One runner at a time holds a run's lease; a crashed runner's lease expires after this and
+  # the next retry or resume takes over. Longer than a normal run (KMS + role cloning).
+  lease_seconds: 120

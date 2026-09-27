@@ -137,6 +137,17 @@ def get_own_tenant(session: Session) -> Tenant | None:
     return session.scalars(select(Tenant)).one_or_none()
 
 
+def lock_tenant_initialisation(session: Session) -> None:
+    """Serialise ``initialise_tenant`` per tenant (FR-PLT-002): concurrent provisioning retries
+    see one another's key and hook writes instead of racing on them."""
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock(hashtextextended("
+            "'core.tenant_keys:initialise:' || core.current_tenant()::text, 0))"
+        )
+    )
+
+
 def list_tenant_keys(session: Session) -> list[TenantKey]:
     return list(session.scalars(select(TenantKey).order_by(TenantKey.key_version)))
 

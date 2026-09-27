@@ -36,6 +36,7 @@ from app.platform import (
     flags,
     fleet,
     operators,
+    provisioning,
     support,
     tenants,
     usage,
@@ -247,14 +248,17 @@ def provision_tenant(
 ) -> Any:
     """Provision a school on the shared tier or register a dedicated host (FR-PLT-002/003).
 
-    The dedicated heartbeat key is returned only in the first response."""
+    Submitting the same request again (any Idempotency-Key) resumes an unfinished provisioning
+    or replays the finished one; the same code with a different request is 409 ``duplicate``;
+    a provisioning another request is running is 409 ``provisioning_in_progress``. The
+    dedicated heartbeat key is returned only in the first response."""
 
     def run() -> tuple[uuid.UUID, BaseModel]:
-        out = tenants.provision(_actor(ctx), data, wrapper=wrapper)
+        out = provisioning.provision(_actor(ctx), data, wrapper=wrapper)
         return out.tenant_id, out
 
     def replay(tid: uuid.UUID) -> BaseModel:
-        return tenants.provision_result(tid)
+        return provisioning.provision_result(tid)
 
     return _idempotent(
         ctx=ctx,
@@ -277,13 +281,29 @@ def get_tenant(
     return tenants.get_tenant(tenant_id)
 
 
+@router.post("/tenants/{tenant_id}/provisioning:resume", response_model=ProvisionOut)
+def resume_provisioning(
+    *,
+    tenant_id: uuid.UUID,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.provision"))],
+    wrapper: Wrapper,
+) -> ProvisionOut:
+    """Resume an unfinished or failed provisioning (FR-PLT-002, docs/16 §5.4).
+
+    Idempotent: a finished provisioning is returned as it is. 409 ``provisioning_in_progress``
+    while another request holds it; 409 ``resume_needs_request`` for a provisioning started
+    before resumable provisioning (submit the same request again)."""
+    return provisioning.resume(_actor(ctx), tenant_id, wrapper=wrapper)
+
+
 @router.post("/tenants/{tenant_id}/activate", response_model=TenantDetailOut)
 def activate_tenant(
     *,
     tenant_id: uuid.UUID,
     ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.provision"))],
 ) -> TenantDetailOut:
-    """Go-live (provisioning -> active); refused by the database without a data key."""
+    """Go-live (provisioning -> active). 409 ``provisioning_incomplete`` until provisioning has
+    finished; also refused by the database without a data key."""
     return tenants.activate(_actor(ctx), tenant_id)
 
 

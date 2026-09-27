@@ -98,3 +98,5 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) | Control-plane boundaries and guaranteed audit copies | Accepted |
 | [ADR-0021](ADR-0021-export-access-and-step-up.md) | Export access and step-up | Accepted |
 | [ADR-0022](ADR-0022-system-role-sync-for-existing-schools.md) | System-role sync for existing schools | Accepted |
+| [ADR-0023](ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) | Operator sign-in for break-glass across the two user pools | Proposed |
+| [ADR-0024](ADR-0024-resumable-school-provisioning.md) | Resumable school provisioning instead of one transaction | Proposed |

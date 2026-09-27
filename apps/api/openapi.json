@@ -8424,6 +8424,82 @@
         "title": "ProvisionOut",
         "type": "object"
       },
+      "ProvisioningOut": {
+        "description": "Where a school's provisioning stands (FR-PLT-002, docs/16 \u00a75.4). Codes only.\n\n``resumable``: not completed and no runner holds it; an operator may resume it\n(``POST /platform/tenants/{id}/provisioning:resume``).",
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "failed_step": {
+            "anyOf": [
+              {
+                "enum": [
+                  "initialise",
+                  "owner_invite"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Step"
+          },
+          "in_progress": {
+            "title": "In Progress",
+            "type": "boolean"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "resumable": {
+            "title": "Resumable",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "initialised",
+              "completed",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "state",
+          "failed_step",
+          "last_error",
+          "attempts",
+          "in_progress",
+          "resumable",
+          "updated_at"
+        ],
+        "title": "ProvisioningOut",
+        "type": "object"
+      },
       "ReadyOut": {
         "additionalProperties": false,
         "properties": {
@@ -10390,6 +10466,16 @@
               }
             ],
             "title": "Plan Code"
+          },
+          "provisioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvisioningOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "school_name": {
             "title": "School Name",
@@ -19625,7 +19711,7 @@
         ]
       },
       "post": {
-        "description": "Provision a school on the shared tier or register a dedicated host (FR-PLT-002/003).\n\nThe dedicated heartbeat key is returned only in the first response.",
+        "description": "Provision a school on the shared tier or register a dedicated host (FR-PLT-002/003).\n\nSubmitting the same request again (any Idempotency-Key) resumes an unfinished provisioning\nor replays the finished one; the same code with a different request is 409 ``duplicate``;\na provisioning another request is running is 409 ``provisioning_in_progress``. The\ndedicated heartbeat key is returned only in the first response.",
         "operationId": "provision_tenant_api_v1_platform_tenants_post",
         "parameters": [
           {
@@ -19728,7 +19814,7 @@
     },
     "/api/v1/platform/tenants/{tenant_id}/activate": {
       "post": {
-        "description": "Go-live (provisioning -> active); refused by the database without a data key.",
+        "description": "Go-live (provisioning -> active). 409 ``provisioning_incomplete`` until provisioning has\nfinished; also refused by the database without a data key.",
         "operationId": "activate_tenant_api_v1_platform_tenants__tenant_id__activate_post",
         "parameters": [
           {
@@ -20020,6 +20106,50 @@
           }
         },
         "summary": "Resend Owner Invite",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/provisioning:resume": {
+      "post": {
+        "description": "Resume an unfinished or failed provisioning (FR-PLT-002, docs/16 \u00a75.4).\n\nIdempotent: a finished provisioning is returned as it is. 409 ``provisioning_in_progress``\nwhile another request holds it; 409 ``resume_needs_request`` for a provisioning started\nbefore resumable provisioning (submit the same request again).",
+        "operationId": "resume_provisioning_api_v1_platform_tenants__tenant_id__provisioning_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Provisioning",
         "tags": [
           "platform"
         ]

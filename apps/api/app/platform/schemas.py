@@ -463,6 +463,25 @@ class UsageCountsOut(Out):
     academic_years: int
 
 
+ProvisioningState = Literal["registered", "initialised", "completed", "failed"]
+
+
+class ProvisioningOut(Out):
+    """Where a school's provisioning stands (FR-PLT-002, docs/16 §5.4). Codes only.
+
+    ``resumable``: not completed and no runner holds it; an operator may resume it
+    (``POST /platform/tenants/{id}/provisioning:resume``).
+    """
+
+    state: ProvisioningState
+    failed_step: Literal["initialise", "owner_invite"] | None
+    last_error: str | None
+    attempts: int
+    in_progress: bool
+    resumable: bool
+    updated_at: dt.datetime | None
+
+
 class TenantDetailOut(TenantSummaryOut):
     boards: list[str]
     tenant_status_reason: str | None
@@ -473,6 +492,7 @@ class TenantDetailOut(TenantSummaryOut):
     open_tickets: int
     invoices: list[InvoiceOut]
     flag_overrides: dict[str, bool]
+    provisioning: ProvisioningOut | None = None
 
 
 # --- usage ------------------------------------------------------------------------------------

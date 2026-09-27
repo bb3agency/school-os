@@ -147,7 +147,9 @@ def initialise_tenant(
     """Create the tenant's wrapped DEK + HMAC key and run :data:`POST_PROVISION_HOOKS`.
 
     Opens ``tenant_session(tenant_id)`` as ``sos_app``. Idempotent while the tenant is
-    ``provisioning``: an existing key is kept. Returns ``(key_version, key_id)``.
+    ``provisioning``: an existing key is kept. Concurrent calls for one tenant are serialised
+    (transaction-level advisory lock), so a retry racing another never creates a second key or
+    runs the hooks side by side (FR-PLT-002). Returns ``(key_version, key_id)``.
 
     Audit (tenant chain, actor_type system): ``tenant.key.created`` with key_version and key_id
     (never key material).
@@ -156,6 +158,7 @@ def initialise_tenant(
         tenant = repo.get_own_tenant(session)
         if tenant is None:
             raise NotFound("Tenant not found")
+        repo.lock_tenant_initialisation(session)
         if tenant.status != "provisioning":
             raise Conflict("Only a school that is being provisioned can be initialised.")
         keys = [k for k in repo.list_tenant_keys(session) if k.retired_at is None]

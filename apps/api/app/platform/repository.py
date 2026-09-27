@@ -46,6 +46,7 @@ _CONSTRAINT_MESSAGES: dict[str, tuple[str, str]] = {
     "deployments_tenant_code_key": ("duplicate", "This school code is already used."),
     "deployments_tenant_id_key": ("duplicate", "This school already has a deployment."),
     "deployments_custom_domain_key": ("duplicate", "This domain is already used."),
+    "provisioning_runs_tenant_code_key": ("duplicate", "This school code is already used."),
     "operators_email_key": ("duplicate", "An operator with this email exists."),
     "operators_idp_subject_key": ("duplicate", "An operator with this sign-in exists."),
     "payments_tenant_id_method_reference_key": (
@@ -568,3 +569,60 @@ def pending_tenant_audit(session: Session) -> tuple[int, dt.datetime | None]:
         select(func.count(), func.min(o.c.created_at)).where(o.c.delivered_at.is_(None))
     ).one()
     return int(row[0]), row[1]
+
+
+# --- provisioning runs (FR-PLT-002, docs/16 §5.4) ----------------------------------------------
+
+
+def claim_provisioning_run(
+    session: Session, tenant_id: uuid.UUID, lease_id: uuid.UUID, lease: dt.timedelta
+) -> RowMapping | None:
+    """Take the run's lease if it is unfinished and no live lease is held; else ``None``.
+
+    Counts the attempt. The returned row still shows the state the run was left in.
+    """
+    r = m.provisioning_runs
+    return (
+        session.execute(
+            update(r)
+            .where(
+                r.c.tenant_id == tenant_id,
+                r.c.state != "completed",
+                or_(r.c.lease_expires_at.is_(None), r.c.lease_expires_at < func.now()),
+            )
+            .values(
+                lease_id=lease_id,
+                lease_expires_at=func.now() + lease,
+                attempts=r.c.attempts + 1,
+            )
+            .returning(r)
+        )
+        .mappings()
+        .first()
+    )
+
+
+def lock_provisioning_run(
+    session: Session, run_id: uuid.UUID, lease_id: uuid.UUID
+) -> RowMapping | None:
+    """Lock the run for the caller's transaction if ``lease_id`` still holds it (fencing)."""
+    r = m.provisioning_runs
+    stmt = select(r).where(r.c.id == run_id, r.c.lease_id == lease_id).with_for_update()
+    return session.execute(stmt).mappings().first()
+
+
+def update_provisioning_run(
+    session: Session, run_id: uuid.UUID, lease_id: uuid.UUID, values: Mapping[str, Any]
+) -> RowMapping | None:
+    """Change a run only while ``lease_id`` still holds it (fencing); ``None`` if it does not."""
+    r = m.provisioning_runs
+    return (
+        session.execute(
+            update(r)
+            .where(r.c.id == run_id, r.c.lease_id == lease_id)
+            .values(**values)
+            .returning(r)
+        )
+        .mappings()
+        .first()
+    )

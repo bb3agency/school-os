@@ -4,23 +4,13 @@ No student data is read or returned: the control plane knows a school by ID, cod
 plan, statuses and counts (BR-09). Tenant rows are created and changed only through the
 allowlisted definer functions via ``app.tenancy.service`` (ADR-0013).
 
-Shared-tier provisioning (docs/16 §5.4):
-1. one ``platform_session`` transaction: ``core.provision_tenant`` (tenant row), deployment,
-   billing account, subscription, platform audit event (atomic: a failure leaves none of them);
-2. ``tenancy.initialise_tenant`` (wrapped DEK + HMAC key, post-provision hooks such as role
-   templates) in the new tenant's own session;
-3. ``core.create_owner_invite`` (invited owner membership, owner role when present) and, in the
-   same platform transaction, ``tenant.provisioned`` queued for the school's own audit chain
-   (``platform.tenant_audit``; actor_type ``platform``, delivered exactly once, ADR-0020).
-Steps 2-3 are idempotent; a retry with the same code and school resumes them.
+Provisioning (shared and dedicated) lives in ``app.platform.provisioning``: a persisted,
+resumable state machine (``platform.provisioning_runs``, docs/16 §5.4). Go-live
+(:func:`activate`) is refused until that run is ``completed``.
 
 Lifecycle changes (activate, suspend, reactivate, offboard) queue their school-chain copy in
 the same platform transaction as the change; delivery is tried right after commit and
 guaranteed by the ``platform.deliver_tenant_audit`` task.
-
-Dedicated tier: the deployment (status ``provisioning``), billing account, subscription and a
-per-deployment heartbeat key (shown once) are created here; the tenant row is created on the
-host by the runbook with the same tenant ID.
 """
 
 from __future__ import annotations
@@ -35,14 +25,12 @@ from sqlalchemy import and_, func, or_, select
 
 from app.core.crypto import KeyWrapper
 from app.core.db import platform_session
-from app.core.errors import Conflict, NotFound, ValidationFailed
-from app.core.ids import new_id
+from app.core.errors import Conflict, NotFound
 from app.core.logging import get_logger
 from app.platform import billing, tenant_audit
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import (
-    SYSTEM,
     Actor,
     audit_platform,
     clamp_limit,
@@ -50,19 +38,16 @@ from app.platform.common import (
     must,
     now,
     parse_cursor,
-    today_ist,
 )
 from app.platform.schemas import (
     InvoiceOut,
-    ProvisionIn,
-    ProvisionOut,
+    ProvisioningOut,
     SubscriptionOut,
     TenantDetailOut,
     TenantSummaryOut,
     UsageCountsOut,
 )
 from app.tenancy import service as tenancy
-from app.tenancy.schemas import TenantProvisionIn
 
 log = get_logger(__name__)
 HEARTBEAT_KEY_BYTES = 32
@@ -179,6 +164,7 @@ def get_tenant(tenant_id: uuid.UUID, *, with_counts: bool = True) -> TenantDetai
                 m.support_tickets.c.status.not_in(("resolved", "closed")),
             )
         ).scalar_one()
+        run = repo.get_by(s, m.provisioning_runs, m.provisioning_runs.c.tenant_id == tenant_id)
         overrides = {
             r["key"]: bool(r["enabled"])
             for r in s.execute(
@@ -200,203 +186,24 @@ def get_tenant(tenant_id: uuid.UUID, *, with_counts: bool = True) -> TenantDetai
             "open_tickets": int(open_tickets),
             "invoices": invoices,
             "flag_overrides": overrides,
+            "provisioning": _provisioning_view(run),
         }
     )
 
 
-def provision(actor: Actor, data: ProvisionIn, *, wrapper: KeyWrapper) -> ProvisionOut:
-    today = today_ist()
-    with platform_session() as s:
-        existing = repo.get_by(s, m.deployments, m.deployments.c.tenant_code == data.code)
-    if existing is not None:
-        return _resume(actor, data, existing, wrapper=wrapper)
-
-    tenant_id = new_id()
-    heartbeat: tuple[str, bytes, str] | None = None
-    if data.tier == "dedicated":
-        heartbeat = new_heartbeat_key(tenant_id, wrapper)
-    with platform_session() as s, db_errors():
-        plan = billing.published_plan(s, data.plan_id)
-        if plan["tier"] != data.tier:
-            raise ValidationFailed(
-                [
-                    {
-                        "field": "plan_id",
-                        "code": "tier_mismatch",
-                        "message_key": "errors.tier_mismatch",
-                    }
-                ]
-            )
-        if data.tier == "shared":
-            tenancy.register_tenant(
-                s,
-                TenantProvisionIn(
-                    code=data.code,
-                    name=data.school_name,
-                    boards=list(data.boards),
-                    plan_tier=data.tier,
-                    deployment_mode=data.tier,
-                ),
-                tenant_id=tenant_id,
-            )
-        dep = repo.insert_row(
-            s,
-            m.deployments,
-            {
-                "id": new_id(),
-                "tenant_id": tenant_id,
-                "tenant_code": data.code,
-                "school_name": data.school_name,
-                "boards": list(data.boards),
-                "mode": data.tier,
-                "custom_domain": data.custom_domain,
-                "tenant_status": "provisioning",
-                "status": "healthy" if data.tier == "shared" else "provisioning",
-                "heartbeat_key_id": heartbeat[0] if heartbeat else None,
-                "heartbeat_key_ciphertext": heartbeat[1] if heartbeat else None,
-            },
-        )
-        account = billing.insert_billing_account(s, tenant_id, data.billing_account)
-        sub = billing.insert_subscription(
-            s,
-            tenant_id=tenant_id,
-            account_id=account["id"],
-            plan=plan,
-            start_as=data.start_as,
-            price_override=data.price_override_inr,
-            override_reason=data.override_reason,
-            today=today,
-        )
-        if sub["status"] == "active":  # billing in advance: first period's draft invoice
-            billing.create_draft(s, SYSTEM, sub, today)
-        audit_platform(
-            s,
-            actor,
-            "tenant.provisioned",
-            "tenant",
-            tenant_id,
-            {
-                "tier": data.tier,
-                "code": data.code,
-                "plan_id": str(plan["id"]),
-                "subscription_id": str(sub["id"]),
-                "deployment_id": str(dep["id"]),
-                "custom_domain_set": data.custom_domain is not None,
-            },
-            tenant_id=tenant_id,
-        )
-        if heartbeat:
-            audit_platform(
-                s,
-                actor,
-                "deployment.created",
-                "deployment",
-                dep["id"],
-                {"mode": "dedicated", "heartbeat_key_id": heartbeat[0]},
-                tenant_id=tenant_id,
-            )
-    invite = "not_applicable"
-    if data.tier == "shared":
-        invite = _finish_shared(actor, tenant_id, data, wrapper=wrapper)
-    log.info("platform.tenant.provisioned", tenant_id=str(tenant_id), outcome=data.tier)
-    return ProvisionOut(
-        tenant_id=tenant_id,
-        deployment_id=dep["id"],
-        subscription_id=sub["id"],
-        billing_account_id=account["id"],
-        tier=data.tier,
-        tenant_status="provisioning",
-        owner_invite=invite,
-        heartbeat_key_id=heartbeat[0] if heartbeat else None,
-        heartbeat_key=heartbeat[2] if heartbeat else None,
-    )
-
-
-def _finish_shared(
-    actor: Actor, tenant_id: uuid.UUID, data: ProvisionIn, *, wrapper: KeyWrapper
-) -> str:
-    key_version, _key_id = tenancy.initialise_tenant(tenant_id, wrapper=wrapper)
-    invite = "existing"
-    owner = data.owner
-    owner = must(owner)
-    try:
-        with platform_session() as s, db_errors():
-            row = repo.call_create_owner_invite(
-                s,
-                tenant_id=tenant_id,
-                subject=owner.idp_subject,
-                display_name=owner.display_name,
-                email=owner.email,
-                language=owner.language,
-            )
-            invite = "created" if row["owner_role_assigned"] else "pending_role"
-            audit_platform(
-                s,
-                actor,
-                "tenant.owner_invite_created",
-                "membership",
-                row["membership_id"],
-                {"owner_role_assigned": bool(row["owner_role_assigned"])},
-                tenant_id=tenant_id,
-            )
-            tenant_audit.enqueue(
-                s,
-                tenant_id,
-                actor,
-                "tenant.provisioned",
-                {"tier": "shared", "key_version": key_version},
-            )
-    except Conflict:
-        invite = "existing"  # resumed: the owner membership was created by an earlier attempt
-    tenant_audit.deliver_now(tenant_id)
-    return invite
-
-
-def _resume(actor: Actor, data: ProvisionIn, dep: Any, *, wrapper: KeyWrapper) -> ProvisionOut:
-    """Retry of a shared provisioning whose first transaction committed (same code and school)."""
-    same = (
-        dep["mode"] == data.tier == "shared"
-        and dep["school_name"] == data.school_name
-        and dep["tenant_status"] == "provisioning"
-    )
-    if not same:
-        raise Conflict("This school code is already used.", code="duplicate")
-    invite = _finish_shared(actor, dep["tenant_id"], data, wrapper=wrapper)
-    with platform_session() as s:
-        sub = repo.live_subscription(s, dep["tenant_id"])
-        account = repo.get_by(
-            s, m.billing_accounts, m.billing_accounts.c.tenant_id == dep["tenant_id"]
-        )
-    sub = must(sub)
-    account = must(account)
-    return ProvisionOut(
-        tenant_id=dep["tenant_id"],
-        deployment_id=dep["id"],
-        subscription_id=sub["id"],
-        billing_account_id=account["id"],
-        tier="shared",
-        tenant_status="provisioning",
-        owner_invite=invite,
-    )
-
-
-def provision_result(tenant_id: uuid.UUID) -> ProvisionOut:
-    """Re-read a provisioning result (idempotent replay; the heartbeat key is never repeated)."""
-    with platform_session() as s:
-        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id)
-        sub = repo.live_subscription(s, tenant_id)
-        account = repo.get_by(s, m.billing_accounts, m.billing_accounts.c.tenant_id == tenant_id)
-    if dep is None or sub is None or account is None:
-        raise NotFound("School not found")
-    return ProvisionOut(
-        tenant_id=tenant_id,
-        deployment_id=dep["id"],
-        subscription_id=sub["id"],
-        billing_account_id=account["id"],
-        tier=dep["mode"],
-        tenant_status=dep["tenant_status"],
-        owner_invite="existing" if dep["mode"] == "shared" else "not_applicable",
-        heartbeat_key_id=dep["heartbeat_key_id"],
+def _provisioning_view(run: Any) -> ProvisioningOut | None:
+    """Codes and counts only; the owner invite parameters are never shown."""
+    if run is None:
+        return None
+    leased = run["lease_expires_at"] is not None and run["lease_expires_at"] > now()
+    return ProvisioningOut(
+        state=run["state"],
+        failed_step=run["failed_step"],
+        last_error=run["last_error"],
+        attempts=run["attempts"],
+        in_progress=leased,
+        resumable=run["state"] != "completed" and not leased,
+        updated_at=run["updated_at"],
     )
 
 
@@ -417,6 +224,7 @@ def _set_status(
     action: str,
     reason: str | None,
     extra: dict[str, Any] | None = None,
+    require_provisioned: bool = False,
 ) -> TenantDetailOut:
     dep0 = _deployment(tenant_id)
     shared = dep0["mode"] == "shared"
@@ -428,6 +236,13 @@ def _set_status(
                 f"A school that is {dep['tenant_status']} cannot become {target}.",
                 code="invalid_state",
             )
+        if require_provisioned:
+            run = repo.get_by(s, m.provisioning_runs, m.provisioning_runs.c.tenant_id == tenant_id)
+            if run is not None and run["state"] != "completed":
+                raise Conflict(
+                    "Provisioning has not finished. Resume it before making the school live.",
+                    code="provisioning_incomplete",
+                )
         if shared:
             tenancy.set_tenant_status(s, tenant_id, target)  # type: ignore[arg-type]
         repo.update_row(
@@ -455,7 +270,8 @@ def _set_status(
 
 
 def activate(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
-    """Go-live: provisioning -> active (the database refuses without a data key)."""
+    """Go-live: provisioning -> active, only once provisioning completed (FR-PLT-002; the
+    database also refuses without a data key)."""
     return _set_status(
         actor,
         tenant_id,
@@ -463,6 +279,7 @@ def activate(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
         allowed_from=("provisioning",),
         action="tenant.activated",
         reason=None,
+        require_provisioned=True,
     )
 
 

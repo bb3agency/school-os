@@ -427,3 +427,28 @@ tenant_audit_outbox = Table(
     Column("attempts", Integer, nullable=False),
     Column("last_error", Text),
 )
+
+# 0020_provisioning_runs: resumable provisioning state, one row per school (FR-PLT-002).
+provisioning_runs = Table(
+    "provisioning_runs",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("tenant_code", Text, nullable=False),
+    Column("tier", Text, nullable=False),
+    Column("request_sha256", Text),
+    Column("state", Text, nullable=False),
+    Column("failed_step", Text),
+    Column("last_error", Text),
+    Column("attempts", Integer, nullable=False),
+    Column("lease_id", Uuid),
+    Column("lease_expires_at", DateTime(timezone=True)),
+    Column("owner_subject", Text),
+    Column("owner_display_name", Text),
+    Column("owner_email", CITEXT),
+    Column("owner_language", Text),
+    Column("created_by", Uuid),
+    Column("created_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True)),
+    Column("completed_at", DateTime(timezone=True)),
+)

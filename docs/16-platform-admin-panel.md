@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.4 · 2026-09-27 |
-| Changes | 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
+| Version | 0.5 · 2026-09-27 |
+| Changes | 0.5: provisioning is a persisted, resumable state machine (`platform.provisioning_runs`, migration `0020_provisioning_runs`): request fingerprint, lease, failed state, `provisioning:resume`, go-live refused until provisioning completed (§5.3, §5.4, §7, §8.1, §16, §18; FR-PLT-002). 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
 | Capability | C14 · Milestone M0 (roadmap Task 11) |
 | Requirements | FR-PLT-001..030 (03-TRD §3.12) · stories US-1301..US-1310, US-1204 (02-PRD §4) |
-| Decisions | ADR-0013 (privilege separation), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies) |
+| Decisions | ADR-0013 (privilege separation), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies), ADR-0023 (operator sign-in for break-glass, Proposed), ADR-0024 (resumable provisioning, Proposed) |
 | Related | 04 §16, 05 §3, 07 §6.5–6.6, 08 §14, 09 §4, 10 §15, 11 §11–12, 12 §4.8–4.13 |
 
 ---
@@ -88,7 +88,7 @@ Each screen lists the permission needed to see it; actions list their own permis
 
 ### 5.3 School detail
 *Permission:* `platform.tenants.read`. Tabs:
-- **Overview:** code, name, boards, state, tier, tenant status (with reason and who changed it), created date, owner invite status (sent/accepted; email masked).
+- **Overview:** code, name, boards, state, tier, tenant status (with reason and who changed it), created date, owner invite status (sent/accepted; email masked), provisioning state (`provisioning`: state, failed step and error code, attempts, `in_progress`, `resumable`; a **Resume provisioning** action when resumable).
 - **Plan & subscription** (`platform.subscriptions.read`): plan and version, status, period, trial end, price override and reason, pending plan change.
 - **Billing account** (`platform.subscriptions.read` or `platform.invoices.read`): legal name, GSTIN, billing email, address, state code.
 - **Invoices** (`platform.invoices.read`): list with number, period, total, paid, status.
@@ -108,16 +108,30 @@ Each screen lists the permission needed to see it; actions list their own permis
 5. **Billing account:** legal name, GSTIN (optional), billing email, address, state code.
 6. **Review and confirm** (step-up).
 
-Result for **shared** (`app/platform/tenants.py`), in four steps:
+Result for **shared** (`app/platform/provisioning.py`). The steps run in different sessions (control plane, then the school's own `tenant_session`) and cannot share one transaction, so every provisioning is a persisted state machine in `platform.provisioning_runs` (one row per school; §7):
 
-1. One `platform_session()` transaction: `core.provision_tenant(...)` (tenant row, status `provisioning`), deployment, billing account, subscription (and, when started as `active`, the first period's draft invoice), platform events `tenant.provisioned`. A failure leaves none of them.
-2. `tenancy.initialise_tenant` in the new school's own `tenant_session`: KMS (or the local-dev wrapper) generates and wraps the DEK and HMAC key into `core.tenant_keys`; post-provision hooks clone the system roles from `apps/api/app/authz/roles.yaml`.
-3. `core.create_owner_invite(...)` (platform session; public wrapper `platform.service.invite_school_owner(platform_db, tenant_id=, subject=, display_name=, email=, language=)`): an `invited` owner membership with `mfa_required`, school scope and the `owner` role; platform event `tenant.owner_invite_created`.
-4. In the same platform transaction as step 3, `tenant.provisioned` is queued for the school's own audit chain (`actor_type = 'platform'`; delivered exactly once, §16).
+```
+registered --(2: keys + roles)--> initialised --(3: owner invite + school-chain event)--> completed
+     |                                 |
+     +------------- a step fails ------+--> failed --(resume)--> continues from the failed step
+```
 
-Steps 2–4 are idempotent: retrying with the same `Idempotency-Key` replays the result, and a retry with the same code and school name resumes an interrupted provisioning. The owner accepts the invite on first sign-in (`POST /api/v1/me/accept-invitations`, ADR-0019) once the school is `active`; an operator makes it live with `POST /platform/tenants/{id}/activate` (refused by the database until a data key exists). Invite **email delivery is not built yet** (`owner-invite:resend` only records `tenant.owner_invite_sent`).
+1. **Register**, one `platform_session()` transaction: `core.provision_tenant(...)` (tenant row, status `provisioning`), deployment, billing account, subscription (and, when started as `active`, the first period's draft invoice), platform event `tenant.provisioned` and the run (`registered`, holding this request's lease, the request fingerprint and the owner invite parameters). A failure leaves none of them.
+2. **Initialise**: `tenancy.initialise_tenant` in the new school's own `tenant_session`: KMS (or the local-dev wrapper) generates and wraps the DEK and HMAC key into `core.tenant_keys`; post-provision hooks clone the system roles from `apps/api/app/authz/roles.yaml`. Keys and hooks share that transaction; an existing key is kept, and concurrent calls for one school are serialised (advisory lock), so a retry never creates a second key. The run becomes `initialised`.
+3. **Invite and finish**, one platform transaction: `core.create_owner_invite(...)` (public wrapper `platform.service.invite_school_owner(platform_db, tenant_id=, subject=, display_name=, email=, language=)`: an `invited` owner membership with `mfa_required`, school scope and the `owner` role; platform event `tenant.owner_invite_created`), `tenant.provisioned` queued for the school's own audit chain (`actor_type = 'platform'`; delivered exactly once, §16) and the run `completed` with the owner parameters cleared. All or nothing, so the school-chain event is queued once.
 
-Result for **dedicated**: the deployment row (`status = provisioning`), billing account, subscription and a new heartbeat key are created in the control plane; the tenant row itself is created **on the host** by the provisioning runbook (§13) with the tenant ID chosen here. The heartbeat key is returned once in the `201` response (`heartbeat_key_id`, `heartbeat_key`) and never again.
+**Idempotency, retries and failures** (FR-PLT-002):
+
+- **Same request again.** The run stores a SHA-256 fingerprint of the request. Submitting the same request again, with any `Idempotency-Key` and by any operator, resumes an unfinished provisioning or replays a finished one (`201`, same school; `owner_invite = existing`). The same code with a different request is `409 duplicate`. Retrying with the same `Idempotency-Key` still replays from the 24-hour key store (§8).
+- **Double submit.** Two concurrent submissions create one school: the second waits on the code's unique index, then finds the run and either replays it or gets `409 provisioning_in_progress`.
+- **Lease.** One runner at a time holds the run's lease (`provisioning.lease_seconds` in `apps/api/app/platform/billing.yaml`, 120 s); every state change is fenced on it, so a runner that lost its lease cannot change the run. While a lease is live other attempts get `409 provisioning_in_progress`. A crashed process leaves its lease to expire; the next attempt takes over.
+- **Failed.** A step that raises marks the run `failed` with `failed_step` (`initialise` or `owner_invite`) and an error code (never a message), releases the lease and records `tenant.provisioning_failed`; the request gets `503 provisioning_failed` (or the step's own domain error). The school detail shows it. An operator resumes it with `POST /platform/tenants/{id}/provisioning:resume` (no body: the owner invite parameters are kept in the run until the invite exists) or by submitting the same request again; each resume records `tenant.provisioning_resumed`.
+- **Go-live guard.** `POST /platform/tenants/{id}/activate` is refused with `409 provisioning_incomplete` until the run is `completed` (keys alone would satisfy the database).
+- **Before `0020`.** Schools provisioned earlier got a backfilled run: `completed` when the platform log has `tenant.owner_invite_created` (or the school is dedicated), otherwise `registered` without fingerprint or owner parameters. Such a run resumes only from the same request again (same code, tier and school name; the owner comes from the request); `provisioning:resume` answers `409 resume_needs_request`.
+
+The owner accepts the invite on first sign-in (`POST /api/v1/me/accept-invitations`, ADR-0019) once the school is `active`; an operator makes it live with `POST /platform/tenants/{id}/activate` (refused until provisioning completed, and by the database until a data key exists). Invite **email delivery is not built yet** (`owner-invite:resend` only records `tenant.owner_invite_sent`).
+
+Result for **dedicated**: the deployment row (`status = provisioning`), billing account, subscription, a new heartbeat key and a `completed` run are created in one control-plane transaction; the tenant row itself is created **on the host** by the provisioning runbook (§13) with the tenant ID chosen here. The heartbeat key is returned once in the `201` response (`heartbeat_key_id`, `heartbeat_key`) and never again: submitting the same request again replays the result without it (rotate the key if the first response was lost).
 
 ### 5.5 Suspend, reactivate, offboard
 - **Suspend (non-billing)** — `platform.tenants.suspend` (ᴿ): reason required (security incident, abuse, school's written request). Calls `core.set_tenant_status(tenant, 'suspended')` for shared; for dedicated, the engineer runs the fleet command (§13.3). Billing suspensions go through the subscription (§5.7).
@@ -177,7 +191,7 @@ Queue with SLA timers, filters by status, priority, school, assignee. Ticket vie
 
 ### 5.15 Break-glass requests
 *Permission:* `platform.breakglass.request` to create (M1); any platform role to view the list.
-M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours.
+M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. An approved grant cannot be used yet: the membership is opened for the operator's operator-pool subject, and the school app accepts only staff-pool tokens (fails closed). How operators sign in to the school app for a grant is proposed in [ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md).
 
 ### 5.16 Operators and roles
 *Permission:* `platform.operators.manage` (ᴿ).
@@ -718,6 +732,7 @@ Notes on columns that are easy to miss:
 - `subscriptions.cancel_at_period_end` (+ `cancel_reason`): `cancel` on a paid subscription ends it at period end; a trial is cancelled at once.
 - `usage_threshold_events`: one row per (school, metric, 80/100, billing period) records the first crossing (FR-PLT-021).
 - `breakglass_requests`: the control-plane side of break-glass (07 §6.4); two different emergency confirmers (`breakglass_two_person`). Tenant-side grants live in `ops.break_glass_grants` (05 §7.2).
+- `provisioning_runs` (migration `0020_provisioning_runs`): one row per school (`tenant_id` → `deployments.tenant_id`, `tenant_code` unique), `tier`, `request_sha256` (NULL for runs backfilled from before `0020`), `state` (`registered`, `initialised`, `completed`, `failed`), `failed_step` + `last_error` (a code; set exactly when `failed`), `attempts`, `lease_id` + `lease_expires_at`, `owner_subject`/`owner_display_name`/`owner_email`/`owner_language` (the owner invite parameters, held only until the invite exists: a CHECK requires them empty once `completed`, and dedicated runs never hold them), `created_by`, `completed_at`. `sos_platform` may `SELECT`, `INSERT`, `UPDATE` (no `DELETE`); `sos_app` and `sos_readonly` nothing. API responses show only state, step, error code and attempts (§5.4).
 - `job_runs.created_by`: the operator who started a job (`GET /platform/jobs/{id}` shows a job to its creator or to holders of `platform.audit.read`).
 - `invoices.invoice_number` is at most 16 characters (CGST Rule 46), e.g. `SOS/26-27/000123`.
 
@@ -734,9 +749,10 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | GET | `/platform/me` | any operator | 200 | Operator, roles, effective permissions, step-up freshness |
 | GET | `/platform/dashboard` | any operator | 200 | Tiles filtered by the caller's read permissions (§5.1) |
 | GET | `/platform/tenants` | `platform.tenants.read` | 200 | Filters: `status`, `tier`, `plan`, `q`, `trial_ending`, `past_due`; cursor |
-| POST | `/platform/tenants` | `platform.tenants.provision` ᴿ | 201 | Provision shared or dedicated (§5.4); `Idempotency-Key`; the dedicated heartbeat key is returned only in the first response |
-| GET | `/platform/tenants/{tenant_id}` | `platform.tenants.read` | 200 | Registry, statuses, subscription summary, counts |
-| POST | `/platform/tenants/{tenant_id}/activate` | `platform.tenants.provision` ᴿ | 200 | Go-live `provisioning → active`; the database refuses without a data key (`core.set_tenant_status`) |
+| POST | `/platform/tenants` | `platform.tenants.provision` ᴿ | 201 | Provision shared or dedicated (§5.4); `Idempotency-Key`; the same request again resumes or replays (`409 duplicate` for the same code with a different request, `409 provisioning_in_progress`, `503 provisioning_failed`); the dedicated heartbeat key is returned only in the first response |
+| GET | `/platform/tenants/{tenant_id}` | `platform.tenants.read` | 200 | Registry, statuses, subscription summary, counts, provisioning state (codes only) |
+| POST | `/platform/tenants/{tenant_id}/provisioning:resume` | `platform.tenants.provision` ᴿ | 200 | Resume an unfinished or failed provisioning (§5.4) and return its result; a finished one is returned as it is; `409 provisioning_in_progress` while another request holds it; `409 resume_needs_request` for a run from before `0020` |
+| POST | `/platform/tenants/{tenant_id}/activate` | `platform.tenants.provision` ᴿ | 200 | Go-live `provisioning → active`; `409 provisioning_incomplete` until provisioning completed; the database refuses without a data key (`core.set_tenant_status`) |
 | POST | `/platform/tenants/{tenant_id}/owner-invite:resend` | `platform.tenants.provision` ᴿ | 202 | Only while `provisioning`; records `tenant.owner_invite_sent` (email delivery not built yet) |
 | POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | 200 | Reason required; non-billing; a billing suspension is lifted from the subscription (`409 billing_suspension`) |
 | POST | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.offboard` ᴿ | 202 | Two-person step 1: request (`409 already_requested` on repeat) |
@@ -1029,7 +1045,7 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Area | Actions |
 |---|---|
 | Operators | `operator.invited`, `operator.activated` (first MFA sign-in), `operator.bootstrapped` (system, bootstrap CLI), `operator.roles_changed`, `operator.deactivated` (`operator.login` and `operator.step_up` are not recorded yet) |
-| Schools | `tenant.provisioned` (+ T), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.deleted` (M1, with the deletion job) |
+| Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.deleted` (M1, with the deletion job) |
 | Plans | `plan.created`, `plan.updated`, `plan.published`, `plan.retired` |
 | Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
 | Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system) |
@@ -1088,7 +1104,7 @@ In addition to the general suites (12 §4):
 | GST | Intra-state → CGST = SGST; inter-state → IGST; totals equal sum; rounding half-up to paise (table-driven) | FR-PLT-017 |
 | Immutability | Issued invoice fields other than status/payments/void cannot change; published plan prices cannot change | FR-PLT-010, FR-PLT-016 |
 | Lifecycle | Past-due after due date; never auto-suspended; suspension before grace end → 409; inside exam window without owner approval → 409 | FR-PLT-014 |
-| Provisioning | The first provisioning transaction is atomic (failure leaves no tenant, subscription or deployment); later steps resume idempotently on retry; school's audit log shows `tenant.provisioned` | FR-PLT-002 |
+| Provisioning | The first provisioning transaction is atomic (failure leaves no tenant, subscription or deployment); a failure or crash at each later step is recorded (or leaves a lease that expires), and a retry or resume converges on exactly one tenant, key, owner membership and school-chain `tenant.provisioned`; concurrent double submission yields one school; a runner that lost its lease cannot change the run; go-live is refused until provisioning completed (`tests/platform/test_provisioning_resume.py`, `test_provisioning_migration.py`) | FR-PLT-002 |
 | Platform audit chain | Every mutating platform route writes exactly one event in the same transaction; tamper and gap detection | FR-PLT-029 |
 | Support redaction | Aadhaar-like and phone numbers in ticket messages are masked before storage | FR-PLT-027 |
 | School billing page | `core.current_subscription()` returns only the caller's tenant; other roles get 403 | FR-PLT-030 |
