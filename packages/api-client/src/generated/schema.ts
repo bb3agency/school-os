@@ -2546,9 +2546,11 @@ export interface paths {
         };
         /**
          * Search Students
-         * @description Find students by partial name in English or Telugu, admission number, class/section
-         *     (``9b``, ``IX-B``) or parent name (permission ``student.read_basic``; class and subject
-         *     teachers see only students in their sections/classes this year).
+         * @description List students by class, section and status (permission ``student.read_basic``; class
+         *     and subject teachers see only students in their sections/classes this year). To search by
+         *     name, parent name or admission number use ``POST /students/search``: the ``query`` and
+         *     ``admission_no`` parameters still work but are deprecated (answered with a ``Deprecation``
+         *     header) because URLs are logged by proxies and load balancers.
          */
         get: operations["search_students_api_v1_students_get"];
         put?: never;
@@ -2720,6 +2722,32 @@ export interface paths {
          *     ``student.update_nonidentity``). Identity values are verified by change requests.
          */
         post: operations["verify_value_api_v1_students__student_id__values__value_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Students By Body
+         * @description Find students by partial name in English or Telugu, admission number, class/section
+         *     (``9b``, ``IX-B``) or parent name, with the filters in the JSON body so personal data never
+         *     appears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see
+         *     only students in their sections/classes this year). Same results, page size and cursor as
+         *     ``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:
+         *     nothing is written, so no ``Idempotency-Key``. A full Aadhaar number anywhere in the body is
+         *     refused (422 ``aadhaar_full_number_rejected``).
+         */
+        post: operations["search_students_by_body_api_v1_students_search_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6319,6 +6347,38 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /**
+         * StudentSearchIn
+         * @description ``POST /students/search`` body (SEC-008): names and admission numbers are personal data
+         *     and never travel in the URL, where proxies and load balancers log them. Same filters, page
+         *     size and cursor as ``GET /students``.
+         */
+        StudentSearchIn: {
+            /** Admission No */
+            admission_no?: string | null;
+            /** Class Id */
+            class_id?: string | null;
+            /**
+             * Cursor
+             * @description Opaque cursor from next_cursor.
+             */
+            cursor?: string | null;
+            /**
+             * Limit
+             * @description Page size (max 200).
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Query
+             * @description Partial name (English or Telugu), parent name, admission number or class/section token such as 9b or IX-B.
+             */
+            query?: string | null;
+            /** Section Id */
+            section_id?: string | null;
+            /** Status */
+            status?: ("provisional" | "active" | "left" | "graduated") | null;
         };
         /** StudentSummary */
         StudentSummary: {
@@ -11964,12 +12024,20 @@ export interface operations {
     search_students_api_v1_students_get: {
         parameters: {
             query?: {
+                /**
+                 * @deprecated
+                 * @description Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).
+                 */
                 admission_no?: string | null;
                 class_id?: string | null;
                 /** @description Opaque cursor from next_cursor. */
                 cursor?: string | null;
                 /** @description Page size (max 200). */
                 limit?: number;
+                /**
+                 * @deprecated
+                 * @description Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).
+                 */
                 query?: string | null;
                 section_id?: string | null;
                 status?: ("provisional" | "active" | "left" | "graduated") | null;
@@ -12362,6 +12430,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_students_by_body_api_v1_students_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_StudentSummary_"];
                 };
             };
             /** @description Validation Error */
