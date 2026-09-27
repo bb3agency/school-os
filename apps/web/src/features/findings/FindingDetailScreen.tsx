@@ -1,0 +1,412 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
+import { z } from "zod";
+import { ActionDialog } from "@/components/ui/ActionDialog";
+import { Alert } from "@/components/ui/Alert";
+import { ButtonLink } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { TextAreaField } from "@/components/ui/Input";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SelectField } from "@/components/ui/Select";
+import { Table, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
+import { Value } from "@/components/ui/Value";
+import { CR_APPROVE, CR_REQUEST, ifMatch } from "@/features/change-requests/types";
+import { Link } from "@/i18n/navigation";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { useStaffCan } from "@/lib/bff/staff-me";
+import { formatDateTime } from "@/lib/format";
+import { optionalText, text, UUID_PATTERN } from "@/lib/validation";
+import {
+  attributeLabel,
+  DQ_KEYS,
+  profileLabel,
+  ruleText,
+  useAttributes,
+  useProfiles,
+  useRules,
+} from "./data";
+import { FindingStatusBadge, SeverityBadge, SourceChip } from "./parts";
+import { isUnresolved, SCHOOL_RECORD_ROUTE, type Bilingual, type Finding } from "./types";
+
+const resolveSchema = z
+  .object({
+    note: optionalText(1000),
+    // Absent when the select is disabled (no pending requests, or no access to them).
+    change_request_id: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value ?? "")
+      .refine((value) => value === "" || UUID_PATTERN.test(value), { error: "chooseOption" })
+      .transform((value) => (value === "" ? null : value)),
+  })
+  .refine((data) => data.note !== null || data.change_request_id !== null, {
+    error: "required",
+    path: ["note"],
+  });
+
+/** API: 3–1000 characters (docs/09 data quality). */
+const waiveSchema = z.object({ reason: text(1000, 3) });
+
+/** English and Telugu side by side: the office often explains a finding to parents. */
+function BothLanguages({ text: message }: { text: Bilingual }) {
+  const locale = useLocale();
+  const [primary, secondary] =
+    locale === "te"
+      ? ([
+          ["te", message.te],
+          ["en", message.en],
+        ] as const)
+      : ([
+          ["en", message.en],
+          ["te", message.te],
+        ] as const);
+  return (
+    <div className="space-y-1">
+      <p lang={primary[0]}>{primary[1]}</p>
+      {secondary[1] && secondary[1] !== primary[1] ? (
+        <p lang={secondary[0]} className="text-sm text-ink-muted">
+          {secondary[1]}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function correctionHref(finding: Finding): string {
+  const params = new URLSearchParams({ student_id: finding.student.id, finding_id: finding.id });
+  if (finding.attribute_key) params.set("attribute_key", finding.attribute_key);
+  return `/change-requests/new?${params.toString()}`;
+}
+
+/**
+ * One finding (US-502, FR-DQ-020): explanation in English and Telugu, the values per source
+ * (masked where sensitive), suggested corrections, history, and resolve (note or change
+ * request) or waive (reason; step-up MFA, the API answers 428 and the app re-authenticates).
+ */
+export function FindingDetailScreen({ findingId }: { findingId: string }) {
+  const t = useTranslations("findings");
+  const td = useTranslations("findings.detail");
+  const tc = useTranslations("common");
+  const te = useTranslations("errors");
+  const locale = useLocale();
+  const api = useBffClient("staff");
+  const can = useStaffCan();
+  const rules = useRules();
+  const attributes = useAttributes();
+  const profiles = useProfiles();
+  const finding = useApiQuery(DQ_KEYS.finding(findingId), () =>
+    unwrap(
+      api.GET("/api/v1/dq/findings/{finding_id}", {
+        params: { path: { finding_id: findingId } },
+      }),
+    ),
+  );
+  const studentId = finding.status === "ready" ? finding.data.student.id : null;
+  const canSeeRequests = can([CR_REQUEST, CR_APPROVE]);
+  const requests = useQuery({
+    queryKey: ["staff", "change-requests", "for-student", studentId],
+    queryFn: async () =>
+      (
+        await unwrap(
+          api.GET("/api/v1/change-requests", {
+            params: { query: { student_id: studentId as string, limit: 50 } },
+          }),
+        )
+      ).data,
+    enabled: studentId !== null && canSeeRequests,
+    retry: false,
+  });
+
+  if (finding.status === "loading") return <LoadingState label={tc("loading")} />;
+  if (finding.status !== "ready") {
+    return (
+      <Alert tone="danger" title={tc("loadErrorTitle")}>
+        {finding.status === "error" && finding.reason
+          ? te(`load.${finding.reason}`)
+          : tc("loadErrorBody")}
+      </Alert>
+    );
+  }
+  const data = finding.data;
+  const field = attributeLabel(attributes.data, data.attribute_key, locale);
+  const open = isUnresolved(data.status);
+  const invalidate = [DQ_KEYS.findings, DQ_KEYS.summary] as const;
+  const suggestsRequest = data.routes.some((route) => route.code === SCHOOL_RECORD_ROUTE);
+  const pending = (requests.data ?? []).filter(
+    (item) => item.status === "pending" || item.status === "approved",
+  );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={td("title", { rule: data.rule_id })}
+        description={ruleText(rules.data, data.rule_id, locale) ?? undefined}
+        badge={
+          <span className="flex flex-wrap gap-2">
+            <SeverityBadge severity={data.severity} />
+            <FindingStatusBadge status={data.status} />
+          </span>
+        }
+        actions={
+          open ? (
+            <>
+              {suggestsRequest && can(CR_REQUEST) ? (
+                <ButtonLink href={correctionHref(data)} variant="secondary">
+                  {td("requestCorrection")}
+                </ButtonLink>
+              ) : null}
+              {can("dq.findings.resolve") ? (
+                <ActionDialog
+                  triggerLabel={td("resolve")}
+                  triggerVariant="primary"
+                  title={td("resolveTitle")}
+                  description={td("resolveBody")}
+                  confirmLabel={td("resolve")}
+                  schema={resolveSchema}
+                  invalidate={invalidate}
+                  errorNamespace="findings"
+                  submit={(input) =>
+                    unwrap(
+                      api.POST("/api/v1/dq/findings/{finding_id}/resolve", {
+                        params: { path: { finding_id: data.id } },
+                        headers: { "If-Match": ifMatch(data.version) },
+                        body: input,
+                      }),
+                    )
+                  }
+                >
+                  {(errors) => (
+                    <>
+                      <TextAreaField
+                        name="note"
+                        label={td("note")}
+                        hint={td("noteHint")}
+                        error={errors.note}
+                        maxLength={1000}
+                        rows={3}
+                      />
+                      <SelectField
+                        name="change_request_id"
+                        label={td("linkRequest")}
+                        hint={canSeeRequests ? td("linkRequestHint") : td("linkRequestNoAccess")}
+                        error={errors.change_request_id}
+                        defaultValue=""
+                        disabled={!canSeeRequests || pending.length === 0}
+                        options={[
+                          { value: "", label: td("noRequest") },
+                          ...pending.map((item) => ({
+                            value: item.id,
+                            label: `${locale === "te" ? item.attribute_label_te : item.attribute_label_en} · ${formatDateTime(item.requested_at) ?? ""}`,
+                          })),
+                        ]}
+                      />
+                    </>
+                  )}
+                </ActionDialog>
+              ) : null}
+              {can("dq.findings.waive") ? (
+                <ActionDialog
+                  triggerLabel={td("waive")}
+                  triggerVariant="secondary"
+                  title={td("waiveTitle")}
+                  description={td("waiveBody")}
+                  confirmLabel={td("waive")}
+                  confirmVariant="danger"
+                  stepUp
+                  schema={waiveSchema}
+                  invalidate={invalidate}
+                  errorNamespace="findings"
+                  submit={(input) =>
+                    unwrap(
+                      api.POST("/api/v1/dq/findings/{finding_id}/waive", {
+                        params: { path: { finding_id: data.id } },
+                        headers: { "If-Match": ifMatch(data.version) },
+                        body: input,
+                      }),
+                    )
+                  }
+                >
+                  {(errors) => (
+                    <TextAreaField
+                      name="reason"
+                      label={td("waiveReason")}
+                      hint={td("waiveReasonHint")}
+                      error={errors.reason}
+                      maxLength={1000}
+                      rows={3}
+                    />
+                  )}
+                </ActionDialog>
+              ) : null}
+            </>
+          ) : null
+        }
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
+        <Card title={td("whatTitle")}>
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
+            <dt className="font-semibold">{t("colStudent")}</dt>
+            <dd>
+              <Value>{data.student.display_name}</Value>
+              {data.student.admission_no ? (
+                <span className="ml-2 text-sm text-ink-muted">
+                  {t("admissionNo", { number: data.student.admission_no })}
+                </span>
+              ) : null}
+            </dd>
+            <dt className="font-semibold">{t("colField")}</dt>
+            <dd>
+              <Value>{field}</Value>
+            </dd>
+            <dt className="font-semibold">{td("explanation")}</dt>
+            <dd>
+              <BothLanguages text={data.explanation} />
+            </dd>
+            {data.match_explanation ? (
+              <>
+                <dt className="font-semibold">{td("matchExplanation")}</dt>
+                <dd>
+                  <BothLanguages text={data.match_explanation} />
+                </dd>
+              </>
+            ) : null}
+            {data.profile_key ? (
+              <>
+                <dt className="font-semibold">{t("filterProfile")}</dt>
+                <dd>{profileLabel(profiles.data, data.profile_key, locale)}</dd>
+              </>
+            ) : null}
+          </dl>
+        </Card>
+
+        <Card title={td("routesTitle")} description={td("routesBody")}>
+          {data.routes.length === 0 ? (
+            <p className="text-sm text-ink-muted">{td("noRoutes")}</p>
+          ) : (
+            <ol className="list-decimal space-y-3 pl-5">
+              {data.routes.map((route) => (
+                <li key={route.code}>
+                  <BothLanguages text={route} />
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      </div>
+
+      <Card title={td("valuesTitle")} description={td("valuesBody")}>
+        {data.values.length === 0 ? (
+          <p className="text-sm text-ink-muted">{t("noValues")}</p>
+        ) : (
+          <div
+            role="region"
+            aria-label={tc("scrollableTable", { caption: td("valuesTitle") })}
+            tabIndex={0}
+            className="overflow-x-auto rounded-md border border-border"
+          >
+            <Table>
+              <caption className="sr-only">{td("valuesTitle")}</caption>
+              <THead>
+                <Tr>
+                  <Th>{td("colSource")}</Th>
+                  <Th>{t("colField")}</Th>
+                  <Th>{td("colValue")}</Th>
+                </Tr>
+              </THead>
+              <TBody>
+                {data.values.map((item) => (
+                  <Tr key={item.value_id}>
+                    <Td>
+                      <SourceChip source={item.source} />
+                    </Td>
+                    <Td>{attributeLabel(attributes.data, item.attribute_key, locale)}</Td>
+                    <Td>
+                      {item.value ?? item.masked ?? t("noValue")}
+                      {item.sensitive || item.value === null ? (
+                        <span className="ml-2 text-xs text-ink-muted">({t("maskedNote")})</span>
+                      ) : null}
+                    </Td>
+                  </Tr>
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        )}
+      </Card>
+
+      <Card title={td("historyTitle")}>
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+          <dt className="font-semibold">{td("firstSeen")}</dt>
+          <dd>
+            <Value>{formatDateTime(data.first_seen_at)}</Value>
+          </dd>
+          <dt className="font-semibold">{td("lastSeen")}</dt>
+          <dd>
+            <Value>{formatDateTime(data.last_seen_at)}</Value>
+          </dd>
+          {data.reopened_count > 0 ? (
+            <>
+              <dt className="font-semibold">{td("reopened")}</dt>
+              <dd>{td("reopenedCount", { count: data.reopened_count })}</dd>
+            </>
+          ) : null}
+          {data.status === "resolved" ? (
+            <>
+              <dt className="font-semibold">{td("resolvedAt")}</dt>
+              <dd>
+                <Value>{formatDateTime(data.resolved_at)}</Value>
+              </dd>
+              {data.resolution_note ? (
+                <>
+                  <dt className="font-semibold">{td("note")}</dt>
+                  <dd className="whitespace-pre-line">{data.resolution_note}</dd>
+                </>
+              ) : null}
+              {data.change_request_id ? (
+                <>
+                  <dt className="font-semibold">{td("linkedRequest")}</dt>
+                  <dd>
+                    <Link
+                      href={`/change-requests/${data.change_request_id}`}
+                      className="text-primary underline"
+                    >
+                      {td("openRequest")}
+                    </Link>
+                  </dd>
+                </>
+              ) : null}
+            </>
+          ) : null}
+          {data.status === "waived" ? (
+            <>
+              <dt className="font-semibold">{td("waivedAt")}</dt>
+              <dd>
+                <Value>{formatDateTime(data.waived_at)}</Value>
+              </dd>
+              <dt className="font-semibold">{td("waiveReason")}</dt>
+              <dd className="whitespace-pre-line">
+                <Value>{data.waived_reason}</Value>
+              </dd>
+            </>
+          ) : null}
+        </dl>
+        {!open ? <p className="mt-4 text-sm text-ink-muted">{td("reopenNote")}</p> : null}
+      </Card>
+
+      <p>
+        <Link href={`/findings?student_id=${data.student.id}`} className="text-primary underline">
+          {td("allForStudent")}
+        </Link>
+        <span aria-hidden="true"> · </span>
+        <Link href="/findings" className="text-primary underline">
+          {td("backToList")}
+        </Link>
+      </p>
+    </div>
+  );
+}

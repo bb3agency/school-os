@@ -3,8 +3,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { SessionControls } from "@/components/session/SessionControls";
+import { StepUpHost } from "@/components/session/StepUpHost";
 import { SchoolShell } from "@/components/shell/SchoolShell";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { AnnouncementBanner } from "@/features/school/AnnouncementBanner";
+import { SuspendedBanner, type SchoolStatus } from "@/features/school-status/SuspendedBanner";
 import { apiGetAsSession, PATH_HEADER, requireStaff } from "@/server/session/rsc";
 
 /** Codes that mean "this session has no usable school right now: pick one". */
@@ -32,15 +35,30 @@ export default async function SchoolLayout({
   const me = await apiGetAsSession<Me>("staff", "/api/v1/me");
   if (me && me.code && CHOOSE_AGAIN.has(me.code)) redirect(picker);
   const profile = me?.data ?? null;
+  // BR-08 / 16 §5.5: while the school is paused, /me works only for the owner and principal.
+  const suspended = me?.code === "tenant_suspended";
+  const schoolStatus: SchoolStatus = profile?.tenant_status ?? (suspended ? "suspended" : "active");
 
   return (
     <SchoolShell
       headerActions={
-        <SessionControls kind="staff" displayName={profile?.display_name ?? session.displayName} />
+        <>
+          {suspended ? null : <NotificationBell />}
+          <SessionControls
+            kind="staff"
+            displayName={profile?.display_name ?? session.displayName}
+          />
+        </>
       }
-      permissions={profile?.permissions ?? null}
+      permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
-      banner={<AnnouncementBanner />}
+      banner={
+        <>
+          <SuspendedBanner initialStatus={schoolStatus} />
+          <AnnouncementBanner />
+          <StepUpHost />
+        </>
+      }
     >
       {children}
     </SchoolShell>

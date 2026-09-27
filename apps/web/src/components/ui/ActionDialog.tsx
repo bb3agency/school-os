@@ -7,7 +7,7 @@ import type { z } from "zod";
 import { cn } from "@/lib/cn";
 import { useApiForm, type FieldErrors } from "@/lib/forms";
 import { Alert } from "./Alert";
-import { ApiErrorAlert } from "./ApiErrorAlert";
+import { ApiErrorAlert, type ErrorNamespace } from "./ApiErrorAlert";
 import { Button, type ButtonSize, type ButtonVariant } from "./Button";
 
 /** Renders a one-time result (e.g. a secret) with a way to close the dialog. */
@@ -50,6 +50,8 @@ export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
   renderResult?: (result: TResult, close: () => void) => ReactNode;
   onSuccess?: (result: TResult) => void;
   className?: string;
+  /** Feature messages for problem codes (`<namespace>.errors.<code>`), see ApiErrorAlert. */
+  errorNamespace?: ErrorNamespace;
 }
 
 /**
@@ -79,6 +81,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   renderResult,
   onSuccess,
   className,
+  errorNamespace,
 }: ActionDialogProps<TSchema, TResult>) {
   const t = useTranslations("common");
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -182,7 +185,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                   {note ? <Alert tone="info">{note}</Alert> : null}
                   {children?.(form.errors)}
                   {stepUp ? <p className="text-sm text-ink-muted">{t("stepUpNote")}</p> : null}
-                  <ApiErrorAlert error={form.error} />
+                  <ApiErrorAlert error={form.error} namespace={errorNamespace} />
                 </div>
                 <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
                   <Button variant="secondary" onClick={close}>

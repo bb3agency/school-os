@@ -61,6 +61,32 @@ describe("SEC-010 content security policy (docs/07 §11)", () => {
     expect(prod({ filesOrigin: "https://x.example; script-src *" })).not.toContain("script-src *");
   });
 
+  it("lets the browser post presigned uploads to the files origin only when configured (SEC-016)", () => {
+    const csp = directives(prod({ filesOrigin: "https://files.schoolos.example/bucket?x=1" }));
+    // Origin only: no path, no query, no wildcard.
+    expect(csp.get("connect-src")).toEqual(["'self'", "https://files.schoolos.example"]);
+    expect(directives(prod()).get("connect-src")).toEqual(["'self'"]);
+    expect(directives(prod({ filesOrigin: "http://files.example" })).get("connect-src")).toEqual([
+      "'self'",
+    ]);
+    expect(directives(prod({ filesOrigin: "*" })).get("connect-src")).toEqual(["'self'"]);
+    expect(prod({ filesOrigin: "https://x.example; connect-src *" })).not.toContain(
+      "connect-src *",
+    );
+    // Nothing else changes: scripts, frames and forms stay as documented.
+    const withFiles = directives(prod({ filesOrigin: "https://files.schoolos.example" }));
+    const without = directives(prod());
+    for (const name of [
+      "default-src",
+      "script-src",
+      "style-src",
+      "frame-ancestors",
+      "form-action",
+    ]) {
+      expect(withFiles.get(name), name).toEqual(without.get(name));
+    }
+  });
+
   it("relaxes only what next dev needs, and never adds unsafe-inline to scripts", () => {
     const csp = directives(prod({ isDev: true }));
     expect(csp.get("script-src")).toContain("'unsafe-eval'");

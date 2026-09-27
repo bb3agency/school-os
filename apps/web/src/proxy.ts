@@ -16,6 +16,17 @@ const PATH_HEADER = "x-sos-path";
 /** Paths that are not localised: health check and the BFF (docs/09 §1). */
 const NON_LOCALISED_PREFIXES = ["/bff/", "/healthz"] as const;
 
+/**
+ * BFF paths that serve an API page with its own strict Content-Security-Policy (FR-CR-005:
+ * the correction memo allows exactly one hashed style block). The page-wide policy would
+ * block that style, and Next.js keeps the header set here over the route's, so these paths
+ * get every other security header here and their CSP from the BFF handler, which keeps the
+ * API's policy only when it denies everything by default (server/bff/proxy.ts).
+ */
+const OWN_CSP_PATHS: readonly RegExp[] = [
+  /^\/bff\/api\/v1\/change-requests\/[0-9a-f-]{36}\/memo$/i,
+];
+
 function isNonLocalised(pathname: string): boolean {
   return NON_LOCALISED_PREFIXES.some(
     (prefix) => pathname === prefix.replace(/\/$/, "") || pathname.startsWith(prefix),
@@ -49,6 +60,9 @@ export function proxy(request: NextRequest): NextResponse {
     : handleI18nRouting(request);
 
   applySecurityHeaders(response.headers, { csp, hsts: https });
+  if (OWN_CSP_PATHS.some((pattern) => pattern.test(request.nextUrl.pathname))) {
+    response.headers.delete("Content-Security-Policy");
+  }
   return response;
 }
 
