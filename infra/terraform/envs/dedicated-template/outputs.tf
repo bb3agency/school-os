@@ -31,6 +31,11 @@ output "files_bucket" {
   value       = module.host.files_bucket
 }
 
+output "files_browser_origin" {
+  description = "Origin of presigned upload/preview URLs (FILES_ORIGIN, derived the same way by compose.yaml)."
+  value       = module.host.files_browser_origin
+}
+
 output "backup_bucket" {
   description = "Backup bucket (ap-south-2)."
   value       = module.backup_bucket.id

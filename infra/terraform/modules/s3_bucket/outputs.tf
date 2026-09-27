@@ -13,6 +13,34 @@ output "bucket_regional_domain_name" {
   value       = aws_s3_bucket.this.bucket_regional_domain_name
 }
 
+# The origin of presigned URLs for this bucket: the API pins boto3 to virtual-hosted, regional
+# addressing (apps/api/app/documents/storage.py, asserted by tests/documents/test_storage_origin.py).
+# Known at plan time (name + region), so it can feed FILES_ORIGIN (web CSP img-src/connect-src).
+output "browser_origin" {
+  description = "https://<bucket>.s3.<region>.amazonaws.com: origin of presigned POST/GET URLs (FILES_ORIGIN)."
+  value       = "https://${var.name}.s3.${data.aws_region.current.region}.amazonaws.com"
+
+  precondition {
+    condition     = !strcontains(var.name, ".")
+    error_message = "Virtual-hosted https presigned URLs need a bucket name without dots (the TLS wildcard covers one label)."
+  }
+}
+
+output "cors_rules" {
+  description = "Rendered CORS rules (empty list when the bucket has no CORS configuration)."
+  value = flatten([
+    for c in aws_s3_bucket_cors_configuration.this : [
+      for r in c.cors_rule : {
+        allowed_origins = toset(r.allowed_origins)
+        allowed_methods = toset(r.allowed_methods)
+        allowed_headers = r.allowed_headers == null ? toset([]) : toset(r.allowed_headers)
+        expose_headers  = r.expose_headers == null ? toset([]) : toset(r.expose_headers)
+        max_age_seconds = r.max_age_seconds
+      }
+    ]
+  ])
+}
+
 # Posture outputs (consumed by terraform test assertions and by compositions for summaries).
 output "public_access_block" {
   description = "Block Public Access settings."

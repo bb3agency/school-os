@@ -13,6 +13,16 @@ output "files_bucket" {
   value       = module.files.id
 }
 
+output "files_browser_origin" {
+  description = "Origin of presigned upload/preview URLs. deploy/dedicated/compose.yaml derives the web container's FILES_ORIGIN from SOS_S3_BUCKET_FILES and AWS_REGION to the same value."
+  value       = module.files.browser_origin
+}
+
+output "files_cors_rules" {
+  description = "Rendered CORS rules of the files bucket (presigned POST from the school's app origins)."
+  value       = module.files.cors_rules
+}
+
 output "audit_bucket" {
   description = "Per-school audit archive bucket (Object Lock COMPLIANCE)."
   value       = module.audit_archive.id

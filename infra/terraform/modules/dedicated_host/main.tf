@@ -37,6 +37,8 @@ locals {
     "schoolos:tier"          = "dedicated"
     "schoolos:deployment-id" = var.deployment_id
   })
+  # Origins the school's browsers use for the app (Caddy serves both names).
+  app_origins = compact(["https://${lower(var.public_host)}", var.custom_domain == "" ? "" : "https://${lower(var.custom_domain)}"])
 }
 
 # Ubuntu 24.04 LTS (unattended-upgrades, SSM agent preinstalled). The AMI is resolved at create time;
@@ -71,6 +73,17 @@ module "files" {
 
   name        = "${local.name}-files-${local.account}"
   kms_key_arn = var.kms_key_arn
+  # Browser uploads (presigned POST, SEC-016, docs/07 §10) from the school's app origins only: the
+  # platform hostname and, when set, the school's custom domain. POST only: previews use <img> and
+  # downloads are navigations (no CORS needed); see modules/s3 for the header reasoning.
+  cors_rules = [
+    {
+      allowed_origins = local.app_origins
+      allowed_methods = ["POST"]
+      allowed_headers = ["content-type"]
+      max_age_seconds = 3600
+    },
+  ]
   lifecycle_rules = [
     { id = "exports-7d", tags = { "sos-lifecycle" = "export-7d" }, expiration_days = 7 },
     { id = "tenant-export-2d", tags = { "sos-lifecycle" = "tenant-export-2d" }, expiration_days = 2 },

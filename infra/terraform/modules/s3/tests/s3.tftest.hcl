@@ -17,6 +17,11 @@ mock_provider "aws" {
       json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
     }
   }
+  mock_data "aws_region" {
+    defaults = {
+      region = "ap-south-1"
+    }
+  }
 }
 
 variables {
@@ -109,4 +114,102 @@ run "sse_s3_requires_justification" {
   }
 
   expect_failures = [aws_s3_bucket_server_side_encryption_configuration.this]
+}
+
+# SEC-016, docs/07 §10: without upload origins no bucket has a CORS configuration.
+run "no_cors_without_upload_origins" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for rules in [module.files.cors_rules, module.audit_archive.cors_rules, module.logs.cors_rules, module.artifacts.cors_rules] : length(rules) == 0
+    ])
+    error_message = "No bucket gets CORS unless upload origins are configured."
+  }
+}
+
+# SEC-016, SEC-010: the app origin may POST (presigned upload) to the files bucket and nothing else;
+# FILES_ORIGIN is the regional virtual-hosted origin the API presigns with.
+run "files_bucket_allows_presigned_post_from_the_app_only" {
+  command = plan
+
+  variables {
+    files_upload_origins = ["https://app.example.test"]
+  }
+
+  assert {
+    condition     = length(module.files.cors_rules) == 1
+    error_message = "The files bucket has exactly one CORS rule."
+  }
+
+  assert {
+    condition = (
+      module.files.cors_rules[0].allowed_origins == toset(["https://app.example.test"])
+      && module.files.cors_rules[0].allowed_methods == toset(["POST"])
+      && module.files.cors_rules[0].allowed_headers == toset(["content-type"])
+      && length(module.files.cors_rules[0].expose_headers) == 0
+      && module.files.cors_rules[0].max_age_seconds == 3600
+    )
+    error_message = "Files bucket CORS: the app origin, POST only, content-type only, nothing exposed."
+  }
+
+  assert {
+    condition = alltrue([
+      for rules in [module.audit_archive.cors_rules, module.logs.cors_rules, module.artifacts.cors_rules] : length(rules) == 0
+    ])
+    error_message = "Only the files bucket has CORS (never the audit, logs or artifacts bucket)."
+  }
+
+  assert {
+    condition     = output.files_browser_origin == "https://sos-test-files-111122223333.s3.ap-south-1.amazonaws.com"
+    error_message = "FILES_ORIGIN is the regional virtual-hosted origin of the files bucket."
+  }
+}
+
+run "cors_origin_must_not_have_a_path" {
+  command = plan
+
+  module {
+    source = "../s3_bucket"
+  }
+
+  variables {
+    name        = "sos-test-cors-path"
+    kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
+    cors_rules  = [{ allowed_origins = ["https://app.example.test/"], allowed_methods = ["POST"] }]
+  }
+
+  expect_failures = [var.cors_rules]
+}
+
+run "cors_origin_must_not_be_a_wildcard" {
+  command = plan
+
+  module {
+    source = "../s3_bucket"
+  }
+
+  variables {
+    name        = "sos-test-cors-wild"
+    kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
+    cors_rules  = [{ allowed_origins = ["https://*.example.test"], allowed_methods = ["POST"] }]
+  }
+
+  expect_failures = [var.cors_rules]
+}
+
+run "cors_origin_must_be_https" {
+  command = plan
+
+  module {
+    source = "../s3_bucket"
+  }
+
+  variables {
+    name        = "sos-test-cors-http"
+    kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
+    cors_rules  = [{ allowed_origins = ["http://app.example.test"], allowed_methods = ["POST"] }]
+  }
+
+  expect_failures = [var.cors_rules]
 }

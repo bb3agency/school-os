@@ -117,6 +117,39 @@ run "audit_archives_are_signed_by_the_worker" {
   }
 }
 
+# SEC-016, SEC-010 (docs/07 §10, §11): browsers upload with presigned POST straight to the files bucket,
+# so the bucket allows exactly the app origin to POST, and the web task's CSP gets the bucket origin.
+run "browser_uploads_reach_the_files_bucket" {
+  command = plan
+
+  assert {
+    condition = (
+      length(module.s3.files_cors_rules) == 1
+      && module.s3.files_cors_rules[0].allowed_origins == toset(["https://app.staging.example.test"])
+      && module.s3.files_cors_rules[0].allowed_methods == toset(["POST"])
+    )
+    error_message = "The files bucket allows presigned POST from https://<app_domain> only (not the admin domain)."
+  }
+
+  assert {
+    condition     = [for e in module.web.container_definition.environment : e.value if e.name == "FILES_ORIGIN"] == ["https://sos-staging-files-444455556666.s3.ap-south-1.amazonaws.com"]
+    error_message = "The web task gets FILES_ORIGIN = the files bucket's regional virtual-hosted origin."
+  }
+
+  assert {
+    condition     = output.files_browser_origin == "https://sos-staging-files-444455556666.s3.ap-south-1.amazonaws.com"
+    error_message = "The files origin is output for operators."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      !contains([for e in c.environment : e.name], "FILES_ORIGIN")
+    ])
+    error_message = "FILES_ORIGIN is a web (BFF) setting only."
+  }
+}
+
 run "gstin_must_be_valid" {
   command = plan
 

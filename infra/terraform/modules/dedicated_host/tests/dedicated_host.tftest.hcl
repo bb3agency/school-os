@@ -184,6 +184,45 @@ run "audit_signing_key_for_the_host" {
   }
 }
 
+# SEC-016, SEC-010 (docs/07 §10, §11): the school's browsers POST uploads straight to the files bucket.
+run "files_bucket_cors_allows_the_public_host" {
+  command = plan
+
+  assert {
+    condition = (
+      length(output.files_cors_rules) == 1
+      && output.files_cors_rules[0].allowed_origins == toset(["https://demo-school.example.test"])
+      && output.files_cors_rules[0].allowed_methods == toset(["POST"])
+      && output.files_cors_rules[0].allowed_headers == toset(["content-type"])
+      && length(output.files_cors_rules[0].expose_headers) == 0
+    )
+    error_message = "Files bucket CORS: POST from https://<public_host> only."
+  }
+
+  assert {
+    condition     = length(module.audit_archive.cors_rules) == 0
+    error_message = "The audit archive has no CORS configuration."
+  }
+
+  assert {
+    condition     = output.files_browser_origin == "https://sos-ded-demo-school-files-111122223333.s3.ap-south-1.amazonaws.com"
+    error_message = "The files origin is the regional virtual-hosted bucket origin (compose derives FILES_ORIGIN the same way)."
+  }
+}
+
+run "files_bucket_cors_adds_the_custom_domain" {
+  command = plan
+
+  variables {
+    custom_domain = "office.demo-school.example.test"
+  }
+
+  assert {
+    condition     = output.files_cors_rules[0].allowed_origins == toset(["https://demo-school.example.test", "https://office.demo-school.example.test"])
+    error_message = "With a custom domain, both app origins may upload."
+  }
+}
+
 run "heartbeat_key_is_operator_supplied" {
   command = plan
 

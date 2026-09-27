@@ -114,6 +114,10 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?}
       REDIS_URL: redis://:${VALKEY_PASSWORD:?}@valkey:6379/1
+      # Origin of presigned upload/preview URLs (CSP connect-src + img-src; docs/07 §10, §11). The API
+      # presigns virtual-hosted, regional URLs, so this is derived from the same bucket and region
+      # (Terraform output files_browser_origin; the bucket's CORS allows this host to POST).
+      FILES_ORIGIN: https://${SOS_S3_BUCKET_FILES:?}.s3.${AWS_REGION:?}.amazonaws.com
     tmpfs:
       - /tmp:size=64m,uid=10001,gid=10001
       - /app/.next/cache:size=128m,uid=10001,gid=10001

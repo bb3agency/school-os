@@ -47,6 +47,11 @@ output "buckets" {
   }
 }
 
+output "files_browser_origin" {
+  description = "Origin of presigned upload/preview URLs (the web task's FILES_ORIGIN; CORS allows https://<app_domain> to POST there)."
+  value       = module.s3.files_browser_origin
+}
+
 output "artifacts_bucket_arn" {
   description = "Artifacts bucket ARN (dedicated hosts read release bundles from dedicated/)."
   value       = module.s3.artifacts_bucket_arn
