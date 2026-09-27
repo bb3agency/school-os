@@ -17,14 +17,7 @@ import type { Loadable } from "@/lib/loadable";
 import { useDocumentList } from "./data";
 import type { DocumentListFilters } from "./filters";
 import { VersionStatusBadge } from "./parts";
-import {
-  DOC_STATUSES,
-  DOC_TYPES,
-  DOCUMENT_PERM,
-  isVersionBusy,
-  PURPOSES,
-  type DocumentRow,
-} from "./types";
+import { DOC_TYPES, DOCUMENT_PERM, isVersionBusy, PURPOSES, type DocumentRow } from "./types";
 
 /**
  * Documents (US-701, FR-DOC-005..008): what the member may see (the API filters by the
@@ -120,7 +113,7 @@ export function DocumentsScreen({
   ];
 
   const canUpload = can(DOCUMENT_PERM.upload);
-  const filtered = Boolean(filters.purpose || filters.docType || filters.status);
+  const filtered = Boolean(filters.purpose || filters.docType || filters.status === "archived");
 
   return (
     <div className="space-y-6">
@@ -151,12 +144,13 @@ export function DocumentsScreen({
             defaultValue={filters.purpose ?? ""}
             options={PURPOSES.map((value) => ({ value, label: tpurpose(value) }))}
           />
+          {/* Without a status the API lists documents in use; archived ones only on request. */}
           <SelectField
             name="status"
             label={tl("filterStatus")}
-            placeholder={tc("all")}
-            defaultValue={filters.status ?? ""}
-            options={DOC_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
+            placeholder={tl("statusInUse")}
+            defaultValue={filters.status === "archived" ? "archived" : ""}
+            options={[{ value: "archived", label: tl("statusArchived") }]}
           />
           <div className="flex flex-wrap gap-3">
             <Button type="submit" variant="secondary">

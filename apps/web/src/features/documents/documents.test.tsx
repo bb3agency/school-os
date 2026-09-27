@@ -22,7 +22,8 @@ import { DocumentDetailScreen } from "./DocumentDetailScreen";
 import { DocumentsScreen } from "./DocumentsScreen";
 import { parseDeletedNotice, parseDocumentListFilters } from "./filters";
 import { NewDocumentScreen } from "./NewDocumentScreen";
-import { purposeFor, versionBadge, versionReason } from "./types";
+import { documentEditSchema, documentPatchBody } from "./forms";
+import { docTypesFor, purposeFor, versionBadge, versionReason } from "./types";
 import { checkFile, contentTypeFor, setDocumentStorageSendForTesting } from "./upload";
 
 const push = vi.hoisted(() => vi.fn());
@@ -224,6 +225,34 @@ describe("documents list (US-701, FR-DOC-005..008)", () => {
     expect(calls[0]?.url.searchParams.has("doc_type")).toBe(false);
     // Uploading needs document.upload.
     expect(screen.queryByRole("link", { name: "Upload a document" })).not.toBeInTheDocument();
+  });
+
+  it("lists archived documents only when the filter asks for them (FR-DOC-006)", async () => {
+    setMe([READ]);
+    stub.routes["GET /bff/api/v1/documents"] = () => page([row({ status: "archived" })]);
+    const { unmount } = renderWithIntl(<DocumentsScreen filters={parseDocumentListFilters({})} />);
+    const filter = await screen.findByLabelText(messages.en.documents.list.filterStatus);
+    // No status sent: the API lists documents in use; the choice says so instead of "All".
+    expect(filter).toHaveValue("");
+    expect(
+      within(filter)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([messages.en.documents.list.statusInUse, messages.en.documents.list.statusArchived]);
+    await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/documents")).toHaveLength(1));
+    expect(stub.callsTo("GET /bff/api/v1/documents")[0]?.url.searchParams.has("status")).toBe(
+      false,
+    );
+    unmount();
+    renderWithIntl(<DocumentsScreen filters={parseDocumentListFilters({ status: "archived" })} />);
+    expect(
+      await screen.findByRole("link", { name: "Dasara holidays circular 2026" }),
+    ).toBeInTheDocument();
+    const calls = stub.callsTo("GET /bff/api/v1/documents");
+    expect(calls.at(-1)?.url.searchParams.get("status")).toBe("archived");
+    expect(
+      screen.getByRole("link", { name: messages.en.documents.list.clearFilters }),
+    ).toBeInTheDocument();
   });
 
   it("offers upload to uploaders and confirms a delete", async () => {
@@ -458,6 +487,170 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
     expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
     expect(keys[1]).toMatch(/^[0-9a-f-]{36}$/);
     expect(keys[0]).not.toBe(keys[1]);
+  });
+});
+
+describe("document details, archive and uploader (FR-DOC-005, FR-DOC-006, US-701)", () => {
+  const PATCH = `PATCH /bff/api/v1/documents/${DOC}`;
+  const ARCHIVE = `POST /bff/api/v1/documents/${DOC}/archive`;
+  const UNARCHIVE = `POST /bff/api/v1/documents/${DOC}/unarchive`;
+  const copy = messages.en.documents;
+
+  function serve(overrides: Partial<Schemas["DocumentDetail"]> = {}) {
+    stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () => Response.json(detail(overrides));
+  }
+
+  async function openEdit() {
+    await userEvent.click(await screen.findByRole("button", { name: copy.edit.trigger }));
+    return screen.findByRole("dialog", { name: copy.edit.title });
+  }
+
+  it("offers only the types that suit the document's purpose (as the API checks)", () => {
+    expect(docTypesFor("circular")).toEqual([
+      "circular",
+      "policy",
+      "minutes",
+      "certificate",
+      "letter",
+      "form",
+      "report",
+      "other",
+    ]);
+    expect(docTypesFor("evidence")).toEqual(["evidence", "certificate", "letter", "form", "other"]);
+    expect(docTypesFor("register_scan")).toEqual(["register_scan"]);
+    expect(docTypesFor("import_file")).toEqual(["import_file"]);
+  });
+
+  it("builds a PATCH body with only what changed; emptied optional fields are null", () => {
+    const current = detail();
+    expect(
+      documentPatchBody(
+        current,
+        documentEditSchema.parse({
+          title: " Dasara holidays circular 2026 (revised) ",
+          doc_type: "circular",
+          language: "",
+          issuer: "",
+          issued_on: "2026-09-15",
+        }),
+      ),
+    ).toEqual({ title: "Dasara holidays circular 2026 (revised)", language: null, issuer: null });
+    expect(
+      documentEditSchema.safeParse({
+        title: `Circular ${fakeAadhaar()}`,
+        doc_type: "circular",
+        language: "",
+        issuer: "",
+        issued_on: "",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("edits the details with If-Match and only the changed fields", async () => {
+    setMe([READ, UPLOAD]);
+    serve();
+    stub.routes[PATCH] = () => Response.json(row({ title: "Dasara holidays 2026", version: 4 }));
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    const dialog = await openEdit();
+    const title = within(dialog).getByLabelText(copy.new.titleField);
+    expect(title).toHaveValue("Dasara holidays circular 2026");
+    const type = within(dialog).getByLabelText(copy.new.docType);
+    expect(within(type).queryByRole("option", { name: copy.docType.evidence })).toBeNull();
+    await userEvent.clear(title);
+    await userEvent.type(title, "Dasara holidays 2026");
+    await userEvent.selectOptions(type, "letter");
+    await userEvent.click(within(dialog).getByRole("button", { name: copy.edit.confirm }));
+    await waitFor(() => expect(stub.callsTo(PATCH)).toHaveLength(1));
+    expect(stub.callsTo(PATCH)[0]?.headers.get("if-match")).toBe('W/"3"');
+    expect(body(PATCH)).toEqual({ title: "Dasara holidays 2026", doc_type: "letter" });
+  });
+
+  it("shows 422 doc_type_not_allowed_for_purpose on the type and 409 document_archived", async () => {
+    setMe([READ, UPLOAD]);
+    serve();
+    let attempts = 0;
+    stub.routes[PATCH] = () => {
+      attempts += 1;
+      return attempts === 1
+        ? problem(422, "validation_error", {
+            errors: [
+              {
+                field: "doc_type",
+                code: "doc_type_not_allowed_for_purpose",
+                message_key: "errors.doc_type_not_allowed_for_purpose",
+              },
+            ],
+          })
+        : problem(409, "document_archived");
+    };
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    const dialog = await openEdit();
+    await userEvent.selectOptions(within(dialog).getByLabelText(copy.new.docType), "minutes");
+    await userEvent.click(within(dialog).getByRole("button", { name: copy.edit.confirm }));
+    expect(
+      await within(dialog).findByText(messages.en.errors.field.doc_type_not_allowed_for_purpose),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: copy.edit.confirm }));
+    expect(
+      await within(dialog).findByText(copy.errors.document_archived.title),
+    ).toBeInTheDocument();
+  });
+
+  it("archives only after the confirm dialog, with If-Match (document.manage_acl)", async () => {
+    setMe([READ, MANAGE]);
+    serve();
+    stub.routes[ARCHIVE] = () => Response.json(row({ status: "archived", version: 4 }));
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    await userEvent.click(await screen.findByRole("button", { name: copy.archive.trigger }));
+    const dialog = await screen.findByRole("dialog", { name: copy.archive.title });
+    expect(stub.callsTo(ARCHIVE)).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole("button", { name: copy.archive.confirm }));
+    await waitFor(() => expect(stub.callsTo(ARCHIVE)).toHaveLength(1));
+    expect(stub.callsTo(ARCHIVE)[0]?.headers.get("if-match")).toBe('W/"3"');
+  });
+
+  it("an archived document says so, offers unarchive, and no edit or new version", async () => {
+    setMe([READ, UPLOAD, MANAGE]);
+    serve({ status: "archived" });
+    stub.routes[UNARCHIVE] = () => Response.json(row({ version: 4 }));
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    expect(await screen.findByText(copy.detail.archivedTitle)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: copy.edit.trigger })).toBeNull();
+    expect(screen.queryByRole("button", { name: copy.newVersion.trigger })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: copy.archive.unTrigger }));
+    const dialog = await screen.findByRole("dialog", { name: copy.archive.unTitle });
+    await userEvent.click(within(dialog).getByRole("button", { name: copy.archive.unConfirm }));
+    await waitFor(() => expect(stub.callsTo(UNARCHIVE)).toHaveLength(1));
+    expect(stub.callsTo(UNARCHIVE)[0]?.headers.get("if-match")).toBe('W/"3"');
+  });
+
+  it("offers no edit without document.upload and no archive without document.manage_acl", async () => {
+    setMe([READ]);
+    serve();
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    expect(await screen.findByText(copy.detail.aboutTitle)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: copy.edit.trigger })).toBeNull();
+    expect(screen.queryByRole("button", { name: copy.archive.trigger })).toBeNull();
+  });
+
+  it("names the uploader from the API instead of 'another staff member'", async () => {
+    setMe([READ], OTHER_USER);
+    serve({
+      uploaded_by: {
+        membership_id: "0192f3a4-0000-7000-8000-0000000000e9",
+        display_name: "Ravi Sample",
+      },
+    });
+    const { unmount } = renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    expect(await screen.findByText("Ravi Sample")).toBeInTheDocument();
+    unmount();
+    serve({ uploaded_by: null, uploaded_by_me: true });
+    const second = renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    expect(await screen.findByText(copy.detail.you)).toBeInTheDocument();
+    second.unmount();
+    serve({ uploaded_by: null, uploaded_by_me: false });
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    expect(await screen.findByText(copy.detail.formerMember)).toBeInTheDocument();
   });
 });
 

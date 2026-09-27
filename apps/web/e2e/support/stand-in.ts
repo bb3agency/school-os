@@ -291,6 +291,11 @@ const DOCUMENT = {
   current_version: DOC_VERSION,
   acl: [],
   created_by: USER_ID,
+  uploaded_by: {
+    membership_id: "0192f3a4-0000-7000-8000-0000000000e1",
+    display_name: "Synthetic Teacher",
+  },
+  uploaded_by_me: false,
   created_at: "2026-09-20T05:00:00Z",
   updated_at: "2026-09-21T05:00:00Z",
   version: 3,

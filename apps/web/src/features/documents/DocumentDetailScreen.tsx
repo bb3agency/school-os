@@ -7,9 +7,10 @@ import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
-import { Field } from "@/components/ui/Input";
+import { Field, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -18,7 +19,14 @@ import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/format";
 import { DOCUMENT_KEYS, useDocument } from "./data";
-import { aclSchema, chosenFile, newVersionSchema, storageFailure } from "./forms";
+import {
+  aclSchema,
+  chosenFile,
+  documentEditSchema,
+  documentPatchBody,
+  newVersionSchema,
+  storageFailure,
+} from "./forms";
 import {
   aclBody,
   aclExtra,
@@ -31,8 +39,12 @@ import {
 } from "./parts";
 import {
   acceptFor,
+  DOC_LANGUAGES,
+  docTypesFor,
   DOCUMENT_PERM,
   ifMatch,
+  MAX_ISSUER,
+  MAX_TITLE,
   isVersionBusy,
   type DocumentDetail,
   type DocumentVersion,
@@ -58,11 +70,13 @@ const KINDS: Record<string, string> = {
 };
 
 /** C3 files open only for staff who may see sensitive data, or the uploader (docs/09). */
-function useMayOpen(doc: Pick<DocumentDetail, "sensitivity" | "created_by">): boolean {
+function useMayOpen(
+  doc: Pick<DocumentDetail, "sensitivity" | "created_by" | "uploaded_by_me">,
+): boolean {
   const can = useStaffCan();
   const me = useStaffMe();
   if (doc.sensitivity !== "C3") return true;
-  return can(DOCUMENT_PERM.readSensitive) || me?.user_id === doc.created_by;
+  return can(DOCUMENT_PERM.readSensitive) || doc.uploaded_by_me || me?.user_id === doc.created_by;
 }
 
 /** The newest version that passed the virus check (what "Download" serves). */
@@ -265,6 +279,120 @@ function EditAcl({ doc }: { doc: DocumentDetail }) {
   );
 }
 
+/** Title, type (within the purpose), language, issuer and date (PATCH; If-Match; FR-DOC-005). */
+function EditDetails({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.edit");
+  const tn = useTranslations("documents.new");
+  const ttype = useTranslations("documents.docType");
+  const tlang = useTranslations("documents.language");
+  const api = useBffClient("staff");
+  const types = docTypesFor(doc.purpose);
+  return (
+    <ActionDialog
+      triggerLabel={t("trigger")}
+      title={t("title")}
+      description={t("description")}
+      confirmLabel={t("confirm")}
+      schema={documentEditSchema}
+      fieldMap={documentFieldMap}
+      invalidate={[DOCUMENT_KEYS.all]}
+      errorNamespace="documents"
+      submit={(data) => {
+        const body = documentPatchBody(doc, data);
+        if (Object.keys(body).length === 0) return Promise.resolve(doc);
+        return unwrap(
+          api.PATCH("/api/v1/documents/{document_id}", {
+            params: { path: { document_id: doc.id } },
+            headers: { "If-Match": ifMatch(doc.version) },
+            body,
+          }),
+        );
+      }}
+    >
+      {(errors) => (
+        <>
+          <TextField
+            name="title"
+            label={tn("titleField")}
+            hint={tn("titleHint")}
+            defaultValue={doc.title}
+            maxLength={MAX_TITLE}
+            autoComplete="off"
+            required
+            error={errors.title}
+          />
+          <SelectField
+            name="doc_type"
+            label={tn("docType")}
+            {...(types.length === 1 ? { hint: t("typeFixed") } : {})}
+            defaultValue={doc.doc_type}
+            options={types.map((value) => ({ value, label: ttype(value) }))}
+            error={errors.doc_type}
+          />
+          <SelectField
+            name="language"
+            label={tn("language")}
+            hint={tn("languageHint")}
+            placeholder={tn("languageUnknown")}
+            defaultValue={doc.language ?? ""}
+            options={DOC_LANGUAGES.map((value) => ({ value, label: tlang(value) }))}
+            error={errors.language}
+          />
+          <TextField
+            name="issuer"
+            label={tn("issuer")}
+            hint={t("issuerHint")}
+            defaultValue={doc.issuer ?? ""}
+            maxLength={MAX_ISSUER}
+            autoComplete="off"
+            error={errors.issuer}
+          />
+          <TextField
+            name="issued_on"
+            type="date"
+            label={tn("issuedOn")}
+            hint={t("issuedOnHint")}
+            defaultValue={doc.issued_on ?? ""}
+            error={errors.issued_on}
+          />
+        </>
+      )}
+    </ActionDialog>
+  );
+}
+
+/**
+ * Archive or bring back (POST /archive or /unarchive; `document.manage_acl`; If-Match). An
+ * archived document keeps its versions and history and is listed only under "Archived".
+ */
+function ArchiveToggle({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.archive");
+  const api = useBffClient("staff");
+  const archived = doc.status === "archived";
+  const path = archived
+    ? ("/api/v1/documents/{document_id}/unarchive" as const)
+    : ("/api/v1/documents/{document_id}/archive" as const);
+  return (
+    <ActionDialog
+      triggerLabel={t(archived ? "unTrigger" : "trigger")}
+      title={t(archived ? "unTitle" : "title")}
+      description={t(archived ? "unDescription" : "description")}
+      confirmLabel={t(archived ? "unConfirm" : "confirm")}
+      schema={z.object({})}
+      invalidate={[DOCUMENT_KEYS.all]}
+      errorNamespace="documents"
+      submit={() =>
+        unwrap(
+          api.POST(path, {
+            params: { path: { document_id: doc.id } },
+            headers: { "If-Match": ifMatch(doc.version) },
+          }),
+        )
+      }
+    />
+  );
+}
+
 function DeleteDocument({ doc }: { doc: DocumentDetail }) {
   const t = useTranslations("documents.delete");
   const api = useBffClient("staff");
@@ -301,7 +429,8 @@ function DeleteDocument({ doc }: { doc: DocumentDetail }) {
 /**
  * One document (US-701 AC2..AC4, FR-DOC-002..008): download, versions with their check status
  * (virus found, withheld because it showed an Aadhaar number, still being checked …), details,
- * who can see it, a new version, and delete. Polls while a version is being checked.
+ * who can see it, a new version, editing its details, archive/unarchive and delete. Polls while
+ * a version is being checked.
  */
 export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   const t = useTranslations("documents");
@@ -314,7 +443,6 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   const tc = useTranslations("common");
   const can = useStaffCan();
   const meQuery = useStaffMeQuery();
-  const me = meQuery.data;
   const allowed = can(DOCUMENT_PERM.read);
   const state = useDocument(documentId, allowed);
 
@@ -356,7 +484,14 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   const doc = state.data;
   const busy = doc.versions.some((version) => isVersionBusy(version.status));
   const canManage = can(DOCUMENT_PERM.manage);
-  const canUpload = can(DOCUMENT_PERM.upload) && doc.purpose !== "import_file";
+  const archived = doc.status === "archived";
+  const canUpload = can(DOCUMENT_PERM.upload) && doc.purpose !== "import_file" && !archived;
+  const canEdit = can(DOCUMENT_PERM.upload) && !archived;
+  const uploader = doc.uploaded_by_me
+    ? td("you")
+    : doc.uploaded_by
+      ? doc.uploaded_by.display_name
+      : td("formerMember");
 
   return (
     <div className="space-y-6">
@@ -375,7 +510,22 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
       <Card title={td("versionsTitle")} description={td("versionsHint")}>
         <VersionsSection doc={doc} />
       </Card>
-      <Card title={td("aboutTitle")}>
+      {archived ? (
+        <Alert tone="info" title={td("archivedTitle")}>
+          {td("archivedBody")}
+        </Alert>
+      ) : null}
+      <Card
+        title={td("aboutTitle")}
+        actions={
+          canEdit || canManage ? (
+            <span className="flex flex-wrap gap-2">
+              {canEdit ? <EditDetails doc={doc} /> : null}
+              {canManage ? <ArchiveToggle doc={doc} /> : null}
+            </span>
+          ) : null
+        }
+      >
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Item label={td("type")}>{ttype(doc.doc_type)}</Item>
           <Item label={td("purpose")}>{tpurpose(doc.purpose)}</Item>
@@ -390,9 +540,7 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
             <Value>{formatDate(doc.issued_on)}</Value>
           </Item>
           <Item label={td("status")}>{tstatus(doc.status)}</Item>
-          <Item label={td("uploadedBy")}>
-            {doc.created_by === me?.user_id ? td("you") : td("someoneElse")}
-          </Item>
+          <Item label={td("uploadedBy")}>{uploader}</Item>
           <Item label={td("created")}>
             <Value>{formatDateTime(doc.created_at)}</Value>
           </Item>

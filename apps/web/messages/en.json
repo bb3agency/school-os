@@ -3376,7 +3376,9 @@
       "emptyFilteredBody": "Choose other filters, or clear them to see every document you can see.",
       "pagesLabel": "Pages of documents",
       "deletedTitle": "Document deleted",
-      "deletedBody": "The document and all its versions were deleted. Its files are removed from storage shortly."
+      "deletedBody": "The document and all its versions were deleted. Its files are removed from storage shortly.",
+      "statusInUse": "In use",
+      "statusArchived": "Archived"
     },
     "detail": {
       "title": "Document",
@@ -3419,13 +3421,15 @@
       "status": "In use or archived",
       "uploadedBy": "Uploaded by",
       "you": "You",
-      "someoneElse": "Another staff member",
       "created": "Uploaded on",
       "updated": "Last changed",
       "aclTitle": "Who can see it",
       "aclHint": "Staff also need document access for their role. Class teachers see only documents for their own classes or sections.",
       "deleteTitle": "Delete this document",
-      "deleteHint": "Deleting removes every version and its files. It cannot be undone."
+      "deleteHint": "Deleting removes every version and its files. It cannot be undone.",
+      "formerMember": "A staff member who is no longer in this school",
+      "archivedTitle": "This document is archived",
+      "archivedBody": "It is kept with all its versions and can still be opened, but it is listed only under \"Archived\". To change its details or add a version, unarchive it first."
     },
     "acl": {
       "legend": "Who can see it",
@@ -3559,7 +3563,30 @@
       "not_versionable": {
         "title": "No new versions for this document",
         "body": "Spreadsheet imports cannot get new versions. Start a new import instead."
+      },
+      "document_archived": {
+        "title": "This document is archived",
+        "body": "Its details can't be changed while it is archived. Reload the page, unarchive it, then try again."
       }
+    },
+    "edit": {
+      "trigger": "Edit details",
+      "title": "Edit the document's details",
+      "description": "The file and who can see it do not change. The change is recorded in the audit log.",
+      "confirm": "Save details",
+      "typeFixed": "This kind of document has only one type.",
+      "issuerHint": "For example the school, the board or the district office. Leave it empty to remove it.",
+      "issuedOnHint": "The date printed on the document. Leave it empty to remove it."
+    },
+    "archive": {
+      "trigger": "Archive",
+      "title": "Archive this document?",
+      "description": "It is kept with every version and its history, and can still be opened. It is no longer listed with the documents in use.",
+      "confirm": "Archive",
+      "unTrigger": "Unarchive",
+      "unTitle": "Unarchive this document?",
+      "unDescription": "It is listed with the documents in use again, and its details can be changed.",
+      "unConfirm": "Unarchive"
     }
   }
 }
