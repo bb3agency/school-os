@@ -179,7 +179,7 @@ async function fillToReview(user: UserEvent, tier: "shared" | "dedicated") {
 
 describe("provision wizard (FR-PLT-001..003)", () => {
   it("validates the current step before moving on and summarises errors", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithIntl(<ProvisionSchoolForm />, "en");
 
     expect(screen.getByRole("heading", { level: 2, name: m.steps.school })).toBeInTheDocument();
@@ -216,7 +216,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
         },
         { status: 201 },
       );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithIntl(<ProvisionSchoolForm />, "en");
     await fillToReview(user, "shared");
     await user.click(screen.getByRole("button", { name: m.submit }));
@@ -256,7 +256,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
         },
         { status: 201 },
       );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithIntl(<ProvisionSchoolForm />, "en");
     await fillToReview(user, "dedicated");
     await user.click(screen.getByRole("button", { name: m.submit }));
@@ -284,7 +284,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
           },
         ],
       });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithIntl(<ProvisionSchoolForm />, "en");
     await fillToReview(user, "shared");
     await user.click(screen.getByRole("button", { name: m.submit }));
@@ -303,7 +303,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
       problem(428, "step_up_required", {
         step_up_url: "/bff/auth/platform/step-up?next=%2Fen%2Fplatform%2Fprovision",
       });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithIntl(<ProvisionSchoolForm />, "en");
     await fillToReview(user, "shared");
     await user.click(screen.getByRole("button", { name: m.submit }));
