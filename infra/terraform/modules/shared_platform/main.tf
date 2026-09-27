@@ -74,6 +74,10 @@ locals {
   # Provider API keys: only for the containers that call providers (api, worker).
   provider_secrets     = { for env_name, short in var.operator_secret_env : env_name => local.op_secret[short] }
   provider_secret_arns = [for short in values(var.operator_secret_env) : local.op_secret[short]]
+
+  # The only queue the worker-pdf service consumes (ADR-0025). var.worker_queues + this = every queue
+  # of sos_worker.celery_app.QUEUES (apps/api/tests/deploy/test_env_contract.py).
+  pdf_worker_queues = "pdf"
 }
 
 # --- Keys ------------------------------------------------------------------------------
@@ -163,6 +167,7 @@ module "rds" {
   allowed_security_groups = {
     api          = module.api.security_group_id
     worker       = module.worker.security_group_id
+    worker-pdf   = module.worker_pdf.security_group_id
     migrate      = module.migrate.security_group_id
     db-bootstrap = module.db_bootstrap.security_group_id
   }
@@ -180,10 +185,11 @@ module "redis" {
   kms_key_arn        = local.kms_data
   secret_name        = "${local.secret_ns}/valkey"
   allowed_security_groups = {
-    web    = module.web.security_group_id
-    api    = module.api.security_group_id
-    worker = module.worker.security_group_id
-    beat   = module.beat.security_group_id
+    web        = module.web.security_group_id
+    api        = module.api.security_group_id
+    worker     = module.worker.security_group_id
+    worker-pdf = module.worker_pdf.security_group_id
+    beat       = module.beat.security_group_id
   }
   tags = var.tags
 }
@@ -251,9 +257,38 @@ module "alb" {
 module "cluster" {
   source = "../ecs_cluster"
 
-  name        = local.name
-  kms_key_arn = local.kms_logs
-  tags        = var.tags
+  name                   = local.name
+  kms_key_arn            = local.kms_logs
+  ec2_capacity_providers = [module.pdf_capacity.capacity_provider_name]
+  tags                   = var.tags
+}
+
+# --- PDF rendering capacity (ADR-0025 option A) --------------------------------------------------
+# Chromium's sandbox needs a user namespace, which Fargate forbids. The pdf queue therefore runs on
+# EC2 instances whose Docker daemon's default seccomp profile allows it (docker-default + chroot,
+# clone, unshare); only worker-pdf is placed there. Every other service stays on Fargate.
+
+module "pdf_capacity" {
+  source = "../ecs_ec2_capacity"
+
+  name                        = "${local.name}-pdf"
+  cluster_name                = module.cluster.name
+  cluster_arn                 = module.cluster.arn
+  vpc_id                      = module.network.vpc_id
+  subnet_ids                  = local.task_subnets
+  associate_public_ip_address = local.assign_public_ip
+  instance_type               = var.pdf_worker.instance_type
+  min_size                    = var.pdf_worker.min_instances
+  max_size                    = var.pdf_worker.max_instances
+  ebs_kms_key_arn             = local.kms_data
+  tags                        = var.tags
+}
+
+check "pdf_worker_has_egress" {
+  assert {
+    condition     = var.nat_mode != "none" || length(var.interface_endpoints) > 0
+    error_message = "nat_mode = none: awsvpc tasks on EC2 get no public IP, so worker-pdf cannot reach KMS, CloudWatch or the providers without NAT or interface endpoints; PDF exports will fail (closed)."
+  }
 }
 
 # --- Task role policies ------------------------------------------------------------------------
@@ -453,6 +488,42 @@ module "worker" {
   tags                    = var.tags
 }
 
+# Consumes only the pdf queue, on the sandbox capacity (ADR-0025 option A), with the Chromium sandbox
+# on (pdf.chromium_sandbox). No provider API keys (it calls no LLM/embeddings/OCR provider); task
+# role = the api's (files bucket + data key), no audit archive or signing key.
+module "worker_pdf" {
+  source = "../ecs_service"
+
+  name                   = "${local.name}-worker-pdf"
+  cluster_arn            = module.cluster.arn
+  cluster_name           = module.cluster.name
+  capacity_provider_name = one(module.cluster.ec2_capacity_providers)
+  placement_constraint   = module.pdf_capacity.placement_constraint
+  cpu_architecture       = module.pdf_capacity.cpu_architecture
+  image                  = local.image.worker
+  cpu                    = var.pdf_worker.cpu
+  memory                 = var.pdf_worker.memory
+  desired_count          = var.pdf_worker.desired_count
+  command                = ["celery", "-A", var.celery_app, "worker", "--loglevel=INFO", "--concurrency=${var.pdf_worker.concurrency}", "-Q", local.pdf_worker_queues]
+  stop_timeout           = 120
+  user                   = var.container_user
+  vpc_id                 = module.network.vpc_id
+  vpc_cidr               = module.network.vpc_cidr_block
+  subnet_ids             = local.task_subnets
+  assign_public_ip       = false
+  egress_vpc_ports       = [5432, 6379]
+  enable_execute_command = var.enable_execute_command
+
+  environment             = merge(local.app_env, { SOS_SERVICE_NAME = "worker-pdf" })
+  secrets                 = local.app_base_secrets
+  secret_arns             = local.app_base_secret_arns
+  secrets_kms_key_arns    = [local.kms_data]
+  attach_task_role_policy = true
+  task_role_policy_json   = data.aws_iam_policy_document.api.json
+  log_kms_key_arn         = local.kms_logs
+  tags                    = var.tags
+}
+
 module "beat" {
   source = "../ecs_service"
 
@@ -602,7 +673,7 @@ module "ci" {
   ecr_repository_arns        = values(module.ecr.repository_arns)
   ecs_cluster_arn            = module.cluster.arn
   passable_role_arns = flatten([
-    for m in [module.web, module.api, module.worker, module.beat, module.migrate, module.db_bootstrap] :
+    for m in [module.web, module.api, module.worker, module.worker_pdf, module.beat, module.migrate, module.db_bootstrap] :
     [m.task_role_arn, m.execution_role_arn]
   ])
   enable_artifacts_publish = true

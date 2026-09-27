@@ -179,9 +179,33 @@ variable "services" {
 }
 
 variable "worker_queues" {
-  description = "Celery queues consumed by the worker service: all of sos_worker.celery_app.QUEUES (beat jobs such as audit archiving, billing and the outbox run on maintenance)."
+  description = "Celery queues consumed by the Fargate worker service: every queue of sos_worker.celery_app.QUEUES except pdf, which only the worker-pdf service on the sandbox capacity consumes (ADR-0025). Beat jobs such as audit archiving, billing and the outbox run on maintenance."
   type        = string
-  default     = "ingest,embed,ocr,dq,exports,pdf,maintenance"
+  default     = "ingest,embed,ocr,dq,exports,maintenance"
+
+  validation {
+    condition     = !contains([for q in split(",", var.worker_queues) : trimspace(q)], "pdf")
+    error_message = "The Fargate worker must not consume pdf: Chromium's sandbox cannot run on Fargate (ADR-0025); worker-pdf consumes it."
+  }
+}
+
+variable "pdf_worker" {
+  description = "The worker-pdf service (queue pdf) and its EC2 capacity whose Docker daemon allows Chromium's sandbox (ADR-0025 option A). A Graviton instance type means ARM64 tasks (the worker image must be built for it). concurrency = Celery processes (one Chromium each)."
+  type = object({
+    instance_type = optional(string, "t4g.medium")
+    min_instances = optional(number, 1)
+    max_instances = optional(number, 2)
+    cpu           = optional(number, 1024)
+    memory        = optional(number, 1536)
+    desired_count = optional(number, 1)
+    concurrency   = optional(number, 2)
+  })
+  default = {}
+
+  validation {
+    condition     = var.pdf_worker.max_instances >= 1 && var.pdf_worker.min_instances <= var.pdf_worker.max_instances && var.pdf_worker.concurrency >= 1
+    error_message = "pdf_worker: 1 <= max_instances, min_instances <= max_instances, concurrency >= 1."
+  }
 }
 
 variable "container_user" {

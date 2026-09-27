@@ -34,18 +34,18 @@ run "every_app_container_gets_the_full_settings" {
 
   assert {
     condition = alltrue([
-      for c in [module.api.container_definition, module.worker.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition, module.beat.container_definition, module.migrate.container_definition] :
       length(setsubtract(
         ["SOS_ENV", "SOS_DEPLOYMENT_MODE", "SOS_VERSION", "AWS_REGION", "SOS_KEY_WRAPPER", "SOS_KMS_DATA_KEY_ARN", "SOS_AUDIT_SIGNING_KEY_ARN", "SOS_BILLING_SUPPLIER_LEGAL_NAME", "SOS_BILLING_SUPPLIER_GSTIN", "SOS_BILLING_SUPPLIER_STATE_CODE", "SOS_S3_BUCKET_FILES", "SOS_S3_BUCKET_AUDIT", "SOS_OIDC_ISSUER", "SOS_OIDC_AUDIENCE", "SOS_SERVICE_NAME"],
         [for e in c.environment : e.name],
       )) == 0
     ])
-    error_message = "api, worker, beat and migrate all get the base app settings."
+    error_message = "api, worker, worker-pdf, beat and migrate all get the base app settings."
   }
 
   assert {
     condition = alltrue([
-      for c in [module.api.container_definition, module.worker.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition, module.beat.container_definition, module.migrate.container_definition] :
       length(setsubtract(["SOS_DATABASE_URL", "SOS_PLATFORM_DATABASE_URL", "SOS_REDIS_URL", "SOS_SERVICE_TOKEN_KEY"], [for s in c.secrets : s.name])) == 0
     ])
     error_message = "api, worker, beat and migrate all get the guarded secrets (no dev-only defaults)."
@@ -84,15 +84,69 @@ run "every_app_container_gets_the_full_settings" {
     condition = (
       length(setsubtract(["SOS_ANTHROPIC_API_KEY", "SOS_EMBEDDINGS_API_KEY"], [for s in module.worker.container_definition.secrets : s.name])) == 0
       && length(setintersection(["SOS_ANTHROPIC_API_KEY", "SOS_EMBEDDINGS_API_KEY"], [for s in module.beat.container_definition.secrets : s.name])) == 0
+      && length(setintersection(["SOS_ANTHROPIC_API_KEY", "SOS_EMBEDDINGS_API_KEY"], [for s in module.worker_pdf.container_definition.secrets : s.name])) == 0
       && length(setintersection(["SOS_ANTHROPIC_API_KEY", "SOS_EMBEDDINGS_API_KEY"], [for s in module.migrate.container_definition.secrets : s.name])) == 0
     )
     error_message = "Provider API keys go only to api and worker."
   }
 
   assert {
-    condition     = toset(split(",", module.worker.container_definition.command[6])) == toset(["ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance"])
-    error_message = "The worker consumes every Celery queue, including maintenance (beat jobs)."
+    condition     = toset(split(",", module.worker.container_definition.command[6])) == toset(["ingest", "embed", "ocr", "dq", "exports", "maintenance"])
+    error_message = "The Fargate worker consumes every Celery queue except pdf, including maintenance (beat jobs)."
   }
+
+  assert {
+    condition     = join(" ", module.worker_pdf.container_definition.command) == "celery -A sos_worker.celery_app worker --loglevel=INFO --concurrency=2 -Q pdf"
+    error_message = "worker-pdf consumes only the pdf queue (ADR-0025)."
+  }
+}
+
+# ADR-0025 option A (FR-EXP-002, SEC-030): the pdf queue runs on EC2 capacity whose daemon allows the
+# Chromium sandbox; the service keeps every container control and is pinned to that capacity.
+run "pdf_worker_runs_on_the_sandbox_capacity" {
+  command = plan
+
+  assert {
+    condition     = contains(module.cluster.ec2_capacity_providers, "sos-staging-pdf") && one(module.cluster.ec2_capacity_providers) == "sos-staging-pdf"
+    error_message = "The cluster has exactly one EC2 capacity provider, the pdf capacity."
+  }
+
+  assert {
+    condition = (
+      one(module.worker_pdf.container_definition.dockerSecurityOptions) == "no-new-privileges"
+      && module.worker_pdf.container_definition.readonlyRootFilesystem
+      && !module.worker_pdf.container_definition.privileged
+      && module.worker_pdf.container_definition.user == "10001:10001"
+      && module.worker_pdf.container_definition.linuxParameters.capabilities.drop == ["ALL"]
+      && module.worker_pdf.container_definition.linuxParameters.tmpfs[0].containerPath == "/tmp"
+    )
+    error_message = "worker-pdf: read-only root, non-root, all capabilities dropped, no-new-privileges, tmpfs scratch."
+  }
+
+  assert {
+    condition     = [for e in module.worker_pdf.container_definition.environment : e.value if e.name == "SOS_SERVICE_NAME"] == ["worker-pdf"]
+    error_message = "worker-pdf identifies itself in logs and metrics."
+  }
+
+  assert {
+    condition     = output.pdf_capacity.posture.imdsv2_required && output.pdf_capacity.posture.root_encrypted && output.pdf_capacity.posture.key_name == null
+    error_message = "The pdf capacity is hardened (IMDSv2, encrypted root, no key pair)."
+  }
+
+  assert {
+    condition     = contains(output.ecs_services, "sos-staging-worker-pdf") && length(output.ecs_services) == 5
+    error_message = "The deploy pipeline rolls web, api, worker, worker-pdf and beat."
+  }
+}
+
+run "fargate_worker_must_not_take_pdf" {
+  command = plan
+
+  variables {
+    worker_queues = "ingest,embed,ocr,dq,exports,pdf,maintenance"
+  }
+
+  expect_failures = [var.worker_queues]
 }
 
 run "audit_archives_are_signed_by_the_worker" {
@@ -160,6 +214,7 @@ run "worker_image_and_upload_encryption" {
     condition = (
       module.worker.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/worker:2026.10.1"
       && module.beat.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/worker:2026.10.1"
+      && module.worker_pdf.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/worker:2026.10.1"
       && module.api.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/api:2026.10.1"
       && module.migrate.container_definition.image == "444455556666.dkr.ecr.ap-south-1.amazonaws.com/schoolos/api:2026.10.1"
     )
@@ -168,7 +223,7 @@ run "worker_image_and_upload_encryption" {
 
   assert {
     condition = alltrue([
-      for c in [module.api.container_definition, module.worker.container_definition] :
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition] :
       [for e in c.environment : e.value if e.name == "SOS_S3_KMS_KEY_ID"] == ["arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000da7a"]
     ])
     error_message = "api and worker encrypt uploads with the data CMK, the files bucket's key (SOS_S3_KMS_KEY_ID)."
