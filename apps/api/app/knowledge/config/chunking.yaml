@@ -24,9 +24,10 @@ token_estimate:
 # Language of a block without a declared one (docs/06 §4.3): Telugu or English when that
 # script has at least this share of the letters, otherwise "mixed".
 language_dominant_share: 0.8
-# What ingestion reads (docs/06 §4.1-4.2). PDF text layer: ADR-0027 (proposed).
+# What ingestion reads (docs/06 §4.1-4.2). PDF text layer: ADR-0027 (pypdfium2).
 extraction:
   supported_mime_types:
+    - "application/pdf"
     - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     - "text/plain"
   # Identity evidence and raw import spreadsheets hold student records, not school knowledge:
@@ -40,3 +41,13 @@ extraction:
     - "C2"
   max_xml_bytes: 52428800   # one DOCX XML part, uncompressed (zip-bomb guard)
   max_text_chars: 2000000   # extracted characters per version; a longer version is not indexed
+  # PDF text layer (ADR-0027). A version over any limit, encrypted, or with a page that needs
+  # OCR is not indexed (an error code, never text).
+  pdf:
+    max_bytes: 26214400         # 25 MB, the upload limit (FR-DOC-001)
+    max_pages: 300
+    time_budget_seconds: 120    # per version, checked between pages
+    max_objects_per_page: 50000
+    max_chars_per_page: 50000
+    min_letters_per_page: 16    # a page with graphics and fewer letters is a scan: needs OCR
+    max_bad_char_share: 0.05    # unmapped/private-use characters: a legacy font, needs OCR

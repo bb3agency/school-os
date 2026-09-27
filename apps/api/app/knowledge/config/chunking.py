@@ -39,6 +39,24 @@ class TokenEstimate(ConfigModel):
     """Grapheme clusters (e.g. Telugu aksharas) of any other script per token."""
 
 
+class PdfLimits(ConfigModel):
+    """PDF text layer (ADR-0027): hostile-input limits and the per-page quality check."""
+
+    max_bytes: int = Field(ge=1024, le=512 * 1024 * 1024)
+    """A larger file is not opened at all."""
+    max_pages: int = Field(ge=1, le=10_000)
+    time_budget_seconds: float = Field(gt=0, le=600)
+    """Wall-clock budget per version, checked between pages (the Celery time limit is the
+    hard stop for a single pathological page)."""
+    max_objects_per_page: int = Field(ge=10, le=1_000_000)
+    max_chars_per_page: int = Field(ge=100, le=1_000_000)
+    min_letters_per_page: int = Field(ge=0, le=1000)
+    """A page with graphics (a scan) and fewer letters than this needs OCR."""
+    max_bad_char_share: float = Field(ge=0, le=1)
+    """Share of unmapped characters (U+FFFD, private use, unassigned, controls) above which a
+    page's text layer is mojibake (e.g. a legacy non-Unicode Telugu font) and needs OCR."""
+
+
 class ExtractionConfig(ConfigModel):
     supported_mime_types: tuple[str, ...] = Field(min_length=1)
     excluded_purposes: tuple[str, ...]
@@ -46,6 +64,7 @@ class ExtractionConfig(ConfigModel):
     indexed_sensitivities: tuple[Sensitivity, ...] = Field(min_length=1)
     max_xml_bytes: int = Field(ge=1024, le=512 * 1024 * 1024)
     max_text_chars: int = Field(ge=1000, le=50_000_000)
+    pdf: PdfLimits
 
     @model_validator(mode="after")
     def _safe(self) -> ExtractionConfig:
