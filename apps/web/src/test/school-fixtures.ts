@@ -28,6 +28,7 @@ export function me(
     mfa: true,
     tenant_ids: [TENANT],
     tenant_status: "active",
+    settings: { idle_timeout_minutes: 15, date_format: "DD/MM/YYYY", languages: ["en", "te"] },
     ...overrides,
   };
 }

@@ -51,6 +51,7 @@ export function me(permissions: readonly string[]): Schemas["app__identity__sche
     scopes: [],
     mfa: true,
     permissions: [...permissions],
+    settings: { idle_timeout_minutes: 15, date_format: "DD/MM/YYYY", languages: ["en", "te"] },
   };
 }
 

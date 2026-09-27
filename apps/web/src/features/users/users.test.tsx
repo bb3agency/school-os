@@ -50,6 +50,8 @@ function role(
     name_te: key,
     is_system: true,
     permissions,
+    grantable: true,
+    scoped: false,
     ...overrides,
   };
 }

@@ -62,6 +62,8 @@ function version(overrides: Partial<Schemas["VersionOut"]> = {}): Schemas["Versi
     status: "ready",
     error: null,
     created_at: "2026-09-20T05:00:00Z",
+    uploaded_by: null,
+    uploaded_by_me: false,
     ...overrides,
   };
 }
@@ -83,6 +85,8 @@ function detail(overrides: Partial<Schemas["DocumentDetail"]> = {}): Schemas["Do
     current_version: versions.at(-1) ?? null,
     acl: [],
     created_by: ID.user,
+    uploaded_by: null,
+    uploaded_by_me: false,
     created_at: "2026-09-20T05:00:00Z",
     updated_at: "2026-09-21T05:00:00Z",
     version: 3,

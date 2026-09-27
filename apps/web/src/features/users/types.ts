@@ -13,7 +13,7 @@ export type StaffScope = Schemas["ScopeOut"];
 export type ScopeInput = Schemas["ScopeIn"];
 export type InviteInput = Schemas["InviteIn"];
 export type MemberStatus = StaffUser["status"];
-export type StatusChange = Schemas["MembershipStatusIn"]["status"];
+export type StatusChange = NonNullable<Schemas["UserUpdateIn"]["status"]>;
 export type UserLanguage = InviteInput["preferred_language"] & string;
 
 type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
