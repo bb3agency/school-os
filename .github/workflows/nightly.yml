@@ -109,9 +109,9 @@ jobs:
           if-no-files-found: warn
 
   eval:
-    # RAG evaluation harness (docs/06 §13). Placeholder until app/knowledge exists; the make
-    # target owns what runs. Synthetic datasets only.
-    name: rag eval
+    # RAG evaluation harness (docs/06 §13): full suite with soft gates enforced; synthetic data
+    # only. The adapter is stub-perfect until app/knowledge provides a real one (EVAL_ADAPTER).
+    name: rag eval (full suite)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -119,5 +119,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-toolchain
-      - name: make eval
-        run: make eval
+      - name: make eval (full, soft gates enforced)
+        run: make eval EVAL_SUITE=full EVAL_ARGS=--fail-on-soft
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rag-eval-report
+          path: evals/reports/
+          retention-days: 30
+          if-no-files-found: warn

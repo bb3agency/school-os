@@ -109,6 +109,14 @@ services:
 
   worker:
     <<: *python-app
+    # The worker target adds headless Chromium for the pdf queue (apps/api/Dockerfile, ADR-0025).
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: worker
+      args:
+        INSTALL_PSQL: ${SOS_INSTALL_PSQL:-false}
+    image: schoolos-worker:dev
     depends_on:
       migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
