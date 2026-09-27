@@ -82,7 +82,7 @@ flowchart TB
 |---|---|---|---|
 | `core` | config, DB/session/tenant context, errors, logging, redaction, crypto helpers | `tenant_session()`, `redact()`, `encrypt_field()` | — |
 | `identity` | users, OIDC, sessions | `get_current_user()`, `revoke_sessions()` | core |
-| `authz` | roles, permissions, scopes, policy | `require()`, `scope_filter()`, `can()` | core, identity |
+| `authz` | roles, permissions, scopes, policy | `require()`, `require_any()`, `scope_filter()`, `can()` | core, identity |
 | `audit` | audit events, chain verification | `record()`, `verify_chain()` | core |
 | `tenancy` | tenants, years, classes, sections, enrolments, settings | `register_tenant()` / `set_tenant_status()` (wrappers over the definer functions), `initialise_tenant()` (keys + post-provision hooks) | core, authz, audit, identity |
 | `students` | students, guardians, attribute values, canonical view | `get_profile()`, `record_value()`, `search()` | core, authz, audit, tenancy |

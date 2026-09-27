@@ -59,8 +59,9 @@ Once all three are applied, reviewed and merged, delete `.handoff/`.
    - Show a suspended banner from `/me.tenant_status`.
    - Break-glass page for school owners; notifications bell with polling and backoff.
    - Exports screens (`/api/v1/exports*`, `/api/v1/export-profiles`) are not started.
-3. **Move `require_any` into `app.authz.dependencies`.** It is duplicated as `AnyOfRequirement` in
-   `app/changes/api.py` and `app/exports/api.py`; the matrix test reads `sos_any_of`.
+3. **Done (branch `wip/authz-require-any`):** `require_any()` / `AnyOfRequirement` now live in
+   `app.authz.dependencies`; `app/changes/api.py` and `app/exports/api.py` import them (the
+   duplicates are gone). Unit tests: `tests/authz/test_require_any.py`.
 4. **Infra for exports:**
    - The worker image needs Chromium revision 1194 for Python Playwright 1.56.0 on the `pdf` queue
      workers.
