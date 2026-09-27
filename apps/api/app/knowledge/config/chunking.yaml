@@ -1,0 +1,15 @@
+# Structure-aware chunking (docs/06 §4.5). Telugu uses more tokens per word than English; the
+# budgets in docs/06 §12 account for it. Changes here need a passing `make eval`.
+version: 1
+target_tokens:
+  min: 350
+  max: 600
+overlap_tokens:
+  min: 60
+  max: 80
+table_max_tokens: 1200     # tables kept whole up to this size, else split by row groups
+contextual_header: true    # prepended for embedding and FTS, never shown to users
+block_markers:             # "Sub:/Ref:/Order:" blocks typical of government circulars
+  - "Sub:"
+  - "Ref:"
+  - "Order:"

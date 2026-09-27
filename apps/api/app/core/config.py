@@ -46,6 +46,17 @@ class ExtractionProviderKind(StrEnum):
     NOT_CONFIGURED = "not-configured"
 
 
+class KnowledgeProviderMode(StrEnum):
+    """How the knowledge module reaches model providers (docs/06, ADR-0005, ADR-0006).
+
+    ``fake`` is offline and deterministic (local/CI; refused in staging/prod). ``live`` uses the
+    providers and models named in ``app/knowledge/config/*.yaml`` (invariant 13) through
+    ``knowledge/gateway`` with the API keys below."""
+
+    FAKE = "fake"
+    LIVE = "live"
+
+
 MIB = 1024 * 1024
 
 
@@ -112,6 +123,16 @@ class Settings(BaseSettings):
     extraction_provider: ExtractionProviderKind | None = None
     extraction_low_confidence_threshold: float = Field(default=0.8, gt=0, le=1)
 
+    # Knowledge / "Ask the school" (M2; docs/06, ADR-0005, ADR-0006). Off by default; a school
+    # also needs the feature flag kb.ask.enabled. Unset mode: ``fake`` in local/ci, ``live`` in
+    # staging/prod. Model IDs, budgets and thresholds are versioned files, not settings
+    # (app/knowledge/config/*.yaml, invariant 13). Keys: organization API keys only, never a
+    # personal subscription (invariant 10).
+    kb_enabled: bool = False
+    kb_provider_mode: KnowledgeProviderMode | None = None
+    anthropic_api_key: SecretStr | None = None
+    embeddings_api_key: SecretStr | None = None
+
     oidc_issuer: str = "http://localhost:8080/schoolos"
     oidc_audience: str = "schoolos-web"
     platform_oidc_issuer: str = "http://localhost:8080/platform"
@@ -146,6 +167,28 @@ class Settings(BaseSettings):
     def is_production_like(self) -> bool:
         return self.env in (Environment.STAGING, Environment.PROD)
 
+    @property
+    def resolved_kb_provider_mode(self) -> KnowledgeProviderMode:
+        """The configured mode; unset means ``fake`` locally/in CI and ``live`` elsewhere."""
+        if self.kb_provider_mode is not None:
+            return self.kb_provider_mode
+        if self.is_production_like:
+            return KnowledgeProviderMode.LIVE
+        return KnowledgeProviderMode.FAKE
+
+    def _guard_knowledge(self) -> None:
+        """Staging/prod: no fake providers; live AI needs a real organization API key."""
+        if self.kb_provider_mode is KnowledgeProviderMode.FAKE:
+            raise ValueError(f"SOS_KB_PROVIDER_MODE=fake is not allowed in {self.env}")
+        for name in ("anthropic_api_key", "embeddings_api_key"):
+            key: SecretStr | None = getattr(self, name)
+            if key is not None and "dev-only" in key.get_secret_value():
+                raise ValueError(f"{name} uses a dev-only value in {self.env}")
+        if self.kb_enabled:
+            key = self.anthropic_api_key
+            if key is None or not key.get_secret_value().strip():
+                raise ValueError(f"SOS_KB_ENABLED needs SOS_ANTHROPIC_API_KEY in {self.env}")
+
     @model_validator(mode="after")
     def _guard_production(self) -> Settings:
         """Fail closed: dev-only conveniences can never run in staging or production."""
@@ -165,6 +208,7 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"billing_supplier_legal_name uses the dev placeholder in {self.env}"
                 )
+            self._guard_knowledge()
         return self
 
 
