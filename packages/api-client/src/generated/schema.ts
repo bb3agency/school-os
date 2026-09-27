@@ -258,6 +258,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/change-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Change Requests
+         * @description Change requests of students you can see, newest first (permission
+         *     ``student.identity_change.request`` or ``student.identity_change.approve``). Values of
+         *     sensitive (C3) fields are masked.
+         */
+        get: operations["list_change_requests_api_v1_change_requests_get"];
+        put?: never;
+        /**
+         * Submit Change Request
+         * @description Request a correction of an identity field (name, date of birth, gender, parents' names,
+         *     admission number/date) with the new value, a reason (at least 10 characters) and an evidence
+         *     document uploaded with purpose ``evidence`` (permission ``student.identity_change.request``).
+         *     Someone else with ``student.identity_change.approve`` decides it. Accepts
+         *     ``Idempotency-Key``. Errors: ``not_identity_attribute``, ``evidence_required`` (422),
+         *     ``duplicate_pending_request`` (409).
+         */
+        post: operations["submit_change_request_api_v1_change_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/change-requests/{change_request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Request
+         * @description One change request with old/new value, source, reason, evidence and decision; returns
+         *     ``ETag`` for the decision calls (request or approve permission).
+         */
+        get: operations["get_change_request_api_v1_change_requests__change_request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/change-requests/{change_request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Change Request
+         * @description Approve: records the new value as verified (the old value stays in history) and closes the
+         *     request (permission ``student.identity_change.approve``, MFA within 5 minutes, not the
+         *     requester, ``If-Match``). Errors: ``self_approval_forbidden`` (403), ``step_up_required``
+         *     (428), ``request_not_pending`` / ``request_expired`` / ``request_outdated`` (409).
+         */
+        post: operations["approve_change_request_api_v1_change_requests__change_request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/change-requests/{change_request_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Change Request
+         * @description Withdraw your own pending request (permission ``student.identity_change.request``,
+         *     ``If-Match``). Error ``not_requester`` (403) for someone else's request.
+         */
+        post: operations["cancel_change_request_api_v1_change_requests__change_request_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/change-requests/{change_request_id}/memo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Change Request Memo
+         * @description Printable correction memo for the paper register, in English and Telugu (request or
+         *     approve permission). Sensitive values appear only for ``student.read_sensitive`` holders.
+         *     The view is audited.
+         */
+        get: operations["change_request_memo_api_v1_change_requests__change_request_id__memo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/change-requests/{change_request_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Change Request
+         * @description Reject with a reason (at least 10 characters) that the requester will see (permission
+         *     ``student.identity_change.approve``, MFA within 5 minutes, not the requester, ``If-Match``).
+         */
+        post: operations["reject_change_request_api_v1_change_requests__change_request_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/classes": {
         parameters: {
             query?: never;
@@ -474,6 +613,336 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dq/findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Findings
+         * @description Findings, most severe first, with masked values, English/Telugu explanations and
+         *     correction routes (permission ``dq.findings.read``). ``status`` defaults to unresolved
+         *     (``open``, ``reopened``).
+         */
+        get: operations["list_findings_api_v1_dq_findings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/findings/{finding_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Finding
+         * @description One finding (permission ``dq.findings.read``); ``ETag`` is its version.
+         */
+        get: operations["get_finding_api_v1_dq_findings__finding_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/findings/{finding_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Finding
+         * @description Resolve with a note or a linked change request (permission ``dq.findings.resolve``).
+         *     If the conflict is still there, the next check reopens it. Optional ``If-Match``.
+         */
+        post: operations["resolve_finding_api_v1_dq_findings__finding_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/findings/{finding_id}/waive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Waive Finding
+         * @description Accept a finding with a reason (permission ``dq.findings.waive`` with a fresh MFA
+         *     sign-in, else 428 ``step_up_required``). Optional ``If-Match``.
+         */
+        post: operations["waive_finding_api_v1_dq_findings__finding_id__waive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Profiles
+         * @description Export pre-check profiles, e.g. CISCE registration and UDISE+ (permission
+         *     ``dq.findings.read``).
+         */
+        get: operations["list_profiles_api_v1_dq_profiles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Rules
+         * @description The rule catalog DQ-001..DQ-012 with English/Telugu texts (permission
+         *     ``dq.findings.read``).
+         */
+        get: operations["list_rules_api_v1_dq_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Run
+         * @description Check sections, classes, students or an import batch, optionally for an export profile
+         *     such as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are
+         *     checked at once (status ``completed``); bigger ones are queued (status ``queued``) and you
+         *     are notified when they finish. Accepts ``Idempotency-Key``.
+         */
+        post: operations["start_run_api_v1_dq_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run
+         * @description A check run with its counts (permission ``dq.findings.read``; class teachers see their
+         *     own runs).
+         */
+        get: operations["get_run_api_v1_dq_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Summary
+         * @description Unresolved findings by severity and rule for the pre-check screen: blockers apart from
+         *     warnings (permission ``dq.findings.read``).
+         */
+        get: operations["get_summary_api_v1_dq_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extraction-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Batches
+         * @description Register-photo batches, newest first, with progress counters (permission
+         *     ``import.run``).
+         */
+        get: operations["list_batches_api_v1_extraction_batches_get"];
+        put?: never;
+        /**
+         * Create Batch
+         * @description Read register-page photos into the verification queue (permission ``import.run``).
+         *
+         *     Send the ids of ``register_scan`` documents that passed the malware scan: JPG or PNG, one
+         *     page each (PDF answers 422 ``pdf_not_supported`` for now: upload a photo of each page).
+         *     Answers 202; follow progress with ``GET /extraction-batches/{id}``. Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["create_batch_api_v1_extraction_batches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extraction-batches/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Batch
+         * @description One batch with progress per page (US-402 AC4). A page with ``image_withheld`` showed a
+         *     full Aadhaar number: its image is not shown (permission ``import.run``).
+         */
+        get: operations["get_batch_api_v1_extraction_batches__batch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extraction-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Items
+         * @description The verification queue in page order (permission ``import.run``). Each field carries its
+         *     confidence and region; ``low_confidence_fields`` lists the ones to check carefully.
+         */
+        get: operations["list_items_api_v1_extraction_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extraction-items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Item
+         * @description One row with a 5-minute link to its page image and students with the same admission
+         *     number (permission ``import.run``; the image also needs ``document.read`` on the page).
+         */
+        get: operations["get_item_api_v1_extraction_items__item_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extraction-items/{item_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Item
+         * @description Save the row as you read it on the page (permission ``import.commit``).
+         *
+         *     Creates a student (or adds to ``student_id``) with source ``admission_register`` and the
+         *     page as evidence. A row already checked answers 409 ``item_already_reviewed``; changing an
+         *     existing register identity value answers 403 ``identity_change_required`` (use a change
+         *     request). Accepts ``Idempotency-Key``.
+         */
+        post: operations["confirm_item_api_v1_extraction_items__item_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extraction-items/{item_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Item
+         * @description Discard a row that is not a student entry; nothing is recorded (permission
+         *     ``import.commit``).
+         */
+        post: operations["reject_item_api_v1_extraction_items__item_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fleet/heartbeat": {
         parameters: {
             query?: never;
@@ -488,6 +957,192 @@ export interface paths {
          * @description HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12).
          */
         post: operations["heartbeat_api_v1_fleet_heartbeat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description Saved column mappings; a file with the same headers reuses one automatically
+         *     (permission ``import.run``).
+         */
+        get: operations["list_templates_api_v1_import_templates_get"];
+        put?: never;
+        /**
+         * Create Template
+         * @description Save an import's column mapping as a template (permission ``import.run``). Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["create_template_api_v1_import_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Imports
+         * @description The school's imports, newest first (permission ``import.run``).
+         */
+        get: operations["list_imports_api_v1_imports_get"];
+        put?: never;
+        /**
+         * Create Import
+         * @description Import an uploaded spreadsheet (permission ``import.run``).
+         *
+         *     Upload the file first with ``POST /documents/uploads`` (purpose ``import_file``: XLSX or
+         *     CSV, at most 10 MB) and register it; once it passed the virus check, send its
+         *     ``document_id`` and the ``source`` the data comes from (e.g. ``admission_register``,
+         *     ``udise_plus``). Answers 202: the file is read (formulas are never run) and columns are
+         *     matched to fields in the background. Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_import_api_v1_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Import
+         * @description One import: status, columns with suggested and chosen fields, row counts, revert
+         *     deadline (permission ``import.run``). ``ETag`` is needed to change the mapping.
+         */
+        get: operations["get_import_api_v1_imports__import_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit Import
+         * @description Add a checked file to the student records, all rows or none (permission
+         *     ``import.commit``; 202). Values are recorded from the import's source; identity values
+         *     from the admission register stay provisional until verified. With rows in error send
+         *     ``{"skip_error_rows": true}`` to add only the valid rows. Accepts ``Idempotency-Key``.
+         */
+        post: operations["commit_import_api_v1_imports__import_id__commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Mapping
+         * @description Choose which field each column fills (permission ``import.run``; ``If-Match``). Check
+         *     the file again afterwards with ``POST /imports/{id}/validate``.
+         */
+        put: operations["set_mapping_api_v1_imports__import_id__mapping_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert Import
+         * @description Undo an added import within 24 hours (permission ``import.commit``). Refused with 409
+         *     ``import_has_dependents`` when records from it were changed or are used since, and 409
+         *     ``revert_window_closed`` after 24 hours.
+         */
+        post: operations["revert_import_api_v1_imports__import_id__revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Rows
+         * @description Checked rows in file order with row-level errors and warnings (permission
+         *     ``import.run``); ``status=error`` lists the rows to fix. Restricted (C3) values are never
+         *     shown, only which of them a row has.
+         */
+        get: operations["list_rows_api_v1_imports__import_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Import
+         * @description Check every row with the current mapping (permission ``import.run``; 202). Nothing is
+         *     saved to student records. Accepts ``Idempotency-Key``.
+         */
+        post: operations["validate_import_api_v1_imports__import_id__validate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2523,6 +3178,11 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** ApproveIn */
+        ApproveIn: {
+            /** Note */
+            note?: string | null;
+        };
         /** AttributeOut */
         AttributeOut: {
             /** Allowed Sources */
@@ -2578,6 +3238,135 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * BatchCreate
+         * @description Start extraction for register-page photos already uploaded as ``register_scan``
+         *     documents (JPG or PNG, one page each, malware scan passed).
+         */
+        BatchCreate: {
+            /** Document Ids */
+            document_ids: string[];
+        };
+        /**
+         * BatchDetail
+         * @description A batch with progress per page (US-402 AC4).
+         */
+        BatchDetail: {
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Error Code */
+            error_code: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Items Confirmed */
+            items_confirmed: number;
+            /** Items Low Confidence */
+            items_low_confidence: number;
+            /** Items Pending */
+            items_pending: number;
+            /** Items Rejected */
+            items_rejected: number;
+            /** Items Total */
+            items_total: number;
+            /** Page Count */
+            page_count: number;
+            /** Pages */
+            pages: components["schemas"]["PageOut"][];
+            /** Pages Done */
+            pages_done: number;
+            /** Pages Failed */
+            pages_failed: number;
+            /** Pages Withheld */
+            pages_withheld: number;
+            /** Processed At */
+            processed_at: string | null;
+            /** Provider */
+            provider: string;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "processing" | "review" | "completed" | "failed";
+            /** Version */
+            version: number;
+        };
+        /** BatchOut */
+        BatchOut: {
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Error Code */
+            error_code: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Items Confirmed */
+            items_confirmed: number;
+            /** Items Low Confidence */
+            items_low_confidence: number;
+            /** Items Pending */
+            items_pending: number;
+            /** Items Rejected */
+            items_rejected: number;
+            /** Items Total */
+            items_total: number;
+            /** Page Count */
+            page_count: number;
+            /** Pages Done */
+            pages_done: number;
+            /** Pages Failed */
+            pages_failed: number;
+            /** Pages Withheld */
+            pages_withheld: number;
+            /** Processed At */
+            processed_at: string | null;
+            /** Provider */
+            provider: string;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "processing" | "review" | "completed" | "failed";
+            /** Version */
+            version: number;
+        };
+        /** Bilingual */
+        Bilingual: {
+            /** Code */
+            code: string;
+            /** En */
+            en: string;
+            /** Te */
+            te: string;
         };
         /** BillingAccountIn */
         BillingAccountIn: {
@@ -2742,6 +3531,106 @@ export interface components {
              */
             plan_id: string;
         };
+        /**
+         * ChangeRequestCreate
+         * @description Request a correction of one identity attribute from one source (FR-CR-001).
+         */
+        ChangeRequestCreate: {
+            /** Attribute Key */
+            attribute_key: string;
+            /**
+             * Evidence Document Id
+             * Format: uuid
+             */
+            evidence_document_id: string;
+            /** New Value */
+            new_value?: string | null;
+            /** New Value Date */
+            new_value_date?: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /**
+             * Target Source
+             * @default admission_register
+             * @enum {string}
+             */
+            target_source: "admission_register" | "aadhaar_as_printed" | "udise_plus" | "board_registration" | "birth_certificate" | "parent_form" | "tc_incoming" | "manual_entry";
+        };
+        /** ChangeRequestOut */
+        ChangeRequestOut: {
+            /** Applied Value Id */
+            applied_value_id: string | null;
+            /** Attribute Key */
+            attribute_key: string;
+            /** Attribute Label En */
+            attribute_label_en: string;
+            /** Attribute Label Te */
+            attribute_label_te: string;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Decide */
+            can_decide: boolean;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            /** Decision Note */
+            decision_note: string | null;
+            /**
+             * Evidence Document Id
+             * Format: uuid
+             */
+            evidence_document_id: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Masked */
+            masked: boolean;
+            /** New Value */
+            new_value: string;
+            /** Old Value */
+            old_value: string | null;
+            /** Old Value Id */
+            old_value_id: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Requested By
+             * Format: uuid
+             */
+            requested_by: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected" | "expired" | "cancelled";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Target Source */
+            target_source: string;
+            /** Version */
+            version: number;
+        };
         /** ClassCreate */
         ClassCreate: {
             /** Code */
@@ -2814,6 +3703,37 @@ export interface components {
             display_te?: string | null;
             /** Sort Order */
             sort_order?: number | null;
+        };
+        /** ColumnMap */
+        ColumnMap: {
+            /** Index */
+            index: number;
+            /** Target */
+            target: string;
+        };
+        /** ColumnOut */
+        ColumnOut: {
+            /** Header */
+            header: string;
+            /** Index */
+            index: number;
+            /** Score */
+            score: number;
+            /** Suggested */
+            suggested: string | null;
+            /** Target */
+            target: string | null;
+        };
+        /**
+         * CommitIn
+         * @description ``skip_error_rows``: commit only the valid rows (rows with errors are marked skipped).
+         */
+        CommitIn: {
+            /**
+             * Skip Error Rows
+             * @default false
+             */
+            skip_error_rows: boolean;
         };
         /** DashboardOut */
         DashboardOut: {
@@ -3139,6 +4059,120 @@ export interface components {
              */
             trial_ends_at: string;
         };
+        /** FieldOut */
+        FieldOut: {
+            /** Bbox */
+            bbox: number[] | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Low Confidence */
+            low_confidence: boolean;
+            /** Masked */
+            masked: boolean;
+            /** Value */
+            value: string;
+        };
+        /** FindingOut */
+        FindingOut: {
+            /** Attribute Key */
+            attribute_key: string | null;
+            /** Blocker */
+            blocker: boolean;
+            /** Change Request Id */
+            change_request_id: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            explanation: components["schemas"]["Bilingual"];
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /** First Seen Run Id */
+            first_seen_run_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /** Last Seen Run Id */
+            last_seen_run_id: string | null;
+            /** Match Class */
+            match_class: string | null;
+            match_explanation: components["schemas"]["Bilingual"] | null;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Related Student Id */
+            related_student_id: string | null;
+            /** Reopened Count */
+            reopened_count: number;
+            /** Resolution */
+            resolution: ("note" | "change_request" | "auto_cleared") | null;
+            /** Resolution Note */
+            resolution_note: string | null;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Resolved By */
+            resolved_by: string | null;
+            /** Routes */
+            routes: components["schemas"]["Bilingual"][];
+            /** Rule Id */
+            rule_id: string;
+            /** Rule Version */
+            rule_version: number;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "blocker" | "high" | "medium" | "low" | "info";
+            /** Sources */
+            sources: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "resolved" | "waived" | "reopened";
+            student: components["schemas"]["StudentRef"];
+            /** Values */
+            values: components["schemas"]["FindingValue"][];
+            /** Version */
+            version: number;
+            /** Waived At */
+            waived_at: string | null;
+            /** Waived By */
+            waived_by: string | null;
+            /** Waived Reason */
+            waived_reason: string | null;
+        };
+        /**
+         * FindingValue
+         * @description A compared value: always masked; ``value`` only for non-sensitive (C2) values that are
+         *     still current (C3 values are revealed on the student record, with an audit event).
+         */
+        FindingValue: {
+            /** Attribute Key */
+            attribute_key: string;
+            /** Masked */
+            masked: string | null;
+            /** Sensitive */
+            sensitive: boolean;
+            /** Source */
+            source: string;
+            /** Value */
+            value: string | null;
+            /**
+             * Value Id
+             * Format: uuid
+             */
+            value_id: string;
+        };
         /** FlagIn */
         FlagIn: {
             /** Description */
@@ -3343,6 +4377,164 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * ImportCreate
+         * @description Start importing an uploaded file (purpose ``import_file``, scanned) from one source.
+         */
+        ImportCreate: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Kind
+             * @default spreadsheet
+             * @constant
+             */
+            kind: "spreadsheet";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "admission_register" | "aadhaar_as_printed" | "udise_plus" | "board_registration" | "birth_certificate" | "parent_form" | "tc_incoming" | "manual_entry";
+        };
+        /** ImportOut */
+        ImportOut: {
+            /** Can Commit */
+            can_commit: boolean;
+            /** Can Revert */
+            can_revert: boolean;
+            /** Columns */
+            columns: components["schemas"]["ColumnOut"][];
+            /** Committed At */
+            committed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Document Id */
+            document_id: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Count */
+            error_count: number;
+            /** File Kind */
+            file_kind: string | null;
+            /** Header Row */
+            header_row: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Id */
+            job_id: string | null;
+            /** Kind */
+            kind: string;
+            /** Mapping Template Id */
+            mapping_template_id: string | null;
+            /** Raw File Deleted At */
+            raw_file_deleted_at: string | null;
+            /** Revert Deadline */
+            revert_deadline: string | null;
+            /** Reverted At */
+            reverted_at: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Source */
+            source: string;
+            /** Stats */
+            stats: {
+                [key: string]: number;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ImportRowOut
+         * @description One row: non-C3 values as they will be recorded, and the C3 keys present (never values).
+         */
+        ImportRowOut: {
+            /** Action */
+            action: ("create" | "update") | null;
+            /** Admission No */
+            admission_no: string | null;
+            /** Class Section */
+            class_section: string | null;
+            /** Errors */
+            errors: components["schemas"]["Issue"][];
+            /** Roll No */
+            roll_no: string | null;
+            /** Row No */
+            row_no: number;
+            /** Section Id */
+            section_id: string | null;
+            /** Sensitive */
+            sensitive: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "valid" | "error" | "committed" | "skipped" | "reverted";
+            /** Student Id */
+            student_id: string | null;
+            /** Values */
+            values: {
+                [key: string]: string;
+            };
+            /** Warnings */
+            warnings: components["schemas"]["Issue"][];
+        };
+        /** ImportSummary */
+        ImportSummary: {
+            /** Committed At */
+            committed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Error Count */
+            error_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reverted At */
+            reverted_at: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
+        };
+        /**
          * InviteIn
          * @description Invite a staff member. ``idp_subject`` is the identity provider's ``sub`` of the account
          *     created for them (admin-created username; docs/07 §5.1).
@@ -3508,6 +4700,182 @@ export interface components {
             /** Month */
             month: string;
         };
+        /** Issue */
+        Issue: {
+            /** Code */
+            code: string;
+            /** Field */
+            field: string;
+            /** Message Key */
+            message_key: string;
+            /** Ref */
+            ref?: string | null;
+        };
+        /**
+         * ItemConfirm
+         * @description The values a person read on the page (edited where the machine was wrong).
+         *
+         *     Keys are register fields (``admission_no``, ``full_name``, ``dob`` (YYYY-MM-DD), ``gender``,
+         *     ``father_name``, ``mother_name``, ``admission_date``, ``mother_tongue``, ``nationality``); an
+         *     empty or ``null`` value is not recorded. Send ``student_id`` to add the values to an
+         *     existing student; otherwise a new student is created (``full_name`` required), optionally
+         *     enrolled in ``section_id``.
+         */
+        ItemConfirm: {
+            /** Fields */
+            fields: {
+                [key: string]: string | null;
+            };
+            /** Roll No */
+            roll_no?: string | null;
+            /** Section Id */
+            section_id?: string | null;
+            /** Student Id */
+            student_id?: string | null;
+            /**
+             * Student Status
+             * @default active
+             * @enum {string}
+             */
+            student_status: "provisional" | "active" | "left" | "graduated";
+        };
+        /**
+         * ItemDetail
+         * @description One row for review with its page image beside it (US-402 AC1).
+         *
+         *     ``image`` is a presigned link valid for 5 minutes, or ``null`` with ``image_unavailable``:
+         *     ``withheld_sensitive_number`` (the page showed a full Aadhaar number, PRV-016),
+         *     ``not_visible`` (you may not open the document) or ``not_ready``. ``possible_matches`` are
+         *     students of this school with the same admission number (link instead of creating twice).
+         */
+        ItemDetail: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Corrected Fields */
+            corrected_fields: string[];
+            /** Created Student */
+            created_student: boolean;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Fields */
+            fields: {
+                [key: string]: components["schemas"]["FieldOut"];
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            image: components["schemas"]["PageImage"] | null;
+            /** Image Unavailable */
+            image_unavailable: ("withheld_sensitive_number" | "not_visible" | "not_ready") | null;
+            /** Low Confidence */
+            low_confidence: boolean;
+            /** Low Confidence Fields */
+            low_confidence_fields: string[];
+            /** Masked */
+            masked: boolean;
+            /**
+             * Page Id
+             * Format: uuid
+             */
+            page_id: string;
+            /** Page No */
+            page_no: number;
+            /** Possible Matches */
+            possible_matches: components["schemas"]["StudentSummary"][];
+            /** Reject Reason */
+            reject_reason: ("not_a_student_row" | "duplicate" | "unreadable" | "other") | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Row Index */
+            row_index: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending_review" | "confirmed" | "rejected";
+            /** Student Id */
+            student_id: string | null;
+            /** Value Ids */
+            value_ids: string[];
+            /** Version */
+            version: number;
+        };
+        /** ItemOut */
+        ItemOut: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Corrected Fields */
+            corrected_fields: string[];
+            /** Created Student */
+            created_student: boolean;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Fields */
+            fields: {
+                [key: string]: components["schemas"]["FieldOut"];
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Low Confidence */
+            low_confidence: boolean;
+            /** Low Confidence Fields */
+            low_confidence_fields: string[];
+            /** Masked */
+            masked: boolean;
+            /**
+             * Page Id
+             * Format: uuid
+             */
+            page_id: string;
+            /** Page No */
+            page_no: number;
+            /** Reject Reason */
+            reject_reason: ("not_a_student_row" | "duplicate" | "unreadable" | "other") | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Row Index */
+            row_index: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending_review" | "confirmed" | "rejected";
+            /** Student Id */
+            student_id: string | null;
+            /** Value Ids */
+            value_ids: string[];
+            /** Version */
+            version: number;
+        };
+        /** ItemReject */
+        ItemReject: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "not_a_student_row" | "duplicate" | "unreadable" | "other";
+        };
         /** JobOut */
         JobOut: {
             /** Error */
@@ -3541,6 +4909,14 @@ export interface components {
              * Format: uuid
              */
             tenant_id: string;
+        };
+        /**
+         * MappingIn
+         * @description The full column mapping (unlisted columns are not imported).
+         */
+        MappingIn: {
+            /** Columns */
+            columns: components["schemas"]["ColumnMap"][];
         };
         /** MarkedReadOut */
         MarkedReadOut: {
@@ -3677,12 +5053,26 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[BatchOut] */
+        Page_BatchOut_: {
+            /** Data */
+            data: components["schemas"]["BatchOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[BreakGlassOut] */
         Page_BreakGlassOut_: {
             /** Data */
             data: components["schemas"]["BreakGlassOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** Page[ChangeRequestOut] */
+        Page_ChangeRequestOut_: {
+            /** Data */
+            data: components["schemas"]["ChangeRequestOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** Page[ClassOut] */
         Page_ClassOut_: {
@@ -3705,6 +5095,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[FindingOut] */
+        Page_FindingOut_: {
+            /** Data */
+            data: components["schemas"]["FindingOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[FlagOut] */
         Page_FlagOut_: {
             /** Data */
@@ -3719,12 +5116,33 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[ImportRowOut] */
+        Page_ImportRowOut_: {
+            /** Data */
+            data: components["schemas"]["ImportRowOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Page[ImportSummary] */
+        Page_ImportSummary_: {
+            /** Data */
+            data: components["schemas"]["ImportSummary"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[InvoiceOut] */
         Page_InvoiceOut_: {
             /** Data */
             data: components["schemas"]["InvoiceOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** Page[ItemOut] */
+        Page_ItemOut_: {
+            /** Data */
+            data: components["schemas"]["ItemOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** Page[NotificationOut] */
         Page_NotificationOut_: {
@@ -3809,6 +5227,54 @@ export interface components {
             data: components["schemas"]["UserOut"][];
             /** Next Cursor */
             next_cursor: string | null;
+        };
+        /** PageImage */
+        PageImage: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Url */
+            url: string;
+        };
+        /** PageOut */
+        PageOut: {
+            /** Aadhaar Detected */
+            aadhaar_detected: boolean;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Version No */
+            document_version_no: number;
+            /** Error Code */
+            error_code: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Image Withheld */
+            image_withheld: boolean;
+            /** Low Confidence Count */
+            low_confidence_count: number;
+            /** Page No */
+            page_no: number;
+            /** Processed At */
+            processed_at: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Seq */
+            seq: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "done" | "failed";
         };
         /** PaymentIn */
         PaymentIn: {
@@ -4054,6 +5520,21 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** ProfileOut */
+        ProfileOut: {
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Needs Apaar */
+            needs_apaar: boolean;
+            /** Required Fields */
+            required_fields: string[];
+            /** Version */
+            version: number;
+        };
         /** ProvisionIn */
         ProvisionIn: {
             billing_account: components["schemas"]["BillingAccountIn"];
@@ -4147,6 +5628,21 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** RejectIn */
+        RejectIn: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * ResolveIn
+         * @description US-502 AC1: a note, a change request, or both.
+         */
+        ResolveIn: {
+            /** Change Request Id */
+            change_request_id?: string | null;
+            /** Note */
+            note?: string | null;
+        };
         /**
          * RevealIn
          * @description Reveal one C3 field (audited). ``guardian_phone``/``guardian_address`` need
@@ -4197,6 +5693,100 @@ export interface components {
         RolesIn: {
             /** Roles */
             roles: string[];
+        };
+        /** RuleCount */
+        RuleCount: {
+            /** Count */
+            count: number;
+            /** Rule Id */
+            rule_id: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "blocker" | "high" | "medium" | "low" | "info";
+        };
+        /** RuleOut */
+        RuleOut: {
+            /** Attribute Keys */
+            attribute_keys: string[];
+            /** Check */
+            check: string;
+            explanation: components["schemas"]["Bilingual"];
+            /** Id */
+            id: string;
+            /** Requires Profile */
+            requires_profile: boolean;
+            /** Routes */
+            routes: components["schemas"]["Bilingual"][];
+            /** Scope */
+            scope: string;
+            severity: components["schemas"]["SeverityPolicyOut"];
+            /** Sources */
+            sources: string[];
+            /** Version */
+            version: number;
+        };
+        /** RunCreate */
+        RunCreate: {
+            /** Profile Key */
+            profile_key?: string | null;
+            scope?: components["schemas"]["RunScopeIn"];
+        };
+        /** RunOut */
+        RunOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Event Type */
+            event_type: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /** Started At */
+            started_at: string | null;
+            /** Stats */
+            stats: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+            /**
+             * Trigger
+             * @enum {string}
+             */
+            trigger: "manual" | "event";
+        };
+        /**
+         * RunScopeIn
+         * @description At most one of the fields; empty = every student you can see.
+         */
+        RunScopeIn: {
+            /** Batch Id */
+            batch_id?: string | null;
+            /** Class Ids */
+            class_ids?: string[] | null;
+            /** Section Ids */
+            section_ids?: string[] | null;
+            /** Student Ids */
+            student_ids?: string[] | null;
         };
         /**
          * SchoolChoiceOut
@@ -4314,6 +5904,20 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** SeverityPolicyOut */
+        SeverityPolicyOut: {
+            /** Cap */
+            cap: ("blocker" | "high" | "medium" | "low" | "info") | null;
+            /** Floor */
+            floor: ("blocker" | "high" | "medium" | "low" | "info") | null;
+            /** Level */
+            level: ("blocker" | "high" | "medium" | "low" | "info") | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "fixed" | "match_class";
+        };
         /**
          * StudentCreate
          * @description New student with its first values (docs/09: source required per value).
@@ -4388,6 +5992,18 @@ export interface components {
              */
             status: "provisional" | "active" | "left" | "graduated";
         };
+        /** StudentRef */
+        StudentRef: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** StudentSummary */
         StudentSummary: {
             /** Admission No */
@@ -4461,6 +6077,27 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * SummaryOut
+         * @description Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).
+         */
+        SummaryOut: {
+            /** Blockers */
+            blockers: number;
+            /** By Rule */
+            by_rule: components["schemas"]["RuleCount"][];
+            /** By Severity */
+            by_severity: {
+                [key: string]: number;
+            };
+            last_run: components["schemas"]["RunOut"] | null;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Students With Blockers */
+            students_with_blockers: number;
+            /** Warnings */
+            warnings: number;
+        };
         /** SuspendSubscriptionIn */
         SuspendSubscriptionIn: {
             /**
@@ -4470,6 +6107,51 @@ export interface components {
             exam_window_override: boolean;
             /** Reason */
             reason: string;
+        };
+        /**
+         * TemplateCreate
+         * @description Save the mapping of an import as a reusable template (matched by the file's headers).
+         */
+        TemplateCreate: {
+            /**
+             * Import Id
+             * Format: uuid
+             */
+            import_id: string;
+            /** Name */
+            name: string;
+        };
+        /** TemplateOut */
+        TemplateOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Headers */
+            headers: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Mapping */
+            mapping: {
+                [key: string]: string;
+            };
+            /** Name */
+            name: string;
+            /** Source */
+            source: string;
+            /** Version */
+            version: number;
         };
         /**
          * TenantBillingOut
@@ -5149,6 +6831,11 @@ export interface components {
             /** Version No */
             version_no: number;
         };
+        /** WaiveIn */
+        WaiveIn: {
+            /** Reason */
+            reason: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -5583,6 +7270,238 @@ export interface operations {
             };
         };
     };
+    list_change_requests_api_v1_change_requests_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("pending" | "approved" | "rejected" | "expired" | "cancelled") | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ChangeRequestOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_change_request_api_v1_change_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_request_api_v1_change_requests__change_request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_change_request_api_v1_change_requests__change_request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApproveIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_change_request_api_v1_change_requests__change_request_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_request_memo_api_v1_change_requests__change_request_id__memo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 memo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_change_request_api_v1_change_requests__change_request_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_classes_api_v1_classes_get: {
         parameters: {
             query?: {
@@ -6003,6 +7922,519 @@ export interface operations {
             };
         };
     };
+    list_findings_api_v1_dq_findings_get: {
+        parameters: {
+            query?: {
+                attribute_key?: string | null;
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                profile_key?: string | null;
+                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012")[] | null;
+                section_id?: string | null;
+                severity?: ("blocker" | "high" | "medium" | "low" | "info")[] | null;
+                status?: ("open" | "resolved" | "waived" | "reopened")[] | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_FindingOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_finding_api_v1_dq_findings__finding_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                finding_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_finding_api_v1_dq_findings__finding_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                finding_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    waive_finding_api_v1_dq_findings__finding_id__waive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                finding_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaiveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_profiles_api_v1_dq_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"][];
+                };
+            };
+        };
+    };
+    list_rules_api_v1_dq_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleOut"][];
+                };
+            };
+        };
+    };
+    start_run_api_v1_dq_runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_api_v1_dq_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_summary_api_v1_dq_summary_get: {
+        parameters: {
+            query?: {
+                profile_key?: string | null;
+                section_ids?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_batches_api_v1_extraction_batches_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BatchOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_batch_api_v1_extraction_batches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_batch_api_v1_extraction_batches__batch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_items_api_v1_extraction_items_get: {
+        parameters: {
+            query?: {
+                batch_id?: string | null;
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("pending_review" | "confirmed" | "rejected") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ItemOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_item_api_v1_extraction_items__item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_item_api_v1_extraction_items__item_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_item_api_v1_extraction_items__item_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemReject"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     heartbeat_api_v1_fleet_heartbeat_post: {
         parameters: {
             query?: never;
@@ -6019,6 +8451,327 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HeartbeatOut"];
+                };
+            };
+        };
+    };
+    list_templates_api_v1_import_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"][];
+                };
+            };
+        };
+    };
+    create_template_api_v1_import_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_imports_api_v1_imports_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ImportSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_import_api_v1_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_import_api_v1_imports__import_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_import_api_v1_imports__import_id__commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CommitIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_mapping_api_v1_imports__import_id__mapping_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MappingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_import_api_v1_imports__import_id__revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rows_api_v1_imports__import_id__rows_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("valid" | "error" | "committed" | "skipped" | "reverted" | "warning") | null;
+            };
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ImportRowOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_import_api_v1_imports__import_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

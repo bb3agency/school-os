@@ -51,7 +51,8 @@ apps/api/app/
   authz/         roles, permissions, scopes, require() dependency, policy tests
   audit/         hash-chained audit events, verification job
   students/      students, guardians, per-source attribute values, canonical view
-  imports/       Excel/CSV/Sheets import, register-photo extraction, verification queue
+  imports/       Excel/CSV/Sheets import (spreadsheet onboarding, 24-hour revert)
+  extraction/    register-photo extraction, verification queue (provider interface, Aadhaar masking)
   dq/            data-quality rules engine, findings, name matching
   changes/       change requests (maker-checker) for identity fields
   documents/     upload, storage, versions, ACLs, virus scan hook
@@ -64,7 +65,7 @@ apps/api/app/
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0007_accept_invitations
+apps/api/migrations/  Alembic revisions 0001_baseline … 0016_extraction (linear chain; one module per M1 revision)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)
