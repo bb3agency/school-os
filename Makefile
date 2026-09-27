@@ -22,6 +22,9 @@ ARGS ?=
 # (e.g. "--tenants 3 --students 800 --no-documents"; see python -m app.devtools.seed_synthetic -h).
 PROFILE   ?= full
 SEED_ARGS ?=
+# test-order: ORDER_SEED (random by default; the run prints it) and ORDER_BUCKET (module, global).
+ORDER_SEED   ?=
+ORDER_BUCKET ?= module
 
 .PHONY: help install dev dev-host dev-stop down logs migrate seed-synthetic sync-system-roles test test-api test-web test-security \
         migration-check e2e lint format typecheck security eval check db-shell openapi tf-validate
@@ -77,6 +80,9 @@ test: test-api test-web ## Run all unit/integration tests
 
 test-api: ## Python tests (real Postgres via testcontainers) with coverage
 	$(UV) run pytest --cov --cov-report=term-missing:skip-covered --cov-report=xml
+
+test-order: ## Python tests in a shuffled order (pytest-random-order); reproduce with ORDER_SEED=<printed seed>
+	$(UV) run pytest -q -p no:cacheprovider --random-order-bucket=$(ORDER_BUCKET) $(if $(ORDER_SEED),--random-order-seed=$(ORDER_SEED),)
 
 test-security: ## Security suites: RLS catalog, tenant isolation, authz, BOLA
 	$(UV) run pytest apps/api/tests/security -q
