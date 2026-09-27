@@ -113,6 +113,19 @@ def verhoeff_check_digit(digits: str) -> str:
 _SEP = r"(?:[ \u00a0]{1,2}|[ \u00a0]?[-\u2010-\u2013][ \u00a0]?)"
 _RUN_RE = re.compile(rf"\+?\d+(?:{_SEP}\d+)*")
 _GROUP_RE = re.compile(r"\+?\d+")
+# UUIDs are identifiers, never Aadhaar candidates: their decimal digits across hyphens pass
+# Verhoeff ~0.24% of the time. Scanning happens on a view where UUID characters are replaced by
+# a same-length non-digit, so indices match the original text.
+_UUID_RE = re.compile(
+    r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"
+    r"(?![0-9A-Fa-f])"
+)
+
+
+def _scan_view(text: str) -> str:
+    return _UUID_RE.sub(lambda m: "u" * len(m.group(0)), text)
+
+
 _EMAIL_RE = re.compile(r"[\w.%+\-]+@[\w\-]+(?:\.[\w\-]+)+")
 _AADHAAR_CONTEXT_RE = re.compile(
     r"a{1,2}dha{1,2}r|(?<![a-z])uid(?:ai)?(?![a-z])|ఆధార్|आधार", re.IGNORECASE
@@ -229,11 +242,12 @@ def _mobile_regions(groups: list[_Group], taken: set[int]) -> list[tuple[int, in
 def _mask_runs(text: str, *, mobiles: bool) -> tuple[str, bool]:
     """One masking pass. Returns (new_text, changed)."""
     spans = _context_spans(text)
+    view = _scan_view(text)
     pieces: list[str] = []
     cursor = 0
     changed = False
-    for run in _RUN_RE.finditer(text):
-        groups = _groups(text, run)
+    for run in _RUN_RE.finditer(view):
+        groups = _groups(view, run)
         replacements: list[tuple[int, int, str]] = []
         aadhaar = _aadhaar_regions(text, groups, spans)
         taken: set[int] = set()
@@ -276,7 +290,7 @@ def redact(text: str) -> str:
 
 def contains_full_aadhaar(text: str) -> bool:
     """True if ``text`` contains a 12-digit number passing the Verhoeff check (input rejection)."""
-    normalised = unicodedata.normalize("NFC", text)
+    normalised = _scan_view(unicodedata.normalize("NFC", text))
     for run in _RUN_RE.finditer(normalised):
         groups = _groups(normalised, run)
         for _i, _j, digits in _windows(groups, _AADHAAR_LEN):

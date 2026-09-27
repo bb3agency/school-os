@@ -9,6 +9,7 @@ from __future__ import annotations
 import random
 import re
 import unicodedata
+import uuid
 
 import pytest
 from hypothesis import assume, given, settings
@@ -312,3 +313,31 @@ def test_PRV_015_property_invalid_numbers_without_context_unchanged(
     assume(not re.fullmatch(r"91[6-9]\d{9}", invalid))
     text = prefix + (spaced(invalid) if grouped else invalid) + suffix
     assert redact(text) == unicodedata.normalize("NFC", text)
+
+
+# --- UUIDs are identifiers, never Aadhaar candidates (false-positive fix) ----------------------
+
+KNOWN_COLLISION = "a37058d2-1459-4055-8683-a2308be1de0d"  # digits across hyphens pass Verhoeff
+
+
+def test_PRV_015_known_uuid_collision_is_not_aadhaar() -> None:
+    assert not contains_full_aadhaar(KNOWN_COLLISION)
+    assert mask_aadhaar(KNOWN_COLLISION) == KNOWN_COLLISION
+    assert redact(f"student {KNOWN_COLLISION} updated") == f"student {KNOWN_COLLISION} updated"
+
+
+@given(st.uuids())
+def test_PRV_015_uuids_are_never_flagged_or_masked(value: uuid.UUID) -> None:
+    for text in (str(value), str(value).upper(), f"id={value};", f"{value} {value}"):
+        assert not contains_full_aadhaar(text)
+        assert mask_aadhaar(text) == text
+
+
+def test_PRV_015_real_aadhaar_next_to_a_uuid_is_still_found() -> None:
+    body = "23456789012"
+    number = body + verhoeff_check_digit(body)
+    text = f"{KNOWN_COLLISION} {number[:4]} {number[4:8]} {number[8:]}"
+    assert contains_full_aadhaar(text)
+    masked = mask_aadhaar(text)
+    assert masked.startswith(KNOWN_COLLISION)
+    assert number not in masked.replace(" ", "")
