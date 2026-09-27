@@ -11,8 +11,8 @@
           "match": "*",
           "claims": {
             "aud": ["schoolos-web"],
-            "amr": ["pwd"],
-            "sos:mfa": "false"
+            "amr": ["pwd", "mfa"],
+            "sos:mfa": "true"
           }
         }
       ]
