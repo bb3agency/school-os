@@ -120,8 +120,10 @@ the signed-out page, without an IdP.
 
 With `E2E_STAND_IN=1` (and Valkey at `REDIS_URL`) it also signs in through a scripted
 stand-in IdP and canned API (`e2e/support/stand-in.ts`; synthetic data only) and runs axe
-plus keyboard-only paths on school pages (billing, support, home, the picker) and platform
-pages (dashboard, schools, invoices, plans, the provision wizard, a dialog):
+plus keyboard-only paths on school pages (billing, support, home, the picker, settings,
+structure, users, documents, the audit check) and platform pages (dashboard, schools, a school
+whose provisioning stopped, invoices, plans, the provision wizard, dialogs). It also fails on
+horizontal overflow at 1366×768 and on any Tab stop without a visible focus indicator:
 
 ```bash
 docker run --rm -d --name sos-e2e-valkey -p 127.0.0.1:6391:6379 valkey/valkey:8.1-alpine
