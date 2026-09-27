@@ -22,7 +22,7 @@ Downgrade drops both tables. Enrolments opened and closed by promotions stay as 
 are ordinary enrolments); only the undo bookkeeping is lost.
 
 Revision ID: 0022_promotions
-Revises: 0020_provisioning_runs
+Revises: 0021_kb_tables
 Create Date: 2026-09-27
 """
 
@@ -31,7 +31,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "0022_promotions"
-down_revision = "0020_provisioning_runs"
+down_revision = "0021_kb_tables"
 branch_labels = None
 depends_on = None
 

@@ -2,7 +2,7 @@
 
 A fresh database is migrated to head and seeded with a synthetic school (``seed-synthetic``);
 a promotion is committed through the service (so promotion runs and items exist), then the walk
-0022 -> 0020 -> 0022 -> 0020 -> head must succeed with that data present. Downgrading drops
+0022 -> 0021 -> 0022 -> 0021 -> head must succeed with that data present. Downgrading drops
 only the undo bookkeeping: the enrolments the promotion opened and closed stay.
 """
 
@@ -31,7 +31,7 @@ from app.devtools import seeder
 pytestmark = pytest.mark.db
 SW = sys.modules["sos_test_student_world"]
 DB = "schoolos_promotions_migration"
-REVISION, BELOW = "0022_promotions", "0020_provisioning_runs"
+REVISION, BELOW = "0022_promotions", "0021_kb_tables"
 SETTINGS = Settings(
     env=Environment.CI,
     key_wrapper=KeyWrapperKind.LOCAL_DEV,
