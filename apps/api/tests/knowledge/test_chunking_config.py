@@ -40,6 +40,11 @@ def test_PRV_removing_a_student_record_purpose_is_refused(purpose: str) -> None:
         (("extraction", "max_xml_bytes"), 10),
         (("extraction", "indexed_sensitivities"), ["C4"]),
         (("extraction", "unknown_key"), 1),
+        (("extraction", "pdf", "max_pages"), 0),
+        (("extraction", "pdf", "time_budget_seconds"), 0),
+        (("extraction", "pdf", "max_bad_char_share"), 1.5),
+        (("extraction", "pdf", "max_bytes"), 10),
+        (("extraction", "pdf", "unknown_key"), 1),
     ],
 )
 def test_invalid_extraction_settings_are_refused(path: tuple[str, ...], value: object) -> None:

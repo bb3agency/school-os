@@ -161,11 +161,12 @@ def test_unsupported_current_version_stops_older_chunks_being_latest() -> None:
     w = S.world()
     seeded(w)
     w.pipeline.ingest(S.TENANT_A, DOC, V1.id)
-    pdf = S.version(2, mime="application/pdf")
-    seeded(w, versions=[V1, pdf], files={1: S.circular_docx(), 2: b"%PDF-1.7"})
-    assert w.pipeline.ingest(S.TENANT_A, DOC, pdf.id) == "unsupported_type"
+    # XLSX is not indexed yet (docs/06 §4.2); PDF has been since ADR-0027.
+    xlsx = S.version(2, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    seeded(w, versions=[V1, xlsx], files={1: S.circular_docx(), 2: b"PK"})
+    assert w.pipeline.ingest(S.TENANT_A, DOC, xlsx.id) == "unsupported_type"
     assert not any(r.is_latest for r in rows(w))
-    assert w.source.reads == 1  # the PDF bytes were never read
+    assert w.source.reads == 1  # the XLSX bytes were never read
 
 
 def test_corrupt_file_fails_with_a_code_and_indexes_nothing() -> None:

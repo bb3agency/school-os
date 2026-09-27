@@ -46,6 +46,12 @@ dependencies = [
   # Starlette's TestClient from httpx to httpx2 across every test module; that migration is a
   # separate, repo-wide change (CLAUDE.md §3 lists httpx), so it is deferred, not smuggled in here.
   "anthropic==0.125.0",
+  # PDF text layer for knowledge ingestion (ADR-0027, FR-KB-001), imported ONLY by
+  # app/knowledge/ingestion/pdf.py inside the ingest worker. Licence Apache-2.0 / BSD-3-Clause;
+  # bundles a PDFium binary (BSD-3-Clause) per platform wheel (manylinux/musllinux, win_amd64);
+  # no runtime Python dependencies; no known vulnerabilities (PyPI + OSV, 2026-09-27); 5.13.0 is
+  # the current release (2026-08-13, roughly monthly releases). trivy/pip-audit cover the wheel.
+  "pypdfium2==5.13.0",
 ]
 
 [build-system]
