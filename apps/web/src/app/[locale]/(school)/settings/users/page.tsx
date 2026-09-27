@@ -1,9 +1,9 @@
-import { UsersScreen } from "@/features/school/screens";
+import { UsersScreen } from "@/features/users/UsersScreen";
 import { pageMetadata } from "@/lib/metadata";
 
 export const generateMetadata = pageMetadata((t) => t("school.users.title"));
 
-/** FR-IAM-010..014: GET /users through the BFF (step-up handled by the client). */
+/** US-102, FR-IAM-010..014: the school's staff, their roles and classes (GET /users, /roles). */
 export default function SchoolUsersPage() {
   return <UsersScreen />;
 }

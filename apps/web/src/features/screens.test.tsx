@@ -4,7 +4,8 @@ import { forgetSessionInfo } from "@/lib/bff/session-client";
 import { setNavigateForTesting } from "@/lib/bff/query";
 import { messages, renderWithIntl } from "@/test/render";
 import { DashboardScreen, SchoolsScreen } from "./platform/screens";
-import { AuditScreen, StructureScreen, toIsoDate, UsersScreen } from "./school/screens";
+import { AuditScreen, StructureScreen, toIsoDate } from "./school/screens";
+import { UsersScreen } from "./users/UsersScreen";
 
 type Route = (url: URL, request: Request) => Response | Promise<Response>;
 let routes: Record<string, Route>;

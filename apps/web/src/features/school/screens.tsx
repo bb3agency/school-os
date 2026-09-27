@@ -3,7 +3,6 @@
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { AuditView } from "./AuditView";
 import { StructureView } from "./StructureView";
-import { UsersView } from "./UsersView";
 
 /**
  * School console screens wired to the API through the BFF (TanStack Query). The views
@@ -28,16 +27,6 @@ export function StructureScreen() {
     async () => (await unwrap(api.GET("/api/v1/sections", { params: { query: PAGE } }))).data,
   );
   return <StructureView years={years} classes={classes} sections={sections} />;
-}
-
-/** US-102 / FR-IAM-010..014: GET /users (the API may ask for step-up: 428). */
-export function UsersScreen() {
-  const api = useBffClient("staff");
-  const users = useApiQuery(
-    ["staff", "users"],
-    async () => (await unwrap(api.GET("/api/v1/users", { params: { query: PAGE } }))).data,
-  );
-  return <UsersView users={users} />;
 }
 
 export interface AuditFilters {
