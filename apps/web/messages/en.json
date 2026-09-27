@@ -273,6 +273,35 @@
         "user": "Staff user",
         "system": "System",
         "operator": "SchoolOS support"
+      },
+      "integrity": {
+        "title": "Audit log integrity",
+        "description": "Check that no audit event was changed, removed or inserted afterwards.",
+        "back": "Back to the audit log",
+        "noAccessTitle": "You can't check the audit log",
+        "noAccessBody": "This check is for staff who can read the audit log, such as the principal. Ask your school's office admin if you need this.",
+        "howTitle": "How the check works",
+        "howBody": "Every audit event is linked to the one before it by a fingerprint. The check recomputes every fingerprint from the first event to the last. It reads the whole log, so it can take a minute in a large school.",
+        "checking": "Checking…",
+        "checkingBody": "Checking the audit log. Keep this page open.",
+        "checkAgain": "Check again",
+        "okTitle": "The audit log is intact",
+        "okBody": "Verified up to event {last}: {count, plural, one {# event was} other {# events were}} checked and none was changed.",
+        "okEmpty": "There are no audit events to check yet.",
+        "brokenTitle": "The audit log is broken at event {seq}",
+        "brokenIntact": "Events before it are intact ({count, plural, one {# event} other {# events}}, up to event {last}).",
+        "brokenFromStart": "The problem starts at the first event.",
+        "brokenAction": "Do not try to fix this yourself. Contact SchoolOS support now and tell them the event number above.",
+        "checkedAt": "Checked on {time}.",
+        "reason": {
+          "duplicate_seq": "Two events have the same number.",
+          "seq_gap": "An event is missing: the numbers skip one.",
+          "prev_hash_mismatch": "This event is not linked to the event before it.",
+          "hash_mismatch": "This event was changed after it was recorded.",
+          "head_missing": "The record of the latest event is missing.",
+          "head_mismatch": "The latest event does not match the recorded end of the log.",
+          "other": "The events do not link up as expected."
+        }
       }
     },
     "switchSchool": "Switch school",
