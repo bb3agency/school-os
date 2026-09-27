@@ -180,6 +180,29 @@ Then:
 
 Settings per query: `SET LOCAL hnsw.ef_search = 64` (tune), and iterative scans for filtered queries when available (pgvector ≥ 0.8).
 
+**As built (M2 package K3; `knowledge/retrieval/`, tables in 05 §6.2):**
+- **Retriever.** `HybridRetriever` implements `interfaces.Retriever`. For each query text it runs three branches in one `UNION ALL` statement: the original text first, then translations when `translated_query_fusion` is on. Every branch has `acl_predicate(acl, filters)` in its own WHERE clause, and the final query that loads content applies it again.
+- **`<ALLOWED>`.** It has four parts:
+  - `is_latest` and the optional filters.
+  - Never a `C3` document. `AclKeys` does not carry `student.read_sensitive`, so retrieval leaves C3 out rather than guess.
+  - The 05 §6.1 rule, when not `sees_all`: an overlap on roles, sections or classes, or the caller's membership. School-wide readers also see every section- and class-restricted document and documents with an empty ACL. For anyone else an empty ACL matches nothing.
+  - Tenant isolation is RLS.
+- **Eval oracle.** `evals/sos_evals/acl.py` is narrower: it knows only roles, sections and classes, with no school-wide readers, memberships or sensitivity. A test checks that the SQL filter and the oracle agree on everything the oracle can express.
+- **Branches.** Differences from the sketch above:
+  - *vector:* `ORDER BY embedding <=> :qvec LIMIT 40` with `hnsw.iterative_scan = relaxed_order` and `hnsw.max_scan_tuples`. Without iterative scan, HNSW returns only `ef_search` neighbours from all schools and RLS drops most of them. A small school may be planned as exact kNN over its rows through the tenant btree, which is cheaper.
+  - *full text:* `content_tsv @@ q`, ranked by `ts_rank_cd`, where `q` ORs the question's lexemes (`any_term`). `websearch_to_tsquery` ANDs every word, so natural questions rarely match. The tsquery is built by PostgreSQL once per text.
+  - *keyword:* `:q <% context_header`, ranked by `word_similarity`. `content % :q` with `similarity()` cannot match a short question against a 350–600-token chunk. Under RLS it also costs about 3 s per 20k chunks, because every row needs a trigram scan. The header holds the title, issuer, reference number, date, subject and section, which are what trigram matching is for.
+- **Index use.** GIN cannot serve `@@`, `<%` or `&&` under FORCE RLS: they are not leakproof (05 §6.2). The text branches filter one school's rows through the tenant btree instead, measured at about 50 ms of full-text filtering per 20k chunks. Watch this at Stage 2; tenant partitioning is in 05 §12.
+- **Fusion.** RRF (k = 60) is computed in Python so that it is deterministic, with ties broken by chunk ID. Then come the boosts, `max_chunks_per_document`, `k`, and merging of adjacent chunks on the same page, which keeps the best chunk's ID and the union of pages. The recency and verified-answer factors ship **neutral** (1.0) until `make eval` tunes them. Recency is measured against the newest candidate, not the wall clock.
+- **Ingestion writes the index only through `knowledge.repository`:**
+  - `replace_version_chunks` (hidden until promoted)
+  - `promote_version`
+  - `refresh_acl`
+  - `demote_document`
+  - `delete_version_chunks` and `delete_document_chunks`
+  - `flag_verified_answers_citing`
+  - the embedding cache: `get_cached_embeddings`, `put_cached_embeddings` and `purge_embedding_cache`
+
 ## 7. Record tools (read-only, whitelisted) (ADR-0008)
 
 Free-form text-to-SQL is **not** used: it is hard to secure and hard to get right. Instead the model calls typed tools; each tool calls a module **service** with the caller's context, so RLS, scopes and sensitivity rules apply automatically.
