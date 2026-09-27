@@ -36,6 +36,8 @@ const LINKS: Record<string, (id: string) => string> = {
   export: (id) => `/exports/${id}`,
   import_batch: (id) => `/imports/${id}`,
   extraction_batch: (id) => `/register-photos/${id}`,
+  // document.quarantined: the document screen explains why the file was blocked.
+  document: (id) => `/documents/${id}`,
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
