@@ -1,0 +1,69 @@
+#!/bin/bash
+# SchoolOS shared tier: ECS container instance for the pdf queue only (ADR-0025 option A).
+# Rendered by infra/terraform/modules/ecs_ec2_capacity. Contains NO secrets.
+#
+# Docker's default seccomp profile blocks the user namespace Chromium's sandbox needs, and ECS task
+# definitions cannot name a seccomp profile, so this daemon's DEFAULT profile is the worker profile
+# (docker-default + chroot/clone/unshare; deploy/dedicated/security/seccomp-worker.json). Only the
+# pdf worker service may be placed here (capacity provider + memberOf ${attribute_name}).
+# If any step fails, the ECS agent is never started and the instance powers off (the launch
+# template terminates it on shutdown), so no task ever runs under an unexpected profile.
+set -euo pipefail
+
+fail() {
+  echo "schoolos-pdf-capacity: $*" >&2
+  systemctl mask --now ecs.service || true
+  shutdown -h +1 "SchoolOS pdf capacity bootstrap failed" || true
+  exit 1
+}
+trap 'fail "user data failed at line $LINENO"' ERR
+
+# 1. Seccomp profile (gzip+base64: user data is limited to 16 KB).
+install -d -m 0755 /etc/docker
+base64 -d <<'PROFILE' | gunzip >/etc/docker/seccomp-worker.json
+${seccomp_profile_gz_b64}
+PROFILE
+chmod 0644 /etc/docker/seccomp-worker.json
+echo "${seccomp_profile_sha256}  /etc/docker/seccomp-worker.json" | sha256sum -c --quiet -
+
+# 2. Daemon default seccomp profile (merge into any daemon.json the AMI ships).
+python3 - <<'PY'
+import json, os
+path = "/etc/docker/daemon.json"
+cfg = {}
+if os.path.exists(path) and os.path.getsize(path):
+    with open(path) as fh:
+        cfg = json.load(fh)
+cfg["seccomp-profile"] = "/etc/docker/seccomp-worker.json"
+with open(path + ".tmp", "w") as fh:
+    json.dump(cfg, fh, indent=2)
+os.replace(path + ".tmp", path)
+PY
+
+# 3. Unprivileged user namespaces (the sandbox's first layer). AL2023 does not restrict them;
+#    set the limit explicitly so an AMI default can never turn the sandbox off.
+install -d -m 0755 /etc/sysctl.d
+echo "user.max_user_namespaces = ${max_user_namespaces}" >/etc/sysctl.d/90-schoolos-userns.conf
+sysctl -q --system
+
+systemctl restart docker
+docker info --format '{{json .SecurityOptions}}' | grep -q 'profile=/etc/docker/seccomp-worker.json' ||
+  fail "dockerd is not using /etc/docker/seccomp-worker.json as its default seccomp profile"
+
+# 4. ECS agent: this cluster only; tasks cannot reach IMDS (they use their task role); no
+#    privileged containers; awslogs and image pulls use the task execution role, not this instance.
+cat >/etc/ecs/ecs.config <<'ECS'
+ECS_CLUSTER=${cluster_name}
+ECS_AWSVPC_BLOCK_IMDS=true
+ECS_ENABLE_TASK_IAM_ROLE=true
+ECS_DISABLE_PRIVILEGED=true
+ECS_SELINUX_CAPABLE=false
+ECS_APPARMOR_CAPABLE=false
+ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true
+ECS_CONTAINER_STOP_TIMEOUT=120s
+ECS_INSTANCE_ATTRIBUTES={"${attribute_name}":"${attribute_value}"}
+ECS_LOGLEVEL=info
+ECS
+
+trap - ERR
+echo "schoolos-pdf-capacity: ready (seccomp profile ${seccomp_profile_sha256})"

@@ -254,3 +254,23 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# --- EC2 capacity (ADR-0025: the shared tier's pdf worker) ------------------------------------------
+
+variable "capacity_provider_name" {
+  description = "Run on this EC2 capacity provider instead of Fargate (null = Fargate). On EC2 the writable paths are tmpfs mounts, the container gets no-new-privileges, and the service uses the capacity provider strategy."
+  type        = string
+  default     = null
+}
+
+variable "placement_constraint" {
+  description = "memberOf expression pinning EC2 tasks to instances with an attribute (e.g. the sandbox-profile hosts). Ignored on Fargate."
+  type        = string
+  default     = null
+}
+
+variable "tmpfs_size_mib" {
+  description = "Size of each writable tmpfs path on EC2 (MiB)."
+  type        = number
+  default     = 512
+}

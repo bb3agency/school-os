@@ -118,3 +118,63 @@ run "root_user_rejected" {
 
   expect_failures = [var.user]
 }
+
+# ADR-0025 option A: the pdf worker runs on EC2 capacity whose daemon allows the Chromium sandbox.
+# The container keeps the same hardening; scratch space is tmpfs; the service is pinned there.
+run "ec2_capacity_keeps_the_hardening" {
+  command = plan
+
+  variables {
+    name                   = "sos-test-worker-pdf"
+    container_port         = null
+    capacity_provider_name = "sos-test-pdf"
+    placement_constraint   = "attribute:schoolos.seccomp == chromium-sandbox"
+    tmpfs_size_mib         = 256
+  }
+
+  assert {
+    condition     = aws_ecs_task_definition.this.requires_compatibilities == toset(["EC2"]) && aws_ecs_task_definition.this.network_mode == "awsvpc"
+    error_message = "EC2 task definition in awsvpc mode (own ENI and security group)."
+  }
+
+  assert {
+    condition = (
+      output.container_definition.readonlyRootFilesystem && !output.container_definition.privileged
+      && output.container_definition.user == "10001:10001"
+      && output.container_definition.linuxParameters.capabilities.drop == ["ALL"]
+      && output.container_definition.dockerSecurityOptions == ["no-new-privileges"]
+    )
+    error_message = "Same hardening as Fargate, plus explicit no-new-privileges (Fargate implies it)."
+  }
+
+  assert {
+    condition = (
+      length(output.container_definition.linuxParameters.tmpfs) == 1
+      && output.container_definition.linuxParameters.tmpfs[0].containerPath == "/tmp"
+      && output.container_definition.linuxParameters.tmpfs[0].size == 256
+      && join(",", output.container_definition.linuxParameters.tmpfs[0].mountOptions) == "nosuid,nodev,noexec,mode=1777"
+      && length(output.container_definition.mountPoints) == 0 && length(aws_ecs_task_definition.this.volume) == 0
+    )
+    error_message = "Writable paths are tmpfs on EC2 (never on the instance disk)."
+  }
+
+  assert {
+    condition = (
+      one(aws_ecs_service.this[0].capacity_provider_strategy).capacity_provider == "sos-test-pdf"
+      && one(aws_ecs_service.this[0].placement_constraints).expression == "attribute:schoolos.seccomp == chromium-sandbox"
+    )
+    error_message = "The service uses the capacity provider and is pinned to the sandbox-profile instances."
+  }
+}
+
+run "ec2_tasks_get_no_public_ip" {
+  command = plan
+
+  variables {
+    container_port         = null
+    capacity_provider_name = "sos-test-pdf"
+    assign_public_ip       = true
+  }
+
+  expect_failures = [aws_ecs_service.this]
+}

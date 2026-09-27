@@ -101,6 +101,17 @@ def test_SEC_030_seccomp_profile_is_what_the_derivation_script_produces() -> Non
     assert SECCOMP.read_text(encoding="utf-8").endswith("}\n")
 
 
+def test_SEC_030_shared_tier_capacity_uses_the_same_seccomp_profile() -> None:
+    copy = CAPACITY / "files" / "seccomp-worker.json"
+    assert copy.read_bytes() == SECCOMP.read_bytes(), (
+        "infra/terraform/modules/ecs_ec2_capacity/files/seccomp-worker.json must be a byte copy of "
+        "deploy/dedicated/security/seccomp-worker.json"
+    )
+    user_data = (CAPACITY / "templates" / "user-data.sh.tftpl").read_text(encoding="utf-8")
+    assert 'cfg["seccomp-profile"] = "/etc/docker/seccomp-worker.json"' in user_data
+    assert "systemctl mask --now ecs.service" in user_data, "no ECS agent without the profile"
+
+
 # --- the AppArmor profile -------------------------------------------------------------------------
 
 
