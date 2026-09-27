@@ -69,6 +69,7 @@ class DocumentsServiceSource:
                 )
                 for v in doc.versions
             ),
+            status=doc.status,
         )
 
     def read_version(self, session: Session, document_id: uuid.UUID, version_no: int) -> bytes:

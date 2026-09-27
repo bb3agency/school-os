@@ -106,6 +106,9 @@ class InMemoryChunkStore:
         self.rows = rows
         return changed
 
+    def hide_document(self, session: Any, document_id: uuid.UUID) -> int:
+        return self._rewrite(session, document_id, is_latest=False)
+
     def update_acl(self, session: Any, document_id: uuid.UUID, acl: ChunkAcl) -> int:
         return self._rewrite(session, document_id, acl=acl)
 
