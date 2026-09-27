@@ -284,6 +284,56 @@ def _dq_fresh(w: Any, r: str, a: Engine) -> uuid.UUID:
     return finding
 
 
+# --- change requests (US-601, FR-CR-*) ------------------------------------------------
+
+
+def _cr() -> ModuleType:
+    """tests/changes/objects.py (change requests through the real services)."""
+    name = "sos_test_changes_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "changes" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+_MAKERS = ("principal", "office_admin", "office_staff", "exam_coordinator")
+
+
+def _cr_submit(w: Any, role: str, admin: Engine) -> Request:
+    """A fresh student and an evidence document the role can open (identity correction)."""
+    student = _cr().student(w.a)
+    doc = _cr().evidence(admin, w.a, w.a.people["owner"])
+    body = {
+        "student_id": str(student),
+        "attribute_key": "dob",
+        "new_value": "2012-03-15",
+        "reason": "Synthetic matrix correction reason",
+        "evidence_document_id": str(doc),
+    }
+    return "/api/v1/change-requests", body, {}
+
+
+def _cr_pending(w: Any, admin: Engine, role: str | None = None) -> uuid.UUID:
+    """A fresh pending request: submitted by ``role`` when it is a maker (cancel), otherwise by
+    the office admin (so approvers are never the requester)."""
+    maker = role if role in _MAKERS else "office_admin"
+    out = _cr().submit(admin, w.a, w.person(maker), maker)
+    value: uuid.UUID = out.id
+    return value
+
+
+def _cr_shared(w: Any, admin: Engine) -> uuid.UUID:
+    if "matrix_change_request" not in w.a.ids:
+        w.a.ids["matrix_change_request"] = _cr_pending(w, admin)
+    value: uuid.UUID = w.a.ids["matrix_change_request"]
+    return value
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -597,6 +647,34 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # Change requests (US-601, FR-CR-*): makers request/cancel, checkers approve/reject.
+    ("POST", "/api/v1/change-requests"): _cr_submit,
+    ("GET", "/api/v1/change-requests"): lambda w, r, a: ("/api/v1/change-requests", None, {}),
+    ("GET", "/api/v1/change-requests/{change_request_id}"): lambda w, r, a: (
+        f"/api/v1/change-requests/{_cr_shared(w, a)}",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/change-requests/{change_request_id}/memo"): lambda w, r, a: (
+        f"/api/v1/change-requests/{_cr_shared(w, a)}/memo",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/change-requests/{change_request_id}/approve"): lambda w, r, a: (
+        f"/api/v1/change-requests/{_cr_pending(w, a)}/approve",
+        None,
+        _if_match(1),
+    ),
+    ("POST", "/api/v1/change-requests/{change_request_id}/reject"): lambda w, r, a: (
+        f"/api/v1/change-requests/{_cr_pending(w, a)}/reject",
+        {"reason": "Synthetic matrix rejection"},
+        _if_match(1),
+    ),
+    ("POST", "/api/v1/change-requests/{change_request_id}/cancel"): lambda w, r, a: (
+        f"/api/v1/change-requests/{_cr_pending(w, a, r)}/cancel",
+        None,
+        _if_match(1),
+    ),
 }
 
 
@@ -685,6 +763,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/students/{student_id}/enrollments",
         "/api/v1/documents/uploads",
         "/api/v1/import-templates",
+        "/api/v1/change-requests",
     }
     accepted = {
         "/api/v1/documents",
@@ -715,8 +794,11 @@ def test_SEC_003_matrix_covers_every_protected_route() -> None:
 def test_SEC_003_role_route_matrix(
     world: Any, api: Any, admin_engine: Engine, role: str, key: tuple[str, str]
 ) -> None:
-    permission = ROUTES[key].sos_permission
-    granted = permission == AUTHENTICATED or permission in system_roles()[role].permission_keys
+    guard = ROUTES[key]
+    # require_any() guards (change-request reads) pass with any of their permissions.
+    permissions = (guard.sos_permission, *getattr(guard, "sos_any_of", ()))
+    held = system_roles()[role].permission_keys
+    granted = AUTHENTICATED in permissions or any(p in held for p in permissions)
     res = _call(api, world, admin_engine, role, key)
     expected = _success(*key) if granted else 403
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"

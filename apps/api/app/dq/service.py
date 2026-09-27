@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
+from app.changes import service as changes
 from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -100,7 +101,9 @@ INCREMENTAL_EVENTS: Final = (
 for _event in INCREMENTAL_EVENTS:
     ops.register_outbox_route(_event, INCREMENTAL_TASK)
 ops.register_outbox_route("change_request.submitted", LINK_TASK)
-ops.register_outbox_route("change_request.rejected", UNLINK_TASK)
+# A request that closes without being applied releases its findings.
+for _closed in ("change_request.rejected", "change_request.cancelled", "change_request.expired"):
+    ops.register_outbox_route(_closed, UNLINK_TASK)
 ops.register_outbox_route(RUN_REQUESTED_EVENT, EXECUTE_TASK)
 
 MAX_OFFSET: Final = 100_000
@@ -681,7 +684,8 @@ def link_change_request(tenant_id: uuid.UUID, payload: Mapping[str, Any]) -> int
 
 
 def unlink_change_request(tenant_id: uuid.UUID, payload: Mapping[str, Any]) -> int:
-    """Worker (``change_request.rejected``): unresolved findings forget the request."""
+    """Worker (``change_request.rejected``/``cancelled``/``expired``): unresolved findings
+    forget the request."""
     cr = _uuid(payload["change_request_id"])
     with tenant_session(tenant_id) as session:
         ids = repo.unlink_change_request(session, cr)
@@ -815,6 +819,26 @@ def _open_for_change(row: RowMapping, expected_version: int | None) -> None:
         raise PreconditionFailed("The finding was changed by someone else. Reload and try again.")
 
 
+def _check_change_request(
+    session: Session, change_request_id: uuid.UUID, students_of_finding: Collection[object]
+) -> None:
+    """A finding is resolved only by a request of this school about one of its students."""
+    student = changes.request_student(session, change_request_id)
+    if student is None:
+        code, detail = "not_found", "No change request with this id. Check the id and try again."
+    elif student not in students_of_finding:
+        code, detail = (
+            "other_student",
+            "This change request is about another student. Choose a request for this student.",
+        )
+    else:
+        return
+    raise ValidationFailed(
+        [{"field": "change_request_id", "code": code, "message_key": f"errors.{code}"}],
+        detail=detail,
+    )
+
+
 def resolve_finding(
     session: Session,
     ctx: UserContext,
@@ -829,6 +853,10 @@ def resolve_finding(
     _reject_aadhaar("note", data.note)
     row, reach = _visible_finding(session, ctx, finding_id, lock=True)
     _open_for_change(row, expected_version)
+    if data.change_request_id is not None:
+        _check_change_request(
+            session, data.change_request_id, (row["student_id"], row["related_student_id"])
+        )
     note = data.note.strip() if data.note else None
     updated = repo.update_finding(
         session,

@@ -969,6 +969,7 @@
       "too_large": "This number is too large.",
       "unknown_role": "This role doesn't exist.",
       "not_found": "We couldn't find this. Choose again.",
+      "other_student": "This is about another student. Choose one for this student.",
       "plan": "Choose a published plan.",
       "operator": "Choose an active operator.",
       "tier_mismatch": "The plan is for a different tier.",

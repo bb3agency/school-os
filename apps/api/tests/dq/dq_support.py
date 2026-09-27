@@ -120,6 +120,14 @@ def one(admin: Engine, student_id: uuid.UUID, rule_id: str) -> dict[str, Any]:
     return rows[0]
 
 
+def one_by_id(admin: Engine, finding_id: uuid.UUID) -> dict[str, Any]:
+    with admin.connect() as c:
+        row = c.execute(
+            text("SELECT * FROM sis.dq_findings WHERE id = :f"), {"f": finding_id}
+        ).one()
+    return dict(row._mapping)
+
+
 def outbox(admin: Engine, tenant_id: uuid.UUID, event_type: str) -> list[dict[str, Any]]:
     with admin.connect() as c:
         rows = c.execute(
@@ -159,3 +167,33 @@ def blocker_finding(school: Any) -> uuid.UUID:
             {"s": sid},
         ).scalar_one()
     return uuid.UUID(str(value))
+
+
+def change_request(
+    admin: Any, school: Any, student_id: uuid.UUID, attribute_key: str = "dob", new_value: str = ""
+) -> uuid.UUID:
+    """A real pending change request (tests/changes/objects.py, submitted by the office admin),
+    so findings can link to it (dq_findings_change_request_fk, 0014)."""
+    name = "sos_test_changes_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "changes" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    objects = sys.modules[name]
+    requester = school.people.get("office_admin") or school.people["owner"]
+    defaults = {"dob": "2012-03-15", "gender": "female"}
+    out = objects.submit(
+        admin,
+        school,
+        requester,
+        "office_admin",
+        student_id=student_id,
+        attribute_key=attribute_key,
+        new_value=new_value or defaults[attribute_key],
+    )
+    value: uuid.UUID = out.id
+    return value

@@ -12,7 +12,13 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.core.db import tenant_session
-from app.core.errors import Conflict, NotFound, PreconditionFailed, StepUpRequired
+from app.core.errors import (
+    Conflict,
+    NotFound,
+    PreconditionFailed,
+    StepUpRequired,
+    ValidationFailed,
+)
 from app.dq import service as dq
 from app.dq.schemas import FindingFilters, ResolveIn, WaiveIn
 from app.students import service as students
@@ -180,11 +186,23 @@ def test_US_502_waiver_holds_for_the_same_conflict_only(world: Any, admin_engine
     assert row["waived_reason"] == "Board accepts either form"
 
 
-def test_FR_DQ_020_resolve_and_waive_rules(world: Any) -> None:
+def test_FR_DQ_020_resolve_and_waive_rules(world: Any, admin_engine: Engine) -> None:
     fid = DS.high_finding(world.a)
     with pytest.raises(PreconditionFailed):
         DS.call(world.a, dq.resolve_finding, fid, ResolveIn(note="x"), expected_version=99)
-    cr = uuid.uuid4()
+    # The request must exist in this school and be about the finding's student.
+    for bad, code in (
+        (uuid.uuid4(), "not_found"),
+        (DS.change_request(admin_engine, world.a, DS.student(world.a)), "other_student"),
+    ):
+        with pytest.raises(ValidationFailed) as err:
+            DS.call(world.a, dq.resolve_finding, fid, ResolveIn(change_request_id=bad))
+        assert (err.value.errors[0]["field"], err.value.errors[0]["code"]) == (
+            "change_request_id",
+            code,
+        )
+    finding_student = DS.one_by_id(admin_engine, fid)["student_id"]
+    cr = DS.change_request(admin_engine, world.a, finding_student)
     out = DS.call(world.a, dq.resolve_finding, fid, ResolveIn(change_request_id=cr))
     assert (out.resolution, out.change_request_id) == ("change_request", cr)
     with pytest.raises(Conflict):
@@ -429,7 +447,7 @@ def test_FR_DQ_002_change_request_events_link_and_resolve(world: Any, admin_engi
 
     sid = DS.student(world.a, extra=DS.aadhaar(dob="2012-03-15"))
     DS.run(world.a, sid)
-    cr = uuid.uuid4()
+    cr = DS.change_request(admin_engine, world.a, sid, "dob")
     payload = {"change_request_id": str(cr), "student_id": str(sid), "attribute_key": "dob"}
     kwargs = {
         "tenant_id": str(world.a.tenant_id),
@@ -457,7 +475,7 @@ def test_FR_DQ_002_change_request_events_link_and_resolve(world: Any, admin_engi
     # A rejected request unlinks unresolved findings.
     other = DS.student(world.a, extra=DS.aadhaar(gender="female"))
     DS.run(world.a, other)
-    cr2 = uuid.uuid4()
+    cr2 = DS.change_request(admin_engine, world.a, other, "gender")
     link = {"change_request_id": str(cr2), "student_id": str(other), "attribute_key": "gender"}
     k2 = {"tenant_id": str(world.a.tenant_id), "event_id": str(uuid.uuid4()), "payload": link}
     tasks.link_change_request.apply(kwargs=k2).get()
@@ -478,7 +496,8 @@ def test_FR_DQ_002_outbox_routes_go_to_the_dq_queue() -> None:
     ):
         assert ops.OUTBOX_ROUTES[event] == "dq.run_incremental"
     assert ops.OUTBOX_ROUTES["change_request.submitted"] == "dq.link_change_request"
-    assert ops.OUTBOX_ROUTES["change_request.rejected"] == "dq.unlink_change_request"
+    for closed in ("rejected", "cancelled", "expired"):
+        assert ops.OUTBOX_ROUTES[f"change_request.{closed}"] == "dq.unlink_change_request"
     assert ops.OUTBOX_ROUTES["dq.run.requested"] == "dq.execute_run"
     for task in (
         tasks.run_incremental,

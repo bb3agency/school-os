@@ -153,12 +153,33 @@ def _evidence_document(admin: Engine, tenant_id: uuid.UUID, created_by: uuid.UUI
     return doc_id
 
 
+def _change_request(
+    admin: Engine, tenant_id: uuid.UUID, student_id: uuid.UUID, evidence: uuid.UUID, maker: Any
+) -> uuid.UUID:
+    """A pending sis.change_requests row (attribute_values.change_request_id is a composite FK
+    to it since 0014_change_requests); the workflow itself is tested in tests/changes."""
+    cr = uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO sis.change_requests (id, tenant_id, student_id, attribute_key, "
+                "new_value_date, reason, evidence_document_id, requested_by, expires_at) "
+                "VALUES (:i, :t, :s, 'dob', '2012-03-15', 'Synthetic birth certificate', "
+                ":e, :m, now() + interval '30 days')"
+            ),
+            {"i": cr, "t": tenant_id, "s": student_id, "e": evidence, "m": maker.membership_id},
+        )
+    return cr
+
+
 def test_BR_01_approved_change_request_records_a_verified_value(
     world: Any, fresh: uuid.UUID, admin_engine: Engine
 ) -> None:
-    cr = uuid.uuid4()
     evidence = _evidence_document(
         admin_engine, world.a.tenant_id, world.a.people["principal"].user_id
+    )
+    cr = _change_request(
+        admin_engine, world.a.tenant_id, fresh, evidence, world.a.people["office_admin"]
     )
     approver = SW.ctx_for(world.a.tenant_id, world.a.people["principal"], "principal")
     out = run(

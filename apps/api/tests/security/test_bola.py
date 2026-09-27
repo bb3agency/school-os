@@ -97,6 +97,11 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/imports/{import_id}/revert"): None,
     ("POST", "/api/v1/dq/findings/{finding_id}/resolve"): {"note": "Synthetic note"},
     ("POST", "/api/v1/dq/findings/{finding_id}/waive"): {"reason": "Synthetic reason"},
+    ("POST", "/api/v1/change-requests/{change_request_id}/approve"): None,
+    ("POST", "/api/v1/change-requests/{change_request_id}/reject"): {
+        "reason": "Synthetic BOLA rejection"
+    },
+    ("POST", "/api/v1/change-requests/{change_request_id}/cancel"): None,
 }
 
 
@@ -136,6 +141,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/imports/{import_id}/validate"),
         ("POST", "/api/v1/imports/{import_id}/commit"),
         ("POST", "/api/v1/imports/{import_id}/revert"),
+        # Cancelling needs student.identity_change.request (the owner only approves).
+        ("POST", "/api/v1/change-requests/{change_request_id}/cancel"),
     ),
     "principal",
 )
@@ -230,6 +237,20 @@ def _dq() -> ModuleType:
     return sys.modules[name]
 
 
+def _changes() -> ModuleType:
+    """tests/changes/objects.py (change requests through the real services)."""
+    name = "sos_test_changes_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "changes" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 def _b_dq_finding(w: Any) -> uuid.UUID:
     """An open finding of school B (DQ-003 on a school B student)."""
     SW.configure_keyring()
@@ -263,6 +284,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # Data quality (FR-DQ-*): a run and a finding of school B.
     "run_id": _b_dq_run,
     "finding_id": _b_dq_finding,
+    # Change requests (US-601): a pending request of school B (real services only).
+    "change_request_id": lambda w: _changes().pending(w.b),
 }
 
 
@@ -490,3 +513,46 @@ def test_SEC_001_student_bodies_cannot_reference_other_school(world: Any, api: A
         },
     )
     assert create.status_code == 422
+
+
+def test_SEC_001_change_request_lists_never_show_other_school(world: Any, api: Any) -> None:
+    b_request = _changes().pending(world.b)
+    res = api.call(world.person("owner"), "GET", "/api/v1/change-requests", params={"limit": 200})
+    assert res.status_code == 200
+    assert str(b_request) not in {r["id"] for r in res.json()["data"]}
+    by_student = api.call(
+        world.person("owner"),
+        "GET",
+        "/api/v1/change-requests",
+        params={"student_id": str(SW.ensure_students(world)["b_sb"])},
+    )
+    assert by_student.json()["data"] == []
+
+
+def test_SEC_001_change_request_bodies_cannot_reference_other_school(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A school B student or evidence document in a school A request is unknown (404/422)."""
+    cr = _changes()
+    a_doc = cr.evidence(admin_engine, world.a, world.a.people["owner"])
+    b_doc = cr.evidence(admin_engine, world.b, world.b.people["owner"])
+    body = {
+        "attribute_key": "dob",
+        "new_value": "2012-03-15",
+        "reason": "Synthetic cross-school probe",
+    }
+    admin = world.person("office_admin")
+    other_student = api.call(
+        admin,
+        "POST",
+        "/api/v1/change-requests",
+        json={**body, "student_id": str(cr.student(world.b)), "evidence_document_id": str(a_doc)},
+    )
+    assert other_student.status_code == 404
+    other_doc = api.call(
+        admin,
+        "POST",
+        "/api/v1/change-requests",
+        json={**body, "student_id": str(cr.student(world.a)), "evidence_document_id": str(b_doc)},
+    )
+    assert (other_doc.status_code, other_doc.json()["code"]) == (422, "evidence_required")
