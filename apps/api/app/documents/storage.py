@@ -376,9 +376,19 @@ class S3ObjectStore:
 
 
 def _client(settings: Settings, endpoint: str | None) -> S3Client:
+    """S3 client. With an endpoint override (SeaweedFS locally and in CI) path-style addressing.
+
+    Without one (AWS, staging/prod) addressing is pinned to ``virtual``, so presigned POST and
+    GET URLs always use the regional virtual-hosted origin
+    ``https://<bucket>.s3.<region>.amazonaws.com``. That exact origin is what Terraform allows
+    in the files bucket's CORS rule and what the web app's CSP gets as ``FILES_ORIGIN``
+    (docs/07 §10, §11). ``auto`` would presign with the legacy global host
+    ``<bucket>.s3.amazonaws.com`` (botocore 1.43), which redirects for buckets outside
+    us-east-1 and breaks a cross-origin POST. Bucket names must therefore not contain dots.
+    """
     config = Config(
         signature_version="s3v4",
-        s3={"addressing_style": "path" if endpoint else "auto"},
+        s3={"addressing_style": "path" if endpoint else "virtual"},
         retries={"max_attempts": 3, "mode": "standard"},
         connect_timeout=5,
         read_timeout=30,
