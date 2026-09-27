@@ -13690,7 +13690,7 @@
     },
     "/api/v1/academic-years/{year_id}/promotions:commit": {
       "post": {
-        "description": "Apply the promotion in one transaction (permission ``tenant.structure.manage``; accepts\n``Idempotency-Key``): old enrolments are closed, new ones opened, graduates marked\n``graduated``. 409 ``promotion_already_committed``, ``promotion_plan_changed`` or\n``nothing_to_promote``; 422 ``no_target_section``. Can be undone within 24 hours.",
+        "description": "Apply the promotion in one transaction (permission ``tenant.structure.manage``; accepts\n``Idempotency-Key``): old enrolments are closed, new ones opened, graduates marked\n``graduated``. 409 ``promotion_already_committed``, ``promotion_plan_changed`` or\n``nothing_to_promote``; 409 ``structure_archived`` when a target section, class or the\ntarget year is archived; 422 ``no_target_section``. Can be undone within 24 hours.",
         "operationId": "commit_promotion_api_v1_academic_years__year_id__promotions_commit_post",
         "parameters": [
           {
@@ -13800,7 +13800,7 @@
     },
     "/api/v1/academic-years/{year_id}/promotions:undo": {
       "post": {
-        "description": "Undo this year's committed promotion within 24 hours (permission\n``tenant.structure.manage``). 409 ``no_promotion``, ``promotion_undo_expired``, or\n``promotion_has_dependents`` when an enrolment it touched changed afterwards.",
+        "description": "Undo this year's committed promotion within 24 hours (permission\n``tenant.structure.manage``). 409 ``no_promotion``, ``promotion_undo_expired``, or\n``promotion_has_dependents`` when an enrolment it touched changed afterwards, or\n``structure_archived`` when the source year (or a section or class of it) was archived.",
         "operationId": "undo_promotion_api_v1_academic_years__year_id__promotions_undo_post",
         "parameters": [
           {
@@ -22700,7 +22700,7 @@
         ]
       },
       "post": {
-        "description": "Enrol in a section; an active enrolment in the same year becomes ``transferred``\n(permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``.",
+        "description": "Enrol in a section; an active enrolment in the same year becomes ``transferred``\n(permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``. 409\n``structure_archived`` when the section, its class or its academic year is archived.",
         "operationId": "enrol_student_api_v1_students__student_id__enrollments_post",
         "parameters": [
           {
@@ -22754,7 +22754,7 @@
     },
     "/api/v1/students/{student_id}/enrollments/{enrollment_id}": {
       "patch": {
-        "description": "Correct the roll number, or move an active enrolment to another section of the same\nclass and year (permission ``student.update_nonidentity``; ``If-Match`` with the\nenrolment's version, 412 ``precondition_failed`` when stale). Moving to another class is a\nnew enrolment (``POST \u2026/enrollments``).",
+        "description": "Correct the roll number, or move an active enrolment to another section of the same\nclass and year (permission ``student.update_nonidentity``; ``If-Match`` with the\nenrolment's version, 412 ``precondition_failed`` when stale). Moving to another class is a\nnew enrolment (``POST \u2026/enrollments``). 409 ``structure_archived`` when the target section\n(or its class or year) is archived.",
         "operationId": "update_enrollment_api_v1_students__student_id__enrollments__enrollment_id__patch",
         "parameters": [
           {
