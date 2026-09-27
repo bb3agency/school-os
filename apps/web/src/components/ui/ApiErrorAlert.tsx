@@ -10,7 +10,8 @@ import { Alert } from "./Alert";
  * problem codes of one feature (e.g. `changeRequests.errors.self_approval_forbidden`). Codes
  * without such a message fall back to `errors.api.*`.
  */
-export type ErrorNamespace = "findings" | "changeRequests" | "breakGlass" | "notifications";
+export type ErrorNamespace =
+  "findings" | "changeRequests" | "breakGlass" | "notifications" | "exports";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

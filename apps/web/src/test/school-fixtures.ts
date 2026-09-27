@@ -189,3 +189,98 @@ export function structureRoutes(): Record<string, () => Response> {
       }),
   };
 }
+
+export const EXPORT_ID = "0192f3a4-0000-7000-8000-00000000e0a9";
+
+/** One export (ADR-0021 shape: requester, own, can_download). Synthetic only. */
+export function exportRow(overrides: Partial<Schemas["ExportOut"]> = {}): Schemas["ExportOut"] {
+  return {
+    id: EXPORT_ID,
+    kind: "board_precheck",
+    profile_key: "cisce-registration-2026",
+    profile_version: 1,
+    layout_version: 1,
+    formats: ["xlsx", "pdf"],
+    language: "en",
+    scope: {},
+    columns: null,
+    include_sensitive: false,
+    student_count: 120,
+    status: "ready",
+    error_code: null,
+    created_at: "2026-09-26T05:00:00Z",
+    started_at: "2026-09-26T05:00:05Z",
+    finished_at: "2026-09-26T05:01:00Z",
+    expires_at: "2026-10-03T05:01:00Z",
+    files: [
+      {
+        format: "xlsx",
+        content_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        size_bytes: 20480,
+      },
+      { format: "pdf", content_type: "application/pdf", size_bytes: 40960 },
+    ],
+    requested_by: { membership_id: ME_MEMBERSHIP, display_name: "Test Clerk" },
+    own: true,
+    can_download: true,
+    ...overrides,
+  };
+}
+
+/** Export profiles as GET /export-profiles returns them (apps/api/app/exports/config.yaml). */
+export function exportProfiles(): Schemas["ExportProfileOut"][] {
+  return [
+    {
+      key: "cisce-registration-2026",
+      kind: "board",
+      permission: "export.board",
+      version: 1,
+      layout_version: 1,
+      label_en: "CISCE registration 2026",
+      label_te: "CISCE నమోదు 2026",
+      fields: ["admission_no", "full_name", "gender", "dob", "father_name", "mother_name"],
+      required_fields: ["full_name", "dob"],
+      allowed: true,
+    },
+    {
+      key: "udise-plus",
+      kind: "portal",
+      permission: "export.portal",
+      version: 1,
+      layout_version: 1,
+      label_en: "UDISE+",
+      label_te: "UDISE+",
+      fields: ["admission_no", "full_name", "gender", "dob", "mother_name", "category"],
+      required_fields: ["full_name"],
+      allowed: true,
+    },
+  ];
+}
+
+/** Student attribute catalogue (GET /attributes), a synthetic subset with classifications. */
+export function exportAttributes(): Schemas["AttributeOut"][] {
+  const base = {
+    data_type: "text",
+    is_identity: false,
+    allowed_sources: [],
+    allowed_values: null,
+    precedence: [],
+    is_global: true,
+  };
+  const make = (key: string, label: string, classification: string, sort: number) => ({
+    ...base,
+    key,
+    label_en: label,
+    label_te: label,
+    classification,
+    sort_order: sort,
+  });
+  return [
+    make("admission_no", "Admission number", "C1", 1),
+    make("full_name", "Full name", "C2", 2),
+    make("dob", "Date of birth", "C2", 3),
+    make("aadhaar_last4", "Aadhaar last 4 digits", "C3", 4),
+    make("aadhaar_name_as_printed", "Name on Aadhaar", "C3", 5),
+    make("category", "Category", "C3", 6),
+  ];
+}
