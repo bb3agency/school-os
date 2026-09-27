@@ -46,6 +46,7 @@ MODELS = [models.DocumentChunk, models.EmbeddingCacheEntry, models.Query, models
 TABLES = ["kb.document_chunks", "kb.embedding_cache", "kb.queries", "kb.verified_answers"]
 
 
+@pytest.mark.filterwarnings("ignore:Did not recognize type 'halfvec'")
 @pytest.mark.parametrize("model", MODELS, ids=lambda m: m.__tablename__)
 def test_models_match_database(model: Any, admin_engine: Engine) -> None:
     table = model.__table__
@@ -125,7 +126,7 @@ def test_embedding_column_matches_the_embeddings_config(admin_engine: Engine) ->
     storage = load_embeddings_config().storage
     assert storage.dimensions == models.EMBEDDING_DIMENSIONS
     with admin_engine.connect() as c:
-        types = dict(
+        types: dict[str, str] = dict(
             c.execute(
                 text(
                     "SELECT attrelid::regclass::text, format_type(atttypid, atttypmod) "
