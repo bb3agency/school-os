@@ -57,7 +57,8 @@ def test_FR_CR_005_memo_is_a_print_ready_bilingual_page(
     assert res.headers["content-type"].startswith("text/html")
     assert res.headers["content-disposition"].startswith("inline;")
     assert res.headers["cache-control"] == "no-store"
-    assert "default-src 'none'" in res.headers["content-security-policy"]
+    # The memo's own policy survives the API security headers: its hashed style block applies.
+    assert res.headers["content-security-policy"] == memo_page.STYLE_CSP
     body = res.text
     for expected in (
         "Synthetic Model School",

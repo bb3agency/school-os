@@ -165,6 +165,15 @@ class RequestContextMiddleware:
             log.info("http.request", **fields)
 
 
+def _at_least_as_strict(policy: str | None) -> bool:
+    """A route's own CSP (e.g. an HTML memo with one hashed style block) is kept only when it
+    still denies everything by default and forbids framing, like :data:`API_CSP`."""
+    if not policy:
+        return False
+    directives = {d.strip().lower() for d in policy.split(";")}
+    return "default-src 'none'" in directives and "frame-ancestors 'none'" in directives
+
+
 class SecurityHeadersMiddleware:
     """Security headers for a JSON API (docs/07 §11)."""
 
@@ -192,7 +201,7 @@ class SecurityHeadersMiddleware:
                 headers = MutableHeaders(scope=message)
                 for name, value in SECURITY_HEADERS:
                     headers[name] = value
-                if csp:
+                if csp and not _at_least_as_strict(headers.get("content-security-policy")):
                     headers["Content-Security-Policy"] = API_CSP
                 if is_api and "cache-control" not in headers:
                     headers["Cache-Control"] = "no-store"

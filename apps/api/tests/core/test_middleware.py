@@ -53,6 +53,9 @@ def bind_tenant() -> None:
     bind_context(tenant_id=TENANT)
 
 
+STRICT_PAGE_CSP = "default-src 'none'; style-src 'sha256-abc='; frame-ancestors 'none'"
+
+
 def _app() -> FastAPI:
     app = FastAPI()
     install_error_handlers(app)
@@ -85,6 +88,18 @@ def _app() -> FastAPI:
         from fastapi.responses import JSONResponse
 
         return JSONResponse({"ok": True}, headers={"Cache-Control": "private, max-age=60"})
+
+    @app.get("/api/v1/page-strict")
+    def page_strict() -> Any:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse("<p>x</p>", headers={"Content-Security-Policy": STRICT_PAGE_CSP})
+
+    @app.get("/api/v1/page-lax")
+    def page_lax() -> Any:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse("<p>x</p>", headers={"Content-Security-Policy": "default-src *"})
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -290,6 +305,14 @@ def test_SEC_010_docs_page_is_exempt_from_api_csp_outside_production() -> None:
     assert res.headers["X-Content-Type-Options"] == "nosniff"
     api = client.get("/api/v1/openapi.json")
     assert api.headers["Content-Security-Policy"] == EXPECTED_HEADERS["Content-Security-Policy"]
+
+
+def test_SEC_010_route_may_set_a_csp_only_as_strict_as_the_api_default(client: TestClient) -> None:
+    """An HTML page (change-request memo) keeps its own policy when it still denies everything
+    by default and forbids framing; any looser policy is replaced by the API default."""
+    assert client.get("/api/v1/page-strict").headers["Content-Security-Policy"] == STRICT_PAGE_CSP
+    lax = client.get("/api/v1/page-lax").headers["Content-Security-Policy"]
+    assert lax == EXPECTED_HEADERS["Content-Security-Policy"]
 
 
 # --- Body size limit ------------------------------------------------------------------------
