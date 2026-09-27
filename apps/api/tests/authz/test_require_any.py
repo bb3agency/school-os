@@ -234,6 +234,8 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             (PORTAL, STUDENT_EXPORT, DOWNLOAD_ANY),
             False,
         ),
+        # Staff directory (FR-TEN-010): the service requires a school-wide grant of either.
+        ("GET", "/api/v1/staff"): ("tenant.structure.manage", ("user.manage",), False),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

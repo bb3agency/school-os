@@ -508,6 +508,26 @@ REVOKE ALL ON core.tenant_keys FROM sos_readonly;
 
 Writes to `core.academic_years`, `core.classes` and `core.sections` require `tenant.structure.manage` (07 §6.2). `POST /classes/defaults` adds the missing classes from `apps/api/app/tenancy/academic_defaults.yaml` (Nursery–XII, EN/TE names).
 
+**Archive (migration `0023_api_gaps`; US-202, FR-TEN-010).** The three structure tables gain `archived_at timestamptz` (NULL while in use). Archived rows are never deleted or rewritten: enrolments, documents, exports and membership scopes keep referring to them, and codes/labels stay taken (the unique keys are unchanged). The API hides them from its lists unless `include_archived=true`; other modules' service calls still see them.
+
+```sql
+ALTER TABLE core.academic_years ADD COLUMN archived_at timestamptz;
+ALTER TABLE core.classes        ADD COLUMN archived_at timestamptz;
+ALTER TABLE core.sections       ADD COLUMN archived_at timestamptz;
+ALTER TABLE core.academic_years ADD CONSTRAINT academic_years_current_not_archived
+  CHECK (NOT (is_current AND archived_at IS NOT NULL));
+-- SECURITY INVOKER (RLS applies), search_path pinned; fires only on the NULL -> timestamp
+-- transition: an active sis.enrollments row in the year / section / any section of the class
+-- raises object_not_in_prerequisite_state, CONSTRAINT structure_active_enrolments (API 409
+-- structure_in_use).
+CREATE FUNCTION core.tg_structure_archive_guard() RETURNS trigger ...;
+CREATE TRIGGER academic_years_archive_guard BEFORE UPDATE OF archived_at ON core.academic_years ...;
+CREATE TRIGGER classes_archive_guard        BEFORE UPDATE OF archived_at ON core.classes ...;
+CREATE TRIGGER sections_archive_guard       BEFORE UPDATE OF archived_at ON core.sections ...;
+```
+
+Downgrade drops the triggers, function, CHECK and columns; archived rows become ordinary rows again (their `*.archived` audit events remain). Enrolling a student into an archived section is not refused by the database yet (students module).
+
 ## 5. Student information schema (`sis`)
 
 ```sql
@@ -862,6 +882,8 @@ M1 creates `kb.documents`, `kb.document_versions`, `kb.document_acl` and `kb.upl
 - The composite FK `sis.attribute_values (tenant_id, evidence_document_id) → kb.documents` is added by this migration when that column exists (§3.5), so evidence still linked to a value cannot be deleted.
 
 Visibility (the documents service; retrieval in M2 uses the same keys): holders of `document.manage_acl` see every document of their school. Other `document.read` holders see a document when an ACL entry matches their role, membership, section or class. A class scope covers its sections, and a section scope matches its class. School-wide readers match every section and class entry. An empty ACL is visible only to school-wide readers. Scoped uploaders (class teachers) must restrict new documents to their own sections or classes. Only scanned (`ready`) versions can be downloaded. C3 files also need `student.read_sensitive`, unless the caller uploaded them.
+
+Metadata and status (no schema change): `title`, `doc_type` (within the purpose's types), `language`, `issuer` and `issued_on` can be changed by `document.upload` holders who can see the document (audit `document.metadata_updated` with field names only). `status` moves between `active` and `archived` for `document.manage_acl` holders (audit `document.archived` / `document.unarchived`; `documents.STATUS_CHANGED_HOOKS` run in the same transaction for M2 retrieval). `created_by` of a document and of each version is shown as the uploader's membership id and display name (through `identity.service`; never contact details).
 
 ## 7. Audit and ops schemas
 

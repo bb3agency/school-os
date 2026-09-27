@@ -213,7 +213,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         )
     assert _page_flags(admin) == (True, False, 0)
     before = _scalar(admin, "SELECT version_num FROM ops.alembic_version")
-    assert before in {REDACTION, "0019_export_access", "0020_provisioning_runs"}  # head
+    assert before in {REDACTION, "0019_export_access", "0020_provisioning_runs", "0023_api_gaps"}
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")
     # The refused walk changes nothing: the database stays at the revision it was at.

@@ -44,7 +44,7 @@ def test_FR_TEN_010_archive_columns_and_guard_exist(admin_engine: Engine) -> Non
         cols = {c["name"]: c for c in insp.get_columns(table, schema="core")}
         assert cols["archived_at"]["nullable"] is True, table
     with admin_engine.connect() as c:
-        triggers = set(
+        triggers: set[str] = set(
             c.execute(
                 text(
                     "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE "

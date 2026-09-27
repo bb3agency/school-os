@@ -34,6 +34,19 @@
       },
       "AcademicYearOut": {
         "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was archived (hidden from lists); null while in use.",
+            "title": "Archived At"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1780,6 +1793,19 @@
       },
       "ClassOut": {
         "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was archived (hidden from lists); null while in use.",
+            "title": "Archived At"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -2686,6 +2712,23 @@
             "title": "Updated At",
             "type": "string"
           },
+          "uploaded_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UploaderOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who registered the document (version 1)."
+          },
+          "uploaded_by_me": {
+            "default": false,
+            "description": "You registered this document.",
+            "title": "Uploaded By Me",
+            "type": "boolean"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -2861,6 +2904,23 @@
             "title": "Updated At",
             "type": "string"
           },
+          "uploaded_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UploaderOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who registered the document (version 1)."
+          },
+          "uploaded_by_me": {
+            "default": false,
+            "description": "You registered this document.",
+            "title": "Uploaded By Me",
+            "type": "boolean"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -2885,6 +2945,93 @@
           "version"
         ],
         "title": "DocumentOut",
+        "type": "object"
+      },
+      "DocumentUpdate": {
+        "additionalProperties": false,
+        "description": "Change a document's metadata (FR-DOC-005): send only what changes, at least one field.\n\n``title`` and ``doc_type`` cannot be null; ``issuer``, ``issued_on`` and ``language`` may be\ncleared with ``null``. The type must suit the document's purpose (422\n``doc_type_not_allowed_for_purpose``).",
+        "properties": {
+          "doc_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "circular",
+                  "policy",
+                  "minutes",
+                  "register_scan",
+                  "certificate",
+                  "letter",
+                  "form",
+                  "report",
+                  "verified_answer",
+                  "other",
+                  "evidence",
+                  "import_file"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doc Type"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te",
+                  "mixed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "DocumentUpdate",
         "type": "object"
       },
       "DownloadUrlOut": {
@@ -6123,26 +6270,6 @@
         "title": "MarkedReadOut",
         "type": "object"
       },
-      "MembershipStatusIn": {
-        "additionalProperties": false,
-        "description": "Activate, suspend or remove a staff member's access to this school.",
-        "properties": {
-          "status": {
-            "enum": [
-              "active",
-              "suspended",
-              "removed"
-            ],
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "title": "MembershipStatusIn",
-        "type": "object"
-      },
       "NotificationOut": {
         "description": "One notification, rendered in the reader's language (``Accept-Language``: en or te).",
         "properties": {
@@ -7227,6 +7354,34 @@
           "next_cursor"
         ],
         "title": "Page[SectionOut]",
+        "type": "object"
+      },
+      "Page_StaffMemberOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StaffMemberOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[StaffMemberOut]",
         "type": "object"
       },
       "Page_StudentSummary_": {
@@ -8711,6 +8866,11 @@
       },
       "RoleOut": {
         "properties": {
+          "grantable": {
+            "description": "Whether you may give (or take away) this role, by the rule the server enforces: with ``role.assign``, when its permissions are within your own (owners may give every role); without ``role.assign``, only non-privileged system roles and only when inviting.",
+            "title": "Grantable",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -8738,6 +8898,11 @@
             },
             "title": "Permissions",
             "type": "array"
+          },
+          "scoped": {
+            "description": "Whether some of its permissions reach only the member's classes/sections (set scopes for them); false when every permission is school-wide.",
+            "title": "Scoped",
+            "type": "boolean"
           }
         },
         "required": [
@@ -8746,7 +8911,9 @@
           "name_en",
           "name_te",
           "is_system",
-          "permissions"
+          "permissions",
+          "grantable",
+          "scoped"
         ],
         "title": "RoleOut",
         "type": "object"
@@ -8755,6 +8922,7 @@
         "additionalProperties": false,
         "properties": {
           "roles": {
+            "description": "The complete new set of roles. An empty list is refused (422 ``roles_required``): suspend or remove the member instead.",
             "items": {
               "pattern": "^[a-z][a-z0-9_]{1,63}$",
               "type": "string"
@@ -9266,6 +9434,19 @@
             "title": "Academic Year Id",
             "type": "string"
           },
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was archived (hidden from lists); null while in use.",
+            "title": "Archived At"
+          },
           "class_id": {
             "format": "uuid",
             "title": "Class Id",
@@ -9353,6 +9534,44 @@
         "title": "SectionUpdate",
         "type": "object"
       },
+      "SessionSettingsOut": {
+        "description": "School settings the web applies to the signed-in session (FR-TEN-012, FR-IAM-003).",
+        "properties": {
+          "date_format": {
+            "enum": [
+              "DD/MM/YYYY",
+              "DD-MM-YYYY",
+              "YYYY-MM-DD"
+            ],
+            "title": "Date Format",
+            "type": "string"
+          },
+          "idle_timeout_minutes": {
+            "description": "Sign out after this many idle minutes (5-30).",
+            "title": "Idle Timeout Minutes",
+            "type": "integer"
+          },
+          "languages": {
+            "description": "Languages the school uses, first is default.",
+            "items": {
+              "enum": [
+                "en",
+                "te"
+              ],
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "idle_timeout_minutes",
+          "date_format",
+          "languages"
+        ],
+        "title": "SessionSettingsOut",
+        "type": "object"
+      },
       "SeverityPolicyOut": {
         "properties": {
           "cap": {
@@ -9425,6 +9644,34 @@
           "cap"
         ],
         "title": "SeverityPolicyOut",
+        "type": "object"
+      },
+      "StaffMemberOut": {
+        "description": "One entry of the staff directory (e.g. choosing a class teacher): no contact details.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name",
+          "roles"
+        ],
+        "title": "StaffMemberOut",
         "type": "object"
       },
       "StudentCreate": {
@@ -11548,6 +11795,26 @@
         "title": "UploadOut",
         "type": "object"
       },
+      "UploaderOut": {
+        "description": "Who uploaded: the staff member's membership id and display name only (no contact\ndetails). ``null`` in ``uploaded_by`` when the account is no longer a member here.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "UploaderOut",
+        "type": "object"
+      },
       "UsageAgainstLimit": {
         "properties": {
           "limit": {
@@ -11799,6 +12066,70 @@
           "version"
         ],
         "title": "UserOut",
+        "type": "object"
+      },
+      "UserUpdateIn": {
+        "additionalProperties": false,
+        "description": "Change a staff member (``PATCH /users/{id}``): send only what changes, at least one field.\n\n``status`` activates, suspends or removes their access to this school. ``display_name``,\n``email`` (``null`` clears it) and ``preferred_language`` edit the person's profile; the\nsign-in account (IdP subject) never changes here.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "suspended",
+                  "removed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "UserUpdateIn",
         "type": "object"
       },
       "ValidationError": {
@@ -12161,6 +12492,21 @@
             "title": "Status",
             "type": "string"
           },
+          "uploaded_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UploaderOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uploaded_by_me": {
+            "default": false,
+            "title": "Uploaded By Me",
+            "type": "boolean"
+          },
           "version_no": {
             "title": "Version No",
             "type": "integer"
@@ -12308,6 +12654,9 @@
             "title": "Scopes",
             "type": "array"
           },
+          "settings": {
+            "$ref": "#/components/schemas/SessionSettingsOut"
+          },
           "tenant_id": {
             "format": "uuid",
             "title": "Tenant Id",
@@ -12349,7 +12698,8 @@
           "permissions",
           "scopes",
           "mfa",
-          "tenant_ids"
+          "tenant_ids",
+          "settings"
         ],
         "title": "MeOut",
         "type": "object"
@@ -12474,7 +12824,7 @@
   "paths": {
     "/api/v1/academic-years": {
       "get": {
-        "description": "Academic years, newest first (permission ``student.read_basic``).",
+        "description": "Academic years, newest first; archived years only with ``include_archived=true``\n(permission ``student.read_basic``).",
         "operationId": "list_academic_years_api_v1_academic_years_get",
         "parameters": [
           {
@@ -12508,6 +12858,18 @@
               ],
               "description": "Opaque cursor from next_cursor.",
               "title": "Cursor"
+            }
+          },
+          {
+            "description": "Also list archived rows (hidden by default; US-202, FR-TEN-010).",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also list archived rows (hidden by default; US-202, FR-TEN-010).",
+              "title": "Include Archived",
+              "type": "boolean"
             }
           }
         ],
@@ -12675,6 +13037,50 @@
         ]
       }
     },
+    "/api/v1/academic-years/{year_id}/archive": {
+      "post": {
+        "description": "Archive a year: it is hidden from lists but kept for old records (permission\n``tenant.structure.manage``; ``If-Match``). The current year answers 409\n``academic_year_current``; a year with active enrolments 409 ``structure_in_use``.",
+        "operationId": "archive_academic_year_api_v1_academic_years__year_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Year Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYearOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Academic Year",
+        "tags": [
+          "school"
+        ]
+      }
+    },
     "/api/v1/academic-years/{year_id}/make-current": {
       "post": {
         "description": "Make this the one current academic year (FR-TEN-010; permission\n``tenant.structure.manage``; ``If-Match``).",
@@ -12714,6 +13120,50 @@
           }
         },
         "summary": "Make Academic Year Current",
+        "tags": [
+          "school"
+        ]
+      }
+    },
+    "/api/v1/academic-years/{year_id}/unarchive": {
+      "post": {
+        "description": "Bring an archived year back into the lists (permission ``tenant.structure.manage``;\n``If-Match``).",
+        "operationId": "unarchive_academic_year_api_v1_academic_years__year_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Year Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYearOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Academic Year",
         "tags": [
           "school"
         ]
@@ -13630,7 +14080,7 @@
     },
     "/api/v1/classes": {
       "get": {
-        "description": "Classes in display order (permission ``student.read_basic``; scoped holders see only\ntheir classes).",
+        "description": "Classes in display order; archived classes only with ``include_archived=true``\n(permission ``student.read_basic``; scoped holders see only their classes).",
         "operationId": "list_classes_api_v1_classes_get",
         "parameters": [
           {
@@ -13664,6 +14114,18 @@
               ],
               "description": "Opaque cursor from next_cursor.",
               "title": "Cursor"
+            }
+          },
+          {
+            "description": "Also list archived rows (hidden by default; US-202, FR-TEN-010).",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also list archived rows (hidden by default; US-202, FR-TEN-010).",
+              "title": "Include Archived",
+              "type": "boolean"
             }
           }
         ],
@@ -13848,6 +14310,94 @@
           }
         },
         "summary": "Update Class",
+        "tags": [
+          "school"
+        ]
+      }
+    },
+    "/api/v1/classes/{class_id}/archive": {
+      "post": {
+        "description": "Archive a class: hidden from lists, kept for old records (permission\n``tenant.structure.manage``; ``If-Match``). A class with active enrolments in any of its\nsections answers 409 ``structure_in_use``.",
+        "operationId": "archive_class_api_v1_classes__class_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Class",
+        "tags": [
+          "school"
+        ]
+      }
+    },
+    "/api/v1/classes/{class_id}/unarchive": {
+      "post": {
+        "description": "Bring an archived class back into the lists (permission ``tenant.structure.manage``;\n``If-Match``).",
+        "operationId": "unarchive_class_api_v1_classes__class_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Class",
         "tags": [
           "school"
         ]
@@ -14170,6 +14720,58 @@
         "tags": [
           "documents"
         ]
+      },
+      "patch": {
+        "description": "Change the title, type, language, issuer or date (permission ``document.upload``; the\ndocument must be visible to you, as for a new version; ``If-Match``). An archived document\nanswers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with\nthe changed field names only.",
+        "operationId": "update_document_api_v1_documents__document_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Document",
+        "tags": [
+          "documents"
+        ]
       }
     },
     "/api/v1/documents/{document_id}/acl": {
@@ -14221,6 +14823,50 @@
           }
         },
         "summary": "Set Acl",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/archive": {
+      "post": {
+        "description": "Archive a document: kept with its versions, listed only with ``status=archived``\n(permission ``document.manage_acl``; ``If-Match``).",
+        "operationId": "archive_document_api_v1_documents__document_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Document",
         "tags": [
           "documents"
         ]
@@ -14283,6 +14929,50 @@
           }
         },
         "summary": "Get Download Url",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/unarchive": {
+      "post": {
+        "description": "Make an archived document active again (permission ``document.manage_acl``;\n``If-Match``).",
+        "operationId": "unarchive_document_api_v1_documents__document_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Document",
         "tags": [
           "documents"
         ]
@@ -16202,7 +16892,7 @@
     },
     "/api/v1/me": {
       "get": {
-        "description": "The signed-in user in the active school: roles, effective permissions, scopes, language\nand the schools they can switch to (permission: any active member).",
+        "description": "The signed-in user in the active school: roles, effective permissions, scopes, language,\nthe schools they can switch to and the school's session settings (idle timeout, date format,\nlanguages) the web applies (permission: any active member).",
         "operationId": "get_me_api_v1_me_get",
         "responses": {
           "200": {
@@ -20432,7 +21122,7 @@
     },
     "/api/v1/roles": {
       "get": {
-        "description": "Roles of this school with their permissions (permission ``user.manage``).",
+        "description": "Roles of this school with their permissions, whether you may give each one\n(``grantable``) and whether it is limited to classes/sections (``scoped``) (permission\n``user.manage``).",
         "operationId": "list_roles_api_v1_roles_get",
         "parameters": [
           {
@@ -20499,7 +21189,7 @@
     },
     "/api/v1/sections": {
       "get": {
-        "description": "Sections, optionally for one year and/or class (permission ``student.read_basic``;\nclass teachers see only their sections).",
+        "description": "Sections, optionally for one year and/or class; archived sections only with\n``include_archived=true`` (permission ``student.read_basic``; class teachers see only\ntheir sections).",
         "operationId": "list_sections_api_v1_sections_get",
         "parameters": [
           {
@@ -20568,6 +21258,18 @@
               ],
               "title": "Class Id"
             }
+          },
+          {
+            "description": "Also list archived rows (hidden by default; US-202, FR-TEN-010).",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also list archived rows (hidden by default; US-202, FR-TEN-010).",
+              "title": "Include Archived",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -20598,7 +21300,7 @@
         ]
       },
       "post": {
-        "description": "Add a section to a class for an academic year, optionally with its class teacher\n(permission ``tenant.structure.manage``). Accepts ``Idempotency-Key``.",
+        "description": "Add a section to a class for an academic year, optionally with its class teacher\n(permission ``tenant.structure.manage``). An archived year or class answers 409\n``structure_archived``. Accepts ``Idempotency-Key``.",
         "operationId": "create_section_api_v1_sections_post",
         "requestBody": {
           "content": {
@@ -20731,6 +21433,161 @@
         "summary": "Update Section",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/archive": {
+      "post": {
+        "description": "Archive a section: hidden from lists, kept for old records (permission\n``tenant.structure.manage``; ``If-Match``). A section with active enrolments answers 409\n``structure_in_use``.",
+        "operationId": "archive_section_api_v1_sections__section_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Section",
+        "tags": [
+          "school"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/unarchive": {
+      "post": {
+        "description": "Bring an archived section back into the lists (permission ``tenant.structure.manage``;\n``If-Match``).",
+        "operationId": "unarchive_section_api_v1_sections__section_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Section",
+        "tags": [
+          "school"
+        ]
+      }
+    },
+    "/api/v1/staff": {
+      "get": {
+        "description": "Active and invited staff with display name and role keys only, e.g. to choose a class\nteacher (permission ``tenant.structure.manage`` or ``user.manage``, school-wide; no\nstep-up). No emails, phone numbers or sign-in details.",
+        "operationId": "list_staff_api_v1_staff_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_StaffMemberOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Staff",
+        "tags": [
+          "identity"
         ]
       }
     },
@@ -21999,8 +22856,8 @@
         ]
       },
       "patch": {
-        "description": "Activate, suspend or remove a staff member (permission ``user.manage``, step-up;\n``If-Match`` required). The last active owner cannot be suspended (409 ``last_owner``).",
-        "operationId": "update_user_status_api_v1_users__user_id__patch",
+        "description": "Activate, suspend or remove a staff member, and/or change their display name, email or\nlanguage (permission ``user.manage``, step-up; ``If-Match`` required). The last active\nowner cannot be suspended (409 ``last_owner``); a removed member's profile cannot be\nedited (409 ``invalid_state``). Audited with the changed field names only.",
+        "operationId": "update_user_api_v1_users__user_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -22017,7 +22874,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MembershipStatusIn"
+                "$ref": "#/components/schemas/UserUpdateIn"
               }
             }
           },
@@ -22045,7 +22902,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update User Status",
+        "summary": "Update User",
         "tags": [
           "identity"
         ]
@@ -22053,7 +22910,7 @@
     },
     "/api/v1/users/{user_id}/roles": {
       "put": {
-        "description": "Replace a staff member's roles (permission ``role.assign``, step-up). Effective within\n60 s (FR-IAM-014).",
+        "description": "Replace a staff member's roles (permission ``role.assign``, step-up). Effective within\n60 s (FR-IAM-014). An empty list answers 422 ``roles_required``: suspend or remove the\nmember instead.",
         "operationId": "replace_user_roles_api_v1_users__user_id__roles_put",
         "parameters": [
           {
