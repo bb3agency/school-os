@@ -481,9 +481,12 @@ locals {
 module "detection_primary" {
   source = "../security_detection"
 
-  name_prefix                        = var.name_prefix
-  is_primary                         = true
-  guardduty_features                 = var.guardduty_features_primary
+  name_prefix = var.name_prefix
+  is_primary  = true
+  guardduty_features = merge(
+    var.guardduty_features_primary,
+    length(var.guardduty_runtime_agent_management) > 0 ? { RUNTIME_MONITORING = true } : {},
+  )
   guardduty_runtime_agent_management = var.guardduty_runtime_agent_management
   guardduty_export = {
     bucket_arn  = module.evidence_bucket.arn

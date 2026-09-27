@@ -205,3 +205,21 @@ variable "billing_supplier_state_code" {
   type        = string
   default     = "37"
 }
+
+variable "security_alert_emails" {
+  description = "Security alert recipients (GuardDuty/Security Hub/tampering, SEC-023). Null = alarm_emails. The on-call path is docs/11 §6-7."
+  type        = list(string)
+  default     = null
+}
+
+variable "securityhub_alert_labels" {
+  description = "Security Hub severity labels that alert (GuardDuty >= 7 always alerts)."
+  type        = list(string)
+  default     = ["CRITICAL"]
+}
+
+variable "guardduty_runtime_agent_management" {
+  description = "GuardDuty Runtime Monitoring agents (ECS_FARGATE_AGENT_MANAGEMENT, EC2_AGENT_MANAGEMENT). Empty = Runtime Monitoring off (owner decision: per vCPU-hour cost)."
+  type        = list(string)
+  default     = []
+}

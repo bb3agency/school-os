@@ -108,7 +108,7 @@ variable "guardduty_features_dr" {
 }
 
 variable "guardduty_runtime_agent_management" {
-  description = "Runtime Monitoring agents (ECS_FARGATE_AGENT_MANAGEMENT, EC2_AGENT_MANAGEMENT) in ap-south-1 when RUNTIME_MONITORING is on. Owner decision (per vCPU-hour cost)."
+  description = "Runtime Monitoring agents in ap-south-1 (ECS_FARGATE_AGENT_MANAGEMENT, EC2_AGENT_MANAGEMENT); a non-empty list turns RUNTIME_MONITORING on. Owner decision (per vCPU-hour cost)."
   type        = list(string)
   default     = []
 }

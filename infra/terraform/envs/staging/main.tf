@@ -79,3 +79,28 @@ module "rds_dr" {
   kms_key_arn            = module.kms_dr.key_arns["backup"]
   retention_days         = var.dr_backup_retention_days
 }
+
+# --- Account security baseline (SEC-023) ---------------------------------------------------------
+# Same controls as prod so staging exercises them; differences: Object Lock GOVERNANCE (a named
+# teardown role may be exempted), 180-day retention (CERT-In minimum), no dedicated-host buckets, and
+# it can be switched off (enable_security_baseline) for a short-lived staging account.
+
+module "security" {
+  source = "../../modules/security_baseline"
+  count  = var.enable_security_baseline ? 1 : 0
+
+  env                = "staging"
+  name_prefix        = "sos-staging"
+  object_lock_mode   = "GOVERNANCE"
+  log_retention_days = var.security_log_retention_days
+  data_event_bucket_arns = [
+    "arn:aws:s3:::${module.platform.buckets.files}",
+    "arn:aws:s3:::${module.platform.buckets.audit}",
+  ]
+  access_log_bucket            = module.platform.buckets.logs
+  delete_exempt_principal_arns = var.security_log_delete_exempt_principal_arns
+  kms_deletion_window_in_days  = 7
+
+  alert_emails             = coalesce(var.security_alert_emails, var.alarm_emails)
+  securityhub_alert_labels = var.securityhub_alert_labels
+}
