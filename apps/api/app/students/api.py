@@ -93,10 +93,14 @@ def list_attributes(ctx: Reader, db: TenantDB) -> list[AttributeOut]:
 
 _PII_IN_URL = (
     "Deprecated: names and admission numbers in the URL end up in proxy and load-balancer "
-    "access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008)."
+    "access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008). "
+    "Stops working after the Sunset date, Thu, 31 Dec 2026 23:59:59 GMT."
 )
 # RFC 9745 ``Deprecation`` date (2026-09-27) for GET /students with personal-data parameters.
 _SEARCH_DEPRECATED_AT = "@1790467200"
+# RFC 8594 ``Sunset``: after this the deprecated parameters may be removed (owner, 2026-09-27).
+_SEARCH_SUNSET = "Thu, 31 Dec 2026 23:59:59 GMT"
+_SEARCH_SUCCESSOR = '</api/v1/students/search>; rel="successor-version"'
 
 
 @router.get("/students", response_model=Page[StudentSummary])
@@ -120,11 +124,15 @@ def search_students(
     """List students by class, section and status (permission ``student.read_basic``; class
     and subject teachers see only students in their sections/classes this year). To search by
     name, parent name or admission number use ``POST /students/search``: the ``query`` and
-    ``admission_no`` parameters still work but are deprecated (answered with a ``Deprecation``
-    header) because URLs are logged by proxies and load balancers."""
+    ``admission_no`` parameters still work but are deprecated because URLs are logged by
+    proxies and load balancers. A response to a request that used them carries a
+    ``Deprecation`` header (RFC 9745), a ``Sunset: Thu, 31 Dec 2026 23:59:59 GMT`` header
+    (RFC 8594; the parameters may stop working after that date) and
+    ``Link: </api/v1/students/search>; rel="successor-version"``."""
     if query or admission_no:
         response.headers["Deprecation"] = _SEARCH_DEPRECATED_AT
-        response.headers["Link"] = '</api/v1/students/search>; rel="successor-version"'
+        response.headers["Sunset"] = _SEARCH_SUNSET
+        response.headers["Link"] = _SEARCH_SUCCESSOR
     filters = SearchFilters(
         query=query,
         section_id=section_id,
