@@ -19,6 +19,16 @@ class FakeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class RedactionConfig:
+    """PRV-016 image redaction (see ``config.yaml`` ``redaction``)."""
+
+    padding_px: int
+    padding_ratio: float
+    max_pixels: int
+    jpeg_quality: int
+
+
+@dataclass(frozen=True, slots=True)
 class ExtractionConfig:
     version: int
     fields: tuple[str, ...]
@@ -27,12 +37,31 @@ class ExtractionConfig:
     rows_per_page: int
     value_max_length: int
     accepted_mime_types: tuple[str, ...]
+    redaction: RedactionConfig
     fake: FakeConfig
+
+
+def _redaction(raw: dict[str, Any]) -> RedactionConfig:
+    cfg = RedactionConfig(
+        padding_px=int(raw["padding_px"]),
+        padding_ratio=float(raw["padding_ratio"]),
+        max_pixels=int(raw["max_pixels"]),
+        jpeg_quality=int(raw["jpeg_quality"]),
+    )
+    if not (
+        0 <= cfg.padding_px <= 50
+        and 0.0 <= cfg.padding_ratio <= 1.0
+        and 1 <= cfg.max_pixels <= 100_000_000
+        and 50 <= cfg.jpeg_quality <= 95
+    ):
+        raise ValueError("extraction redaction settings out of range")
+    return cfg
 
 
 def _parse(raw: dict[str, Any]) -> ExtractionConfig:
     limits = raw["limits"]
     fake = raw["fake"]
+    redaction = raw["redaction"]
     fields = tuple(str(f) for f in raw["fields"])
     if len(set(fields)) != len(fields) or not fields:
         raise ValueError("extraction fields must be unique and non-empty")
@@ -44,6 +73,7 @@ def _parse(raw: dict[str, Any]) -> ExtractionConfig:
         rows_per_page=int(limits["rows_per_page"]),
         value_max_length=int(limits["value_max_length"]),
         accepted_mime_types=tuple(str(m) for m in raw["accepted_mime_types"]),
+        redaction=_redaction(redaction),
         fake=FakeConfig(
             rows_min=int(fake["rows_min"]),
             rows_max=int(fake["rows_max"]),

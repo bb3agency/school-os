@@ -2,15 +2,17 @@
 
 This is the first thing that touches a provider result, before any database write or log line:
 
-1. Every string the provider returned (all cells, including columns we do not keep, and the page
-   text) is checked for a Verhoeff-valid 12-digit number. A hit marks the page
-   ``aadhaar_detected`` so its image is withheld (PRV-016).
+1. Every string the provider returned (all cells, including columns we do not keep, the page
+   text and the text layer ``spans``) is checked for a Verhoeff-valid 12-digit number. A hit
+   marks the page ``aadhaar_detected``: its image is redacted or discarded (PRV-016,
+   :mod:`app.extraction.imaging`).
 2. Kept cells (``config.yaml`` ``fields``) are NFC-normalised, stripped of control characters,
    cut to ``value_max_length`` and masked with :func:`app.core.redaction.mask_aadhaar`
    (``XXXX XXXX 1234``); a masked cell is flagged ``masked``.
 3. Confidence is clamped to 0..1 (missing = unknown = low confidence); bounding boxes are kept
    only when they are four finite fractions of the page.
-4. The page text is discarded: nothing but the kept, masked cells leaves this function.
+4. The page text and spans are discarded: nothing but the kept, masked cells leaves this
+   function.
 """
 
 from __future__ import annotations
@@ -50,7 +52,7 @@ class CleanPage:
         return sum(1 for r in self.rows if r.low_confidence)
 
 
-def _flatten(value: str) -> str:
+def flatten(value: str) -> str:
     """NFC, control characters and line breaks to single spaces (so "1234\n5678\n9012" is
     seen as one number by the Verhoeff scan)."""
     text = unicodedata.normalize("NFC", value)
@@ -58,7 +60,7 @@ def _flatten(value: str) -> str:
 
 
 def _detect(value: str) -> bool:
-    return contains_full_aadhaar(value) or contains_full_aadhaar(_flatten(value))
+    return contains_full_aadhaar(value) or contains_full_aadhaar(flatten(value))
 
 
 def _confidence(value: float | None) -> float | None:
@@ -75,6 +77,8 @@ def _bbox(box: tuple[float, float, float, float] | None) -> list[float] | None:
 
 def _strings(page: PageExtraction) -> Iterable[str]:
     yield page.raw_text
+    # The text layer, joined in reading order: word-level OCR splits "1234 5678 9012".
+    yield " ".join(span.text for span in page.spans)
     for row in page.rows:
         for key, reading in row.items():
             yield key
@@ -82,7 +86,7 @@ def _strings(page: PageExtraction) -> Iterable[str]:
 
 
 def _clean_cell(reading: FieldReading, cfg: ExtractionConfig, threshold: float) -> dict[str, Any]:
-    text = _flatten(reading.value)
+    text = flatten(reading.value)
     # Mask BEFORE cutting to length, so a number on the boundary is never half kept.
     masked_text = mask_aadhaar(text)
     value = masked_text[: cfg.value_max_length].strip()
@@ -96,9 +100,14 @@ def _clean_cell(reading: FieldReading, cfg: ExtractionConfig, threshold: float) 
     }
 
 
+def page_has_aadhaar(page: PageExtraction) -> bool:
+    """Whether any string of a provider result holds a Verhoeff-valid 12-digit number."""
+    return any(_detect(s) for s in _strings(page))
+
+
 def clean_page(page: PageExtraction, cfg: ExtractionConfig, *, threshold: float) -> CleanPage:
     """Mask, validate and reduce one provider result (see module docstring)."""
-    detected = any(_detect(s) for s in _strings(page))
+    detected = page_has_aadhaar(page)
     keep = set(cfg.fields)
     rows: list[CleanRow] = []
     dropped = 0
