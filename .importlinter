@@ -17,9 +17,11 @@
 # import-linter fails on modules that do not exist, so only modules that exist today are
 # listed. When a new module lands, add it to every `source_modules` list below and add its
 # own "<module>-internals" contract. Future modules (CLAUDE.md §4):
-#   knowledge, exports, admin
-# Note for knowledge: also forbid app.knowledge.gateway internals once it exists, and keep
-# the semgrep rule `sos-llm-sdk-outside-gateway` for third-party SDK imports.
+#   admin
+# knowledge (M2) has its own section at the end: internals, layers, gateway isolation,
+# read-only tools and pure foundations. Third-party provider SDK imports are covered by the
+# semgrep rule `sos-llm-sdk-outside-gateway` (only apps/api/app/knowledge/gateway/ may import
+# them), because import-linter cannot forbid a package that is not installed.
 
 [importlinter]
 root_package = app
@@ -49,6 +51,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -75,6 +78,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -101,6 +105,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -130,6 +135,7 @@ forbidden_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
@@ -150,6 +156,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.platform
 
@@ -174,6 +181,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -200,6 +208,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -226,6 +235,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -252,6 +262,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -278,6 +289,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -304,6 +316,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -354,6 +367,7 @@ source_modules =
     app.changes
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.imports.repository
     app.imports.models
@@ -404,6 +418,7 @@ source_modules =
     app.imports
     app.extraction
     app.exports
+    app.knowledge
 forbidden_modules =
     app.changes.repository
     app.changes.models
@@ -430,6 +445,7 @@ source_modules =
     app.imports
     app.changes
     app.exports
+    app.knowledge
 forbidden_modules =
     app.extraction.repository
     app.extraction.models
@@ -456,6 +472,7 @@ source_modules =
     app.imports
     app.changes
     app.extraction
+    app.knowledge
 forbidden_modules =
     app.exports.repository
     app.exports.models
@@ -481,3 +498,156 @@ forbidden_modules =
     app.students
     app.documents
     app.dq
+
+# --- 4. knowledge (M2; docs/06, ADR-0005, ADR-0008) ----------------------------------------
+# Other modules use only app.knowledge.service (and, later, the api/tasks entry points that
+# app.main and the worker load). Every subpackage and internal module below is private.
+
+[importlinter:contract:knowledge-internals]
+name = knowledge: subpackages and internals are private (use app.knowledge.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+forbidden_modules =
+    app.knowledge.gateway
+    app.knowledge.embeddings
+    app.knowledge.retrieval
+    app.knowledge.ingestion
+    app.knowledge.chunking
+    app.knowledge.tools
+    app.knowledge.prompts
+    app.knowledge.config
+    app.knowledge.interfaces
+    app.knowledge.domain
+    app.knowledge.sources
+allow_indirect_imports = True
+
+# Top to bottom: a package may import only packages below it. Consequences that matter:
+# retrieval, tools, embeddings and chunking cannot reach the gateway (no model calls from
+# ranking, record tools or chunking); nothing below ingestion can write the index; the
+# pure foundations (prompts, config, interfaces, sources, domain) import no knowledge package.
+# Implementations are wired together in service (composition root).
+[importlinter:contract:knowledge-layers]
+name = knowledge packages are layered (retrieval/tools/embeddings/chunking never reach the gateway)
+type = layers
+containers =
+    app.knowledge
+layers =
+    service
+    ingestion
+    gateway
+    tools
+    retrieval
+    embeddings
+    chunking
+    prompts
+    config
+    interfaces
+    sources
+    domain
+
+# The gateway sends to a provider exactly what its caller hands it: it never reads records,
+# documents or the index itself, so the model cannot receive data the user cannot see
+# (invariant 8). Indirect imports (e.g. through app.audit) are allowed.
+[importlinter:contract:knowledge-gateway-isolated]
+name = knowledge.gateway reads no records, documents or index (callers pass allowed blocks)
+type = forbidden
+source_modules =
+    app.knowledge.gateway
+forbidden_modules =
+    app.knowledge.service
+    app.knowledge.ingestion
+    app.knowledge.tools
+    app.knowledge.retrieval
+    app.knowledge.embeddings
+    app.knowledge.chunking
+    app.identity
+    app.tenancy
+    app.platform
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+allow_indirect_imports = True
+
+# Record tools are read-only and have no network (invariant 9, ADR-0008, SEC-020): no model
+# calls, no ingestion writes, no HTTP/S3 clients, no task enqueueing. Indirect imports through
+# other modules' services (which use S3 or Celery themselves) are allowed.
+[importlinter:contract:knowledge-tools-read-only]
+name = knowledge.tools are read-only (no gateway, ingestion, network or task queue)
+type = forbidden
+source_modules =
+    app.knowledge.tools
+forbidden_modules =
+    app.knowledge.service
+    app.knowledge.gateway
+    app.knowledge.ingestion
+    httpx
+    boto3
+    celery
+allow_indirect_imports = True
+
+# Chunking, prompts, config and the value types stay pure (no database, web, network or
+# feature module), so they run anywhere and test without a database. Indirect imports count.
+[importlinter:contract:knowledge-pure-foundations]
+name = knowledge chunking/prompts/config/domain/sources stay pure (only app.core helpers)
+type = forbidden
+source_modules =
+    app.knowledge.chunking
+    app.knowledge.prompts
+    app.knowledge.config
+    app.knowledge.domain
+    app.knowledge.sources
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    celery
+    httpx
+    boto3
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge.service
+    app.knowledge.ingestion
+    app.knowledge.gateway
+    app.knowledge.tools
+    app.knowledge.retrieval
+    app.knowledge.embeddings
+    app.knowledge.interfaces
