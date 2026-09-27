@@ -9,5 +9,31 @@ subject, section) is prepended for embedding and full-text search but never show
 
 Boundary: pure. May import only ``app.core`` helpers (never ``app.core.db``),
 ``app.knowledge.domain`` and ``app.knowledge.config``; no database, web, network or other module
-(import-linter ``knowledge-pure-foundations`` and ``knowledge-layers``).
+(import-linter ``knowledge-pure-foundations`` and ``knowledge-layers``). It satisfies the
+``Chunker`` protocol structurally and does not import ``interfaces`` (also a pure-foundations
+rule).
+
+As built (K5): :class:`StructureChunker` (``chunker``), the contextual header (``header``) and
+the text primitives (``text``: grapheme clusters, token estimate, script-based language ID).
 """
+
+from app.knowledge.chunking.chunker import TABLE_CELL_SEPARATOR, StructureChunker
+from app.knowledge.chunking.header import context_header
+from app.knowledge.chunking.text import (
+    count_tokens,
+    detect_language,
+    estimate_tokens,
+    graphemes,
+    split_word,
+)
+
+__all__ = [
+    "TABLE_CELL_SEPARATOR",
+    "StructureChunker",
+    "context_header",
+    "count_tokens",
+    "detect_language",
+    "estimate_tokens",
+    "graphemes",
+    "split_word",
+]

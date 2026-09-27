@@ -46,6 +46,7 @@ TASK_MODULES: list[str] = [
     "app.changes.tasks",
     "app.extraction.tasks",
     "app.exports.tasks",
+    "app.knowledge.tasks",
 ]
 
 
@@ -89,6 +90,9 @@ def create_celery() -> Celery:
             "exports.generate": {"queue": "exports"},
             "exports.render": {"queue": "pdf"},
             "exports.purge_expired": {"queue": "maintenance"},
+            # docs/06 §4: document ingestion (extract, redact, chunk, embed, index), ACL
+            # refresh and chunk removal (outbox consumers of the kb.* events).
+            "knowledge.*": {"queue": "ingest"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).

@@ -1,5 +1,6 @@
-# Structure-aware chunking (docs/06 §4.5). Telugu uses more tokens per word than English; the
-# budgets in docs/06 §12 account for it. Changes here need a passing `make eval`.
+# Extraction limits and structure-aware chunking (docs/06 §4.2-4.5). Telugu uses more tokens per
+# word than English; the budgets in docs/06 §12 account for it. Changes here need a passing
+# `make eval`.
 version: 1
 target_tokens:
   min: 350
@@ -13,3 +14,29 @@ block_markers:             # "Sub:/Ref:/Order:" blocks typical of government cir
   - "Sub:"
   - "Ref:"
   - "Order:"
+# Deterministic token estimate (no tokenizer dependency). A word costs
+# ceil(latin_chars / latin_chars_per_token + other_graphemes / other_graphemes_per_token), at
+# least 1. One Telugu akshara per token is deliberately pessimistic, so a chunk stays within the
+# embedding model's input limit whichever model ADR-0006 selects.
+token_estimate:
+  latin_chars_per_token: 4.0
+  other_graphemes_per_token: 1.0
+# Language of a block without a declared one (docs/06 §4.3): Telugu or English when that
+# script has at least this share of the letters, otherwise "mixed".
+language_dominant_share: 0.8
+# What ingestion reads (docs/06 §4.1-4.2). PDF text layer: ADR-0027 (proposed).
+extraction:
+  supported_mime_types:
+    - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    - "text/plain"
+  # Identity evidence and raw import spreadsheets hold student records, not school knowledge:
+  # they are never indexed.
+  excluded_purposes:
+    - "evidence"
+    - "import_file"
+  # C3 stays out of the index until retrieval enforces student.read_sensitive (fail closed).
+  indexed_sensitivities:
+    - "C1"
+    - "C2"
+  max_xml_bytes: 52428800   # one DOCX XML part, uncompressed (zip-bomb guard)
+  max_text_chars: 2000000   # extracted characters per version; a longer version is not indexed
