@@ -1,0 +1,33 @@
+# Hybrid retrieval (docs/06 §6; FR-KB-001, FR-KB-002). The ACL predicate is code, not config:
+# it is never tunable (invariant 8). Changes here need a passing `make eval`.
+version: 1
+
+fusion:
+  method: rrf
+  k: 60              # Reciprocal Rank Fusion constant
+final_k: 12          # fused results returned by default
+
+branches:
+  vector:
+    limit: 40        # HNSW, embedding <=> query vector
+  full_text:
+    limit: 40
+    ts_config: simple
+  trigram:
+    limit: 20        # content % query text
+
+hnsw_ef_search: 64   # SET LOCAL hnsw.ef_search (tune)
+
+diversity:
+  max_chunks_per_document: 3        # unless the question targets one document
+  merge_adjacent_same_page: true
+
+boosts:
+  recency_when_latest_intent: true  # decay on issued_on when the question implies latest/current
+  verified_answers: true            # doc_type = 'verified_answer'
+
+rerank:
+  enabled: false                    # adopt only if evals show a gain worth the latency
+
+translated_query_fusion:
+  enabled: true                     # original + translated query (small model), fused

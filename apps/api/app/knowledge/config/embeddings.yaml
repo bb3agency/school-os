@@ -1,0 +1,31 @@
+# Embeddings candidates and selection (ADR-0006; docs/06 §4.6, §12; docs/05 §6; FR-KB-001).
+# Nothing is selected until the ADR-0006 evaluation runs: Recall@10 on the Telugu/English/mixed
+# golden set, storage cost, latency and residency. Until then the offline fake provider is used
+# (SOS_KB_PROVIDER_MODE=fake) and no chunk text leaves the process.
+version: 1
+selected: null
+
+# The schema placeholder (docs/05 §6: halfvec(1024)). Changing it is a re-embedding migration.
+storage:
+  dimensions: 1024
+  precision: halfvec
+
+query_cache_ttl_s: 600        # docs/06 §12: cache query embeddings for 10 minutes
+
+# ADR-0006: prefer 512-dim halfvec if its recall loss is under 2 points versus 1024.
+selection_rule:
+  prefer_dimensions: 512
+  max_recall_loss_points: 2.0
+
+candidates:
+  # Default candidate: a Voyage multilingual model (Voyage 4 generation: 1024 dims by default,
+  # also 256/512/2048). Model ID to be pinned by the evaluation run.
+  voyage_multilingual:
+    provider: voyage
+    model: null
+    dimensions: 1024
+  # Alternative: an open-source multilingual model self-hosted in ap-south-1.
+  self_hosted_multilingual:
+    provider: self_hosted
+    model: null
+    dimensions: 1024

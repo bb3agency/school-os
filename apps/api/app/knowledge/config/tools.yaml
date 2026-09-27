@@ -1,0 +1,36 @@
+# Read-only record tools (docs/06 §7; ADR-0008; FR-KB-004, SEC-018, SEC-020). The whitelist is
+# fixed by ADR-0008: the loader refuses any other tool. Permissions are catalog keys
+# (app/authz/permissions.yaml); each tool also calls the owning module's service with the
+# caller's UserContext, so RLS and scopes apply exactly as in the UI.
+version: 1
+tools:
+  find_students:
+    permission: student.read_basic
+    max_results: 20                    # returns IDs + display fields
+  get_student_facts:
+    permission: student.read_basic
+    sensitive_permission: student.read_sensitive   # C3 masked unless held and explicitly asked
+    max_fields: 8                      # the caller must name fields
+    fields:
+      - full_name
+      - dob
+      - gender
+      - father_name
+      - mother_name
+      - admission_no
+      - admission_date
+      - current_class_section
+      - status
+      - leaving_date
+  get_value_history:
+    permission: student.read_basic
+    actor_names_permission: audit.read
+  count_students:
+    permission: student.read_basic
+    small_cell_min: 5                  # suppress cells < 5 in sensitive breakdowns
+  list_findings:
+    permission: dq.findings.read
+  list_documents:
+    permission: document.read          # metadata only; content via search_documents
+  search_documents:
+    permission: document.read
