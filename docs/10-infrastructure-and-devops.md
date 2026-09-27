@@ -88,7 +88,9 @@ infra/terraform/
 └── scripts/validate.sh
 ```
 
-Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs `terraform fmt -check`, `init -backend=false` + `validate`, `tflint` and `trivy config` on every root; **no plan or apply has run against AWS yet** (14 · M0 status).
+Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs `terraform fmt -check`, `init -backend=false` + `validate`, `tflint` and `trivy config` on every root; **no plan or apply has run against AWS yet** (14 · M0 status). Locally, `make tf-validate` runs fmt, init, validate and `terraform test` on every root in the official `hashicorp/terraform` image at CI's version (1.16.4, pinned by digest; `ONLY="modules/s3 …"` limits the roots).
+
+- **Files-bucket lifecycle.** Keys start with the tenant (`t/<tenant_id>/…`) and S3 lifecycle filters match only a literal prefix, so expiring categories are selected by the object tag `sos-lifecycle`, which the app sets in the upload itself (`ObjectStore.put(…, lifecycle=…)`). Export files get `export-7d`: rule `exports-7d` expires them after 7 days and their noncurrent versions after 1 day (docs/05 §13), as a backstop to the daily purge job. `discarded` is set by `ObjectStore.discard` (PRV-016). The rules `tenant-export-2d` and `import-raw-90d` exist but no upload sets their tags yet.
 
 - Remote state in S3 (versioned, encrypted) with locking; separate state per env.
 - Planned: `terraform plan` on PR (posted as comment); `apply` only from the pipeline with approval. Today CI validates only (§7).
@@ -102,7 +104,7 @@ Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs 
 
 - Multi-stage Dockerfiles; slim/distroless bases; pinned digests. Base and service images per ADR-0014 (`python:3.12-slim-bookworm`, `node:24-bookworm-slim`, `pgvector/pgvector:0.8.6-pg16-bookworm`, `valkey/valkey:8.1-alpine`, pinned `chrislusf/seaweedfs`, pinned `caddy:2`).
 - Run as non-root; read-only root FS; `/tmp` as tmpfs; drop Linux capabilities.
-- API, worker and beat share one image (`apps/api/Dockerfile`: `python:3.12-slim-bookworm`, uv-built venv, UID 10001, `INSTALL_PSQL=true` for release images, RDS CA bundle). Chromium (Playwright) with Noto Sans/Serif Telugu for PDF rendering and a ClamAV service arrive with the modules that need them (M1/M3).
+- `apps/api/Dockerfile` builds two Python images from one base (`python:3.12-slim-bookworm`, uv-built venv, UID 10001, `INSTALL_PSQL=true` for release images, RDS CA bundle): target `api` (default; api, migrate, db-bootstrap) and target `worker` (worker and beat; ECR repository `worker`, Terraform `worker_image_repository`, dedicated `SOS_WORKER_IMAGE`). The worker adds chrome-headless-shell at the revision the locked Playwright expects (1194 for 1.56.0; `tests/deploy/test_worker_image.py` fails when they diverge) with its Debian libraries, read-only under `/opt/ms-playwright`; the renderer never downloads a browser and serves the bundled Noto Sans Telugu itself. CI renders a synthetic Telugu PDF in the built worker image as UID 10001 on a read-only root with all capabilities dropped and no network (`infra/docker/worker-pdf-smoke.py`). The Chromium **sandbox** cannot run on Fargate (no seccomp or capability changes allowed); staging and prod keep it required, so PDF renders fail closed there until [ADR-0023](adr/ADR-0023-chromium-sandbox-for-pdf-rendering.md) (Proposed) is decided. A ClamAV service arrives with the module that needs it (M3).
 - Health endpoints: `/healthz` (liveness), `/readyz` (DB, Valkey reachable).
 - Images tagged with git SHA; SBOM attached; Trivy scan must pass (no critical CVEs) before push to ECR.
 
@@ -225,7 +227,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_REDIS_URL` | `redis://localhost:6379/0` | Valkey |
 | `SOS_S3_ENDPOINT_URL`, `SOS_S3_BUCKET_FILES`, `SOS_S3_BUCKET_AUDIT` | none, `sos-local-files`, `sos-local-audit-archive` | Object storage (endpoint only for SeaweedFS) |
 | `SOS_S3_PRESIGN_ENDPOINT_URL` | none | Endpoint used only to sign browser-facing presigned URLs (locally `http://localhost:8333`); unset in staging/prod |
-| `SOS_S3_KMS_KEY_ID` | none | KMS key for SSE-KMS on uploaded files (FR-DOC-003); unset locally (SeaweedFS) |
+| `SOS_S3_KMS_KEY_ID` | none | KMS key for SSE-KMS on uploaded files (FR-DOC-003): presigned POST policies require it and server writes send it. Shared tier: the data CMK (the files bucket's key); dedicated: `SOS_KMS_DATA_KEY_ARN` (the host key). Unset locally (SeaweedFS) |
 | `SOS_DOCUMENTS_MAX_UPLOAD_BYTES`, `SOS_DOCUMENTS_IMPORT_MAX_UPLOAD_BYTES` | 25 MiB, 10 MiB (at most 100 MiB) | Largest document / spreadsheet import upload (FR-DOC-001, SEC-016) |
 | `SOS_DOCUMENTS_UPLOAD_URL_TTL_S`, `SOS_DOCUMENTS_DOWNLOAD_URL_TTL_S` | 600, 300 (at most 600, 300) | Presigned POST and GET lifetimes (FR-DOC-004) |
 | `SOS_DOCUMENTS_ALLOWED_KINDS`, `SOS_DOCUMENTS_IMPORT_ALLOWED_KINDS` | `pdf,jpg,png,docx,xlsx`, `xlsx,csv` | File kinds accepted by content sniffing (never by extension) |
