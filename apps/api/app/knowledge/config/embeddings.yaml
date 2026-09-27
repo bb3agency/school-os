@@ -11,6 +11,32 @@ storage:
   precision: halfvec
 
 query_cache_ttl_s: 600        # docs/06 §12: cache query embeddings for 10 minutes
+query_cache_max_entries: 2048 # per process (~16 MiB of 1024-dim vectors)
+
+# TenantEmbedder request shaping (K2). max_chars is a conservative proxy for the provider's
+# tokens-per-request limit (Voyage: 120k-1M tokens depending on the model; Telugu uses more
+# tokens per character than English).
+batching:
+  max_texts: 128
+  max_chars: 120000
+
+# Transient failures only (timeouts, connection errors, HTTP 429 and 5xx). Delay before retry n:
+# min(max_delay_s, base_delay_s * 2^(n-1)), at least the provider's Retry-After, with jitter.
+retry:
+  max_attempts: 4
+  base_delay_s: 0.5
+  max_delay_s: 8.0
+
+# The Voyage network provider (app/knowledge/gateway/embeddings_voyage.py). Used only when
+# SOS_KB_PROVIDER_MODE=live AND `selected` names a voyage candidate with a model.
+voyage:
+  endpoint: https://api.voyageai.com/v1/embeddings
+  connect_timeout_s: 5
+  read_timeout_s: 30
+
+# The offline deterministic provider (SOS_KB_PROVIDER_MODE=fake: local, CI, eval stubs).
+fake:
+  model: sos-fake-ngram-1024-v1
 
 # ADR-0006: prefer 512-dim halfvec if its recall loss is under 2 points versus 1024.
 selection_rule:
@@ -19,12 +45,16 @@ selection_rule:
 
 candidates:
   # Default candidate: a Voyage multilingual model (Voyage 4 generation: 1024 dims by default,
-  # also 256/512/2048). Model ID to be pinned by the evaluation run.
+  # also 256/512/2048). Model ID to be pinned by the evaluation run (ADR-0006 "Evaluation
+  # plan": voyage-4 / voyage-4-lite / voyage-4-large are the shortlist). No default on purpose:
+  # live mode refuses to start until an owner-approved evaluation fills it in.
   voyage_multilingual:
     provider: voyage
     model: null
     dimensions: 1024
-  # Alternative: an open-source multilingual model self-hosted in ap-south-1.
+  # Alternative: an open-source multilingual model self-hosted in ap-south-1 (shortlist in
+  # ADR-0006: BAAI/bge-m3, intfloat/multilingual-e5-large; both 1024 dims). No provider
+  # implementation yet: selecting it refuses to start until one exists.
   self_hosted_multilingual:
     provider: self_hosted
     model: null
