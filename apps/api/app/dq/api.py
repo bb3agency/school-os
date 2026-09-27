@@ -36,7 +36,9 @@ router = APIRouter(prefix="/api/v1/dq", tags=["data-quality"])
 
 Reader = Annotated[UserContext, Depends(require(dq.READ))]
 Resolver = Annotated[UserContext, Depends(require(dq.RESOLVE))]
-Waiver = Annotated[UserContext, Depends(require(dq.WAIVE))]
+# dq.findings.waive is a step-up permission (docs/07 §6.2 ✓ᴿ): every waiver needs a fresh MFA
+# sign-in at the route; the service also insists on it for blockers (docs/09).
+Waiver = Annotated[UserContext, Depends(require(dq.WAIVE, step_up=True))]
 
 
 def optional_if_match(request: Request) -> int | None:
@@ -136,8 +138,8 @@ def waive_finding(
     version: OptionalIfMatch,
     response: Response,
 ) -> FindingOut:
-    """Accept a finding with a reason (permission ``dq.findings.waive``; blockers also need a
-    fresh MFA sign-in, 428 ``step_up_required``). Optional ``If-Match``."""
+    """Accept a finding with a reason (permission ``dq.findings.waive`` with a fresh MFA
+    sign-in, else 428 ``step_up_required``). Optional ``If-Match``."""
     out = dq.waive_finding(db, ctx, finding_id, body, expected_version=version)
     response.headers["ETag"] = etag(out.version)
     return out

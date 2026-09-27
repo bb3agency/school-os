@@ -153,10 +153,18 @@ Students notes (M1, as built):
 ### Data quality
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/dq/runs` (`scope`, `profile_key`) → 202 | `dq.findings.read` |
-| GET | `/dq/findings` (`severity`, `rule_id`, `section_id`, `status`) | `dq.findings.read` |
-| POST | `/dq/findings/{id}/resolve` | `dq.findings.resolve` |
-| POST | `/dq/findings/{id}/waive` | `dq.findings.waive` (step-up for blockers) |
+| POST | `/dq/runs` (`scope`: `section_ids` \| `class_ids` \| `student_ids` \| `batch_id`, `profile_key`) → 202 (**built**) | `dq.findings.read` |
+| GET | `/dq/runs/{id}` (**built**) | `dq.findings.read` (scoped holders: own runs) |
+| GET | `/dq/findings` (`severity`, `rule_id`, `section_id`, `status`, `student_id`, `profile_key`, `attribute_key`, cursor) · `/dq/findings/{id}` (`ETag`) (**built**) | `dq.findings.read` |
+| POST | `/dq/findings/{id}/resolve` (`note` and/or `change_request_id`; optional `If-Match`) (**built**) | `dq.findings.resolve` |
+| POST | `/dq/findings/{id}/waive` (`reason`; optional `If-Match`) (**built**) | `dq.findings.waive` (step-up) |
+| GET | `/dq/rules` · `/dq/profiles` · `/dq/summary` (`profile_key`, `section_ids`) (**built**) | `dq.findings.read` |
+
+Data quality notes (M1, as built):
+- **Runs:** scopes with at most `sync_max_students` (300, `app/dq/config/engine.yaml`) students are checked inside the request and answer `202` with `status: completed`; bigger scopes answer `202` with `status: queued` and run on the worker (queue `dq`); the requester gets the `dq.run.completed` notification. `Location: /api/v1/dq/runs/{id}`; `Idempotency-Key` accepted. Unknown `profile_key` or another school's section/class → `422`. Writes also trigger incremental runs through the outbox (`student.values.changed`, `import.committed|reverted`, `extraction.confirmed`, `change_request.approved`).
+- **Findings** are ordered most severe first; `status` defaults to `open` + `reopened`; `profile_key` keeps the base rules plus that profile's. Each finding carries `explanation` and `match_explanation` (`{code, en, te}`), `routes` (`{code, en, te}`), `values` (`masked` always; `value` only for current C2 values, never C3), `blocker`, `student` (`display_name`, `admission_no`) and workflow fields. Scoped holders (class teacher) see only students in their sections this year; other ids → `404`.
+- **Resolve** needs a `note` or a `change_request_id` (`422` otherwise; a full Aadhaar number in the note → `422 aadhaar_full_number_rejected`); **waive** needs a `reason` (3–1000 characters). Not open → `409 finding_not_open`; stale `If-Match` → `412`. `dq.findings.waive` is a step-up permission (07 §6.2), so every waiver needs MFA within 5 minutes (`428 step_up_required`); the service also enforces it for blockers. Both are audited (`dq.finding.resolved`, `dq.finding.waived`).
+- **Summary** (pre-check screen, US-501 AC2): `blockers`, `warnings` (every other severity), `students_with_blockers`, `by_severity`, `by_rule` and the last completed manual run for that profile.
 
 ### Documents
 | Method | Path | Permission |

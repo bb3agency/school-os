@@ -133,7 +133,7 @@ Generated from the `is_platform` entries of `apps/api/app/authz/permissions.yaml
 | Area | Tests |
 |---|---|
 | Name matching | Table-driven cases per match class; property tests (order invariance, idempotent normalization); Telugu-script ↔ Latin transliteration cases |
-| DQ engine | Rule outputs on seeded mismatches (precision/recall per rule); idempotent findings; reopen behaviour |
+| DQ engine | Rule outputs on seeded mismatches (precision/recall per rule); idempotent findings; reopen behaviour. As built (`apps/api/tests/dq/`): `test_checks.py` (DQ-001..012 on in-memory facts, masking, fingerprints), `test_precision.py` (labelled synthetic sets: precision ≥ 0.95 for blocker/high findings of DQ-001/002/008/010), `test_engine.py` (idempotency, auto-clear, reopen, waiver per conflict, profiles, scope, outbox-driven incremental runs, change-request link/resolve, queued runs + notification), `test_api.py` (routes, step-up, 404 outside scope, log redaction), `test_performance.py` (2,000 students ≪ 2 min), `test_migration.py` (0013 round trip with data) |
 | Imports | Mapping suggestions from EN/TE headers; row errors; atomic commit; revert window; 2,000-row timing |
 | Extraction queue | Nothing becomes a record without confirmation; evidence linked; low-confidence highlighting |
 | Exports | Profile validation; field order; formula-injection escaping; watermark; audit event |
