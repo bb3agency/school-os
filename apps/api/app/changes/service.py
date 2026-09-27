@@ -242,12 +242,12 @@ def _clean_text(field: str, value: str | None, *, required: bool) -> str | None:
     return text
 
 
-def _require_recent_mfa(ctx: UserContext, now: dt.datetime) -> None:
+def _require_recent_mfa(ctx: UserContext) -> None:
     """Defence in depth for FR-CR-002 (the route already demands step-up): MFA-backed sign-in
-    within 5 minutes, else 428 ``step_up_required``."""
+    within 5 minutes of the wall clock, else 428 ``step_up_required``."""
     if not ctx.mfa or ctx.auth_time is None:
         raise StepUpRequired()
-    age = now - ctx.auth_time
+    age = dt.datetime.now(dt.UTC) - ctx.auth_time
     if age > STEP_UP_MAX_AGE or age < -dt.timedelta(seconds=30):
         raise StepUpRequired()
 
@@ -577,7 +577,7 @@ def approve(
     if row.requested_by == ctx.membership_id:
         raise SelfApprovalForbidden()
     now = _now(session)
-    _require_recent_mfa(ctx, now)
+    _require_recent_mfa(ctx)
     _check_version(row, expected_version)
     _check_open(row, now)
     note = _clean_text("note", data.note, required=False)
@@ -639,7 +639,7 @@ def reject(
     if row.requested_by == ctx.membership_id:
         raise SelfApprovalForbidden()
     now = _now(session)
-    _require_recent_mfa(ctx, now)
+    _require_recent_mfa(ctx)
     _check_version(row, expected_version)
     _check_open(row, now)
     note = _clean_text("reason", data.reason, required=True)
