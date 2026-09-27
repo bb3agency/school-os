@@ -200,7 +200,7 @@ def test_ADR_0013_definer_access_allowlist_matches_the_catalog_exactly(
 ) -> None:
     """The allowlist must list exactly the tables that carry ``definer_access`` (no stale rows)."""
     with admin_engine.connect() as conn:
-        carrying = set(
+        carrying: set[str] = set(
             conn.execute(
                 text(
                     "SELECT n.nspname || '.' || c.relname FROM pg_policy p "
