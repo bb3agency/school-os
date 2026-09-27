@@ -188,14 +188,19 @@ GRANT UPDATE (status, decided_by, decided_at, decision_note, applied_value_id, v
 ALTER TABLE sis.attribute_values ADD CONSTRAINT attribute_values_change_request_fk
   FOREIGN KEY (tenant_id, change_request_id) REFERENCES sis.change_requests (tenant_id, id)
   NOT VALID;
+-- Validate without FORCE: under FORCE RLS and no school context the owner's check would see no
+-- rows and accept anything. The block's own rollback restores FORCE when validation fails.
 DO $$
 BEGIN
+  ALTER TABLE sis.attribute_values NO FORCE ROW LEVEL SECURITY;
   ALTER TABLE sis.attribute_values VALIDATE CONSTRAINT attribute_values_change_request_fk;
+  ALTER TABLE sis.attribute_values FORCE ROW LEVEL SECURITY;
 EXCEPTION WHEN foreign_key_violation THEN
   -- Only after a lossy downgrade: old values keep ids of dropped requests (see docstring).
   RAISE NOTICE 'attribute_values_change_request_fk left NOT VALID (ids of dropped requests)';
 END
 $$;
+ALTER TABLE sis.attribute_values FORCE ROW LEVEL SECURITY;
 """
 
 DOWNGRADE_SQL = r"""
