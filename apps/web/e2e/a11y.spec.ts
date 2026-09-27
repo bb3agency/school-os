@@ -21,6 +21,36 @@ async function expectNoAxeViolations(page: Page, label: string) {
   expect(summary, label).toEqual([]);
 }
 
+/**
+ * Keyboard only (WCAG 2.4.7): Tab through the page from the top and require a visible focus
+ * indicator (outline or box shadow) on every stop, including the parts of native controls
+ * such as the date picker button.
+ */
+async function expectVisibleFocusOnEveryStop(page: Page, label: string, maxStops = 60) {
+  await page.locator("body").focus();
+  const missing: string[] = [];
+  let first: string | null = null;
+  for (let i = 0; i < maxStops; i += 1) {
+    await page.keyboard.press("Tab");
+    const stop = await page.evaluate((index) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el === document.body) return null;
+      const style = getComputedStyle(el);
+      const ring =
+        (style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0) ||
+        style.boxShadow !== "none";
+      const text = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
+      return { id: `${index}:${el.tagName.toLowerCase()}[${text}]`, ring };
+    }, i);
+    if (!stop) break;
+    const key = stop.id.replace(/^\d+:/, "");
+    if (first === key) break;
+    first ??= key;
+    if (!stop.ring) missing.push(stop.id);
+  }
+  expect(missing, `${label}: focus stops without a visible indicator`).toEqual([]);
+}
+
 async function signIn(page: Page, path: string, subject: string) {
   await page.goto(path);
   // The stand-in IdP's login form (plain HTML; not part of SchoolOS).
@@ -73,6 +103,103 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/en\/support$/);
     await expect(page.getByRole("link", { name: "Switch school" })).toBeVisible();
+  });
+
+  test("school settings, structure, users, documents, audit check: axe and keyboard (NFR-A11Y-001)", async ({
+    page,
+  }) => {
+    await signIn(page, "/en/settings/structure", "clerk");
+    await expect(page).toHaveURL(/\/en\/settings\/structure$/);
+    // [page, text that proves the data (not only the shell or an error) is shown]
+    const pages: Array<[string, string]> = [
+      ["/en/settings/structure", "Class 6"],
+      ["/te/settings/structure", "6వ తరగతి"],
+      ["/en/settings/school", "STATE_AP, CBSE"],
+      ["/te/settings/school", "STATE_AP, CBSE"],
+      ["/en/settings/users", "Synthetic Teacher"],
+      ["/en/settings/users/new", "Invite"],
+      ["/en/settings/users/0192f3a4-0000-7000-8000-0000000000d1", "teacher@school.example"],
+      ["/te/settings/users", "Synthetic Teacher"],
+      ["/en/documents", "Dasara holidays circular 2026"],
+      ["/en/documents/new", "Upload"],
+      ["/en/documents/0192f3a4-0000-7000-8000-00000000d001", "Dasara holidays circular 2026"],
+      ["/te/documents", "Dasara holidays circular 2026"],
+      ["/en/audit/verify", "Check integrity"],
+    ];
+    for (const [path, proof] of pages) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      // Wait for the data, not only the shell, before checking.
+      await expect(page.getByText(proof).first()).toBeVisible();
+      await expect(page.getByText("Loading…")).toHaveCount(0);
+      await expectNoAxeViolations(page, path);
+      // 1366×768: no horizontal page scroll.
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `${path} horizontal overflow`).toBeLessThanOrEqual(0);
+      if (path.startsWith("/en/")) await expectVisibleFocusOnEveryStop(page, path);
+    }
+
+    // Structure, keyboard only: open "Add academic year" with Enter, fields reachable by Tab,
+    // Escape closes and returns focus to the trigger.
+    await page.goto("/en/settings/structure");
+    const add = page.getByRole("button", { name: "Add academic year" });
+    await add.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.querySelector("dialog[open]")?.contains(document.activeElement) ?? false,
+        ),
+      )
+      .toBe(true);
+    await expectNoAxeViolations(page, "add year dialog");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(add).toBeFocused();
+
+    // Audit chain check by keyboard: the button runs it and the result is announced.
+    await page.goto("/en/audit/verify");
+    await page.getByRole("button", { name: "Check integrity" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("The audit log is intact")).toBeVisible();
+    await expectNoAxeViolations(page, "audit verify result");
+  });
+
+  test("platform school detail: provisioning state and 'Resume provisioning' by keyboard (FR-PLT-002)", async ({
+    page,
+  }) => {
+    const detail = "/en/platform/schools/0192f3a4-0000-7000-8000-000000000003";
+    await signIn(page, detail, "operator-1");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Sample Model School" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Setup stopped before it finished" }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page, "school detail provisioning en");
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, "school detail horizontal overflow").toBeLessThanOrEqual(0);
+    await expectVisibleFocusOnEveryStop(page, "school detail");
+
+    const resume = page.getByRole("button", { name: "Resume provisioning" });
+    await resume.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "Resume setting up this school?" });
+    await expect(dialog).toBeVisible();
+    await expectNoAxeViolations(page, "resume dialog");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(resume).toBeFocused();
+
+    await page.goto(detail.replace("/en/", "/te/"));
+    await expect(page.getByRole("button", { name: "సెటప్‌ను కొనసాగించండి" })).toBeVisible();
+    await expectNoAxeViolations(page, "school detail provisioning te");
   });
 
   test("platform pages: no axe violations; wizard and dialogs by keyboard", async ({ page }) => {
