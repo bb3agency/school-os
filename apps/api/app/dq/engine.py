@@ -474,7 +474,8 @@ def reconcile(
             else:
                 unchanged.append(row["id"])
                 stats.unchanged += 1
-        if status in ACTIVE_STATUSES:
+        # Counts cover the run's own students (DQ-008 mirrors of other students are not theirs).
+        if status in ACTIVE_STATUSES and finding.student_id in scope:
             stats.by_severity[finding.severity.value] += 1
             if finding.severity is Severity.BLOCKER:
                 stats.blockers += 1

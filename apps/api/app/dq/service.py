@@ -742,6 +742,7 @@ def list_findings(
     """Findings, most severe first (US-501 AC1). ``status`` defaults to the unresolved ones
     (``open``, ``reopened``); ``profile_key`` keeps the base rules plus that profile's."""
     offset = _offset(cursor)
+    _check_profile(filters.profile_key)
     reach = _reach(session, ctx)
     ids = _student_filter(
         session,
