@@ -1,0 +1,20 @@
+# System-role grants the system-role sync never removes, not even with --prune
+# (ADR-0022 amendment 2026-09-27; FR-IAM-011, SEC-003).
+#
+# `python -m app.identity.sync_system_roles --prune` removes grants that roles.yaml no longer
+# lists. Removing one of these from a school would lock the school out of administering itself
+# (nobody left who can invite staff, assign roles or change school settings), and only a
+# platform-side repair could undo it. A removal listed here is reported as `!` (a conflict,
+# exit 4) and not applied; every other change in the same run still goes through.
+#
+# Read by app/identity/service.py (protected_system_grants); kept next to roles.yaml because it
+# names roles.yaml keys. Every entry must be a system role in roles.yaml and a tenant (not
+# platform.*) permission in permissions.yaml; tests/identity/test_sync_system_roles.py also
+# checks that roles.yaml grants each of them today. Removing an entry needs an ADR-0022 amendment.
+version: 1
+
+protected_grants:
+  owner:
+    - user.manage # invite, activate, suspend and remove staff; see roles and permissions
+    - role.assign # change staff roles and class/section scopes (owner: every role)
+    - tenant.settings.manage # school settings (languages, idle timeout, AI, retention)

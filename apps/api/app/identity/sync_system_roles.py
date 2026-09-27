@@ -18,6 +18,10 @@ Behaviour (ADR-0022):
 - Dry run by default: the per-school transaction is read-only. ``--apply`` writes: missing
   system roles and grants are added and display names updated; grants roles.yaml no longer lists
   are removed only with ``--prune``. Custom roles and ``platform_support`` are never changed.
+- Lockout guard: grants listed in ``app/authz/protected_grants.yaml`` (at least the owner's
+  ``user.manage``, ``role.assign`` and ``tenant.settings.manage``) are never removed, not even
+  with ``--prune``: such a removal is reported as ``!`` and counted as a conflict (exit 4); the
+  school's other changes still apply.
 - Every change is audited in the same transaction (actor ``system``, keys and counts only).
 - Output: one line per school plus one line per change, IDs and keys only (no names).
 - Refuses unless connected as ``sos_app`` (never a superuser or a BYPASSRLS role), and until the
@@ -25,7 +29,8 @@ Behaviour (ADR-0022):
   (``SOS_DEPLOYMENT_MODE=dedicated``) it handles only ``SOS_DEDICATED_TENANT_ID``.
 
 Exit codes: 0 in line or applied · 1 refused (nothing done) · 2 invalid arguments ·
-3 dry run found changes to make · 4 at least one school failed or has a role-key conflict.
+3 dry run found changes to make · 4 at least one school failed or has a conflict (a role-key
+conflict, or a protected grant ``--prune`` would have removed).
 """
 
 from __future__ import annotations
@@ -75,7 +80,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--prune",
         action="store_true",
-        help="also remove system-role grants roles.yaml no longer lists (can remove access)",
+        help=(
+            "also remove system-role grants roles.yaml no longer lists (can remove access;"
+            " never the grants in protected_grants.yaml)"
+        ),
     )
     p.add_argument("--tenant", type=uuid.UUID, help="only this school (tenant ID)")
     return p
@@ -130,7 +138,8 @@ def _write_plan(out: TextIO, plan: identity.SystemRoleSyncPlan) -> None:
         f" roles_created={len(plan.create_roles)} grants_added={len(plan.add_grants)}"
         f" grants_removed={len(plan.remove_grants)} roles_updated={len(plan.update_names)}"
         f" extra_grants_kept={len(plan.extra_grants)} conflicts={len(plan.conflicts)}"
-        f" unknown_system_roles={len(plan.unknown_system_roles)}\n"
+        f" unknown_system_roles={len(plan.unknown_system_roles)}"
+        f" grants_protected={len(plan.protected_grants)}\n"
     )
     for key, perms in plan.create_roles:
         out.write(f"  + role {key} ({len(perms)} grants)\n")
@@ -142,6 +151,8 @@ def _write_plan(out: TextIO, plan: identity.SystemRoleSyncPlan) -> None:
         out.write(f"  = {key} {perm} (not in roles.yaml; kept, use --prune to remove)\n")
     for key in plan.update_names:
         out.write(f"  ~ {key} display names\n")
+    for key, perm in plan.protected_grants:
+        out.write(f"  ! {key} {perm} protected (lockout guard); not removed\n")
     for key in plan.conflicts:
         out.write(f"  ! {key} is a custom role in this school; not changed\n")
     for key in plan.unknown_system_roles:
@@ -172,7 +183,7 @@ def run(
             out.write(f"tenant={tenant_id} result=failed error={type(exc).__name__}\n")
             continue
         counts[_result(plan)] += 1
-        if plan.conflicts:
+        if plan.has_conflicts:
             counts["conflict"] += 1
         _write_plan(out, plan)
         log.info(
@@ -184,6 +195,7 @@ def run(
             grants_removed=len(plan.remove_grants),
             roles_updated=len(plan.update_names),
             conflicts=len(plan.conflicts),
+            grants_protected=len(plan.protected_grants),
         )
     out.write(
         f"summary mode={'apply' if apply else 'dry_run'} prune={str(prune).lower()}"

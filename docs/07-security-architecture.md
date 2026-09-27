@@ -194,7 +194,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
-These defaults are copied into a school at provisioning. When a release changes them, existing schools are brought in line only by the operator command `python -m app.identity.sync_system_roles` (ADR-0022): per school in its own `tenant_session` as `sos_app` (no new definer function), dry run by default, grants removed only with `--prune`, custom roles never changed, every change audited in the school's chain.
+These defaults are copied into a school at provisioning. When a release changes them, existing schools are brought in line only by the operator command `python -m app.identity.sync_system_roles` (ADR-0022): per school in its own `tenant_session` as `sos_app` (no new definer function), dry run by default, grants removed only with `--prune`, custom roles never changed, every change audited in the school's chain. Lockout guard: the grants listed in `apps/api/app/authz/protected_grants.yaml` (the owner's `user.manage`, `role.assign` and `tenant.settings.manage`) are never removed, not even with `--prune`; such a removal is reported as a conflict (exit 4) and not applied (ADR-0022 amendment 2026-09-27).
 
 ### 6.3 Maker-checker (ADR-0010)
 - Applies to identity attributes (`is_identity = true`), waiving blocker findings, and custom-role creation.

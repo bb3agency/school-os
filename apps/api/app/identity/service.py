@@ -16,8 +16,11 @@ import uuid
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from functools import lru_cache
+from importlib import resources
 from typing import Any
 
+import yaml
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
@@ -26,6 +29,8 @@ from app.audit import service as audit
 from app.authz import cache
 from app.authz.catalog import (
     BREAKGLASS_ROLE,
+    CatalogError,
+    PermissionDef,
     RoleDef,
     assign_any_roles,
     breakglass_role,
@@ -832,6 +837,44 @@ def clone_system_roles(session: Session, tenant_id: uuid.UUID) -> None:
 # --- system-role sync for existing schools (ADR-0022; FR-IAM-011, SEC-003, SEC-007) ----------
 
 SYSTEM_ROLE_SYNC_VIA = "system_role_sync"
+PROTECTED_GRANTS_FILE = "protected_grants.yaml"
+"""Versioned list of system-role grants ``--prune`` never removes (``app/authz``, next to
+roles.yaml; ADR-0022 amendment 2026-09-27)."""
+
+
+def parse_protected_grants(
+    raw: Any, templates: Mapping[str, RoleDef], catalog: Mapping[str, PermissionDef]
+) -> frozenset[tuple[str, str]]:
+    """Validate ``protected_grants.yaml``: version 1, system roles, tenant permissions."""
+    name = PROTECTED_GRANTS_FILE
+    if not isinstance(raw, dict) or raw.get("version") != 1:
+        raise CatalogError(f"{name}: expected a mapping with version: 1")
+    section = raw.get("protected_grants")
+    if not isinstance(section, dict) or not section:
+        raise CatalogError(f"{name}: 'protected_grants' must be a non-empty mapping")
+    pairs: set[tuple[str, str]] = set()
+    for role_key, perms in section.items():
+        if role_key not in templates:
+            raise CatalogError(f"{name}: {role_key!r} is not a system role in roles.yaml")
+        if not isinstance(perms, list) or not perms:
+            raise CatalogError(f"{name}: {role_key} must list at least one permission")
+        for perm in perms:
+            pdef = catalog.get(perm) if isinstance(perm, str) else None
+            if pdef is None or pdef.is_platform or pdef.implicit:
+                raise CatalogError(f"{name}: {role_key} lists {perm!r}, not a tenant permission")
+            pairs.add((role_key, perm))
+    return frozenset(pairs)
+
+
+@lru_cache(maxsize=1)
+def protected_system_grants() -> frozenset[tuple[str, str]]:
+    """(role key, permission) pairs the system-role sync never removes, even with prune.
+
+    Removing one would lock a school out of administering itself (ADR-0022 amendment
+    2026-09-27; FR-IAM-011, SEC-003).
+    """
+    text_ = resources.files("app.authz").joinpath(PROTECTED_GRANTS_FILE).read_text("utf-8")
+    return parse_protected_grants(yaml.safe_load(text_), system_roles(), permission_catalog())
 
 
 @dataclass(frozen=True, slots=True)
@@ -841,6 +884,8 @@ class SystemRoleSyncPlan:
     ``create_roles``: (role key, permission keys) for system roles missing in the school;
     ``add_grants`` / ``remove_grants``: (role key, permission key) pairs (removals only with
     prune); ``extra_grants``: grants roles.yaml no longer lists that are kept (no prune);
+    ``protected_grants``: grants prune would remove but ``protected_grants.yaml`` protects
+    (kept; a conflict, like ``conflicts``);
     ``update_names``: system roles whose display names differ from roles.yaml;
     ``conflicts``: roles.yaml keys held by a school's custom role (never touched);
     ``unknown_system_roles``: system roles roles.yaml no longer defines (never deleted).
@@ -853,9 +898,16 @@ class SystemRoleSyncPlan:
     add_grants: tuple[tuple[str, str], ...] = ()
     remove_grants: tuple[tuple[str, str], ...] = ()
     extra_grants: tuple[tuple[str, str], ...] = ()
+    protected_grants: tuple[tuple[str, str], ...] = ()
     update_names: tuple[str, ...] = ()
     conflicts: tuple[str, ...] = ()
     unknown_system_roles: tuple[str, ...] = ()
+
+    @property
+    def has_conflicts(self) -> bool:
+        """True when something needs a person: a custom role on a system key, or a protected
+        grant that prune was asked to remove."""
+        return bool(self.conflicts or self.protected_grants)
 
     @property
     def pending(self) -> bool:
@@ -888,10 +940,12 @@ def sync_system_roles(
     Runs in that school's own ``tenant_session`` as ``sos_app`` (RLS applies; no definer
     function). Only roles with ``is_system`` whose key roles.yaml defines are touched: missing
     roles are created, missing grants added and display names updated; grants roles.yaml no
-    longer lists are removed only with ``prune``. Custom roles, the break-glass
-    ``platform_support`` role and system roles roles.yaml no longer defines are never changed.
-    Scope (school/scoped) and step-up are not stored per grant: the resolver reads them from
-    roles.yaml and ``core.permissions`` at request time, so they need no reconciliation here.
+    longer lists are removed only with ``prune``, and never those in ``protected_grants.yaml``
+    (the lockout guard: they are reported in ``protected_grants`` as a conflict and kept).
+    Custom roles, the break-glass ``platform_support`` role and system roles roles.yaml no
+    longer defines are never changed. Scope (school/scoped) and step-up are not stored per
+    grant: the resolver reads them from roles.yaml and ``core.permissions`` at request time, so
+    they need no reconciliation here.
 
     ``apply=False`` (dry run) makes the transaction read-only and writes nothing. With
     ``apply=True`` every change is audited in this transaction (actor ``system``, keys only):
@@ -936,14 +990,16 @@ def sync_system_roles(
     unknown = sorted(
         r.key for r in roles if r.is_system and r.key not in templates and r.key != BREAKGLASS_ROLE
     )
+    guarded = protected_system_grants()
     plan = SystemRoleSyncPlan(
         tenant_id=tenant_id,
         applied=False,
         prune=prune,
         create_roles=tuple(create),
         add_grants=tuple(add),
-        remove_grants=tuple(extra) if prune else (),
+        remove_grants=tuple(g for g in extra if g not in guarded) if prune else (),
         extra_grants=() if prune else tuple(extra),
+        protected_grants=tuple(g for g in extra if g in guarded) if prune else (),
         update_names=tuple(names),
         conflicts=tuple(conflicts),
         unknown_system_roles=tuple(unknown),
@@ -1021,6 +1077,7 @@ def _apply_system_role_plan(
             "roles_created": len(plan.create_roles),
             "grants_added": len(plan.add_grants),
             "grants_removed": len(plan.remove_grants),
+            "grants_protected": len(plan.protected_grants),
             "roles_updated": len(plan.update_names),
             "prune": prune,
             "via": via,
