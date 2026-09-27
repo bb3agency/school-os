@@ -1237,5 +1237,790 @@
     "stillNone": "Still no access. Ask the office to send the invitation again.",
     "checkFailed": "We couldn't check right now. Try again in a minute.",
     "signIn": "Sign in"
+  },
+  "students": {
+    "nav": "Students",
+    "aadhaarNotAllowed": "This looks like a full Aadhaar number. SchoolOS never stores it: enter only the last 4 digits, in the Aadhaar last 4 digits field.",
+    "aadhaarWarningTitle": "No Aadhaar numbers",
+    "aadhaarWarningBody": "Don't enter full Aadhaar numbers anywhere. Only the last 4 digits are kept, in their own field.",
+    "dateHint": "Use DD/MM/YYYY, for example 14/03/2012.",
+    "dateInvalid": "Enter a real date as DD/MM/YYYY, for example 14/03/2012.",
+    "status": {
+      "provisional": "Provisional",
+      "active": "Studying",
+      "left": "Left school",
+      "graduated": "Completed school"
+    },
+    "sources": {
+      "admission_register": "Admission register",
+      "aadhaar_as_printed": "Aadhaar (as printed)",
+      "udise_plus": "UDISE+",
+      "board_registration": "Board registration",
+      "birth_certificate": "Birth certificate",
+      "parent_form": "Parent form",
+      "tc_incoming": "Transfer certificate (incoming)",
+      "manual_entry": "Entered by the office"
+    },
+    "sourceShort": {
+      "admission_register": "Register",
+      "aadhaar_as_printed": "Aadhaar",
+      "udise_plus": "UDISE+",
+      "board_registration": "Board",
+      "birth_certificate": "Birth cert.",
+      "parent_form": "Parent form",
+      "tc_incoming": "TC",
+      "manual_entry": "Office"
+    },
+    "verification": {
+      "verified": "verified",
+      "unverified": "not verified yet",
+      "rejected": "marked wrong",
+      "provisional": "provisional, waiting for verification"
+    },
+    "enumValues": {
+      "female": "Girl",
+      "male": "Boy",
+      "transgender": "Transgender",
+      "general": "General",
+      "ews": "EWS",
+      "obc": "OBC / BC",
+      "sc": "SC",
+      "st": "ST"
+    },
+    "sensitive": {
+      "show": "Show",
+      "showing": "Showing…",
+      "hide": "Hide",
+      "revealedLabel": "{field}:",
+      "hiddenLabel": "{field} is hidden. Showing it is recorded in the audit log."
+    },
+    "list": {
+      "title": "Students",
+      "description": "Find a student by name in English or Telugu, admission number, class and section, or a parent's name.",
+      "add": "Add a student",
+      "import": "Import from a spreadsheet",
+      "print": "Print this list",
+      "searchTitle": "Find students",
+      "searchLabel": "Name, admission number or class",
+      "searchHint": "For example: venkat sai 9b, 2019/0457 or a parent's name.",
+      "filterClass": "Class",
+      "filterSection": "Section",
+      "filterStatus": "Status",
+      "clear": "Clear the search",
+      "resultsTitle": "Students found",
+      "noMatchTitle": "No student matches",
+      "noMatchBody": "Check the spelling, try fewer words, or clear the class and section filters.",
+      "emptyTitle": "No students yet",
+      "emptyBody": "Add students one by one, or import your class lists from a spreadsheet.",
+      "pagesLabel": "Pages of results",
+      "previous": "Previous page",
+      "next": "Next page",
+      "pageNumber": "Page {page}",
+      "colName": "Name",
+      "colAdmissionNo": "Admission number",
+      "colClassSection": "Class and section",
+      "colStatus": "Status",
+      "unnamed": "Name not recorded",
+      "matchedOn": "Found by: {field}"
+    },
+    "create": {
+      "title": "Add a student",
+      "description": "Enter the details as written on the source you have in hand. Each value remembers where it came from.",
+      "noPermissionTitle": "You can't add students",
+      "noPermissionBody": "Ask your school's office admin if you need to add students.",
+      "source": "Where are these details from?",
+      "sourceHint": "Usually the admission register. It is the legal record of the school.",
+      "detailsLegend": "Student details",
+      "admissionNo": "Admission number",
+      "admissionNoHint": "Letters, digits and / . _ - only, for example 2019/0457.",
+      "fullName": "Full name",
+      "fullNameHint": "Exactly as written on the source, including initials.",
+      "dob": "Date of birth",
+      "gender": "Gender",
+      "fatherName": "Father's name",
+      "motherName": "Mother's name",
+      "classLegend": "Class this year",
+      "section": "Class and section",
+      "sectionHint": "Leave empty to add the student to a section later.",
+      "noSection": "Not in a section yet",
+      "rollNo": "Roll number",
+      "status": "Record status",
+      "statusHint": "Choose Provisional if the details still need checking.",
+      "submit": "Add student"
+    },
+    "detail": {
+      "loadingTitle": "Student",
+      "unnamed": "Name not recorded",
+      "summary": "Admission number {admission} · {classSection}",
+      "noClass": "not in a section this year",
+      "relatedLabel": "Related pages",
+      "backToList": "Back to students",
+      "findingsLink": "Data checks for this student",
+      "changeRequestsLink": "Correction requests for this student",
+      "valuesTitle": "Details and their sources",
+      "valuesDescription": "The value used is the one from the most trusted source. For identity fields that is the verified admission register value. Other sources are shown beside it so differences are never hidden.",
+      "valuesTable": "Student details with every source",
+      "colField": "Field",
+      "colUsed": "Value used",
+      "colSources": "Values from each source",
+      "identityField": "Identity field: changes need a correction request",
+      "restrictedField": "Restricted: hidden until you choose Show",
+      "provisional": "Provisional",
+      "conflicts": "Differs from: {sources}",
+      "recordedOn": "Recorded {date}",
+      "hasEvidence": "evidence attached",
+      "fromImport": "from an import",
+      "markVerified": "Mark verified",
+      "markRejected": "Mark wrong",
+      "verifiedDone": "The value is marked verified.",
+      "rejectedDone": "The value is marked wrong. It is no longer used.",
+      "noValues": "No details are recorded for this student yet. Choose “Record a value” to add one.",
+      "classTitle": "Class and enrolment",
+      "classSection": "Class and section",
+      "rollNo": "Roll number",
+      "notEnrolled": "Not in a section this academic year."
+    },
+    "record": {
+      "open": "Record a value",
+      "title": "Record a value",
+      "description": "Add what one source says. The earlier value from that source stays in the history.",
+      "field": "Field",
+      "source": "Source",
+      "sourceHint": "Where you read this value.",
+      "value": "Value",
+      "digits4Hint": "Only the last 4 digits of the Aadhaar number, for example 1234.",
+      "digits4Invalid": "Enter exactly 4 digits: the last 4 digits of the Aadhaar number.",
+      "identityNote": "This is an identity field. Once the admission register value is recorded, changing it needs a correction request with evidence, approved by the principal.",
+      "submit": "Record value",
+      "goToChangeRequests": "Open correction requests for this student"
+    },
+    "guardians": {
+      "title": "Parents and guardians",
+      "description": "Phone numbers and addresses are restricted and hidden until you choose Show.",
+      "colName": "Name",
+      "colRelationship": "Relationship",
+      "colPhone": "Phone",
+      "colAddress": "Address",
+      "primary": "Main contact",
+      "emptyTitle": "No parent or guardian recorded",
+      "emptyBody": "Parents and guardians appear here once they are added to the student's record.",
+      "phoneOf": "Phone number of {name}",
+      "addressOf": "Address of {name}",
+      "relationship": {
+        "father": "Father",
+        "mother": "Mother",
+        "guardian": "Guardian"
+      }
+    },
+    "errors": {
+      "identity_change_required": {
+        "title": "This needs a correction request",
+        "body": "The admission register value of an identity field can't be changed directly. Raise a correction request with the evidence, and the principal will approve it."
+      },
+      "value_superseded": {
+        "title": "A newer value was recorded",
+        "body": "Someone recorded a newer value for this field. Reload the page and check the current value."
+      },
+      "already_enrolled": {
+        "title": "Already in this section",
+        "body": "The student is already in this section. Choose a different section, or leave it as it is."
+      },
+      "not_sensitive": {
+        "title": "Nothing to show",
+        "body": "This field is not restricted, so it is already shown on the page."
+      },
+      "aadhaar_full_number_rejected": {
+        "title": "Full Aadhaar numbers are not allowed",
+        "body": "SchoolOS never stores a full Aadhaar number. Remove it and enter only the last 4 digits in their own field."
+      },
+      "student_not_found": {
+        "title": "Student not found",
+        "body": "The student may have been removed, or is not in your classes. Search for the student again."
+      }
+    }
+  },
+  "imports": {
+    "nav": "Imports",
+    "status": {
+      "uploaded": "Waiting to be read",
+      "parsing": "Reading the file",
+      "parsed": "Choose columns",
+      "validating": "Checking rows",
+      "validated": "Checked",
+      "committing": "Adding to records",
+      "committed": "Added",
+      "reverting": "Undoing",
+      "reverted": "Undone",
+      "failed": "Could not be read"
+    },
+    "upload": {
+      "file": "Spreadsheet file",
+      "fileHint": "An Excel (.xlsx) or CSV file, at most {size}. For a Google Sheet, choose File, then Download, then Microsoft Excel.",
+      "fileMissing": "Choose the spreadsheet file to import.",
+      "fileType": "This file type can't be imported. Save it as Excel (.xlsx) or CSV and choose it again.",
+      "fileTooLarge": "This file is larger than 10 MB. Split the list into smaller files, for example one per class.",
+      "source": "Where does this list come from?",
+      "sourceHint": "Values are recorded with this source. Only the admission register, a transfer certificate or office entry can add new students.",
+      "sourceMatchOnly": "{source} (updates existing students only)",
+      "aadhaarColumn": "Remove any column with full Aadhaar numbers before you upload. Only the last 4 digits may be imported, in their own column.",
+      "progressLabel": "Upload progress",
+      "working": "Uploading…",
+      "submit": "Upload and read the file",
+      "stage": {
+        "requesting": "Preparing the upload…",
+        "uploading": "Uploading the file…",
+        "uploadingPercent": "Uploading the file: {percent}%",
+        "registering": "Saving the file…",
+        "scanning": "Checking the file for viruses…",
+        "ready": "File ready."
+      }
+    },
+    "list": {
+      "title": "Imports",
+      "description": "Import class lists from Excel or Google Sheets instead of typing them again. Nothing is added to student records until you check the rows and confirm.",
+      "uploadTitle": "Import a spreadsheet",
+      "uploadDescription": "Upload the file, choose which column is which field, check the rows, then add them.",
+      "historyTitle": "Earlier imports",
+      "colStarted": "Started",
+      "open": "Open",
+      "openHint": ", open this import",
+      "colSource": "Source",
+      "colRows": "Rows",
+      "colErrors": "Rows with errors",
+      "colStatus": "Status",
+      "templateName": "Template name",
+      "templateColumns": "Columns",
+      "templateLastUsed": "Last used",
+      "emptyTitle": "No imports yet",
+      "emptyBody": "Upload your first spreadsheet to start.",
+      "pagesLabel": "Pages of imports",
+      "templatesTitle": "Saved column templates",
+      "templatesDescription": "A file with the same column headings reuses its template automatically.",
+      "templatesEmptyTitle": "No templates saved",
+      "templatesEmptyBody": "After you choose the columns of an import, save them as a template to reuse next time."
+    },
+    "detail": {
+      "loadingTitle": "Import",
+      "title": "Import of {date}",
+      "relatedLabel": "Related pages",
+      "backToList": "Back to imports",
+      "source": "Source",
+      "committedAt": "Added on",
+      "revertedAt": "Undone on",
+      "busy": {
+        "uploaded": "Waiting for the file to be read",
+        "parsing": "Reading the file",
+        "validating": "Checking every row",
+        "committing": "Adding the rows to student records",
+        "reverting": "Undoing the import"
+      },
+      "busyBody": "This page updates by itself. You can leave it and come back later.",
+      "failedTitle": "Something needs your attention",
+      "fileDeleted": "The uploaded file has been deleted under the school's retention policy. The records it added stay.",
+      "addedTitle": "Added to student records",
+      "revertUntil": "If something is wrong, you can undo this import until {deadline}.",
+      "revertClosed": "This import can no longer be undone. Correct individual records instead.",
+      "readyTitle": "Ready to add",
+      "readyDescription": "Review the rows below. Adding is all or nothing, and can be undone within 24 hours.",
+      "noCommitPermission": "Ask your office admin or principal to add these rows. You can check them, but not add them.",
+      "nothingToAdd": "No row is ready to add. Fix the rows with errors in the file and upload it again.",
+      "mappingTitle": "Choose which field each column fills",
+      "mappingDescription": "Suggestions come from the column headings, in English or Telugu. Check each one, then check the rows.",
+      "next": {
+        "uploaded": "The file is waiting to be read.",
+        "parsing": "The file is being read. This takes a few seconds.",
+        "parsed": "Next: choose which field each column fills, then check the rows.",
+        "validating": "Every row is being checked. Nothing is saved yet.",
+        "validated": "Next: look at the rows with errors, then add the valid rows.",
+        "committing": "The rows are being added to student records.",
+        "committed": "The rows were added to student records.",
+        "reverting": "The import is being undone.",
+        "reverted": "This import was undone. The records it added were removed.",
+        "failed": "The file could not be read. See the reason below."
+      }
+    },
+    "failure": {
+      "generic": "Something went wrong with this file. Upload it again, or contact support with the time of the import.",
+      "file_missing": "The uploaded file is missing. Upload it again.",
+      "file_changed": "The uploaded file changed after it was checked. Upload it again.",
+      "unsupported_file_type": "This file type can't be imported. Save it as Excel (.xlsx) or CSV and upload it again.",
+      "file_unreadable": "The file could not be opened. Open it in Excel, save it again as .xlsx or CSV, and upload it again.",
+      "file_too_complex": "The file is too complex to read safely. Copy the list into a new, plain sheet and upload that.",
+      "no_worksheet": "The file has no sheet with data. Check that you chose the right file.",
+      "too_many_rows": "The file has more than 5,000 rows. Split it into smaller files, for example one per class.",
+      "not_utf8": "The CSV file uses an unknown text encoding. Save it as \"CSV UTF-8\" in Excel and upload it again.",
+      "too_many_columns": "The file has more than 60 columns. Delete the columns you don't need and upload it again.",
+      "cell_too_long": "A cell has more than 1,000 characters. Shorten it and upload the file again.",
+      "header_not_found": "No row of column headings was found in the first 10 rows. Put the headings in the first row and upload again.",
+      "no_data_rows": "The file has headings but no student rows. Check that you chose the right file.",
+      "file_too_large": "The file is larger than 10 MB. Split it into smaller files, for example one per class.",
+      "permission_revoked": "Your permission to import changed while this was running. Ask your office admin, then try again.",
+      "commit_failed": "The rows could not be added, and nothing was saved. Try adding them again.",
+      "nothing_to_commit": "No row was ready to add, so nothing was saved.",
+      "revalidation_errors": "Some rows no longer pass the checks (records changed meanwhile), so nothing was saved. Check the rows again.",
+      "commit_row_failed": "One row was refused while adding, so nothing was saved. Check the rows again and fix the one with an error."
+    },
+    "stats": {
+      "rows": "Rows",
+      "valid": "Valid rows",
+      "errors": "Rows with errors",
+      "warnings": "Rows with warnings",
+      "create": "New students",
+      "update": "Existing students updated",
+      "committed": "Rows added",
+      "created": "Students created",
+      "updated": "Students updated",
+      "skipped": "Rows skipped"
+    },
+    "targets": {
+      "ignore": "Don't import this column",
+      "row": "Row",
+      "column": "Column {number}",
+      "class": "Class",
+      "section": "Section",
+      "class_section": "Class and section together (for example 9A)",
+      "roll_no": "Roll number",
+      "section_id": "Section",
+      "values": "Values",
+      "name": "Template name",
+      "columns": "Columns",
+      "document_id": "File"
+    },
+    "issues": {
+      "generic": "check this value in the file.",
+      "missing": "this value is required. Fill it in the file.",
+      "invalid": "this value is not valid. Check it in the file.",
+      "invalid_format": "the value is in the wrong format. Check it in the file.",
+      "invalid_date": "write the date as DD/MM/YYYY, for example 14/03/2012.",
+      "year_needs_four_digits": "write the year with 4 digits, for example 14/03/2012.",
+      "ambiguous_date": "this date could be read two ways. It was read as DD/MM/YYYY: check it.",
+      "date_in_future": "the date is in the future. Check it in the file.",
+      "date_too_early": "the date is too far in the past. Check it in the file.",
+      "too_long": "the value is too long. Shorten it in the file.",
+      "not_allowed": "this value is not one of the allowed choices. Check it in the file.",
+      "identity_change_required": "this differs from the admission register value. Identity changes need a correction request.",
+      "duplicate_in_file": "the same admission number is also in row {row}. Keep one of them.",
+      "no_matching_student": "no student has this admission number. Only the admission register can add new students.",
+      "student_create_not_permitted": "you can't add new students. Ask your office admin.",
+      "student_out_of_scope": "this student is not in your classes.",
+      "class_not_found": "this class does not exist. Add it under school structure, or fix the file.",
+      "section_not_found": "this section does not exist this year. Add it under school structure, or fix the file.",
+      "no_section": "no section was given. Add a section column, or add students to sections later.",
+      "section_required": "the section is missing. Fill it in the file.",
+      "section_out_of_scope": "this section is not one of your classes.",
+      "enrolment_unchanged": "the student is already in this section.",
+      "no_current_academic_year": "no academic year is marked as current. Mark one under school structure first.",
+      "class_section_conflict": "use either one \"class and section\" column or separate class and section columns, not both.",
+      "duplicate_target": "another column already fills this field. Choose a different field, or don't import this column.",
+      "unknown_column": "this column is not in the file. Reload the page.",
+      "unknown_target": "this field does not exist. Choose another one.",
+      "source_not_allowed": "this field can't be filled from this source. Choose another field.",
+      "duplicate_column": "two columns have the same heading. Rename one in the file.",
+      "admission_no_not_mapped": "Choose the column with the admission number. Every row needs one to be matched.",
+      "aadhaar_full_number_rejected": "this looks like a full Aadhaar number. It was not kept. Keep only the last 4 digits in the file.",
+      "aadhaar_last4_only": "this looks like a full Aadhaar number. It was not kept. Keep only the last 4 digits in the file.",
+      "formula_not_evaluated": "this cell holds a formula, which is never run. Replace it with its value in the file."
+    },
+    "mapping": {
+      "duplicate": "Another column already fills this field. Choose a different field, or don't import this column.",
+      "tableLabel": "Columns of the file and the field each one fills",
+      "colHeader": "Column heading in the file",
+      "colTarget": "Field it fills",
+      "noHeader": "Column {number} (no heading)",
+      "suggested": "Suggested",
+      "targetFor": "Field for the column {header}",
+      "nothingSaved": "Checking saves nothing to student records.",
+      "checking": "Checking…",
+      "submit": "Check the rows"
+    },
+    "rows": {
+      "title": "Rows",
+      "description": "Each row as it will be recorded, with what needs fixing. Restricted values are never shown here.",
+      "colRow": "Row",
+      "colAdmissionNo": "Admission number",
+      "colName": "Name",
+      "colClass": "Class and section",
+      "colAction": "Will",
+      "colStatus": "Status",
+      "colIssues": "What to fix",
+      "action": {
+        "create": "Add a new student",
+        "update": "Update a student"
+      },
+      "status": {
+        "valid": "Valid",
+        "error": "Has errors",
+        "committed": "Added",
+        "skipped": "Skipped",
+        "reverted": "Undone"
+      },
+      "errorPrefix": "Error:",
+      "warningPrefix": "Warning:",
+      "sensitive": "{count, plural, one {Has # restricted value (hidden)} other {Has # restricted values (hidden)}}",
+      "filter": "Show",
+      "filters": {
+        "all": "All rows",
+        "error": "Rows with errors",
+        "warning": "Rows with warnings",
+        "valid": "Valid rows",
+        "committed": "Added rows",
+        "skipped": "Skipped rows"
+      },
+      "emptyTitle": "No rows to show",
+      "emptyBody": "Choose another option under Show.",
+      "pagesLabel": "Pages of rows"
+    },
+    "commit": {
+      "open": "Add to student records",
+      "title": "Add these rows to student records?",
+      "description": "Each value is recorded with this import's source. Identity values from the admission register stay provisional until verified.",
+      "submit": "Add rows",
+      "summary": "{valid} of {total} rows are ready to add.",
+      "sourceLabel": "Source:",
+      "skipErrors": "Add only the valid rows and skip the {errors} rows with errors",
+      "undoNote": "You can undo this import within 24 hours if nothing was changed since."
+    },
+    "revert": {
+      "open": "Undo this import",
+      "title": "Undo this import?",
+      "description": "Students this import created are removed, and values it recorded are taken back.",
+      "submit": "Undo import",
+      "warning": "This can't be done if any record from this import was changed or used since. Correct those records one by one instead."
+    },
+    "template": {
+      "open": "Save columns as a template",
+      "title": "Save as a template",
+      "description": "Next time a file with the same headings is imported, these columns are chosen automatically.",
+      "submit": "Save template",
+      "name": "Template name",
+      "nameHint": "For example: UDISE+ download or Class list from office.",
+      "saved": "Template saved."
+    },
+    "errors": {
+      "network": {
+        "title": "The upload was interrupted",
+        "body": "Check the internet connection and upload the file again."
+      },
+      "storage_rejected": {
+        "title": "The file was not accepted",
+        "body": "The upload link may have expired. Upload the file again."
+      },
+      "scan_failed": {
+        "title": "The file could not be checked",
+        "body": "The virus check did not finish. Upload the file again in a few minutes."
+      },
+      "quarantined": {
+        "title": "The file was blocked",
+        "body": "The virus check found a problem with this file. Don't open it. Ask for a fresh copy of the list."
+      },
+      "scan_timeout": {
+        "title": "The check is taking longer than usual",
+        "body": "The file was uploaded but is still being checked. Try again in a few minutes."
+      },
+      "document_not_ready": {
+        "title": "The file is still being checked",
+        "body": "The virus check is not finished yet. Try again in a minute."
+      },
+      "file_too_large": {
+        "title": "The file is too large",
+        "body": "Split it into smaller files, for example one per class, and upload them one by one."
+      },
+      "unsupported_file_type": {
+        "title": "This type of file is not accepted",
+        "body": "Choose a file of the right type and upload it again."
+      },
+      "upload_missing": {
+        "title": "The file did not arrive",
+        "body": "Upload the file again."
+      },
+      "storage_unavailable": {
+        "title": "File storage is not responding",
+        "body": "Nothing was saved. Try again in a few minutes."
+      },
+      "precondition_failed": {
+        "title": "Someone changed this import",
+        "body": "Reload the page to see the latest version, then choose the columns again."
+      },
+      "import_not_editable": {
+        "title": "This import can't be changed now",
+        "body": "It is being checked or was already added. Reload the page to see its status."
+      },
+      "import_not_validated": {
+        "title": "Check the rows first",
+        "body": "Choose the columns and check the rows before adding them."
+      },
+      "nothing_to_commit": {
+        "title": "No row is ready to add",
+        "body": "Fix the rows with errors in the file and upload it again."
+      },
+      "import_has_errors": {
+        "title": "Some rows have errors",
+        "body": "Fix them in the file and upload it again, or tick \"Add only the valid rows\"."
+      },
+      "mapping_missing": {
+        "title": "Choose the columns first",
+        "body": "A template needs the columns of this import. Choose them and check the rows, then save."
+      },
+      "import_has_dependents": {
+        "title": "This import can't be undone",
+        "body": "Records from it were changed or used since. Correct those records one by one instead."
+      },
+      "revert_window_closed": {
+        "title": "The 24 hours to undo have passed",
+        "body": "Correct the records one by one instead, or ask your principal about a correction request."
+      },
+      "import_not_committed": {
+        "title": "Only an added import can be undone",
+        "body": "Reload the page to see this import's status."
+      }
+    }
+  },
+  "extraction": {
+    "nav": "Register photos",
+    "batchStatus": {
+      "queued": "Waiting",
+      "processing": "Reading photos",
+      "review": "Ready for checking",
+      "completed": "All rows checked",
+      "failed": "Could not be read"
+    },
+    "itemStatus": {
+      "pending_review": "To check",
+      "confirmed": "Saved",
+      "rejected": "Discarded"
+    },
+    "upload": {
+      "photos": "Photos of register pages",
+      "photosHint": "One JPG or PNG photo per page, up to {max} photos, each at most {size}. Take the photo straight on, in good light.",
+      "photosMissing": "Choose the photos of the register pages.",
+      "photosTooMany": "Choose at most {max} photos at a time.",
+      "photoType": "Only JPG and PNG photos can be read. Choose photos of the pages.",
+      "photoPdf": "PDF files can't be read yet. Take a photo of each page instead.",
+      "photoTooLarge": "One photo is larger than 25 MB. Take it again at a lower resolution.",
+      "aadhaarNote": "If a page shows full Aadhaar numbers, cover them before taking the photo. SchoolOS blacks out any it finds; if it can't, the photo is deleted and that page must be photographed again.",
+      "progressLabel": "Upload progress",
+      "working": "Uploading…",
+      "submit": "Upload and read the photos",
+      "starting": "Starting to read the photos…",
+      "stagePercent": "uploading, {percent}%",
+      "stage": {
+        "requesting": "preparing",
+        "uploading": "uploading",
+        "registering": "saving",
+        "scanning": "checking for viruses",
+        "ready": "done"
+      },
+      "photoOf": "Photo {current} of {total}: {stage}"
+    },
+    "list": {
+      "title": "Register photos",
+      "description": "Photograph admission register pages. The rows found are shown beside the photo for you to check; nothing becomes a student record until someone confirms it.",
+      "uploadTitle": "Upload register photos",
+      "uploadDescription": "The photos are read in the background. You can check the rows as soon as each page is ready.",
+      "historyTitle": "Uploaded photos",
+      "colStarted": "Uploaded",
+      "open": "Open",
+      "openHint": ", open these photos",
+      "colPages": "Pages read",
+      "pagesDone": "{done} of {total}",
+      "colPending": "Rows to check",
+      "colConfirmed": "Rows saved",
+      "colWithheld": "Photos withheld",
+      "colStatus": "Status",
+      "emptyTitle": "No register photos yet",
+      "emptyBody": "Upload photos of your admission register pages to start.",
+      "pagesLabel": "Pages of uploads"
+    },
+    "pages": {
+      "title": "Pages",
+      "description": "Progress of each photo.",
+      "colPage": "Page",
+      "colStatus": "Status",
+      "status": {
+        "queued": "Waiting",
+        "done": "Read",
+        "failed": "Could not be read"
+      },
+      "colRows": "Rows found",
+      "colLowConfidence": "Values to check carefully",
+      "colAadhaar": "Aadhaar protection",
+      "withheld": "Photo withheld: it showed a full Aadhaar number",
+      "redacted": "Aadhaar number blacked out",
+      "emptyTitle": "No pages"
+    },
+    "pageFailure": {
+      "generic": "This page could not be read. Take a clearer photo and upload it again.",
+      "page_unreadable": "The page could not be read. Take a clearer, straight photo in good light and upload it again.",
+      "document_unavailable": "The photo is no longer available. Upload it again.",
+      "provider_refused": "The reading service refused this photo. Take a new photo of the page and upload it again.",
+      "provider_unavailable": "The reading service was not available. Upload the photo again later.",
+      "provider_not_configured": "Reading register photos is not set up for this school yet. Contact support."
+    },
+    "batchFailure": {
+      "generic": "The photos could not be read. Upload them again, or contact support.",
+      "all_pages_failed": "None of the pages could be read. Take clearer, straight photos in good light and upload them again.",
+      "template_unavailable": "The register layout for this school is not set up yet. Contact support.",
+      "provider_unavailable": "The reading service was not available. Upload the photos again later.",
+      "provider_not_configured": "Reading register photos is not set up for this school yet. Contact support."
+    },
+    "queue": {
+      "title": "Rows to check",
+      "description": "Each row found on the photos. Open a row to compare it with the page, correct it, and save or discard it.",
+      "colWhere": "Where",
+      "where": "Page {page}, row {row}",
+      "colAdmissionNo": "Admission number (as read)",
+      "colName": "Name (as read)",
+      "colCheck": "Check carefully",
+      "lowConfidence": "{count, plural, one {# unclear value} other {# unclear values}}",
+      "colStatus": "Status",
+      "colOpen": "Open",
+      "review": "Check this row",
+      "view": "View",
+      "filter": "Show",
+      "filters": {
+        "pending_review": "Rows to check",
+        "confirmed": "Saved rows",
+        "rejected": "Discarded rows",
+        "all": "All rows"
+      },
+      "emptyPendingTitle": "No rows left to check",
+      "emptyPendingBody": "Every row found so far has been checked. Pages still being read add rows here.",
+      "emptyTitle": "No rows to show",
+      "pagesLabel": "Pages of rows"
+    },
+    "batch": {
+      "loadingTitle": "Register photos",
+      "title": "Photos uploaded {date}",
+      "next": {
+        "queued": "The photos are waiting to be read.",
+        "processing": "The photos are being read. Rows appear below as each page is ready.",
+        "review": "Check each row against the page, then save or discard it.",
+        "completed": "Every row has been checked.",
+        "failed": "The photos could not be read. See the reason below."
+      },
+      "start": "Start checking rows",
+      "relatedLabel": "Related pages",
+      "backToList": "Back to register photos",
+      "busyTitle": "Reading the photos",
+      "busyBody": "{done} of {total} pages read. This page updates by itself.",
+      "failedTitle": "The photos could not be read",
+      "withheldTitle": "{count, plural, one {# photo was withheld} other {# photos were withheld}}",
+      "withheldBody": "These pages showed a full Aadhaar number that could not be blacked out, so the photo was deleted to protect it. Their rows can't be saved. Cover the Aadhaar numbers, take a new photo and upload it again.",
+      "statPages": "{done} of {total}",
+      "stat": {
+        "pages": "Pages read",
+        "rows": "Rows found",
+        "pending": "Rows to check",
+        "confirmed": "Rows saved",
+        "low": "Rows with unclear values"
+      }
+    },
+    "image": {
+      "caption": "Page {page}, row {row}",
+      "zoom": "Larger photo",
+      "redacted": "An Aadhaar number on this page was blacked out. Only the photo with the black box is kept.",
+      "scrollLabel": "Photo of the register page. Scroll to see all of it.",
+      "alt": "Photo of register page {page}",
+      "withheld_sensitive_number": {
+        "title": "The photo of this page was withheld",
+        "body": "It showed a full Aadhaar number that could not be blacked out, so the photo was deleted. This row can't be saved without it: cover the number, take a new photo of the page and upload it again."
+      },
+      "not_visible": {
+        "title": "You can't open this photo",
+        "body": "You don't have access to this document. Ask your office admin to share it with you."
+      },
+      "not_ready": {
+        "title": "The photo is not ready yet",
+        "body": "It is still being processed. Reload the page in a minute."
+      }
+    },
+    "review": {
+      "loadingTitle": "Check a register row",
+      "title": "Page {page}, row {row}",
+      "description": "Compare each value with the photo. Correct what was misread, then save the row, or discard it if it is not a student entry.",
+      "relatedLabel": "Related pages",
+      "backToBatch": "Back to these photos",
+      "after": {
+        "confirmed": "The previous row was saved.",
+        "rejected": "The previous row was discarded."
+      },
+      "lowTitle": "{count, plural, one {# value was hard to read} other {# values were hard to read}}",
+      "lowBody": "They are marked \"Check this\". Compare them with the photo carefully before saving.",
+      "maskedRow": "An Aadhaar-like number in this row was masked. SchoolOS never stores a full Aadhaar number.",
+      "withheldTitle": "This row can't be saved",
+      "withheldBody": "The photo of its page was deleted because it showed a full Aadhaar number. Discard this row, then photograph the page again with the number covered.",
+      "noPermissionTitle": "You can check rows but not save them",
+      "noPermissionBody": "Ask your office admin or principal to save or discard these rows.",
+      "valuesLegend": "Values on this row",
+      "valuesHint": "Type what is written on the page. Leave a box empty if the page has nothing there.",
+      "checkThis": "Check this",
+      "confidence": "Read with {percent}% certainty.",
+      "lowHint": "Hard to read: compare it with the photo.",
+      "maskedHint": "Masked: SchoolOS never stores a full Aadhaar number. This value is not saved.",
+      "readAs": "The photo says \"{value}\". Choose the matching option.",
+      "studentLegend": "Which student is this?",
+      "createNew": "A new student: create the record",
+      "addTo": "{name}, admission number {admission}, {classSection}: add these values to this student",
+      "unnamed": "Name not recorded",
+      "noClass": "not in a section this year",
+      "matchesHint": "These students already have the same admission number. Choose one to avoid adding the same student twice.",
+      "section": "Class and section this year",
+      "sectionHint": "Leave empty to add the student to a section later.",
+      "noSection": "Not in a section yet",
+      "rollNo": "Roll number",
+      "status": "Record status",
+      "evidenceNote": "Saved values are recorded from the admission register, with this photo attached as evidence.",
+      "goToChangeRequests": "Open correction requests for this student",
+      "confirm": "Save this row",
+      "rejectHint": "Not a student entry, a repeat or unreadable?",
+      "reviewedTitle": "This row has been checked",
+      "rejectReason": "Reason",
+      "student": "Student",
+      "openCreated": "Open the student record created from this row",
+      "openStudent": "Open the student record",
+      "corrected": "Corrected by hand",
+      "correctedCount": "{count, plural, one {# value} other {# values}}",
+      "openingNext": "Opening the next row",
+      "allChecked": "Every row has been checked. Going back to the photos…"
+    },
+    "reject": {
+      "open": "Discard this row",
+      "title": "Discard this row?",
+      "description": "Nothing from this row is recorded.",
+      "submit": "Discard row",
+      "reason": "Why?",
+      "reasons": {
+        "not_a_student_row": "Not a student entry",
+        "duplicate": "The same student appears twice",
+        "unreadable": "Can't be read",
+        "other": "Another reason"
+      }
+    },
+    "errors": {
+      "item_already_reviewed": {
+        "title": "Someone already checked this row",
+        "body": "Go back to the list of rows and open the next one."
+      },
+      "evidence_unavailable": {
+        "title": "The photo of this page is no longer available",
+        "body": "The row can't be saved without it. Discard it, then photograph the page again and upload it."
+      },
+      "document_not_ready": {
+        "title": "A photo is still being checked",
+        "body": "The virus check is not finished yet. Try again in a minute."
+      },
+      "not_register_scan": {
+        "title": "A file is not a register photo",
+        "body": "Upload the photos again from this page."
+      },
+      "pdf_not_supported": {
+        "title": "PDF files can't be read yet",
+        "body": "Take a photo of each page (JPG or PNG) and upload the photos instead."
+      },
+      "too_many": {
+        "title": "Too many photos at once",
+        "body": "Upload at most 50 photos at a time."
+      }
+    }
   }
 }
