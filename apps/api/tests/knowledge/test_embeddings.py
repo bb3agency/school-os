@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import KnowledgeProviderMode
+from app.core.config import KnowledgeProviderMode, Settings
+from app.core.logging import setup_logging
 from app.knowledge.config.embeddings import Candidate, EmbeddingsConfig, load_embeddings_config
 from app.knowledge.domain import InputType
 from app.knowledge.embeddings import (
@@ -405,6 +406,8 @@ def test_permanent_failures_are_not_retried() -> None:
 
 
 def test_SEC_008_no_text_in_logs(capsys: pytest.CaptureFixture[str]) -> None:
+    # The production pipeline on stdout, whatever an earlier test configured.
+    setup_logging(Settings(env="ci"))
     secret = "Ravi Kumar Synthetic, DOB 01/02/2012, ph 9876543210"
     provider = Recording(failures=[Transient()])
     capsys.readouterr()

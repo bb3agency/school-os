@@ -97,6 +97,8 @@ def capture() -> Iterator[Captured]:
     clear_context()
     yield cap
     clear_context()
+    # Back to stdout: later tests (any module, any order) must not log into this buffer.
+    setup_logging(_settings())
 
 
 def _assert_no_pii(text: str) -> None:

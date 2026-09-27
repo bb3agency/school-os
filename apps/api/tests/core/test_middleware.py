@@ -122,10 +122,12 @@ class Logs:
 
 
 @pytest.fixture
-def logs() -> Logs:
+def logs() -> Iterator[Logs]:
     captured = Logs()
     setup_logging(Settings(env="ci"), stream=captured.stream)
-    return captured
+    yield captured
+    # Back to stdout: later tests (any module, any order) must not log into this buffer.
+    setup_logging(Settings(env="ci"))
 
 
 @pytest.fixture

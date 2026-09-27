@@ -97,12 +97,28 @@ def _school(admin: Engine, chunks: int) -> uuid.UUID:
 
 @pytest.fixture(scope="module")
 def corpus(admin_engine: Engine, app_engine: Engine) -> Iterator[Corpus]:
+    # Start from a compact table. The large school holds about half of the rows, so whether
+    # its tenant btree beats a sequential scan depends on its rows lying together on disk.
+    # After earlier corpora were deleted (a shuffled order rebuilds this module fixture
+    # between other modules' tests), new rows filled scattered free space and the planner
+    # rightly chose a sequential scan. VACUUM FULL makes the layout the same in every order.
+    with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as c:
+        c.execute(text("VACUUM FULL kb.document_chunks"))
     large = _school(admin_engine, LARGE_SCHOOL_CHUNKS)
     small = [_school(admin_engine, SMALL_SCHOOL_CHUNKS) for _ in range(SMALL_SCHOOLS)]
     with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as c:
         c.execute(text("ANALYZE kb.document_chunks"))
     yield Corpus(large, small)
     R.delete_tenant_data(admin_engine, [large, *small])
+
+
+@pytest.fixture(autouse=True)
+def _fresh_statistics(admin_engine: Engine) -> None:
+    """Plans follow the table statistics. Other modules insert and delete chunks between these
+    tests when the order is shuffled, so analyse the table as it is now (as autovacuum would)
+    instead of relying on the statistics taken when the corpus was built."""
+    with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as c:
+        c.execute(text("ANALYZE kb.document_chunks"))
 
 
 def _explain(s: Session, config: RetrievalConfig, branch: str) -> list[dict[str, Any]]:
