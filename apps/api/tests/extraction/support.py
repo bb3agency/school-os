@@ -15,13 +15,11 @@ import hashlib
 import importlib.util
 import sys
 import uuid
-from collections.abc import Mapping
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
-import yaml
 from sqlalchemy import Engine, text
 
 from app.core.db import tenant_session
@@ -253,24 +251,14 @@ def dump_tenant_text(admin: Engine, tenant_id: uuid.UUID) -> str:
     return "\n".join(parts)
 
 
-# --- notification templates (owned by notifications; proposed in the extraction package) ----
-
-
-def proposed_templates() -> Mapping[str, Any]:
-    from importlib import resources
-
-    raw = yaml.safe_load(
-        resources.files("app.extraction").joinpath("notification_templates.yaml").read_text("utf-8")
-    )
-    return dict(raw["templates"])
+# --- notification templates (FR-NOT-001; owned by app/notifications/templates.yaml) ---------
 
 
 @pytest.fixture
-def extraction_templates(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make the proposed extraction templates known to the notifications catalog (test only)."""
+def extraction_templates() -> None:
+    """The extraction templates ship in the production notifications catalog: tests that
+    expect the batch owner to be told use that catalog, nothing injected."""
     from app.notifications import templates
 
-    base = dict(templates.catalog())
-    for key, spec in proposed_templates().items():
-        base.setdefault(key, templates._parse_template(key, spec))
-    monkeypatch.setattr(templates, "catalog", lambda: base)
+    catalog = templates.catalog()
+    assert {service.READY_TEMPLATE, service.FAILED_TEMPLATE} <= set(catalog)
