@@ -3,6 +3,7 @@
 import type { Me } from "@schoolos/api-client";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { setSchoolDateFormat } from "@/lib/date-format";
 import { unwrap, useBffClient } from "./query";
 
 /** Query key of GET /me for school staff (shared by every screen that checks permissions). */
@@ -16,7 +17,13 @@ export function useStaffMeQuery(): UseQueryResult<Me> {
   const api = useBffClient("staff");
   return useQuery({
     queryKey: STAFF_ME_KEY,
-    queryFn: () => unwrap(api.GET("/api/v1/me")),
+    queryFn: async () => {
+      const me = await unwrap(api.GET("/api/v1/me"));
+      // Display dates follow the school's format from here on (FR-TEN-012).
+      const settings: Partial<Me["settings"]> | undefined = me.settings;
+      setSchoolDateFormat(settings?.date_format);
+      return me;
+    },
     staleTime: 60_000,
     retry: false,
   });
