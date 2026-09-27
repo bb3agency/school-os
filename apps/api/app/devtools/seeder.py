@@ -10,7 +10,9 @@ roles via the identity hook) + ``tenancy.activate_tenant``; academic years 2026-
 through ``identity.invite_user`` + ``set_membership_status``; class teachers scoped to, and
 assigned as class teacher of, one current-year section each; subject teachers scoped to two
 classes. Every write goes through the owning module's service in a ``tenant_session``, so RLS,
-validation and audit events apply exactly as in production.
+validation and audit events apply exactly as in production. With :class:`StudentOptions`
+(``--profile small|full``) the first office admin then adds students, guardians, enrolments,
+register-page images and documents (:mod:`app.devtools.student_seeder`).
 
 The one exception is the school's FIRST owner. On this code base nothing on the tenant side may
 create a member before one exists (``core.create_user_for_invite`` requires an active inviter),
@@ -47,7 +49,10 @@ from app.core.db import context_free_session, platform_session, tenant_session
 from app.core.errors import Conflict
 from app.core.ids import new_id
 from app.core.logging import get_logger
+from app.devtools import student_seeder
 from app.devtools.plan import DatasetPlan, StaffSpec, TenantPlan
+from app.devtools.register_pages import RegisterPage
+from app.devtools.students import SchoolStudents
 from app.identity import service as identity
 from app.identity.schemas import InviteIn, ScopeIn, UserOut
 from app.platform import service as platform_service
@@ -63,6 +68,7 @@ from app.tenancy.schemas import (
 REQUEST_ID: Final = "seed-synthetic"
 AUDIT_SOURCE: Final = "synthetic_seed"
 PAGE: Final = 200
+STUDENT_SEEDER_ROLE: Final = "office_admin"  # student.create, document.upload
 
 log = get_logger(__name__)
 
@@ -73,6 +79,18 @@ OwnerBootstrap = Callable[[uuid.UUID, StaffSpec], None]
 
 class SeedError(RuntimeError):
     """The dataset cannot be applied (message never contains personal data)."""
+
+
+@dataclass(frozen=True)
+class StudentOptions:
+    """What to add besides schools and staff (``--profile``; docs/12 §3)."""
+
+    build: Callable[[TenantPlan], SchoolStudents]
+    """The school's synthetic students (pure: :func:`app.devtools.students.build_students`)."""
+    pages: Callable[[TenantPlan, SchoolStudents], list[RegisterPage]]
+    """Rendered register pages to store as ``register_scan`` documents."""
+    documents: bool = True
+    uploader: student_seeder.Uploader = student_seeder.http_uploader
 
 
 # --- first owner -----------------------------------------------------------------------------
@@ -219,6 +237,8 @@ class TenantSummary:
     outcome: str = "unchanged"
     counts: dict[str, int] = field(default_factory=dict)
     created: Counter[str] = field(default_factory=Counter)
+    students: SchoolStudents | None = None
+    """The synthetic students applied (for the manifest file; never printed)."""
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -272,12 +292,13 @@ def _members_by_email(session: Session) -> dict[str, UserOut]:
             return out
 
 
-def _owner_context(tenant_id: uuid.UUID, owner: UserOut) -> UserContext:
-    snap = build_snapshot(identity.membership_access(tenant_id, owner.id, owner.membership_id))
+def _member_context(tenant_id: uuid.UUID, member: UserOut) -> UserContext:
+    """The member's effective roles, permissions and scopes (as after an MFA sign-in)."""
+    snap = build_snapshot(identity.membership_access(tenant_id, member.id, member.membership_id))
     return UserContext(
-        user_id=owner.id,
+        user_id=member.id,
         tenant_id=tenant_id,
-        membership_id=owner.membership_id,
+        membership_id=member.membership_id,
         roles=snap.roles,
         permissions=snap.permissions,
         scopes=snap.scopes,
@@ -443,17 +464,66 @@ def _count(session: Session, summary: TenantSummary) -> None:
     }
 
 
+def _seed_students(plan: TenantPlan, summary: TenantSummary, options: StudentOptions) -> None:
+    """Students, guardians, enrolments and documents, created as the first office admin."""
+    school = options.build(plan)
+    summary.students = school
+    if not school.students:
+        return
+    spec = next(s for s in plan.staff if s.role == STUDENT_SEEDER_ROLE and s.ordinal == 1)
+    with tenant_session(plan.tenant_id) as session:
+        member = _members_by_email(session).get(spec.email)
+    if member is None or member.status != "active":
+        raise SeedError(f"tenant {plan.tenant_id}: the synthetic office admin is not active")
+    ctx = _member_context(plan.tenant_id, member)
+    created: dict[str, int] = {}
+    try:
+        student_seeder.seed_students(
+            tenant_id=plan.tenant_id,
+            user_id=member.id,
+            ctx=ctx,
+            plan=plan,
+            school=school,
+            created=created,
+        )
+        if options.documents:
+            student_seeder.seed_documents(
+                tenant_id=plan.tenant_id,
+                user_id=member.id,
+                ctx=ctx,
+                plan=plan,
+                school=school,
+                pages=options.pages(plan, school),
+                uploader=options.uploader,
+                created=created,
+            )
+    except student_seeder.StudentSeedError as exc:
+        raise SeedError(str(exc)) from exc
+    finally:
+        summary.created.update({k: v for k, v in created.items() if v})
+    with tenant_session(plan.tenant_id, member.id) as session:
+        summary.counts["students"] = len(student_seeder.existing_admission_numbers(session, ctx))
+        if options.documents:
+            summary.counts["documents"] = student_seeder.count_documents(session, ctx)
+
+
 def seed_tenant(
-    plan: TenantPlan, *, wrapper: KeyWrapper, owner_bootstrap: OwnerBootstrap
+    plan: TenantPlan,
+    *,
+    wrapper: KeyWrapper,
+    owner_bootstrap: OwnerBootstrap,
+    students: StudentOptions | None = None,
 ) -> TenantSummary:
     summary = TenantSummary(tenant_id=plan.tenant_id, code=plan.code)
     owner = _ensure_tenant(plan, summary, wrapper, owner_bootstrap)
-    ctx = _owner_context(plan.tenant_id, owner)
+    ctx = _member_context(plan.tenant_id, owner)
     with tenant_session(plan.tenant_id, owner.id) as session:
         classes, sections = _ensure_structure(session, plan, summary)
         _ensure_staff(session, ctx, plan=plan, summary=summary, classes=classes, sections=sections)
     with tenant_session(plan.tenant_id, owner.id) as session:
         _count(session, summary)
+    if students is not None:
+        _seed_students(plan, summary, students)
     if summary.outcome != "created" and any(summary.created.values()):
         summary.outcome = "updated"
     log.info(
@@ -465,14 +535,22 @@ def seed_tenant(
     return summary
 
 
-def seed(plan: DatasetPlan, *, wrapper: KeyWrapper, owner_bootstrap: OwnerBootstrap) -> SeedSummary:
+def seed(
+    plan: DatasetPlan,
+    *,
+    wrapper: KeyWrapper,
+    owner_bootstrap: OwnerBootstrap,
+    students: StudentOptions | None = None,
+) -> SeedSummary:
     """Apply ``plan`` (idempotent). Callers must have checked the environment.
 
     Importing :mod:`app.identity.service` (above) registers the system-role cloning hook that
-    :func:`app.tenancy.service.initialise_tenant` runs.
+    :func:`app.tenancy.service.initialise_tenant` runs. ``students`` adds synthetic students,
+    guardians, enrolments and documents (docs/12 §3; ``--profile``).
     """
     tenants = [
-        seed_tenant(t, wrapper=wrapper, owner_bootstrap=owner_bootstrap) for t in plan.tenants
+        seed_tenant(t, wrapper=wrapper, owner_bootstrap=owner_bootstrap, students=students)
+        for t in plan.tenants
     ]
     log.info("devtools.seed_synthetic.done", count=len(tenants), outcome="ok")
     return SeedSummary(dataset_version=plan.dataset_version, seed=plan.seed, tenants=tenants)
