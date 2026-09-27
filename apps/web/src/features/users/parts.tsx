@@ -1,6 +1,6 @@
 "use client";
 
-import { TENANT_ROLES, type Me, type TenantRoleKey } from "@schoolos/api-client";
+import { TENANT_ROLES, type TenantRoleKey } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { z } from "zod";
@@ -12,10 +12,8 @@ import { formatList } from "@/lib/format";
 import { uuid } from "@/lib/validation";
 import { roleName } from "./data";
 import {
-  ASSIGN_ANY_ROLES,
   MAX_SCOPES,
   MFA_ROLES,
-  USER_PERM,
   type MemberStatus,
   type ScopeInput,
   type StaffRole,
@@ -64,51 +62,30 @@ export function useScopeSummary(): (scopes: readonly StaffScope[]) => string {
 
 // --- roles ------------------------------------------------------------------------------------
 
-type Member = Pick<Me, "roles" | "permissions">;
-
-function holdsAll(role: StaffRole, member: Member): boolean {
-  return role.permissions.every((permission) => member.permissions.includes(permission));
-}
-
-/**
- * Whether the signed-in member may give or take away `role` (mirrors the API's
- * `_guard_grantable` / `_guard_invite_roles`). UX only: roles the API would refuse with 403
- * `role_not_grantable` are shown greyed out with the reason; the API checks every change.
- *
- * - `assign` (PUT /users/{id}/roles): the owner may change any role; everyone else only roles
- *   whose permissions they hold themselves.
- * - `invite` (POST /users): any built-in role without two-step sign-in may be given with
- *   `user.manage`; the other roles need `role.assign` and the same rule as `assign`.
- */
-export function canGrantRole(role: StaffRole, member: Member, mode: "invite" | "assign"): boolean {
-  if (member.roles.some((key) => ASSIGN_ANY_ROLES.includes(key))) return true;
-  if (mode === "invite" && role.is_system && !MFA_ROLES.includes(role.key)) return true;
-  if (mode === "invite" && !member.permissions.includes(USER_PERM.assign)) return false;
-  return holdsAll(role, member);
-}
-
 export const rolesField = z
   .array(z.string().regex(/^[a-z][a-z0-9_]{1,63}$/, { error: "chooseRole" }))
   .min(1, { error: "chooseRole" })
   .max(20, { error: "tooManyRoles" });
 
 /**
- * Role checkboxes (name="roles"). Roles the member cannot change are disabled; when such a
- * role is already held, a hidden input keeps it in the form so saving never drops it.
+ * Role checkboxes (name="roles"). Roles the member cannot give or take away (`grantable`
+ * false in GET /roles, computed by the API for the caller by the rule it enforces) are
+ * disabled with the reason; when such a role is already held, a hidden input keeps it in the
+ * form so saving never drops it. UX only: the API checks every change (403
+ * `role_not_grantable`).
  */
 export function RoleCheckboxes({
   roles,
   selected,
-  grantable,
   error,
   legend,
 }: {
   roles: readonly StaffRole[];
   selected: readonly string[];
-  grantable: (role: StaffRole) => boolean;
   error?: string | undefined;
   legend: string;
 }) {
+  const grantable = (role: StaffRole) => role.grantable;
   const t = useTranslations("school.users.rolesForm");
   const label = useRoleLabel(roles);
   const errorId = useId();
@@ -129,6 +106,7 @@ export function RoleCheckboxes({
           const notes = [
             ...(MFA_ROLES.includes(role.key) ? [t("needsMfa")] : []),
             ...(!role.is_system ? [t("schoolRole")] : []),
+            ...(role.scoped ? [t("scopedRole")] : []),
             ...(!allowed ? [t("notGrantable")] : []),
           ];
           return (

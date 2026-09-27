@@ -1,13 +1,18 @@
 import { z } from "zod";
+import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { ApiError } from "@/lib/bff/query";
 import { optionalText, text } from "@/lib/validation";
 import { aclField, refineAcl, visibilityField } from "./parts";
 import {
   DOC_LANGUAGES,
+  DOC_TYPES,
   GENERAL_DOC_TYPES,
   MAX_ISSUER,
   MAX_TITLE,
   SENSITIVITIES,
+  type DocLanguage,
+  type DocType,
+  type DocumentRow,
   type Purpose,
 } from "./types";
 import { checkFile, StorageUploadError } from "./upload";
@@ -52,6 +57,58 @@ export const newDocumentSchema = z
     acl: aclField,
   })
   .superRefine(refineAcl);
+
+/**
+ * Edit a document's details (PATCH /documents/{id}; `DocumentUpdate`). Title and type are
+ * required; language, issuer and date may be emptied (sent as `null`). The type list offered
+ * suits the purpose; the API checks again. A full Aadhaar number is refused in the title and
+ * issuer (invariant 4).
+ */
+export const documentEditSchema = z
+  .object({
+    title: text(MAX_TITLE),
+    doc_type: z.enum(DOC_TYPES, { error: "chooseOption" }),
+    language: z
+      .union([z.enum(DOC_LANGUAGES), z.literal("")], { error: "chooseOption" })
+      .transform((value) => (value === "" ? null : value)),
+    issuer: optionalText(MAX_ISSUER),
+    issued_on: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value), {
+        error: "invalidIssueDate",
+      })
+      .transform((value) => (value === "" ? null : value)),
+  })
+  .superRefine((data, context) => {
+    if (containsAadhaarNumber(data.title)) {
+      context.addIssue({ code: "custom", path: ["title"], message: "noAadhaar" });
+    }
+    if (data.issuer !== null && containsAadhaarNumber(data.issuer)) {
+      context.addIssue({ code: "custom", path: ["issuer"], message: "noAadhaar" });
+    }
+  });
+export type DocumentEditInput = z.output<typeof documentEditSchema>;
+
+/** PATCH body with only what changed (the API ignores unchanged values anyway). */
+export function documentPatchBody(
+  current: Pick<DocumentRow, "title" | "doc_type" | "language" | "issuer" | "issued_on">,
+  data: DocumentEditInput,
+) {
+  const body: {
+    title?: string;
+    doc_type?: DocType;
+    language?: DocLanguage | null;
+    issuer?: string | null;
+    issued_on?: string | null;
+  } = {};
+  if (data.title !== current.title) body.title = data.title;
+  if (data.doc_type !== current.doc_type) body.doc_type = data.doc_type;
+  if (data.language !== current.language) body.language = data.language;
+  if (data.issuer !== current.issuer) body.issuer = data.issuer;
+  if (data.issued_on !== current.issued_on) body.issued_on = data.issued_on;
+  return body;
+}
 
 export const aclSchema = z
   .object({ visibility: visibilityField, acl: aclField })

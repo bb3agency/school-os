@@ -47,7 +47,7 @@ export function isStaleConflict(error: unknown): boolean {
  * Shown under a version conflict: reload the record (the dialog stays open, so the clerk can
  * check what changed and submit again with the new version).
  */
-function ReloadAction({ keys }: { keys: readonly QueryKey[] }) {
+export function ReloadAction({ keys }: { keys: readonly QueryKey[] }) {
   const t = useTranslations("students.edit");
   const queryClient = useQueryClient();
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
@@ -278,6 +278,53 @@ export function guardianPatchBody(current: Guardian, data: GuardianInput) {
   else if (data.address) body.address = data.address;
   if (data.is_primary !== current.is_primary) body.is_primary = data.is_primary;
   return body;
+}
+
+/**
+ * Remove a parent/guardian from this student (DELETE with the guardian's ETag), after a
+ * confirmation that says what happens: a guardian no other student is linked to is deleted
+ * with their phone number and address; one shared with a sibling stays for the sibling.
+ */
+export function RemoveGuardianDialog({
+  studentId,
+  guardian,
+}: {
+  studentId: string;
+  guardian: Guardian;
+}) {
+  const t = useTranslations("students.guardians");
+  const api = useBffClient("staff");
+  const keys = [guardiansKey(studentId)];
+  return (
+    <FormDialog
+      triggerLabel={
+        <>
+          {t("remove")}
+          <span className="sr-only">: {guardian.full_name}</span>
+        </>
+      }
+      triggerVariant="ghost"
+      triggerSize="sm"
+      title={t("removeTitle", { name: guardian.full_name })}
+      description={t("removeBody")}
+      confirmLabel={t("removeSubmit")}
+      confirmVariant="danger"
+      problems="students.errors"
+      problemAction={reloadOnConflict(keys)}
+      schema={z.object({})}
+      invalidate={[STUDENTS_KEY]}
+      submit={() =>
+        unwrap(
+          api.DELETE("/api/v1/students/{student_id}/guardians/{guardian_id}", {
+            params: { path: { student_id: studentId, guardian_id: guardian.id } },
+            headers: { "If-Match": etag(guardian.version) },
+          }),
+        )
+      }
+    >
+      {() => <p className="text-sm">{t("removeNote")}</p>}
+    </FormDialog>
+  );
 }
 
 /** Add a parent/guardian (POST, Idempotency-Key) or edit one (PATCH, the guardian's ETag). */

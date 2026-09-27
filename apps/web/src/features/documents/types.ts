@@ -99,6 +99,24 @@ export function purposeFor(docType: GeneralDocType): Purpose {
   return "other";
 }
 
+/**
+ * Document types that suit a purpose (apps/api/app/documents/service.py `purpose_rule`; the
+ * API answers 422 `doc_type_not_allowed_for_purpose` for any other). Used to offer only valid
+ * types when a document's details are edited.
+ */
+const TYPES_BY_PURPOSE: Record<Purpose, readonly DocType[]> = {
+  circular: GENERAL_DOC_TYPES,
+  policy: GENERAL_DOC_TYPES,
+  other: GENERAL_DOC_TYPES,
+  evidence: ["evidence", "certificate", "letter", "form", "other"],
+  register_scan: ["register_scan"],
+  import_file: ["import_file"],
+};
+
+export function docTypesFor(purpose: Purpose): readonly DocType[] {
+  return TYPES_BY_PURPOSE[purpose];
+}
+
 /** Permission keys (apps/api/app/authz/permissions.yaml). */
 export const DOCUMENT_PERM = {
   read: "document.read",

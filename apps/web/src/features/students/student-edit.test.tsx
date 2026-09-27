@@ -18,6 +18,7 @@ import {
 import { messages, renderWithIntl } from "@/test/render";
 import { permissionsFrom } from "./me";
 import { StudentDetailView } from "./StudentDetail";
+import { endEnrolmentSchema, enrolmentPatchBody, enrolmentPatchSchema } from "./Enrolments";
 import { enrolmentSchema, guardianCreateBody, guardianPatchBody } from "./StudentEdit";
 
 vi.mock("next/navigation", async (importOriginal) => {
@@ -40,7 +41,43 @@ vi.mock("next/navigation", async (importOriginal) => {
 type Schemas = components["schemas"];
 const sm = messages.en.students;
 const SECTION_B = "0192f3a4-0000-7000-8000-00000000c404";
+const OLD_YEAR = "0192f3a4-0000-7000-8000-00000000c405";
+const OLD_SECTION = "0192f3a4-0000-7000-8000-00000000c406";
+const CLASS_8 = "0192f3a4-0000-7000-8000-00000000c407";
+const ENROLMENT = "0192f3a4-0000-7000-8000-00000000cb01";
+const OLD_ENROLMENT = "0192f3a4-0000-7000-8000-00000000cb02";
 let stub: BffStub;
+
+function enrolment(extra: Partial<Schemas["EnrollmentOut"]> = {}): Schemas["EnrollmentOut"] {
+  return {
+    id: ENROLMENT,
+    student_id: ID.student,
+    section_id: ID.section,
+    academic_year_id: ID.year,
+    roll_no: "12",
+    status: "active",
+    started_on: "2026-06-01",
+    ended_on: null,
+    version: 6,
+    ...extra,
+  };
+}
+
+function enrolments(): Schemas["EnrollmentOut"][] {
+  return [
+    enrolment(),
+    enrolment({
+      id: OLD_ENROLMENT,
+      section_id: OLD_SECTION,
+      academic_year_id: OLD_YEAR,
+      roll_no: "31",
+      status: "completed",
+      started_on: "2025-06-02",
+      ended_on: "2026-04-30",
+      version: 2,
+    }),
+  ];
+}
 
 function guardian(extra: Partial<Schemas["GuardianOut"]> = {}): Schemas["GuardianOut"] {
   return {
@@ -96,10 +133,18 @@ function renderDetail(
 
 beforeEach(() => {
   stub = installBffStub("staff");
-  stub.routes["GET /bff/api/v1/academic-years"] = () => page([YEAR]);
-  stub.routes["GET /bff/api/v1/classes"] = () => page([CLASS]);
+  stub.routes["GET /bff/api/v1/academic-years"] = () =>
+    page([YEAR, { ...YEAR, id: OLD_YEAR, label: "2025-26", is_current: false }]);
+  stub.routes["GET /bff/api/v1/classes"] = () =>
+    page([CLASS, { ...CLASS, id: CLASS_8, code: "VIII", display_en: "Class 8", sort_order: 8 }]);
   stub.routes["GET /bff/api/v1/sections"] = () =>
-    page([SECTION, { ...SECTION, id: SECTION_B, name: "B" }]);
+    page([
+      SECTION,
+      { ...SECTION, id: SECTION_B, name: "B" },
+      { ...SECTION, id: OLD_SECTION, academic_year_id: OLD_YEAR, class_id: CLASS_8 },
+    ]);
+  stub.routes[`GET /bff/api/v1/students/${ID.student}/enrollments`] = () =>
+    Response.json(enrolments());
   stub.routes["GET /bff/api/v1/attributes"] = () => Response.json(ATTRIBUTES);
   stub.routes[`GET /bff/api/v1/students/${ID.student}/values`] = () => Response.json(history());
 });
@@ -384,6 +429,207 @@ describe("US-301 / FR-STU-004: parents and guardians", () => {
       await within(dialog).findByText(sm.errors.precondition_failed.title),
     ).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: sm.edit.reload })).toBeInTheDocument();
+  });
+});
+
+describe("US-301 / FR-STU-005: enrolments (list, correct, end)", () => {
+  const PATCH = `PATCH /bff/api/v1/students/${ID.student}/enrollments/${ENROLMENT}`;
+  const END = `POST /bff/api/v1/students/${ID.student}/enrollments/${ENROLMENT}/end`;
+
+  async function enrolmentRow(year: string) {
+    const table = await screen.findByRole("table", { name: sm.enrolments.table });
+    await within(table).findByText("Class 8 · A");
+    const row = within(table)
+      .getAllByRole("row")
+      .find((item) => (item.textContent ?? "").includes(year));
+    if (!row) throw new Error(`no enrolment row for ${year}`);
+    return row;
+  }
+
+  it("lists every enrolment, newest first, with its year, class, roll number and status", async () => {
+    renderDetail();
+    const current = await enrolmentRow("2026-27");
+    expect(within(current).getByText("Class 9 · A")).toBeInTheDocument();
+    expect(within(current).getByText("12")).toBeInTheDocument();
+    expect(within(current).getByText(sm.enrolments.status.active)).toBeInTheDocument();
+    const old = await enrolmentRow("2025-26");
+    expect(within(old).getByText(sm.enrolments.status.completed)).toBeInTheDocument();
+    // A closed enrolment can still have its roll number corrected, but cannot end again.
+    expect(within(old).getByRole("button", { name: /^Correct/ })).toBeInTheDocument();
+    expect(within(old).queryByRole("button", { name: /^End/ })).toBeNull();
+  });
+
+  it("builds a PATCH body with only what changed (an empty roll number clears it)", () => {
+    const current = enrolment();
+    expect(
+      enrolmentPatchBody(current, enrolmentPatchSchema.parse({ roll_no: " 14 ", section_id: "" })),
+    ).toEqual({ roll_no: "14" });
+    expect(
+      enrolmentPatchBody(
+        current,
+        enrolmentPatchSchema.parse({ roll_no: "", section_id: SECTION_B }),
+      ),
+    ).toEqual({ roll_no: null, section_id: SECTION_B });
+    expect(
+      enrolmentPatchBody(
+        current,
+        enrolmentPatchSchema.parse({ roll_no: "12", section_id: ID.section }),
+      ),
+    ).toEqual({});
+    expect(enrolmentPatchSchema.safeParse({ roll_no: fakeAadhaar(), section_id: "" }).success).toBe(
+      false,
+    );
+    expect(endEnrolmentSchema.parse({ status: "transferred", ended_on: "15/07/2026" })).toEqual({
+      status: "transferred",
+      ended_on: "2026-07-15",
+    });
+    expect(endEnrolmentSchema.parse({ status: "completed", ended_on: "" })).toEqual({
+      status: "completed",
+      ended_on: null,
+    });
+    expect(endEnrolmentSchema.safeParse({ status: "left", ended_on: "" }).success).toBe(false);
+  });
+
+  it("corrects the roll number and moves to another section of the same class, with If-Match", async () => {
+    stub.routes[PATCH] = () => Response.json(enrolment({ roll_no: "14", section_id: SECTION_B }));
+    const user = userEvent.setup();
+    renderDetail();
+    const row = await enrolmentRow("2026-27");
+    await user.click(within(row).getByRole("button", { name: /^Correct/ }));
+    const dialog = screen.getByRole("dialog");
+    const section = within(dialog).getByLabelText(sm.enrolments.section);
+    // Only sections of the same class and academic year are offered.
+    expect(
+      within(section)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Class 9 · A", "Class 9 · B"]);
+    expect(section).toHaveValue(ID.section);
+    await user.selectOptions(section, SECTION_B);
+    const roll = within(dialog).getByLabelText(sm.enrolments.rollNo);
+    expect(roll).toHaveValue("12");
+    await user.clear(roll);
+    await user.type(roll, "14");
+    await user.click(within(dialog).getByRole("button", { name: sm.enrolments.editSubmit }));
+    await waitFor(() => expect(stub.callsTo(PATCH)).toHaveLength(1));
+    const call = stub.callsTo(PATCH)[0];
+    expect(call?.headers.get("if-match")).toBe('W/"6"');
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({ roll_no: "14", section_id: SECTION_B });
+  });
+
+  it("explains a stale enrolment (412) with a reload, and a section of another class (422)", async () => {
+    let attempts = 0;
+    stub.routes[PATCH] = () => {
+      attempts += 1;
+      return attempts === 1
+        ? problem(412, "precondition_failed")
+        : problem(422, "validation_error", {
+            errors: [
+              {
+                field: "section_id",
+                code: "different_class_or_year",
+                message_key: "errors.different_class_or_year",
+              },
+            ],
+          });
+    };
+    const user = userEvent.setup();
+    renderDetail();
+    const row = await enrolmentRow("2026-27");
+    await user.click(within(row).getByRole("button", { name: /^Correct/ }));
+    const dialog = screen.getByRole("dialog");
+    await user.selectOptions(within(dialog).getByLabelText(sm.enrolments.section), SECTION_B);
+    await user.click(within(dialog).getByRole("button", { name: sm.enrolments.editSubmit }));
+    expect(
+      await within(dialog).findByText(sm.errors.precondition_failed.title),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: sm.edit.reload }));
+    expect(await within(dialog).findByText(sm.edit.reloaded)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: sm.enrolments.editSubmit }));
+    expect(
+      await within(dialog).findByText(messages.en.errors.field.different_class_or_year),
+    ).toBeInTheDocument();
+  });
+
+  it("ends an enrolment only after the confirm dialog, as a transfer, with If-Match", async () => {
+    stub.routes[END] = () =>
+      Response.json(enrolment({ status: "transferred", ended_on: "2026-07-15", version: 7 }));
+    const user = userEvent.setup();
+    renderDetail();
+    const row = await enrolmentRow("2026-27");
+    await user.click(within(row).getByRole("button", { name: /^End/ }));
+    let dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: messages.en.common.cancel }));
+    expect(stub.callsTo(END)).toHaveLength(0);
+    await user.click(within(row).getByRole("button", { name: /^End/ }));
+    dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByLabelText(sm.enrolments.endStatus.transferred));
+    await user.type(within(dialog).getByLabelText(sm.enrolments.endedOn), "15/07/2026");
+    await user.click(within(dialog).getByRole("button", { name: sm.enrolments.endSubmit }));
+    await waitFor(() => expect(stub.callsTo(END)).toHaveLength(1));
+    const call = stub.callsTo(END)[0];
+    expect(call?.headers.get("if-match")).toBe('W/"6"');
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+      status: "transferred",
+      ended_on: "2026-07-15",
+    });
+  });
+
+  it("explains 409 enrollment_not_active and offers to reload", async () => {
+    stub.routes[END] = () => problem(409, "enrollment_not_active");
+    const user = userEvent.setup();
+    renderDetail();
+    const row = await enrolmentRow("2026-27");
+    await user.click(within(row).getByRole("button", { name: /^End/ }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: sm.enrolments.endSubmit }));
+    expect(
+      await within(dialog).findByText(sm.errors.enrollment_not_active.title),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: sm.edit.reload })).toBeInTheDocument();
+  });
+
+  it("offers no enrolment changes without student.update_nonidentity", async () => {
+    renderDetail(["student.read_basic"]);
+    const row = await enrolmentRow("2026-27");
+    expect(within(row).queryByRole("button")).toBeNull();
+  });
+});
+
+describe("US-301 / FR-STU-004: remove a parent or guardian", () => {
+  const DELETE = `DELETE /bff/api/v1/students/${ID.student}/guardians/${ID.guardian}`;
+
+  it("removes only after the confirm dialog, says what is deleted, and sends If-Match", async () => {
+    stub.routes[DELETE] = () => new Response(null, { status: 204 });
+    const user = userEvent.setup();
+    renderDetail();
+    await user.click(screen.getByRole("button", { name: `${sm.guardians.remove}: Ramana K.` }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(sm.guardians.removeBody)).toBeInTheDocument();
+    expect(stub.callsTo(DELETE)).toHaveLength(0);
+    await user.click(within(dialog).getByRole("button", { name: sm.guardians.removeSubmit }));
+    await waitFor(() => expect(stub.callsTo(DELETE)).toHaveLength(1));
+    expect(stub.callsTo(DELETE)[0]?.headers.get("if-match")).toBe('W/"2"');
+  });
+
+  it("explains a guardian changed meanwhile (412) and offers to reload", async () => {
+    stub.routes[DELETE] = () => problem(412, "precondition_failed");
+    const user = userEvent.setup();
+    renderDetail();
+    await user.click(screen.getByRole("button", { name: `${sm.guardians.remove}: Ramana K.` }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: sm.guardians.removeSubmit }));
+    expect(
+      await within(dialog).findByText(sm.errors.precondition_failed.title),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: sm.edit.reload })).toBeInTheDocument();
+  });
+
+  it("offers no remove without student.update_nonidentity", () => {
+    renderDetail(["student.read_basic"]);
+    expect(
+      screen.queryByRole("button", { name: new RegExp(`^${sm.guardians.remove}`) }),
+    ).toBeNull();
   });
 });
 
