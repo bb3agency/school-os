@@ -470,6 +470,25 @@
         "title": "AnnouncementOut",
         "type": "object"
       },
+      "ApproveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "ApproveIn",
+        "type": "object"
+      },
       "AttributeOut": {
         "properties": {
           "allowed_sources": {
@@ -1141,6 +1160,262 @@
           "plan_id"
         ],
         "title": "ChangePlanIn",
+        "type": "object"
+      },
+      "ChangeRequestCreate": {
+        "additionalProperties": false,
+        "description": "Request a correction of one identity attribute from one source (FR-CR-001).",
+        "properties": {
+          "attribute_key": {
+            "pattern": "^[a-z][a-z0-9_]{1,63}$",
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "evidence_document_id": {
+            "format": "uuid",
+            "title": "Evidence Document Id",
+            "type": "string"
+          },
+          "new_value": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value"
+          },
+          "new_value_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value Date"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "title": "Reason",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "target_source": {
+            "default": "admission_register",
+            "enum": [
+              "admission_register",
+              "aadhaar_as_printed",
+              "udise_plus",
+              "board_registration",
+              "birth_certificate",
+              "parent_form",
+              "tc_incoming",
+              "manual_entry"
+            ],
+            "title": "Target Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "attribute_key",
+          "reason",
+          "evidence_document_id"
+        ],
+        "title": "ChangeRequestCreate",
+        "type": "object"
+      },
+      "ChangeRequestOut": {
+        "properties": {
+          "applied_value_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied Value Id"
+          },
+          "attribute_key": {
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "attribute_label_en": {
+            "title": "Attribute Label En",
+            "type": "string"
+          },
+          "attribute_label_te": {
+            "title": "Attribute Label Te",
+            "type": "string"
+          },
+          "can_cancel": {
+            "title": "Can Cancel",
+            "type": "boolean"
+          },
+          "can_decide": {
+            "title": "Can Decide",
+            "type": "boolean"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          },
+          "evidence_document_id": {
+            "format": "uuid",
+            "title": "Evidence Document Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "new_value": {
+            "title": "New Value",
+            "type": "string"
+          },
+          "old_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value"
+          },
+          "old_value_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value Id"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "requested_by": {
+            "format": "uuid",
+            "title": "Requested By",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "expired",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "target_source": {
+            "title": "Target Source",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "attribute_key",
+          "attribute_label_en",
+          "attribute_label_te",
+          "target_source",
+          "old_value_id",
+          "old_value",
+          "new_value",
+          "masked",
+          "reason",
+          "evidence_document_id",
+          "status",
+          "requested_by",
+          "requested_at",
+          "decided_by",
+          "decided_at",
+          "decision_note",
+          "applied_value_id",
+          "expires_at",
+          "version",
+          "can_decide",
+          "can_cancel"
+        ],
+        "title": "ChangeRequestOut",
         "type": "object"
       },
       "ClassCreate": {
@@ -4062,6 +4337,34 @@
         "title": "Page[BreakGlassOut]",
         "type": "object"
       },
+      "Page_ChangeRequestOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeRequestOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[ChangeRequestOut]",
+        "type": "object"
+      },
       "Page_ClassOut_": {
         "properties": {
           "data": {
@@ -5568,6 +5871,21 @@
           "reason"
         ],
         "title": "Reasoned",
+        "type": "object"
+      },
+      "RejectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "RejectIn",
         "type": "object"
       },
       "RevealIn": {
@@ -9457,6 +9775,400 @@
         "summary": "Deny Request",
         "tags": [
           "break-glass"
+        ]
+      }
+    },
+    "/api/v1/change-requests": {
+      "get": {
+        "description": "Change requests of students you can see, newest first (permission\n``student.identity_change.request`` or ``student.identity_change.approve``). Values of\nsensitive (C3) fields are masked.",
+        "operationId": "list_change_requests_api_v1_change_requests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "approved",
+                    "rejected",
+                    "expired",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ChangeRequestOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Change Requests",
+        "tags": [
+          "change-requests"
+        ]
+      },
+      "post": {
+        "description": "Request a correction of an identity field (name, date of birth, gender, parents' names,\nadmission number/date) with the new value, a reason (at least 10 characters) and an evidence\ndocument uploaded with purpose ``evidence`` (permission ``student.identity_change.request``).\nSomeone else with ``student.identity_change.approve`` decides it. Accepts\n``Idempotency-Key``. Errors: ``not_identity_attribute``, ``evidence_required`` (422),\n``duplicate_pending_request`` (409).",
+        "operationId": "submit_change_request_api_v1_change_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Change Request",
+        "tags": [
+          "change-requests"
+        ]
+      }
+    },
+    "/api/v1/change-requests/{change_request_id}": {
+      "get": {
+        "description": "One change request with old/new value, source, reason, evidence and decision; returns\n``ETag`` for the decision calls (request or approve permission).",
+        "operationId": "get_change_request_api_v1_change_requests__change_request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Request",
+        "tags": [
+          "change-requests"
+        ]
+      }
+    },
+    "/api/v1/change-requests/{change_request_id}/approve": {
+      "post": {
+        "description": "Approve: records the new value as verified (the old value stays in history) and closes the\nrequest (permission ``student.identity_change.approve``, MFA within 5 minutes, not the\nrequester, ``If-Match``). Errors: ``self_approval_forbidden`` (403), ``step_up_required``\n(428), ``request_not_pending`` / ``request_expired`` / ``request_outdated`` (409).",
+        "operationId": "approve_change_request_api_v1_change_requests__change_request_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ApproveIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Change Request",
+        "tags": [
+          "change-requests"
+        ]
+      }
+    },
+    "/api/v1/change-requests/{change_request_id}/cancel": {
+      "post": {
+        "description": "Withdraw your own pending request (permission ``student.identity_change.request``,\n``If-Match``). Error ``not_requester`` (403) for someone else's request.",
+        "operationId": "cancel_change_request_api_v1_change_requests__change_request_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Change Request",
+        "tags": [
+          "change-requests"
+        ]
+      }
+    },
+    "/api/v1/change-requests/{change_request_id}/memo": {
+      "get": {
+        "description": "Printable correction memo for the paper register, in English and Telugu (request or\napprove permission). Sensitive values appear only for ``student.read_sensitive`` holders.\nThe view is audited.",
+        "operationId": "change_request_memo_api_v1_change_requests__change_request_id__memo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 memo"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Request Memo",
+        "tags": [
+          "change-requests"
+        ]
+      }
+    },
+    "/api/v1/change-requests/{change_request_id}/reject": {
+      "post": {
+        "description": "Reject with a reason (at least 10 characters) that the requester will see (permission\n``student.identity_change.approve``, MFA within 5 minutes, not the requester, ``If-Match``).",
+        "operationId": "reject_change_request_api_v1_change_requests__change_request_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Change Request",
+        "tags": [
+          "change-requests"
         ]
       }
     },
