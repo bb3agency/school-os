@@ -20,6 +20,10 @@ import { callApi } from "./upstream";
  * - Upstream 401 token_expired: one refresh and one retry. Upstream 428: problem with
  *   `step_up_url` for the UI.
  * - Streams responses (Server-Sent Events are passed through unbuffered).
+ * - A GET marked passive (`x-sos-passive: 1`, background polls such as the notification bell)
+ *   reads the session without sliding its idle timeout.
+ * - An API page that brings its own strict Content-Security-Policy (the change-request memo)
+ *   keeps it; src/proxy.ts leaves those paths' CSP to this handler.
  */
 
 export const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
@@ -43,6 +47,22 @@ const FORWARDED_RESPONSE_HEADERS = [
   "sunset",
   "x-request-id",
 ] as const;
+
+/** Same name as PASSIVE_HEADER in src/lib/bff/fetch.ts (browser side). */
+const PASSIVE_HEADER = "x-sos-passive";
+
+/** CSP for BFF responses whose API policy is missing or looser than this. */
+const STRICT_FALLBACK_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
+/**
+ * Same test as the API's `_at_least_as_strict` (apps/api/app/core/middleware.py): a route's own
+ * policy is kept only when it still denies everything by default and forbids framing.
+ */
+export function isStrictPolicy(policy: string | null): policy is string {
+  if (!policy) return false;
+  const directives = new Set(policy.split(";").map((part) => part.trim().toLowerCase()));
+  return directives.has("default-src 'none'") && directives.has("frame-ancestors 'none'");
+}
 
 class BodyTooLargeError extends Error {}
 
@@ -82,6 +102,10 @@ function responseHeaders(upstream: Response, requestId: string): Headers {
   if (location?.startsWith("/api/v1/")) headers.set("location", `${BFF_PREFIX}${location}`);
   else if (location) headers.delete("location");
   if (!headers.has("cache-control")) headers.set("cache-control", "no-store");
+  // Only matters where src/proxy.ts sets no CSP of its own (OWN_CSP_PATHS); elsewhere the
+  // page-wide policy set by the proxy wins, because Next.js keeps the header set first.
+  const policy = upstream.headers.get("content-security-policy");
+  headers.set("content-security-policy", isStrictPolicy(policy) ? policy : STRICT_FALLBACK_CSP);
   if ((headers.get("content-type") ?? "").startsWith("text/event-stream")) {
     headers.set("cache-control", "no-cache, no-transform");
     headers.set("x-accel-buffering", "no");
@@ -116,8 +140,9 @@ async function resolveSession(
   runtime: AuthRuntime,
   kind: SessionKind,
   requestId: string,
+  touch: boolean,
 ): Promise<Session | Response> {
-  const own = await readSession(request, runtime, kind, { touch: true });
+  const own = await readSession(request, runtime, kind, { touch });
   if (own) return own.session;
   const otherKind: SessionKind = kind === "operator" ? "staff" : "operator";
   if (await readSession(request, runtime, otherKind, { touch: false })) {
@@ -146,7 +171,8 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
     return problem(requestId, 404, "not_found", "Not found");
   }
 
-  const resolved = await resolveSession(request, runtime, kind, requestId);
+  const passive = method === "GET" && request.headers.get(PASSIVE_HEADER) === "1";
+  const resolved = await resolveSession(request, runtime, kind, requestId, !passive);
   if (resolved instanceof Response) return resolved;
   let session = resolved;
 

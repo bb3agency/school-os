@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthRedirectError, createBffClient, createBffFetch } from "./fetch";
+import {
+  AuthRedirectError,
+  createBffClient,
+  createBffFetch,
+  PASSIVE_HEADER,
+  TENANT_SUSPENDED_EVENT,
+} from "./fetch";
 import { ACTIVITY_EVENT, forgetSessionInfo } from "./session-client";
 
 const CSRF = "c".repeat(43);
@@ -139,5 +145,62 @@ describe("browser BFF client (SEC-004)", () => {
     const client = createBffClient({ kind: "operator", locale: "en", navigate: vi.fn() });
     await client.GET("/api/v1/platform/tenants", { params: { query: { q: "sri" } } });
     expect(seen).toEqual(["http://localhost:3000/bff/api/v1/platform/tenants?q=sri"]);
+  });
+});
+
+describe("background polls and suspended schools (FR-NOT-001, BR-08)", () => {
+  it("a passive GET neither reports activity nor leaves the page on 401", async () => {
+    const { navigate, bffFetch } = setup(() =>
+      Response.json({ code: "unauthenticated" }, { status: 401 }),
+    );
+    const listener = vi.fn();
+    window.addEventListener(ACTIVITY_EVENT, listener);
+    const response = await bffFetch(
+      new Request("http://localhost:3000/bff/api/v1/notifications/unread-count", {
+        headers: { [PASSIVE_HEADER]: "1" },
+      }),
+    );
+    expect(response.status).toBe(401);
+    expect(navigate).not.toHaveBeenCalled();
+
+    const ok = setup(() => Response.json({ count: 2 }));
+    await ok.bffFetch(
+      new Request("http://localhost:3000/bff/api/v1/notifications/unread-count", {
+        headers: { [PASSIVE_HEADER]: "1" },
+      }),
+    );
+    window.removeEventListener(ACTIVITY_EVENT, listener);
+    expect(listener).not.toHaveBeenCalled();
+    // The header travels to the BFF, which reads the session without sliding it.
+    expect(ok.calls[0]?.headers.get(PASSIVE_HEADER)).toBe("1");
+  });
+
+  it("the passive header is ignored on writes (they always count as activity)", async () => {
+    const { navigate, bffFetch } = setup(() =>
+      Response.json({ code: "unauthenticated" }, { status: 401 }),
+    );
+    await expect(
+      bffFetch(
+        new Request("http://localhost:3000/bff/api/v1/notifications/read-all", {
+          method: "POST",
+          headers: { [PASSIVE_HEADER]: "1" },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(AuthRedirectError);
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces 403 tenant_suspended to the page, and only that code", async () => {
+    const listener = vi.fn();
+    window.addEventListener(TENANT_SUSPENDED_EVENT, listener);
+    const suspended = setup(() =>
+      Response.json({ code: "tenant_suspended", status: 403 }, { status: 403 }),
+    );
+    const response = await suspended.bffFetch(new Request("http://localhost:3000/bff/api/v1/users"));
+    expect(response.status).toBe(403);
+    const forbidden = setup(() => Response.json({ code: "forbidden", status: 403 }, { status: 403 }));
+    await forbidden.bffFetch(new Request("http://localhost:3000/bff/api/v1/users"));
+    window.removeEventListener(TENANT_SUSPENDED_EVENT, listener);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });

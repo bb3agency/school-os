@@ -22,9 +22,28 @@ import {
  * - Sends the UI language as Accept-Language.
  * - 401: the session has ended → go to sign-in and come back here afterwards.
  * - 428 step_up_required → go to the problem's `step_up_url` (re-authentication).
+ * - 403 tenant_suspended → tell the page (TENANT_SUSPENDED_EVENT) so the suspended-school
+ *   banner can explain it, whatever screen made the call (BR-08).
+ * - Passive calls (PASSIVE_HEADER, e.g. the notification bell's polling) do not count as
+ *   activity: the BFF does not slide the idle timeout and a 401 does not leave the page.
  */
 
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Request header for background polls. The BFF then reads the session without sliding the
+ * idle timeout (an unattended office PC still locks after 15 minutes), and this client neither
+ * reports activity nor navigates to sign-in on 401. GET only.
+ */
+export const PASSIVE_HEADER = "x-sos-passive";
+
+/** Window event fired when the API answers 403 tenant_suspended (BR-08, FR-PLT-004). */
+export const TENANT_SUSPENDED_EVENT = "sos:tenant-suspended";
+
+function reportTenantSuspended(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(TENANT_SUSPENDED_EVENT));
+}
 
 /** Thrown while the page navigates away to sign in or step up. */
 export class AuthRedirectError extends Error {
@@ -65,6 +84,7 @@ export function createBffFetch(options: BffFetchOptions): FetchLike {
     const headers = new Headers(input.headers);
     headers.set("accept-language", options.locale);
     const unsafe = UNSAFE.has(input.method.toUpperCase());
+    const passive = !unsafe && headers.get(PASSIVE_HEADER) === "1";
     if (unsafe) {
       const token = await csrfToken(options.kind).catch(() => null);
       if (token) headers.set("x-csrf-token", token);
@@ -85,8 +105,13 @@ export function createBffFetch(options: BffFetchOptions): FetchLike {
       }
     }
 
+    if (response.status === 403 && (await readProblem(response)).code === "tenant_suspended") {
+      reportTenantSuspended();
+    }
     if (response.status === 401) {
       forgetSessionInfo(options.kind);
+      // A background poll never takes the user away: the idle-timeout dialog handles that.
+      if (passive) return response;
       const target = loginUrl(options.kind, currentPath());
       navigate(target);
       throw new AuthRedirectError(target);
@@ -99,7 +124,7 @@ export function createBffFetch(options: BffFetchOptions): FetchLike {
       navigate(target);
       throw new AuthRedirectError(target);
     }
-    if (response.ok) reportActivity(options.kind);
+    if (response.ok && !passive) reportActivity(options.kind);
     return response;
   };
 }

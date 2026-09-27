@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { decodeProtectedHeader, jwtVerify } from "jose";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHarness, type Harness } from "@/test/bff-harness";
 import { TEST_SERVICE_TOKEN_KEY } from "@/test/server-env";
-import { MAX_REQUEST_BODY_BYTES, proxyToApi } from "./proxy";
+import { isStrictPolicy, MAX_REQUEST_BODY_BYTES, proxyToApi } from "./proxy";
 
 const TENANT = "0192f3a4-0000-7000-8000-000000000001";
 const clerk = { sub: "staff-sub-1", name: "Office Clerk" };
@@ -336,5 +336,60 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
     const response = await call("/bff/api/v1/users");
     expect(response.status).toBe(502);
     expect(await response.text()).not.toContain("fetch failed");
+  });
+});
+
+describe("BFF proxy: background polls and API pages (FR-NOT-001, FR-CR-005)", () => {
+  it("a passive GET reads the session without sliding the idle timeout", async () => {
+    await h.signIn("staff", clerk);
+    const load = vi.spyOn(h.runtime.store, "load");
+    await call("/bff/api/v1/notifications/unread-count", { headers: { "x-sos-passive": "1" } });
+    expect(load).toHaveBeenLastCalledWith(expect.any(String), { touch: false });
+    await call("/bff/api/v1/notifications/unread-count");
+    expect(load).toHaveBeenLastCalledWith(expect.any(String), { touch: true });
+    // Writes always count as activity, whatever the header says.
+    await call("/bff/api/v1/notifications/read-all", {
+      method: "POST",
+      headers: { "x-sos-passive": "1", "x-csrf-token": await h.csrf() },
+    });
+    expect(load).toHaveBeenLastCalledWith(expect.any(String), { touch: true });
+    // The marker never reaches the API.
+    expect(h.apiCalls.every((request) => request.headers.get("x-sos-passive") === null)).toBe(true);
+  });
+
+  it("keeps an API page's own strict CSP and replaces anything looser", async () => {
+    await h.signIn("staff", clerk);
+    const memoPolicy =
+      "default-src 'none'; style-src 'sha256-abc='; img-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+    h.setApi(
+      () =>
+        new Response("<!doctype html><p>memo</p>", {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "content-security-policy": memoPolicy,
+            "content-disposition": 'inline; filename="correction-memo-0192f3a4.html"',
+          },
+        }),
+    );
+    const memo = await call("/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo");
+    expect(memo.headers.get("content-security-policy")).toBe(memoPolicy);
+    expect(memo.headers.get("content-disposition")).toContain("inline");
+
+    h.setApi(
+      () =>
+        new Response("<p>x</p>", {
+          headers: { "content-type": "text/html", "content-security-policy": "default-src *" },
+        }),
+    );
+    const loose = await call("/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo");
+    expect(loose.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(loose.headers.get("content-security-policy")).not.toContain("default-src *");
+  });
+
+  it("isStrictPolicy needs default-src 'none' and frame-ancestors 'none'", () => {
+    expect(isStrictPolicy("default-src 'none'; frame-ancestors 'none'")).toBe(true);
+    expect(isStrictPolicy("default-src 'none'")).toBe(false);
+    expect(isStrictPolicy("default-src 'self'; frame-ancestors 'none'")).toBe(false);
+    expect(isStrictPolicy(null)).toBe(false);
   });
 });

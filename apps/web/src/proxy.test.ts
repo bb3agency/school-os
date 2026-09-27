@@ -86,4 +86,22 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       expect(response.headers.get("content-security-policy"), path).toContain("default-src 'self'");
     }
   });
+
+  it("leaves the correction memo's CSP to the BFF handler, and only that path (FR-CR-005)", () => {
+    const memo = proxy(
+      request("/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo"),
+    );
+    expect(memo.headers.get("content-security-policy")).toBeNull();
+    expect(memo.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(memo.headers.get("cross-origin-opener-policy")).toBe("same-origin");
+    for (const path of [
+      "/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001",
+      "/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo/x",
+      "/bff/api/v1/change-requests/../memo",
+    ]) {
+      expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
+        "default-src 'self'",
+      );
+    }
+  });
 });
