@@ -141,16 +141,16 @@ Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs 
    - **Dry run first** (default; read-only): it prints one line per school (`tenant=<id> result=in_line|pending|failed` with counts) and one line per change (`+ <role> <permission>`, `- …` with `--prune`, `= …` stale grant kept, `~ <role> display names`, `! <role>` conflict with a custom role, `? <role>` unknown system role), IDs and keys only. Check that the grants match the release notes.
    - **Apply:** `--apply` adds missing system roles and grants and updates display names; `--prune` also removes grants roles.yaml no longer lists (removing access can lock staff out: only when the release notes ask for it, after a `--prune` dry run). Custom roles and `platform_support` are never changed. Every change is audited in the school's chain (`role.permission_granted`, `role.permission_revoked`, `role.created`, `role.updated`, `role.system_sync_applied`; actor `system`). A second `--apply` changes nothing. `--tenant <id>` limits the run to one school.
    - **Exit codes:** `0` in line or applied · `1` refused (nothing done) · `2` invalid arguments · `3` dry run found changes · `4` a school failed or has a conflict (the others were still processed; re-run after fixing, it is idempotent).
-   - **Shared tier (staging, then production):** a one-off ECS task from the current **worker** task definition (its `SOS_DATABASE_URL` is `sos_app`; the migrate task's `sos_migrator` is refused) with a command override, in the same network configuration as the services; output goes to the task's CloudWatch log stream:
+   - **Shared tier (staging, then production):** a one-off ECS task from the current **worker** task definition (its `SOS_DATABASE_URL` is `sos_app`; the migrate task's `sos_migrator` is refused) with a command override, in the same network configuration as the services. The container is named `app` in every task definition (`modules/ecs_service` `container_name`); output goes to the task's CloudWatch log stream (`/schoolos/ecs/sos-<env>-worker`, stream prefix `app`):
      ```bash
      td=$(aws ecs describe-services --cluster "$CLUSTER" --services "$WORKER_SERVICE" --query 'services[0].taskDefinition' --output text)
      net=$(aws ecs describe-services --cluster "$CLUSTER" --services "$WORKER_SERVICE" --query 'services[0].networkConfiguration' --output json)
      aws ecs run-task --cluster "$CLUSTER" --task-definition "$td" --launch-type FARGATE \
        --network-configuration "$net" --started-by "ops-role-sync" \
-       --overrides '{"containerOverrides":[{"name":"<worker container>","command":["python","-m","app.identity.sync_system_roles"]}]}'
+       --overrides '{"containerOverrides":[{"name":"app","command":["python","-m","app.identity.sync_system_roles"]}]}'
      # read the log, then repeat with "command":["python","-m","app.identity.sync_system_roles","--apply"]
      ```
-   - **Dedicated tier:** on each host after its upgrade (§15.5), `sudo /opt/schoolos/deploy/dedicated/scripts/sync-system-roles.sh` (dry run), then `… --apply` (SSM Run Command for the fleet). It runs the command in a one-off `api` container of the active release and handles only `SOS_DEDICATED_TENANT_ID`.
+   - **Dedicated tier:** automatic (ADR-0024). `upgrade.sh` runs `scripts/sync-system-roles.sh --apply` after the release's migrations on every upgrade (§15.5), never `--prune`; any exit other than `0` fails the upgrade and rolls the host back. By hand (`sudo /opt/schoolos/deploy/dedicated/scripts/sync-system-roles.sh`, dry run by default) only for a dry run, a reviewed `--prune`, or a re-run after fixing a conflict. It runs the command in a one-off `api` container of the active release and handles only `SOS_DEDICATED_TENANT_ID`.
    - **Local:** `make sync-system-roles` (dry run) or `make sync-system-roles ARGS="--apply"`.
 
 ## 9. Database operations
@@ -336,8 +336,8 @@ Targets: RPO ≤ 15 min, RTO ≤ 8 h (NFR-AVL-005). The RPO needs continuous WAL
 
 ### 15.5 Fleet upgrades
 
-- The `deploy-dedicated` GitHub Actions workflow runs after a shared-tier production release: it reads the fleet list, then upgrades hosts in waves (canary host first, then the rest) via SSM Run Command: pull new digests → run `migrate` (backward-compatible migrations only) → `docker compose up -d` → smoke test → confirm the next heartbeat reports the new version.
-- When the release changes the system roles (§8 item 7, ADR-0022), run `scripts/sync-system-roles.sh` (dry run, then `--apply`) on each upgraded host; the upgrade itself does not change role grants.
+- The `deploy-dedicated` GitHub Actions workflow runs after a shared-tier production release: it reads the fleet list, then upgrades hosts in waves (canary host first, then the rest) via SSM Run Command: pull new digests → run `migrate` (backward-compatible migrations only) → system-role sync → `docker compose up -d` → smoke test → confirm the next heartbeat reports the new version.
+- System-role sync (§8 item 7, ADR-0022, ADR-0024): after `migrate`, `upgrade.sh` runs `scripts/sync-system-roles.sh --apply` (never `--prune`), so the school's system roles follow the release's roles.yaml. Exit `1` (refused), `4` (the school failed, or a custom role holds a system role key) or any other non-zero code fails the upgrade loudly and rolls the host back; grants already added stay (additive, audited). Removing grants roles.yaml no longer lists stays manual: `--prune` dry run, then `--apply --prune`.
 - A failed wave stops the rollout and rolls the host back to the previous digests. Upgrades run outside school hours (after 18:00 IST or Sundays) with 48-hour notice via announcements.
 - Target: every host no more than one release behind 14 days after a release (NFR-FLT-002).
 

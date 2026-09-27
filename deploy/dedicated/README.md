@@ -126,19 +126,24 @@ The fleet workflow runs this through SSM Run Command, targeting the tag `schoolo
 3. takes a pre-upgrade backup (`daily/…-pre-upgrade-<version>.dump`) and aborts if the backup fails;
 4. switches the release link and runs `db-bootstrap` and `migrate`. Migrations are expand-only, so older code
    still works;
-5. restarts services in order (worker, beat, api, web, caddy), waiting for each health check;
-6. checks health end to end through Caddy (`https://<host>/healthz`).
+5. brings the school's system roles in line with `app/authz/roles.yaml` (`scripts/sync-system-roles.sh --apply`,
+   ADR-0022; never `--prune`). A refusal (exit 1), a failed school or a conflict with a custom role (exit 4)
+   fails the upgrade;
+6. restarts services in order (worker, beat, api, web, caddy), waiting for each health check;
+7. checks health end to end through Caddy (`https://<host>/healthz`).
 
 If any step fails, it relinks the previous release, restarts it and exits non-zero. It never rolls a
-migration back (they are backward compatible), and it keeps the last three releases. Upgrades run outside
+migration back (they are backward compatible) or a role grant the sync already added (additive, audited,
+permissions the migrations put in the catalog), and it keeps the last three releases. Upgrades run outside
 school hours (after 18:00 IST or on Sundays), with 48 h notice.
 
 If a release changes `systemd/`, run `scripts/bootstrap-host.sh` afterwards. It is idempotent.
 
-If the release notes say the system roles changed (`app/authz/roles.yaml`, ADR-0022), bring this school's
-roles in line after the upgrade: `sudo scripts/sync-system-roles.sh` (dry run: prints the grants it would add),
-then `sudo scripts/sync-system-roles.sh --apply`. Add `--prune` only when the release notes ask for removals.
-It is idempotent and audited in the school's own chain; exit code 3 means a dry run found changes (docs/10 §8).
+The upgrade adds missing system roles and grants itself (step 5). Grants roles.yaml no longer lists are kept
+and reported; remove them only when the release notes ask for it: `sudo scripts/sync-system-roles.sh --prune`
+(dry run first), then `--apply --prune`. After an exit-4 failure, fix the conflict (a custom role using a
+system role key) and re-run the upgrade or `sudo scripts/sync-system-roles.sh --apply`. The command is
+idempotent and audited in the school's own chain; exit code 3 means a dry run found changes (docs/10 §8).
 
 ## Backup and restore
 

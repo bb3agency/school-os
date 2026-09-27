@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · Amended by [ADR-0024](ADR-0024-dedicated-upgrades-apply-system-role-sync.md) |
 | Date | 2026-09-27 |
 | Deciders | Product owner (decision of 2026-09-27 on ADR-0021 follow-up (a)) |
 | Amends / supersedes | none (settles [ADR-0021](ADR-0021-export-access-and-step-up.md) follow-up (a); adds no definer function, policy, role or RLS change, so ADR-0013 is unchanged) |
@@ -62,3 +62,9 @@ Facts checked on 2026-09-27:
 ## Related requirements
 
 FR-IAM-010, FR-IAM-011, FR-IAM-014, SEC-003, SEC-007, ADR-0013, ADR-0020, ADR-0021; docs/05 §4 (permission catalog), docs/07 §6.2, docs/10 §8 and §15.5, `deploy/dedicated/README.md`.
+
+## Amendments (2026-09-27)
+
+Reference only (implementation facts; the decision is in the ADR named).
+
+**A1 · Follow-up "run it from upgrade.sh" settled by [ADR-0024](ADR-0024-dedicated-upgrades-apply-system-role-sync.md).** `deploy/dedicated/scripts/upgrade.sh` calls `upgrade_sync_system_roles` (`scripts/lib.sh`), which runs the activated release's `scripts/sync-system-roles.sh --apply` (never `--prune`) after `migrate` and before the services restart; any exit other than `0` fails the upgrade and the ERR trap rolls the host back. Tests: `apps/api/tests/deploy/test_upgrade_role_sync.py`. The shared tier is unchanged: the one-off ECS task uses the worker task definition's container `app` (docs/10 §8 item 7).

@@ -158,6 +158,26 @@ fetch_release() {
   rm -rf "$tmp"
 }
 
+# Upgrade step after the release's migrations (ADR-0022, amended 2026-09-27; docs/10 §15.5): bring
+# the school's system roles in line with roles.yaml. Always --apply, NEVER --prune (removing access
+# stays a deliberate operator action). <scripts dir> is the activated release's scripts/ directory.
+# Returns 0 when the roles were in line or were updated; otherwise logs why and returns 1, so the
+# caller fails (and rolls back) the upgrade. With --apply the command never exits 3 (dry-run changes).
+upgrade_sync_system_roles() {
+  local scripts_dir="$1" rc=0
+  "$scripts_dir/sync-system-roles.sh" --apply || rc=$?
+  case $rc in
+    0)
+      info "system-role sync: in line or applied"
+      return 0
+      ;;
+    4) log ERR "system-role sync: the school failed or a system role key is held by a custom role (exit 4); see the lines above, fix, then re-run sync-system-roles.sh --apply" ;;
+    1) log ERR "system-role sync refused (exit 1): wrong database role or migrations not applied" ;;
+    *) log ERR "system-role sync failed with exit code $rc" ;;
+  esac
+  return 1
+}
+
 activate_release() {
   local version="$1"
   ln -sfn "$SOS_RELEASES_DIR/$version" "$SOS_INSTALL_DIR.new"
