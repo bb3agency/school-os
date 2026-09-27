@@ -2,11 +2,11 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
@@ -32,6 +32,8 @@ import {
 } from "./parts";
 import { ProblemAlert, problemCode } from "./ProblemAlert";
 import { SensitiveValue } from "./SensitiveValue";
+import { ValuesBySource } from "./SourceCompare";
+import { EnrolmentDialog, GuardianDialog, StatusDialog, reloadOnConflict } from "./StudentEdit";
 import {
   VALUE_SOURCES,
   isValueSource,
@@ -90,6 +92,8 @@ interface RowProps {
   permissions: Permissions;
   onVerify: (value: SourceValue, status: "verified" | "rejected") => void;
   verifying: string | null;
+  /** "Change" (non-identity) or "Request a change" (identity field), when allowed. */
+  action?: ReactNode;
 }
 
 /** One attribute: the value SchoolOS uses, and every source's current value beside it. */
@@ -101,6 +105,7 @@ function AttributeRow({
   permissions,
   onVerify,
   verifying,
+  action,
 }: RowProps) {
   const t = useTranslations("students.detail");
   const ts = useTranslations("students");
@@ -137,6 +142,11 @@ function AttributeRow({
         ) : null}
         {attribute?.classification === "C3" ? (
           <span className="block text-xs font-normal text-ink-muted">{t("restrictedField")}</span>
+        ) : null}
+        {action ? (
+          <span className="mt-1 block font-normal" data-print="hide">
+            {action}
+          </span>
         ) : null}
       </th>
       <td className="px-3 py-3">
@@ -247,16 +257,25 @@ function recordSchema(attribute: Attribute | undefined) {
 function RecordValueDialog({
   student,
   attributes,
+  initialKey = "",
+  triggerLabel,
+  triggerVariant,
+  triggerSize,
 }: {
   student: Student;
   attributes: readonly Attribute[];
+  /** Field chosen when the dialog opens (the row's "Change" button). */
+  initialKey?: string;
+  triggerLabel?: ReactNode;
+  triggerVariant?: ButtonVariant;
+  triggerSize?: ButtonSize;
 }) {
   const t = useTranslations("students.record");
   const ts = useTranslations("students");
   const tc = useTranslations("common");
   const locale = useLocale();
   const api = useBffClient("staff");
-  const [key, setKey] = useState("");
+  const [key, setKey] = useState(initialKey);
   const [raw, setRaw] = useState("");
   const format = useValueFormatter();
   const attribute = attributes.find((item) => item.key === key);
@@ -274,7 +293,9 @@ function RecordValueDialog({
 
   return (
     <FormDialog
-      triggerLabel={t("open")}
+      triggerLabel={triggerLabel ?? t("open")}
+      {...(triggerVariant ? { triggerVariant } : {})}
+      {...(triggerSize ? { triggerSize } : {})}
       title={t("title")}
       description={t("description")}
       confirmLabel={t("submit")}
@@ -287,11 +308,13 @@ function RecordValueDialog({
           >
             {t("goToChangeRequests")}
           </Link>
-        ) : null
+        ) : (
+          reloadOnConflict([studentKey(student.id)])(error)
+        )
       }
       schema={recordSchema(attribute)}
       onOpen={() => {
-        setKey("");
+        setKey(initialKey);
         setRaw("");
       }}
       invalidate={[studentKey(student.id)]}
@@ -386,7 +409,9 @@ function GuardiansCard({
   permissions: Permissions;
 }) {
   const t = useTranslations("students.guardians");
+  const tc = useTranslations("common");
   const canReveal = permissions.has(PERM.readSensitive) && student.sensitive_revealable;
+  const canEdit = permissions.has(PERM.updateNonIdentity);
   const relationship = (value: string) =>
     value === "father" || value === "mother" || value === "guardian"
       ? t(`relationship.${value}`)
@@ -426,10 +451,23 @@ function GuardiansCard({
     },
     { key: "phone", header: t("colPhone"), cell: (row) => contact(row, "phone") },
     { key: "address", header: t("colAddress"), cell: (row) => contact(row, "address") },
+    ...(canEdit
+      ? [
+          {
+            key: "actions",
+            header: <span className="sr-only">{tc("actions")}</span>,
+            cell: (row: Guardian) => <GuardianDialog studentId={student.id} guardian={row} />,
+          },
+        ]
+      : []),
   ];
 
   return (
-    <Card title={t("title")} description={t("description")}>
+    <Card
+      title={t("title")}
+      description={t("description")}
+      actions={canEdit ? <GuardianDialog studentId={student.id} /> : null}
+    >
       <DataTable
         caption={t("title")}
         captionHidden
@@ -466,6 +504,9 @@ export function StudentDetailView({
   const [verifyError, setVerifyError] = useState<unknown>(undefined);
   const [verified, setVerified] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const te = useTranslations("students.edit");
+  const canEdit = permissions.has(PERM.updateNonIdentity);
+  const canRequest = permissions.has(PERM.requestChange);
 
   if (student.status !== "ready") {
     return (
@@ -483,6 +524,42 @@ export function StudentDetailView({
       .filter((key) => key in data.canonical || key in data.values),
     ...Object.keys(data.canonical).filter((key) => !index.byKey.has(key)),
   ];
+
+  /** Identity fields: a correction request with evidence (invariant 6); others: record a value. */
+  function rowAction(key: string): ReactNode {
+    const attribute = index.byKey.get(key);
+    if (!attribute) return null;
+    const label = index.label(key);
+    if (attribute.is_identity) {
+      if (!canRequest) return null;
+      const query = new URLSearchParams({ student_id: data.id, attribute_key: key });
+      return (
+        <Link
+          href={`/change-requests/new?${query.toString()}`}
+          className="text-sm text-primary underline"
+        >
+          {te("requestChange")}
+          <span className="sr-only">: {label}</span>
+        </Link>
+      );
+    }
+    if (!canEdit) return null;
+    return (
+      <RecordValueDialog
+        student={data}
+        attributes={index.sorted}
+        initialKey={key}
+        triggerVariant="ghost"
+        triggerSize="sm"
+        triggerLabel={
+          <>
+            {te("change")}
+            <span className="sr-only">: {label}</span>
+          </>
+        }
+      />
+    );
+  }
 
   async function verify(value: SourceValue, status: "verified" | "rejected") {
     setVerifying(value.id);
@@ -509,6 +586,7 @@ export function StudentDetailView({
       <PageHeader
         title={name}
         badge={<StudentStatusBadge status={data.status} />}
+        actions={canEdit ? <StatusDialog student={data} /> : null}
         description={t("summary", {
           admission: data.admission_no ?? "—",
           classSection: data.enrollment?.label ?? t("noClass"),
@@ -566,6 +644,7 @@ export function StudentDetailView({
                       permissions={permissions}
                       onVerify={verify}
                       verifying={verifying}
+                      action={rowAction(key)}
                     />
                   ))}
                 </tbody>
@@ -574,9 +653,14 @@ export function StudentDetailView({
           )}
         </div>
       </Card>
+      <ValuesBySource
+        studentId={data.id}
+        index={index}
+        canReveal={permissions.has(PERM.readSensitive) && data.sensitive_revealable}
+      />
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <GuardiansCard student={data} guardians={guardians} permissions={permissions} />
-        <Card title={t("classTitle")}>
+        <Card title={t("classTitle")} actions={canEdit ? <EnrolmentDialog student={data} /> : null}>
           {data.enrollment ? (
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
               <dt className="text-ink-muted">{t("classSection")}</dt>
