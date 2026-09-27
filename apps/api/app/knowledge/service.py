@@ -31,6 +31,7 @@ import datetime as dt
 import time
 import uuid
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from app.audit import service as audit
@@ -124,6 +125,13 @@ def _verified_out(row: VerifiedAnswer) -> VerifiedAnswerOut:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class AskResponse:
+    query_id: uuid.UUID
+    answer: Answer
+    events: tuple[AskEvent, ...]
+
+
 class SchoolKnowledgeService:
     """:class:`KnowledgeService` over the process runtime (:mod:`app.knowledge.composition`)."""
 
@@ -156,6 +164,11 @@ class SchoolKnowledgeService:
         yield from events
 
     def answer(self, session: Session, ctx: UserContext, request: AskRequest) -> list[AskEvent]:
+        """The SSE events of one question (recorded and audited before they are returned)."""
+        return list(self.respond(session, ctx, request).events)
+
+    def respond(self, session: Session, ctx: UserContext, request: AskRequest) -> AskResponse:
+        """One question: the validated :class:`Answer`, its events, stored and audited."""
         if not ctx.has(ASK):
             raise Forbidden()
         started = time.monotonic()
@@ -177,7 +190,8 @@ class SchoolKnowledgeService:
             result=result,
             latency_ms=latency,
         )
-        return list(self._events(query_id, result, latency))
+        events = tuple(self._events(query_id, result, latency))
+        return AskResponse(query_id=query_id, answer=result, events=events)
 
     def _record(
         self,
@@ -448,6 +462,7 @@ __all__ = [
     "AskEvent",
     "AskMode",
     "AskRequest",
+    "AskResponse",
     "Citation",
     "CitationEvent",
     "DoneEvent",
