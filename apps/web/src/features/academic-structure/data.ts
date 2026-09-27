@@ -16,8 +16,8 @@ import { isoDate, requiredInt, text, uuid } from "@/lib/validation";
 export const STRUCTURE_MANAGE = "tenant.structure.manage";
 
 /**
- * Query keys. The first two segments match the keys the student list and the older read-only
- * structure view use, so invalidating a prefix refreshes every screen that shows the structure.
+ * Query keys. The first two segments match the keys the student list uses, so invalidating a
+ * prefix refreshes every screen that shows the structure.
  */
 export const STRUCTURE_KEYS = {
   years: ["staff", "academic-years"] as const,
@@ -109,12 +109,8 @@ export function pickYear(years: readonly AcademicYear[], chosen: string | null):
   return (years.find((year) => year.is_current) ?? years[0])?.id ?? null;
 }
 
-/** Class name in the UI language (the API stores English and Telugu names). */
-export function classLabel(schoolClass: SchoolClass, locale: string): string {
-  return locale === "te" && schoolClass.display_te
-    ? schoolClass.display_te
-    : schoolClass.display_en;
-}
+/** Class name in the UI language (shared helper; re-exported for this feature's imports). */
+export { classLabel } from "@/lib/school-class";
 
 /**
  * Run an edit; when someone else changed the record first (412) refetch the lists before the

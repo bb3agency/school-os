@@ -155,7 +155,6 @@
       "currentBadge": "Current",
       "years": {
         "title": "Academic years",
-        "add": "Add academic year",
         "colYear": "Year",
         "colStarts": "Starts on",
         "colEnds": "Ends on",
@@ -165,16 +164,13 @@
       },
       "classes": {
         "title": "Classes",
-        "add": "Add class",
         "colName": "Class",
         "colOrder": "Order",
-        "colSections": "Sections",
         "emptyTitle": "No classes yet",
         "emptyBody": "Add classes from Nursery to Class XII, the way your school runs them."
       },
       "sections": {
         "title": "Sections",
-        "add": "Add section",
         "colName": "Section",
         "colClass": "Class",
         "emptyTitle": "No sections yet",

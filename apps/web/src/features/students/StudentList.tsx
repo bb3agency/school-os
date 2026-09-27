@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
-import { className as classDisplay } from "@/features/school/StructureView";
+import { classLabel as classDisplay } from "@/lib/school-class";
 import { Link } from "@/i18n/navigation";
 import { formValues } from "@/lib/forms";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
