@@ -503,3 +503,68 @@ def start_job(
     if existing is None:  # pragma: no cover - the conflicting row exists
         raise RuntimeError("job run vanished")
     return existing, False
+
+
+# --- school-chain copies of platform actions (ADR-0020) ---------------------------------------
+
+
+def insert_tenant_audit(session: Session, values: Mapping[str, Any]) -> None:
+    session.execute(insert(m.tenant_audit_outbox).values(**values))
+
+
+def claim_tenant_audit(
+    session: Session, *, tenant_id: uuid.UUID | None, skip: Sequence[uuid.UUID]
+) -> RowMapping | None:
+    """Lock the oldest undelivered row that is its school's head (no older undelivered row).
+
+    ``FOR UPDATE SKIP LOCKED``: a head held by another deliverer is skipped, and that school's
+    later rows are not heads, so each school's events are delivered strictly in ``seq`` order
+    while different schools proceed in parallel. ``skip`` excludes heads that failed in this run.
+    """
+    o = m.tenant_audit_outbox
+    older = o.alias("older")
+    has_older = (
+        select(older.c.id)
+        .where(
+            older.c.tenant_id == o.c.tenant_id,
+            older.c.delivered_at.is_(None),
+            older.c.seq < o.c.seq,
+        )
+        .exists()
+    )
+    stmt = select(o).where(o.c.delivered_at.is_(None), ~has_older)
+    if tenant_id is not None:
+        stmt = stmt.where(o.c.tenant_id == tenant_id)
+    if skip:
+        stmt = stmt.where(o.c.id.not_in(list(skip)))
+    stmt = stmt.order_by(o.c.seq).limit(1).with_for_update(of=o, skip_locked=True)
+    return session.execute(stmt).mappings().first()
+
+
+def mark_tenant_audit_delivered(session: Session, event_id: uuid.UUID) -> None:
+    o = m.tenant_audit_outbox
+    session.execute(
+        update(o)
+        .where(o.c.id == event_id, o.c.delivered_at.is_(None))
+        .values(delivered_at=func.now(), attempts=o.c.attempts + 1, last_error=None)
+    )
+
+
+def mark_tenant_audit_failed(session: Session, event_id: uuid.UUID, error_code: str) -> int:
+    o = m.tenant_audit_outbox
+    attempts: int = session.execute(
+        update(o)
+        .where(o.c.id == event_id)
+        .values(attempts=o.c.attempts + 1, last_error=error_code)
+        .returning(o.c.attempts)
+    ).scalar_one()
+    return attempts
+
+
+def pending_tenant_audit(session: Session) -> tuple[int, dt.datetime | None]:
+    """(undelivered rows, oldest created_at) for monitoring."""
+    o = m.tenant_audit_outbox
+    row = session.execute(
+        select(func.count(), func.min(o.c.created_at)).where(o.c.delivered_at.is_(None))
+    ).one()
+    return int(row[0]), row[1]

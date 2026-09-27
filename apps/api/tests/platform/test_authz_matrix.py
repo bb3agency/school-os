@@ -199,8 +199,13 @@ def test_ADR_0017_dedicated_mode_mounts_no_control_plane() -> None:
 def test_ADR_0017_beat_schedule_per_deployment_mode() -> None:
     dedicated = beat_schedule(Settings(deployment_mode=DeploymentMode.DEDICATED))
     shared = beat_schedule(Settings(deployment_mode=DeploymentMode.SHARED))
-    assert {v["task"] for v in dedicated.values()} == {"fleet.send_heartbeat"}
+    # ADR-0020: school-chain copies of platform actions are delivered in both modes.
+    assert {v["task"] for v in dedicated.values()} == {
+        "fleet.send_heartbeat",
+        "platform.deliver_tenant_audit",
+    }
     assert "fleet.send_heartbeat" not in {v["task"] for v in shared.values()}
+    assert "platform.deliver_tenant_audit" in {v["task"] for v in shared.values()}
     assert {"billing.generate_invoices", "usage.collect_daily", "fleet.check_staleness"} <= {
         v["task"] for v in shared.values()
     }

@@ -22,7 +22,9 @@ Steps (each resumable; a re-run continues where an interrupted run stopped):
    platform event ``tenant.owner_invite_created`` + school-chain ``tenant.provisioned``;
 4. ``tenancy.activate_tenant`` + platform and school-chain ``tenant.activated``.
 
-Platform events are ``actor_type = system``; school-chain events are ``actor_type = platform``.
+Platform events are ``actor_type = system``; school-chain events are ``actor_type = platform``,
+queued in the same platform transaction and delivered right away (``platform.tenant_audit``;
+the host's worker retries anything left undelivered, ADR-0020).
 Only IDs and states are printed (never the owner's name or email).
 """
 
@@ -46,7 +48,8 @@ from app.core.db import context_free_session, platform_session
 from app.core.errors import Conflict, DomainError
 from app.core.logging import get_logger
 from app.platform import service as platform_service
-from app.platform.common import SYSTEM, audit_platform, db_errors, tenant_chain
+from app.platform import tenant_audit
+from app.platform.common import SYSTEM, audit_platform, db_errors
 from app.platform.schemas import OwnerIn
 from app.tenancy import service as tenancy
 from app.tenancy.schemas import TenantProvisionIn
@@ -117,13 +120,7 @@ def _invite_owner(
 ) -> tuple[str, uuid.UUID | None]:
     """Invite the first owner; ``existing`` when an earlier run already did (resume)."""
     try:
-        with (
-            tenant_chain(
-                tenant_id, SYSTEM, "tenant.provisioned", {"tier": TIER, "key_version": key_version}
-            ),
-            platform_session() as s,
-            db_errors(),
-        ):
+        with platform_session() as s, db_errors():
             _user_id, membership_id, role_assigned = platform_service.invite_school_owner(
                 s,
                 tenant_id=tenant_id,
@@ -141,19 +138,24 @@ def _invite_owner(
                 {"owner_role_assigned": role_assigned},
                 tenant_id=tenant_id,
             )
+            tenant_audit.enqueue(
+                s,
+                tenant_id,
+                SYSTEM,
+                "tenant.provisioned",
+                {"tier": TIER, "key_version": key_version},
+            )
     except Conflict:
         # core.create_owner_invite refuses once the school has members: the invite exists.
         return "existing", None
+    finally:
+        tenant_audit.deliver_now(tenant_id)
     return ("created" if role_assigned else "pending_role"), membership_id
 
 
 def _activate(tenant_id: uuid.UUID) -> None:
     change = {"from": "provisioning", "to": "active"}
-    with (
-        tenant_chain(tenant_id, SYSTEM, "tenant.activated", change),
-        platform_session() as s,
-        db_errors(),
-    ):
+    with platform_session() as s, db_errors():
         tenancy.activate_tenant(s, tenant_id)
         audit_platform(
             s,
@@ -164,6 +166,8 @@ def _activate(tenant_id: uuid.UUID) -> None:
             {**change, "tier": TIER},
             tenant_id=tenant_id,
         )
+        tenant_audit.enqueue(s, tenant_id, SYSTEM, "tenant.activated", change)
+    tenant_audit.deliver_now(tenant_id)
 
 
 def provision(

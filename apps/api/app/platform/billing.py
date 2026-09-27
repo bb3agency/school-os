@@ -32,6 +32,7 @@ from app.core.ids import new_id
 from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
+from app.platform import tenant_audit
 from app.platform.common import (
     SYSTEM,
     Actor,
@@ -43,7 +44,6 @@ from app.platform.common import (
     must,
     now,
     parse_cursor,
-    tenant_chain,
     today_ist,
 )
 from app.platform.payments import get_provider
@@ -536,17 +536,7 @@ def suspend_subscription(
     if sub0 is None or dep is None:
         raise NotFound("Subscription not found")
     shared_active = dep["mode"] == "shared" and dep["tenant_status"] == "active"
-    with (
-        tenant_chain(
-            sub0["tenant_id"],
-            actor,
-            "tenant.suspended",
-            {"cause": "billing"},
-            enabled=shared_active,
-        ),
-        platform_session() as s,
-        db_errors(),
-    ):
+    with platform_session() as s, db_errors():
         sub = _sub_or_404(s, sub_id)
         if sub["status"] != "past_due":
             raise Conflict("Only a past-due subscription can be suspended.", code="invalid_state")
@@ -581,6 +571,9 @@ def suspend_subscription(
                 dep["id"],
                 {"tenant_status": "suspended", "tenant_status_reason": "billing"},
             )
+            tenant_audit.enqueue(
+                s, sub["tenant_id"], actor, "tenant.suspended", {"cause": "billing"}
+            )
         audit_platform(
             s,
             actor,
@@ -590,7 +583,10 @@ def suspend_subscription(
             {"exam_window_override": override_by is not None},
             tenant_id=sub["tenant_id"],
         )
-        return SubscriptionOut.model_validate(dict(sub))
+        out = SubscriptionOut.model_validate(dict(sub))
+    if shared_active:
+        tenant_audit.deliver_now(out.tenant_id)
+    return out
 
 
 def reactivate_subscription(
@@ -611,17 +607,7 @@ def reactivate_subscription(
         and dep["tenant_status"] == "suspended"
         and dep["tenant_status_reason"] == "billing"
     )
-    with (
-        tenant_chain(
-            sub0["tenant_id"],
-            actor,
-            "tenant.reactivated",
-            {"cause": "billing"},
-            enabled=resume_tenant,
-        ),
-        platform_session() as s,
-        db_errors(),
-    ):
+    with platform_session() as s, db_errors():
         sub = _sub_or_404(s, sub_id)
         if sub["status"] != "suspended":
             raise Conflict(
@@ -651,6 +637,9 @@ def reactivate_subscription(
                 dep["id"],
                 {"tenant_status": "active", "tenant_status_reason": None},
             )
+            tenant_audit.enqueue(
+                s, sub["tenant_id"], actor, "tenant.reactivated", {"cause": "billing"}
+            )
         audit_platform(
             s,
             actor,
@@ -660,7 +649,10 @@ def reactivate_subscription(
             {},
             tenant_id=sub["tenant_id"],
         )
-        return SubscriptionOut.model_validate(dict(sub))
+        out = SubscriptionOut.model_validate(dict(sub))
+    if resume_tenant:
+        tenant_audit.deliver_now(out.tenant_id)
+    return out
 
 
 def mark_past_due(*, today: dt.date | None = None) -> int:

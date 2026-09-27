@@ -408,3 +408,22 @@ audit_events = Table(
     Column("summary", JSONB, nullable=False),
     Column("request_id", Text),
 )
+
+# 0015_platform_decisions: school-chain copies of platform actions (ADR-0020, docs/16 §16).
+tenant_audit_outbox = Table(
+    "tenant_audit_outbox",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("seq", BigInteger),  # GENERATED ALWAYS AS IDENTITY: never inserted by the app
+    Column("tenant_id", Uuid, nullable=False),
+    Column("action", Text, nullable=False),
+    Column("resource_type", Text, nullable=False),
+    Column("resource_id", Uuid),
+    Column("summary", JSONB, nullable=False),
+    Column("actor_id", Uuid),
+    Column("request_id", Text),
+    Column("created_at", DateTime(timezone=True)),
+    Column("delivered_at", DateTime(timezone=True)),
+    Column("attempts", Integer, nullable=False),
+    Column("last_error", Text),
+)
