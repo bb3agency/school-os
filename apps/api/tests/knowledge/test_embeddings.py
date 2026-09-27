@@ -404,7 +404,7 @@ def test_permanent_failures_are_not_retried() -> None:
 # --- no text in logs (invariant 5) -----------------------------------------------------------
 
 
-def test_SEC_018_no_text_in_logs(capsys: pytest.CaptureFixture[str]) -> None:
+def test_SEC_008_no_text_in_logs(capsys: pytest.CaptureFixture[str]) -> None:
     secret = "Ravi Kumar Synthetic, DOB 01/02/2012, ph 9876543210"
     provider = Recording(failures=[Transient()])
     capsys.readouterr()

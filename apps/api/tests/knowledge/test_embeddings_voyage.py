@@ -223,7 +223,7 @@ def test_tenant_embedder_does_not_retry_permanent_voyage_failures() -> None:
     assert sleeps == []
 
 
-def test_SEC_018_no_text_or_key_in_logs(capsys: pytest.CaptureFixture[str]) -> None:
+def test_SEC_008_no_text_or_key_in_logs(capsys: pytest.CaptureFixture[str]) -> None:
     text = "Synthetic student Lakshmi Devi, ph 9123456780"
     server = Server(httpx.Response(500, json={"detail": text}))
     embedder = CachingTenantEmbedder(
@@ -279,7 +279,7 @@ def test_FR_KB_001_shipped_config_refuses_live_voyage() -> None:
 
 
 @pytest.mark.parametrize("key", [None, "", "   "])
-def test_invariant_10_voyage_needs_an_api_key(key: str | None) -> None:
+def test_SEC_009_voyage_needs_an_api_key(key: str | None) -> None:
     with pytest.raises(ValueError, match="SOS_EMBEDDINGS_API_KEY"):
         select_embeddings_provider(
             KnowledgeProviderMode.LIVE,
