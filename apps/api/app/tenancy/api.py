@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Protocol
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.authz import scope
 from app.authz.catalog import AUTHENTICATED
@@ -41,6 +41,10 @@ Member = Annotated[UserContext, Depends(require(AUTHENTICATED))]
 SettingsManager = Annotated[UserContext, Depends(require("tenant.settings.manage", step_up=True))]
 Reader = Annotated[UserContext, Depends(require(READ))]
 Manager = Annotated[UserContext, Depends(require("tenant.structure.manage", scope="school"))]
+IncludeArchived = Annotated[
+    bool,
+    Query(description="Also list archived rows (hidden by default; US-202, FR-TEN-010)."),
+]
 
 
 def _with_etag(response: Response, version: int) -> None:
@@ -98,10 +102,16 @@ def _year_key(year: AcademicYearOut) -> str:
 
 @router.get("/academic-years", response_model=Page[AcademicYearOut])
 def list_academic_years(
-    ctx: Reader, db: TenantDB, limit: Limit = 50, cursor: Cursor = None
+    ctx: Reader,
+    db: TenantDB,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+    include_archived: IncludeArchived = False,
 ) -> Page[AcademicYearOut]:
-    """Academic years, newest first (permission ``student.read_basic``)."""
-    return paginate(tenancy.list_academic_years(db), key=_year_key, cursor=cursor, limit=limit)
+    """Academic years, newest first; archived years only with ``include_archived=true``
+    (permission ``student.read_basic``)."""
+    years = tenancy.list_academic_years(db, include_archived=include_archived)
+    return paginate(years, key=_year_key, cursor=cursor, limit=limit)
 
 
 @router.get("/academic-years/{year_id}", response_model=AcademicYearOut)
@@ -155,6 +165,29 @@ def make_academic_year_current(
     return year
 
 
+@router.post("/academic-years/{year_id}/archive", response_model=AcademicYearOut)
+def archive_academic_year(
+    ctx: Manager, db: TenantDB, year_id: uuid.UUID, version: IfMatch, response: Response
+) -> AcademicYearOut:
+    """Archive a year: it is hidden from lists but kept for old records (permission
+    ``tenant.structure.manage``; ``If-Match``). The current year answers 409
+    ``academic_year_current``; a year with active enrolments 409 ``structure_in_use``."""
+    year = tenancy.archive_academic_year(db, year_id, archived=True, expected_version=version)
+    _with_etag(response, year.version)
+    return year
+
+
+@router.post("/academic-years/{year_id}/unarchive", response_model=AcademicYearOut)
+def unarchive_academic_year(
+    ctx: Manager, db: TenantDB, year_id: uuid.UUID, version: IfMatch, response: Response
+) -> AcademicYearOut:
+    """Bring an archived year back into the lists (permission ``tenant.structure.manage``;
+    ``If-Match``)."""
+    year = tenancy.archive_academic_year(db, year_id, archived=False, expected_version=version)
+    _with_etag(response, year.version)
+    return year
+
+
 # --- classes ----------------------------------------------------------------------------------
 
 
@@ -164,11 +197,16 @@ def _class_key(klass: ClassOut) -> str:
 
 @router.get("/classes", response_model=Page[ClassOut])
 def list_classes(
-    ctx: Reader, db: TenantDB, limit: Limit = 50, cursor: Cursor = None
+    ctx: Reader,
+    db: TenantDB,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+    include_archived: IncludeArchived = False,
 ) -> Page[ClassOut]:
-    """Classes in display order (permission ``student.read_basic``; scoped holders see only
-    their classes)."""
-    visible = scope.visible_classes(ctx, READ, tenancy.list_classes(db), tenancy.list_sections(db))
+    """Classes in display order; archived classes only with ``include_archived=true``
+    (permission ``student.read_basic``; scoped holders see only their classes)."""
+    classes = tenancy.list_classes(db, include_archived=include_archived)
+    visible = scope.visible_classes(ctx, READ, classes, tenancy.list_sections(db))
     return paginate(visible, key=_class_key, cursor=cursor, limit=limit)
 
 
@@ -218,6 +256,29 @@ def update_class(
     return klass
 
 
+@router.post("/classes/{class_id}/archive", response_model=ClassOut)
+def archive_class(
+    ctx: Manager, db: TenantDB, class_id: uuid.UUID, version: IfMatch, response: Response
+) -> ClassOut:
+    """Archive a class: hidden from lists, kept for old records (permission
+    ``tenant.structure.manage``; ``If-Match``). A class with active enrolments in any of its
+    sections answers 409 ``structure_in_use``."""
+    klass = tenancy.archive_class(db, class_id, archived=True, expected_version=version)
+    _with_etag(response, klass.version)
+    return klass
+
+
+@router.post("/classes/{class_id}/unarchive", response_model=ClassOut)
+def unarchive_class(
+    ctx: Manager, db: TenantDB, class_id: uuid.UUID, version: IfMatch, response: Response
+) -> ClassOut:
+    """Bring an archived class back into the lists (permission ``tenant.structure.manage``;
+    ``If-Match``)."""
+    klass = tenancy.archive_class(db, class_id, archived=False, expected_version=version)
+    _with_etag(response, klass.version)
+    return klass
+
+
 # --- sections ---------------------------------------------------------------------------------
 
 
@@ -230,10 +291,17 @@ def list_sections(
     cursor: Cursor = None,
     academic_year_id: uuid.UUID | None = None,
     class_id: uuid.UUID | None = None,
+    include_archived: IncludeArchived = False,
 ) -> Page[SectionOut]:
-    """Sections, optionally for one year and/or class (permission ``student.read_basic``;
-    class teachers see only their sections)."""
-    sections = tenancy.list_sections(db, academic_year_id=academic_year_id, class_id=class_id)
+    """Sections, optionally for one year and/or class; archived sections only with
+    ``include_archived=true`` (permission ``student.read_basic``; class teachers see only
+    their sections)."""
+    sections = tenancy.list_sections(
+        db,
+        academic_year_id=academic_year_id,
+        class_id=class_id,
+        include_archived=include_archived,
+    )
     order = {s.id: i for i, s in enumerate(sections)}
     visible = scope.visible_sections(ctx, READ, sections)
     return paginate(visible, key=lambda s: f"{order[s.id]:06d}", cursor=cursor, limit=limit)
@@ -252,7 +320,8 @@ def create_section(
     ctx: Manager, db: TenantDB, body: SectionCreate, idem: IdempotencyDep
 ) -> Response:
     """Add a section to a class for an academic year, optionally with its class teacher
-    (permission ``tenant.structure.manage``). Accepts ``Idempotency-Key``."""
+    (permission ``tenant.structure.manage``). An archived year or class answers 409
+    ``structure_archived``. Accepts ``Idempotency-Key``."""
     return idem.run(
         db,
         body,
@@ -274,5 +343,28 @@ def update_section(
     """Rename a section or assign/clear its class teacher (permission
     ``tenant.structure.manage``; ``If-Match``)."""
     section = tenancy.update_section(db, section_id, body, expected_version=version)
+    _with_etag(response, section.version)
+    return section
+
+
+@router.post("/sections/{section_id}/archive", response_model=SectionOut)
+def archive_section(
+    ctx: Manager, db: TenantDB, section_id: uuid.UUID, version: IfMatch, response: Response
+) -> SectionOut:
+    """Archive a section: hidden from lists, kept for old records (permission
+    ``tenant.structure.manage``; ``If-Match``). A section with active enrolments answers 409
+    ``structure_in_use``."""
+    section = tenancy.archive_section(db, section_id, archived=True, expected_version=version)
+    _with_etag(response, section.version)
+    return section
+
+
+@router.post("/sections/{section_id}/unarchive", response_model=SectionOut)
+def unarchive_section(
+    ctx: Manager, db: TenantDB, section_id: uuid.UUID, version: IfMatch, response: Response
+) -> SectionOut:
+    """Bring an archived section back into the lists (permission ``tenant.structure.manage``;
+    ``If-Match``)."""
+    section = tenancy.archive_section(db, section_id, archived=False, expected_version=version)
     _with_etag(response, section.version)
     return section

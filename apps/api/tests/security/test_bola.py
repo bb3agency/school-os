@@ -67,6 +67,12 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/academic-years/{year_id}"): {},
     ("PATCH", "/api/v1/classes/{class_id}"): {},
     ("PATCH", "/api/v1/sections/{section_id}"): {},
+    ("POST", "/api/v1/academic-years/{year_id}/archive"): None,
+    ("POST", "/api/v1/academic-years/{year_id}/unarchive"): None,
+    ("POST", "/api/v1/classes/{class_id}/archive"): None,
+    ("POST", "/api/v1/classes/{class_id}/unarchive"): None,
+    ("POST", "/api/v1/sections/{section_id}/archive"): None,
+    ("POST", "/api/v1/sections/{section_id}/unarchive"): None,
     ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): {"body": "Synthetic follow-up"},
     ("PATCH", "/api/v1/students/{student_id}"): {"status": "active"},
     ("POST", "/api/v1/students/{student_id}/values"): {

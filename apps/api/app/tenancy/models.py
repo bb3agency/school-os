@@ -1,4 +1,4 @@
-"""Tenancy tables in schema ``core`` (migration 0003_core_schema, docs/05 §4).
+"""Tenancy tables in schema ``core`` (migrations 0003_core_schema, 0023_api_gaps; docs/05 §4).
 
 ``sections.class_teacher_membership_id`` references ``core.memberships`` (identity module); that
 composite FK is enforced by the database only and not declared here, so this module never imports
@@ -85,6 +85,7 @@ class AcademicYear(Base):
     starts_on: Mapped[dt.date] = mapped_column(Date)
     ends_on: Mapped[dt.date] = mapped_column(Date)
     is_current: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    archived_at: Mapped[dt.datetime | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
@@ -107,6 +108,7 @@ class SchoolClass(Base):
     display_en: Mapped[str] = mapped_column(Text)
     display_te: Mapped[str] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer)
+    archived_at: Mapped[dt.datetime | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
@@ -135,6 +137,7 @@ class Section(Base):
     academic_year_id: Mapped[uuid.UUID]
     name: Mapped[str] = mapped_column(Text)
     class_teacher_membership_id: Mapped[uuid.UUID | None]
+    archived_at: Mapped[dt.datetime | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
