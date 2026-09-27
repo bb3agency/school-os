@@ -1,0 +1,1478 @@
+"""Imports public API: spreadsheet onboarding (US-401; FR-IMP-001..007; SEC-013, SEC-015,
+SEC-017; NFR-PERF-004). Other modules call only these functions.
+
+Flow (docs/04 §7.1)::
+
+    POST /imports          create_import()      batch "uploaded" + job + outbox event
+                                                import.parse_requested
+    worker imports.parse   run_parse()          read file (never evaluating formulas), find the
+                                                header, suggest a mapping (or reuse the school's
+                                                template for this header layout), then validate
+                                                when the admission number column is mapped
+    PUT  .../mapping       set_mapping()        the office corrects the mapping ("parsed")
+    POST .../validate      request_validation() worker imports.validate -> run_validate()
+    POST .../commit        request_commit()     worker imports.commit -> run_commit(): the file is
+                                                re-read and re-validated, then ONE transaction
+                                                creates students / records values through
+                                                students.service, audits, queues
+                                                ``import.committed`` and notifies the importer
+    POST .../revert        revert()             within 24 h, if nothing depends on the batch
+    beat imports.purge_raw_files                raw files deleted 90 days after commit
+
+Data minimisation: ``sis.import_rows.parsed`` never holds C3 values (only their keys); commit
+re-reads them from the SSE-KMS raw file and the student service encrypts them. A full Aadhaar
+number anywhere in a row is a row error and is never stored (the error names the column only).
+Workers act for the member who asked (their permissions and scope are re-resolved at job time).
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import re
+import uuid
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any, Final
+from zoneinfo import ZoneInfo
+
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session
+
+from app.audit import service as audit
+from app.authz.context import Scopes, UserContext
+from app.authz.http import Page, decode_cursor, encode_cursor
+from app.authz.resolver import build_snapshot
+from app.core.db import tenant_session
+from app.core.errors import Conflict, DomainError, NotFound, PreconditionFailed, ValidationFailed
+from app.core.ids import new_id
+from app.core.logging import get_context, get_logger
+from app.core.redaction import mask_aadhaar
+from app.documents import service as documents
+from app.identity import service as identity
+from app.imports import repository as repo
+from app.imports.config import import_config
+from app.imports.mapping import (
+    IGNORE,
+    header_signature,
+    mapping_from_template,
+    suggest,
+    template_payload,
+)
+from app.imports.models import ImportBatch, ImportMappingTemplate, ImportRow
+from app.imports.schemas import (
+    ColumnOut,
+    CommitIn,
+    ImportCreate,
+    ImportOut,
+    ImportRowOut,
+    ImportSummary,
+    Issue,
+    MappingIn,
+    TemplateCreate,
+    TemplateOut,
+)
+from app.imports.sheet import FileKind, Sheet, SheetError, read_sheet
+from app.imports.validation import (
+    AADHAAR_CODE,
+    ANCHOR_SOURCE,
+    AttributeSpec,
+    ExistingStudent,
+    RowResult,
+    SectionInfo,
+    ValidationContext,
+    ValidationResult,
+    admission_key,
+    allowed_targets,
+    is_full_aadhaar,
+    issue,
+    mapping_problems,
+    validate_sheet,
+)
+from app.imports.values import ClassInfo, ClassResolver, cell_text
+from app.notifications import service as notifications
+from app.ops import service as ops
+from app.students import crypto as student_crypto
+from app.students import service as students
+from app.students.schemas import StudentCreate, ValueIn
+from app.tenancy import service as tenancy
+
+log = get_logger(__name__)
+
+RUN: Final = "import.run"
+COMMIT: Final = "import.commit"
+CREATE_STUDENT: Final = "student.create"
+
+PARSE_EVENT: Final = "import.parse_requested"
+VALIDATE_EVENT: Final = "import.validate_requested"
+COMMIT_EVENT: Final = "import.commit_requested"
+COMMITTED_EVENT: Final = "import.committed"
+REVERTED_EVENT: Final = "import.reverted"
+PARSE_TASK: Final = "imports.parse"
+VALIDATE_TASK: Final = "imports.validate"
+COMMIT_TASK: Final = "imports.commit"
+PURGE_TASK: Final = "imports.purge_raw_files"
+ops.register_outbox_route(PARSE_EVENT, PARSE_TASK)
+ops.register_outbox_route(VALIDATE_EVENT, VALIDATE_TASK)
+ops.register_outbox_route(COMMIT_EVENT, COMMIT_TASK)
+
+IST: Final = ZoneInfo("Asia/Kolkata")
+MIME_KINDS: Final[dict[str, FileKind]] = {
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "text/csv": "csv",
+}
+_BATCH_IN_KEY: Final = re.compile(r"^t/[0-9a-f-]{36}/imports/([0-9a-f-]{36})/raw\.(?:xlsx|csv)$")
+VALUES_TABLE: Final = "sis.attribute_values"
+VALUE_COLUMN: Final = "value_ciphertext"
+EDITABLE: Final = ("parsed", "validated")
+
+
+# --- plumbing -------------------------------------------------------------------------------------
+
+
+@contextmanager
+def _db_errors() -> Iterator[None]:
+    try:
+        yield
+    except DBAPIError as exc:
+        mapped = repo.translate_db_error(exc)
+        if mapped is None:
+            raise
+        raise mapped from exc
+
+
+def _request_id() -> str | None:
+    value = get_context().get("request_id")
+    return value if isinstance(value, str) else None
+
+
+def _audit(
+    session: Session,
+    action: str,
+    batch_id: uuid.UUID,
+    summary: Mapping[str, Any],
+    *,
+    resource_type: str = "import_batch",
+) -> None:
+    audit.record(
+        session,
+        action=action,
+        resource_type=resource_type,
+        resource_id=batch_id,
+        summary=summary,
+        request_id=_request_id(),
+    )
+
+
+def _today() -> dt.date:
+    return dt.datetime.now(IST).date()
+
+
+def _uuid(value: str | None) -> uuid.UUID | None:
+    return uuid.UUID(value) if value else None
+
+
+def _not_found() -> NotFound:
+    return NotFound("Import not found")
+
+
+def _visible(
+    session: Session,
+    ctx: UserContext,
+    batch_id: uuid.UUID,
+    permission: str,
+    *,
+    lock: bool = False,
+) -> ImportBatch:
+    """The batch if the caller may reach it: school-wide holders see every batch of the school,
+    scoped holders only their own (404 otherwise, never 403)."""
+    batch = repo.get_batch(session, batch_id, lock=lock)
+    if batch is None:
+        raise _not_found()
+    if not ctx.scope_for(permission).school_wide and batch.created_by != ctx.user_id:
+        raise _not_found()
+    return batch
+
+
+def member_context(
+    tenant_id: uuid.UUID, user_id: uuid.UUID, membership_id: uuid.UUID
+) -> UserContext:
+    """The importer's CURRENT permissions and scopes, for work done on their behalf in a
+    worker (a revoked role stops a queued job). Opens its own short transaction."""
+    snap = build_snapshot(identity.membership_access(tenant_id, user_id, membership_id))
+    return UserContext(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        roles=snap.roles,
+        permissions=snap.permissions,
+        scopes=snap.scopes,
+        mfa=True,
+        auth_time=None,
+        scoped_permissions=snap.scoped_permissions,
+    )
+
+
+# --- output ---------------------------------------------------------------------------------------
+
+
+def _columns_out(batch: ImportBatch) -> list[ColumnOut]:
+    return [
+        ColumnOut(
+            index=int(c["index"]),
+            header=str(c.get("header", "")),
+            suggested=c.get("suggested"),
+            score=int(c.get("score", 0)),
+            target=batch.mapping.get(str(c["index"])),
+        )
+        for c in batch.columns
+    ]
+
+
+def _out(session: Session, batch: ImportBatch) -> ImportOut:
+    stats = {k: int(v) for k, v in (batch.stats or {}).items() if isinstance(v, int)}
+    now = repo.now(session)
+    return ImportOut(
+        id=batch.id,
+        kind=batch.kind,
+        source=batch.source,
+        status=batch.status,
+        document_id=batch.document_id,
+        file_kind=batch.file_kind,
+        header_row=batch.header_row,
+        columns=_columns_out(batch),
+        mapping_template_id=batch.mapping_template_id,
+        stats=stats,
+        row_count=batch.row_count,
+        error_count=batch.error_count,
+        error_code=batch.error_code,
+        job_id=batch.job_id,
+        created_by=batch.created_by,
+        created_at=batch.created_at,
+        updated_at=batch.updated_at,
+        committed_at=batch.committed_at,
+        revert_deadline=batch.revert_deadline,
+        reverted_at=batch.reverted_at,
+        raw_file_deleted_at=batch.raw_file_deleted_at,
+        version=batch.version,
+        can_commit=batch.status == "validated" and stats.get("valid", 0) > 0,
+        can_revert=batch.status == "committed"
+        and batch.revert_deadline is not None
+        and batch.revert_deadline > now,
+    )
+
+
+def _summary(batch: ImportBatch) -> ImportSummary:
+    return ImportSummary(
+        id=batch.id,
+        source=batch.source,
+        status=batch.status,
+        row_count=batch.row_count,
+        error_count=batch.error_count,
+        created_by=batch.created_by,
+        created_at=batch.created_at,
+        committed_at=batch.committed_at,
+        reverted_at=batch.reverted_at,
+    )
+
+
+def _row_out(row: ImportRow) -> ImportRowOut:
+    parsed = row.parsed or {}
+    return ImportRowOut(
+        row_no=row.row_no,
+        status=row.status,
+        action=row.action,
+        student_id=row.student_id,
+        admission_no=parsed.get("admission_no"),
+        values=dict(parsed.get("values") or {}),
+        sensitive=list(parsed.get("sensitive") or []),
+        section_id=_uuid(parsed.get("section_id")),
+        class_section=parsed.get("class_label"),
+        roll_no=parsed.get("roll_no"),
+        errors=[Issue(**e) for e in row.errors],
+        warnings=[Issue(**w) for w in row.warnings],
+    )
+
+
+def _template_out(t: ImportMappingTemplate) -> TemplateOut:
+    return TemplateOut(
+        id=t.id,
+        name=t.name,
+        source=t.source,
+        headers=list(t.headers),
+        mapping=dict(t.mapping),
+        created_by=t.created_by,
+        created_at=t.created_at,
+        last_used_at=t.last_used_at,
+        version=t.version,
+    )
+
+
+# --- catalog and structure ------------------------------------------------------------------------
+
+
+def _specs(session: Session) -> dict[str, AttributeSpec]:
+    return {
+        a.key: AttributeSpec(
+            key=a.key,
+            data_type=a.data_type,
+            classification=a.classification,
+            is_identity=a.is_identity,
+            allowed_sources=tuple(a.allowed_sources) if a.allowed_sources else None,
+            allowed_values=tuple(a.allowed_values) if a.allowed_values else None,
+        )
+        for a in students.attribute_catalog(session)
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class _Structure:
+    year_id: uuid.UUID | None
+    sections: list[SectionInfo]
+    resolver: ClassResolver
+
+
+def _structure(session: Session) -> _Structure:
+    cfg = import_config()
+    year = tenancy.get_current_academic_year(session)
+    classes = tenancy.list_classes(session)
+    codes = {c.id: c.code for c in classes}
+    sections = tenancy.list_sections(session, academic_year_id=year.id) if year else []
+    return _Structure(
+        year_id=year.id if year else None,
+        sections=[
+            SectionInfo(
+                id=str(s.id),
+                class_id=str(s.class_id),
+                name=s.name,
+                label=f"{codes.get(s.class_id, '?')}-{s.name}",
+            )
+            for s in sections
+        ],
+        resolver=ClassResolver(
+            [ClassInfo(str(c.id), c.code, c.display_en, c.display_te) for c in classes],
+            cfg.class_aliases,
+            cfg.class_noise_words,
+        ),
+    )
+
+
+def _sheet_admission_keys(sheet: Sheet, mapping: Mapping[str, str]) -> set[str]:
+    index = next((int(k) for k, v in mapping.items() if v == "admission_no"), None)
+    if index is None:
+        return set()
+    keys: set[str] = set()
+    for row in sheet.rows:
+        text = cell_text(row.cell(index).value)
+        if text:
+            keys.add(admission_key(text))
+    return keys
+
+
+def _existing_students(
+    session: Session,
+    ctx: UserContext,
+    wanted: set[str],
+    specs: Mapping[str, AttributeSpec],
+    structure: _Structure,
+    *,
+    need_sections: bool,
+) -> dict[str, ExistingStudent]:
+    """Students (in the importer's reach) whose admission numbers appear in the file."""
+    if not wanted:
+        return {}
+    ids = students.list_students_in_scope(session, ctx)
+    canonical = students.canonical_values(session, ids, ["admission_no"])
+    matched: dict[str, uuid.UUID] = {}
+    for sid, values in canonical.items():
+        adm = values.get("admission_no")
+        if adm is not None and adm.value and admission_key(adm.value) in wanted:
+            matched[admission_key(adm.value)] = sid
+    if not matched:
+        return {}
+    identity_keys = [k for k, s in specs.items() if s.is_identity]
+    recorded = students.source_values(session, list(matched.values()), identity_keys)
+    section_of: dict[uuid.UUID, str] = {}
+    if need_sections and structure.year_id is not None:
+        wanted_ids = set(matched.values())
+        for section in structure.sections:
+            for sid in students.list_students_in_scope(
+                session, ctx, section_ids=[uuid.UUID(section.id)]
+            ):
+                if sid in wanted_ids:
+                    section_of[sid] = section.id
+    out: dict[str, ExistingStudent] = {}
+    for key, sid in matched.items():
+        anchors = {
+            attr: v[ANCHOR_SOURCE].value
+            for attr, v in recorded.get(sid, {}).items()
+            if ANCHOR_SOURCE in v and v[ANCHOR_SOURCE].value is not None
+        }
+        out[key] = ExistingStudent(
+            id=str(sid),
+            section_id=section_of.get(sid),
+            anchor_values={k: str(v) for k, v in anchors.items()},
+        )
+    return out
+
+
+def _validation_context(
+    session: Session, ctx: UserContext, batch: ImportBatch, sheet: Sheet, permission: str
+) -> ValidationContext:
+    specs = _specs(session)
+    structure = _structure(session)
+    grant = ctx.scope_for(permission)
+    allowed: frozenset[str] | None = None
+    if not grant.school_wide:
+        allowed = frozenset(
+            s.id
+            for s in structure.sections
+            if uuid.UUID(s.id) in grant.section_ids or uuid.UUID(s.class_id) in grant.class_ids
+        )
+    targets = set(batch.mapping.values())
+    return ValidationContext(
+        source=batch.source,
+        specs=specs,
+        classes=structure.resolver,
+        sections=structure.sections,
+        has_current_year=structure.year_id is not None,
+        allowed_sections=allowed,
+        can_create=ctx.has(CREATE_STUDENT),
+        existing=_existing_students(
+            session,
+            ctx,
+            _sheet_admission_keys(sheet, batch.mapping),
+            specs,
+            structure,
+            need_sections=bool({"class", "section", "class_section"} & targets)
+            or allowed is not None,
+        ),
+        config=import_config(),
+        today=_today(),
+    )
+
+
+def _row_values(result: RowResult, specs: Mapping[str, AttributeSpec]) -> dict[str, Any]:
+    return {
+        "id": new_id(),
+        "row_no": result.row_no,
+        "parsed": result.parsed(specs),
+        "errors": result.errors,
+        "warnings": result.warnings,
+        "status": result.status,
+        "action": result.action,
+        "student_id": _uuid(result.student_id),
+        "created_student": False,
+        "student_version": None,
+    }
+
+
+def _store_validation(
+    session: Session, batch: ImportBatch, result: ValidationResult, specs: Mapping[str, Any]
+) -> ImportBatch:
+    tenant_id = repo.current_tenant_id(session)
+    repo.replace_rows(session, tenant_id, batch.id, [_row_values(r, specs) for r in result.rows])
+    updated = repo.update_batch(
+        session,
+        batch.id,
+        status="validated",
+        stats=result.stats,
+        row_count=len(result.rows),
+        error_count=result.error_rows,
+        error_code=None,
+    )
+    if updated is None:  # pragma: no cover - row locked by the caller
+        raise _not_found()
+    return updated
+
+
+# --- file -----------------------------------------------------------------------------------------
+
+
+def _load_sheet(tenant_id: uuid.UUID, user_id: uuid.UUID, batch_id: uuid.UUID) -> Sheet:
+    """Read and parse the batch's raw file (SHA-256 checked); ``SheetError`` for any problem."""
+    with tenant_session(tenant_id, user_id) as s:
+        batch = repo.get_batch(s, batch_id)
+        if batch is None or batch.document_id is None:
+            raise SheetError("file_missing")
+        try:
+            obj = documents.document_object(s, batch.document_id)
+        except NotFound as exc:
+            raise SheetError("file_missing") from exc
+        except Conflict as exc:
+            raise SheetError(exc.code) from exc
+        kind = MIME_KINDS.get(obj.mime_type)
+        if kind is None:
+            raise SheetError("unsupported_file_type")
+        try:
+            data = documents.read_document_object(s, obj)
+        except (Conflict, NotFound) as exc:
+            raise SheetError(
+                "file_changed" if isinstance(exc, Conflict) else "file_missing"
+            ) from exc
+    return read_sheet(data, kind, import_config().limits)
+
+
+# --- create, read, mapping (API) ------------------------------------------------------------------
+
+
+def _batch_id_for(session: Session, object_key: str) -> uuid.UUID:
+    """Reuse the storage batch id of the upload (docs/04 §8.2 ``imports/<batch_id>/raw``) when it
+    is free, so the batch and its raw file share one id."""
+    match = _BATCH_IN_KEY.match(object_key)
+    if match is not None:
+        candidate = uuid.UUID(match.group(1))
+        if not repo.batch_id_taken(session, candidate):
+            return candidate
+    return new_id()
+
+
+def create_import(session: Session, ctx: UserContext, data: ImportCreate) -> ImportOut:
+    """Start importing an uploaded, scanned ``import_file`` document (``import.run``; 202).
+
+    The document must be visible to the caller (404 otherwise), XLSX or CSV (415) and at most
+    10 MB (413, FR-IMP-001). Parsing runs in a worker. Audit: ``import.created``.
+    """
+    if not documents.is_visible(session, ctx, data.document_id):
+        raise NotFound("Document not found")
+    try:
+        obj = documents.document_object(session, data.document_id)
+    except Conflict as exc:
+        raise Conflict(
+            "The file is still being checked for viruses. Try again in a minute.",
+            code="document_not_ready",
+        ) from exc
+    if obj.purpose != "import_file":
+        raise ValidationFailed([issue("document_id", "not_an_import_file")])
+    kind = MIME_KINDS.get(obj.mime_type)
+    if kind is None:
+        raise documents.UnsupportedFileType("Import an XLSX or CSV file.")
+    if obj.size_bytes > import_config().limits.max_file_bytes:
+        raise documents.FileTooLarge("Import files can be at most 10 MB.")
+    tenant_id = repo.current_tenant_id(session)
+    batch_id = _batch_id_for(session, obj.object_key)
+    job = ops.start_job(
+        session,
+        task_name=PARSE_TASK,
+        idempotency_key=f"{PARSE_TASK}:{batch_id}",
+        created_by=ctx.user_id,
+    )
+    with _db_errors():
+        batch = repo.insert_batch(
+            session,
+            id=batch_id,
+            tenant_id=tenant_id,
+            kind=data.kind,
+            source=data.source,
+            status="uploaded",
+            document_id=data.document_id,
+            file_kind=kind,
+            job_id=job.id,
+            created_by=ctx.user_id,
+        )
+    _audit(
+        session,
+        "import.created",
+        batch.id,
+        {
+            "document_id": data.document_id,
+            "source": data.source,
+            "kind": data.kind,
+            "file_kind": kind,
+        },
+    )
+    ops.enqueue_event(
+        session,
+        PARSE_EVENT,
+        {
+            "batch_id": batch.id,
+            "job_id": job.id,
+            "user_id": ctx.user_id,
+            "membership_id": ctx.membership_id,
+        },
+    )
+    log.info("imports.batch.created", resource_type="import_batch", resource_id=batch.id)
+    return _out(session, batch)
+
+
+def list_imports(
+    session: Session,
+    ctx: UserContext,
+    *,
+    limit: int,
+    cursor: str | None = None,
+    status: str | None = None,
+) -> Page[ImportSummary]:
+    """The school's imports, newest first (scoped holders: their own)."""
+    before: uuid.UUID | None = None
+    after = decode_cursor(cursor)
+    if after is not None:
+        try:
+            before = uuid.UUID(str(after.get("k")))
+        except ValueError as exc:
+            raise ValidationFailed([issue("cursor", "invalid", "errors.invalid_cursor")]) from exc
+    own = None if ctx.scope_for(RUN).school_wide else ctx.user_id
+    rows = repo.list_batches(
+        session, limit=limit + 1, before_id=before, created_by=own, status=status
+    )
+    page = rows[:limit]
+    more = len(rows) > limit
+    return Page[ImportSummary](
+        data=[_summary(b) for b in page],
+        next_cursor=encode_cursor({"k": str(page[-1].id)}) if more and page else None,
+    )
+
+
+def get_import(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut:
+    return _out(session, _visible(session, ctx, batch_id, RUN))
+
+
+def list_rows(
+    session: Session,
+    ctx: UserContext,
+    batch_id: uuid.UUID,
+    *,
+    status: str | None,
+    limit: int,
+    cursor: str | None = None,
+) -> Page[ImportRowOut]:
+    """Rows of a batch in file order (``status=error`` for the rows to fix; ``warning``)."""
+    batch = _visible(session, ctx, batch_id, RUN)
+    after_row: int | None = None
+    decoded = decode_cursor(cursor)
+    if decoded is not None:
+        value = decoded.get("r")
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise ValidationFailed([issue("cursor", "invalid", "errors.invalid_cursor")])
+        after_row = value
+    rows = repo.list_rows(
+        session,
+        batch.id,
+        status=None if status in (None, "warning") else status,
+        with_warnings=status == "warning",
+        after_row_no=after_row,
+        limit=limit + 1,
+    )
+    page = rows[:limit]
+    more = len(rows) > limit
+    return Page[ImportRowOut](
+        data=[_row_out(r) for r in page],
+        next_cursor=encode_cursor({"r": page[-1].row_no}) if more and page else None,
+    )
+
+
+def set_mapping(
+    session: Session,
+    ctx: UserContext,
+    batch_id: uuid.UUID,
+    data: MappingIn,
+    *,
+    expected_version: int,
+) -> ImportOut:
+    """Replace the column mapping (``If-Match``). Previous validation results are cleared; the
+    batch goes back to ``parsed`` until it is validated again. Audit: ``import.mapping_changed``."""
+    batch = _visible(session, ctx, batch_id, RUN, lock=True)
+    if batch.version != expected_version:
+        raise PreconditionFailed("The import was changed meanwhile. Reload and try again.")
+    if batch.status not in EDITABLE:
+        raise Conflict("This import can no longer be changed.", code="import_not_editable")
+    mapping: dict[str, str] = {}
+    problems: list[dict[str, str]] = []
+    for i, column in enumerate(data.columns):
+        if str(column.index) in mapping:
+            problems.append(issue(f"columns.{i}.index", "duplicate_column"))
+        if column.target != IGNORE:
+            mapping[str(column.index)] = column.target
+    problems += mapping_problems(mapping, len(batch.columns), _specs(session), batch.source)
+    if problems:
+        raise ValidationFailed(problems)
+    repo.replace_rows(session, batch.tenant_id, batch.id, [])
+    updated = repo.update_batch(
+        session,
+        batch.id,
+        mapping=mapping,
+        mapping_template_id=None,
+        status="parsed",
+        error_count=0,
+        row_count=0,
+        stats={},
+        error_code=None,
+    )
+    if updated is None:  # pragma: no cover - locked above
+        raise _not_found()
+    _audit(
+        session,
+        "import.mapping_changed",
+        batch.id,
+        {"columns": len(mapping), "targets": sorted(set(mapping.values()))},
+    )
+    return _out(session, updated)
+
+
+def _start_job(session: Session, ctx: UserContext, task: str, batch_id: uuid.UUID) -> ops.JobRun:
+    return ops.start_job(
+        session,
+        task_name=task,
+        idempotency_key=f"{task}:{batch_id}:{new_id()}",
+        created_by=ctx.user_id,
+    )
+
+
+def request_validation(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut:
+    """Validate every row in a worker (202). Needs the admission number column mapped."""
+    batch = _visible(session, ctx, batch_id, RUN, lock=True)
+    if batch.status not in EDITABLE:
+        raise Conflict("This import is not ready to be checked.", code="import_not_editable")
+    if "admission_no" not in batch.mapping.values():
+        raise ValidationFailed([issue("columns", "admission_no_not_mapped")])
+    job = _start_job(session, ctx, VALIDATE_TASK, batch.id)
+    updated = repo.update_batch(
+        session, batch.id, status="validating", job_id=job.id, error_code=None
+    )
+    if updated is None:  # pragma: no cover
+        raise _not_found()
+    ops.enqueue_event(
+        session,
+        VALIDATE_EVENT,
+        {
+            "batch_id": batch.id,
+            "job_id": job.id,
+            "user_id": ctx.user_id,
+            "membership_id": ctx.membership_id,
+        },
+    )
+    return _out(session, updated)
+
+
+def request_commit(
+    session: Session, ctx: UserContext, batch_id: uuid.UUID, data: CommitIn
+) -> ImportOut:
+    """Commit a validated batch in a worker (``import.commit``; 202). All-or-nothing: with
+    errors the commit is refused unless ``skip_error_rows`` (FR-IMP-004)."""
+    batch = _visible(session, ctx, batch_id, COMMIT, lock=True)
+    if batch.status != "validated":
+        raise Conflict("Check the file before adding it.", code="import_not_validated")
+    valid = int((batch.stats or {}).get("valid", 0))
+    if valid == 0:
+        raise Conflict("No row is ready to add.", code="nothing_to_commit")
+    if batch.error_count and not data.skip_error_rows:
+        raise Conflict(
+            "Some rows have errors. Fix them in the file, or add only the valid rows.",
+            code="import_has_errors",
+        )
+    job = _start_job(session, ctx, COMMIT_TASK, batch.id)
+    updated = repo.update_batch(
+        session, batch.id, status="committing", job_id=job.id, error_code=None
+    )
+    if updated is None:  # pragma: no cover
+        raise _not_found()
+    _audit(
+        session,
+        "import.commit_requested",
+        batch.id,
+        {
+            "valid_rows": valid,
+            "error_rows": batch.error_count,
+            "skip_error_rows": data.skip_error_rows,
+        },
+    )
+    ops.enqueue_event(
+        session,
+        COMMIT_EVENT,
+        {
+            "batch_id": batch.id,
+            "job_id": job.id,
+            "user_id": ctx.user_id,
+            "membership_id": ctx.membership_id,
+            "skip_error_rows": data.skip_error_rows,
+        },
+    )
+    return _out(session, updated)
+
+
+# --- templates ------------------------------------------------------------------------------------
+
+
+def list_templates(session: Session, ctx: UserContext) -> list[TemplateOut]:
+    return [_template_out(t) for t in repo.list_templates(session)]
+
+
+def create_template(session: Session, ctx: UserContext, data: TemplateCreate) -> TemplateOut:
+    """Save an import's mapping for files with the same headers (FR-IMP-002). Audit:
+    ``import.template_created``."""
+    if is_full_aadhaar(data.name):
+        raise ValidationFailed([issue("name", AADHAAR_CODE, "errors.aadhaar_last4_only")])
+    batch = _visible(session, ctx, data.import_id, RUN)
+    if not batch.columns or not batch.mapping:
+        raise Conflict("This import has no column mapping yet.", code="mapping_missing")
+    headers = [str(c.get("header", "")) for c in batch.columns]
+    with _db_errors():
+        template = repo.insert_template(
+            session,
+            id=new_id(),
+            tenant_id=batch.tenant_id,
+            name=data.name,
+            source=batch.source,
+            header_signature=header_signature(headers),
+            headers=headers,
+            mapping=template_payload(headers, batch.mapping),
+            created_by=ctx.user_id,
+        )
+    _audit(
+        session,
+        "import.template_created",
+        template.id,
+        {"import_id": batch.id, "columns": len(template.mapping)},
+        resource_type="import_template",
+    )
+    return _template_out(template)
+
+
+# --- worker: parse and validate -------------------------------------------------------------------
+
+
+def _columns(sheet: Sheet, suggestions: Sequence[Any]) -> list[dict[str, Any]]:
+    out = []
+    for i, header in enumerate(sheet.headers):
+        hint = suggestions[i] if i < len(suggestions) else None
+        out.append(
+            {
+                "index": i,
+                # Headers are labels, but a mis-detected header row could be data: mask Aadhaar.
+                "header": mask_aadhaar(header)[:100],
+                "suggested": hint.target if hint is not None else None,
+                "score": hint.score if hint is not None else 0,
+            }
+        )
+    return out
+
+
+def _fail(
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    job_id: uuid.UUID | None,
+    code: str,
+    *,
+    status: str,
+) -> None:
+    with tenant_session(tenant_id, user_id) as s:
+        repo.update_batch(s, batch_id, status=status, error_code=code)
+        if job_id is not None:
+            ops.fail_job(s, job_id, code)
+    log.warning(
+        "imports.job.failed", resource_type="import_batch", resource_id=batch_id, error_code=code
+    )
+
+
+def abandon(
+    tenant_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    job_id: uuid.UUID | None,
+    user_id: uuid.UUID,
+    code: str,
+    *,
+    status: str,
+) -> None:
+    """Worker gave up retrying: record the reason on the batch and the job."""
+    _fail(tenant_id, user_id, batch_id, job_id, code, status=status)
+
+
+def _notify_validated(
+    session: Session, batch: ImportBatch, membership_id: uuid.UUID, job_id: uuid.UUID | None
+) -> None:
+    notifications.notify(
+        session,
+        tenant_id=batch.tenant_id,
+        recipients=[membership_id],
+        template_key="import.validated",
+        params={
+            "import_id": str(batch.id),
+            "valid_rows": int(batch.stats.get("valid", 0)),
+            "error_rows": batch.error_count,
+        },
+        resource_id=batch.id,
+        dedupe_key=f"import.validated:{batch.id}:{job_id}",
+    )
+
+
+def _claim(
+    tenant_id: uuid.UUID, user_id: uuid.UUID, batch_id: uuid.UUID, statuses: Sequence[str], to: str
+) -> bool:
+    with tenant_session(tenant_id, user_id) as s:
+        batch = repo.get_batch(s, batch_id, lock=True)
+        if batch is None or batch.status not in statuses:
+            return False
+        if batch.status != to:
+            repo.update_batch(s, batch_id, status=to)
+        return True
+
+
+def run_parse(
+    tenant_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    *,
+    job_id: uuid.UUID | None,
+    user_id: uuid.UUID,
+    membership_id: uuid.UUID,
+) -> str:
+    """Worker: parse the file, suggest (or reuse) a mapping and validate when possible."""
+    if not _claim(tenant_id, user_id, batch_id, ("uploaded", "parsing"), "parsing"):
+        return "skipped"
+    try:
+        sheet = _load_sheet(tenant_id, user_id, batch_id)
+    except SheetError as exc:
+        _fail(tenant_id, user_id, batch_id, job_id, exc.code, status="failed")
+        return "failed"
+    ctx = member_context(tenant_id, user_id, membership_id)
+    cfg = import_config()
+    with tenant_session(tenant_id, user_id) as s:
+        batch = repo.get_batch(s, batch_id, lock=True)
+        if batch is None or batch.status != "parsing":
+            return "skipped"
+        specs = _specs(s)
+        targets = allowed_targets(specs, batch.source)
+        template = repo.find_template(s, header_signature(sheet.headers), batch.source)
+        suggestions = suggest(
+            sheet.headers, cfg.synonyms, allowed_targets=targets, threshold=cfg.suggest_threshold
+        )
+        if template is not None:
+            mapping = mapping_from_template(sheet.headers, template.mapping, targets)
+            repo.touch_template(s, template.id)
+        else:
+            mapping = {str(h.index): h.target for h in suggestions if h.target is not None}
+        batch = repo.update_batch(
+            s,
+            batch.id,
+            status="parsed",
+            header_row=sheet.header_row,
+            columns=_columns(sheet, suggestions),
+            mapping=mapping,
+            mapping_template_id=template.id if template is not None else None,
+            row_count=len(sheet.rows),
+            stats={"rows": len(sheet.rows), "formula_cells": sheet.formula_cells},
+            error_code=None,
+        )
+        assert batch is not None  # noqa: S101 - locked above
+        _audit(
+            s,
+            "import.parsed",
+            batch.id,
+            {
+                "rows": len(sheet.rows),
+                "columns": len(sheet.headers),
+                "mapped_columns": len(mapping),
+                "template_id": template.id if template is not None else None,
+                "formula_cells": sheet.formula_cells,
+            },
+        )
+        validated = False
+        if "admission_no" in mapping.values() and ctx.has(RUN):
+            result = validate_sheet(sheet, mapping, _validation_context(s, ctx, batch, sheet, RUN))
+            batch = _store_validation(s, batch, result, specs)
+            _notify_validated(s, batch, membership_id, job_id)
+            validated = True
+        if job_id is not None:
+            ops.finish_job(s, job_id, {"rows": len(sheet.rows), "validated": validated})
+    log.info(
+        "imports.parse.done",
+        resource_type="import_batch",
+        resource_id=batch_id,
+        count=len(sheet.rows),
+    )
+    return "validated" if validated else "parsed"
+
+
+def run_validate(
+    tenant_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    *,
+    job_id: uuid.UUID | None,
+    user_id: uuid.UUID,
+    membership_id: uuid.UUID,
+) -> str:
+    """Worker: validate every row with the current mapping (FR-IMP-003, NFR-PERF-004)."""
+    with tenant_session(tenant_id, user_id) as s:
+        batch = repo.get_batch(s, batch_id)
+        if batch is None or batch.status != "validating":
+            return "skipped"
+    ctx = member_context(tenant_id, user_id, membership_id)
+    if not ctx.has(RUN):
+        _fail(tenant_id, user_id, batch_id, job_id, "permission_revoked", status="parsed")
+        return "failed"
+    try:
+        sheet = _load_sheet(tenant_id, user_id, batch_id)
+    except SheetError as exc:
+        _fail(tenant_id, user_id, batch_id, job_id, exc.code, status="failed")
+        return "failed"
+    with tenant_session(tenant_id, user_id) as s:
+        batch = repo.get_batch(s, batch_id, lock=True)
+        if batch is None or batch.status != "validating":
+            return "skipped"
+        specs = _specs(s)
+        result = validate_sheet(
+            sheet, batch.mapping, _validation_context(s, ctx, batch, sheet, RUN)
+        )
+        batch = _store_validation(s, batch, result, specs)
+        _audit(
+            s,
+            "import.validated",
+            batch.id,
+            {
+                "rows": len(result.rows),
+                "valid_rows": result.stats["valid"],
+                "error_rows": result.error_rows,
+            },
+        )
+        _notify_validated(s, batch, membership_id, job_id)
+        if job_id is not None:
+            ops.finish_job(s, job_id, {"rows": len(result.rows), "errors": result.error_rows})
+    log.info(
+        "imports.validate.done",
+        resource_type="import_batch",
+        resource_id=batch_id,
+        count=len(result.rows),
+    )
+    return "validated"
+
+
+# --- worker: commit -------------------------------------------------------------------------------
+
+
+class _CommitAborted(Exception):
+    """Commit rolled back; ``result`` (with any new row error) is stored for the office."""
+
+    def __init__(self, code: str, result: ValidationResult) -> None:
+        super().__init__(code)
+        self.code = code
+        self.result = result
+
+
+def _row_failure(exc: DomainError) -> dict[str, str]:
+    if isinstance(exc, ValidationFailed) and exc.errors:
+        first = exc.errors[0]
+        return issue(str(first.get("field", "row")), str(first.get("code", exc.code)))
+    return issue("row", exc.code)
+
+
+def _apply_row(
+    session: Session, ctx: UserContext, batch: ImportBatch, row: RowResult
+) -> tuple[uuid.UUID, bool, int]:
+    """Write one valid row through students.service; (student id, created, student version)."""
+    if row.action == "create":
+        created = students.create_student(
+            session,
+            ctx,
+            StudentCreate(
+                values=[
+                    ValueIn(attribute_key=k, source=batch.source, value=v)
+                    for k, v in row.values.items()
+                ],
+                section_id=_uuid(row.section_id),
+                roll_no=row.roll_no,
+            ),
+        )
+        return created.id, True, created.version
+    student_id = uuid.UUID(str(row.student_id))
+    version = 0
+    for key, value in row.values.items():
+        recorded = students.record_value(
+            session, ctx, student_id, key, batch.source, value, import_batch_id=batch.id
+        )
+        version = recorded.student_version
+    return student_id, False, version
+
+
+def _commit(
+    session: Session,
+    ctx: UserContext,
+    batch: ImportBatch,
+    sheet: Sheet,
+    *,
+    membership_id: uuid.UUID,
+    job_id: uuid.UUID | None,
+    skip_error_rows: bool,
+) -> dict[str, int]:
+    cfg = import_config()
+    specs = _specs(session)
+    result = validate_sheet(
+        sheet, batch.mapping, _validation_context(session, ctx, batch, sheet, COMMIT)
+    )
+    valid_rows = [r for r in result.rows if r.status == "valid"]
+    if not valid_rows:
+        raise _CommitAborted("nothing_to_commit", result)
+    if result.error_rows and not skip_error_rows:
+        raise _CommitAborted("revalidation_errors", result)
+    applied: dict[int, tuple[uuid.UUID, bool, int]] = {}
+    for row in valid_rows:
+        try:
+            applied[row.row_no] = _apply_row(session, ctx, batch, row)
+        except DomainError as exc:
+            row.errors.append(_row_failure(exc))
+            row.status = "error"
+            raise _CommitAborted("commit_row_failed", result) from exc
+    rows: list[dict[str, Any]] = []
+    for r in result.rows:
+        values = _row_values(r, specs)
+        if r.row_no in applied:
+            student_id, created, version = applied[r.row_no]
+            values.update(
+                status="committed",
+                student_id=student_id,
+                created_student=created,
+                student_version=version,
+            )
+        else:
+            values["status"] = "skipped"
+        rows.append(values)
+    repo.replace_rows(session, batch.tenant_id, batch.id, rows)
+    created_count = sum(1 for _, c, _ in applied.values() if c)
+    student_ids = {sid for sid, _, _ in applied.values()}
+    stats = {
+        **result.stats,
+        "committed": len(applied),
+        "skipped": len(result.rows) - len(applied),
+        "created": created_count,
+        "updated": len(applied) - created_count,
+    }
+    now = repo.now(session)
+    updated = repo.update_batch(
+        session,
+        batch.id,
+        status="committed",
+        stats=stats,
+        row_count=len(result.rows),
+        error_count=result.error_rows,
+        error_code=None,
+        committed_at=now,
+        committed_by=ctx.user_id,
+        revert_deadline=now + dt.timedelta(hours=cfg.revert_window_hours),
+    )
+    assert updated is not None  # noqa: S101 - locked by the caller
+    _audit(
+        session,
+        "import.committed",
+        batch.id,
+        {
+            "source": batch.source,
+            "rows": len(applied),
+            "students_created": created_count,
+            "students_updated": len(applied) - created_count,
+            "rows_skipped": len(result.rows) - len(applied),
+        },
+    )
+    ops.enqueue_event(
+        session, COMMITTED_EVENT, {"batch_id": batch.id, "student_ids_count": len(student_ids)}
+    )
+    notifications.notify(
+        session,
+        tenant_id=batch.tenant_id,
+        recipients=[membership_id],
+        template_key="import.committed",
+        params={"import_id": str(batch.id), "rows": len(applied)},
+        resource_id=batch.id,
+        dedupe_key=f"import.committed:{batch.id}",
+    )
+    if job_id is not None:
+        ops.finish_job(session, job_id, {"rows": len(applied), "created": created_count})
+    return stats
+
+
+def _store_aborted(
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    job_id: uuid.UUID | None,
+    aborted: _CommitAborted,
+) -> None:
+    with tenant_session(tenant_id, user_id) as s:
+        batch = repo.get_batch(s, batch_id, lock=True)
+        if batch is None or batch.status != "committing":
+            return
+        for row in aborted.result.rows:
+            row.status = "error" if row.errors else "valid"
+        stats = dict(aborted.result.stats)
+        stats["valid"] = sum(1 for r in aborted.result.rows if r.status == "valid")
+        stats["errors"] = sum(1 for r in aborted.result.rows if r.status == "error")
+        fixed = ValidationResult(aborted.result.rows, stats)
+        batch = _store_validation(s, batch, fixed, _specs(s))
+        repo.update_batch(s, batch.id, error_code=aborted.code)
+        if job_id is not None:
+            ops.fail_job(s, job_id, aborted.code)
+    log.warning(
+        "imports.commit.aborted",
+        resource_type="import_batch",
+        resource_id=batch_id,
+        error_code=aborted.code,
+    )
+
+
+def run_commit(  # noqa: PLR0911 - one outcome code per exit path
+    tenant_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    *,
+    job_id: uuid.UUID | None,
+    user_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    skip_error_rows: bool = False,
+) -> str:
+    """Worker: re-read, re-validate and commit the batch in ONE transaction (FR-IMP-004).
+
+    Any failure rolls everything back; the batch returns to ``validated`` with the reason
+    (``error_code``) and, when a row was refused, that row's error.
+    """
+    with tenant_session(tenant_id, user_id) as s:
+        batch = repo.get_batch(s, batch_id)
+        if batch is None or batch.status != "committing":
+            return "skipped"
+    ctx = member_context(tenant_id, user_id, membership_id)
+    if not ctx.has(COMMIT):
+        _fail(tenant_id, user_id, batch_id, job_id, "permission_revoked", status="validated")
+        return "failed"
+    try:
+        sheet = _load_sheet(tenant_id, user_id, batch_id)
+    except SheetError as exc:
+        _fail(tenant_id, user_id, batch_id, job_id, exc.code, status="validated")
+        return "failed"
+    try:
+        with tenant_session(tenant_id, user_id) as s:
+            batch = repo.get_batch(s, batch_id, lock=True)
+            if batch is None or batch.status != "committing":
+                return "skipped"
+            stats = _commit(
+                s,
+                ctx,
+                batch,
+                sheet,
+                membership_id=membership_id,
+                job_id=job_id,
+                skip_error_rows=skip_error_rows,
+            )
+    except _CommitAborted as aborted:
+        _store_aborted(tenant_id, user_id, batch_id, job_id, aborted)
+        return "aborted"
+    except Exception as exc:
+        log.error(
+            "imports.commit.failed",
+            resource_type="import_batch",
+            resource_id=batch_id,
+            error_type=type(exc).__name__,
+        )
+        _fail(tenant_id, user_id, batch_id, job_id, "commit_failed", status="validated")
+        return "failed"
+    log.info(
+        "imports.commit.done",
+        resource_type="import_batch",
+        resource_id=batch_id,
+        count=stats["committed"],
+    )
+    return "committed"
+
+
+# --- revert ---------------------------------------------------------------------------------------
+
+
+def _plain(session: Session, prior: repo.PriorValue) -> str:
+    if prior.value_ciphertext is not None:
+        return student_crypto.decrypt_value(
+            session,
+            prior.value_ciphertext,
+            table=VALUES_TABLE,
+            column=VALUE_COLUMN,
+            row_id=prior.id,
+        )
+    if prior.value_date is not None:
+        return prior.value_date.isoformat()
+    return prior.value_text or ""
+
+
+def _dependents() -> Conflict:
+    return Conflict(
+        "Records from this import were changed after it was added, so it cannot be reverted. "
+        "Correct the records instead.",
+        code="import_has_dependents",
+    )
+
+
+def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut:
+    """Undo a committed batch within 24 hours (``import.commit``; FR-IMP-005).
+
+    Refused (409 ``import_has_dependents``) when anything was recorded on top of it: a student
+    it created was changed since (version), one of its values was superseded, a value it replaced
+    is a verified or register identity value, or other records point at its students (change
+    requests, findings: foreign keys). Otherwise, in one transaction: students it created are
+    removed (with their values, enrolment and profile), values it added to existing students are
+    withdrawn (marked rejected; history kept) and any value they replaced becomes current again
+    (re-recorded through students.service). Audit: ``student.removed`` per student,
+    ``import.reverted``; outbox ``import.reverted``.
+    """
+    batch = _visible(session, ctx, batch_id, COMMIT, lock=True)
+    if batch.status != "committed":
+        raise Conflict("Only an added import can be reverted.", code="import_not_committed")
+    now = repo.now(session)
+    if batch.revert_deadline is None or batch.revert_deadline <= now:
+        raise Conflict("Imports can be reverted only within 24 hours.", code="revert_window_closed")
+    rows = repo.committed_rows(session, batch.id)
+    created = {r.student_id: r.student_version for r in rows if r.created_student and r.student_id}
+    versions = repo.student_versions(session, list(created))
+    if any(versions.get(sid) != version for sid, version in created.items()):
+        raise _dependents()
+    values = repo.batch_values(session, batch.id)
+    if any(v.superseded_by is not None for v in values):
+        raise _dependents()
+    priors = repo.prior_values(session, [v.id for v in values])
+    specs = _specs(session)
+    for prior in priors:
+        spec = specs.get(prior.attribute_key)
+        if spec is None or (
+            spec.is_identity
+            and (prior.source == ANCHOR_SOURCE or prior.verification_status != "unverified")
+        ):
+            raise _dependents()
+    replaced = {p.successor_id for p in priors}
+    with _db_errors():
+        repo.update_batch(session, batch.id, status="reverting")
+        withdrawn = repo.withdraw_values(
+            session, [v.id for v in values if v.id not in replaced], ctx.user_id
+        )
+        for prior in priors:
+            students.record_value(
+                session,
+                ctx,
+                prior.student_id,
+                prior.attribute_key,
+                prior.source,
+                _plain(session, prior),
+                evidence_document_id=prior.evidence_document_id,
+                verification=prior.verification_status,  # type: ignore[arg-type]
+            )
+        removed = repo.delete_created_students(session, list(created))
+    for student_id in created:
+        _audit(
+            session,
+            "student.removed",
+            student_id,
+            {"import_batch_id": batch.id, "reason": "import_reverted"},
+            resource_type="student",
+        )
+    repo.mark_rows_reverted(session, batch.id)
+    updated = repo.update_batch(
+        session, batch.id, status="reverted", reverted_at=now, reverted_by=ctx.user_id
+    )
+    assert updated is not None  # noqa: S101 - locked above
+    _audit(
+        session,
+        "import.reverted",
+        batch.id,
+        {
+            "students_removed": removed,
+            "values_withdrawn": withdrawn,
+            "values_restored": len(priors),
+        },
+    )
+    ops.enqueue_event(session, REVERTED_EVENT, {"batch_id": batch.id})
+    log.info("imports.reverted", resource_type="import_batch", resource_id=batch.id, count=removed)
+    return _out(session, updated)
+
+
+# --- retention (FR-IMP-007) -----------------------------------------------------------------------
+
+
+def _retention_guard(session: Session, document_id: uuid.UUID) -> str | None:
+    """documents.DELETE_GUARDS: keep an import's raw file while a job uses it, and for the
+    retention period after commit (docs/05 §13: 90 days)."""
+    batches = repo.batches_for_document(session, document_id)
+    if not batches:
+        return None
+    now = repo.now(session)
+    keep = dt.timedelta(days=import_config().raw_file_retention_days)
+    for batch in batches:
+        if batch.status in repo.LIVE_STATUSES:
+            return "import_in_progress"
+        if (
+            batch.status == "committed"
+            and batch.committed_at is not None
+            and (batch.committed_at + keep > now)
+        ):
+            return "import_file_retained"
+    return None
+
+
+if _retention_guard not in documents.DELETE_GUARDS:
+    documents.DELETE_GUARDS.append(_retention_guard)
+
+
+def _retention_context(tenant_id: uuid.UUID, user_id: uuid.UUID) -> UserContext:
+    """Just enough authority for documents.delete_document (school-wide ACL management)."""
+    return UserContext(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        membership_id=uuid.UUID(int=0),
+        roles=frozenset({"system"}),
+        permissions=frozenset({"document.read", "document.manage_acl"}),
+        scopes=Scopes(school=True),
+        mfa=True,
+        auth_time=None,
+    )
+
+
+def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> int:
+    """Delete raw import files kept past the retention period (daily job, FR-IMP-007); the
+    parsed rows stay. Returns the number of documents deleted."""
+    moment = now or dt.datetime.now(dt.UTC)
+    cutoff = moment - dt.timedelta(days=import_config().raw_file_retention_days)
+    deleted = 0
+    with tenant_session(tenant_id) as s:
+        due = repo.batches_due_for_file_deletion(s, cutoff)
+        by_document: dict[uuid.UUID, list[ImportBatch]] = {}
+        for batch in due:
+            if batch.document_id is not None:
+                by_document.setdefault(batch.document_id, []).append(batch)
+        for document_id, batches in by_document.items():
+            ctx = _retention_context(tenant_id, batches[0].created_by)
+            try:
+                documents.delete_document(s, ctx, document_id)
+            except (Conflict, NotFound):
+                continue  # kept by another batch, or already gone
+            repo.mark_raw_file_deleted(s, [b.id for b in batches], moment)
+            for batch in batches:
+                audit.record(
+                    s,
+                    action="import.raw_file_deleted",
+                    resource_type="import_batch",
+                    resource_id=batch.id,
+                    summary={"document_id": document_id, "reason": "retention"},
+                    actor_type="system",
+                )
+            deleted += 1
+    if deleted:
+        log.info("imports.raw_files.purged", tenant_id=tenant_id, count=deleted)
+    return deleted
+
+
+__all__ = [
+    "COMMIT",
+    "COMMITTED_EVENT",
+    "COMMIT_TASK",
+    "PARSE_TASK",
+    "PURGE_TASK",
+    "REVERTED_EVENT",
+    "RUN",
+    "VALIDATE_TASK",
+    "abandon",
+    "create_import",
+    "create_template",
+    "get_import",
+    "list_imports",
+    "list_rows",
+    "list_templates",
+    "member_context",
+    "purge_raw_files",
+    "request_commit",
+    "request_validation",
+    "revert",
+    "run_commit",
+    "run_parse",
+    "run_validate",
+    "set_mapping",
+]

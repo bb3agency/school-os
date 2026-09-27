@@ -19,6 +19,7 @@ from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
+from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
@@ -38,6 +39,7 @@ TASK_MODULES: list[str] = [
     "app.breakglass.tasks",
     "app.platform.tasks",
     "app.documents.tasks",
+    "app.imports.tasks",
 ]
 
 
@@ -64,6 +66,11 @@ def create_celery() -> Celery:
             "maintenance.*": {"queue": "maintenance"},
             # FR-DOC-002: AV scans run on the ingest queue (send_task honours routes only).
             "documents.scan": {"queue": "ingest"},
+            # FR-IMP-001..004: spreadsheet parsing, checking and commit (outbox consumers).
+            "imports.parse": {"queue": "ingest"},
+            "imports.validate": {"queue": "ingest"},
+            "imports.commit": {"queue": "ingest"},
+            "imports.purge_raw_files": {"queue": "maintenance"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
@@ -83,6 +90,8 @@ def create_celery() -> Celery:
             **breakglass_beat_schedule(),
             # FR-DOC-007: purge expired upload intents and staging objects.
             **documents_beat_schedule(),
+            # FR-IMP-007: raw import files deleted 90 days after commit.
+            **imports_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

@@ -1,0 +1,128 @@
+# Spreadsheet onboarding configuration (US-401, FR-IMP-001..007; CLAUDE.md §6.13: thresholds and
+# vocabularies live in versioned files, not in code). Shipped inside the package (the API image
+# does not copy /config). Change together with tests/imports.
+version: 1
+
+limits:
+  max_file_bytes: 10485760          # 10 MB (FR-IMP-001); documents enforces the same at upload
+  max_rows: 5000                    # data rows (non-empty) per file
+  max_columns: 60
+  max_cell_chars: 1000
+  header_search_rows: 10            # the header is the first row with >= 3 text cells in here
+  header_min_text_cells: 3
+  # XLSX is a zip: refuse archives that inflate beyond these (zip bombs) before parsing.
+  xlsx_max_uncompressed_bytes: 104857600   # 100 MB
+  xlsx_max_compression_ratio: 200
+  xlsx_max_members: 2000
+  max_scanned_rows: 60000           # stop reading a sheet after this many physical rows
+
+mapping:
+  # rapidfuzz score (0-100) a header needs to be suggested for a target when no synonym matches
+  # exactly; exact synonym matches score 100.
+  suggest_threshold: 86
+
+revert_window_hours: 24             # FR-IMP-005
+raw_file_retention_days: 90         # FR-IMP-007 (docs/05 §13: import raw files 90 days)
+
+# Sources whose rows may CREATE students (the admission number can be recorded from them). Rows
+# of other sources (UDISE+, board registration, Aadhaar-as-printed, ...) attach observations to
+# existing students matched by admission number.
+creating_sources: [admission_register, tc_incoming, manual_entry]
+
+# Required columns per row. `always` applies to every row; `create` to rows that create a student
+# (plus per-source extras).
+required:
+  always: [admission_no]
+  create: [full_name]
+  create_by_source:
+    admission_register: [dob]
+
+# Maximum lengths for text attributes the student catalog does not expose (the student service
+# re-validates everything at commit).
+text_max_length:
+  default: 1000
+  full_name: 120
+  father_name: 120
+  mother_name: 120
+  aadhaar_name_as_printed: 120
+  admission_no: 32
+  mother_tongue: 40
+  nationality: 40
+  religion: 40
+  caste: 80
+  disability: 200
+  address: 500
+  roll_no: 16
+
+admission_no_pattern: '^[A-Za-z0-9][A-Za-z0-9/._-]{0,31}$'
+
+# Header synonyms (English and Telugu) per mapping target. Headers are compared after
+# normalisation: NFC, lower case, punctuation removed, spaces collapsed. Special targets:
+# class, section, class_section ("9-A", "IX A"), roll_no.
+synonyms:
+  full_name: [name, student name, name of the student, name of student, students name,
+              pupil name, candidate name, full name, student full name, విద్యార్థి పేరు,
+              విద్యార్థి పూర్తి పేరు, పేరు]
+  father_name: [father name, fathers name, name of the father, father, father s name,
+                తండ్రి పేరు, తండ్రి]
+  mother_name: [mother name, mothers name, name of the mother, mother, తల్లి పేరు, తల్లి]
+  dob: [dob, d o b, date of birth, birth date, birthdate, dateofbirth, పుట్టిన తేదీ, జనన తేదీ]
+  gender: [gender, sex, boy girl, లింగం]
+  admission_no: [adm no, admn no, adm number, admission no, admission number, admission num,
+                 ad no, admission, ప్రవేశ సంఖ్య, అడ్మిషన్ నంబర్, ప్రవేశ నంబర్]
+  admission_date: [date of admission, admission date, doa, date of joining, joining date,
+                   ప్రవేశ తేదీ]
+  mother_tongue: [mother tongue, mothertongue, మాతృభాష]
+  nationality: [nationality, జాతీయత]
+  religion: [religion, మతం]
+  caste: [caste, sub caste, కులం]
+  category: [category, social category, caste category, సామాజిక వర్గం, వర్గం]
+  disability: [disability, cwsn, divyang, disability type, వైకల్యం]
+  health_notes: [health notes, health, medical notes, ఆరోగ్య వివరాలు]
+  address: [address, residential address, home address, చిరునామా]
+  aadhaar_last4: [aadhaar, aadhar, aadhaar no, aadhar no, aadhaar number, aadhar number, uid,
+                  uid no, aadhaar last 4, aadhaar last 4 digits, ఆధార్, ఆధార్ నంబర్]
+  aadhaar_name_as_printed: [name as per aadhaar, name as on aadhaar, aadhaar name,
+                            ఆధార్ ప్రకారం పేరు]
+  aadhaar_dob_as_printed: [dob as per aadhaar, date of birth as per aadhaar, aadhaar dob,
+                           ఆధార్ ప్రకారం పుట్టిన తేదీ]
+  aadhaar_gender_as_printed: [gender as per aadhaar, aadhaar gender, ఆధార్ ప్రకారం లింగం]
+  class: [class, std, standard, grade, class name, తరగతి]
+  section: [section, sec, div, division, సెక్షన్, విభాగం]
+  class_section: [class section, class and section, class sec, class div, తరగతి సెక్షన్,
+                  తరగతి విభాగం]
+  roll_no: [roll no, roll number, roll, రోల్ నంబర్]
+
+# Cell values for enum attributes (compared case-insensitively after trimming).
+enum_synonyms:
+  gender: &gender
+    male: [m, male, boy, b, పురుషుడు, బాలుడు, మగ]
+    female: [f, female, girl, g, స్త్రీ, బాలిక, ఆడ]
+    transgender: [t, tg, transgender, third gender, ట్రాన్స్‌జెండర్]
+  aadhaar_gender_as_printed: *gender
+  category:
+    general: [general, gen, oc, open, open category]
+    ews: [ews]
+    obc: [obc, bc, bc a, bc b, bc c, bc d, bc e, bc-a, bc-b, bc-c, bc-d, bc-e]
+    sc: [sc]
+    st: [st]
+
+# Class tokens: Roman numerals, words and Telugu forms that name the same class code.
+class_aliases:
+  I: ['1', 'i', 'one', 'first', '1st', '1వ']
+  II: ['2', 'ii', 'two', 'second', '2nd', '2వ']
+  III: ['3', 'iii', 'three', 'third', '3rd', '3వ']
+  IV: ['4', 'iv', 'four', 'fourth', '4th', '4వ']
+  V: ['5', 'v', 'five', 'fifth', '5th', '5వ']
+  VI: ['6', 'vi', 'six', 'sixth', '6th', '6వ']
+  VII: ['7', 'vii', 'seven', 'seventh', '7th', '7వ']
+  VIII: ['8', 'viii', 'eight', 'eighth', '8th', '8వ']
+  IX: ['9', 'ix', 'nine', 'ninth', '9th', '9వ']
+  X: ['10', 'x', 'ten', 'tenth', '10th', '10వ']
+  XI: ['11', 'xi', 'eleven', 'eleventh', '11th', '11వ']
+  XII: ['12', 'xii', 'twelve', 'twelfth', '12th', '12వ']
+  NUR: [nursery, pre kg, prekg, nur]
+  LKG: [lkg, l kg, lower kg]
+  UKG: [ukg, u kg, upper kg]
+# Words dropped from class cells before matching ("Class 9", "9th std", "9వ తరగతి").
+class_noise_words: [class, std, standard, grade, తరగతి, cls]

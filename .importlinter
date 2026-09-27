@@ -17,7 +17,7 @@
 # import-linter fails on modules that do not exist, so only modules that exist today are
 # listed. When a new module lands, add it to every `source_modules` list below and add its
 # own "<module>-internals" contract. Future modules (CLAUDE.md §4):
-#   imports, changes, knowledge, exports, admin
+#   changes, knowledge, exports, admin
 # Note for knowledge: also forbid app.knowledge.gateway internals once it exists, and keep
 # the semgrep rule `sos-llm-sdk-outside-gateway` for third-party SDK imports.
 
@@ -45,6 +45,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.imports
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -67,6 +68,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.imports
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -89,6 +91,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.imports
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -114,6 +117,7 @@ forbidden_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.imports
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
@@ -130,6 +134,7 @@ source_modules =
     app.students
     app.documents
     app.notifications
+    app.imports
 forbidden_modules =
     app.platform
 
@@ -150,6 +155,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.imports
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -168,6 +174,7 @@ source_modules =
     app.platform
     app.ops
     app.devtools
+    app.imports
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -187,6 +194,7 @@ source_modules =
     app.ops
     app.devtools
     app.dq
+    app.imports
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -207,6 +215,7 @@ source_modules =
     app.devtools
     app.dq
     app.students
+    app.imports
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -229,6 +238,7 @@ source_modules =
     app.students
     app.documents
     app.breakglass
+    app.imports
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -251,6 +261,7 @@ source_modules =
     app.students
     app.documents
     app.notifications
+    app.imports
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -275,3 +286,50 @@ forbidden_modules =
     app.tenancy
     app.platform
     app.ops
+
+[importlinter:contract:imports-internals]
+name = imports: repository/models are private (use app.imports.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+forbidden_modules =
+    app.imports.repository
+    app.imports.models
+allow_indirect_imports = True
+
+# Spreadsheet reading, mapping suggestions, value conversion and row validation stay pure (no
+# database or web), so 2,000 rows validate without a round trip per row (NFR-PERF-004).
+[importlinter:contract:imports-pure-library]
+name = imports parsing/mapping/validation modules stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.imports.sheet
+    app.imports.mapping
+    app.imports.values
+    app.imports.validation
+    app.imports.config
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.students
+    app.documents

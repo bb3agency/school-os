@@ -14,6 +14,7 @@ from app.core.middleware import install_middleware
 from app.core.telemetry import setup_telemetry
 from app.documents.api import router as documents_router
 from app.identity.api import router as identity_router
+from app.imports.api import router as imports_router
 from app.notifications.api import router as notifications_router
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
@@ -44,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(students_router)
     app.include_router(audit_router)
     app.include_router(documents_router)
+    app.include_router(imports_router)
     app.include_router(platform_tenant_router)
     app.include_router(notifications_router)
     app.include_router(breakglass_router)
