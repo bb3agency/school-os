@@ -1036,33 +1036,15 @@ def test_SEC_008_titles_and_file_names_never_reach_logs(
         assert secret not in logs, secret
 
 
-# --- PRV-016: withholding a version (e.g. a register page showing a full Aadhaar number) -----
+# --- PRV-016: no primitive keeps a file that showed a full Aadhaar number --------------------
 
 
-def test_PRV_016_withheld_version_can_never_be_downloaded(
-    world: Any, api: Any, admin_engine: Engine
-) -> None:
-    who = world.person("office_admin")
-    doc = new_document(api, who)
-    scan(world.a.tenant_id, doc)
-    path = f"/api/v1/documents/{doc['id']}/download-url"
-    assert api.call(who, "GET", path).status_code == 200
-    with tenant_session(world.a.tenant_id) as s:
-        assert service.withhold_version(s, uuid.UUID(doc["id"]), 1, "aadhaar_detected") is True
-    with tenant_session(world.a.tenant_id) as s:
-        assert service.withhold_version(s, uuid.UUID(doc["id"]), 1, "aadhaar_detected") is False
-    res = api.call(who, "GET", path)
-    assert res.status_code == 409
-    events = W.audit_events(admin_engine, world.a.tenant_id, "document.version_withheld")
-    mine = [e for e in events if str(e["resource_id"]) == doc["id"]]
-    assert len(mine) == 1
-    assert mine[0]["summary"] == {"version_no": 1, "reason": "aadhaar_detected"}
-
-
-def test_PRV_016_withhold_rejects_unknown_reason_codes(world: Any, api: Any) -> None:
-    doc = new_document(api, world.person("office_admin"))
-    with pytest.raises(ValueError, match="reason"), tenant_session(world.a.tenant_id) as s:
-        service.withhold_version(s, uuid.UUID(doc["id"]), 1, "because I said so")
+def test_PRV_016_documents_offer_no_withhold_that_keeps_the_file() -> None:
+    """``withhold_version`` kept the stored object of a version that could show a full Aadhaar
+    number; PRV-016 redacts or discards instead (tests below), so it is gone for good."""
+    assert not hasattr(service, "withhold_version")
+    assert not hasattr(service, "WITHHOLD_REASONS")
+    assert "withhold_version" not in service.__all__
 
 
 # --- PRV-016: redacted copies and discarded originals ---------------------------------------
