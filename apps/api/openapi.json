@@ -2740,6 +2740,372 @@
         "title": "EnrollmentOut",
         "type": "object"
       },
+      "ExportDownloadOut": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "xlsx",
+              "pdf",
+              "csv"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "format",
+          "content_type",
+          "filename"
+        ],
+        "title": "ExportDownloadOut",
+        "type": "object"
+      },
+      "ExportFileOut": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "xlsx",
+              "pdf",
+              "csv"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "format",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "ExportFileOut",
+        "type": "object"
+      },
+      "ExportOut": {
+        "properties": {
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ExportFileOut"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "formats": {
+            "items": {
+              "enum": [
+                "xlsx",
+                "pdf",
+                "csv"
+              ],
+              "type": "string"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "include_sensitive": {
+            "title": "Include Sensitive",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "board_precheck",
+              "portal_precheck",
+              "student_list"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "layout_version": {
+            "title": "Layout Version",
+            "type": "integer"
+          },
+          "profile_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "scope": {
+            "additionalProperties": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Scope",
+            "type": "object"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "failed",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_count": {
+            "title": "Student Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "profile_key",
+          "profile_version",
+          "layout_version",
+          "formats",
+          "language",
+          "scope",
+          "columns",
+          "include_sensitive",
+          "student_count",
+          "status",
+          "error_code",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "expires_at",
+          "files"
+        ],
+        "title": "ExportOut",
+        "type": "object"
+      },
+      "ExportProfileOut": {
+        "properties": {
+          "allowed": {
+            "title": "Allowed",
+            "type": "boolean"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "board",
+              "portal"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "layout_version": {
+            "title": "Layout Version",
+            "type": "integer"
+          },
+          "permission": {
+            "title": "Permission",
+            "type": "string"
+          },
+          "required_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Fields",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "permission",
+          "version",
+          "layout_version",
+          "label_en",
+          "label_te",
+          "fields",
+          "required_fields",
+          "allowed"
+        ],
+        "title": "ExportProfileOut",
+        "type": "object"
+      },
+      "ExportScopeIn": {
+        "additionalProperties": false,
+        "description": "Sections or classes of the current academic year (at most one of the two); empty = every\nstudent you can see.",
+        "properties": {
+          "class_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Ids"
+          },
+          "section_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Ids"
+          }
+        },
+        "title": "ExportScopeIn",
+        "type": "object"
+      },
       "ExtendTrialIn": {
         "additionalProperties": false,
         "properties": {
@@ -5448,6 +5814,34 @@
         "title": "Page[DocumentOut]",
         "type": "object"
       },
+      "Page_ExportOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ExportOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[ExportOut]",
+        "type": "object"
+      },
       "Page_FindingOut_": {
         "properties": {
           "data": {
@@ -6684,6 +7078,56 @@
           "request_id"
         ],
         "title": "PlatformAuditEventOut",
+        "type": "object"
+      },
+      "PrecheckCreate": {
+        "additionalProperties": false,
+        "description": "US-501 AC4: a board or portal pre-check report.",
+        "properties": {
+          "format": {
+            "default": [
+              "xlsx",
+              "pdf"
+            ],
+            "items": {
+              "enum": [
+                "xlsx",
+                "pdf"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Format",
+            "type": "array"
+          },
+          "include_sensitive": {
+            "default": false,
+            "title": "Include Sensitive",
+            "type": "boolean"
+          },
+          "language": {
+            "default": "en",
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "profile_key": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+            "title": "Profile Key",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ExportScopeIn"
+          }
+        },
+        "required": [
+          "profile_key"
+        ],
+        "title": "PrecheckCreate",
         "type": "object"
       },
       "PriceOverrideIn": {
@@ -7933,6 +8377,47 @@
           "values"
         ],
         "title": "StudentCreate",
+        "type": "object"
+      },
+      "StudentListCreate": {
+        "additionalProperties": false,
+        "description": "A student list with chosen columns (``student.export``, step-up).",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 60,
+            "minItems": 1,
+            "title": "Columns",
+            "type": "array"
+          },
+          "format": {
+            "default": "xlsx",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "language": {
+            "default": "en",
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ExportScopeIn"
+          }
+        },
+        "required": [
+          "columns"
+        ],
+        "title": "StudentListCreate",
         "type": "object"
       },
       "StudentMatch": {
@@ -13215,6 +13700,290 @@
         "summary": "Get Summary",
         "tags": [
           "data-quality"
+        ]
+      }
+    },
+    "/api/v1/export-profiles": {
+      "get": {
+        "description": "Board and portal pre-check profiles (e.g. ``cisce-registration-2026``, ``udise-plus``)\nwith their field order for the \"ready to enter\" sheet (permission ``export.board`` or\n``export.portal``). ``allowed`` says whether you can run each one.",
+        "operationId": "list_export_profiles_api_v1_export_profiles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExportProfileOut"
+                  },
+                  "title": "Response List Export Profiles Api V1 Export Profiles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Export Profiles",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports": {
+      "get": {
+        "description": "Your own exports, newest first (any export permission).",
+        "operationId": "list_exports_api_v1_exports_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ExportOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Exports",
+        "tags": [
+          "exports"
+        ]
+      },
+      "post": {
+        "description": "Make a pre-check report for a board or portal profile (``export.board`` for board\nprofiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and\n``dq.findings.read``). Choose sections or classes (empty = every student you can see), the\nformats (``xlsx``, ``pdf``) and the language (``en``, ``te``). The students are checked again\nand the files are made in the background (202); you are notified when they are ready.\nRestricted values are hidden unless ``include_sensitive`` is true (needs\n``student.read_sensitive`` and a recent sign-in, 428 ``step_up_required``). Errors: 422\n``unknown_profile``, ``no_students``, ``too_many_students``. Accepts ``Idempotency-Key``.",
+        "operationId": "create_precheck_export_api_v1_exports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrecheckCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Precheck Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/student-list": {
+      "post": {
+        "description": "Export a student list with the columns you choose as CSV or XLSX (permission\n``student.export``, recent sign-in with MFA). Columns are attribute keys (``GET\n/attributes``) or ``class``, ``section``, ``roll_no``; restricted (C3) columns need\n``student.read_sensitive`` (403 ``sensitive_not_allowed``) and the Aadhaar-as-printed fields\nare never exported (422 ``column_not_exportable``). Accepts ``Idempotency-Key``.",
+        "operationId": "create_student_list_export_api_v1_exports_student_list_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentListCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Student List Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{export_id}": {
+      "get": {
+        "description": "One of your exports: status (``queued``, ``running``, ``ready``, ``failed``,\n``expired``), files and when they are deleted.",
+        "operationId": "get_export_api_v1_exports__export_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{export_id}/download-url": {
+      "get": {
+        "description": "A download link for one file of your ready export, valid at most 5 minutes (the first\nformat unless ``format`` is given). Student lists and exports with restricted values need a\nrecent sign-in with MFA (428). Errors: 409 ``export_not_ready``, ``export_failed``,\n``export_expired``. Every download is recorded in the audit log.",
+        "operationId": "get_export_download_url_api_v1_exports__export_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "xlsx",
+                    "pdf",
+                    "csv"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportDownloadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Export Download Url",
+        "tags": [
+          "exports"
         ]
       }
     },
