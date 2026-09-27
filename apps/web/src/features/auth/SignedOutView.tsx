@@ -1,4 +1,4 @@
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
 import { buttonClasses } from "@/components/ui/Button";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
@@ -17,12 +17,17 @@ export function SignedOutView({
   operator,
   idle,
   error,
+  devSignIn = false,
 }: {
   operator: boolean;
   idle: boolean;
   error: SignInError | undefined;
+  /** Local development only (`isDevSignInEnabled()`): link to the dev sign-in helper. */
+  devSignIn?: boolean;
 }) {
   const t = useTranslations("auth");
+  const td = useTranslations("devSignIn");
+  const locale = useLocale();
   const tc = useTranslations("common");
   const signIn = operator ? "/bff/auth/platform/login" : "/bff/auth/login";
   return (
@@ -44,6 +49,13 @@ export function SignedOutView({
         <a href={signIn} className={buttonClasses("primary")}>
           {operator ? t("signedOut.platformSignIn") : t("signedOut.signIn")}
         </a>
+        {devSignIn ? (
+          <p className="text-sm">
+            <a href={`/${locale}/dev/sign-in`} className="text-primary underline">
+              {td("link")}
+            </a>
+          </p>
+        ) : null}
       </main>
     </div>
   );

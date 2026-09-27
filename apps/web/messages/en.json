@@ -2779,5 +2779,38 @@
         "body": "Only staff allowed to see restricted details (such as category) can include or download them. Leave them out, or ask your school's office admin."
       }
     }
+  },
+  "devSignIn": {
+    "title": "Dev sign-in",
+    "link": "Dev sign-in (local only)",
+    "localOnly": "Local development only. This page does not exist in staging or production, and it does not skip any sign-in check.",
+    "steps": {
+      "copy": "Copy the subject of the person you want to be.",
+      "signIn": "Select Sign in. The local sign-in page opens.",
+      "paste": "Paste the subject in the user box and select Sign-in. Leave the claims box empty."
+    },
+    "mfaNote": "The local sign-in page marks every sign-in as two-step verified (MFA), so owner, principal and office admin work without extra claims. SchoolOS still checks MFA as in production.",
+    "school": "School {code}",
+    "tableCaption": "Synthetic staff of school {code}",
+    "columns": {
+      "role": "Role",
+      "subject": "Subject",
+      "actions": "Actions"
+    },
+    "more": "{count} people: change the last number (1 to {count})",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the subject and copy it yourself.",
+    "signIn": "Sign in",
+    "signInAs": "Sign in as {role} of {code}",
+    "stepUp": {
+      "title": "Confirming it's you (step-up)",
+      "body": "Some actions ask you to sign in again. The local sign-in page does not add the sign-in time by itself, so copy these claims just before, paste them in its claims box and sign in with the same subject. They are valid for 5 minutes.",
+      "copy": "Copy step-up claims"
+    },
+    "operators": {
+      "title": "Platform operators",
+      "body": "Operators are not seeded. Create the first one with app.platform.bootstrap_owner, then sign in at /en/platform with that subject."
+    }
   }
 }

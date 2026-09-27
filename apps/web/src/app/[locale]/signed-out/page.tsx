@@ -1,4 +1,5 @@
 import { SIGN_IN_ERRORS, SignedOutView } from "@/features/auth/SignedOutView";
+import { isDevSignInEnabled } from "@/features/dev-sign-in/enabled";
 import { pageMetadata } from "@/lib/metadata";
 
 export const generateMetadata = pageMetadata((t) => t("auth.signedOut.title"));
@@ -17,6 +18,7 @@ export default async function SignedOutPage({ searchParams }: Props) {
       operator={params.kind === "operator"}
       idle={params.reason === "idle"}
       error={error}
+      devSignIn={isDevSignInEnabled()}
     />
   );
 }
