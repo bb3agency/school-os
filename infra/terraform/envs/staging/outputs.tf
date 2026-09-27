@@ -52,3 +52,13 @@ output "nat_public_ips" {
   description = "Egress IPs."
   value       = module.platform.nat_public_ips
 }
+
+output "security" {
+  description = "SEC-023 baseline: trail, log buckets, alert topic (subscribe extra on-call endpoints), security-logs CMK."
+  value = var.enable_security_baseline ? {
+    trail_arn       = module.security[0].trail_arn
+    log_buckets     = module.security[0].log_buckets
+    alert_topic_arn = module.security[0].alert_topic_arn
+    kms_key_arn     = module.security[0].kms_key_arn
+  } : null
+}

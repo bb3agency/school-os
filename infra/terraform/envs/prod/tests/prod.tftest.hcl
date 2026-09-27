@@ -184,3 +184,55 @@ run "region_guard_rejects_other_dr_region" {
 
   expect_failures = [var.dr_region]
 }
+
+run "security_baseline_sec_023" {
+  command = plan
+
+  assert {
+    condition = (module.security.posture.trail.multi_region && module.security.posture.trail.log_file_validation
+    && module.security.posture.trail.management_events)
+    error_message = "Prod has a multi-region, validated CloudTrail with management events (SEC-023)."
+  }
+
+  assert {
+    condition     = module.security.posture.trail_bucket.object_lock_mode == "COMPLIANCE" && module.security.posture.trail_bucket.object_lock_days >= 400
+    error_message = "Prod CloudTrail logs are Object Lock COMPLIANCE for >= 400 days (CERT-In 180 d in India, DPDP 1 y)."
+  }
+
+  assert {
+    condition     = length(module.security.posture.delete_exempt_principals) == 0
+    error_message = "Nobody is exempt from the prod log buckets' deny-delete policy."
+  }
+
+  assert {
+    condition = length(setsubtract([
+      "arn:aws:s3:::${module.platform.buckets.files}/",
+      "arn:aws:s3:::${module.platform.buckets.audit}/",
+      "arn:aws:s3:::sos-ded-",
+    ], module.security.posture.trail.s3_data_event_arn_prefixes)) == 0
+    error_message = "S3 data events cover the files and audit buckets and every dedicated host's buckets."
+  }
+
+  assert {
+    condition = alltrue([
+      for p in [module.security.posture.detection_primary, module.security.posture.detection_dr] :
+      p.guardduty_enabled && p.guardduty_features["S3_DATA_EVENTS"] == "ENABLED" && p.config_recording_enabled && length(p.securityhub_standards) >= 2
+    ])
+    error_message = "GuardDuty (S3 Protection), Config and Security Hub (FSBP + CIS) run in ap-south-1 and ap-south-2."
+  }
+
+  assert {
+    condition     = module.security.posture.detection_primary.guardduty_features["EBS_MALWARE_PROTECTION"] == "ENABLED"
+    error_message = "Malware Protection covers dedicated-host EBS volumes."
+  }
+
+  assert {
+    condition     = toset(module.security.posture.alert_subscriptions) == toset(var.alarm_emails)
+    error_message = "Security alerts reach the on-call recipients (alarm_emails unless security_alert_emails is set)."
+  }
+
+  assert {
+    condition     = module.security.posture.account_public_access_block
+    error_message = "Account-level S3 Block Public Access is on in prod."
+  }
+}

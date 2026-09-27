@@ -29,6 +29,8 @@
 
 SCPs: restrict regions to ap-south-1/ap-south-2 (global services excepted), deny disabling logging/detection, deny public S3, deny root usage.
 
+Security logging by stage (SEC-023, §5.1): at **Stage 0** each workload account (`staging`, `prod`) runs its own multi-region account trail, GuardDuty, Config and Security Hub from `envs/<env>` (`modules/security_baseline`); logs stay in that account's Object Lock bucket in ap-south-1. The management account is not managed by this Terraform: enable a trail there by hand (it records Organizations, IAM Identity Center and billing activity) until Stage 1. At **Stage 1** an organization trail in the management account delivers to `log-archive` and GuardDuty/Security Hub use `security` as delegated administrator; the per-account trails are removed only after the organization trail has covered the retention period. Dedicated-tier hosts run in the prod account (ADR-0015, §15), so the prod baseline covers them.
+
 ## 3. Network
 
 ```
@@ -78,12 +80,14 @@ infra/terraform/
 │   ├── alb_waf/              ALB (TLS 1.2+), WAFv2 managed + rate rules; optional fleet heartbeat route
 │   ├── cognito/              staff and operator user pools (Essentials), app clients, pre-token Lambda (ADR-0018)
 │   ├── observability/        alarms, SNS topic, log groups (400 days), budget
+│   ├── security_baseline/    SEC-023 per account: CloudTrail + Object Lock log bucket, evidence bucket, Config role, alerts (§5.1)
+│   ├── security_detection/   SEC-023 per region: GuardDuty, AWS Config, Security Hub (FSBP + CIS), forwarding to ap-south-1
 │   ├── ci_oidc/              GitHub OIDC provider + deploy roles
 │   ├── shared_platform/      composition of the above for one shared-tier environment
 │   └── dedicated_host/       one school's EC2 host, KMS key, buckets, IAM, secrets, log group (§15)
 ├── envs/
-│   ├── staging/              shared_platform, small sizes, synthetic data only
-│   ├── prod/                 shared_platform + DR copies; deletion protection asserted by tests
+│   ├── staging/              shared_platform + security_baseline (GOVERNANCE, 180 days), small sizes, synthetic data only
+│   ├── prod/                 shared_platform + DR copies + security_baseline (COMPLIANCE, 400 days); asserted by tests
 │   └── dedicated-template/   one backend config + tfvars per school under schools/<code>.* (module dedicated_host)
 └── scripts/validate.sh
 ```
@@ -99,6 +103,29 @@ Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs 
 - Log group retention: security/access/app logs **400 days** (≥ 13 months) in ap-south-1.
 - App container settings: `shared_platform` gives the `api`, `worker`, `beat` and `migrate` tasks the same base settings (`local.app_env` + `local.app_base_secrets`; `migrate` adds `SOS_MIGRATOR_DATABASE_URL`, `api`/`worker` add the provider API keys) under the names in §11, so each task passes the staging/prod start-up guards. The shared tier needs `billing_supplier_legal_name` and `billing_supplier_gstin` (validated GSTIN whose first two digits equal `billing_supplier_state_code`, default `37`); the staging tfvars example uses a synthetic supplier that is not valid for tax invoices. `apps/api/tests/deploy/test_env_contract.py` parses the HCL maps and `deploy/dedicated/compose.yaml` and fails when a name is not a setting or a container would be refused at start-up.
 - Audit archive signing (FR-AUD-004): an asymmetric `audit-signing` KMS key (`ECC_NIST_P256`, `SIGN_VERIFY`, `ECDSA_SHA_256`) per shared environment and per dedicated host; only the worker task role (shared) and the host's instance role (dedicated) may `kms:Sign`/`kms:GetPublicKey`. AWS KMS does not rotate asymmetric keys: replacing one means a new key and keeping the old public key to verify older archives.
+
+### 5.1 Security logging and detection (SEC-023)
+
+`modules/security_baseline` (which calls `modules/security_detection` once per region) is instantiated only by `envs/staging` and `envs/prod`; its `env` input accepts nothing else, so it never runs locally or in CI. ap-south-2 resources use the AWS provider's per-resource `region` argument (provider 6.x), so one provider with `allowed_account_ids` guards both regions. Planned against mocks by `terraform test`; **never applied yet**.
+
+| Control | Setting |
+|---|---|
+| CloudTrail | One multi-region account trail `sos-<env>-trail`: management events (read and write, global services included), S3 object-level (data) events on the files and audit-archive buckets, and in prod on every bucket named `sos-ded-*` (dedicated hosts' files buckets in ap-south-1 and backup buckets in ap-south-2); log file validation on; SSE-KMS with `alias/sos-<env>-security-logs` (annual rotation). The log buckets are never data-event sources (a precondition refuses it) |
+| Log archive | `sos-<env>-cloudtrail-<account>` in ap-south-1: S3 Object Lock default retention (prod **COMPLIANCE, 400 days**; staging **GOVERNANCE, 180 days**), versioned, SSE-KMS, Block Public Access, TLS 1.2+ only, server access logs to the environment's logs bucket (`s3/`), lifecycle deletes versions after retention. The bucket policy denies `s3:DeleteObject`, `s3:DeleteObjectVersion`, `s3:BypassGovernanceRetention` and `s3:DeleteBucket` to every principal (staging may exempt a named teardown role, `security_log_delete_exempt_principal_arns`) |
+| Evidence | `sos-<env>-security-evidence-<account>`: AWS Config snapshots and history (`config/`) and exported GuardDuty findings from both regions (`guardduty/`; GuardDuty itself keeps findings 90 days), same key, deny-delete policy and retention. No Object Lock: these are evidence, not the log of record, and not every AWS delivery service writes the checksums Object Lock requires |
+| GuardDuty | Both regions, findings every 15 min, every protection plan set explicitly. ap-south-1: S3 Protection, Malware Protection for EC2 (EBS; dedicated hosts), RDS Protection, Lambda Protection; Runtime Monitoring off unless `guardduty_runtime_agent_management` lists `ECS_FARGATE_AGENT_MANAGEMENT`/`EC2_AGENT_MANAGEMENT`. ap-south-2: S3 Protection. EKS off (no EKS) |
+| AWS Config | Both regions: recorder for all supported resource types (global IAM types in ap-south-1 only), continuous recording, KMS-encrypted delivery to the evidence bucket through role `sos-<env>-config-recorder`. Managed rules in ap-south-1: CloudTrail enabled, multi-region, log validation and encryption; root MFA and no root access key; IAM console MFA; account and bucket S3 public access, TLS-only and encryption; RDS encrypted, not public, snapshots not public; EBS default encryption and encrypted volumes; IMDSv2; no SSH from the internet; KMS rotation; GuardDuty and Security Hub enabled; VPC flow logs |
+| Security Hub | Both regions, consolidated control findings, standards AWS Foundational Security Best Practices v1.0.0 and CIS AWS Foundations Benchmark v3.0.0 (default standards off, list explicit); ap-south-2 findings aggregated into ap-south-1 |
+| Guardrails | Account-level S3 Block Public Access; EBS encryption by default in both regions |
+| Alerts | EventBridge rules in ap-south-1 → SNS `sos-<env>-security-alerts` (same CMK) → `security_alert_emails` (defaults to `alarm_emails`): GuardDuty severity ≥ 7 in either region (ap-south-2 forwards GuardDuty findings and tampering API calls to the ap-south-1 default bus); new, active Security Hub findings labelled CRITICAL that are not GuardDuty (add `HIGH` via `securityhub_alert_labels` once the first-run backlog is triaged); API calls that stop or blind logging and detection; policy, lifecycle, lock, logging or encryption changes on the log buckets. Routing and severities: 11 §6; response: R5 (CERT-In 6-hour clock) |
+
+**Retention.** CERT-In Directions (April 2022) require ICT system logs for 180 days **within India**; the DPDP Rules require at least one year of logs for breach investigation; SchoolOS keeps security logs 400 days (same as the log groups, 08 §6). The module refuses less than 180 days. Everything is stored in ap-south-1 (India). COMPLIANCE mode in prod means nobody, the root user included, can delete or shorten retention; the bucket (and the account) cannot be emptied until the last object expires. GOVERNANCE in staging lets an exempted role with `s3:BypassGovernanceRetention` tear the account down.
+
+**After the first apply (runbook).** Confirm each SNS email subscription; check Security Hub's first findings and record accepted exceptions; if GuardDuty, Config or Security Hub was already enabled by hand in the account, `terraform import` the detector, recorder, delivery channel and hub before applying; run `aws cloudtrail validate-logs` once to prove digest validation.
+
+**Known gaps (owner decisions).** Root console sign-in and IAM API events are delivered to EventBridge only in us-east-1, which the region guardrail excludes, so they are recorded and checked by Config/Security Hub but not paged in real time. The trail does not send to CloudWatch Logs, so CIS controls CloudWatch.1-14 (metric filters and alarms) will fail until either CloudWatch Logs delivery is added (billed per GB ingested) or those controls are disabled with a recorded reason. GuardDuty Malware Protection for S3 (scanning new uploads to the files bucket) is not enabled: it overlaps the upload antivirus hook (SEC-016) and is billed per GB scanned.
+
+**Cost (Stage 0, estimate; check current ap-south-1 pricing).** Per account: one KMS key (about USD 1/month) plus requests; CloudTrail's first copy of management events is free and S3 data events cost about USD 0.10 per 100,000 events (every presigned upload or download of a school file is one); GuardDuty is billed by the volume of CloudTrail, VPC flow, DNS and S3 events analysed (small at pilot scale; 30-day free trial per region); Config about USD 0.003 per configuration item recorded plus rule evaluations; Security Hub per control check and per finding ingested beyond the free tier; S3 storage of compressed logs is small. Expect tens of US dollars per month per account at pilot volume; the monthly budget alert (§12) covers surprises. `config_recording_frequency = "DAILY"` lowers Config cost if needed.
 
 ## 6. Containers
 
@@ -351,6 +378,7 @@ Targets: RPO ≤ 15 min, RTO ≤ 8 h (NFR-AVL-005). The RPO needs continuous WAL
 - Containers non-root, read-only root filesystems where possible, resource limits; Docker daemon with live-restore and log rotation.
 - Clock sync to Amazon Time Sync Service (CERT-In NTP requirement; 08 §6).
 - Logs shipped to CloudWatch (no personal data; same allowlist and `redact()` as the shared tier).
+- Account-level detection (SEC-023): hosts run in the prod account, so the prod `security_baseline` covers them: CloudTrail records their API calls and object-level access to their `sos-ded-*` buckets, GuardDuty watches EC2 (with EBS malware scans) and the buckets in both regions, and Config/Security Hub check IMDSv2, EBS encryption and open SSH (§5.1). A host placed in any other AWS account needs its own `security_baseline` instance first.
 - Operator access only through the pipeline or SSM, under the same break-glass rules as the shared tier; the control plane has no inbound path.
 
 ### 15.5 Fleet upgrades

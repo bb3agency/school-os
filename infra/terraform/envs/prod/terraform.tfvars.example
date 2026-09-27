@@ -20,6 +20,9 @@ billing_supplier_gstin      = "<15-character GSTIN>"
 billing_supplier_state_code = "37"
 
 alarm_emails       = ["<oncall@your-domain>"]
+# SEC-023 security alerts (GuardDuty High, critical Security Hub findings, logging tampering).
+# Null/omitted = alarm_emails. Confirm each SNS subscription email after apply.
+# security_alert_emails = ["<security-oncall@your-domain>"]
 monthly_budget_usd = 300
 
 state_bucket_arn  = "arn:aws:s3:::sos-tfstate-<PROD_ACCOUNT_ID>"

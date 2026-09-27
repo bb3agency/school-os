@@ -211,3 +211,33 @@ variable "billing_supplier_state_code" {
   type        = string
   default     = "37"
 }
+
+variable "security_alert_emails" {
+  description = "Security alert recipients (GuardDuty/Security Hub/tampering, SEC-023). Null = alarm_emails. The on-call path is docs/11 §6-7."
+  type        = list(string)
+  default     = null
+}
+
+variable "securityhub_alert_labels" {
+  description = "Security Hub severity labels that alert (GuardDuty >= 7 always alerts)."
+  type        = list(string)
+  default     = ["CRITICAL"]
+}
+
+variable "enable_security_baseline" {
+  description = "Create the SEC-023 account baseline (CloudTrail, GuardDuty, Config, Security Hub) in the staging account."
+  type        = bool
+  default     = true
+}
+
+variable "security_log_retention_days" {
+  description = "CloudTrail/evidence retention in staging (>= 180, CERT-In)."
+  type        = number
+  default     = 180
+}
+
+variable "security_log_delete_exempt_principal_arns" {
+  description = "Roles allowed to delete staging log objects after GOVERNANCE retention bypass (account teardown). Empty = nobody."
+  type        = list(string)
+  default     = []
+}

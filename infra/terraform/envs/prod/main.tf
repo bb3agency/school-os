@@ -74,3 +74,29 @@ module "rds_dr" {
   kms_key_arn            = module.kms_dr.key_arns["backup"]
   retention_days         = var.dr_backup_retention_days
 }
+
+# --- Account security baseline (SEC-023, pilot-ready gate) ---------------------------------------
+# CloudTrail (all regions) into an Object Lock COMPLIANCE bucket for 400 days (CERT-In: 180 days in
+# India; DPDP: 1 year), GuardDuty, Config and Security Hub in ap-south-1 and ap-south-2, alerts to
+# on-call. Dedicated-tier hosts live in this account (docs/10 §15), so the same baseline covers them;
+# their buckets (sos-ded-*) are in the S3 data events. Hard-wired here and asserted by tests.
+
+module "security" {
+  source = "../../modules/security_baseline"
+
+  env                = "prod"
+  name_prefix        = "sos-prod"
+  object_lock_mode   = "COMPLIANCE"
+  log_retention_days = 400
+  data_event_bucket_arns = [
+    "arn:aws:s3:::${module.platform.buckets.files}",
+    "arn:aws:s3:::${module.platform.buckets.audit}",
+  ]
+  data_event_bucket_name_prefixes = ["sos-ded-"]
+  access_log_bucket               = module.platform.buckets.logs
+  delete_exempt_principal_arns    = []
+
+  alert_emails                       = coalesce(var.security_alert_emails, var.alarm_emails)
+  securityhub_alert_labels           = var.securityhub_alert_labels
+  guardduty_runtime_agent_management = var.guardduty_runtime_agent_management
+}

@@ -23,6 +23,9 @@ mock_provider "aws" {
   mock_data "aws_caller_identity" {
     defaults = { account_id = "444455556666" }
   }
+  mock_data "aws_partition" {
+    defaults = { partition = "aws" }
+  }
   mock_data "aws_region" {
     defaults = { region = "ap-south-2" }
   }
@@ -86,5 +89,40 @@ run "staging_containers_hardened" {
       c.readonlyRootFilesystem && !c.privileged && contains(c.linuxParameters.capabilities.drop, "ALL")
     ])
     error_message = "Containers are hardened in every environment (SEC-030)."
+  }
+}
+
+run "security_baseline_on_in_staging" {
+  command = plan
+
+  assert {
+    condition     = length(module.security) == 1
+    error_message = "The SEC-023 baseline is created in the staging account by default."
+  }
+
+  assert {
+    condition     = module.security[0].posture.trail_bucket.object_lock_mode == "GOVERNANCE" && module.security[0].posture.trail_bucket.object_lock_days >= 180
+    error_message = "Staging CloudTrail logs are GOVERNANCE-locked for at least the CERT-In 180 days."
+  }
+
+  assert {
+    condition = alltrue([
+      for p in [module.security[0].posture.detection_primary, module.security[0].posture.detection_dr] :
+      p.guardduty_enabled && p.config_recording_enabled && length(p.securityhub_standards) >= 2
+    ])
+    error_message = "Staging exercises the same detection as prod."
+  }
+}
+
+run "security_baseline_can_be_disabled" {
+  command = plan
+
+  variables {
+    enable_security_baseline = false
+  }
+
+  assert {
+    condition     = length(module.security) == 0 && output.security == null
+    error_message = "enable_security_baseline = false creates nothing."
   }
 }

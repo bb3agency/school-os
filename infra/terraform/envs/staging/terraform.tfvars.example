@@ -17,6 +17,9 @@ billing_supplier_gstin      = "37STAGE0000S1Z5"
 billing_supplier_state_code = "37"
 
 alarm_emails       = ["<dev-alerts@your-domain>"]
+# SEC-023 baseline in the staging account (on by default; 180-day GOVERNANCE-locked CloudTrail).
+# enable_security_baseline = true
+# security_alert_emails    = ["<dev-alerts@your-domain>"]
 monthly_budget_usd = 120
 
 state_bucket_arn  = "arn:aws:s3:::sos-tfstate-<STAGING_ACCOUNT_ID>"
