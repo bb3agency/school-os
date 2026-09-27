@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-09-27 |
-| Deciders | Founder / product owner |
+| Deciders | Product owner (accepted 2026-09-27) |
 | Amends / supersedes | Would amend requirement FR-PLT-002 (03-TRD §3.12) wording "in one transaction"; builds on [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md), [ADR-0017](ADR-0017-platform-admin-panel-architecture.md), [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) |
 
 ## Context
@@ -87,3 +87,7 @@ school name (03 §5 marks FR-PLT-002 "Partial"; roadmap 14 lists the question as
 
 FR-PLT-002, FR-PLT-003, FR-PLT-004, FR-TEN-003, FR-AUD-001, SEC-026; docs/16 §5.3, §5.4, §7,
 §8.1, §16, §18; 03 §3.12 and §5; 14 (M0 status).
+
+## Acceptance (2026-09-27)
+
+Accepted by the product owner on 2026-09-27 ("go with your recommendations"). As proposed.

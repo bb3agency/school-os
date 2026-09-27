@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-09-27 |
-| Deciders | Founder / product owner (security review before acceptance) |
+| Deciders | Product owner (accepted 2026-09-27) |
 | Amends / supersedes | Would amend [ADR-0012](ADR-0012-managed-oidc-identity.md), [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (definer allowlist: `core.resolve_login`, `core.find_user_id_by_subject`, `core.create_user_for_invite` gain an issuer) and [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) (a third app client) once accepted |
 
 ## Context
@@ -159,7 +159,7 @@ Rejected already by ADR-0018 (MFA is pool-wide; operators would inherit OPTIONAL
   school side, including the session start (new report status or event, IDs only).
 - No tokens, emails or names in either chain; IDs and codes only (CLAUDE.md §6.5).
 
-## Decision (proposed)
+## Decision
 
 Adopt **option C**. Until it is implemented, break-glass stays unusable by design (fail closed);
 no operator gets a staff-pool account in the meantime. Option A is the fallback if the product
@@ -194,3 +194,7 @@ owner does not want the tenant API to trust a second issuer.
 US-103, FR-OPS-004, FR-IAM-001..004, FR-PLT-028, SEC-005, SEC-021, SEC-026, SEC-027, SEC-029,
 T1, T2, T17 (07 §4); 05 §3.3–3.4; 07 §5, §6.4; 09 §1; 10 §5, §11; 16 §5.15, §19 Q4;
 `.handoff/HANDOFF.md` §3.5.
+
+## Acceptance (2026-09-27)
+
+Accepted by the product owner on 2026-09-27 ("go with your recommendations"). Option C adopted.

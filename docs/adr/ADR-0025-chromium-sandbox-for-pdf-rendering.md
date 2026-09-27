@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-09-27 |
-| Deciders | Product owner (pending) |
+| Deciders | Product owner (accepted 2026-09-27) |
 | Amends / supersedes | none. Would change how docs/07 §10 ("Chromium runs sandboxed") is met; does not change the promise itself. |
 
 ## Context
@@ -47,3 +47,7 @@ Current state (fail closed): the worker image and CI render PDFs **unsandboxed o
 ## Related requirements
 
 FR-EXP-002, FR-EXP-003, FR-EXP-004, SEC-030, SEC-011, NFR-SEC-005; docs/04 §6, docs/07 §10, docs/10 §6 and §15, ADR-0004, ADR-0015; `apps/api/app/exports/pdf.py`, `apps/api/app/exports/config.yaml`, `apps/api/Dockerfile` (target `worker`), `infra/docker/worker-pdf-smoke.py`.
+
+## Acceptance (2026-09-27)
+
+Accepted by the product owner on 2026-09-27 ("go with your recommendations"). Dedicated tier: option D; shared tier: option A (EC2 capacity for the `pdf` queue). Interim B only with a docs/07 exception if PDFs are needed on the shared tier before A exists; C rejected.

@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-09-27 |
-| Deciders | Product owner (pending), tech lead |
+| Deciders | Product owner (accepted 2026-09-27) |
 | Amends / supersedes | none. Adds one dependency under ADR-0004's stack. |
 
 ## Context
@@ -18,7 +18,7 @@ Forces:
 - **Telugu.** Many Telugu PDFs use legacy non-Unicode fonts or lack `ToUnicode` maps, so the "text layer" is mojibake. Extraction must detect this (e.g. share of Telugu-block or replacement characters per page) and route such pages to OCR (docs/06 §4.2 scanned path) instead of indexing garbage.
 - **Layout.** Page numbers are required; block order and table detection help chunking (docs/06 §4.5) but are secondary to correct text.
 
-## Decision (proposed)
+## Decision
 
 1. Use **pypdfium2** (Python bindings to Google's PDFium; Apache-2.0 / BSD-3-Clause, PDFium itself BSD-3-Clause) for the PDF text layer: per-page text with page numbers, run in the `ingest` worker only.
 2. Pages whose extracted text fails a quality check (to be set in `knowledge/config/chunking.yaml`, e.g. too few letters per page, or Telugu-looking text outside the Telugu Unicode block) MUST NOT be indexed from the text layer; they are marked `needs attention` and later go to OCR.
@@ -43,3 +43,7 @@ Forces:
 ## Related requirements
 
 FR-DOC-001, FR-DOC-002, FR-DOC-006, FR-KB-001, PRV-013 (redaction still runs on PDF text); docs/06 §4.2, §4.3; CLAUDE.md §11 (dependency checks).
+
+## Acceptance (2026-09-27)
+
+Accepted by the product owner on 2026-09-27 ("go with your recommendations"). pypdfium2 adopted as proposed.

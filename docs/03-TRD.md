@@ -183,7 +183,7 @@ All FR-PLT routes are under `/api/v1/platform/*`, use `require_platform()` and t
 | ID | Requirement | V |
 |---|---|---|
 | FR-PLT-001 | Operators with `platform.tenants.read` MUST be able to list and view schools (plan, subscription and tenant status, tier, deployment, usage, invoices, flags, tickets) without any access to student data. | T |
-| FR-PLT-002 | Provisioning a shared-tier school (`platform.tenants.provision` ᴿ) MUST, in one transaction and idempotently, create the tenant, wrapped DEK and HMAC key, audit chain head, system roles, owner invite, billing account, subscription and deployment record, via `core.provision_tenant()` and `core.create_user_for_invite()`. | T |
+| FR-PLT-002 | Provisioning a shared-tier school (`platform.tenants.provision` ᴿ) MUST, atomically per step and idempotently, as a resumable provisioning whose incomplete state is visible and blocks go-live (ADR-0024), create the tenant, wrapped DEK and HMAC key, audit chain head, system roles, owner invite, billing account, subscription and deployment record, via `core.provision_tenant()` and `core.create_user_for_invite()`. | T |
 | FR-PLT-003 | Provisioning a dedicated-tier school MUST create the deployment record (`provisioning`), subscription, billing account and a per-deployment heartbeat key (shown once); the tenant row is created on the host by the runbook with the same tenant ID. | T/D |
 | FR-PLT-004 | Suspend and reactivate (`platform.tenants.suspend` ᴿ) MUST require a reason, use `core.set_tenant_status()`, keep the owner's access to full export and Plan & billing while suspended, and delete nothing. | T |
 | FR-PLT-005 | Offboarding (`platform.tenants.offboard` ᴿ) MUST need two different operators (request + approve), then delete tenant data within 30 days, destroy keys (crypto-shredding) and record a certificate of deletion. | T |
@@ -223,7 +223,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-AUD-005 | Partial | Viewer with filters and chain verification built; CSV export not built |
 | FR-OPS-004 | Partial | `ops.break_glass_grants` and `platform.breakglass_requests` with the 8-hour and two-person rules in the database; workflow M1 |
 | FR-PLT-001, FR-PLT-003, FR-PLT-005, FR-PLT-010..018, FR-PLT-020, FR-PLT-022..030 | Built | 16 §8 route catalog. FR-PLT-005: two-person request/approval built; data deletion, key destruction and certificate are M1. FR-PLT-020: students, storage, documents and AI meters are 0 until `sis`/`kb` exist |
-| FR-PLT-002 | Partial | Built, but not "in one transaction": the first transaction (tenant row, deployment, billing account, subscription) is atomic; keys, roles, owner invite and the school-chain event follow as idempotent, resumable steps (decision pending) |
+| FR-PLT-002 | Built | Resumable provisioning (ADR-0024, migration `0020_provisioning_runs`): each step atomic and idempotent, state visible to operators, resume route, go-live blocked until complete |
 | FR-PLT-004 | Partial | Suspend/reactivate built; while suspended the owner and principal keep `/me` and Plan & billing (pinned allowlist, 16 §5.5); the full export joins the allowlist when FR-ADM-001 is built |
 | FR-PLT-019, FR-PLT-021 | Partial | Void built; reminder and threshold emails not built (no email delivery in M0); threshold crossings recorded and audited |
 
