@@ -11,11 +11,12 @@ when Docker is missing: DB tests fail loudly instead (never weaken tests).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import subprocess
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -191,6 +192,33 @@ def make_alembic_config() -> type[Config] | object:
 def tenant_ids() -> tuple[uuid.UUID, uuid.UUID]:
     """Two fresh synthetic tenant IDs (A, B) for cross-tenant tests."""
     return uuid.uuid4(), uuid.uuid4()
+
+
+@contextlib.contextmanager
+def _coverage_paused() -> Iterator[None]:
+    """Stop coverage tracing (``make test-api`` runs with ``--cov``) for a timed block.
+
+    Branch tracing adds ~25% CPU time to tight Python loops, and more when the host is busy, so
+    a CPU-time budget measured under ``--cov`` measures the tracer, not the code. The block's
+    lines are covered by the functional tests; the budget itself is unchanged.
+    """
+    import coverage
+
+    cov = coverage.Coverage.current()
+    if cov is None:
+        yield
+        return
+    cov.stop()
+    try:
+        yield
+    finally:
+        cov.start()
+
+
+@pytest.fixture
+def coverage_paused() -> Callable[[], contextlib.AbstractContextManager[None]]:
+    """Context manager factory for timing tests: ``with coverage_paused(): ...``."""
+    return _coverage_paused
 
 
 def execute_admin(engine: Engine, sql: str) -> None:

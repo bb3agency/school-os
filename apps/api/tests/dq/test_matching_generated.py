@@ -12,6 +12,8 @@ from __future__ import annotations
 import random
 import time
 from collections import Counter
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 
 import pytest
 
@@ -112,7 +114,9 @@ def test_unrelated_names_are_never_structural_matches(
     assert sum(matrix[("NEGATIVE", c)] for c in lenient) == 0
 
 
-def test_FR_DQ_005_twenty_thousand_pairs_under_two_seconds() -> None:
+def test_FR_DQ_005_twenty_thousand_pairs_under_two_seconds(
+    coverage_paused: Callable[[], AbstractContextManager[None]],
+) -> None:
     """20,000 classifications (register name vs other sources) in < 2 s of CPU time.
 
     Workload: generated variants of synthetic names plus unrelated names, all caches cleared
@@ -124,7 +128,9 @@ def test_FR_DQ_005_twenty_thousand_pairs_under_two_seconds() -> None:
     one unlucky run could fail a correct build. The test therefore takes the best of 3
     identical runs: noise only ever makes a run slower, so the fastest run is the
     closest measure of the code itself. The 2-second limit is unchanged; a real slowdown makes
-    every run slow and still fails.
+    every run slow and still fails. Coverage tracing is paused while timing (``make test-api``
+    runs with ``--cov``; branch tracing alone added ~25% and, on a busy host, pushed a 1.0 s
+    workload to 2.3 s): the budget is for the code, not the tracer.
     """
     runs = 3
     pairs = [(a, b) for a, b, _ in _labelled_pairs(3500, seed=SEED + 1)][:20_000]
@@ -134,10 +140,11 @@ def test_FR_DQ_005_twenty_thousand_pairs_under_two_seconds() -> None:
     for _ in range(runs):
         matching.load_variant_dictionary()._prepared.clear()
         matching._analyse.cache_clear()
-        started = time.process_time()
-        for a, b in pairs:
-            classify(a, b)
-        timings.append(time.process_time() - started)
+        with coverage_paused():
+            started = time.process_time()
+            for a, b in pairs:
+                classify(a, b)
+            timings.append(time.process_time() - started)
     best = min(timings)
     shown = ", ".join(f"{t:.2f}" for t in timings)
     print(f"\n20,000 name classifications: best {best:.2f} s CPU of {shown}")  # noqa: T201
