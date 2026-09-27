@@ -108,7 +108,7 @@ ifneq ($(HAS_WEB),)
 endif
 
 typecheck: ## mypy --strict + tsc
-	$(UV) run mypy apps/api apps/worker
+	$(UV) run mypy apps/api apps/worker evals
 ifneq ($(HAS_WEB),)
 	npm run typecheck
 endif

@@ -65,7 +65,7 @@ apps/api/app/
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0016_extraction (linear chain; one module per M1 revision)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0020_provisioning_runs (linear chain; `alembic heads` shows the current head)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)
@@ -76,7 +76,7 @@ infra/db/        bootstrap.sql: database roles, schemas, extensions (run as DB a
 infra/docker/    local-only helpers (db init, dev OIDC stub config, SeaweedFS config)
 deploy/dedicated/ compose.yaml + Caddyfile + scripts for dedicated-tier hosts
 docs/            this documentation
-evals/, config/  planned (M2): RAG harness; models, prompts, DQ rules, export profiles
+evals/           RAG evaluation harness (package sos_evals: synthetic datasets, metrics, hard/soft gates in gates.toml; make eval)
 ```
 
 Each backend module: `api.py` (routes) · `schemas.py` (Pydantic IO) · `service.py` (business logic) · `repository.py` (DB access) · `models.py` (SQLAlchemy) · `tasks.py` (Celery); its tests live in `apps/api/tests/<module>/`.
@@ -98,7 +98,7 @@ make migration-check  # migration upgrade/downgrade round trips (fresh and popul
 make e2e              # playwright
 make lint typecheck   # ruff, import-linter, eslint, prettier; mypy --strict, tsc
 make security         # gitleaks, semgrep, pip-audit, npm audit, trivy fs + config
-make eval             # RAG evaluation harness (placeholder until M2; see docs/06 §13)
+make eval             # RAG evaluation harness, hard gates (stub adapter until the knowledge module lands; docs/06 §13)
 make check            # lint typecheck test security (what CI runs; CI adds migrations, authz-suite, terraform, images)
 ```
 
