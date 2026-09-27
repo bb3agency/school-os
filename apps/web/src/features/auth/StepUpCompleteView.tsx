@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { STEP_UP_CHANNEL, STEP_UP_COMPLETE } from "@/lib/bff/step-up";
@@ -13,7 +13,6 @@ import { STEP_UP_CHANNEL, STEP_UP_COMPLETE } from "@/lib/bff/step-up";
  */
 export function StepUpCompleteView() {
   const t = useTranslations("errors.stepUp");
-  const [announced, setAnnounced] = useState(false);
 
   useEffect(() => {
     if (typeof BroadcastChannel !== "undefined") {
@@ -21,7 +20,6 @@ export function StepUpCompleteView() {
       channel.postMessage(STEP_UP_COMPLETE);
       channel.close();
     }
-    setAnnounced(true);
     // Allowed for windows opened by a script; ignored otherwise.
     window.close();
   }, []);
@@ -29,9 +27,7 @@ export function StepUpCompleteView() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">{t("completeTitle")}</h1>
-      <Alert tone="success" live={announced}>
-        {t("completeBody")}
-      </Alert>
+      <Alert tone="success">{t("completeBody")}</Alert>
       <Button variant="secondary" onClick={() => window.close()}>
         {t("closeWindow")}
       </Button>

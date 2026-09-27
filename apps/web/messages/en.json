@@ -1442,5 +1442,235 @@
       "pageDescription": "Progress and results of one check of student records.",
       "seeFindings": "See the problems found"
     }
+  },
+  "changeRequests": {
+    "nav": "Correction requests",
+    "title": "Correction requests",
+    "description": "Changes to a student's name, date of birth, gender, parents' names or admission details. One person asks with evidence; someone else approves.",
+    "approverHint": "Requests marked \"Waiting for you\" need your decision. You can never approve your own request.",
+    "newRequest": "Request a correction",
+    "filtersTitle": "Filters",
+    "filterStatus": "Status",
+    "oneStudentOnly": "Showing one student only.",
+    "allStudents": "Show all students",
+    "colRequested": "Asked on",
+    "colField": "Field",
+    "colChange": "Change",
+    "colStatus": "Status",
+    "colBy": "Asked by",
+    "you": "You",
+    "someoneElse": "Someone else",
+    "byYou": "Asked by you",
+    "bySomeoneElse": "Asked by someone else",
+    "waitingForYou": "Waiting for you",
+    "open": "Open",
+    "showMore": "Show more",
+    "emptyTitle": "No correction requests",
+    "emptyBody": "Nothing matches these filters.",
+    "emptyBodyRequester": "Nothing matches these filters. To fix a student's identity details, request a correction with evidence.",
+    "oldValue": "Now",
+    "newValue": "Change to",
+    "noValue": "Empty",
+    "maskedValue": "Hidden to protect personal details",
+    "expiresOn": "Expires on {date} ({days, plural, =0 {today} one {in # day} other {in # days}})",
+    "expiredNow": "Expired",
+    "genderValues": {
+      "female": "Female",
+      "male": "Male",
+      "transgender": "Transgender"
+    },
+    "status": {
+      "pending": "Waiting for approval",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Withdrawn"
+    },
+    "errors": {
+      "self_approval_forbidden": {
+        "title": "Someone else must decide this",
+        "body": "You asked for this correction, so another person with approval rights must approve or reject it."
+      },
+      "not_requester": {
+        "title": "Only the person who asked can withdraw it",
+        "body": "Ask the person who made this request to withdraw it, or reject it if you approve requests."
+      },
+      "request_not_pending": {
+        "title": "This request was already decided",
+        "body": "Reload the page to see what was decided."
+      },
+      "request_expired": {
+        "title": "This request has expired",
+        "body": "Requests expire after 30 days. If the correction is still needed, make a new request."
+      },
+      "request_outdated": {
+        "title": "The value changed after this request was made",
+        "body": "Reject this request and make a new one with the current value."
+      },
+      "duplicate_pending_request": {
+        "title": "A request is already waiting",
+        "body": "There is already a request for this student, field and source. Open the list of correction requests and wait for that one to be decided."
+      },
+      "evidence_required": {
+        "title": "Attach the evidence",
+        "body": "Add a scan or photo of the document that shows the right value, such as the birth certificate."
+      },
+      "not_identity_attribute": {
+        "title": "This field does not need a correction request",
+        "body": "Only identity details need approval. Change this field on the student's record instead."
+      },
+      "aadhaar_full_number_rejected": {
+        "title": "Remove the Aadhaar number",
+        "body": "Never type a full Aadhaar number. If you need to refer to it, use only the last 4 digits."
+      },
+      "file_too_large": {
+        "title": "The file is too large",
+        "body": "Evidence can be up to 25 MB. Scan at a lower resolution or send a photo instead."
+      },
+      "unsupported_file_type": {
+        "title": "This kind of file can't be used",
+        "body": "Upload a PDF, JPG or PNG file."
+      },
+      "polyglot_suspected": {
+        "title": "This file can't be used",
+        "body": "The file looks damaged or unsafe. Scan the document again and upload the new file."
+      },
+      "upload_expired": {
+        "title": "The upload took too long",
+        "body": "Send the request again; the file will be uploaded again."
+      },
+      "storage_unavailable": {
+        "title": "Files can't be stored right now",
+        "body": "Try again in a few minutes. Nothing was saved."
+      }
+    },
+    "validation": {
+      "invalid": "Check this value and try again.",
+      "tooLong": "This is too long. Shorten it and try again.",
+      "chooseStudent": "Find and choose the student first.",
+      "chooseField": "Choose the field to correct.",
+      "chooseSource": "Choose the record this correction is for.",
+      "valueRequired": "Enter the correct value.",
+      "invalidDate": "Enter a real date as DD/MM/YYYY, for example 01/06/2012.",
+      "dateInFuture": "The date can't be in the future.",
+      "noAadhaar": "This looks like a full Aadhaar number. Remove it; use only the last 4 digits if you must refer to it.",
+      "reasonRequired": "Say why the record should change.",
+      "reasonTooShort": "Give a reason of at least 10 characters.",
+      "reasonTooLong": "Keep the reason under 1000 characters.",
+      "fileRequired": "Choose the evidence file (a scan or photo of the document).",
+      "fileType": "Choose a PDF, JPG or PNG file.",
+      "fileTooLarge": "The file is larger than 25 MB. Scan at a lower resolution or use a photo.",
+      "fileEmpty": "This file is empty. Choose the scanned document again.",
+      "uploadFailed": "The file could not be uploaded. Check your internet connection and send the request again.",
+      "chooseDocument": "Choose the evidence document."
+    },
+    "fieldErrors": {
+      "invalid": "Check this value and try again.",
+      "missing": "Fill in this field.",
+      "too_long": "This is too long. Shorten it and try again.",
+      "invalid_format": "This value is not in the right format. Check it against the document.",
+      "not_allowed": "Choose one of the allowed values.",
+      "invalid_date": "Enter a real date as DD/MM/YYYY.",
+      "date_too_early": "This date is too early to be right. Check it against the document.",
+      "date_in_future": "The date can't be in the future.",
+      "source_not_allowed": "This field can't be recorded for that source. Choose another source.",
+      "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits.",
+      "evidence_not_found": "This evidence document can't be found or you can't open it. Upload the file again.",
+      "evidence_wrong_purpose": "This document was not uploaded as evidence. Upload the file again here.",
+      "evidence_not_usable": "This document can't be used (it may have failed the virus check). Upload a new scan.",
+      "not_identity_attribute": "This field does not need a correction request."
+    },
+    "new": {
+      "title": "Request a correction",
+      "description": "Ask for an identity detail to be corrected. Nothing on the student's record changes until someone else approves it.",
+      "makerChecker": "You make the request; another person with approval rights checks the evidence and decides. The old value is kept in the history.",
+      "noPermissionTitle": "You can't request corrections",
+      "noPermissionBody": "Ask your school's office admin or principal if you need to request corrections.",
+      "studentTitle": "Student",
+      "search": "Find the student",
+      "searchHint": "Type part of the name, the admission number or the class, for example 9B.",
+      "find": "Find",
+      "searchTooShort": "Type at least 2 characters.",
+      "resultsCount": "{count, plural, =0 {No students found. Check the spelling or try the admission number.} one {# student found} other {# students found}}",
+      "chooseStudent": "Choose the student",
+      "changeStudent": "Choose a different student",
+      "studentUnknown": "Student chosen",
+      "changeTitle": "What to correct",
+      "field": "Field",
+      "fieldHint": "Only identity details are listed. Other details can be changed on the student's record.",
+      "source": "Record to correct",
+      "sourceHint": "Usually the admission register, the legal record of the school.",
+      "currentValue": "Now:",
+      "newValue": "Correct value",
+      "newTextHint": "Type it exactly as on the evidence document.",
+      "reason": "Reason",
+      "reasonHint": "At least 10 characters, for example \"Spelling differs from the birth certificate\". Do not type Aadhaar numbers.",
+      "evidenceCardTitle": "Evidence",
+      "evidenceBody": "Every identity correction needs a document that shows the right value, such as a birth certificate or transfer certificate.",
+      "evidenceHow": "Evidence document",
+      "evidenceUpload": "Upload a file now",
+      "evidenceExisting": "Use a document already uploaded",
+      "evidenceFile": "Scan or photo",
+      "evidenceHint": "PDF, JPG or PNG, up to 25 MB.",
+      "evidenceDocument": "Document",
+      "evidenceDocumentHint": "Documents uploaded as evidence that you can open.",
+      "evidenceNoDocuments": "No evidence documents yet. Choose \"Upload a file now\" instead.",
+      "evidenceDocumentTitle": "Evidence: {field}",
+      "step": {
+        "idle": "Ready.",
+        "presign": "Preparing the upload…",
+        "send": "Uploading the evidence…",
+        "register": "Saving the evidence…",
+        "submit": "Sending the request…"
+      },
+      "submit": "Send for approval",
+      "createdTitle": "Request sent",
+      "createdBody": "Someone with approval rights will check it. You'll be told in the bell when it is decided.",
+      "openCreated": "Open the request",
+      "backToFinding": "Back to the problem"
+    },
+    "detail": {
+      "title": "Correction: {field}",
+      "ownRequestTitle": "You asked for this",
+      "ownRequestBody": "Someone else must approve or reject it. You can withdraw it while it is waiting.",
+      "cannotDecide": "You can't decide this request.",
+      "changeTitle": "The change",
+      "student": "Student",
+      "admissionNo": "Adm. no. {number}",
+      "source": "Record",
+      "reason": "Reason",
+      "evidence": "Evidence",
+      "openEvidence": "Show the evidence",
+      "reloadEvidence": "Show it again",
+      "evidenceAlt": "Evidence document for this correction",
+      "evidenceLinkNote": "The picture link works for a few minutes only. Show it again if it stops loading.",
+      "maskedNote": "Sensitive values are hidden here. The printed memo shows them to staff who may see them.",
+      "timelineTitle": "Timeline",
+      "requestedAt": "Asked on",
+      "expires": "Expires",
+      "decidedAt": "Decided on",
+      "decisionNote": "Note",
+      "rejectReason": "Reason for rejecting",
+      "approvedNote": "The new value was recorded as verified. The old value is kept in the history, and the checks were run again.",
+      "expiredNote": "Nobody decided this within 30 days. Make a new request if the correction is still needed.",
+      "approve": "Approve",
+      "approveTitle": "Approve this correction",
+      "approveBody": "The new value will be recorded as verified for this record. Check the evidence first. You will be asked to confirm it's you.",
+      "approveNote": "Note (optional)",
+      "approveNoteHint": "Up to 1000 characters. Do not type Aadhaar numbers.",
+      "reject": "Reject",
+      "rejectTitle": "Reject this correction",
+      "rejectBody": "The record stays as it is. The person who asked will see your reason.",
+      "rejectReasonHint": "At least 10 characters, for example \"The birth certificate shows a different date\".",
+      "cancel": "Withdraw",
+      "cancelTitle": "Withdraw this request",
+      "cancelBody": "Nothing on the record changes. You can make a new request later.",
+      "memoTitle": "Correction memo",
+      "memoBody": "A printable memo in English and Telugu to file with the paper admission register.",
+      "openMemo": "Open the memo to print",
+      "newTab": "opens in a new tab",
+      "allForStudent": "All correction requests for this student",
+      "backToList": "Back to the list"
+    }
   }
 }

@@ -15,12 +15,7 @@ import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
 import type { ChangeRequestFilters } from "./filters";
 import { ChangeRequestStatusBadge, ExpiryText, fieldLabel, ValueChange } from "./parts";
-import {
-  CHANGE_REQUEST_STATUSES,
-  CR_APPROVE,
-  CR_REQUEST,
-  type ChangeRequest,
-} from "./types";
+import { CHANGE_REQUEST_STATUSES, CR_APPROVE, CR_REQUEST, type ChangeRequest } from "./types";
 
 export const CR_KEYS = {
   all: ["staff", "change-requests"],

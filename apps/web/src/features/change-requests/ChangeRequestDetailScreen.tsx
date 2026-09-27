@@ -35,8 +35,7 @@ const approveSchema = z.object({
   note: z
     .string()
     .trim()
-    .refine((value) => value === "" || value.length >= TEXT_MIN, { error: "reasonTooShort" })
-    .refine((value) => value.length <= TEXT_MAX, { error: "tooLong" })
+    .max(TEXT_MAX, { error: "tooLong" })
     .transform((value) => (value === "" ? null : value)),
 });
 const rejectSchema = z.object({ reason: decisionText });
@@ -64,13 +63,18 @@ function useStudentLabel(studentId: string | null, enabled: boolean) {
   };
 }
 
-/** Evidence: a short-lived presigned download link (≤ 5 min), opened as a download. */
-function EvidenceButton({ documentId }: { documentId: string }) {
+/**
+ * Evidence (docs/07 §6.3: the approver sees an evidence preview). A short-lived presigned link
+ * (≤ 5 min, `attachment`) is fetched on demand: images are shown on the page (img-src allows
+ * the files origin), other files (PDF) are downloaded. The link is never stored.
+ */
+function EvidenceViewer({ documentId }: { documentId: string }) {
   const t = useTranslations("changeRequests.detail");
   const tc = useTranslations("common");
   const api = useBffClient("staff");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
+  const [image, setImage] = useState<string | null>(null);
   async function open() {
     setPending(true);
     setError(undefined);
@@ -80,7 +84,8 @@ function EvidenceButton({ documentId }: { documentId: string }) {
           params: { path: { document_id: documentId } },
         }),
       );
-      window.location.assign(link.url);
+      if (link.mime_type.startsWith("image/")) setImage(link.url);
+      else window.location.assign(link.url);
     } catch (failure) {
       setError(failure);
     } finally {
@@ -89,8 +94,21 @@ function EvidenceButton({ documentId }: { documentId: string }) {
   }
   return (
     <div className="space-y-2">
+      {image ? (
+        <figure className="space-y-2">
+          {/* A short-lived presigned URL on the files origin (CSP img-src): next/image would
+              proxy and cache it, which must not happen for evidence documents. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image}
+            alt={t("evidenceAlt")}
+            className="max-h-96 max-w-full rounded-md border border-border"
+          />
+          <figcaption className="text-xs text-ink-muted">{t("evidenceLinkNote")}</figcaption>
+        </figure>
+      ) : null}
       <Button variant="secondary" size="sm" onClick={() => void open()} disabled={pending}>
-        {pending ? tc("working") : t("downloadEvidence")}
+        {pending ? tc("working") : image ? t("reloadEvidence") : t("openEvidence")}
       </Button>
       <ApiErrorAlert error={error} namespace="changeRequests" />
     </div>
@@ -105,8 +123,7 @@ function Decisions({ request, mine }: { request: ChangeRequest; mine: boolean })
   const path = { change_request_id: request.id };
   const headers = { "If-Match": ifMatch(request.version) };
   // SEC-014 / FR-CR-002: the requester is never offered approve or reject (the API refuses too).
-  const decide =
-    request.status === "pending" && request.can_decide && !mine && can(CR_APPROVE);
+  const decide = request.status === "pending" && request.can_decide && !mine && can(CR_APPROVE);
   const cancel = request.status === "pending" && request.can_cancel && mine && can(CR_REQUEST);
   if (!decide && !cancel) return null;
   return (
@@ -296,7 +313,7 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
             <dd className="whitespace-pre-line">{data.reason}</dd>
             <dt className="font-semibold">{td("evidence")}</dt>
             <dd>
-              <EvidenceButton documentId={data.evidence_document_id} />
+              <EvidenceViewer documentId={data.evidence_document_id} />
             </dd>
           </dl>
           {data.masked ? <p className="mt-4 text-sm text-ink-muted">{td("maskedNote")}</p> : null}
@@ -307,9 +324,7 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
             <dt className="font-semibold">{td("requestedAt")}</dt>
             <dd>
               <Value>{formatDateTime(data.requested_at)}</Value>
-              <span className="block text-ink-muted">
-                {mine ? t("byYou") : t("bySomeoneElse")}
-              </span>
+              <span className="block text-ink-muted">{mine ? t("byYou") : t("bySomeoneElse")}</span>
             </dd>
             {data.status === "pending" ? (
               <>
@@ -336,12 +351,8 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
               </>
             ) : null}
           </dl>
-          {data.status === "approved" ? (
-            <p className="mt-4 text-sm">{td("approvedNote")}</p>
-          ) : null}
-          {data.status === "expired" ? (
-            <p className="mt-4 text-sm">{td("expiredNote")}</p>
-          ) : null}
+          {data.status === "approved" ? <p className="mt-4 text-sm">{td("approvedNote")}</p> : null}
+          {data.status === "expired" ? <p className="mt-4 text-sm">{td("expiredNote")}</p> : null}
         </Card>
       </div>
 

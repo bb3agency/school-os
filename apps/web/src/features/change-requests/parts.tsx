@@ -82,6 +82,8 @@ export function ExpiryText({ request }: { request: ChangeRequest }) {
   const days = daysUntil(request.expires_at);
   if (days < 0) return <span suppressHydrationWarning>{t("expiredNow")}</span>;
   return (
-    <span suppressHydrationWarning>{t("expiresOn", { date: formatDate(request.expires_at) ?? "", days: Math.max(days, 0) })}</span>
+    <span suppressHydrationWarning>
+      {t("expiresOn", { date: formatDate(request.expires_at) ?? "", days: Math.max(days, 0) })}
+    </span>
   );
 }
