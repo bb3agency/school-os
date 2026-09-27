@@ -9,6 +9,8 @@ HAS_WEB   := $(wildcard package.json)
 GITLEAKS_IMAGE  ?= zricethezav/gitleaks:v8.30.1
 TRIVY_IMAGE     ?= aquasec/trivy:0.74.0
 SEMGREP_VERSION ?= 1.178.0
+# Same Terraform version as CI (.github/actions/install-tools); multi-arch index digest.
+TERRAFORM_IMAGE ?= hashicorp/terraform:1.16.4@sha256:985cdc6c1d9b0a65b83377f666efd2f740b47f02ac55be1ced3d18f7d3b0e829
 
 # CI installs gitleaks/trivy on PATH (.github/actions/install-tools); locally we fall back to pinned images.
 GITLEAKS = $(if $(shell command -v gitleaks 2>/dev/null),gitleaks,docker run --rm -v "$(CURDIR):/repo" -w /repo $(GITLEAKS_IMAGE))
@@ -18,7 +20,7 @@ TRIVY    = $(if $(shell command -v trivy 2>/dev/null),trivy,docker run --rm -v "
 ARGS ?=
 
 .PHONY: help install dev dev-host dev-stop down logs migrate seed-synthetic sync-system-roles test test-api test-web test-security \
-        migration-check e2e lint format typecheck security eval check db-shell openapi
+        migration-check e2e lint format typecheck security eval check db-shell openapi tf-validate
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-16s %s\n",$$1,$$2}'
@@ -125,6 +127,11 @@ ifneq ($(HAS_WEB),)
 endif
 	$(TRIVY) fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .venv --skip-dirs .claude .
 	$(TRIVY) config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .claude .
+
+tf-validate: ## terraform fmt/init/validate/test on every root, pinned image as CI (ONLY="modules/s3 ...")
+	docker run --rm -v "$(CURDIR)/infra/terraform:/src:ro" -v sos-terraform-plugins:/plugins \
+	  -e TF_PLUGIN_CACHE_DIR=/plugins -e ONLY -e SKIP_TESTS --entrypoint /bin/sh $(TERRAFORM_IMAGE) \
+	  -c 'cp -R /src /work && exec /bin/sh /work/scripts/validate.sh'
 
 eval: ## RAG evaluation harness (M2; no knowledge module yet)
 	@echo "eval: no knowledge module yet (M2). Nothing to evaluate."
