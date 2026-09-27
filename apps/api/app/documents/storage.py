@@ -6,6 +6,7 @@ per school)::
     t/<tenant_id>/docs/<document_id>/v<n>/original.<ext>
     t/<tenant_id>/docs/<document_id>/v<n>/derived/...        (M2: text layer, page renders)
     t/<tenant_id>/imports/<batch_id>/raw.<ext>
+    t/<tenant_id>/exports/<export_id>/<file>                  (exports; deleted after 7 days)
 
 - Browsers upload with a presigned POST that pins the exact key, the exact Content-Type and a
   content-length-range, and expires in at most 10 minutes. With ``SOS_S3_KMS_KEY_ID`` set the
@@ -20,6 +21,7 @@ is :class:`S3ObjectStore` (boto3; SeaweedFS locally and in CI via an endpoint ov
 from __future__ import annotations
 
 import datetime as dt
+import re
 import threading
 import uuid
 from collections.abc import Iterator
@@ -40,6 +42,7 @@ MAX_UPLOAD_URL_TTL_S: Final = 600
 MAX_DOWNLOAD_URL_TTL_S: Final = 300
 CHUNK_BYTES: Final = 1024 * 1024
 SSE_KMS: Final = "aws:kms"
+_EXPORT_FILENAME_RE: Final = re.compile(r"[a-z0-9][a-z0-9._-]{0,79}")
 
 
 class ObjectStoreError(RuntimeError):
@@ -100,6 +103,17 @@ def derived_key(
 
 def import_key(tenant_id: uuid.UUID, batch_id: uuid.UUID, ext: str) -> str:
     return f"{tenant_prefix(tenant_id)}imports/{batch_id}/raw.{ext}"
+
+
+def export_prefix(tenant_id: uuid.UUID, export_id: uuid.UUID) -> str:
+    """``t/<tenant_id>/exports/<export_id>/`` (docs/04 §8.2; lifecycle: delete after 7 days)."""
+    return f"{tenant_prefix(tenant_id)}exports/{export_id}/"
+
+
+def export_key(tenant_id: uuid.UUID, export_id: uuid.UUID, filename: str) -> str:
+    if not _EXPORT_FILENAME_RE.fullmatch(filename):
+        raise ValueError("export file names are generated: [a-z0-9][a-z0-9._-]{0,79}")
+    return f"{export_prefix(tenant_id, export_id)}{filename}"
 
 
 def upload_key(tenant_id: uuid.UUID, intent_id: uuid.UUID, ext: str) -> str:

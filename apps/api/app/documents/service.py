@@ -77,6 +77,8 @@ from app.documents.storage import (
     derived_key,
     document_key,
     document_prefix,
+    export_key,
+    export_prefix,
     get_object_store,
     import_key,
     key_in_tenant,
@@ -1217,6 +1219,62 @@ def store_page_image(
     return key
 
 
+# --- export files (app.exports; docs/04 §8.2 t/<tenant>/exports/<export_id>/<file>) ---------------
+
+
+def store_export_file(
+    session: Session,
+    export_id: uuid.UUID,
+    filename: str,
+    data: bytes,
+    content_type: str,
+    *,
+    store: ObjectStore | None = None,
+) -> str:
+    """Store a generated export file (worker) in the private bucket under the current school's
+    ``exports/`` prefix (SSE-KMS through the object store); returns the object key. Export
+    files are not documents: they are never scanned, indexed or listed, and are deleted after
+    the export retention period (:func:`delete_export_files`)."""
+    if not data:
+        raise ValueError("export files are never empty")
+    key = export_key(repo.current_tenant_id(session), export_id, filename)
+    (store or get_object_store()).put(key, data, content_type)
+    return key
+
+
+def export_download_url(
+    session: Session,
+    export_id: uuid.UUID,
+    object_key: str,
+    *,
+    content_type: str,
+    filename: str,
+    ttl_s: int,
+    store: ObjectStore | None = None,
+) -> tuple[str, dt.datetime]:
+    """A presigned GET (at most 5 minutes, ``Content-Disposition: attachment``) for an export
+    file of the current school (FR-DOC-004). The caller (``app.exports``) has checked who may
+    download it and audits the download."""
+    tenant_id = repo.current_tenant_id(session)
+    if not (
+        key_in_tenant(object_key, tenant_id)
+        and object_key.startswith(export_prefix(tenant_id, export_id))
+    ):
+        raise _not_found()
+    ttl = min(ttl_s, get_settings().documents_download_url_ttl_s)
+    return (store or get_object_store()).presigned_get(
+        key=object_key, content_type=content_type, filename=filename, expires_s=ttl
+    )
+
+
+def delete_export_files(
+    session: Session, export_id: uuid.UUID, *, store: ObjectStore | None = None
+) -> int:
+    """Delete every stored file of one export of the current school (retention, docs/05 §13)."""
+    prefix = export_prefix(repo.current_tenant_id(session), export_id)
+    return (store or get_object_store()).delete_prefix(prefix)
+
+
 __all__ = [
     "ACL_CHANGED_HOOKS",
     "DELETE_GUARDS",
@@ -1229,8 +1287,10 @@ __all__ = [
     "add_version",
     "create_upload",
     "delete_document",
+    "delete_export_files",
     "document_object",
     "evidence_exists",
+    "export_download_url",
     "get_document",
     "get_download_url",
     "is_visible",
@@ -1242,6 +1302,7 @@ __all__ = [
     "register_document",
     "scan_version",
     "set_acl",
+    "store_export_file",
     "store_page_image",
     "validate_acl",
     "withhold_version",

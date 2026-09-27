@@ -1309,13 +1309,15 @@ class ActiveEnrolment:
     student_id: uuid.UUID
     section_id: uuid.UUID
     academic_year_id: uuid.UUID
+    roll_no: str | None = None  # exports: class lists and "ready to enter" sheets
 
 
 def active_enrolments(
     session: Session, student_ids: Collection[uuid.UUID]
 ) -> dict[uuid.UUID, list[ActiveEnrolment]]:
     """Active enrolments in any academic year for many students (dq: DQ-007 age band,
-    DQ-012 enrolled twice). ``student_ids`` MUST come from :func:`list_students_in_scope`."""
+    DQ-012 enrolled twice; exports: section and roll number). ``student_ids`` MUST come from
+    :func:`list_students_in_scope`."""
     out: dict[uuid.UUID, list[ActiveEnrolment]] = {}
     for row in repo.active_enrollments_of(session, list(student_ids)):
         out.setdefault(row.student_id, []).append(
@@ -1324,6 +1326,7 @@ def active_enrolments(
                 student_id=row.student_id,
                 section_id=row.section_id,
                 academic_year_id=row.academic_year_id,
+                roll_no=row.roll_no,
             )
         )
     return out
