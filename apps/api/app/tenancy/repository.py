@@ -171,6 +171,32 @@ def lock_tenant_initialisation(session: Session) -> None:
     )
 
 
+def lock_tenant_keys(session: Session) -> None:
+    """Serialise key rotation and retirement per tenant (transaction-level advisory lock)."""
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock(hashtextextended("
+            "'core.tenant_keys:rotate:' || core.current_tenant()::text, 0))"
+        )
+    )
+
+
+def db_now(session: Session) -> dt.datetime:
+    """The transaction timestamp (``now()``), the clock ``created_at``/``retired_at`` use."""
+    value: dt.datetime = session.execute(select(func.now())).scalar_one()
+    return value
+
+
+def retire_tenant_key(session: Session, key_version: int) -> TenantKey | None:
+    """Set ``retired_at`` once (``sos_app`` may update only that column); ``None`` if absent."""
+    return session.scalars(
+        update(TenantKey)
+        .where(TenantKey.key_version == key_version, TenantKey.retired_at.is_(None))
+        .values(retired_at=func.now())
+        .returning(TenantKey)
+    ).one_or_none()
+
+
 def list_tenant_keys(session: Session) -> list[TenantKey]:
     return list(session.scalars(select(TenantKey).order_by(TenantKey.key_version)))
 

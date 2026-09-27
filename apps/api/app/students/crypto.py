@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.crypto import (
+    KEY_CACHE_MAX_S,
     CryptoError,
     KeyWrapper,
     aead_decrypt,
@@ -39,6 +40,7 @@ from app.core.crypto import (
     ciphertext_key_version,
     field_aad,
     get_key_wrapper,
+    reencrypt,
 )
 
 __all__ = [
@@ -50,10 +52,11 @@ __all__ = [
     "decrypt_value",
     "encrypt_value",
     "get_keyring",
+    "reencrypt_value",
     "set_key_wrapper",
 ]
 
-CACHE_TTL_S: Final = 15 * 60
+CACHE_TTL_S: Final = KEY_CACHE_MAX_S
 _BLIND_INDEX_CONTEXT: Final = b"schoolos/blind-index/v1|"
 
 _KEYS_SQL = text(
@@ -110,6 +113,13 @@ class TenantKeyring:
         with self._lock:
             self._cache.clear()
             self._active.clear()
+
+    def forget(self, tenant_id: uuid.UUID) -> None:
+        """Drop one school's cached keys (after its key versions changed in this process)."""
+        with self._lock:
+            for cached in [k for k in self._cache if k[0] == tenant_id]:
+                del self._cache[cached]
+            self._active.pop(tenant_id, None)
 
     def _fresh(self, loaded_at: float) -> bool:
         return self._clock() - loaded_at < self._ttl
@@ -219,6 +229,27 @@ def decrypt_value(
     tenant_id, dek = ring.dek(session, ciphertext_key_version(blob))
     aad = field_aad(tenant_id, table, column, row_id)
     return aead_decrypt(dek, blob, aad).decode("utf-8")
+
+
+def reencrypt_value(
+    session: Session,
+    blob: bytes,
+    *,
+    table: str,
+    column: str,
+    row_id: uuid.UUID,
+    key_version: int,
+    keyring: TenantKeyring | None = None,
+) -> bytes:
+    """Re-encrypt one cell under ``key_version`` (key rotation, SEC-012); same AAD, same cell.
+
+    :class:`CryptoError` if the stored value fails authentication (it is then left unchanged).
+    """
+    ring = keyring or get_keyring()
+    tenant_id, old_dek = ring.dek(session, ciphertext_key_version(blob))
+    _, new_dek = ring.dek(session, key_version)
+    aad = field_aad(tenant_id, table, column, row_id)
+    return reencrypt(old_dek, new_dek, blob, aad, key_version=key_version)
 
 
 def blind_index(

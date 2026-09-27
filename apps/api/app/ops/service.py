@@ -127,6 +127,11 @@ def start_job(
     return _job(row, created)
 
 
+def record_job_progress(session: Session, job_id: uuid.UUID, progress: Mapping[Any, Any]) -> None:
+    """Store a running job's progress (IDs, codes and counts only, validated like audit)."""
+    repo.update_job(session, job_id, {"progress": sanitize_summary(progress)})
+
+
 def finish_job(
     session: Session, job_id: uuid.UUID, progress: Mapping[Any, Any] | None = None
 ) -> None:

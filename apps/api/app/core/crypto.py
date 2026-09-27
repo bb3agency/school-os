@@ -10,6 +10,10 @@
   The GCM associated data is ``header || aad`` where ``aad = tenant_id|table|column|row_id``
   (:func:`field_aad`), so a ciphertext cannot be moved to another row, column or tenant, and its
   header cannot be edited.
+- Key rotation (07 §8): a school gets a new key version; new writes use the newest unretired
+  version and :func:`reencrypt` moves a value to it. Unwrapped keys are cached for at most
+  :data:`KEY_CACHE_MAX_S`, so a process may keep writing under the previous version for that
+  long after a rotation; retiring a version waits for that window (``tenancy.service``).
 
 Never log keys, plaintext or ciphertext.
 """
@@ -39,6 +43,8 @@ TAG_BYTES = 16
 CIPHERTEXT_VERSION = 1
 MAX_KEY_VERSION = 0xFFFF
 _HEADER_BYTES = 1 + 2
+KEY_CACHE_MAX_S = 15 * 60
+"""Upper bound for caching unwrapped keys in process memory (docs/05 §9: at most 15 minutes)."""
 _LOCAL_WRAP_VERSION = 1
 _MIN_MASTER_KEY_BYTES = 32
 
@@ -223,3 +229,14 @@ def aead_decrypt(dek: bytes, blob: bytes, aad: bytes) -> bytes:
         return AESGCM(dek).decrypt(nonce, sealed, header + aad)
     except InvalidTag as exc:
         raise CryptoError("ciphertext failed authentication") from exc
+
+
+def reencrypt(
+    old_dek: bytes, new_dek: bytes, blob: bytes, aad: bytes, *, key_version: int
+) -> bytes:
+    """Decrypt ``blob`` with ``old_dek`` and encrypt it again under ``new_dek`` as ``key_version``.
+
+    The associated data stays the same (same tenant, table, column and row), so a value can only
+    be re-encrypted in place. The plaintext exists only in this function's frame.
+    """
+    return aead_encrypt(new_dek, aead_decrypt(old_dek, blob, aad), aad, key_version=key_version)
