@@ -40,6 +40,7 @@ from app.authz.catalog import (
     system_roles,
 )
 from app.authz.context import UserContext
+from app.core.config import get_settings
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
 from app.core.logging import get_context
@@ -240,8 +241,26 @@ def _guard_last_owner(session: Session, membership: Membership) -> None:
 # --- login and permission resolution (used by authz) ------------------------------------------
 
 
-def login_memberships(subject: str) -> list[LoginChoice]:
-    """Active, unexpired memberships of the active user with IdP ``subject`` (FR-IAM-013)."""
+def staff_issuer() -> str:
+    """Issuer of school staff identities (``SOS_OIDC_ISSUER``; the tenant token verifier
+    accepts only this issuer for staff tokens)."""
+    return get_settings().oidc_issuer
+
+
+def operator_issuer() -> str:
+    """Issuer of SchoolOS operator identities: the operator pool, whose support app client signs
+    operators in to a school during break-glass (ADR-0023)."""
+    return get_settings().resolved_support_issuer
+
+
+def login_memberships(subject: str, *, support: bool = False) -> list[LoginChoice]:
+    """Active, unexpired memberships of the active user ``(issuer, subject)`` (FR-IAM-013).
+
+    Staff principals (``support=False``) resolve in the staff issuer and never reach a
+    ``platform_support`` membership. Support principals (ADR-0023) resolve in the operator
+    issuer and reach ONLY unexpired memberships holding exactly ``platform_support``
+    (``core.resolve_login`` filters; the authz resolver checks again)."""
+    issuer = operator_issuer() if support else staff_issuer()
     with context_free_session() as session:
         return [
             LoginChoice(
@@ -250,7 +269,7 @@ def login_memberships(subject: str) -> list[LoginChoice]:
                 membership_id=m.membership_id,
                 tenant_status=m.tenant_status,
             )
-            for m in repo.resolve_login(session, subject)
+            for m in repo.resolve_login(session, subject, issuer=issuer, support_only=support)
         ]
 
 
@@ -286,12 +305,17 @@ def record_login_event(
     reason: str | None = None,
     request_id: str | None = None,
     session_id_present: bool = False,
+    issuer_kind: str | None = None,
 ) -> None:
-    """Audit ``auth.login.succeeded`` / ``auth.login.denied`` in the school's own chain."""
+    """Audit ``auth.login.succeeded`` / ``auth.login.denied`` in the school's own chain.
+
+    ``issuer_kind`` = ``operator_support`` for SchoolOS support sign-ins (ADR-0023)."""
     with tenant_session(tenant_id, user_id) as session:
         summary: dict[str, Any] = {"membership_id": membership_id, "session": session_id_present}
         if reason:
             summary["reason"] = reason
+        if issuer_kind:
+            summary["issuer_kind"] = issuer_kind
         audit.record(
             session,
             action="auth.login.succeeded" if succeeded else "auth.login.denied",
@@ -460,6 +484,7 @@ def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
         user_id = repo.create_user_for_invite(
             session,
             subject=data.idp_subject,
+            issuer=staff_issuer(),
             display_name=data.display_name,
             email=data.email,
             language=data.preferred_language,
@@ -845,6 +870,7 @@ def open_breakglass_membership(
     ctx: UserContext | None,
     *,
     subject: str,
+    issuer: str,
     display_name: str,
     email: str | None,
     expires_at: dt.datetime,
@@ -852,11 +878,14 @@ def open_breakglass_membership(
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """Give an operator temporary, read-only ``platform_support`` access until ``expires_at``.
 
-    ``ctx`` is the approving owner/principal (``breakglass.approve``, step-up). The account is
-    created or found with ``core.create_user_for_invite`` (the approver is the inviter), so no
-    new definer function is needed. ``ctx=None`` is the emergency path (two operators confirmed,
-    no school approver): only an existing SchoolOS account can be used, else
-    :class:`BreakglassIdentityMissing` (fail closed).
+    ``ctx`` is the approving owner/principal (``breakglass.approve``, step-up). The operator's
+    identity ``(issuer, subject)`` (operator pool, ADR-0023) is created or found with
+    ``core.create_user_for_invite`` (the approver is the inviter), so no new definer function is
+    needed. A staff account that happens to use the same subject is a different identity and
+    is never given the membership: while the subject is taken by another issuer the approval
+    fails with 409 ``breakglass_identity_conflict`` (fail closed). ``ctx=None`` is the emergency
+    path (two operators confirmed, no school approver): only an existing identity of that
+    operator can be used, else :class:`BreakglassIdentityMissing` (fail closed).
 
     Refuses self-approval and people who already hold ordinary access to this school. A past
     support membership of the same person is reopened (one membership per person and school).
@@ -865,14 +894,26 @@ def open_breakglass_membership(
     Returns (user_id, membership_id).
     """
     if ctx is not None:
-        with _db_errors():
-            user_id = repo.create_user_for_invite(
-                session, subject=subject, display_name=display_name, email=email, language="en"
-            )
+        try:
+            with _db_errors():
+                user_id = repo.create_user_for_invite(
+                    session,
+                    subject=subject,
+                    issuer=issuer,
+                    display_name=display_name,
+                    email=email,
+                    language="en",
+                )
+        except Conflict as exc:
+            raise Conflict(
+                "SchoolOS support cannot be given access with this sign-in. "
+                "Deny this request and ask SchoolOS support to contact you.",
+                code="breakglass_identity_conflict",
+            ) from exc
         if user_id == ctx.user_id:
             raise Forbidden("You cannot approve support access for yourself.", code="self_approval")
     else:
-        found = repo.find_user_id_by_subject(session, subject)
+        found = repo.find_user_id_by_subject(session, subject, issuer=issuer)
         if found is None:
             raise BreakglassIdentityMissing(
                 "The SchoolOS support person has no sign-in for schools yet.",

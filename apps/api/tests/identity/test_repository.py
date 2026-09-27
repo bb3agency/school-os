@@ -11,11 +11,13 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import get_settings
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Forbidden, PreconditionFailed
 from app.identity import repository as repo
 
 pytestmark = pytest.mark.db
+STAFF = get_settings().oidc_issuer
 
 
 @pytest.fixture
@@ -63,6 +65,7 @@ def _invite(tenant: uuid.UUID, inviter: uuid.UUID, subject: str | None = None) -
         return repo.create_user_for_invite(
             s,
             subject=subject or f"sub-{uuid.uuid4().hex}",
+            issuer=STAFF,
             display_name=unicodedata.normalize("NFD", " Lakshmī Devi "),
             email="Lakshmi@Example.test",
             language="te",
@@ -85,8 +88,8 @@ def test_FR_IAM_010_invite_flow_creates_user_and_membership(
         assert user.display_name == unicodedata.normalize("NFC", "Lakshmī Devi")
         assert user.preferred_language == "te"
     with context_free_session() as s:
-        assert repo.find_user_id_by_subject(s, subject) == user_id
-        assert repo.resolve_login(s, subject) == []  # still invited
+        assert repo.find_user_id_by_subject(s, subject, issuer=STAFF) == user_id
+        assert repo.resolve_login(s, subject, issuer=STAFF) == []  # still invited
 
 
 def test_FR_IAM_010_invite_without_inviter_membership_is_forbidden(
@@ -114,7 +117,7 @@ def test_FR_IAM_013_resolve_login_after_activation(
             repo.set_membership_status(s, m.id, status="active", expected_version=m.version)
             memberships[tid] = m.id
     with context_free_session() as s:
-        logins = repo.resolve_login(s, subject)
+        logins = repo.resolve_login(s, subject, issuer=STAFF)
     assert {(x.tenant_id, x.membership_id, x.tenant_status) for x in logins} == {
         (a, memberships[a], "active"),
         (b, memberships[b], "active"),

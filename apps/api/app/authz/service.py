@@ -54,6 +54,11 @@ def switch_active_tenant(
     return ctx, [c.tenant_id for c in choices]
 
 
+def _issuer_kind(principal: Principal) -> str | None:
+    """``operator_support`` for SchoolOS support sign-ins (ADR-0023); staff: not recorded."""
+    return "operator_support" if principal.kind == "support" else None
+
+
 def record_login(
     resolver: AuthzResolver,
     principal: Principal,
@@ -74,6 +79,7 @@ def record_login(
             reason=denied.code,
             request_id=request_id,
             session_id_present=principal.session_id is not None,
+            issuer_kind=_issuer_kind(principal),
         )
         raise
     identity.record_login_event(
@@ -83,5 +89,6 @@ def record_login(
         succeeded=True,
         request_id=request_id,
         session_id_present=principal.session_id is not None,
+        issuer_kind=_issuer_kind(principal),
     )
     return ctx

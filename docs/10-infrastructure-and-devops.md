@@ -244,6 +244,9 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_OIDC_ISSUER`, `SOS_OIDC_AUDIENCE` | local stub `/schoolos`, `schoolos-web` | Staff tokens (Cognito: audience = app client ID) |
 | `SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE` | local stub `/platform`, `schoolos-platform` | Operator tokens |
 | `SOS_OIDC_JWKS_URI`, `SOS_PLATFORM_OIDC_JWKS_URI` | none (discovery) | Explicit JWKS URLs; compose points them at `http://oidc:8080/...` |
+| `SOS_SUPPORT_OIDC_AUDIENCE` | none (off) | Break-glass support sign-in (ADR-0023): the support app client ID of the OPERATOR pool. Unset = support tokens are refused and approved break-glass access cannot be used (fail closed). Must differ from the staff and operator admin clients |
+| `SOS_SUPPORT_OIDC_ISSUER` | `SOS_PLATFORM_OIDC_ISSUER` | Issuer of support tokens; on the shared tier it must equal the operator pool issuer, never the staff issuer; public https in staging/prod. Dedicated hosts set it explicitly |
+| `SOS_SUPPORT_OIDC_JWKS_URI` | `SOS_PLATFORM_OIDC_JWKS_URI` when the issuers match, else discovery | Explicit JWKS URL for support tokens |
 | `SOS_SERVICE_TOKEN_KEY` | dev-only value | HS256 key for the BFF's `X-Service-Token` (same value in the web app) |
 | `SOS_KEY_WRAPPER` | `local-dev` | `kms` or `local-dev` (local/CI only) |
 | `SOS_LOCAL_DEV_MASTER_KEY` | none | Local-dev key wrapper and local audit-archive signing key |

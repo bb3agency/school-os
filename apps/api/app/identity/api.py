@@ -92,7 +92,13 @@ def accept_my_invitations(
 ) -> AcceptedInvitationsOut:
     """Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the
     OIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged
-    active membership without MFA gets 403 ``mfa_required`` (FR-IAM-002)."""
+    active membership without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support
+    sign-ins never accept invitations (403 ``breakglass_only``, ADR-0023)."""
+    if principal.kind == "support":
+        raise Forbidden(
+            "SchoolOS support sign-in works only with the school's approved support access.",
+            code="breakglass_only",
+        )
     choices = resolver.choices(principal)
     if not principal.mfa and any(resolver.snapshot(c).mfa_required for c in choices):
         raise Forbidden(

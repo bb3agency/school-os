@@ -53,6 +53,7 @@ __all__ = [
     "list_tenant_tickets",
     "open_ticket_from_tenant",
     "record_breakglass_outcome",
+    "record_breakglass_session_started",
     "reply_from_tenant",
 ]
 
@@ -145,3 +146,16 @@ def record_breakglass_outcome(
 ) -> bool:
     """Report the school's decision / the grant's end to the control plane (idempotent)."""
     return breakglass.record_school_outcome(tenant_id, request_id, status, grant_id=grant_id)
+
+
+def record_breakglass_session_started(
+    tenant_id: uuid.UUID,
+    request_id: uuid.UUID,
+    *,
+    grant_id: uuid.UUID,
+    session_ref: str | None,
+) -> bool:
+    """Copy a support session start into the control-plane chain (ADR-0023 §4; IDs only)."""
+    return breakglass.record_session_started(
+        tenant_id, request_id, grant_id=grant_id, session_ref=session_ref
+    )

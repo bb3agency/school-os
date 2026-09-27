@@ -1,6 +1,8 @@
 """School-side break-glass routes (US-103, FR-OPS-004, SEC-021; docs/09 §4 Break-glass).
 
-All routes need ``breakglass.approve`` (owner, principal); every change needs step-up MFA.
+The request and grant routes need ``breakglass.approve`` (owner, principal); every change needs
+step-up MFA. ``POST /support-session`` is for SchoolOS support itself (ADR-0023): any signed-in
+member may call it, the service accepts only a support principal on its own active grant.
 ``{request_id}`` and ``{grant_id}`` are the same object (a row of ``ops.break_glass_grants``):
 a request becomes a grant when it is approved. Another school's ID answers 404.
 """
@@ -12,16 +14,19 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
+from app.authz.catalog import AUTHENTICATED
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, Limit, Page
 from app.breakglass import service
-from app.breakglass.schemas import GrantOut
+from app.breakglass.schemas import GrantOut, SupportSessionIn, SupportSessionOut
+from app.identity.principal import Principal, get_principal
 
 router = APIRouter(prefix="/api/v1/breakglass", tags=["break-glass"])
 
 Reader = Annotated[UserContext, Depends(require("breakglass.approve"))]
 Approver = Annotated[UserContext, Depends(require("breakglass.approve", step_up=True))]
+Member = Annotated[UserContext, Depends(require(AUTHENTICATED))]
 StatusFilter = Literal["requested", "approved", "active", "expired", "revoked", "denied"]
 
 
@@ -56,6 +61,21 @@ def approve_request(ctx: Approver, db: TenantDB, request_id: uuid.UUID) -> Grant
 def deny_request(ctx: Approver, db: TenantDB, request_id: uuid.UUID) -> GrantOut:
     """Deny (step-up MFA). SchoolOS support gets no access."""
     return service.deny(db, ctx, request_id)
+
+
+@router.post("/support-session", response_model=SupportSessionOut)
+def start_support_session(
+    ctx: Member,
+    db: TenantDB,
+    principal: Annotated[Principal, Depends(get_principal)],
+    body: SupportSessionIn,
+) -> SupportSessionOut:
+    """Start a SchoolOS support session (ADR-0023). Only for SchoolOS support signed in with the
+    support client, on the school's own active approval (403 ``breakglass_only`` otherwise;
+    404 for a request that is not this membership's; 409 ``breakglass_grant_inactive`` once it
+    ended). Needs a sign-in within 5 minutes (428 ``step_up_required``). Recorded in the
+    school's audit log as ``breakglass.session_started``."""
+    return service.start_support_session(db, ctx, principal, body.platform_request_id)
 
 
 @router.post("/grants/{grant_id}/revoke", response_model=GrantOut)

@@ -13,12 +13,18 @@
 4. Load the permission snapshot (cached 60 s per tenant + membership, invalidated on change).
 5. FR-IAM-002: a membership holding a privileged role (roles.yaml ``mfa_required``) or flagged
    ``mfa_required`` needs the MFA claim, else 403 ``mfa_required``.
+6. Break-glass (ADR-0023 option C, 07 §6.4): a SchoolOS support principal (support app client
+   of the operator pool) resolves in the operator issuer and may use ONLY a membership that
+   holds exactly ``platform_support`` and has an active grant in ``ops.break_glass_grants``
+   (403 ``breakglass_only`` / ``breakglass_grant_inactive``). A staff principal never uses a
+   ``platform_support`` membership (403 ``breakglass_only``). ``core.resolve_login`` applies the
+   same filters in the database.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -133,11 +139,52 @@ def build_snapshot(access: MembershipAccess) -> PermissionSnapshot:
     )
 
 
+BREAKGLASS_ONLY_MESSAGE: Final = (
+    "SchoolOS support sign-in works only with the school's approved support access."
+)
+
+
+SupportGrantCheck = Callable[[uuid.UUID, uuid.UUID], bool]
+"""(tenant_id, membership_id) -> is there an active break-glass grant for this membership now."""
+
+_support_grant_check: SupportGrantCheck | None = None
+
+
+def register_support_grant_check(check: SupportGrantCheck) -> None:
+    """Installed by ``app.breakglass.service`` at import (authz must not import it: the
+    break-glass module bridges to the control plane). Until installed, every support principal
+    is refused (fail closed)."""
+    global _support_grant_check  # noqa: PLW0603 - one process-wide hook, set at import
+    _support_grant_check = check
+
+
+def _support_grant_active(choice: LoginChoice) -> bool:
+    check = _support_grant_check
+    return check is not None and check(choice.tenant_id, choice.membership_id)
+
+
+def _check_breakglass(principal: Principal, choice: LoginChoice, snap: PermissionSnapshot) -> None:
+    """ADR-0023: support principals only on break-glass memberships with an active grant; staff
+    principals never on a break-glass membership."""
+    if principal.kind == "support":
+        if snap.roles != frozenset({BREAKGLASS_ROLE}):
+            raise AccessDenied(BREAKGLASS_ONLY_MESSAGE, code="breakglass_only", choice=choice)
+        if not _support_grant_active(choice):
+            raise AccessDenied(
+                "The school's approval for SchoolOS support access has ended.",
+                code="breakglass_grant_inactive",
+                choice=choice,
+            )
+        return
+    if BREAKGLASS_ROLE in snap.roles:
+        raise AccessDenied(BREAKGLASS_ONLY_MESSAGE, code="breakglass_only", choice=choice)
+
+
 class AuthzResolver:
     """Implements ``identity.principal.PrincipalResolver[UserContext]``."""
 
     def choices(self, principal: Principal) -> list[LoginChoice]:
-        return identity.login_memberships(principal.subject)
+        return identity.login_memberships(principal.subject, support=principal.kind == "support")
 
     def choose(self, choices: Sequence[LoginChoice], tenant_hint: uuid.UUID | None) -> LoginChoice:
         if not choices:
@@ -180,6 +227,7 @@ class AuthzResolver:
         if suspended and route is None:
             raise AccessDenied(SUSPENDED_MESSAGE, code="tenant_suspended", choice=choice)
         snap = self.snapshot(choice)
+        _check_breakglass(principal, choice, snap)
         if suspended and not suspended_access_allowed(route, snap.roles):
             raise AccessDenied(SUSPENDED_MESSAGE, code="tenant_suspended", choice=choice)
         if snap.mfa_required and not principal.mfa:

@@ -33,9 +33,11 @@ BASE = "/api/v1/breakglass"
 
 @dataclass
 class Caller:
-    """An operator signing in to the school app with their IdP subject."""
+    """An operator signing in to the school app with the support client of the operator pool
+    (ADR-0023): the operator's IdP subject, principal kind ``support``."""
 
     subject: str
+    kind: str = "support"
 
 
 def _pending(campus: Campus, operator: Any, **kw: Any) -> tuple[uuid.UUID, uuid.UUID]:
@@ -207,20 +209,53 @@ def test_US_103_deny_gives_no_access(
 # --- self-approval, withdrawn requests, inactive operators ---------------------------------
 
 
-def test_US_103_requesting_operator_cannot_approve_own_request(
+def test_ADR_0023_staff_subject_collision_never_attaches_a_support_membership(
     campus: Campus, api: Any, admin_engine: Engine, make_operator: MakeOperator
 ) -> None:
-    # The operator's sign-in is also an owner of this school (e.g. a demo school).
+    # A staff-pool account (an owner here) whose subject equals the operator's operator-pool
+    # subject. Different issuers: different identities (ADR-0023). While the old unique subject
+    # constraint exists (expand phase) the operator identity cannot be created: fail closed.
     insider = W.add_member(admin_engine, campus.tenant_id, ["owner"])
     op = make_operator("support_agent", subject=insider.subject)
     request_id, grant_id = _pending(campus, op)
-    own = api.call(insider, "POST", f"{BASE}/requests/{grant_id}/approve")
+    for approver in (insider, campus.person("owner")):
+        res = api.call(approver, "POST", f"{BASE}/requests/{grant_id}/approve")
+        assert res.status_code == 409, res.text
+        assert res.json()["code"] == "breakglass_identity_conflict"
+    assert grant_row(admin_engine, request_id)["status"] == "requested"
+    # The staff account got nothing: still only its owner role, no platform_support anywhere.
+    with admin_engine.connect() as c:
+        roles: set[str] = set(
+            c.execute(
+                text(
+                    "SELECT r.key FROM core.membership_roles mr JOIN core.roles r "
+                    "ON r.tenant_id = mr.tenant_id AND r.id = mr.role_id "
+                    "JOIN core.memberships m ON m.tenant_id = mr.tenant_id "
+                    "AND m.id = mr.membership_id WHERE m.user_id = :u"
+                ),
+                {"u": insider.user_id},
+            ).scalars()
+        )
+    assert roles == {"owner"}
+    # Neither a support token nor a staff token with that subject opens support access.
+    assert api.call(Caller(op.subject), "GET", "/api/v1/me").status_code == 403
+    staff = api.call(insider, "GET", "/api/v1/me")
+    assert staff.status_code == 200
+    assert staff.json()["roles"] == ["owner"]
+
+
+def test_US_103_support_access_never_holds_approval_rights(
+    campus: Campus, api: Any, admin_engine: Engine, make_operator: MakeOperator
+) -> None:
+    # The operator's own identity holds (support) access in this school: it cannot approve a
+    # further request for itself (read-only role without breakglass.approve).
+    op = make_operator("support_agent")
+    _, first = _pending(campus, op)
+    approved = api.call(campus.person("owner"), "POST", f"{BASE}/requests/{first}/approve")
+    assert approved.status_code == 200, approved.text
+    request_id, second = _pending(campus, op)
+    own = api.call(Caller(op.subject), "POST", f"{BASE}/requests/{second}/approve")
     assert own.status_code == 403
-    assert own.json()["code"] == "self_approval"
-    # Nobody else can hand extra "support" access to a person who already has access.
-    other = api.call(campus.person("owner"), "POST", f"{BASE}/requests/{grant_id}/approve")
-    assert other.status_code == 409
-    assert other.json()["code"] == "already_member"
     assert grant_row(admin_engine, request_id)["status"] == "requested"
 
 

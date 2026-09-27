@@ -43,6 +43,23 @@ def get_by_request(session: Session, request_id: uuid.UUID) -> RowMapping | None
     )
 
 
+def active_grant_for_membership(
+    session: Session, membership_id: uuid.UUID, now: dt.datetime
+) -> uuid.UUID | None:
+    """The active grant whose membership is ``membership_id`` and whose window is open."""
+    value: object = session.execute(
+        select(g.c.id)
+        .where(
+            g.c.membership_id == membership_id,
+            g.c.status == "active",
+            g.c.expires_at > now,
+            or_(g.c.starts_at.is_(None), g.c.starts_at <= now),
+        )
+        .limit(1)
+    ).scalar_one_or_none()
+    return uuid.UUID(str(value)) if value is not None else None
+
+
 def update_grant(session: Session, grant_id: uuid.UUID, values: Mapping[str, Any]) -> RowMapping:
     stmt = update(g).where(g.c.id == grant_id).values(**values).returning(g)
     return session.execute(stmt).mappings().one()

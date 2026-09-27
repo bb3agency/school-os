@@ -20,6 +20,7 @@ from typing import Any, Final
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound
 from app.core.ids import new_id
@@ -43,7 +44,8 @@ class SchoolBreakGlassRequest(BaseModel):
     """What the school needs to decide on a request: the request and who would get access.
 
     ``operator_*`` identify the requesting operator (an adult SchoolOS employee): the school
-    sees who asks, and an approval gives that IdP subject a temporary membership.
+    sees who asks, and an approval gives that identity (``operator_issuer`` = the operator
+    pool, ``operator_subject``; ADR-0023) a temporary membership.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -60,6 +62,7 @@ class SchoolBreakGlassRequest(BaseModel):
     created_at: dt.datetime
     emergency_confirmed_at: dt.datetime | None
     operator_subject: str | None
+    operator_issuer: str
     operator_display_name: str
     operator_email: str | None
     operator_status: str
@@ -95,9 +98,12 @@ def _school_requests(
         stmt = stmt.where(r.c.id == request_id)
     else:
         stmt = stmt.where(r.c.status.in_(("requested", "approved"))).limit(200)
+    # Operators sign in to schools through the support client of the operator pool.
+    issuer = get_settings().resolved_support_issuer
     with platform_session() as s:
         return [
-            SchoolBreakGlassRequest.model_validate(dict(row)) for row in s.execute(stmt).mappings()
+            SchoolBreakGlassRequest.model_validate({**dict(row), "operator_issuer": issuer})
+            for row in s.execute(stmt).mappings()
         ]
 
 
@@ -146,6 +152,37 @@ def record_school_outcome(
             "breakglass_request",
             request_id,
             {"grant_id": grant_id, "status": status, "source": "school"},
+            tenant_id=tenant_id,
+        )
+        return True
+
+
+def record_session_started(
+    tenant_id: uuid.UUID,
+    request_id: uuid.UUID,
+    *,
+    grant_id: uuid.UUID,
+    session_ref: str | None,
+) -> bool:
+    """Write ``breakglass.session_started`` to the control-plane chain (ADR-0023 §4).
+
+    Called by the school side when the requesting operator starts a support session in the
+    school app. IDs only (no token, no names). Returns False when the request is not this
+    school's (nothing is written)."""
+    with platform_session() as s, db_errors():
+        row = repo.get(s, m.breakglass_requests, request_id)
+        if row is None or row["tenant_id"] != tenant_id:
+            return False
+        summary: dict[str, Any] = {"grant_id": grant_id, "source": "school"}
+        if session_ref:
+            summary["session_ref"] = session_ref
+        audit_platform(
+            s,
+            Actor(row["requested_by"]),
+            "breakglass.session_started",
+            "breakglass_request",
+            request_id,
+            summary,
             tenant_id=tenant_id,
         )
         return True

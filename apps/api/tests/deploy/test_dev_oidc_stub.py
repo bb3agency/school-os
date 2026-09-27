@@ -29,6 +29,7 @@ from app.core.config import Environment, KeyWrapperKind, Settings
 from app.identity.tokens import (
     TokenVerifier,
     build_platform_verifier,
+    build_support_verifier,
     build_tenant_verifier,
     is_dev_issuer,
 )
@@ -107,6 +108,29 @@ def test_SEC_005_stub_staff_issuer_asserts_mfa_like_the_platform_issuer() -> Non
     # auth_time is deliberately NOT a static claim: a fixed value would be either stale (step-up
     # fails) or in the future (the API refuses it). Step-up locally pastes a fresh one (README).
     assert all("auth_time" not in c for c in claims.values())
+
+
+def test_ADR_0023_stub_support_client_lives_only_in_the_operator_issuer() -> None:
+    """The local stub mimics the Cognito support app client of the operator pool: client_id,
+    token_use=access and MFA. Every mapping of every issuer asserts MFA; none pins auth_time."""
+    support = []
+    for cb in stub_config()["tokenCallbacks"]:
+        for mapping in cb["requestMappings"]:
+            claims = mapping["claims"]
+            assert claims["sos:mfa"] == "true"
+            assert "mfa" in claims["amr"]
+            assert "auth_time" not in claims
+            if mapping["match"] == "schoolos-support":
+                support.append((cb["issuerId"], claims))
+    assert [issuer for issuer, _ in support] == ["platform"]
+    claims = support[0][1]
+    assert claims["client_id"] == "schoolos-support"
+    assert claims["token_use"] == "access"
+    assert claims["aud"] == ["schoolos-support"]
+    platform = next(cb for cb in stub_config()["tokenCallbacks"] if cb["issuerId"] == "platform")
+    # The specific mapping must come before the wildcard (first match wins).
+    assert platform["requestMappings"][0]["match"] == "schoolos-support"
+    assert platform["requestMappings"][-1]["match"] == "*"
 
 
 # --- only the local compose file runs it ------------------------------------------------------
@@ -198,6 +222,22 @@ def test_FR_IAM_001_stub_issuers_refused_in_staging_and_prod(
     settings = _settings(env, **{field_name: issuer})
     with pytest.raises(ValueError, match="issuer"):
         builder(settings)
+
+
+@pytest.mark.parametrize("env", [Environment.STAGING, Environment.PROD])
+@pytest.mark.parametrize("issuer", stub_issuers())
+def test_ADR_0023_stub_issuers_refused_for_support_sign_in_outside_local(
+    env: Environment, issuer: str
+) -> None:
+    with pytest.raises(ValueError, match=r"SOS_SUPPORT_OIDC_ISSUER|issuer"):
+        build_support_verifier(
+            _settings(
+                env,
+                deployment_mode="dedicated",
+                support_oidc_issuer=issuer,
+                support_oidc_audience="synthsupport01",
+            )
+        )
 
 
 @pytest.mark.parametrize("issuer", stub_issuers())
