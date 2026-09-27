@@ -183,6 +183,27 @@ def all_student_ids(session: Session) -> list[uuid.UUID]:
     return list(session.scalars(select(Student.id).order_by(Student.id)))
 
 
+def active_enrollments_of(session: Session, student_ids: Collection[uuid.UUID]) -> list[Enrollment]:
+    """Active enrolments of ``student_ids`` in any academic year (one query)."""
+    if not student_ids:
+        return []
+    stmt = select(Enrollment).where(
+        Enrollment.student_id.in_(list(student_ids)), Enrollment.status == "active"
+    )
+    return list(session.scalars(stmt.order_by(Enrollment.student_id, Enrollment.created_at)))
+
+
+def student_ids_with_batch(session: Session, batch_id: uuid.UUID) -> list[uuid.UUID]:
+    """Students with at least one value recorded by import batch ``batch_id``."""
+    stmt = (
+        select(AttributeValue.student_id)
+        .where(AttributeValue.import_batch_id == batch_id)
+        .distinct()
+        .order_by(AttributeValue.student_id)
+    )
+    return list(session.scalars(stmt))
+
+
 # --- enrolments -----------------------------------------------------------------------------
 
 

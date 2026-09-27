@@ -321,3 +321,35 @@ def test_FR_IMP_005_students_are_deleted_only_by_their_import_revert(
         tenant_session(world.a.tenant_id) as s,
     ):
         s.execute(text("DELETE FROM sis.attribute_values WHERE student_id = :s"), {"s": sid})
+
+
+def test_FR_IMP_005_revert_takes_the_dq_findings_of_removed_students_along(
+    world: Any, admin_engine: Engine
+) -> None:
+    """Every commit triggers a data-quality run (import.committed); its findings about the
+    students the batch created must not block the 24-hour revert (FR-IMP-005, FR-DQ-002)."""
+    from app.dq import service as dq
+
+    rows, numbers = S.class_list(2)
+    for row in rows[1:]:
+        row[3] = "01/01/2022"  # far too young for class IX: DQ-003 age/class finding
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sids = [S.student_by_adm(admin_engine, world.a.tenant_id, n) for n in numbers]
+    # Values of students the batch created carry the batch, so a batch-scoped run finds them.
+    assert (
+        S.count(
+            admin_engine,
+            "SELECT count(*) FROM sis.attribute_values "
+            "WHERE student_id = ANY(:s) AND import_batch_id IS DISTINCT FROM :b",
+            s=sids,
+            b=batch_id,
+        )
+        == 0
+    )
+    run = dq.run_for_event(world.a.tenant_id, {"batch_id": str(batch_id), "student_ids_count": 2})
+    assert run is not None
+    findings = "SELECT count(*) FROM sis.dq_findings WHERE student_id = ANY(:s)"
+    assert S.count(admin_engine, findings, s=sids) >= 2
+    assert _revert(world.a, batch_id).status == "reverted"
+    assert _students_with(admin_engine, world.a.tenant_id, numbers) == 0
+    assert S.count(admin_engine, findings, s=sids) == 0

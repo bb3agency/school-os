@@ -87,9 +87,24 @@ def _load_imports_support() -> ModuleType:
     return sys.modules[name]
 
 
+def _load_dq_support() -> ModuleType:
+    """DQ helpers (tests/dq/dq_support.py): findings created through the real engine."""
+    name = "sos_test_dq_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "dq_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 SW = _load_students()
 D = _load_documents_support()
 IM = _load_imports_support()
+DQ = _load_dq_support()
 
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
@@ -241,6 +256,32 @@ def _import_mapping(w: Any, r: str, a: Engine) -> Request:
 def _import_committed(w: Any, r: str, a: Engine) -> Request:
     batch_id = IM.imported(a, w.a, IM.xlsx_bytes(IM.class_list(1)[0]))
     return f"/api/v1/imports/{batch_id}/revert", None, {}
+
+
+# --- data quality (FR-DQ-*, US-501, US-502): class teacher reaches 9A findings only ---------------
+
+
+def _dq_run(w: Any, r: str, a: Engine) -> Request:
+    """A run requested by the role itself (scoped holders see only their own runs)."""
+    SW.configure_keyring()
+    run = DQ.call(w.a, DQ.dq.run_checks, student_ids=[_student(w, r)], as_ctx=DQ.ctx(w.a, r))
+    return f"/api/v1/dq/runs/{run.id}", None, {}
+
+
+def _dq_finding(w: Any, slot: str) -> uuid.UUID:
+    """A school A finding in 9A (visible to every dq.findings.read holder)."""
+    key = f"matrix_dq_{slot}"
+    if key not in w.a.ids:
+        SW.configure_keyring()
+        w.a.ids[key] = DQ.high_finding(w.a)
+    value: uuid.UUID = w.a.ids[key]
+    return value
+
+
+def _dq_fresh(w: Any, r: str, a: Engine) -> uuid.UUID:
+    SW.configure_keyring()
+    finding: uuid.UUID = DQ.high_finding(w.a)
+    return finding
 
 
 SPECS: dict[tuple[str, str], Builder] = {
@@ -521,6 +562,36 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # Data quality (app/dq/api.py; docs/09 Data quality).
+    ("POST", "/api/v1/dq/runs"): lambda w, r, a: (
+        "/api/v1/dq/runs",
+        {"scope": {"student_ids": [str(_student(w, r))]}},
+        {},
+    ),
+    ("GET", "/api/v1/dq/runs/{run_id}"): _dq_run,
+    ("GET", "/api/v1/dq/findings"): lambda w, r, a: ("/api/v1/dq/findings", None, {}),
+    ("GET", "/api/v1/dq/findings/{finding_id}"): lambda w, r, a: (
+        f"/api/v1/dq/findings/{_dq_finding(w, 'read')}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/dq/findings/{finding_id}/resolve"): lambda w, r, a: (
+        f"/api/v1/dq/findings/{_dq_fresh(w, r, a)}/resolve",
+        {"note": "Synthetic matrix note"},
+        {},
+    ),
+    ("POST", "/api/v1/dq/findings/{finding_id}/waive"): lambda w, r, a: (
+        f"/api/v1/dq/findings/{_dq_fresh(w, r, a)}/waive",
+        {"reason": "Synthetic matrix reason"},
+        {},
+    ),
+    ("GET", "/api/v1/dq/rules"): lambda w, r, a: ("/api/v1/dq/rules", None, {}),
+    ("GET", "/api/v1/dq/profiles"): lambda w, r, a: ("/api/v1/dq/profiles", None, {}),
+    ("GET", "/api/v1/dq/summary"): lambda w, r, a: (
+        "/api/v1/dq/summary",
+        None,
+        {},
+    ),
     ("POST", "/api/v1/breakglass/grants/{grant_id}/revoke"): lambda w, r, a: (
         f"/api/v1/breakglass/grants/{_bg().active_grant(w.a.tenant_id, w.person('owner'))}/revoke",
         None,
@@ -621,6 +692,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/imports",
         "/api/v1/imports/{import_id}/validate",
         "/api/v1/imports/{import_id}/commit",
+        "/api/v1/dq/runs",
     }
     if method == "POST" and path in accepted:
         return 202

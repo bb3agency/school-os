@@ -40,6 +40,7 @@ TASK_MODULES: list[str] = [
     "app.platform.tasks",
     "app.documents.tasks",
     "app.imports.tasks",
+    "app.dq.tasks",
 ]
 
 
@@ -71,6 +72,8 @@ def create_celery() -> Celery:
             "imports.validate": {"queue": "ingest"},
             "imports.commit": {"queue": "ingest"},
             "imports.purge_raw_files": {"queue": "maintenance"},
+            # FR-DQ-002: data-quality runs (outbox consumers and queued runs) on queue "dq".
+            "dq.*": {"queue": "dq"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).

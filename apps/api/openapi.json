@@ -640,6 +640,29 @@
         "title": "AuditEventOut",
         "type": "object"
       },
+      "Bilingual": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "en": {
+            "title": "En",
+            "type": "string"
+          },
+          "te": {
+            "title": "Te",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "en",
+          "te"
+        ],
+        "title": "Bilingual",
+        "type": "object"
+      },
       "BillingAccountIn": {
         "additionalProperties": false,
         "properties": {
@@ -2455,6 +2478,364 @@
           "trial_ends_at"
         ],
         "title": "ExtendTrialIn",
+        "type": "object"
+      },
+      "FindingOut": {
+        "properties": {
+          "attribute_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribute Key"
+          },
+          "blocker": {
+            "title": "Blocker",
+            "type": "boolean"
+          },
+          "change_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Request Id"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "title": "First Seen At",
+            "type": "string"
+          },
+          "first_seen_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Seen Run Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "last_seen_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen Run Id"
+          },
+          "match_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Class"
+          },
+          "match_explanation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Bilingual"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "related_student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Student Id"
+          },
+          "reopened_count": {
+            "title": "Reopened Count",
+            "type": "integer"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "enum": [
+                  "note",
+                  "change_request",
+                  "auto_cleared"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "resolution_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Note"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "resolved_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved By"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/Bilingual"
+            },
+            "title": "Routes",
+            "type": "array"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "integer"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved",
+              "waived",
+              "reopened"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/StudentRef"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/FindingValue"
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "waived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waived At"
+          },
+          "waived_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waived By"
+          },
+          "waived_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waived Reason"
+          }
+        },
+        "required": [
+          "id",
+          "student",
+          "related_student_id",
+          "rule_id",
+          "rule_version",
+          "profile_key",
+          "attribute_key",
+          "sources",
+          "match_class",
+          "severity",
+          "blocker",
+          "status",
+          "explanation",
+          "match_explanation",
+          "routes",
+          "values",
+          "details",
+          "resolution",
+          "resolution_note",
+          "change_request_id",
+          "resolved_by",
+          "resolved_at",
+          "waived_by",
+          "waived_at",
+          "waived_reason",
+          "reopened_count",
+          "first_seen_at",
+          "last_seen_at",
+          "first_seen_run_id",
+          "last_seen_run_id",
+          "version"
+        ],
+        "title": "FindingOut",
+        "type": "object"
+      },
+      "FindingValue": {
+        "description": "A compared value: always masked; ``value`` only for non-sensitive (C2) values that are\nstill current (C3 values are revealed on the student record, with an audit event).",
+        "properties": {
+          "attribute_key": {
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Masked"
+          },
+          "sensitive": {
+            "title": "Sensitive",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_id": {
+            "format": "uuid",
+            "title": "Value Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attribute_key",
+          "source",
+          "value_id",
+          "masked",
+          "value",
+          "sensitive"
+        ],
+        "title": "FindingValue",
         "type": "object"
       },
       "FlagIn": {
@@ -4764,6 +5145,34 @@
         "title": "Page[DocumentOut]",
         "type": "object"
       },
+      "Page_FindingOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FindingOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[FindingOut]",
+        "type": "object"
+      },
       "Page_FlagOut_": {
         "properties": {
           "data": {
@@ -6004,6 +6413,47 @@
         "title": "PriceOverrideIn",
         "type": "object"
       },
+      "ProfileOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "needs_apaar": {
+            "title": "Needs Apaar",
+            "type": "boolean"
+          },
+          "required_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Fields",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "version",
+          "label_en",
+          "label_te",
+          "required_fields",
+          "needs_apaar"
+        ],
+        "title": "ProfileOut",
+        "type": "object"
+      },
       "ProvisionIn": {
         "additionalProperties": false,
         "properties": {
@@ -6245,6 +6695,39 @@
         "title": "Reasoned",
         "type": "object"
       },
+      "ResolveIn": {
+        "additionalProperties": false,
+        "description": "US-502 AC1: a note, a change request, or both.",
+        "properties": {
+          "change_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Request Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "ResolveIn",
+        "type": "object"
+      },
       "RevealIn": {
         "additionalProperties": false,
         "description": "Reveal one C3 field (audited). ``guardian_phone``/``guardian_address`` need\n``guardian_id``; ``value_id`` reveals a specific (possibly historical) value.",
@@ -6419,6 +6902,315 @@
           "roles"
         ],
         "title": "RolesIn",
+        "type": "object"
+      },
+      "RuleCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "severity",
+          "count"
+        ],
+        "title": "RuleCount",
+        "type": "object"
+      },
+      "RuleOut": {
+        "properties": {
+          "attribute_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attribute Keys",
+            "type": "array"
+          },
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "requires_profile": {
+            "title": "Requires Profile",
+            "type": "boolean"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/Bilingual"
+            },
+            "title": "Routes",
+            "type": "array"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/SeverityPolicyOut"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "check",
+          "scope",
+          "attribute_keys",
+          "sources",
+          "requires_profile",
+          "severity",
+          "explanation",
+          "routes"
+        ],
+        "title": "RuleOut",
+        "type": "object"
+      },
+      "RunCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "profile_key": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/RunScopeIn"
+          }
+        },
+        "title": "RunCreate",
+        "type": "object"
+      },
+      "RunOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "profile_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "title": "Scope",
+            "type": "object"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "stats": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stats"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "trigger": {
+            "enum": [
+              "manual",
+              "event"
+            ],
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trigger",
+          "event_type",
+          "status",
+          "profile_key",
+          "scope",
+          "stats",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "error_code"
+        ],
+        "title": "RunOut",
+        "type": "object"
+      },
+      "RunScopeIn": {
+        "additionalProperties": false,
+        "description": "At most one of the fields; empty = every student you can see.",
+        "properties": {
+          "batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "class_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Ids"
+          },
+          "section_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Ids"
+          },
+          "student_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 2000,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Ids"
+          }
+        },
+        "title": "RunScopeIn",
         "type": "object"
       },
       "SchoolChoiceOut": {
@@ -6695,6 +7487,80 @@
         "title": "SectionUpdate",
         "type": "object"
       },
+      "SeverityPolicyOut": {
+        "properties": {
+          "cap": {
+            "anyOf": [
+              {
+                "enum": [
+                  "blocker",
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "enum": [
+                  "blocker",
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "blocker",
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "mode": {
+            "enum": [
+              "fixed",
+              "match_class"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "level",
+          "floor",
+          "cap"
+        ],
+        "title": "SeverityPolicyOut",
+        "type": "object"
+      },
       "StudentCreate": {
         "additionalProperties": false,
         "description": "New student with its first values (docs/09: source required per value).\n\n``values`` must include ``full_name``. ``section_id`` enrols the student in that section's\nacademic year.",
@@ -6885,6 +7751,44 @@
           "status"
         ],
         "title": "StudentPatch",
+        "type": "object"
+      },
+      "StudentRef": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "admission_no"
+        ],
+        "title": "StudentRef",
         "type": "object"
       },
       "StudentSummary": {
@@ -7101,6 +8005,69 @@
           "version"
         ],
         "title": "SubscriptionOut",
+        "type": "object"
+      },
+      "SummaryOut": {
+        "description": "Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).",
+        "properties": {
+          "blockers": {
+            "title": "Blockers",
+            "type": "integer"
+          },
+          "by_rule": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCount"
+            },
+            "title": "By Rule",
+            "type": "array"
+          },
+          "by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Severity",
+            "type": "object"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "students_with_blockers": {
+            "title": "Students With Blockers",
+            "type": "integer"
+          },
+          "warnings": {
+            "title": "Warnings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_key",
+          "blockers",
+          "warnings",
+          "students_with_blockers",
+          "by_severity",
+          "by_rule",
+          "last_run"
+        ],
+        "title": "SummaryOut",
         "type": "object"
       },
       "SuspendSubscriptionIn": {
@@ -9199,6 +10166,22 @@
         "title": "VersionOut",
         "type": "object"
       },
+      "WaiveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "WaiveIn",
+        "type": "object"
+      },
       "app__audit__viewer__AuditVerifyOut": {
         "properties": {
           "checked": {
@@ -10939,6 +11922,587 @@
         "summary": "Add Version",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/dq/findings": {
+      "get": {
+        "description": "Findings, most severe first, with masked values, English/Telugu explanations and\ncorrection routes (permission ``dq.findings.read``). ``status`` defaults to unresolved\n(``open``, ``reopened``).",
+        "operationId": "list_findings_api_v1_dq_findings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "blocker",
+                      "high",
+                      "medium",
+                      "low",
+                      "info"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rule_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "DQ-001",
+                      "DQ-002",
+                      "DQ-003",
+                      "DQ-004",
+                      "DQ-005",
+                      "DQ-006",
+                      "DQ-007",
+                      "DQ-008",
+                      "DQ-009",
+                      "DQ-010",
+                      "DQ-011",
+                      "DQ-012"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "open",
+                      "resolved",
+                      "waived",
+                      "reopened"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "profile_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Key"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attribute_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attribute Key"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_FindingOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Findings",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/findings/{finding_id}": {
+      "get": {
+        "description": "One finding (permission ``dq.findings.read``); ``ETag`` is its version.",
+        "operationId": "get_finding_api_v1_dq_findings__finding_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Finding",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/findings/{finding_id}/resolve": {
+      "post": {
+        "description": "Resolve with a note or a linked change request (permission ``dq.findings.resolve``).\nIf the conflict is still there, the next check reopens it. Optional ``If-Match``.",
+        "operationId": "resolve_finding_api_v1_dq_findings__finding_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Finding",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/findings/{finding_id}/waive": {
+      "post": {
+        "description": "Accept a finding with a reason (permission ``dq.findings.waive`` with a fresh MFA\nsign-in, else 428 ``step_up_required``). Optional ``If-Match``.",
+        "operationId": "waive_finding_api_v1_dq_findings__finding_id__waive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WaiveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Waive Finding",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/profiles": {
+      "get": {
+        "description": "Export pre-check profiles, e.g. CISCE registration and UDISE+ (permission\n``dq.findings.read``).",
+        "operationId": "list_profiles_api_v1_dq_profiles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileOut"
+                  },
+                  "title": "Response List Profiles Api V1 Dq Profiles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Profiles",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/rules": {
+      "get": {
+        "description": "The rule catalog DQ-001..DQ-012 with English/Telugu texts (permission\n``dq.findings.read``).",
+        "operationId": "list_rules_api_v1_dq_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleOut"
+                  },
+                  "title": "Response List Rules Api V1 Dq Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Rules",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/runs": {
+      "post": {
+        "description": "Check sections, classes, students or an import batch, optionally for an export profile\nsuch as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are\nchecked at once (status ``completed``); bigger ones are queued (status ``queued``) and you\nare notified when they finish. Accepts ``Idempotency-Key``.",
+        "operationId": "start_run_api_v1_dq_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Run",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/runs/{run_id}": {
+      "get": {
+        "description": "A check run with its counts (permission ``dq.findings.read``; class teachers see their\nown runs).",
+        "operationId": "get_run_api_v1_dq_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/summary": {
+      "get": {
+        "description": "Unresolved findings by severity and rule for the pre-check screen: blockers apart from\nwarnings (permission ``dq.findings.read``).",
+        "operationId": "get_summary_api_v1_dq_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Key"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Ids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Summary",
+        "tags": [
+          "data-quality"
         ]
       }
     },

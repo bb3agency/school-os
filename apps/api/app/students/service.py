@@ -24,6 +24,10 @@ Other modules call only these functions. Every function takes the caller's ``ten
   :func:`record_verified_identity_value` after an approval.
 - **Audit (invariant 7).** Every write records an event in the same transaction; summaries hold
   ids, attribute keys, sources and codes, never values.
+- **Outbox (FR-DQ-002).** Value, verification and enrolment writes queue one
+  ``student.values.changed`` event per transaction (``{student_ids, attribute_keys}``, at most 100
+  ids per event) for the incremental data-quality checks. Values recorded by an import batch are
+  left to the import's own ``import.committed`` event.
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ from decimal import Decimal
 from typing import Any, Final, Literal
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import event
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
@@ -53,6 +58,7 @@ from app.core.errors import (
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.core.textnorm import comparison_key
+from app.ops import service as ops
 from app.students import crypto
 from app.students import repository as repo
 from app.students.canonical import Resolution, resolve
@@ -112,6 +118,11 @@ IST: Final = ZoneInfo("Asia/Kolkata")
 
 Verification = Literal["unverified", "verified", "rejected"]
 
+VALUES_CHANGED_EVENT: Final = "student.values.changed"
+ENROLLMENT_KEY: Final = "enrollment"  # attribute_keys marker for enrolment changes (DQ-007/012)
+_CHANGED_INFO: Final = "sos_students_values_changed"
+_EVENT_CHUNK: Final = 100
+
 log = get_logger(__name__)
 
 
@@ -158,6 +169,35 @@ def _audit(
         summary=summary,
         request_id=request_id if isinstance(request_id, str) else None,
     )
+
+
+def _values_changed(
+    session: Session, student_id: uuid.UUID, attribute_keys: Collection[str]
+) -> None:
+    """Remember a change; :func:`_emit_values_changed` queues the events at commit (coalesced)."""
+    pending: dict[uuid.UUID, set[str]] | None = session.info.get(_CHANGED_INFO)
+    if pending is None:
+        pending = session.info[_CHANGED_INFO] = {}
+        event.listen(session, "before_commit", _emit_values_changed, once=True)
+        event.listen(session, "after_rollback", _forget_values_changed, once=True)
+    pending.setdefault(student_id, set()).update(attribute_keys)
+
+
+def _emit_values_changed(session: Session) -> None:
+    pending: dict[uuid.UUID, set[str]] | None = session.info.pop(_CHANGED_INFO, None)
+    if not pending:
+        return
+    ids = sorted(pending, key=str)
+    for start in range(0, len(ids), _EVENT_CHUNK):
+        chunk = ids[start : start + _EVENT_CHUNK]
+        keys = sorted(set().union(*(pending[i] for i in chunk)))
+        ops.enqueue_event(
+            session, VALUES_CHANGED_EVENT, {"student_ids": chunk, "attribute_keys": keys}
+        )
+
+
+def _forget_values_changed(session: Session) -> None:
+    session.info.pop(_CHANGED_INFO, None)
 
 
 def _today() -> dt.date:
@@ -611,10 +651,18 @@ def _section_or_422(session: Session, section_id: uuid.UUID) -> Any:
         raise ValidationFailed([error("section_id", "not_found")]) from None
 
 
-def create_student(session: Session, ctx: UserContext, data: StudentCreate) -> StudentOut:
+def create_student(
+    session: Session,
+    ctx: UserContext,
+    data: StudentCreate,
+    *,
+    import_batch_id: uuid.UUID | None = None,
+) -> StudentOut:
     """Create a student with its first values (docs/09; permission ``student.create``).
 
-    Every value names its source. Identity values are recorded unverified, so the canonical
+    Every value names its source. ``import_batch_id`` (imports only, never from the API) tags
+    the values with their batch; the batch's own ``import.committed`` event then covers them
+    instead of ``student.values.changed``. Identity values are recorded unverified, so the canonical
     identity values stay provisional until verified through a change request. Optional
     ``section_id`` enrols the student. Audit: ``student.created`` (+ ``enrollment.created``).
     """
@@ -648,7 +696,7 @@ def create_student(session: Session, ctx: UserContext, data: StudentCreate) -> S
             previous=None,
             verification="unverified",
             evidence_document_id=evidence,
-            import_batch_id=None,
+            import_batch_id=import_batch_id,
             change_request_id=None,
             confidence=None,
         )
@@ -658,6 +706,9 @@ def create_student(session: Session, ctx: UserContext, data: StudentCreate) -> S
             session, ctx, student, section, roll_no=data.roll_no, started_on=None
         ).id
     student = _refresh_projection(session, student, defs)
+    changed = {d.key for d, *_ in cleaned}
+    if import_batch_id is None:
+        _values_changed(session, student.id, changed | ({ENROLLMENT_KEY} if section else set()))
     _audit(
         session,
         action="student.created",
@@ -743,6 +794,8 @@ def record_value(  # noqa: PLR0917 - signature fixed by the M1 build contract
         confidence=confidence,
     )
     student = _touch(session, student, defs)
+    if import_batch_id is None:
+        _values_changed(session, student_id, [attribute_key])
     _audit(
         session,
         action="student.value.recorded",
@@ -835,6 +888,7 @@ def record_verified_identity_value(
         confidence=None,
     )
     student = _touch(session, student, defs)
+    _values_changed(session, student_id, [attribute_key])
     _audit(
         session,
         action="student.value.recorded",
@@ -892,6 +946,7 @@ def verify_value(
             session, value_id, status=status, by=ctx.user_id, at=repo.now(session)
         )
     _touch(session, student, defs)
+    _values_changed(session, student_id, [row.attribute_key])
     _audit(
         session,
         action="student.value.verified",
@@ -1013,6 +1068,7 @@ def enrol(
     section = _section_or_422(session, data.section_id)
     out = _enrol(session, ctx, student, section, roll_no=data.roll_no, started_on=data.started_on)
     _touch(session, student, _definitions(session))
+    _values_changed(session, student_id, [ENROLLMENT_KEY])
     return out
 
 
@@ -1224,6 +1280,38 @@ def source_values(
             )
         )
     return out
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveEnrolment:
+    enrollment_id: uuid.UUID
+    student_id: uuid.UUID
+    section_id: uuid.UUID
+    academic_year_id: uuid.UUID
+
+
+def active_enrolments(
+    session: Session, student_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, list[ActiveEnrolment]]:
+    """Active enrolments in any academic year for many students (dq: DQ-007 age band,
+    DQ-012 enrolled twice). ``student_ids`` MUST come from :func:`list_students_in_scope`."""
+    out: dict[uuid.UUID, list[ActiveEnrolment]] = {}
+    for row in repo.active_enrollments_of(session, list(student_ids)):
+        out.setdefault(row.student_id, []).append(
+            ActiveEnrolment(
+                enrollment_id=row.id,
+                student_id=row.student_id,
+                section_id=row.section_id,
+                academic_year_id=row.academic_year_id,
+            )
+        )
+    return out
+
+
+def student_ids_for_import_batch(session: Session, batch_id: uuid.UUID) -> list[uuid.UUID]:
+    """Students with a value recorded by import batch ``batch_id`` (dq runs for a batch).
+    Callers intersect the result with :func:`list_students_in_scope`."""
+    return repo.student_ids_with_batch(session, batch_id)
 
 
 # --- sensitive reveal --------------------------------------------------------------------------

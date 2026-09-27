@@ -95,6 +95,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/imports/{import_id}/validate"): None,
     ("POST", "/api/v1/imports/{import_id}/commit"): {},
     ("POST", "/api/v1/imports/{import_id}/revert"): None,
+    ("POST", "/api/v1/dq/findings/{finding_id}/resolve"): {"note": "Synthetic note"},
+    ("POST", "/api/v1/dq/findings/{finding_id}/waive"): {"reason": "Synthetic reason"},
 }
 
 
@@ -119,6 +121,8 @@ SW = _load_students()
 # object lookup instead of stopping at 403.
 ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
     (
+        ("POST", "/api/v1/dq/findings/{finding_id}/resolve"),
+        ("POST", "/api/v1/dq/findings/{finding_id}/waive"),
         ("PATCH", "/api/v1/students/{student_id}"),
         ("POST", "/api/v1/students/{student_id}/values"),
         ("POST", "/api/v1/students/{student_id}/values/{value_id}/verify"),
@@ -212,6 +216,34 @@ def _bg() -> ModuleType:
     return sys.modules[name]
 
 
+def _dq() -> ModuleType:
+    """tests/dq/dq_support.py (runs and findings through the real engine)."""
+    name = "sos_test_dq_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "dq_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_dq_finding(w: Any) -> uuid.UUID:
+    """An open finding of school B (DQ-003 on a school B student)."""
+    SW.configure_keyring()
+    finding: uuid.UUID = _dq().high_finding(w.b)
+    return finding
+
+
+def _b_dq_run(w: Any) -> uuid.UUID:
+    SW.configure_keyring()
+    dq = _dq()
+    run_id: uuid.UUID = dq.call(w.b, dq.dq.run_checks).id
+    return run_id
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -228,6 +260,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "request_id": lambda w: _bg().pending_grant(w.b.tenant_id),
     "grant_id": lambda w: _bg().active_grant(w.b.tenant_id, w.b.people["owner"]),
     "import_id": _b_import,
+    # Data quality (FR-DQ-*): a run and a finding of school B.
+    "run_id": _b_dq_run,
+    "finding_id": _b_dq_finding,
 }
 
 

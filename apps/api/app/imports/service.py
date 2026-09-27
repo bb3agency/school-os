@@ -1086,6 +1086,7 @@ def _apply_row(
                     section_id=_uuid(row.section_id),
                     roll_no=row.roll_no,
                 ),
+                import_batch_id=batch.id,
             )
         except DomainError as exc:
             raise _RowRefused(_row_failure(exc, keys)) from exc
@@ -1332,7 +1333,8 @@ def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut
     Refused (409 ``import_has_dependents``) when anything was recorded on top of it: a student
     it created was changed since (version), one of its values was superseded, a value it replaced
     is a verified or register identity value, or other records point at its students (change
-    requests, findings: foreign keys). Otherwise, in one transaction: students it created are
+    requests: foreign keys). Data-quality findings about removed students are derived data and
+    go with them (``ON DELETE CASCADE``). Otherwise, in one transaction: students it created are
     removed (with their values, enrolment and profile), values it added to existing students are
     withdrawn (marked rejected; history kept) and any value they replaced becomes current again
     (re-recorded through students.service). Audit: ``student.removed`` per student,

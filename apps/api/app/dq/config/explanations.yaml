@@ -66,6 +66,11 @@ rules:
   DQ-005:
     en: "Required for {profile}: {field} is missing."
     te: "{profile} కోసం తప్పనిసరి: {field} నమోదు కాలేదు."
+  # DQ-005 for a required identity field that has a value, but not yet a verified admission
+  # register value (the canonical value is provisional, docs/05 §10).
+  DQ-005-UNVERIFIED:
+    en: "Required for {profile}: {field} is not yet verified in the admission register."
+    te: "{profile} కోసం తప్పనిసరి: {field} ఇంకా అడ్మిషన్ రిజిస్టర్‌లో ధృవీకరించబడలేదు."
   DQ-006:
     en: "{profile} does not accept {issue}."
     te: "{profile} లో {issue} అనుమతించబడదు."

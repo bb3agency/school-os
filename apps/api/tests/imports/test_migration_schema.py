@@ -168,7 +168,9 @@ def test_CLAUDE_6_12_imports_migration_reversible_with_data(populated: _Walk) ->
     admin = populated.admin
     assert _scalar(admin, "SELECT count(*) FROM sis.import_batches") == 4
     assert (
-        _scalar(admin, "SELECT count(*) FROM sis.attribute_values WHERE import_batch_id IS NULL")
+        _scalar(
+            admin, "SELECT count(*) FROM sis.attribute_values WHERE import_batch_id IS NOT NULL"
+        )
         > 0
     )
     students_before = _scalar(admin, "SELECT count(*) FROM sis.students")

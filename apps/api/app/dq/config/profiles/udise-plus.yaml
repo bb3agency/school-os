@@ -1,0 +1,25 @@
+# Export pre-check profile: UDISE+ student profile (US-501, DQ-005, DQ-006, DQ-009).
+# Loaded and validated by app.dq.profiles.load_profiles(); the file name is the profile key.
+#
+# TODO(portal formats): minimal field list for M1. Replace with the exact UDISE+ student data
+# capture format (field order, lengths, code lists) before the pilot; the exports module
+# (FR-EXP-002) will share this profile key.
+key: udise-plus
+version: 1
+label_en: UDISE+ student profile
+label_te: UDISE+ విద్యార్థి ప్రొఫైల్
+
+required_fields: [full_name, dob, gender, father_name, mother_name, admission_no,
+                  mother_tongue, category]
+
+unverified_identity_severity: low
+
+name_format:
+  fields: [full_name, father_name, mother_name]
+  min_length: 2
+  max_length: 100
+  latin_only: true
+  allowed_punctuation: " .'"
+
+# UDISE+ generates APAAR IDs from the Aadhaar-as-printed details.
+needs_apaar: true
