@@ -2,32 +2,11 @@
 
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { AuditView } from "./AuditView";
-import { StructureView } from "./StructureView";
 
 /**
  * School console screens wired to the API through the BFF (TanStack Query). The views
  * stay presentational; these components only load data.
  */
-
-const PAGE = { limit: 200 } as const;
-
-/** US-202 / FR-TEN-010: GET /academic-years, /classes, /sections. */
-export function StructureScreen() {
-  const api = useBffClient("staff");
-  const years = useApiQuery(
-    ["staff", "academic-years"],
-    async () => (await unwrap(api.GET("/api/v1/academic-years", { params: { query: PAGE } }))).data,
-  );
-  const classes = useApiQuery(
-    ["staff", "classes"],
-    async () => (await unwrap(api.GET("/api/v1/classes", { params: { query: PAGE } }))).data,
-  );
-  const sections = useApiQuery(
-    ["staff", "sections"],
-    async () => (await unwrap(api.GET("/api/v1/sections", { params: { query: PAGE } }))).data,
-  );
-  return <StructureView years={years} classes={classes} sections={sections} />;
-}
 
 export interface AuditFilters {
   actor?: string | undefined;

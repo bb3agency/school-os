@@ -4,7 +4,8 @@ import { forgetSessionInfo } from "@/lib/bff/session-client";
 import { setNavigateForTesting } from "@/lib/bff/query";
 import { messages, renderWithIntl } from "@/test/render";
 import { DashboardScreen, SchoolsScreen } from "./platform/screens";
-import { AuditScreen, StructureScreen, toIsoDate } from "./school/screens";
+import { AcademicStructureScreen } from "./academic-structure/AcademicStructureScreen";
+import { AuditScreen, toIsoDate } from "./school/screens";
 import { UsersScreen } from "./users/UsersScreen";
 
 type Route = (url: URL, request: Request) => Response | Promise<Response>;
@@ -72,7 +73,7 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     routes["/bff/api/v1/academic-years"] = () => page([YEAR]);
     routes["/bff/api/v1/classes"] = () => page([CLASS_6]);
     routes["/bff/api/v1/sections"] = () => page([section("A"), section("B")]);
-    renderWithIntl(<StructureScreen />, "te");
+    renderWithIntl(<AcademicStructureScreen />, "te");
 
     expect(await screen.findByText("2026-27")).toBeInTheDocument();
     const classes = await screen.findByRole("region", {
@@ -92,11 +93,14 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
       Response.json({ code: "not_implemented" }, { status: 501 });
     routes["/bff/api/v1/sections"] = () =>
       Response.json({ code: "internal_error" }, { status: 500 });
-    renderWithIntl(<StructureScreen />, "te");
+    renderWithIntl(<AcademicStructureScreen />, "te");
 
     expect(await screen.findByText("2026-27")).toBeInTheDocument();
     expect(await screen.findByText(messages.te.common.notAvailableYetTitle)).toBeInTheDocument();
-    expect(await screen.findByText(messages.te.common.loadErrorTitle)).toBeInTheDocument();
+    // Sections load once the year is known, and a 5xx is retried once (about 1 s) first.
+    expect(
+      await screen.findByText(messages.te.common.loadErrorTitle, {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
     expect(seen.map((u) => u.pathname).sort()).toEqual(
       expect.arrayContaining([
         "/bff/api/v1/academic-years",

@@ -21,6 +21,12 @@ export const CLIENTS = {
 const T1 = "0192f3a4-0000-7000-8000-000000000001";
 const T2 = "0192f3a4-0000-7000-8000-000000000002";
 const SUB = "0192f3a4-0000-7000-8000-00000000b001";
+/** A school whose provisioning stopped (platform school detail, FR-PLT-002). */
+const T3 = "0192f3a4-0000-7000-8000-000000000003";
+const USER_ID = "0192f3a4-0000-7000-8000-0000000000d1";
+const DOC_ID = "0192f3a4-0000-7000-8000-00000000d001";
+const YEAR_ID = "0192f3a4-0000-7000-8000-0000000000a1";
+const CLASS_ID = "0192f3a4-0000-7000-8000-0000000000c6";
 
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -179,6 +185,153 @@ const INVOICE = {
   version: 1,
 };
 
+const STAMP = {
+  version: 1,
+  created_at: "2026-06-01T04:30:00Z",
+  updated_at: "2026-06-01T04:30:00Z",
+};
+
+/** School console fixtures for the screens added on 2026-09-27 (synthetic only). */
+const STRUCTURE = {
+  years: [
+    {
+      id: YEAR_ID,
+      label: "2026-27",
+      starts_on: "2026-06-01",
+      ends_on: "2027-04-30",
+      is_current: true,
+      ...STAMP,
+    },
+  ],
+  classes: [
+    {
+      id: CLASS_ID,
+      code: "6",
+      display_en: "Class 6",
+      display_te: "6వ తరగతి",
+      sort_order: 6,
+      ...STAMP,
+    },
+  ],
+  sections: ["A", "B"].map((name, index) => ({
+    id: `0192f3a4-0000-7000-8000-0000000005${index}0`,
+    academic_year_id: YEAR_ID,
+    class_id: CLASS_ID,
+    name,
+    class_teacher_membership_id: null,
+    ...STAMP,
+  })),
+};
+
+const TENANT = {
+  id: T1,
+  code: "sshs",
+  name: "Sri Saraswati High School",
+  boards: ["STATE_AP", "CBSE"],
+  state_code: "37",
+  status: "active",
+  plan_tier: "shared",
+  deployment_mode: "shared",
+  settings: {
+    languages: ["en", "te"],
+    date_format: "DD/MM/YYYY",
+    idle_timeout_minutes: 15,
+    ai_features_enabled: true,
+    ai_monthly_budget_inr: 5000,
+  },
+  version: 7,
+};
+
+const ROLES = [
+  { key: "office_admin", name_en: "Office admin", name_te: "ఆఫీసు అడ్మిన్" },
+  { key: "class_teacher", name_en: "Class teacher", name_te: "తరగతి ఉపాధ్యాయులు" },
+].map((role, index) => ({
+  id: `0192f3a4-0000-7000-8000-0000000007${index}0`,
+  ...role,
+  is_system: true,
+  permissions: ["student.read_basic"],
+}));
+
+const USER = {
+  id: USER_ID,
+  membership_id: "0192f3a4-0000-7000-8000-0000000000e1",
+  display_name: "Synthetic Teacher",
+  email: "teacher@school.example",
+  preferred_language: "te",
+  status: "active",
+  expires_at: null,
+  roles: ["class_teacher"],
+  scopes: [{ type: "section", ref: STRUCTURE.sections[0]?.id }],
+  last_login_at: "2026-09-20T04:30:00Z",
+  created_at: "2026-06-01T04:30:00Z",
+  version: 3,
+};
+
+const DOC_VERSION = {
+  id: "0192f3a4-0000-7000-8000-00000000d101",
+  version_no: 1,
+  mime_type: "application/pdf",
+  size_bytes: 204_800,
+  status: "ready",
+  error: null,
+  created_at: "2026-09-20T05:00:00Z",
+};
+const DOCUMENT = {
+  id: DOC_ID,
+  purpose: "circular",
+  doc_type: "circular",
+  title: "Dasara holidays circular 2026",
+  issuer: "Synthetic school",
+  issued_on: "2026-09-15",
+  academic_year_id: null,
+  language: "en",
+  sensitivity: "C1",
+  status: "active",
+  current_version: DOC_VERSION,
+  acl: [],
+  created_by: USER_ID,
+  created_at: "2026-09-20T05:00:00Z",
+  updated_at: "2026-09-21T05:00:00Z",
+  version: 3,
+};
+
+/** Platform school detail while provisioning is stopped (docs/16 §5.4). */
+const PROVISIONING_DETAIL = {
+  ...provisioningSummary(),
+  boards: ["CBSE"],
+  tenant_status_reason: null,
+  offboard_requested_at: null,
+  offboard_approved_at: null,
+  subscription: null,
+  counts: { users: 0, active_memberships: 0, academic_years: 0, sections: 0 },
+  open_tickets: 0,
+  invoices: [],
+  flag_overrides: {},
+  provisioning: {
+    state: "failed",
+    failed_step: "initialise",
+    last_error: "unexpected_error",
+    attempts: 2,
+    in_progress: false,
+    resumable: true,
+    updated_at: "2026-09-27T04:30:00Z",
+  },
+};
+
+function provisioningSummary() {
+  return {
+    ...TENANT_SUMMARY,
+    tenant_id: T3,
+    school_name: "Sample Model School",
+    code: "sms",
+    tenant_status: "provisioning",
+    subscription_status: "trial",
+    deployment_status: "healthy",
+    app_version: null,
+    last_heartbeat_at: null,
+  };
+}
+
 const OPERATOR_PERMISSIONS = [
   "platform.tenants.read",
   "platform.tenants.provision",
@@ -217,7 +370,19 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
         display_name: "Synthetic Principal",
         preferred_language: "en",
         roles: ["principal"],
-        permissions: ["tenant.billing.read", "support.ticket.create", "audit.read", "user.manage"],
+        permissions: [
+          "tenant.billing.read",
+          "support.ticket.create",
+          "audit.read",
+          "user.manage",
+          "role.assign",
+          "student.read_basic",
+          "tenant.structure.manage",
+          "tenant.settings.manage",
+          "document.read",
+          "document.upload",
+          "document.manage_acl",
+        ],
         scopes: [{ type: "school", ref: null }],
         mfa: true,
       },
@@ -263,6 +428,19 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
       },
     ];
   if (path === "/api/v1/tenant/billing/invoices") return [200, page([])];
+  if (path === "/api/v1/tenant") return [200, TENANT];
+  if (path === "/api/v1/academic-years") return [200, page(STRUCTURE.years)];
+  if (path === "/api/v1/classes") return [200, page(STRUCTURE.classes)];
+  if (path === "/api/v1/sections") return [200, page(STRUCTURE.sections)];
+  if (path === "/api/v1/roles") return [200, page(ROLES)];
+  if (path === "/api/v1/users") return [200, page([USER])];
+  if (path === `/api/v1/users/${USER_ID}`) return [200, USER];
+  if (path === "/api/v1/documents") return [200, page([DOCUMENT])];
+  if (path === `/api/v1/documents/${DOC_ID}`)
+    return [200, { ...DOCUMENT, versions: [DOC_VERSION] }];
+  if (path === "/api/v1/audit/verify")
+    return [200, { ok: true, checked: 1234, first_bad_seq: null, reason: null }];
+  if (path === `/api/v1/platform/tenants/${T3}`) return [200, PROVISIONING_DETAIL];
   if (path === "/api/v1/platform/me")
     return [
       200,
@@ -293,7 +471,8 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
         tickets_sla_breached: 0,
       },
     ];
-  if (path === "/api/v1/platform/tenants" && method === "GET") return [200, page([TENANT_SUMMARY])];
+  if (path === "/api/v1/platform/tenants" && method === "GET")
+    return [200, page([TENANT_SUMMARY, provisioningSummary()])];
   if (path === "/api/v1/platform/plans") return [200, page([PLAN])];
   if (path === "/api/v1/platform/invoices") return [200, page([INVOICE])];
   if (path.startsWith("/api/v1/")) return [200, page([])];

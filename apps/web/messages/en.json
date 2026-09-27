@@ -155,7 +155,6 @@
       "currentBadge": "Current",
       "years": {
         "title": "Academic years",
-        "add": "Add academic year",
         "colYear": "Year",
         "colStarts": "Starts on",
         "colEnds": "Ends on",
@@ -165,16 +164,13 @@
       },
       "classes": {
         "title": "Classes",
-        "add": "Add class",
         "colName": "Class",
         "colOrder": "Order",
-        "colSections": "Sections",
         "emptyTitle": "No classes yet",
         "emptyBody": "Add classes from Nursery to Class XII, the way your school runs them."
       },
       "sections": {
         "title": "Sections",
-        "add": "Add section",
         "colName": "Section",
         "colClass": "Class",
         "emptyTitle": "No sections yet",
@@ -557,7 +553,8 @@
         "users": "Staff accounts",
         "activeMembers": "Active staff",
         "sections": "Sections",
-        "openTickets": "Open tickets"
+        "openTickets": "Open tickets",
+        "setup": "Setup"
       },
       "activate": "Go live",
       "activateTitle": "Make this school live?",
@@ -585,7 +582,35 @@
       "offboardPendingBody": "Requested on {date}. A different operator must approve it.",
       "offboardApprovedTitle": "Offboarding approved",
       "offboardApprovedBody": "Approved on {date}. Data is deleted within 30 days.",
-      "offboardNote": "Offboarding needs a second operator's approval. The school's data is exported, then deleted within 30 days."
+      "offboardNote": "Offboarding needs a second operator's approval. The school's data is exported, then deleted within 30 days.",
+      "provisioning": {
+        "state": {
+          "registered": "Setup has started but is not finished",
+          "initialised": "Setup is almost finished",
+          "completed": "Setup is finished. The school can go live.",
+          "failed": "Setup stopped before it finished"
+        },
+        "label": {
+          "registered": "Started, not finished",
+          "initialised": "Keys and roles ready, owner not invited yet",
+          "completed": "Finished",
+          "failed": "Stopped, needs resuming"
+        },
+        "steps": {
+          "initialise": "setting up the school's keys and roles",
+          "owner_invite": "inviting the school's owner"
+        },
+        "failedAt": "It stopped while {step}.",
+        "errorCode": "Error code for support: {code}",
+        "attempts": "Attempts so far: {count, number}",
+        "updatedAt": "Last change: {date}",
+        "inProgress": "Setup is running right now. Reload the page in a few minutes.",
+        "resumeHint": "Select \"Resume provisioning\" to continue from where it stopped. Steps already done are not repeated.",
+        "resume": "Resume provisioning",
+        "resumeTitle": "Resume setting up this school?",
+        "resumeBody": "SchoolOS continues from the step that stopped. Steps already done are kept and not repeated.",
+        "activateIncomplete": "Setup is not finished, so SchoolOS will refuse to make this school live. Resume provisioning first, then go live."
+      }
     },
     "provision": {
       "title": "Provision school",
@@ -1294,6 +1319,22 @@
       "tenant_not_available": {
         "title": "You can't open this school",
         "body": "Ask the school's office admin to give you access."
+      },
+      "provisioning_in_progress": {
+        "title": "Setup is already running",
+        "body": "Another request is setting up this school right now. Wait a few minutes, then reload the page."
+      },
+      "provisioning_incomplete": {
+        "title": "The school's setup is not finished",
+        "body": "A school can go live only after setup finishes. Select \"Resume provisioning\" on the school's page, then try again."
+      },
+      "provisioning_failed": {
+        "title": "Setup stopped before it finished",
+        "body": "Nothing is lost. Reload the school's page and select \"Resume provisioning\" to continue."
+      },
+      "resume_needs_request": {
+        "title": "This setup can't be resumed from here",
+        "body": "It was started before setup could be resumed. Open \"Provision school\" and submit the same details again to finish it."
       },
       "redirecting": "Taking you to sign in so you can confirm it's you…",
       "unavailable": "This isn't available on this deployment.",

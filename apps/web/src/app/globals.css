@@ -74,7 +74,10 @@
     line-height: 1.75;
   }
 
-  :focus-visible {
+  :focus-visible,
+  /* Chrome's date picker button sits inside the input and never matches :focus-visible:
+     keep the ring on the input while any part of it has focus (WCAG 2.4.7). */
+  input[type="date"]:focus-within {
     outline: 3px solid var(--color-focus);
     outline-offset: 2px;
   }
