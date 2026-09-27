@@ -97,6 +97,8 @@ describe("notification bell (FR-NOT-001)", () => {
       "href",
       "/en/change-requests/0192f3a4-0000-7000-8000-00000000c001",
     );
+    // jsdom cannot navigate: stop the link's default action after React has handled the click.
+    document.addEventListener("click", (event) => event.preventDefault(), { once: true });
     await userEvent.click(link);
     await waitFor(() =>
       expect(

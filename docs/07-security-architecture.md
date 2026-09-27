@@ -306,7 +306,7 @@ Workers never run "for all tenants" in one transaction; batch jobs get tenant ID
 ```
 Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
 Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{n}' 'strict-dynamic'; style-src 'self';
-  img-src 'self' data: blob: https://{files-domain}; connect-src 'self'; font-src 'self'; object-src 'none';
+  img-src 'self' data: blob: https://{files-domain}; connect-src 'self' https://{files-domain}; font-src 'self'; object-src 'none';
   base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests
 X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
@@ -314,7 +314,7 @@ Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=()
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Resource-Policy: same-origin
 ```
-(`camera=(self)` allows photographing register pages from a phone browser.)
+(`camera=(self)` allows photographing register pages from a phone browser. The files domain is in `connect-src` so the browser can send presigned-POST uploads straight to storage (§10); it is added only when configured, as an https origin without path or wildcard. The correction memo, served through the BFF, keeps the API's own policy only when every directive allows nothing but `'none'` or hash-pinned blocks.)
 
 **OWASP API Security Top 10 mapping**
 
