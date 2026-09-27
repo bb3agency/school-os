@@ -80,11 +80,16 @@ Once all three are applied, reviewed and merged, delete `.handoff/`.
 
 ## 3. Open questions for the product owner (don't guess; ask)
 
-1. Should every board/portal pre-check export need step-up MFA? It contains names, DOB and parents'
-   names in bulk. Today only student lists and `include_sensitive` pre-checks need it.
-2. UDISE+ needs `category` (C3). Is explicit inclusion by `student.read_sensitive` holders with
-   step-up acceptable?
-3. Should principals see and download exports made by other staff? Today only the requester can.
+1. **Decided 2026-09-27 (ADR-0021 decision 1):** every export (board/portal pre-checks and
+   student lists) needs step-up MFA to be created. Built on `wip/exports-access`.
+2. **Decided 2026-09-27 (ADR-0021 decision 2):** UDISE+ `category` (C3) is included only by
+   explicit opt-in (`include_sensitive`) by `student.read_sensitive` holders with step-up; the
+   audit event lists the included columns. Built on `wip/exports-access`.
+3. **Decided 2026-09-27 (ADR-0021 decision 3):** `export.read_all` (owner, principal, office
+   admin) sees every export's details; `export.download_any` (owner only by default, always
+   step-up) downloads others' exports. Built on `wip/exports-access`. Still open: delivering
+   new `roles.yaml` grants to schools provisioned before migration `0019_export_access` (see
+   ADR-0021 "Follow-up work").
 4. CISCE/UDISE+ profile layouts in `app/dq/config/profiles/` and `app/exports/config.yaml` are
    placeholders. The real templates are needed before the pilot.
 5. Operator sign-in across the two Cognito pools for break-glass needs an ADR.

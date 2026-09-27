@@ -96,3 +96,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) | MFA enforcement and step-up with Amazon Cognito | Accepted |
 | [ADR-0019](ADR-0019-invitation-acceptance-on-first-sign-in.md) | Invitation acceptance on first sign-in | Accepted |
 | [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) | Control-plane boundaries and guaranteed audit copies | Accepted |
+| [ADR-0021](ADR-0021-export-access-and-step-up.md) | Export access and step-up | Accepted |

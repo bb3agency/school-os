@@ -130,7 +130,7 @@ Review the model at each milestone and after any incident.
 - Server-side session in Valkey, referenced by a `__Host-sos_session` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`.
 - Tokens stored server-side, encrypted; access token ≤ 10 min; refresh token rotated on every use; reuse detection revokes the whole session family.
 - Idle timeout 15 min (tenant-configurable 5–30), absolute 12 h. Shared-PC mode shows a visible "Lock now" button.
-- **Step-up authentication** (MFA within the last 5 minutes) for: approving identity changes, role/permission changes, waiving blockers, bulk exports, full tenant export, break-glass approval, and every platform permission marked ᴿ (§6.5). The API requires `sos:mfa = "true"` and `auth_time` within 5 minutes, otherwise returns `428 step_up_required`; the BFF re-authenticates with `prompt=login` and retries (ADR-0018).
+- **Step-up authentication** (MFA within the last 5 minutes) for: approving identity changes, role/permission changes, waiving blockers, creating any export (board/portal pre-checks and student lists, ADR-0021), downloading an export another member requested (`export.download_any`), full tenant export, break-glass approval, and every platform permission marked ᴿ (§6.5). The API requires `sos:mfa = "true"` and `auth_time` within 5 minutes, otherwise returns `428 step_up_required`; the BFF re-authenticates with `prompt=login` and retries (ADR-0018).
 - CSRF: synchronizer token on all state-changing BFF routes in addition to SameSite.
 - Users can list and revoke sessions; admins can force sign-out for a user.
 
@@ -282,7 +282,7 @@ Workers never run "for all tenants" in one transaction; batch jobs get tenant ID
 - **Application-layer encryption** for C3 fields (05 §9): AES-256-GCM, per-tenant DEK wrapped by KMS, AAD binds ciphertext to tenant/table/column/row.
 - **Key rotation:** CMKs rotated annually (automatic); DEKs rotated on schedule or incident with background re-encryption.
 - **Crypto-shredding:** deleting a tenant's wrapped keys renders remaining ciphertext (including in backups) unreadable.
-- **Masking:** C3 values masked in UI by default ("show" click is audited), in exports unless explicitly included, and always in logs.
+- **Masking:** C3 values masked in UI by default ("show" click is audited), in exports unless explicitly included by a holder of `student.read_sensitive` (`include_sensitive`, with step-up; the audit event names the included columns, never their values, ADR-0021), and always in logs.
 - **Aadhaar:** never stored (ADR-0007); Verhoeff-based redaction in all text pipelines.
 
 ## 9. Secrets management
