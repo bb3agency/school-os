@@ -594,6 +594,60 @@ def test_FR_IAM_010_new_user_invisible_to_inviting_tenant_until_membership_exist
         )
 
 
+# --- user_membership_count (ADR-0028) ------------------------------------------------------
+
+COUNT = text("SELECT core.user_membership_count(:u)")
+
+
+def test_ADR_0028_membership_count_counts_schools_of_own_member_only(
+    admin_engine: Engine, engines: None
+) -> None:
+    a, b, c_ = (make_tenant(admin_engine) for _ in range(3))
+    person, _ = make_user(admin_engine)
+    viewer, _ = make_user(admin_engine)
+    make_membership(admin_engine, a, person)
+    make_membership(admin_engine, a, viewer)
+    with tenant_session(a, viewer) as s:
+        assert s.execute(COUNT, {"u": person}).scalar_one() == 1
+    make_membership(admin_engine, b, person, status="removed")
+    with tenant_session(a, viewer) as s:
+        assert s.execute(COUNT, {"u": person}).scalar_one() == 2
+    # A school cannot ask about someone who is not its member (no cross-school probing).
+    stranger, _ = make_user(admin_engine)
+    make_membership(admin_engine, c_, stranger)
+    with tenant_session(a, viewer) as s:
+        assert s.execute(COUNT, {"u": stranger}).scalar_one() is None
+        assert s.execute(COUNT, {"u": uuid.uuid4()}).scalar_one() is None
+
+
+def test_ADR_0028_membership_count_needs_tenant_context(engines: None) -> None:
+    with (
+        pytest.raises(ProgrammingError, match="tenant context"),
+        context_free_session() as s,
+    ):
+        s.execute(COUNT, {"u": uuid.uuid4()})
+
+
+def test_ADR_0028_membership_count_returns_only_an_integer(admin_engine: Engine) -> None:
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT pg_catalog.format_type(prorettype, NULL), proretset, provolatile "
+                "FROM pg_proc WHERE oid = 'core.user_membership_count(uuid)'::regprocedure"
+            )
+        ).one()
+    assert tuple(row) == ("integer", False, "s")
+
+
+@pytest.mark.parametrize("engine_name", ["platform_engine", "readonly_engine"])
+def test_ADR_0028_membership_count_denied_to_other_roles(
+    engine_name: str, request: pytest.FixtureRequest
+) -> None:
+    engine: Engine = request.getfixturevalue(engine_name)
+    with pytest.raises(ProgrammingError, match="permission denied"), engine.begin() as c:
+        c.execute(COUNT, {"u": uuid.uuid4()})
+
+
 # --- list_tenant_ids -----------------------------------------------------------------------
 
 

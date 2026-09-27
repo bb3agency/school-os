@@ -158,6 +158,17 @@ def create_user_for_invite(
     return uuid.UUID(str(value))
 
 
+def user_membership_count(session: Session, user_id: uuid.UUID) -> int | None:
+    """Schools ``user_id`` has a membership in (any status), via the ADR-0028 definer function.
+
+    ``None`` when the person is not a member of the current school. Needs a ``tenant_session``.
+    """
+    value: object = session.execute(
+        text("SELECT core.user_membership_count(:u)"), {"u": user_id}
+    ).scalar_one()
+    return int(str(value)) if value is not None else None
+
+
 # --- users ---------------------------------------------------------------------------------
 
 

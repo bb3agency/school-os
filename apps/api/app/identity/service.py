@@ -226,6 +226,29 @@ def _guard_not_breakglass(session: Session, membership: Membership) -> None:
         )
 
 
+def _guard_not_own(ctx: UserContext, user_id: uuid.UUID) -> None:
+    """Nobody suspends or removes their own membership (as ``own_account`` for operators)."""
+    if user_id == ctx.user_id:
+        raise Conflict(
+            "You cannot change your own access. Ask another administrator to do it.",
+            code="own_account",
+        )
+
+
+def _guard_profile_not_shared(session: Session, user_id: uuid.UUID) -> None:
+    """ADR-0028: a profile is shared by every school the person belongs to; a school may edit
+    it only when the person belongs to that school alone."""
+    count = repo.user_membership_count(session, user_id)
+    if count is None:  # pragma: no cover - the membership was read in this transaction
+        raise NotFound("User not found")
+    if count > 1:
+        raise Conflict(
+            "This person also works at another school on SchoolOS, so their name, email and "
+            "language are shared. Ask them to update their profile, or contact SchoolOS support.",
+            code="profile_shared",
+        )
+
+
 def _guard_last_owner(session: Session, membership: Membership) -> None:
     owner = repo.get_role_by_key(session, OWNER_ROLE)
     if owner is None:
@@ -545,6 +568,7 @@ def set_membership_status(
         raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
     if previous == "active":
         _guard_last_owner(session, membership)
+    _guard_not_own(ctx, user_id)
     updated = repo.set_membership_status(
         session, membership.id, status=status, expected_version=expected_version
     )
@@ -579,8 +603,11 @@ def update_user(
     ``status`` follows :func:`set_membership_status` (transitions, last owner). Profile fields
     (display name, email, language) change the person's account (visible only through their
     membership here, RLS ``users_in_tenant_update``); a removed member's profile is not edited
-    (409 ``invalid_state``). Unchanged values are ignored; with nothing to change the member
-    is returned as is. Otherwise the membership version is bumped once (the ETag changes).
+    (409 ``invalid_state``), and a profile shared with another school is not edited either
+    (409 ``profile_shared``, ADR-0028; the whole request is refused). Nobody changes the status
+    of their own membership (409 ``own_account``). Unchanged values are ignored; with nothing
+    to change the member is returned as is. Otherwise the membership version is bumped once
+    (the ETag changes).
     Audit: ``user.profile_updated`` with the changed field NAMES only (never values) and
     ``membership.status_changed`` {from, to}.
     """
@@ -608,7 +635,9 @@ def update_user(
             raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
         if previous == "active":
             _guard_last_owner(session, membership)
+        _guard_not_own(ctx, user_id)
     if profile:
+        _guard_profile_not_shared(session, user_id)
         with _db_errors():
             repo.update_user_profile(
                 session, user_id, expected_version=user.version, values=profile
