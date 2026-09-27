@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -124,3 +126,87 @@ def test_FR_NOT_001_accept_language_negotiation(header: str | None, expected: st
 
 def test_FR_ADM_002_read_retention_is_ninety_days() -> None:
     assert t.read_retention_days() == 90
+
+
+# --- every notification the code sends has a template -------------------------------------
+
+APP_DIR = Path(t.__file__).resolve().parents[1]
+
+
+def _module_constants(tree: ast.Module) -> dict[str, str]:
+    """Module-level ``NAME = "text"`` / ``NAME: Final = "text"`` assignments."""
+    constants: dict[str, str] = {}
+    for stmt in tree.body:
+        targets = (
+            stmt.targets
+            if isinstance(stmt, ast.Assign)
+            else [stmt.target]
+            if isinstance(stmt, ast.AnnAssign)
+            else []
+        )
+        value = getattr(stmt, "value", None)
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    constants[target.id] = value.value
+    return constants
+
+
+def _sent_template_keys() -> dict[str, tuple[str, set[str] | None]]:
+    """``template_key`` values passed to ``notifications.notify`` by app code, with the literal
+    param names when the call spells them out. Covers literals, module constants and module
+    helpers that forward a key (``changes._notify(session, row, "<key>", ...)``,
+    ``extraction._notify(session, batch, <CONSTANT>, {...})``)."""
+    found: dict[str, tuple[str, set[str] | None]] = {}
+    for path in sorted(APP_DIR.rglob("*.py")):
+        if path.parent.name == "notifications":
+            continue
+        tree = ast.parse(path.read_text("utf-8"))
+        constants = _module_constants(tree)
+
+        def resolve(expr: ast.expr, constants: dict[str, str] = constants) -> str | None:
+            if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+                return expr.value
+            if isinstance(expr, ast.Name):
+                return constants.get(expr.id)
+            return None
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            kwargs = {k.arg: k.value for k in node.keywords}
+            key_expr = kwargs.get("template_key")
+            params_expr = kwargs.get("params")
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+            if key_expr is None and name == "_notify" and len(node.args) >= 3:
+                key_expr = node.args[2]
+                params_expr = node.args[3] if len(node.args) >= 4 else None
+            if key_expr is None:
+                continue
+            key = resolve(key_expr)
+            if key is None:
+                continue  # a forwarded parameter: checked where the helper is called
+            params = (
+                {str(k.value) for k in params_expr.keys if isinstance(k, ast.Constant)}
+                if isinstance(params_expr, ast.Dict)
+                else None
+            )
+            found[f"{path.relative_to(APP_DIR)}:{node.lineno}"] = (key, params)
+    return found
+
+
+def test_FR_NOT_001_every_notification_sent_by_the_code_has_a_bilingual_template() -> None:
+    sent = _sent_template_keys()
+    keys = {key for key, _ in sent.values()}
+    # The scan sees literals, module constants and forwarding helpers.
+    assert {"export.ready", "extraction.batch.ready", "change_request.expired"} <= keys
+    catalog = t.catalog()
+    problems = []
+    for where, (key, params) in sorted(sent.items()):
+        template = catalog.get(key)
+        if template is None:
+            problems.append(f"{where}: {key} has no template")
+        elif params is not None and params != set(template.params):
+            problems.append(f"{where}: {key} params {sorted(params)} != {sorted(template.params)}")
+    assert problems == []
