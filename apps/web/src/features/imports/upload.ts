@@ -56,7 +56,7 @@ export function extensionOf(name: string): string {
 
 /** Document title from the file name (API: 1–200 characters, no control characters). */
 export function titleOf(name: string): string {
-  // eslint-disable-next-line no-control-regex -- strip control characters the API refuses
+  // Strip control characters the API refuses.
   const clean = name.replace(/[\u0000-\u001f\u007f]/g, " ").trim();
   return (clean || "file").slice(0, 200);
 }

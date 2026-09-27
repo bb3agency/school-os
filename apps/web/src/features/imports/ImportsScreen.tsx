@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
+import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +19,7 @@ import { VALUE_SOURCES, isValueSource } from "@/features/students/types";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { ApiError, newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { formValues } from "@/lib/forms";
 import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import {
@@ -33,7 +35,8 @@ import { extensionOf, uploadDocument, type UploadProgress } from "./upload";
 export const IMPORTS_KEY = ["staff", "imports"] as const;
 /** FR-IMP-001: XLSX or CSV (a Google Sheets download), at most 10 MB. */
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
-const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+const ACCEPT =
+  ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
 
 export function ImportStatusBadge({ status }: { status: ImportBatch["status"] }) {
   const t = useTranslations("imports.status");
@@ -45,7 +48,7 @@ export function SourceName({ source }: { source: string }) {
   return <>{isValueSource(source) ? t(source) : source}</>;
 }
 
-type FileProblem = "fileMissing" | "fileType" | "fileTooLarge";
+export type FileProblem = "fileMissing" | "fileType" | "fileTooLarge";
 
 export function checkSpreadsheet(file: File | null | undefined): FileProblem | null {
   if (!file) return "fileMissing";
@@ -54,20 +57,32 @@ export function checkSpreadsheet(file: File | null | undefined): FileProblem | n
   return null;
 }
 
+const uploadSchema = z.object({
+  source: z.enum(VALUE_SOURCES, { error: "chooseOption" }),
+});
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Pause between "the scan is not visible to imports yet" retries (tests shorten it). */
+let notReadyRetryMs = 2000;
+export function setNotReadyRetryForTesting(ms: number): void {
+  notReadyRetryMs = ms;
+}
 
 /** US-401 AC1: upload a spreadsheet and start reading it (documents upload → POST /imports). */
 export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatch) => void }) {
   const t = useTranslations("imports.upload");
   const ts = useTranslations("students");
+  const tv = useTranslations("validation");
   const locale = useLocale() as Locale;
   const api = useBffClient("staff");
   const fileRef = useRef<HTMLInputElement>(null);
   const statusId = useId();
   const [problem, setProblem] = useState<FileProblem | null>(null);
+  const [sourceError, setSourceError] = useState<string | undefined>(undefined);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<unknown>(undefined);
-  const busy = progress !== null && progress.stage !== "ready";
+  const busy = progress !== null;
 
   async function start(file: File, source: ImportSource) {
     const documentId = await uploadDocument(api, file, "import_file", { onProgress: setProgress });
@@ -82,28 +97,29 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
           }),
         );
       } catch (failure) {
-        if (!(failure instanceof ApiError && failure.code === "document_not_ready") || attempt >= 4) {
-          throw failure;
-        }
-        await sleep(2000);
+        const notReady = failure instanceof ApiError && failure.code === "document_not_ready";
+        if (!notReady || attempt >= 4) throw failure;
+        await sleep(notReadyRetryMs);
       }
     }
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const form = event.currentTarget;
     const file = fileRef.current?.files?.[0];
     const found = checkSpreadsheet(file);
+    const parsed = uploadSchema.safeParse(formValues(form));
     setProblem(found);
+    setSourceError(parsed.success ? undefined : tv("chooseOption"));
     setError(undefined);
     if (found || !file) {
       fileRef.current?.focus();
       return;
     }
-    const source = new FormData(form).get("source");
-    const chosen = VALUE_SOURCES.find((value) => value === source) ?? "admission_register";
-    start(file, chosen)
+    if (!parsed.success) return;
+    start(file, parsed.data.source)
       .then((batch) => {
         form.reset();
         setProgress(null);
@@ -121,7 +137,7 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
       : t(`stage.${value.stage}`);
 
   return (
-    <form noValidate onSubmit={onSubmit} className="space-y-4" aria-describedby={statusId}>
+    <form noValidate onSubmit={onSubmit} className="space-y-4">
       <Field
         label={t("file")}
         hint={t("fileHint", { size: formatBytes(MAX_IMPORT_BYTES, locale) ?? "10 MB" })}
@@ -148,6 +164,7 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
         hint={t("sourceHint")}
         defaultValue="admission_register"
         disabled={busy}
+        error={sourceError}
         options={VALUE_SOURCES.map((value) => ({
           value,
           label: CREATING_SOURCES.includes(value)
@@ -175,7 +192,7 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
       </div>
       <ProblemAlert error={error} namespace="imports.errors" />
       <div className="flex justify-end">
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy} aria-describedby={statusId}>
           {busy ? t("working") : t("submit")}
         </Button>
       </div>
@@ -214,6 +231,7 @@ export function ImportsView({
       cell: (row) => (
         <Link href={`/imports/${row.id}`} className="font-semibold text-primary underline">
           {formatDateTime(row.created_at) ?? t("open")}
+          <span className="sr-only">{t("openHint")}</span>
         </Link>
       ),
     },
@@ -229,7 +247,11 @@ export function ImportsView({
           count(row.error_count)
         ),
     },
-    { key: "status", header: t("colStatus"), cell: (row) => <ImportStatusBadge status={row.status} /> },
+    {
+      key: "status",
+      header: t("colStatus"),
+      cell: (row) => <ImportStatusBadge status={row.status} />,
+    },
   ];
 
   const templateColumns: Column<ImportTemplate>[] = [
@@ -258,7 +280,7 @@ export function ImportsView({
             <UploadSpreadsheet onStarted={onStarted} />
           </Card>
         ) : null}
-        <Card title={t("historyTitle")} className={canUpload ? undefined : "xl:col-span-2"}>
+        <Card title={t("historyTitle")} {...(canUpload ? {} : { className: "xl:col-span-2" })}>
           <div className="space-y-3">
             <DataTable
               caption={t("historyTitle")}
