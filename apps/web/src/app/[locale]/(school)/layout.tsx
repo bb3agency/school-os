@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { SessionControls } from "@/components/session/SessionControls";
 import { StepUpHost } from "@/components/session/StepUpHost";
 import { SchoolShell } from "@/components/shell/SchoolShell";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { AnnouncementBanner } from "@/features/school/AnnouncementBanner";
 import { SuspendedBanner, type SchoolStatus } from "@/features/school-status/SuspendedBanner";
 import { apiGetAsSession, PATH_HEADER, requireStaff } from "@/server/session/rsc";
@@ -41,7 +42,13 @@ export default async function SchoolLayout({
   return (
     <SchoolShell
       headerActions={
-        <SessionControls kind="staff" displayName={profile?.display_name ?? session.displayName} />
+        <>
+          {suspended ? null : <NotificationBell />}
+          <SessionControls
+            kind="staff"
+            displayName={profile?.display_name ?? session.displayName}
+          />
+        </>
       }
       permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}

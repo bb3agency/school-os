@@ -1672,5 +1672,22 @@
       "allForStudent": "All correction requests for this student",
       "backToList": "Back to the list"
     }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "Messages about requests, checks and support access, newest first.",
+    "bellLabel": "Notifications",
+    "bellLabelCount": "{count, plural, =0 {Notifications, none unread} one {Notifications, # unread} other {Notifications, # unread}}",
+    "unreadCount": "{count, plural, one {# unread notification} other {# unread notifications}}",
+    "panelLabel": "Latest notifications",
+    "unread": "Unread",
+    "markRead": "Mark as read",
+    "markAllRead": "Mark all as read",
+    "loading": "Loading…",
+    "empty": "No notifications",
+    "emptyBody": "You'll see messages here when a request needs you or a check finishes.",
+    "unreadOnly": "Show unread only",
+    "seeAll": "See all notifications",
+    "showMore": "Show more"
   }
 }
