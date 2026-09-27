@@ -102,3 +102,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0024](ADR-0024-resumable-school-provisioning.md) | Resumable school provisioning instead of one transaction | Proposed |
 | [ADR-0025](ADR-0025-chromium-sandbox-for-pdf-rendering.md) | Chromium sandbox for PDF rendering on Fargate and dedicated hosts | Proposed |
 | [ADR-0026](ADR-0026-dedicated-upgrades-apply-system-role-sync.md) | Dedicated upgrades apply the system-role sync | Accepted |
+| [ADR-0027](ADR-0027-pdf-text-layer-extraction.md) | PDF text-layer extraction library for knowledge ingestion | Proposed |
