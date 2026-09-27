@@ -502,6 +502,30 @@
         "title": "ApproveIn",
         "type": "object"
       },
+      "AskIn": {
+        "additionalProperties": false,
+        "description": "One question to the school's records and documents (docs/09 \u00a75.4).",
+        "properties": {
+          "question": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "session_id": {
+            "description": "The browser's Ask session: context never crosses users (FR-KB-012).",
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "session_id"
+        ],
+        "title": "AskIn",
+        "type": "object"
+      },
       "AttributeOut": {
         "properties": {
           "allowed_sources": {
@@ -3671,6 +3695,78 @@
           "trial_ends_at"
         ],
         "title": "ExtendTrialIn",
+        "type": "object"
+      },
+      "FeedbackIn": {
+        "additionalProperties": false,
+        "properties": {
+          "feedback": {
+            "enum": [
+              "helpful",
+              "not_helpful"
+            ],
+            "title": "Feedback",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A reason code (e.g. wrong_source, outdated, not_found_but_exists); never free text.",
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "feedback"
+        ],
+        "title": "FeedbackIn",
+        "type": "object"
+      },
+      "FeedbackOut": {
+        "properties": {
+          "feedback": {
+            "enum": [
+              "helpful",
+              "not_helpful"
+            ],
+            "title": "Feedback",
+            "type": "string"
+          },
+          "query_id": {
+            "format": "uuid",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id",
+          "feedback",
+          "reason",
+          "recorded_at"
+        ],
+        "title": "FeedbackOut",
         "type": "object"
       },
       "FieldOut": {
@@ -7584,6 +7680,34 @@
         "title": "Page[UserOut]",
         "type": "object"
       },
+      "Page_VerifiedAnswerOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/VerifiedAnswerOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[VerifiedAnswerOut]",
+        "type": "object"
+      },
       "PaymentIn": {
         "additionalProperties": false,
         "properties": {
@@ -9877,6 +10001,168 @@
           }
         },
         "title": "ScopesIn",
+        "type": "object"
+      },
+      "SearchIn": {
+        "additionalProperties": false,
+        "description": "Search-only retrieval (ranked, cited passages without generated prose).",
+        "properties": {
+          "doc_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "circular",
+                    "policy",
+                    "minutes",
+                    "register_scan",
+                    "certificate",
+                    "letter",
+                    "form",
+                    "report",
+                    "verified_answer",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doc Types"
+          },
+          "from_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Date"
+          },
+          "limit": {
+            "default": 12,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "SearchIn",
+        "type": "object"
+      },
+      "SearchOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResultOut"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SearchOut",
+        "type": "object"
+      },
+      "SearchResultOut": {
+        "properties": {
+          "doc_type": {
+            "title": "Doc Type",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "page_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page From"
+          },
+          "page_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page To"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "source": {
+            "description": "sos://doc/{document_id}/v{n}#p{page}",
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "document_id",
+          "version_no",
+          "page_from",
+          "page_to",
+          "doc_type",
+          "title",
+          "issued_on",
+          "snippet",
+          "score"
+        ],
+        "title": "SearchResultOut",
         "type": "object"
       },
       "SectionCreate": {
@@ -12928,6 +13214,192 @@
           "student_version"
         ],
         "title": "ValueRecorded",
+        "type": "object"
+      },
+      "VerifiedAnswerIn": {
+        "additionalProperties": false,
+        "description": "An approved answer to a recurring question (FR-KB-030). Citations must point at the\ncurrent version of documents you can read and quote their text.",
+        "properties": {
+          "answer_text": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Answer Text",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/VerifiedCitationIn"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Citations",
+            "type": "array"
+          },
+          "language": {
+            "enum": [
+              "en",
+              "te",
+              "mixed"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "review_due": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Due"
+          }
+        },
+        "required": [
+          "question",
+          "language",
+          "answer_text",
+          "citations"
+        ],
+        "title": "VerifiedAnswerIn",
+        "type": "object"
+      },
+      "VerifiedAnswerOut": {
+        "properties": {
+          "answer_text": {
+            "title": "Answer Text",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/VerifiedCitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "en",
+              "te",
+              "mixed"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "review_due": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Due"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "needs_review",
+              "retired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verified_at": {
+            "format": "date-time",
+            "title": "Verified At",
+            "type": "string"
+          },
+          "verified_by": {
+            "description": "Membership id of the person who verified it.",
+            "format": "uuid",
+            "title": "Verified By",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "language",
+          "answer_text",
+          "citations",
+          "status",
+          "verified_by",
+          "verified_at",
+          "review_due",
+          "version",
+          "created_at"
+        ],
+        "title": "VerifiedAnswerOut",
+        "type": "object"
+      },
+      "VerifiedCitationIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cited_text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Cited Text",
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 300,
+            "pattern": "^sos://(doc|student|finding|change|verified)/[0-9a-f-]{36}[#/?a-z0-9_=-]*$",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "cited_text"
+        ],
+        "title": "VerifiedCitationIn",
+        "type": "object"
+      },
+      "VerifiedCitationOut": {
+        "properties": {
+          "cited_text": {
+            "title": "Cited Text",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "cited_text"
+        ],
+        "title": "VerifiedCitationOut",
         "type": "object"
       },
       "VerifyIn": {
@@ -17605,6 +18077,273 @@
         "summary": "Validate Import",
         "tags": [
           "imports"
+        ]
+      }
+    },
+    "/api/v1/knowledge/ask": {
+      "post": {
+        "description": "Ask a question of the school's records and documents (permission ``kb.ask``).\n\nAnswers cite their sources (``sos://`` URIs) or say the answer was not found in the school\nrecords you can access. Only records and documents you may see are used. When the school's\nAI budget is used up or AI answers are unavailable, you get ranked, cited passages instead\n(``mode: search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.",
+        "operationId": "ask_api_v1_knowledge_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "example": "event: meta\ndata: {\"query_id\":\"\u2026\",\"language\":\"en\",\"mode\":\"full\"}\n\nevent: token\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\"}\n\nevent: citation\ndata: {\"index\":1,\"source\":\"sos://doc/\u2026/v2#p1\",\"title\":\"Circular \u00b7 \u2026\",\"snippet\":\"\u2026\"}\n\nevent: done\ndata: {\"latency_ms\":4120,\"cited_sources\":1}\n\n",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-Sent Events: meta, token, citation, error, done (docs/06 \u00a75.1)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ask",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/queries/{query_id}/feedback": {
+      "post": {
+        "description": "Mark one of YOUR answers helpful or not (permission ``kb.ask``; a reason code, never\nfree text). Other people's questions answer 404.",
+        "operationId": "feedback_api_v1_knowledge_queries__query_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "query_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Query Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Feedback",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/search": {
+      "post": {
+        "description": "Ranked passages from documents you can read (permission ``document.read``): the\nsearch-only view of Ask, without generated prose. The query goes in the body (SEC-008).",
+        "operationId": "search_api_v1_knowledge_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/verified-answers": {
+      "get": {
+        "description": "Verified answers (permission ``kb.ask``), newest first. Only answers whose cited\ndocuments you can all read are listed.",
+        "operationId": "list_verified_answers_api_v1_knowledge_verified_answers_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "needs_review",
+                    "retired"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_VerifiedAnswerOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Verified Answers",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "post": {
+        "description": "Record an approved answer to a recurring question (permission\n``kb.verified_answer.manage``; FR-KB-030). Each citation must quote the current version of\na document you can read (422 ``citation_not_found``, ``citation_not_current``,\n``citation_text_not_found``, ``citation_source_unsupported``). It is flagged for review when\na cited document changes or is deleted. Accepts ``Idempotency-Key``.",
+        "operationId": "create_verified_answer_api_v1_knowledge_verified_answers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifiedAnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Verified Answer",
+        "tags": [
+          "knowledge"
         ]
       }
     },

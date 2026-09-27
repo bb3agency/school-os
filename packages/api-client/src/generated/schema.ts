@@ -1506,6 +1506,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask
+         * @description Ask a question of the school's records and documents (permission ``kb.ask``).
+         *
+         *     Answers cite their sources (``sos://`` URIs) or say the answer was not found in the school
+         *     records you can access. Only records and documents you may see are used. When the school's
+         *     AI budget is used up or AI answers are unavailable, you get ranked, cited passages instead
+         *     (``mode: search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.
+         */
+        post: operations["ask_api_v1_knowledge_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/queries/{query_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Feedback
+         * @description Mark one of YOUR answers helpful or not (permission ``kb.ask``; a reason code, never
+         *     free text). Other people's questions answer 404.
+         */
+        post: operations["feedback_api_v1_knowledge_queries__query_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search
+         * @description Ranked passages from documents you can read (permission ``document.read``): the
+         *     search-only view of Ask, without generated prose. The query goes in the body (SEC-008).
+         */
+        post: operations["search_api_v1_knowledge_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/verified-answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Verified Answers
+         * @description Verified answers (permission ``kb.ask``), newest first. Only answers whose cited
+         *     documents you can all read are listed.
+         */
+        get: operations["list_verified_answers_api_v1_knowledge_verified_answers_get"];
+        put?: never;
+        /**
+         * Create Verified Answer
+         * @description Record an approved answer to a recurring question (permission
+         *     ``kb.verified_answer.manage``; FR-KB-030). Each citation must quote the current version of
+         *     a document you can read (422 ``citation_not_found``, ``citation_not_current``,
+         *     ``citation_text_not_found``, ``citation_source_unsupported``). It is flagged for review when
+         *     a cited document changes or is deleted. Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_verified_answer_api_v1_knowledge_verified_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -3742,6 +3838,20 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /**
+         * AskIn
+         * @description One question to the school's records and documents (docs/09 §5.4).
+         */
+        AskIn: {
+            /** Question */
+            question: string;
+            /**
+             * Session Id
+             * Format: uuid
+             * @description The browser's Ask session: context never crosses users (FR-KB-012).
+             */
+            session_id: string;
+        };
         /** AttributeOut */
         AttributeOut: {
             /** Allowed Sources */
@@ -4828,6 +4938,39 @@ export interface components {
              * Format: date-time
              */
             trial_ends_at: string;
+        };
+        /** FeedbackIn */
+        FeedbackIn: {
+            /**
+             * Feedback
+             * @enum {string}
+             */
+            feedback: "helpful" | "not_helpful";
+            /**
+             * Reason
+             * @description A reason code (e.g. wrong_source, outdated, not_found_but_exists); never free text.
+             */
+            reason?: string | null;
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /**
+             * Feedback
+             * @enum {string}
+             */
+            feedback: "helpful" | "not_helpful";
+            /**
+             * Query Id
+             * Format: uuid
+             */
+            query_id: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
         };
         /** FieldOut */
         FieldOut: {
@@ -6001,6 +6144,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[VerifiedAnswerOut] */
+        Page_VerifiedAnswerOut_: {
+            /** Data */
+            data: components["schemas"]["VerifiedAnswerOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** PageImage */
         PageImage: {
             /**
@@ -6887,6 +7037,57 @@ export interface components {
         ScopesIn: {
             /** Scopes */
             scopes?: components["schemas"]["ScopeIn"][];
+        };
+        /**
+         * SearchIn
+         * @description Search-only retrieval (ranked, cited passages without generated prose).
+         */
+        SearchIn: {
+            /** Doc Types */
+            doc_types?: ("circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other")[] | null;
+            /** From Date */
+            from_date?: string | null;
+            /**
+             * Limit
+             * @default 12
+             */
+            limit: number;
+            /** Query */
+            query: string;
+        };
+        /** SearchOut */
+        SearchOut: {
+            /** Data */
+            data: components["schemas"]["SearchResultOut"][];
+        };
+        /** SearchResultOut */
+        SearchResultOut: {
+            /** Doc Type */
+            doc_type: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Issued On */
+            issued_on: string | null;
+            /** Page From */
+            page_from: number | null;
+            /** Page To */
+            page_to: number | null;
+            /** Score */
+            score: number;
+            /** Snippet */
+            snippet: string;
+            /**
+             * Source
+             * @description sos://doc/{document_id}/v{n}#p{page}
+             */
+            source: string;
+            /** Title */
+            title: string;
+            /** Version No */
+            version_no: number;
         };
         /** SectionCreate */
         SectionCreate: {
@@ -7976,6 +8177,84 @@ export interface components {
             student_version: number;
             /** Superseded */
             superseded: string | null;
+        };
+        /**
+         * VerifiedAnswerIn
+         * @description An approved answer to a recurring question (FR-KB-030). Citations must point at the
+         *     current version of documents you can read and quote their text.
+         */
+        VerifiedAnswerIn: {
+            /** Answer Text */
+            answer_text: string;
+            /** Citations */
+            citations: components["schemas"]["VerifiedCitationIn"][];
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te" | "mixed";
+            /** Question */
+            question: string;
+            /** Review Due */
+            review_due?: string | null;
+        };
+        /** VerifiedAnswerOut */
+        VerifiedAnswerOut: {
+            /** Answer Text */
+            answer_text: string;
+            /** Citations */
+            citations: components["schemas"]["VerifiedCitationOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te" | "mixed";
+            /** Question */
+            question: string;
+            /** Review Due */
+            review_due: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "needs_review" | "retired";
+            /**
+             * Verified At
+             * Format: date-time
+             */
+            verified_at: string;
+            /**
+             * Verified By
+             * Format: uuid
+             * @description Membership id of the person who verified it.
+             */
+            verified_by: string;
+            /** Version */
+            version: number;
+        };
+        /** VerifiedCitationIn */
+        VerifiedCitationIn: {
+            /** Cited Text */
+            cited_text: string;
+            /** Source */
+            source: string;
+        };
+        /** VerifiedCitationOut */
+        VerifiedCitationOut: {
+            /** Cited Text */
+            cited_text: string;
+            /** Source */
+            source: string;
         };
         /** VerifyIn */
         VerifyIn: {
@@ -10500,6 +10779,188 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_api_v1_knowledge_ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskIn"];
+            };
+        };
+        responses: {
+            /** @description Server-Sent Events: meta, token, citation, error, done (docs/06 §5.1). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example event: meta
+                     *     data: {"query_id":"…","language":"en","mode":"full"}
+                     *
+                     *     event: token
+                     *     data: {"text":"Exams begin on 22/09/2026. [1]"}
+                     *
+                     *     event: citation
+                     *     data: {"index":1,"source":"sos://doc/…/v2#p1","title":"Circular · …","snippet":"…"}
+                     *
+                     *     event: done
+                     *     data: {"latency_ms":4120,"cited_sources":1}
+                     */
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_api_v1_knowledge_queries__query_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                query_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_v1_knowledge_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_verified_answers_api_v1_knowledge_verified_answers_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("active" | "needs_review" | "retired") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_VerifiedAnswerOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_verified_answer_api_v1_knowledge_verified_answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifiedAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifiedAnswerOut"];
                 };
             };
             /** @description Validation Error */
