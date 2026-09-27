@@ -1318,6 +1318,88 @@
         "title": "ClassUpdate",
         "type": "object"
       },
+      "ColumnMap": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "maximum": 59.0,
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "target": {
+            "pattern": "^[a-z][a-z0-9_]{1,63}$",
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "target"
+        ],
+        "title": "ColumnMap",
+        "type": "object"
+      },
+      "ColumnOut": {
+        "properties": {
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "suggested": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "index",
+          "header",
+          "suggested",
+          "score",
+          "target"
+        ],
+        "title": "ColumnOut",
+        "type": "object"
+      },
+      "CommitIn": {
+        "additionalProperties": false,
+        "description": "``skip_error_rows``: commit only the valid rows (rows with errors are marked skipped).",
+        "properties": {
+          "skip_error_rows": {
+            "default": false,
+            "title": "Skip Error Rows",
+            "type": "boolean"
+          }
+        },
+        "title": "CommitIn",
+        "type": "object"
+      },
       "DashboardOut": {
         "properties": {
           "ai_spend_mtd_inr": {
@@ -3045,6 +3127,490 @@
         "title": "HeartbeatOut",
         "type": "object"
       },
+      "ImportCreate": {
+        "additionalProperties": false,
+        "description": "Start importing an uploaded file (purpose ``import_file``, scanned) from one source.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "spreadsheet",
+            "default": "spreadsheet",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "admission_register",
+              "aadhaar_as_printed",
+              "udise_plus",
+              "board_registration",
+              "birth_certificate",
+              "parent_form",
+              "tc_incoming",
+              "manual_entry"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "source"
+        ],
+        "title": "ImportCreate",
+        "type": "object"
+      },
+      "ImportOut": {
+        "properties": {
+          "can_commit": {
+            "title": "Can Commit",
+            "type": "boolean"
+          },
+          "can_revert": {
+            "title": "Can Revert",
+            "type": "boolean"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_count": {
+            "title": "Error Count",
+            "type": "integer"
+          },
+          "file_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Kind"
+          },
+          "header_row": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Row"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "mapping_template_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping Template Id"
+          },
+          "raw_file_deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw File Deleted At"
+          },
+          "revert_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revert Deadline"
+          },
+          "reverted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverted At"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "stats": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Stats",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "uploaded",
+              "parsing",
+              "parsed",
+              "validating",
+              "validated",
+              "committing",
+              "committed",
+              "reverting",
+              "reverted",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "source",
+          "status",
+          "document_id",
+          "file_kind",
+          "header_row",
+          "columns",
+          "mapping_template_id",
+          "stats",
+          "row_count",
+          "error_count",
+          "error_code",
+          "job_id",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "committed_at",
+          "revert_deadline",
+          "reverted_at",
+          "raw_file_deleted_at",
+          "version",
+          "can_commit",
+          "can_revert"
+        ],
+        "title": "ImportOut",
+        "type": "object"
+      },
+      "ImportRowOut": {
+        "description": "One row: non-C3 values as they will be recorded, and the C3 keys present (never values).",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "enum": [
+                  "create",
+                  "update"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "roll_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "row_no": {
+            "title": "Row No",
+            "type": "integer"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "sensitive": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sensitive",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "valid",
+              "error",
+              "committed",
+              "skipped",
+              "reverted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Values",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "row_no",
+          "status",
+          "action",
+          "student_id",
+          "admission_no",
+          "values",
+          "sensitive",
+          "section_id",
+          "class_section",
+          "roll_no",
+          "errors",
+          "warnings"
+        ],
+        "title": "ImportRowOut",
+        "type": "object"
+      },
+      "ImportSummary": {
+        "properties": {
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "error_count": {
+            "title": "Error Count",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reverted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverted At"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "uploaded",
+              "parsing",
+              "parsed",
+              "validating",
+              "validated",
+              "committing",
+              "committed",
+              "reverting",
+              "reverted",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "row_count",
+          "error_count",
+          "created_by",
+          "created_at",
+          "committed_at",
+          "reverted_at"
+        ],
+        "title": "ImportSummary",
+        "type": "object"
+      },
       "InviteIn": {
         "additionalProperties": false,
         "description": "Invite a staff member. ``idp_subject`` is the identity provider's ``sub`` of the account\ncreated for them (admin-created username; docs/07 \u00a75.1).",
@@ -3518,6 +4084,40 @@
         "title": "InvoiceRunIn",
         "type": "object"
       },
+      "Issue": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "message_key": {
+            "title": "Message Key",
+            "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "required": [
+          "field",
+          "code",
+          "message_key"
+        ],
+        "title": "Issue",
+        "type": "object"
+      },
       "JobOut": {
         "properties": {
           "error": {
@@ -3615,6 +4215,25 @@
           "tenant_id"
         ],
         "title": "LoginEventOut",
+        "type": "object"
+      },
+      "MappingIn": {
+        "additionalProperties": false,
+        "description": "The full column mapping (unlisted columns are not imported).",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnMap"
+            },
+            "maxItems": 60,
+            "title": "Columns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "columns"
+        ],
+        "title": "MappingIn",
         "type": "object"
       },
       "MarkedReadOut": {
@@ -4198,6 +4817,62 @@
           "next_cursor"
         ],
         "title": "Page[GrantOut]",
+        "type": "object"
+      },
+      "Page_ImportRowOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRowOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[ImportRowOut]",
+        "type": "object"
+      },
+      "Page_ImportSummary_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ImportSummary"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[ImportSummary]",
         "type": "object"
       },
       "Page_InvoiceOut_": {
@@ -6447,6 +7122,99 @@
           "reason"
         ],
         "title": "SuspendSubscriptionIn",
+        "type": "object"
+      },
+      "TemplateCreate": {
+        "additionalProperties": false,
+        "description": "Save the mapping of an import as a reusable template (matched by the file's headers).",
+        "properties": {
+          "import_id": {
+            "format": "uuid",
+            "title": "Import Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "import_id"
+        ],
+        "title": "TemplateCreate",
+        "type": "object"
+      },
+      "TemplateOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Mapping",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "source",
+          "headers",
+          "mapping",
+          "created_by",
+          "created_at",
+          "last_used_at",
+          "version"
+        ],
+        "title": "TemplateOut",
         "type": "object"
       },
       "TenantBillingOut": {
@@ -10193,6 +10961,555 @@
         "summary": "Heartbeat",
         "tags": [
           "fleet"
+        ]
+      }
+    },
+    "/api/v1/import-templates": {
+      "get": {
+        "description": "Saved column mappings; a file with the same headers reuses one automatically\n(permission ``import.run``).",
+        "operationId": "list_templates_api_v1_import_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateOut"
+                  },
+                  "title": "Response List Templates Api V1 Import Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Templates",
+        "tags": [
+          "imports"
+        ]
+      },
+      "post": {
+        "description": "Save an import's column mapping as a template (permission ``import.run``). Accepts\n``Idempotency-Key``.",
+        "operationId": "create_template_api_v1_import_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Template",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports": {
+      "get": {
+        "description": "The school's imports, newest first (permission ``import.run``).",
+        "operationId": "list_imports_api_v1_imports_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "uploaded",
+                    "parsing",
+                    "parsed",
+                    "validating",
+                    "validated",
+                    "committing",
+                    "committed",
+                    "reverting",
+                    "reverted",
+                    "failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ImportSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Imports",
+        "tags": [
+          "imports"
+        ]
+      },
+      "post": {
+        "description": "Import an uploaded spreadsheet (permission ``import.run``).\n\nUpload the file first with ``POST /documents/uploads`` (purpose ``import_file``: XLSX or\nCSV, at most 10 MB) and register it; once it passed the virus check, send its\n``document_id`` and the ``source`` the data comes from (e.g. ``admission_register``,\n``udise_plus``). Answers 202: the file is read (formulas are never run) and columns are\nmatched to fields in the background. Accepts ``Idempotency-Key``.",
+        "operationId": "create_import_api_v1_imports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}": {
+      "get": {
+        "description": "One import: status, columns with suggested and chosen fields, row counts, revert\ndeadline (permission ``import.run``). ``ETag`` is needed to change the mapping.",
+        "operationId": "get_import_api_v1_imports__import_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/commit": {
+      "post": {
+        "description": "Add a checked file to the student records, all rows or none (permission\n``import.commit``; 202). Values are recorded from the import's source; identity values\nfrom the admission register stay provisional until verified. With rows in error send\n``{\"skip_error_rows\": true}`` to add only the valid rows. Accepts ``Idempotency-Key``.",
+        "operationId": "commit_import_api_v1_imports__import_id__commit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CommitIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit Import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/mapping": {
+      "put": {
+        "description": "Choose which field each column fills (permission ``import.run``; ``If-Match``). Check\nthe file again afterwards with ``POST /imports/{id}/validate``.",
+        "operationId": "set_mapping_api_v1_imports__import_id__mapping_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Mapping",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/revert": {
+      "post": {
+        "description": "Undo an added import within 24 hours (permission ``import.commit``). Refused with 409\n``import_has_dependents`` when records from it were changed or are used since, and 409\n``revert_window_closed`` after 24 hours.",
+        "operationId": "revert_import_api_v1_imports__import_id__revert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/rows": {
+      "get": {
+        "description": "Checked rows in file order with row-level errors and warnings (permission\n``import.run``); ``status=error`` lists the rows to fix. Restricted (C3) values are never\nshown, only which of them a row has.",
+        "operationId": "list_rows_api_v1_imports__import_id__rows_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "valid",
+                    "error",
+                    "committed",
+                    "skipped",
+                    "reverted",
+                    "warning"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ImportRowOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Rows",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/validate": {
+      "post": {
+        "description": "Check every row with the current mapping (permission ``import.run``; 202). Nothing is\nsaved to student records. Accepts ``Idempotency-Key``.",
+        "operationId": "validate_import_api_v1_imports__import_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Import",
+        "tags": [
+          "imports"
         ]
       }
     },
