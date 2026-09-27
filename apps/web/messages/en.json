@@ -305,6 +305,14 @@
           "title": "This is temporary SchoolOS support access",
           "body": "Change or end it on the Support access page."
         },
+        "own_account": {
+          "title": "You can't change your own access",
+          "body": "Ask another owner or office admin to suspend or remove your access."
+        },
+        "profile_shared": {
+          "title": "This person's profile is shared with another school",
+          "body": "They also work at another school on SchoolOS, so their name, email and language can't be changed here. Ask them to update it, or contact SchoolOS support."
+        },
         "duplicate": {
           "title": "This person already has access",
           "body": "Someone with this sign-in ID is already in this school's list of users. Find them in the list instead."
@@ -1002,6 +1010,8 @@
       "description": "Temporary support access to a school. The school's principal approves it, and access ends automatically.",
       "m1Note": "Schools approve requests in their own console. Emergency access without the school's approval needs two different operators and is reported to the school within 24 hours.",
       "request": "Request access",
+      "openSchool": "Open the school",
+      "openSchoolHint": "Support sign-in: you sign in again with MFA. Only the operator who asked can use it. Read only; every page is recorded in the school's audit log.",
       "requestTitle": "Request temporary access",
       "requestBody": "Read-only access for the time you choose. Every action is audited in the school's log.",
       "colSchool": "School",
@@ -1377,14 +1387,22 @@
       "body": "If this is a shared computer, close the browser when you are done.",
       "idle": "You were signed out because this computer was not used for a while.",
       "signIn": "Sign in to the school office",
-      "platformSignIn": "Sign in to the platform admin panel"
+      "platformSignIn": "Sign in to the platform admin panel",
+      "supportBody": "Your SchoolOS support session has ended. To look again, open the approved request from the admin panel.",
+      "supportBack": "Back to break-glass requests"
+    },
+    "support": {
+      "bannerTitle": "SchoolOS support access (read only)",
+      "bannerBody": "You are signed in as SchoolOS support for this school. You can only look, and every page you open is recorded in the school's audit log. Access ends when the school's approval ends or the school revokes it."
     },
     "errors": {
       "signin_expired": "Signing in took too long. Sign in again.",
       "signin_failed": "We couldn't sign you in. Sign in again. If it keeps happening, contact your school's office admin.",
       "signin_unavailable": "Sign-in is not available right now. Try again in a few minutes.",
       "mfa_required": "Your account needs two-step verification (MFA). Set it up, then sign in again.",
-      "step_up_failed": "We couldn't confirm it's you. Sign in again to continue."
+      "step_up_failed": "We couldn't confirm it's you. Sign in again to continue.",
+      "support_not_allowed": "Support access could not be opened. Only the operator who asked can use an approved request, and only while it is active. Check the request in the admin panel.",
+      "support_ended": "This support access has ended or the school revoked it. Ask the school to approve a new request."
     }
   },
   "validation": {

@@ -7,6 +7,7 @@ import {
   jsonResponse,
   kindParam,
   problem,
+  readSchoolSession,
   readSession,
   seeOther,
 } from "@/server/bff/http";
@@ -31,6 +32,13 @@ import { TRANSACTION_TTL_SECONDS } from "./transaction";
  * BFF authentication route handlers (FR-IAM-001, FR-IAM-003, FR-IAM-004, SEC-004,
  * SEC-005; docs/07 §5; ADR-0018). Framework-free: each takes a Request and the runtime,
  * returns a Response. Tokens never leave the server.
+ *
+ * Break-glass support sign-in (ADR-0023 option C; SEC-021): an operator opens an approved
+ * grant from the admin panel (`/bff/auth/support/login?request=&tenant=`). The BFF runs
+ * Authorization Code + PKCE against the support app client of the operator pool with a forced
+ * fresh sign-in, keeps the tokens in its own `__Host-sos_support_session` session, and starts
+ * the support session with the API (`POST /api/v1/breakglass/support-session`, audited in the
+ * school's and the control-plane chains) before the operator sees any school page.
  */
 
 /** Step-up must be a sign-in within the last 5 minutes (docs/07 §5.2). */
@@ -39,7 +47,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_SMALL_BODY = 4 * 1024;
 
 export type SignInError =
-  "signin_expired" | "signin_failed" | "signin_unavailable" | "mfa_required" | "step_up_failed";
+  | "signin_expired"
+  | "signin_failed"
+  | "signin_unavailable"
+  | "mfa_required"
+  | "step_up_failed"
+  | "support_not_allowed"
+  | "support_ended";
 
 function signedOutUrl(kind: SessionKind, error?: SignInError): string {
   const base = signedOutPath(kind);
@@ -50,12 +64,20 @@ function platformDisabled(requestId: string): Response {
   return problem(requestId, 404, "not_found", "Not found");
 }
 
+/** Operator routes need the control plane on this host; support routes the support client. */
+function kindDisabled(runtime: AuthRuntime, kind: SessionKind): boolean {
+  if (kind === "operator") return !runtime.config.platformEnabled;
+  if (kind === "support") return !runtime.config.supportEnabled;
+  return false;
+}
+
 /** Redirect the browser to the IdP with a new sign-in transaction (PKCE S256, state, nonce). */
 async function startSignIn(
   runtime: AuthRuntime,
   kind: SessionKind,
   next: string,
   stepUpSessionId: string | null,
+  support?: { requestId: string; tenantId: string },
 ): Promise<Response> {
   const state = oauth.randomState();
   const nonce = oauth.randomNonce();
@@ -66,7 +88,8 @@ async function startSignIn(
       state,
       nonce,
       codeChallenge: await oauth.calculatePKCECodeChallenge(codeVerifier),
-      stepUp: stepUpSessionId !== null,
+      // Support sign-in always re-authenticates: step-up at session start (ADR-0023 §4).
+      stepUp: stepUpSessionId !== null || support !== undefined,
     });
   } catch (error) {
     logEvent(
@@ -84,6 +107,7 @@ async function startSignIn(
     codeVerifier,
     next,
     stepUpSessionId,
+    ...(support ? { support } : {}),
   });
   return seeOther(runtime, authorizationUrl.href, [
     serializeCookie(transactionCookieName(kind, secure), transaction, {
@@ -95,7 +119,8 @@ async function startSignIn(
 
 /** GET /bff/auth/login?next= and /bff/auth/platform/login?next= */
 export async function handleLogin(request: Request, runtime: AuthRuntime, kind: SessionKind) {
-  if (kind === "operator" && !runtime.config.platformEnabled) {
+  // Support sessions start only from a grant: GET /bff/auth/support/login.
+  if (kind === "support" || kindDisabled(runtime, kind)) {
     return platformDisabled(requestIdFrom(request.headers));
   }
   const next = safeNext(new URL(request.url).searchParams.get("next"), kind);
@@ -105,7 +130,7 @@ export async function handleLogin(request: Request, runtime: AuthRuntime, kind: 
 
 /** GET /bff/auth/step-up?next= : re-authenticate now (prompt=login, max_age=0; ADR-0018). */
 export async function handleStepUp(request: Request, runtime: AuthRuntime, kind: SessionKind) {
-  if (kind === "operator" && !runtime.config.platformEnabled) {
+  if (kindDisabled(runtime, kind)) {
     return platformDisabled(requestIdFrom(request.headers));
   }
   const next = safeNext(new URL(request.url).searchParams.get("next"), kind);
@@ -121,6 +146,7 @@ async function apiCall(
   method: "GET" | "POST",
   path: string,
   requestId: string,
+  payload: unknown = {},
 ): Promise<{ status: number; body: unknown }> {
   const response = await callApi(runtime, {
     session,
@@ -128,7 +154,7 @@ async function apiCall(
     method,
     path,
     incomingHeaders: new Headers({ "content-type": "application/json" }),
-    body: method === "POST" ? new TextEncoder().encode("{}") : null,
+    body: method === "POST" ? new TextEncoder().encode(JSON.stringify(payload)) : null,
     requestId,
     headersTimeoutMs: 5_000,
   });
@@ -275,6 +301,70 @@ async function afterStaffSignIn(
   return { kind: "choose" };
 }
 
+/**
+ * Start the support session with the API (ADR-0023 §4): the API checks the grant, the school
+ * and a fresh sign-in, and audits `breakglass.session_started`. Anything but 200 refuses.
+ */
+async function startSupportSession(
+  runtime: AuthRuntime,
+  session: Session,
+  accessToken: string,
+  platformRequestId: string,
+  requestId: string,
+): Promise<"ok" | SignInError> {
+  try {
+    const { status } = await apiCall(
+      runtime,
+      session,
+      accessToken,
+      "POST",
+      "/api/v1/breakglass/support-session",
+      requestId,
+      { platform_request_id: platformRequestId },
+    );
+    if (status === 200) return "ok";
+    logEvent("support_session_refused", { status, request_id: requestId });
+    if (status === 409) return "support_ended";
+    if (status === 428) return "step_up_failed";
+    if ([401, 403, 404].includes(status)) return "support_not_allowed";
+    return "signin_unavailable";
+  } catch {
+    logEvent("support_session_refused", { code: "network", request_id: requestId });
+    return "signin_unavailable";
+  }
+}
+
+/**
+ * GET /bff/auth/support/login?request=<control-plane request id>&tenant=<school id>
+ * (ADR-0023): start a fresh, MFA sign-in with the support client for one approved grant.
+ *
+ * The admin panel may live on another host (`admin.<domain>`), and the sign-in cookies are
+ * host-only (`__Host-`), so the first request is always sent once to the school app's own
+ * address (APP_BASE_URL, never the Host header) with `c=1`; the sign-in starts there.
+ */
+export async function handleSupportLogin(request: Request, runtime: AuthRuntime) {
+  if (kindDisabled(runtime, "support")) return platformDisabled(requestIdFrom(request.headers));
+  const params = new URL(request.url).searchParams;
+  const platformRequestId = params.get("request") ?? "";
+  const tenantId = params.get("tenant") ?? "";
+  if (!UUID.test(platformRequestId) || !UUID.test(tenantId)) {
+    return seeOther(runtime, signedOutUrl("support", "support_not_allowed"));
+  }
+  if (params.get("c") !== "1") {
+    const canonical = new URLSearchParams({
+      request: platformRequestId.toLowerCase(),
+      tenant: tenantId.toLowerCase(),
+      c: "1",
+    });
+    return seeOther(runtime, `/bff/auth/support/login?${canonical.toString()}`);
+  }
+  const next = safeNext(params.get("next"), "support");
+  return startSignIn(runtime, "support", next, null, {
+    requestId: platformRequestId.toLowerCase(),
+    tenantId: tenantId.toLowerCase(),
+  });
+}
+
 /** The UI language of a `next` path (`/te/...`), English otherwise. */
 function localeOf(path: string): "en" | "te" {
   return /^\/te(\/|$|\?)/.test(path) ? "te" : "en";
@@ -294,7 +384,7 @@ async function revokeAtIdp(runtime: AuthRuntime, session: Session): Promise<void
 /** GET /bff/auth/callback and /bff/auth/platform/callback */
 export async function handleCallback(request: Request, runtime: AuthRuntime, kind: SessionKind) {
   const requestId = requestIdFrom(request.headers);
-  if (kind === "operator" && !runtime.config.platformEnabled) return platformDisabled(requestId);
+  if (kindDisabled(runtime, kind)) return platformDisabled(requestId);
   const { config, store } = runtime;
   const secure = config.secureCookies;
   const cookies = parseCookies(request.headers.get("cookie"));
@@ -330,10 +420,19 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
   }
   const claims = sessionClaims(tokens);
   if (!claims) return fail("signin_failed");
-  // Operators always need MFA (contract §5); the API checks it again on every request.
-  if (kind === "operator" && !claims.mfa) return fail("mfa_required");
+  // Operators always need MFA (contract §5), also as SchoolOS support (ADR-0023); the API
+  // checks it again on every request.
+  if ((kind === "operator" || kind === "support") && !claims.mfa) return fail("mfa_required");
 
   const nowSeconds = Math.floor(runtime.now() / 1000);
+  const support = kind === "support" && !transaction.stepUpSessionId ? transaction.support : null;
+  if (kind === "support" && !transaction.stepUpSessionId) {
+    // A support session starts only for a grant, with a sign-in within 5 minutes (step-up).
+    if (!support) return fail("support_not_allowed");
+    if (claims.authTime === null || nowSeconds - claims.authTime > STEP_UP_MAX_AGE_SECONDS) {
+      return fail("step_up_failed");
+    }
+  }
   const existing = await store.load(cookies.get(sessionCookieName(kind, secure)), {
     touch: false,
   });
@@ -380,7 +479,24 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
     },
     accessExpiresAt: tokens.accessExpiresAt,
     ...carried,
+    // The support session is pinned to the grant's school (the API refuses any other).
+    ...(support ? { activeTenantId: support.tenantId } : {}),
   });
+  if (support) {
+    const started = await startSupportSession(
+      runtime,
+      session,
+      tokens.accessToken,
+      support.requestId,
+      requestId,
+    );
+    if (started !== "ok") {
+      await revokeAtIdp(runtime, session);
+      await store.revoke(session.id);
+      return fail(started);
+    }
+    await recordLoginEvent(runtime, session, tokens.accessToken, requestId);
+  }
   if (kind === "staff" && !transaction.stepUpSessionId) {
     const outcome = await afterStaffSignIn(runtime, session, tokens.accessToken, requestId);
     const locale = localeOf(next);
@@ -409,10 +525,15 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
 /** POST /bff/auth/logout?kind= (CSRF): revoke server-side, then end the IdP session. */
 export async function handleLogout(request: Request, runtime: AuthRuntime) {
   const requestId = requestIdFrom(request.headers);
-  const kind = kindParam(request);
+  const requested = kindParam(request);
   const secure = runtime.config.secureCookies;
+  // The school console signs out whichever school session it runs as (staff or support).
+  const current =
+    requested === "staff"
+      ? await readSchoolSession(request, runtime, { touch: false })
+      : await readSession(request, runtime, requested, { touch: false });
+  const kind = current?.session.kind ?? requested;
   const clear = clearCookie(sessionCookieName(kind, secure), secure);
-  const current = await readSession(request, runtime, kind, { touch: false });
   if (!current) {
     return jsonResponse({ redirect_to: signedOutUrl(kind) }, { cookies: [clear], requestId });
   }
@@ -456,7 +577,10 @@ export async function handleSessionInfo(request: Request, runtime: AuthRuntime) 
   const requestId = requestIdFrom(request.headers);
   const kind = kindParam(request);
   const touch = request.method === "POST";
-  const current = await readSession(request, runtime, kind, { touch: false });
+  const current =
+    kind === "staff"
+      ? await readSchoolSession(request, runtime, { touch: false })
+      : await readSession(request, runtime, kind, { touch: false });
   if (!current) return jsonResponse({ authenticated: false, kind }, { requestId });
   let session = current.session;
   if (touch) {

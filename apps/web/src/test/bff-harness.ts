@@ -75,15 +75,21 @@ export async function createHarness(
   const env = testEnv(envOverrides);
   const config = loadAuthConfig(env);
   const kv = new MemoryKeyValue();
+  // The support client lives in the operator pool (ADR-0023): one IdP, two app clients.
+  const operatorIdp = await createFakeIdp({
+    issuer: config.operator.issuer.href,
+    clients: {
+      [config.operator.clientId]: config.operator.clientSecret,
+      ...(config.supportEnabled ? { [config.support.clientId]: config.support.clientSecret } : {}),
+    },
+  });
   const idp = {
     staff: await createFakeIdp({
       issuer: config.staff.issuer.href,
       clients: { [config.staff.clientId]: config.staff.clientSecret },
     }),
-    operator: await createFakeIdp({
-      issuer: config.operator.issuer.href,
-      clients: { [config.operator.clientId]: config.operator.clientSecret },
-    }),
+    operator: operatorIdp,
+    support: operatorIdp,
   };
   const oidcFetch: CustomFetch = (url, init) =>
     url.startsWith(config.operator.issuer.href)

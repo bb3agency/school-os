@@ -263,7 +263,7 @@ Deployments use exactly these names: Terraform `shared_platform` (§5) and `depl
 
 Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test), `SOS_WEB_TEST_LOGS` (print the web app's JSON logs during vitest). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
 
-**Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`.
+**Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`, and optional `SUPPORT_OIDC_CLIENT_ID`, `SUPPORT_OIDC_CLIENT_SECRET`, `SUPPORT_OIDC_ISSUER` (break-glass support app client of the operator pool, ADR-0023; unset client ID = off; callback `/bff/auth/support/callback`).
 
 `FILES_ORIGIN` is the origin of presigned upload and preview URLs, added to the CSP `connect-src` and `img-src` (docs/07 §10, §11; https only, except a loopback http origin under `next dev`). It must equal the origin the API presigns with, which the files bucket's CORS rule allows the app to `POST` to:
 

@@ -7,7 +7,12 @@ import "server-only";
  * runtime. Error messages name the variable, never its value.
  */
 
-export type SessionKind = "staff" | "operator";
+/**
+ * `support`: a SchoolOS operator signed in to the SCHOOL app during break-glass, through the
+ * dedicated support app client of the operator pool (ADR-0023 option C). Own cookie, own
+ * session; the school console accepts it when there is no staff session.
+ */
+export type SessionKind = "staff" | "operator" | "support";
 
 export interface OidcClientConfig {
   kind: SessionKind;
@@ -33,13 +38,22 @@ export interface AuthConfig {
   serviceTokenKey: Uint8Array;
   staff: OidcClientConfig;
   operator: OidcClientConfig;
+  /** Break-glass support client of the operator pool (ADR-0023); see `supportEnabled`. */
+  support: OidcClientConfig;
   /** SOS_DEPLOYMENT_MODE=dedicated switches the control plane off on this host (contract §1). */
   platformEnabled: boolean;
+  /**
+   * SUPPORT_OIDC_CLIENT_ID set: operators can use an approved break-glass grant in this school
+   * app. Unset: the support routes answer 404 and approved access cannot be used (fail closed).
+   */
+  supportEnabled: boolean;
 }
 
 /** Where people land after signing out (outside the authenticated route groups). */
 export function signedOutPath(kind: SessionKind): string {
-  return kind === "operator" ? "/signed-out?kind=operator" : "/signed-out";
+  if (kind === "operator") return "/signed-out?kind=operator";
+  if (kind === "support") return "/signed-out?kind=support";
+  return "/signed-out";
 }
 
 export class ConfigError extends Error {
@@ -136,8 +150,9 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     idVar: string,
     secretVar: string,
     callbackPath: string,
+    issuerValue: string | undefined = env[issuerVar],
   ): OidcClientConfig => {
-    const issuer = parseUrl(env[issuerVar]);
+    const issuer = parseUrl(issuerValue);
     let allowInsecureIssuer = false;
     if (!issuer) {
       problems.push(`${issuerVar} must be an absolute URL`);
@@ -177,6 +192,30 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     "/bff/auth/platform/callback",
   );
 
+  // Break-glass support sign-in (ADR-0023): a third app client, in the OPERATOR pool.
+  const supportEnabled = Boolean(env.SUPPORT_OIDC_CLIENT_ID?.trim());
+  const supportIssuer = env.SUPPORT_OIDC_ISSUER?.trim() || env.PLATFORM_OIDC_ISSUER;
+  let support: OidcClientConfig;
+  if (supportEnabled) {
+    support = client(
+      "support",
+      "SUPPORT_OIDC_ISSUER",
+      "SUPPORT_OIDC_CLIENT_ID",
+      "SUPPORT_OIDC_CLIENT_SECRET",
+      "/bff/auth/support/callback",
+      supportIssuer,
+    );
+    if (support.clientId && [staff.clientId, operator.clientId].includes(support.clientId)) {
+      problems.push("SUPPORT_OIDC_CLIENT_ID must be its own app client");
+    }
+    if (support.issuer.href === staff.issuer.href) {
+      problems.push("SUPPORT_OIDC_ISSUER must be the operator pool, not the staff pool");
+    }
+  } else {
+    // Placeholder (never used: every support route answers 404 first).
+    support = { ...operator, kind: "support", clientId: "", clientSecret: "" };
+  }
+
   if (problems.length > 0) throw new ConfigError(problems);
 
   return {
@@ -188,6 +227,8 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     serviceTokenKey,
     staff,
     operator,
+    support,
     platformEnabled: (env.SOS_DEPLOYMENT_MODE ?? "shared").trim() !== "dedicated",
+    supportEnabled,
   };
 }

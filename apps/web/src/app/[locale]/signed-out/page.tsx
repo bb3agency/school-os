@@ -16,6 +16,7 @@ export default async function SignedOutPage({ searchParams }: Props) {
   return (
     <SignedOutView
       operator={params.kind === "operator"}
+      support={params.kind === "support"}
       idle={params.reason === "idle"}
       error={error}
       devSignIn={isDevSignInEnabled()}

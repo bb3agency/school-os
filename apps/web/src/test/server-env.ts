@@ -21,6 +21,9 @@ export function testEnv(overrides: Record<string, string | undefined> = {}) {
     PLATFORM_OIDC_ISSUER: "https://idp.example/operators",
     PLATFORM_OIDC_CLIENT_ID: "operator-client",
     PLATFORM_OIDC_CLIENT_SECRET: randomBytes(16).toString("hex"),
+    // Break-glass support client of the operator pool (ADR-0023); same issuer as operators.
+    SUPPORT_OIDC_CLIENT_ID: "support-client",
+    SUPPORT_OIDC_CLIENT_SECRET: randomBytes(16).toString("hex"),
     ...overrides,
   };
 }

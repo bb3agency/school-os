@@ -50,7 +50,9 @@ export async function getSession(kind: SessionKind): Promise<SessionView | null>
 }
 
 async function requireSession(kind: SessionKind): Promise<SessionView> {
-  const session = await getSession(kind);
+  // The school console also runs as a SchoolOS support session (break-glass, ADR-0023).
+  const session =
+    (await getSession(kind)) ?? (kind === "staff" ? await getSession("support") : null);
   if (session) return session;
   const path = (await headers()).get(PATH_HEADER) ?? "/";
   const login = kind === "operator" ? "/bff/auth/platform/login" : "/bff/auth/login";
@@ -58,7 +60,8 @@ async function requireSession(kind: SessionKind): Promise<SessionView> {
   redirect(`${login}?next=${encodeURIComponent(path)}`);
 }
 
-/** School console pages: a staff session, or off to staff sign-in. */
+/** School console pages: a staff session (or a SchoolOS support session), or off to staff
+ * sign-in. */
 export function requireStaff(): Promise<SessionView> {
   return requireSession("staff");
 }
@@ -90,12 +93,19 @@ export async function apiGetAsSession<T>(
   path: `/api/v1/${string}`,
 ): Promise<RscApiResult<T> | null> {
   const secure = isHttpsDeployment(process.env.APP_BASE_URL);
-  const value = (await cookies()).get(sessionCookieName(kind, secure))?.value;
+  const jar = await cookies();
+  let effective = kind;
+  let value = jar.get(sessionCookieName(kind, secure))?.value;
+  if (!value && kind === "staff") {
+    // No staff session: the school console may run as a support session (ADR-0023).
+    effective = "support";
+    value = jar.get(sessionCookieName("support", secure))?.value;
+  }
   if (!value) return null;
   try {
     const runtime = await getAuthRuntime();
     const current = await runtime.store.load(value, { touch: false });
-    if (!current || current.kind !== kind) return null;
+    if (!current || current.kind !== effective) return null;
     const session = await runtime.refresher.ensureFresh(current);
     const stored = await runtime.store.tokens(session.id);
     if (!stored) return null;

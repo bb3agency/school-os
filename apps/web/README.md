@@ -100,7 +100,18 @@ and `<APP_BASE_URL>/bff/auth/platform/callback` (operator client); post-logout U
 `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY` (same value as the
 API), `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`,
 `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional
-`SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`. See the root `.env.example`.
+`SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`, and for break-glass support sign-in (ADR-0023)
+`SUPPORT_OIDC_CLIENT_ID`, `SUPPORT_OIDC_CLIENT_SECRET` (the support app client of the operator
+pool; unset = off) and `SUPPORT_OIDC_ISSUER` (default `PLATFORM_OIDC_ISSUER`). See the root
+`.env.example`.
+
+Break-glass support sign-in: the admin panel links to
+`/bff/auth/support/login?request=<request id>&tenant=<school id>`; the BFF signs the operator in
+again (MFA, fresh sign-in) with the support client, keeps the tokens in
+`__Host-sos_support_session`, calls `POST /api/v1/breakglass/support-session` and opens the
+school console with a read-only banner. When there is no staff session, the school console
+(`requireStaff`, the `/bff/api` proxy, `/bff/auth/session?kind=staff`) runs as that support
+session.
 
 ## Tests
 

@@ -62,7 +62,11 @@ export async function callApi(runtime: AuthRuntime, call: ApiCall): Promise<Resp
     await mintServiceToken(runtime.config.serviceTokenKey, runtime.now),
   );
   headers.set("x-request-id", call.requestId);
-  if (call.session.kind === "staff" && call.session.activeTenantId) {
+  // Support sessions (ADR-0023) are pinned to the school of their grant.
+  if (
+    (call.session.kind === "staff" || call.session.kind === "support") &&
+    call.session.activeTenantId
+  ) {
     headers.set("x-active-tenant", call.session.activeTenantId);
   }
 

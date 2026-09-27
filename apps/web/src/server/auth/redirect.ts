@@ -18,6 +18,7 @@ const PLATFORM_PATH = /^\/(en|te)\/platform(\/|$|\?|#)/;
 export const DEFAULT_NEXT: Record<SessionKind, string> = {
   staff: "/",
   operator: "/en/platform",
+  support: "/",
 };
 
 export function safeNext(value: string | null | undefined, kind: SessionKind): string {
@@ -40,7 +41,8 @@ export function safeNext(value: string | null | undefined, kind: SessionKind): s
   if (path === "/bff" || path.startsWith("/bff/")) return fallback;
   const isPlatform = PLATFORM_PATH.test(path);
   if (kind === "operator" && !isPlatform) return fallback;
-  if (kind === "staff" && isPlatform) return fallback;
+  // Support sessions use the school console, never the control plane (ADR-0023).
+  if ((kind === "staff" || kind === "support") && isPlatform) return fallback;
   return path;
 }
 

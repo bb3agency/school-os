@@ -18,10 +18,14 @@ import type { KeyValue } from "./kv";
 export const SESSION_KEY_PREFIX = "sos:web:sess:";
 /** Idle timeout (docs/07 §5.2). Tenant-configurable 5–30 min later; default for now. */
 export const IDLE_TIMEOUT_MS = 15 * 60_000;
-/** Absolute lifetime: 12 h for school staff, 8 h for operators (docs/16 §2). */
+/**
+ * Absolute lifetime: 12 h for school staff, 8 h for operators (docs/16 §2) and for break-glass
+ * support sessions (a grant lasts at most 8 h; the API refuses once it ends, ADR-0023).
+ */
 export const ABSOLUTE_TIMEOUT_MS: Record<SessionKind, number> = {
   staff: 12 * 60 * 60_000,
   operator: 8 * 60 * 60_000,
+  support: 8 * 60 * 60_000,
 };
 
 const SESSION_ID = /^[A-Za-z0-9_-]{43}$/;
