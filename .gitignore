@@ -28,6 +28,8 @@ test-results/
 !.env.example
 *.pem
 *.key
+# Public CA bundle for TLS to RDS (docs/10 §6); certificates only, checked by tests/deploy.
+!infra/certs/rds-global-bundle.pem
 
 # Terraform
 .terraform/
