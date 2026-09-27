@@ -2883,5 +2883,49 @@
         "body": "There is already a class with this code, or a section with this name in the same class and year. Check the list before adding it again."
       }
     }
+  },
+  "schoolSettings": {
+    "nav": "School settings",
+    "title": "School settings",
+    "description": "Your school's details and the settings that apply to everyone in the school.",
+    "readOnlyNote": "You can see these settings. Only the owner or principal can change them.",
+    "minutes": "{count, plural, one {# minute} other {# minutes}}",
+    "aiOn": "On",
+    "aiOff": "Off",
+    "profile": {
+      "title": "School details",
+      "description": "SchoolOS sets these when your school joins. To change them, contact SchoolOS support.",
+      "name": "School name",
+      "code": "School code",
+      "boards": "Boards",
+      "stateCode": "State code",
+      "status": "Status",
+      "tier": "Plan type"
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Languages, date format, sign-out time and AI features."
+    },
+    "form": {
+      "languagesField": "Languages",
+      "languagesHint": "Choose at least one.",
+      "dateFormatField": "Date format",
+      "idleField": "Sign out after this many idle minutes",
+      "idleHint": "A whole number from 5 to 30.",
+      "aiField": "AI features",
+      "aiHint": "Turn off to stop AI features for everyone in the school.",
+      "budgetField": "Monthly AI budget in rupees",
+      "budgetHint": "A whole number from 0 to 1,00,00,000.",
+      "save": "Save settings",
+      "saved": "Settings saved.",
+      "nothingChanged": "Nothing changed, so there was nothing to save.",
+      "reload": "Load the latest settings"
+    },
+    "errors": {
+      "precondition_failed": {
+        "title": "Someone else changed these settings first",
+        "body": "Select “Load the latest settings” to see their change, then make yours again."
+      }
+    }
   }
 }
