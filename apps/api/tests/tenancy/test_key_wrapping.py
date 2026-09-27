@@ -26,6 +26,7 @@ from app.core.crypto import (
     field_aad,
     generate_tenant_keys,
     get_key_wrapper,
+    reencrypt,
 )
 
 MASTER = SecretStr("synthetic-local-dev-master-key-for-tests-0123456789")
@@ -239,3 +240,20 @@ def test_field_aad_is_unambiguous() -> None:
     assert field_aad(t, "a", "b", r) == f"{t}|a|b|{r}".encode()
     with pytest.raises(ValueError, match="'\\|'"):
         field_aad(t, "a|b", "c", r)
+
+
+def test_SEC_012_reencrypt_moves_a_value_to_a_new_key_version_in_place() -> None:
+    old, new = bytes(range(32)), bytes(range(1, 33))
+    aad = field_aad(uuid.uuid4(), "sis.guardians", "address_ciphertext", uuid.uuid4())
+    blob = aead_encrypt(old, b"Synthetic lane 3", aad, key_version=1)
+    moved = reencrypt(old, new, blob, aad, key_version=2)
+    assert ciphertext_key_version(moved) == 2
+    assert aead_decrypt(new, moved, aad) == b"Synthetic lane 3"
+    with pytest.raises(CryptoError):
+        aead_decrypt(old, moved, aad)
+    # The same associated data only: a value cannot be re-encrypted into another cell.
+    other = field_aad(uuid.uuid4(), "sis.guardians", "address_ciphertext", uuid.uuid4())
+    with pytest.raises(CryptoError):
+        reencrypt(old, new, blob, other, key_version=2)
+    with pytest.raises(CryptoError):
+        reencrypt(new, new, blob, aad, key_version=2)

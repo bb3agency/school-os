@@ -89,6 +89,16 @@ class TenantProvisioned(_Out):
     key_id: str
 
 
+class TenantKeyVersion(_Out):
+    """One wrapped key version of a school (never key material; SEC-012, 07 §8)."""
+
+    key_version: int
+    key_id: str
+    created_at: dt.datetime
+    retired_at: dt.datetime | None
+    current: bool
+
+
 class TenantStatusChange(_Out):
     tenant_id: uuid.UUID
     previous: TenantStatus

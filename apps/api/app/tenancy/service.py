@@ -25,7 +25,13 @@ from sqlalchemy.orm import Session
 
 from app.audit import service as audit
 from app.core.config import get_settings
-from app.core.crypto import KeyWrapper, generate_tenant_keys, get_key_wrapper
+from app.core.crypto import (
+    KEY_CACHE_MAX_S,
+    MAX_KEY_VERSION,
+    KeyWrapper,
+    generate_tenant_keys,
+    get_key_wrapper,
+)
 from app.core.db import platform_session, tenant_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
@@ -41,6 +47,7 @@ from app.tenancy.schemas import (
     SectionCreate,
     SectionOut,
     SectionUpdate,
+    TenantKeyVersion,
     TenantOut,
     TenantProvisioned,
     TenantProvisionIn,
@@ -64,6 +71,21 @@ retried while the tenant is still ``provisioning``.
 POST_PROVISION_HOOKS: list[PostProvisionHook] = []
 
 FIRST_KEY_VERSION = 1
+
+KeyReferenceCounter = Callable[[Session, int], int]
+"""Called as ``counter(session, key_version)`` inside the school's ``tenant_session``; returns how
+many stored ciphertexts still use that key version (SEC-012 rotation).
+
+The module that owns field encryption (``students.rotation``) appends to
+:data:`KEY_REFERENCE_COUNTERS` at import time. :func:`retire_key_version` refuses when none is
+registered (fail closed) or any counter reports a reference.
+"""
+
+KEY_REFERENCE_COUNTERS: list[KeyReferenceCounter] = []
+
+ROTATABLE_STATUSES = ("active", "suspended")
+RETIRE_MARGIN_S = 60
+"""Extra wait on top of the key cache TTL before an older version may be retired."""
 
 
 @contextmanager
@@ -186,6 +208,146 @@ def initialise_tenant(
         for hook in POST_PROVISION_HOOKS:
             hook(session, tenant_id)
     return key_version, key_id
+
+
+# --- key versions (SEC-012 rotation, 07 §8) -------------------------------------------------
+
+
+def _key_versions(keys: Sequence[Any]) -> list[TenantKeyVersion]:
+    active = [k.key_version for k in keys if k.retired_at is None]
+    current = max(active) if active else None
+    return [
+        TenantKeyVersion(
+            key_version=k.key_version,
+            key_id=k.kms_key_arn,
+            created_at=k.created_at,
+            retired_at=k.retired_at,
+            current=k.key_version == current,
+        )
+        for k in keys
+    ]
+
+
+def list_key_versions(session: Session) -> list[TenantKeyVersion]:
+    """The current school's key versions, oldest first (``tenant_session``; no key material).
+
+    ``current`` marks the newest unretired version: the one new ciphertext uses.
+    """
+    return _key_versions(repo.list_tenant_keys(session))
+
+
+def current_key_version(session: Session) -> int:
+    """The newest unretired key version of the current school; ``Conflict`` if there is none."""
+    current = [k.key_version for k in list_key_versions(session) if k.current]
+    if not current:
+        raise Conflict("The school has no active data encryption key.", code="key_missing")
+    return current[0]
+
+
+def create_key_version(
+    session: Session, tenant_id: uuid.UUID, *, wrapper: KeyWrapper, new_hmac_key: bool = False
+) -> TenantKeyVersion:
+    """Rotate the school's data encryption key: add the next key version (SEC-012, 07 §8).
+
+    Runs in the school's ``tenant_session`` (sos_app may INSERT into ``core.tenant_keys``; RLS).
+    A fresh random DEK is wrapped by ``wrapper`` (KMS in deployed environments, encryption
+    context = tenant id). The blind-index HMAC key is carried over (unwrapped and wrapped again),
+    so existing blind indexes keep matching, unless ``new_hmac_key`` (incident response): then a
+    fresh one is generated and re-encryption recomputes the blind indexes it owns.
+
+    Older versions are kept for decryption; nothing is retired or destroyed here. Only schools in
+    ``active``/``suspended`` can rotate (``Conflict`` otherwise). Serialised per school.
+
+    Audit (tenant chain, actor_type system): ``tenant.key.rotated`` with key_version,
+    previous_key_version, key_id and hmac_key (``carried``/``new``); never key material.
+    """
+    tenant = repo.get_own_tenant(session)
+    if tenant is None or tenant.id != tenant_id:
+        raise NotFound("Tenant not found")
+    if tenant.status not in ROTATABLE_STATUSES:
+        raise Conflict("Only an active or suspended school can rotate its key.", code="key_state")
+    repo.lock_tenant_keys(session)
+    keys = repo.list_tenant_keys(session)
+    active = [k for k in keys if k.retired_at is None]
+    if not active:
+        raise Conflict("The school has no active data encryption key.", code="key_missing")
+    previous = active[-1]
+    version = max(k.key_version for k in keys) + 1
+    if version > MAX_KEY_VERSION:
+        raise Conflict("The school has used every key version.", code="key_versions_exhausted")
+    wrapped_dek, wrapped_hmac = generate_tenant_keys(tenant_id, wrapper)
+    if not new_hmac_key:
+        hmac_key = wrapper.unwrap(bytes(previous.wrapped_hmac), tenant_id=tenant_id)
+        wrapped_hmac = wrapper.wrap(hmac_key, tenant_id=tenant_id)
+        del hmac_key
+    key = repo.insert_tenant_key(
+        session,
+        tenant_id=tenant_id,
+        key_version=version,
+        wrapped_dek=wrapped_dek,
+        wrapped_hmac=wrapped_hmac,
+        key_id=wrapper.key_id,
+    )
+    _audit(
+        session,
+        action="tenant.key.rotated",
+        resource_type="tenant",
+        resource_id=tenant_id,
+        summary={
+            "key_version": key.key_version,
+            "previous_key_version": previous.key_version,
+            "key_id": key.kms_key_arn,
+            "hmac_key": "new" if new_hmac_key else "carried",
+        },
+        system=True,
+    )
+    return next(v for v in list_key_versions(session) if v.key_version == version)
+
+
+def retire_key_version(session: Session, key_version: int) -> TenantKeyVersion:
+    """Mark an older key version retired once no ciphertext uses it (SEC-012, 07 §8).
+
+    Refuses (``Conflict``) the current version, a version any :data:`KEY_REFERENCE_COUNTERS`
+    counter still reports (or when no counter is registered), and any retirement until the
+    current version is older than the key cache TTL plus :data:`RETIRE_MARGIN_S` (a process may
+    still write under an older version until its cache expires). Retiring an already retired
+    version returns it unchanged. The wrapped key row is kept: a retired version still decrypts
+    (for example data restored from a backup); key material is never destroyed here.
+
+    Audit (tenant chain, actor_type system): ``tenant.key.retired`` with key_version.
+    """
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("Tenant not found")
+    repo.lock_tenant_keys(session)
+    versions = list_key_versions(session)
+    target = next((v for v in versions if v.key_version == key_version), None)
+    if target is None:
+        raise NotFound("Key version not found")
+    if target.retired_at is not None:
+        return target
+    if target.current:
+        raise Conflict("The current key version cannot be retired.", code="key_current")
+    current = next(v for v in versions if v.current)
+    age = (repo.db_now(session) - current.created_at).total_seconds()
+    if age < KEY_CACHE_MAX_S + RETIRE_MARGIN_S:
+        raise Conflict(
+            "Wait until cached keys have expired after the rotation.", code="key_cache_window"
+        )
+    if not KEY_REFERENCE_COUNTERS:
+        raise Conflict("No ciphertext census is registered.", code="key_census_missing")
+    if any(counter(session, key_version) for counter in KEY_REFERENCE_COUNTERS):
+        raise Conflict("Stored values still use this key version.", code="key_in_use")
+    repo.retire_tenant_key(session, key_version)
+    _audit(
+        session,
+        action="tenant.key.retired",
+        resource_type="tenant",
+        resource_id=tenant.id,
+        summary={"key_version": key_version},
+        system=True,
+    )
+    return next(v for v in list_key_versions(session) if v.key_version == key_version)
 
 
 def provision_tenant(
