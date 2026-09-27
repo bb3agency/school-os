@@ -2,12 +2,23 @@
 # fixed by ADR-0008: the loader refuses any other tool. Permissions are catalog keys
 # (app/authz/permissions.yaml); each tool also calls the owning module's service with the
 # caller's UserContext, so RLS and scopes apply exactly as in the UI.
+# `description` is what the answer model is told (prompt text, invariant 13; change it only with
+# a passing `make eval`). A tool without a description is not offered to the model yet (M2 wave 4
+# implements find_students, get_student_facts and search_documents; docs/06 §7 as built).
 version: 1
 tools:
   find_students:
+    description: >-
+      Find students the user can access by name (English or Telugu), admission number or
+      class/section token such as 9b. Returns each student's ID with display fields only. Use the
+      ID with get_student_facts to read a field.
     permission: student.read_basic
     max_results: 20                    # returns IDs + display fields
   get_student_facts:
+    description: >-
+      Get specific fields for ONE student the user can access. Returns each value with its source
+      (admission_register, aadhaar_as_printed, udise_plus, board_registration, ...), verification
+      status and as-of date. Ask only for fields needed to answer.
     permission: student.read_basic
     sensitive_permission: student.read_sensitive   # C3 masked unless held and explicitly asked
     max_fields: 8                      # the caller must name fields
@@ -33,4 +44,10 @@ tools:
   list_documents:
     permission: document.read          # metadata only; content via search_documents
   search_documents:
+    description: >-
+      Search the school's documents the user can read (circulars, policies, minutes, letters) and
+      return the most relevant passages. Use for rules, dates, timings and announcements.
     permission: document.read
+    max_results: 6                     # passages per call (docs/06 §12: prefer fewer, better)
+    # A question with one of these words prefers the newest documents (recency boost, §6).
+    latest_terms: [latest, current, recent, newest, new, updated, revised, తాజా, ప్రస్తుత, కొత్త]

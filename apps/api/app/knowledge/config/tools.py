@@ -34,6 +34,9 @@ WHITELIST: Final = frozenset(
 
 
 class ToolConfig(ConfigModel):
+    description: str | None = Field(default=None, min_length=20, max_length=1000)
+    """What the model is told the tool does (a prompt text: versioned here, invariant 13).
+    Tools without one are not offered to the model yet."""
     permission: str = Field(pattern=PERMISSION_PATTERN)
     """Required to call the tool at all; the service still checks scope per object."""
     sensitive_permission: str | None = Field(default=None, pattern=PERMISSION_PATTERN)
@@ -46,6 +49,8 @@ class ToolConfig(ConfigModel):
     """The enum of fields the tool accepts (never free-form)."""
     small_cell_min: int | None = Field(default=None, ge=1, le=100)
     """Counts below this are suppressed for sensitive breakdowns."""
+    latest_terms: tuple[str, ...] = ()
+    """Words that make a search prefer the latest documents (recency boost, docs/06 §6)."""
 
     @model_validator(mode="after")
     def _field_keys(self) -> ToolConfig:

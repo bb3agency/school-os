@@ -97,6 +97,8 @@ class ClientConfig(ConfigModel):
 class RateLimit(ConfigModel):
     requests_per_minute_per_tenant: int = Field(ge=1, le=10_000)
     """Provider calls per tenant and feature per minute (docs/07 T15; each tool round counts)."""
+    questions_per_minute_per_user: int = Field(default=10, ge=1, le=1000)
+    """Questions one user may ask per minute (docs/06 §5 step 1; checked before any model call)."""
 
 
 class Budget(ConfigModel):
@@ -115,9 +117,16 @@ class Budget(ConfigModel):
         return self
 
 
+class NotFoundText(ConfigModel):
+    en: str = Field(min_length=10, max_length=300)
+    te: str = Field(min_length=10, max_length=300)
+
+
 class AnswerChecks(ConfigModel):
     max_uncited_factual_fraction: float = Field(ge=0, le=1)
     """docs/06 §9 rule 3: above this share of uncited factual sentences, answer search-only."""
+    not_found: NotFoundText
+    """What the user reads when no valid citation supports an answer (FR-KB-007, invariant 8)."""
 
 
 class LlmConfig(ConfigModel):
