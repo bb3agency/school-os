@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · Amended by ADR-0020 |
 | Date | 2026-09-26 |
 | Deciders | Founder (product owner approval of build proposals B1–B25) |
 | Amends / supersedes | Replaces the v0.1 "operator console" in module `ops` (C13, FR-OPS-001) with capability C14 in module `platform` |

@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
-| Changes | 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
+| Version | 0.4 · 2026-09-27 |
+| Changes | 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
 | Capability | C14 · Milestone M0 (roadmap Task 11) |
 | Requirements | FR-PLT-001..030 (03-TRD §3.12) · stories US-1301..US-1310, US-1204 (02-PRD §4) |
-| Decisions | ADR-0013 (privilege separation), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture) |
+| Decisions | ADR-0013 (privilege separation), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies) |
 | Related | 04 §16, 05 §3, 07 §6.5–6.6, 08 §14, 09 §4, 10 §15, 11 §11–12, 12 §4.8–4.13 |
 
 ---
@@ -113,7 +113,7 @@ Result for **shared** (`app/platform/tenants.py`), in four steps:
 1. One `platform_session()` transaction: `core.provision_tenant(...)` (tenant row, status `provisioning`), deployment, billing account, subscription (and, when started as `active`, the first period's draft invoice), platform events `tenant.provisioned`. A failure leaves none of them.
 2. `tenancy.initialise_tenant` in the new school's own `tenant_session`: KMS (or the local-dev wrapper) generates and wraps the DEK and HMAC key into `core.tenant_keys`; post-provision hooks clone the system roles from `apps/api/app/authz/roles.yaml`.
 3. `core.create_owner_invite(...)` (platform session; public wrapper `platform.service.invite_school_owner(platform_db, tenant_id=, subject=, display_name=, email=, language=)`): an `invited` owner membership with `mfa_required`, school scope and the `owner` role; platform event `tenant.owner_invite_created`.
-4. `tenant.provisioned` in the school's own audit chain (`actor_type = 'platform'`, §16).
+4. In the same platform transaction as step 3, `tenant.provisioned` is queued for the school's own audit chain (`actor_type = 'platform'`; delivered exactly once, §16).
 
 Steps 2–4 are idempotent: retrying with the same `Idempotency-Key` replays the result, and a retry with the same code and school name resumes an interrupted provisioning. The owner accepts the invite on first sign-in (`POST /api/v1/me/accept-invitations`, ADR-0019) once the school is `active`; an operator makes it live with `POST /platform/tenants/{id}/activate` (refused by the database until a data key exists). Invite **email delivery is not built yet** (`owner-invite:resend` only records `tenant.owner_invite_sent`).
 
@@ -123,7 +123,17 @@ Result for **dedicated**: the deployment row (`status = provisioning`), billing 
 - **Suspend (non-billing)** — `platform.tenants.suspend` (ᴿ): reason required (security incident, abuse, school's written request). Calls `core.set_tenant_status(tenant, 'suspended')` for shared; for dedicated, the engineer runs the fleet command (§13.3). Billing suspensions go through the subscription (§5.7).
 - **Reactivate** — same permission and step-up; reason required. A billing suspension is lifted from the subscription instead (`409 billing_suspension`).
 - **Activate (go-live)** — `platform.tenants.provision` (ᴿ): `provisioning → active` through `core.set_tenant_status`, which refuses a tenant without an unretired data key.
-- **What suspension does:** staff sign-in shows a suspension notice; the school `owner` can still sign in to download the full data export and see Plan & billing (BR-08). No data is deleted. Scheduled tenant jobs pause, except audit verification and retention purges.
+- **What suspension does** (decided 2026-09-27; BR-08, FR-PLT-004): while a school is `suspended` (and also while it is `offboarding`), the school's **owner and principal** may still use only these routes, and every other school route answers `403 tenant_suspended` for every role. The problem detail says in plain language that Plan & billing and the data export remain available to the owner and principal. The allowlist is one explicit list of (method, route template, roles), `SUSPENDED_SCHOOL_ALLOWLIST` in `apps/api/app/authz/resolver.py`, pinned by `tests/authz/test_suspended_allowlist.py` and an enumeration over every school route (`tests/api/test_suspended_school.py`). The route permission still applies on top (for example `tenant.billing.read`).
+
+  | Method | Route | Why |
+  |---|---|---|
+  | GET | `/api/v1/me` | Who am I in this school |
+  | POST | `/api/v1/me/active-tenant` | Choose the suspended school (users with several schools) |
+  | POST | `/api/v1/me/login-event` | Sign-in event (`auth.login.succeeded`); other roles get `auth.login.denied` with reason `tenant_suspended` |
+  | GET | `/api/v1/tenant/billing`, `/api/v1/tenant/billing/invoices` | Plan & billing (FR-PLT-030) |
+  | — | full data export (FR-ADM-001, not built yet) | Added to the allowlist with one line when the route exists |
+
+  `GET /me/schools` and `POST /me/accept-invitations` never resolve a school and are not affected; `/me/schools` reports the school's `status`, which the web app uses to show the suspended banner. No data is deleted. Scheduled tenant jobs pause, except audit verification and retention purges.
 - **Offboard** — `platform.tenants.offboard` (ᴿ, **two-person**): operator A records the request (reason, reference to the school's written request); operator B (a different operator holding the permission) approves with step-up. Then: tenant status `offboarding` → school confirms it has its export (or the export is delivered by us per R8) → access disabled → deletion job removes tenant data **within 30 days** → wrapped keys destroyed (crypto-shredding; for dedicated, the host's KMS key is scheduled for deletion and the host destroyed) → certificate of deletion issued → status `deleted`. Invoices and the billing account stay in `platform` as business records (retention in 08 §14).
 
 ### 5.6 Plans and pricing
@@ -1008,9 +1018,13 @@ After offboarding approval (§5.5): final export delivered → data deleted → 
 
 ## 16. Audit events
 
-Written with `audit.service.record_platform(...)` in `platform.audit_events`, in the same transaction as the change. Actions marked (+ T) are **also** written into the school's own chain (`actor_type = 'platform'`, shared tier only) with `audit.record()` in a `tenant_session`.
+Written with `audit.service.record_platform(...)` in `platform.audit_events`, in the same transaction as the change. Actions marked (+ T) are **also** copied into the school's own chain (`actor_type = 'platform'`; shared tier, and on a dedicated host by its own provisioning command) through a transactional outbox ([ADR-0020](adr/ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md)):
 
-**Known limitation (ADR-0013 Amendment A6).** The school-chain event is not atomic with the control-plane change: it is written first in a separate `sos_app` transaction that commits right after the platform transaction commits. If the platform transaction fails, both roll back; if the tenant commit then fails, the platform change stands without its school-chain event (the platform event still records it). One transaction cannot span the two database roles, and a definer function that writes tenant audit events would widen the allowlist. Listed for decision in 14 · M0 status.
+1. `platform.tenant_audit.enqueue(...)` writes a row to `platform.tenant_audit_outbox` **in the same platform transaction** as the change and its platform event (all commit or none do). The summary is validated like any audit summary (IDs, codes, counts only) before anything is written.
+2. `platform.deliver_tenant_audit` (Celery, queue `maintenance`, every minute, both modes; also tried right after the action commits) locks each school's oldest undelivered row (`FOR UPDATE SKIP LOCKED`), writes `audit.record()` in that school's `tenant_session` and marks the row delivered. Per school the order is the queue order; schools do not wait for each other.
+3. Exactly once: the row ID is stored in the school event's summary as `platform_event_id`. A retry after a crash between the school commit and marking the row delivered finds that event and does not write it again (advisory lock + lookup in the school's session).
+
+`platform.tenant_audit_outbox`: `id` (the platform event ID), `seq` (identity), `tenant_id`, `action`, `resource_type`, `resource_id`, `summary` jsonb, `actor_id`, `request_id`, `created_at`, `delivered_at`, `attempts`, `last_error` (code). `sos_platform` may `SELECT`, `INSERT` and update only `delivered_at`, `attempts`, `last_error`; nobody else has access. Thresholds (`stuck_after_attempts`, `backlog_alert_minutes`) are in `apps/api/app/platform/billing.yaml` → `tenant_audit`.
 
 | Area | Actions |
 |---|---|
@@ -1050,6 +1064,7 @@ Alerts specific to the control plane (full table in 11 §11–12):
 | Version skew | Host more than one release behind 14 days after release | P3 |
 | Heartbeat signature failures | > 5 rejected per deployment per hour | P2 security |
 | Platform audit chain broken | Verification failure | **P1 security** |
+| School-chain audit copies stuck | `platform.tenant_audit.backlog` (oldest undelivered copy older than 15 min) or `platform.tenant_audit.stuck` | P2 |
 | `sos_platform` permission denied | Any `permission denied` on `core`/`sis`/`kb`/`audit`/`ops` from the platform path | **P1 security** |
 | Invoice run failed | Job `failed` or `dead` | P2 |
 | Invoices overdue | School past grace | Info (daily digest) |

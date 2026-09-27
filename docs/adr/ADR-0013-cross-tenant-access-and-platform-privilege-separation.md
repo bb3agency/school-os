@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · Amended by ADR-0018, ADR-0019 · implementation amendments 2026-09-26 (see [Amendments](#amendments-2026-09-26)) |
+| Status | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020 · implementation amendments 2026-09-26, 2026-09-27 (see [Amendments](#amendments-2026-09-26)) |
 | Date | 2026-09-26 |
 | Deciders | Founder (product owner approval of build proposals B1–B25) |
 | Amends / supersedes | Amends [ADR-0003](ADR-0003-pool-tenancy-rls.md), [ADR-0011](ADR-0011-hash-chained-audit.md), [ADR-0012](ADR-0012-managed-oidc-identity.md) |
@@ -227,3 +227,9 @@ The school-chain copies (`tenant.provisioned`, `tenant.activated`, `tenant.suspe
 `sos_platform` itself still has no tenant-table privileges.
 
 **A11 · Heartbeat keys.** Per-deployment heartbeat keys are stored **wrapped** in `platform.deployments.heartbeat_key_ciphertext`, not hashed: KMS in AWS, the local-dev wrapper elsewhere. The control plane has to recompute the HMAC, so it needs the key itself.
+
+## Amendments (2026-09-27)
+
+Reference only (implementation facts; the decisions are in the ADR named).
+
+**A12 · A6 and A10 settled by [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md).** They are no longer open deviations. School-chain copies of platform actions are queued in `platform.tenant_audit_outbox` (migration `0015_platform_decisions`) inside the platform transaction and delivered exactly once, in order per school, by the task `platform.deliver_tenant_audit`; the post-commit `tenant_session` write described in A6 no longer exists. What `platform` may call in `app.tenancy.service`, which files may open `tenant_session()`, and which tenant relations its raw SQL may name are pinned by `apps/api/tests/platform/test_boundaries.py`. No definer function, `definer_access` policy or tenant-table grant was added.
