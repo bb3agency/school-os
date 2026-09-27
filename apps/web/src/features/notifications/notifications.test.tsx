@@ -57,8 +57,12 @@ describe("bell polling (FR-NOT-001)", () => {
     expect(notificationHref({ resource_type: "extraction_batch", resource_id: id })).toBe(
       `/register-photos/${id}`,
     );
-    // No school screen for these (yet): shown without a link.
-    expect(notificationHref({ resource_type: "document", resource_id: id })).toBeNull();
+    // document.quarantined opens the document screen (FR-DOC-002).
+    expect(notificationHref({ resource_type: "document", resource_id: id })).toBe(
+      `/documents/${id}`,
+    );
+    expect(notificationHref({ resource_type: "document", resource_id: "../x" })).toBeNull();
+    // announcement.new stays unlinked (owner decision: the banner shows it).
     expect(notificationHref({ resource_type: "announcement", resource_id: id })).toBeNull();
     expect(notificationHref({ resource_type: "change_request", resource_id: "../x" })).toBeNull();
     expect(notificationHref({ resource_type: "export", resource_id: "../x" })).toBeNull();
@@ -152,7 +156,15 @@ describe("notifications page (FR-NOT-001)", () => {
           id: "0192f3a4-0000-7000-8000-00000000c0e2",
           template_key: "document.quarantined",
           resource_type: "document",
+          resource_id: "0192f3a4-0000-7000-8000-00000000d001",
           title: "File blocked",
+        }),
+        notification({
+          id: "0192f3a4-0000-7000-8000-00000000c0e3",
+          template_key: "announcement.new",
+          resource_type: "announcement",
+          resource_id: "0192f3a4-0000-7000-8000-00000000a001",
+          title: "New message from SchoolOS",
         }),
       ]);
     renderWithIntl(<NotificationsScreen />);
@@ -161,8 +173,15 @@ describe("notifications page (FR-NOT-001)", () => {
       "href",
       expect.stringContaining("/exports/0192f3a4-0000-7000-8000-00000000e001"),
     );
-    // No school screen for documents: no link, a plain "mark as read" button instead.
-    expect(screen.getByRole("button", { name: "Mark as read: File blocked" })).toBeInTheDocument();
+    // A blocked file opens its document screen, which explains why (FR-DOC-002).
+    expect(screen.getByRole("link", { name: /File blocked/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/documents/0192f3a4-0000-7000-8000-00000000d001"),
+    );
+    // Announcements have no school screen: no link, a plain "mark as read" button instead.
+    expect(
+      screen.getByRole("button", { name: "Mark as read: New message from SchoolOS" }),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole("checkbox", { name: "Show unread only" }));
     await waitFor(() =>
       expect(

@@ -1,0 +1,419 @@
+"use client";
+
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
+import { useRef, type ReactNode } from "react";
+import { z } from "zod";
+import { ActionDialog } from "@/components/ui/ActionDialog";
+import { Alert } from "@/components/ui/Alert";
+import { Card } from "@/components/ui/Card";
+import { Field } from "@/components/ui/Input";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { DataTable, type Column } from "@/components/ui/Table";
+import { Value } from "@/components/ui/Value";
+import { Link, useRouter } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
+import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
+import { useStaffCan, useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
+import { formatBytes, formatDate, formatDateTime } from "@/lib/format";
+import { DOCUMENT_KEYS, useDocument } from "./data";
+import { aclSchema, chosenFile, newVersionSchema, storageFailure } from "./forms";
+import {
+  aclBody,
+  aclExtra,
+  AclFields,
+  AclSummary,
+  documentFieldMap,
+  DownloadButton,
+  VersionReason,
+  VersionStatusBadge,
+} from "./parts";
+import {
+  acceptFor,
+  DOCUMENT_PERM,
+  ifMatch,
+  isVersionBusy,
+  type DocumentDetail,
+  type DocumentVersion,
+} from "./types";
+import { createUploadKeys, StorageUploadError, uploadVersion } from "./upload";
+
+function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd className="font-semibold text-ink">{children}</dd>
+    </div>
+  );
+}
+
+const KINDS: Record<string, string> = {
+  "application/pdf": "PDF",
+  "image/jpeg": "JPG",
+  "image/png": "PNG",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
+  "text/csv": "CSV",
+};
+
+/** C3 files open only for staff who may see sensitive data, or the uploader (docs/09). */
+function useMayOpen(doc: Pick<DocumentDetail, "sensitivity" | "created_by">): boolean {
+  const can = useStaffCan();
+  const me = useStaffMe();
+  if (doc.sensitivity !== "C3") return true;
+  return can(DOCUMENT_PERM.readSensitive) || me?.user_id === doc.created_by;
+}
+
+/** The newest version that passed the virus check (what "Download" serves). */
+function latestReady(versions: readonly DocumentVersion[]): DocumentVersion | undefined {
+  return [...versions]
+    .filter((version) => version.status === "ready")
+    .sort((a, b) => b.version_no - a.version_no)[0];
+}
+
+function FileSection({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.detail");
+  const mayOpen = useMayOpen(doc);
+  const current = doc.current_version;
+  const ready = latestReady(doc.versions);
+  const notice =
+    current && current.status !== "ready" ? (
+      isVersionBusy(current.status) ? (
+        <Alert tone="info" title={t("checkingTitle", { version: current.version_no })}>
+          <VersionReason version={current} />
+        </Alert>
+      ) : (
+        <Alert tone="warning" title={t("blockedTitle", { version: current.version_no })}>
+          <VersionReason version={current} />
+        </Alert>
+      )
+    ) : null;
+
+  if (!mayOpen) {
+    return (
+      <div className="space-y-3">
+        {notice}
+        <Alert tone="info" title={t("restrictedTitle")}>
+          {t("restrictedBody")}
+        </Alert>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {notice}
+      {ready ? (
+        <>
+          <DownloadButton
+            documentId={doc.id}
+            versionNo={ready.version_no}
+            label={t("download", { version: ready.version_no })}
+          />
+          {current && ready.version_no !== current.version_no ? (
+            <p className="text-sm">{t("olderReady", { version: ready.version_no })}</p>
+          ) : null}
+          <p className="text-xs text-ink-muted">{t("linkNote")}</p>
+        </>
+      ) : (
+        <p className="text-sm">{t("nothingReady")}</p>
+      )}
+    </div>
+  );
+}
+
+function VersionsSection({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.detail");
+  const locale = useLocale() as Locale;
+  const mayOpen = useMayOpen(doc);
+  const versions = [...doc.versions].sort((a, b) => b.version_no - a.version_no);
+  const columns: Column<DocumentVersion>[] = [
+    {
+      key: "version",
+      header: t("colVersion"),
+      cell: (row) => (
+        <>
+          {row.version_no}
+          {doc.current_version?.id === row.id ? (
+            <span className="ml-2 text-xs text-ink-muted">{t("latest")}</span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: t("colStatus"),
+      cell: (row) => (
+        <span className="flex max-w-md flex-col items-start gap-1">
+          <VersionStatusBadge version={row} />
+          {row.status !== "ready" ? (
+            <span className="text-sm">
+              <VersionReason version={row} />
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    { key: "kind", header: t("colKind"), cell: (row) => KINDS[row.mime_type] ?? t("otherKind") },
+    {
+      key: "size",
+      header: t("colSize"),
+      cell: (row) => <Value>{formatBytes(row.size_bytes, locale)}</Value>,
+    },
+    {
+      key: "uploaded",
+      header: t("colUploaded"),
+      cell: (row) => <Value>{formatDateTime(row.created_at)}</Value>,
+    },
+    {
+      key: "open",
+      header: t("colOpen"),
+      cell: (row) =>
+        row.status === "ready" && mayOpen ? (
+          <DownloadButton
+            documentId={doc.id}
+            versionNo={row.version_no}
+            label={t("downloadShort")}
+            description={t("downloadVersion", { version: row.version_no })}
+            variant="secondary"
+          />
+        ) : (
+          <span className="text-sm text-ink-muted">{t("cannotOpen")}</span>
+        ),
+    },
+  ];
+  return (
+    <DataTable
+      caption={t("versionsTitle")}
+      captionHidden
+      columns={columns}
+      state={{ status: "ready", data: versions }}
+      rowKey={(row) => row.id}
+      emptyTitle={t("noVersions")}
+    />
+  );
+}
+
+function NewVersion({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.newVersion");
+  const api = useBffClient("staff");
+  const keys = useRef(createUploadKeys(newIdempotencyKey));
+  return (
+    <ActionDialog
+      triggerLabel={t("trigger")}
+      title={t("title")}
+      description={t("description")}
+      confirmLabel={t("confirm")}
+      schema={newVersionSchema(doc.purpose)}
+      extra={chosenFile}
+      invalidate={[DOCUMENT_KEYS.all]}
+      errorNamespace="documents"
+      submit={async (data, key) => {
+        try {
+          return await uploadVersion(api, doc.id, data.file, doc.purpose, keys.current.for(key));
+        } catch (failure) {
+          if (failure instanceof StorageUploadError) keys.current.storageFailed();
+          throw storageFailure(failure);
+        }
+      }}
+    >
+      {(errors) => (
+        <Field label={t("file")} hint={t("fileHint")} error={errors.file}>
+          {({ id, describedBy, invalid }) => (
+            <input
+              id={id}
+              name="file"
+              type="file"
+              accept={acceptFor(doc.purpose)}
+              aria-describedby={describedBy}
+              aria-invalid={invalid || undefined}
+              className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-border-strong file:bg-surface file:px-3 file:py-2 file:font-semibold"
+            />
+          )}
+        </Field>
+      )}
+    </ActionDialog>
+  );
+}
+
+function EditAcl({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.aclEdit");
+  const api = useBffClient("staff");
+  return (
+    <ActionDialog
+      triggerLabel={t("trigger")}
+      title={t("title")}
+      description={t("description")}
+      confirmLabel={t("confirm")}
+      schema={aclSchema}
+      extra={aclExtra}
+      fieldMap={documentFieldMap}
+      invalidate={[DOCUMENT_KEYS.all]}
+      errorNamespace="documents"
+      submit={(data) =>
+        unwrap(
+          api.PUT("/api/v1/documents/{document_id}/acl", {
+            params: { path: { document_id: doc.id } },
+            headers: { "If-Match": ifMatch(doc.version) },
+            body: { acl: aclBody(data) },
+          }),
+        )
+      }
+    >
+      {(errors) => <AclFields errors={errors} initial={doc.acl} />}
+    </ActionDialog>
+  );
+}
+
+function DeleteDocument({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.delete");
+  const api = useBffClient("staff");
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  return (
+    <ActionDialog
+      triggerLabel={t("trigger")}
+      triggerVariant="danger"
+      title={t("title")}
+      description={t("description")}
+      confirmLabel={t("confirm")}
+      confirmVariant="danger"
+      schema={z.object({})}
+      errorNamespace="documents"
+      submit={() =>
+        unwrap(
+          api.DELETE("/api/v1/documents/{document_id}", {
+            params: { path: { document_id: doc.id } },
+          }),
+        )
+      }
+      onSuccess={() => {
+        queryClient.removeQueries({ queryKey: DOCUMENT_KEYS.one(doc.id) });
+        void queryClient.invalidateQueries({ queryKey: DOCUMENT_KEYS.all });
+        router.push("/documents?deleted=1");
+      }}
+    >
+      {() => <p className="text-sm">{t("body", { title: doc.title })}</p>}
+    </ActionDialog>
+  );
+}
+
+/**
+ * One document (US-701 AC2..AC4, FR-DOC-002..008): download, versions with their check status
+ * (virus found, withheld because it showed an Aadhaar number, still being checked …), details,
+ * who can see it, a new version, and delete. Polls while a version is being checked.
+ */
+export function DocumentDetailScreen({ documentId }: { documentId: string }) {
+  const t = useTranslations("documents");
+  const td = useTranslations("documents.detail");
+  const ttype = useTranslations("documents.docType");
+  const tpurpose = useTranslations("documents.purpose");
+  const tsens = useTranslations("documents.sensitivity");
+  const tlang = useTranslations("documents.language");
+  const tstatus = useTranslations("documents.docStatus");
+  const tc = useTranslations("common");
+  const can = useStaffCan();
+  const meQuery = useStaffMeQuery();
+  const me = meQuery.data;
+  const allowed = can(DOCUMENT_PERM.read);
+  const state = useDocument(documentId, allowed);
+
+  const back = (
+    <Link href="/documents" className="text-primary underline">
+      {td("back")}
+    </Link>
+  );
+
+  if (meQuery.isPending || (allowed && state.status === "loading")) {
+    return <LoadingState label={tc("loading")} />;
+  }
+  if (!allowed) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t("title")} />
+        <Alert tone="warning" title={t("noAccessTitle")}>
+          {t("noAccessBody")}
+        </Alert>
+      </div>
+    );
+  }
+  if (state.status !== "ready") {
+    const missing = state.status === "error" && state.reason === "not_found";
+    return (
+      <div className="space-y-6">
+        <PageHeader title={td("title")} />
+        <Alert
+          tone={missing ? "warning" : "danger"}
+          title={td(missing ? "notFoundTitle" : "loadErrorTitle")}
+        >
+          <p>{td(missing ? "notFoundBody" : "loadErrorBody")}</p>
+        </Alert>
+        {back}
+      </div>
+    );
+  }
+
+  const doc = state.data;
+  const busy = doc.versions.some((version) => isVersionBusy(version.status));
+  const canManage = can(DOCUMENT_PERM.manage);
+  const canUpload = can(DOCUMENT_PERM.upload) && doc.purpose !== "import_file";
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={doc.title}
+        badge={doc.current_version ? <VersionStatusBadge version={doc.current_version} /> : null}
+        actions={back}
+      />
+      {/* Announces status changes while polling; the buttons stay outside the live region. */}
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {doc.current_version && busy ? td("stillChecking") : ""}
+      </p>
+      <Card title={td("fileTitle")} actions={canUpload ? <NewVersion doc={doc} /> : null}>
+        <FileSection doc={doc} />
+      </Card>
+      <Card title={td("versionsTitle")} description={td("versionsHint")}>
+        <VersionsSection doc={doc} />
+      </Card>
+      <Card title={td("aboutTitle")}>
+        <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Item label={td("type")}>{ttype(doc.doc_type)}</Item>
+          <Item label={td("purpose")}>{tpurpose(doc.purpose)}</Item>
+          <Item label={td("sensitivity")}>{tsens(`${doc.sensitivity}.short`)}</Item>
+          <Item label={td("language")}>
+            {doc.language ? tlang(doc.language) : tc("notAvailable")}
+          </Item>
+          <Item label={td("issuer")}>
+            <Value>{doc.issuer}</Value>
+          </Item>
+          <Item label={td("issuedOn")}>
+            <Value>{formatDate(doc.issued_on)}</Value>
+          </Item>
+          <Item label={td("status")}>{tstatus(doc.status)}</Item>
+          <Item label={td("uploadedBy")}>
+            {doc.created_by === me?.user_id ? td("you") : td("someoneElse")}
+          </Item>
+          <Item label={td("created")}>
+            <Value>{formatDateTime(doc.created_at)}</Value>
+          </Item>
+          <Item label={td("updated")}>
+            <Value>{formatDateTime(doc.updated_at)}</Value>
+          </Item>
+        </dl>
+        <p className="mt-4 text-sm text-ink-muted">{tsens(`${doc.sensitivity}.hint`)}</p>
+      </Card>
+      <Card
+        title={td("aclTitle")}
+        description={td("aclHint")}
+        actions={canManage ? <EditAcl doc={doc} /> : null}
+      >
+        <AclSummary acl={doc.acl} />
+      </Card>
+      {canManage ? (
+        <Card title={td("deleteTitle")} description={td("deleteHint")}>
+          <DeleteDocument doc={doc} />
+        </Card>
+      ) : null}
+    </div>
+  );
+}

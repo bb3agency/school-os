@@ -1,6 +1,6 @@
 import type { AuditEvent } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -73,9 +73,9 @@ export function AuditView({ events }: { events: Loadable<readonly AuditEvent[]> 
         description={t("description")}
         actions={
           <>
-            <Button variant="secondary" disabled>
+            <ButtonLink href="/audit/verify" variant="secondary">
               {t("verify")}
-            </Button>
+            </ButtonLink>
             <Button variant="secondary" disabled>
               {t("exportCsv")}
             </Button>

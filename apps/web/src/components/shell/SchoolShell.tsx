@@ -37,6 +37,7 @@ export function SchoolShell({
     { href: "/imports", label: t("imports.nav"), permission: "import.run" },
     { href: "/register-photos", label: t("extraction.nav"), permission: "import.run" },
     { href: "/settings/school", label: t("schoolSettings.nav") },
+    { href: "/documents", label: t("documents.nav"), permission: "document.read" },
     { href: "/settings/structure", label: t("school.nav.structure") },
     { href: "/settings/users", label: t("school.nav.users"), permission: "user.manage" },
     {
