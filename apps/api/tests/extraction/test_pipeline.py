@@ -52,8 +52,11 @@ def test_worker_routes_extraction_tasks_to_ocr() -> None:
     from sos_worker.celery_app import TASK_MODULES, celery_app
 
     assert "app.extraction.tasks" in TASK_MODULES
-    routes = celery_app.conf.task_routes
-    assert routes["extraction.*"] == {"queue": "ocr"}
+    celery_app.loader.import_default_modules()
+    assert service.PROCESS_TASK in celery_app.tasks
+    # send_task (used by the outbox dispatcher) honours task_routes, not the task's own queue.
+    route = celery_app.amqp.router.route({}, service.PROCESS_TASK)
+    assert route["queue"].name == "ocr"
 
 
 def test_US_402_AC1_end_to_end_through_the_outbox_task(
