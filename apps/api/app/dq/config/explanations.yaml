@@ -1,0 +1,89 @@
+# Bilingual explanation texts for data-quality findings (docs/02 §5–6, FR-DQ-001, FR-DQ-006).
+# Loaded and validated by app.dq.explanations. Audience: school office staff; plain language,
+# sentence case, polite Telugu. English and Telugu of one code use the same {placeholders};
+# placeholders are filled at render time with labels or codes, never with raw personal data
+# (the finding shows masked values next to the text). Examples in quotes are generic spellings,
+# not anyone's name.
+version: 1
+
+# One code per match class (match_classes.yaml).
+match_classes:
+  NM-EXACT:
+    en: "The name is the same in both records."
+    te: "రెండు రికార్డులలోనూ పేరు ఒకేలా ఉంది."
+  NM-ORDER:
+    en: "Same name, but the parts are in a different order (for example, the surname first in one record and last in the other)."
+    te: "పేరు ఒకటే, కానీ పేరులోని భాగాల క్రమం వేరుగా ఉంది (ఉదాహరణకు, ఒక రికార్డులో ఇంటి పేరు ముందు, మరో రికార్డులో చివర ఉంది)."
+  NM-SPACING:
+    en: "Same name, but the spaces between its parts differ (for example, \"VENKATASAI\" and \"VENKATA SAI\")."
+    te: "పేరు ఒకటే, కానీ పదాల మధ్య ఖాళీలు వేరుగా ఉన్నాయి (ఉదాహరణకు, \"VENKATASAI\" మరియు \"VENKATA SAI\")."
+  NM-INITIALS:
+    en: "One record has only an initial where the other has the full name (for example, \"K.\" for the surname). Check which form the board or portal needs."
+    te: "ఒక రికార్డులో పూర్తి పేరుకు బదులుగా పొడి అక్షరం (ఇనిషియల్) మాత్రమే ఉంది (ఉదాహరణకు, ఇంటి పేరుకు \"K.\"). బోర్డు లేదా పోర్టల్‌కు ఏ రూపం కావాలో దయచేసి సరిచూడండి."
+  NM-VARIANT:
+    en: "The name is spelt differently in the two records (a common spelling difference, such as \"LAKSHMI\" and \"LAXMI\"). All official records should use the same spelling."
+    te: "రెండు రికార్డులలో పేరు స్పెల్లింగ్ వేరుగా ఉంది (\"LAKSHMI\", \"LAXMI\" వంటి సాధారణ తేడా). అన్ని అధికారిక రికార్డులలో ఒకే స్పెల్లింగ్ ఉండాలి."
+  NM-TYPO:
+    en: "The names are almost the same but not identical. One record probably has a typing mistake."
+    te: "పేర్లు దాదాపు ఒకేలా ఉన్నాయి, కానీ పూర్తిగా ఒకటి కావు. ఒక రికార్డులో టైపింగ్ పొరపాటు ఉండవచ్చు."
+  NM-DIFFERENT:
+    en: "The names are different. Check both records against the admission register before any submission."
+    te: "పేర్లు వేర్వేరుగా ఉన్నాయి. ఏదైనా సమర్పణకు ముందు రెండు రికార్డులనూ అడ్మిషన్ రిజిస్టర్‌తో దయచేసి సరిచూడండి."
+  NM-MISSING:
+    en: "The names could not be compared because one record has no name."
+    te: "ఒక రికార్డులో పేరు లేనందున పేర్లను పోల్చలేకపోయాము."
+
+# Suggested correction routes (docs/02 §5). "Evidence" is translated as రుజువు పత్రం so it is
+# not confused with ఆధార్ (Aadhaar).
+routes:
+  ROUTE-SCHOOL-CR:
+    en: "Correct the school record (change request + evidence)."
+    te: "పాఠశాల రికార్డును సరిచేయండి (రుజువు పత్రంతో మార్పు అభ్యర్థన ద్వారా)."
+  ROUTE-UIDAI:
+    en: "Parent should correct Aadhaar with UIDAI."
+    te: "తల్లిదండ్రులు UIDAI ద్వారా ఆధార్‌లో సవరణ చేయించుకోవాలి."
+  ROUTE-UDISE:
+    en: "Update UDISE+ after correcting the school record."
+    te: "పాఠశాల రికార్డును సరిచేసిన తర్వాత UDISE+ లో కూడా నవీకరించండి."
+  ROUTE-BOARD:
+    en: "Raise a correction request on the board portal."
+    te: "బోర్డు పోర్టల్‌లో సవరణ అభ్యర్థన సమర్పించండి."
+
+# Rule explanation templates (rules.yaml `explanation_key`), English from docs/02 §5.
+rules:
+  DQ-001:
+    en: "Name differs between admission register and Aadhaar."
+    te: "అడ్మిషన్ రిజిస్టర్‌లోని పేరు, ఆధార్‌లోని పేరు వేర్వేరుగా ఉన్నాయి."
+  DQ-002:
+    en: "Date of birth differs. Boards and APAAR need these to match."
+    te: "పుట్టిన తేదీ వేరుగా ఉంది. బోర్డులు, APAAR కోసం ఇవి ఒకేలా ఉండాలి."
+  DQ-003:
+    en: "Gender differs between records."
+    te: "రికార్డులలో లింగం (జెండర్) వేర్వేరుగా ఉంది."
+  DQ-004:
+    en: "Parent name spelled differently across records."
+    te: "తల్లి లేదా తండ్రి పేరు రికార్డులలో వేర్వేరుగా రాసి ఉంది."
+  DQ-005:
+    en: "Required for {profile}: {field} is missing."
+    te: "{profile} కోసం తప్పనిసరి: {field} నమోదు కాలేదు."
+  DQ-006:
+    en: "{profile} does not accept {issue}."
+    te: "{profile} లో {issue} అనుమతించబడదు."
+  DQ-007:
+    en: "Age {n} is unusual for class {c}. Check DOB."
+    te: "తరగతి {c} కి వయస్సు {n} అసాధారణంగా ఉంది. పుట్టిన తేదీని సరిచూడండి."
+  DQ-008:
+    en: "Possible duplicate of {student}."
+    te: "ఇది {student} రికార్డుకు నకలు (డూప్లికేట్) కావచ్చు."
+  DQ-009:
+    en: "Aadhaar details needed to generate APAAR."
+    te: "APAAR రూపొందించడానికి ఆధార్ వివరాలు అవసరం."
+  DQ-010:
+    en: "Board record differs from admission register."
+    te: "బోర్డు రికార్డు అడ్మిషన్ రిజిస్టర్‌తో సరిపోలడం లేదు."
+  DQ-011:
+    en: "UDISE+ differs from admission register."
+    te: "UDISE+ వివరాలు అడ్మిషన్ రిజిస్టర్‌తో సరిపోలడం లేదు."
+  DQ-012:
+    en: "Student is enrolled twice."
+    te: "విద్యార్థి రెండుసార్లు నమోదై ఉన్నారు."

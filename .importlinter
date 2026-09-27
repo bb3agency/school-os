@@ -17,12 +17,14 @@
 # import-linter fails on modules that do not exist, so only modules that exist today are
 # listed. When a new module lands, add it to every `source_modules` list below and add its
 # own "<module>-internals" contract. Future modules (CLAUDE.md §4):
-#   students, imports, dq, changes, documents, knowledge, exports, notifications, admin, ops
+#   students, imports, changes, documents, knowledge, exports, notifications, admin
 # Note for knowledge: also forbid app.knowledge.gateway internals once it exists, and keep
 # the semgrep rule `sos-llm-sdk-outside-gateway` for third-party SDK imports.
 
 [importlinter]
 root_package = app
+# External packages are graph nodes so a contract can forbid e.g. sqlalchemy (dq-pure-library).
+include_external_packages = True
 
 # --- 1. module internals are private -------------------------------------------------------
 
@@ -38,6 +40,7 @@ source_modules =
     app.platform
     app.ops
     app.devtools
+    app.dq
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -55,6 +58,7 @@ source_modules =
     app.platform
     app.ops
     app.devtools
+    app.dq
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -72,6 +76,7 @@ source_modules =
     app.tenancy
     app.ops
     app.devtools
+    app.dq
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -92,6 +97,7 @@ forbidden_modules =
     app.platform
     app.ops
     app.devtools
+    app.dq
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
@@ -102,6 +108,7 @@ source_modules =
     app.core
     app.identity
     app.tenancy
+    app.dq
 forbidden_modules =
     app.platform
 
@@ -117,7 +124,46 @@ source_modules =
     app.tenancy
     app.platform
     app.devtools
+    app.dq
 forbidden_modules =
     app.ops.repository
     app.ops.models
 allow_indirect_imports = True
+
+[importlinter:contract:dq-internals]
+name = dq: repository/models are private (use app.dq.service; wave 2 adds them)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+forbidden_modules =
+    app.dq.repository
+    app.dq.models
+allow_indirect_imports = True
+
+# The name-matching library, rule types and explanation catalog stay pure (no database, web or
+# tenant modules), so the engine, imports and exports can reuse them anywhere (FR-DQ-003).
+[importlinter:contract:dq-pure-library]
+name = dq library modules (matching, rules, explanations) stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.dq.matching
+    app.dq.rules
+    app.dq.explanations
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops

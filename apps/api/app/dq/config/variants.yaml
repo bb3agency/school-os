@@ -1,0 +1,256 @@
+# Name variant dictionary (docs/02 §6 step 4, FR-DQ-003). Dataset version 1.
+#
+# Each group lists spellings of ONE name token that school records use interchangeably in
+# Andhra Pradesh. The first member is the group's representative. Matching looks tokens up by
+# their phonetic key (app.core.textnorm.phonetic_key), so spellings that already share a
+# phonetic key (SEETHA/SITA, SHIVA/SIVA, VENKATTA/VENKATA) would match without an entry. Such
+# groups are still listed where people expect them (SRI/SREE/SHRI, SAI/SAAI, SEKHAR/SHEKAR) so
+# the file documents the known equivalences; a test requires at least 60 groups that join two
+# or more different phonetic keys, i.e. groups the phonetic key alone would not catch.
+#
+# Written from common spellings seen in registers, certificates and Aadhaar letters. No entry
+# comes from a real record. Tenants can add groups (VariantDictionary.merged); groups that share
+# a spelling are joined. Pairs under `distinct` are never joined, not even through a tenant
+# extension, and are never accepted as a typo of each other: they mark gender or a different
+# name form, which boards treat as a different name.
+#
+# Group ids are stable identifiers (lowercase ascii); members are upper-case Latin tokens.
+version: 1
+
+groups:
+  # --- honorific / devotional prefixes and "Sri" compounds ----------------------------------
+  - id: sri                 # Sri, Sree, Shri, Shree ("Sri Lakshmi", "Sree Vani")
+    members: [SRI, SREE, SHRI, SHREE, SHRII]
+  - id: srilakshmi          # compound written as one word
+    members: [SRILAKSHMI, SREELAKSHMI, SRILAXMI, SREELAXMI, SHRILAKSHMI]
+  - id: sridevi
+    members: [SRIDEVI, SREEDEVI, SHRIDEVI]
+  - id: srikanth
+    members: [SRIKANTH, SREEKANTH, SRIKANT, SHRIKANTH, SHREEKANTH]
+  - id: sriram
+    members: [SRIRAM, SREERAM, SHRIRAM, SREERAMA]
+  - id: srihari
+    members: [SRIHARI, SREEHARI, SHRIHARI]
+  - id: srivani
+    members: [SRIVANI, SREEVANI]
+  - id: sridhar
+    members: [SRIDHAR, SREEDHAR, SHRIDHAR, SRIDHARA]
+
+  # --- Lakshmi and its compounds --------------------------------------------------------------
+  - id: lakshmi             # Lakshmi, Laxmi, Laksmi, Lakshmy
+    members: [LAKSHMI, LAXMI, LAKSMI, LAKSHMY, LAKHSMI, LUXMI]
+  - id: varalakshmi
+    members: [VARALAKSHMI, VARALAXMI]
+  - id: mahalakshmi
+    members: [MAHALAKSHMI, MAHALAXMI]
+  - id: vijayalakshmi
+    members: [VIJAYALAKSHMI, VIJAYALAXMI]
+  - id: dhanalakshmi
+    members: [DHANALAKSHMI, DHANALAXMI]
+  - id: rajyalakshmi
+    members: [RAJYALAKSHMI, RAJYALAXMI, RAJALAKSHMI]
+  - id: bhagyalakshmi
+    members: [BHAGYALAKSHMI, BHAGYALAXMI]
+  - id: lakshmana           # Lakshmana, Laxmana, Laxman
+    members: [LAKSHMANA, LAXMANA, LAKSHMAN, LAXMAN]
+
+  # --- Venkata and its compounds ----------------------------------------------------------------
+  - id: venkata             # Venkata, Venkat, Venkatta, Venkath; Vemkata (anusvara spelt m)
+    members: [VENKATA, VENKAT, VENKATTA, VENKATH, VEMKATA]
+  - id: venkatesh
+    members: [VENKATESH, VENKATESHA]
+  - id: venkateswara        # Venkateswara, Venkateshwara, Venkateswar
+    members: [VENKATESWARA, VENKATESHWARA, VENKATESWAR, VENKATESWRA]
+  - id: venkateswarlu       # the -lu form is its own name
+    members: [VENKATESWARLU, VENKATESHWARLU, VENKATESWARULU]
+  - id: venkataramana
+    members: [VENKATARAMANA, VENKATRAMANA, VENKATRAMAN]
+
+  # --- Sai --------------------------------------------------------------------------------------
+  - id: sai                 # Sai, Saai, Saayi, Sayi
+    members: [SAI, SAAI, SAAYI, SAYI, SAEE]
+
+  # --- Narayana family --------------------------------------------------------------------------
+  - id: narayana            # Narayana, Narayan (not Narayanan: see distinct)
+    members: [NARAYANA, NARAYAN, NARAYANAA, NARAYANAM]
+  - id: satyanarayana
+    members: [SATYANARAYANA, SATHYANARAYANA, SATYANARAYAN, SATYANARAYANAM, SATYNARAYANA]
+  - id: suryanarayana
+    members: [SURYANARAYANA, SURYANARAYAN, SURIYANARAYANA, SURYANARAYANAM]
+  - id: lakshminarayana
+    members: [LAKSHMINARAYANA, LAXMINARAYANA, LAKSHMINARAYAN]
+
+  # --- Krishna, Rama and compounds ------------------------------------------------------------
+  - id: krishna             # Krishna, Krushna, Krisna (not Krishnan: see distinct)
+    members: [KRISHNA, KRUSHNA, KRISNA, KRISHANA, KRIHSNA]
+  - id: ramakrishna
+    members: [RAMAKRISHNA, RAMAKRUSHNA, RAMKRISHNA, RAMAKRISNA]
+  - id: gopalakrishna
+    members: [GOPALAKRISHNA, GOPALKRISHNA, GOPALAKRUSHNA]
+  - id: balakrishna
+    members: [BALAKRISHNA, BALKRISHNA, BALAKRUSHNA]
+
+  # --- Srinivasa family -------------------------------------------------------------------------
+  - id: srinivasa           # Srinivas, Sreenivas, Srinivasa, Shrinivas
+    members: [SRINIVASA, SRINIVAS, SREENIVASA, SREENIVAS, SHRINIVAS, SHRINIVASA, SRINIVASH]
+  - id: srinivasulu         # the -ulu form is its own name
+    members: [SRINIVASULU, SREENIVASULU, SRINIVASALU, SRINIVASUL]
+
+  # --- Prasad, Satya, Surya ---------------------------------------------------------------------
+  - id: prasad              # Prasad, Prasadh, Prasada, Prashad
+    members: [PRASAD, PRASADH, PRASADA, PRASHAD, PRASADU]
+  - id: satya               # Satya, Sathya, Sathiya
+    members: [SATYA, SATHYA, SATHIYA, SATTYA]
+
+  # --- family / caste-title surnames written after the given name -----------------------------
+  - id: reddy               # Reddy, Reddi
+    members: [REDDY, REDDI, REDY, REDDYY]
+  - id: naidu               # Naidu, Nayudu, Naidoo
+    members: [NAIDU, NAYUDU, NAIDOO, NAYADU]
+  - id: chowdary            # Chowdary, Choudary, Chaudhari, Chowdhary ...
+    members: [CHOWDARY, CHOWDHARY, CHOUDARY, CHOUDHARY, CHAUDHARI, CHAUDHARY, CHOWDARI, CHOWDHARI, CHOUDARI]
+  - id: nayak               # Nayak, Naik
+    members: [NAYAK, NAIK, NAYAKA]
+  - id: varma               # Varma, Verma
+    members: [VARMA, VERMA, VARMAA]
+  - id: sarma               # Sarma, Sharma, Sarmah
+    members: [SARMA, SHARMA, SHARMAA, SARMAH]
+  - id: sastry              # Sastry, Sastri, Shastri
+    members: [SASTRY, SASTRI, SHASTRI, SHASTRY, SASTHRY]
+
+  # --- -aiah / -ayya names (Telugu honorific ending) ------------------------------------------
+  - id: ramaiah
+    members: [RAMAIAH, RAMAYYA, RAMAYA, RAMAIA]
+  - id: subbaiah
+    members: [SUBBAIAH, SUBBAYYA, SUBAYYA, SUBBAIA]
+  - id: venkaiah
+    members: [VENKAIAH, VENKAYYA, VENKAYA]
+  - id: narasaiah
+    members: [NARASAIAH, NARASAYYA, NARSAIAH, NARSAYYA]
+  - id: chinnaiah
+    members: [CHINNAIAH, CHINNAYYA, CHINAYYA]
+  - id: pullaiah
+    members: [PULLAIAH, PULLAYYA, PULAYYA]
+  - id: yellaiah
+    members: [YELLAIAH, YELLAYYA, ELLAIAH]
+  - id: anjaiah
+    members: [ANJAIAH, ANJAYYA, ANJAYA]
+  - id: kondaiah
+    members: [KONDAIAH, KONDAYYA]
+
+  # --- -ulu / -alu names ------------------------------------------------------------------------
+  - id: anjaneyulu
+    members: [ANJANEYULU, ANJANEYALU, ANJANEYLU, ANJANEYULLU]
+  - id: ramanjaneyulu
+    members: [RAMANJANEYULU, RAMANJANEYALU, RAMANJANEYLU]
+  - id: hanumantha          # Hanumantha, Hanumanthu, Hanumanth
+    members: [HANUMANTHA, HANUMANTHU, HANUMANTH, HANMANTHA]
+
+  # --- -eswara / -eswari names ------------------------------------------------------------------
+  - id: eswar               # Eswar, Eshwar, Iswar, Ishwar
+    members: [ESWAR, ESHWAR, ISWAR, ISHWAR, ESWARA, ESHWARA, EASWAR]
+  - id: eswari
+    members: [ESWARI, ESHWARI, ISWARI, EASWARI]
+  - id: nageswara
+    members: [NAGESWARA, NAGESHWARA, NAGESWAR, NAGESWRA]
+  - id: nageswari
+    members: [NAGESWARI, NAGESHWARI, NAGESWRI]
+  - id: rajeswari
+    members: [RAJESWARI, RAJESHWARI, RAJESWRI]
+  - id: maheswari
+    members: [MAHESWARI, MAHESHWARI, MAHESWRI]
+  - id: bhuvaneswari
+    members: [BHUVANESWARI, BHUVANESHWARI, BUVANESWARI, BHUVANESWRI]
+  - id: kameswari
+    members: [KAMESWARI, KAMESHWARI, KAMESWRI]
+
+  # --- -sekhar names ----------------------------------------------------------------------------
+  - id: sekhar              # Sekhar, Shekar, Sekar, Shekhar
+    members: [SEKHAR, SHEKAR, SEKAR, SHEKHAR, SEKHARA]
+  - id: chandrasekhar
+    members: [CHANDRASEKHAR, CHANDRASHEKAR, CHANDRASEKAR, CHANDRASEKHARA, CHANDRASHEKHAR]
+  - id: rajasekhar
+    members: [RAJASEKHAR, RAJASHEKAR, RAJASEKAR, RAJASEKHARA, RAJASHEKHAR]
+  - id: somasekhar
+    members: [SOMASEKHAR, SOMASHEKAR, SOMASEKAR]
+
+  # --- ow / au / ou spellings -------------------------------------------------------------------
+  - id: gowtham             # Gowtham, Gautam, Goutham
+    members: [GOWTHAM, GAUTHAM, GOUTHAM, GAUTAM, GOUTAM, GOWTAM]
+  - id: gowri
+    members: [GOWRI, GAURI, GOURI]
+  - id: sowmya
+    members: [SOWMYA, SOUMYA, SAUMYA]
+  - id: sowjanya
+    members: [SOWJANYA, SOUJANYA, SAUJANYA]
+  - id: mounika
+    members: [MOUNIKA, MOWNIKA, MAUNIKA]
+  - id: vyshnavi            # Vyshnavi, Vaishnavi
+    members: [VYSHNAVI, VAISHNAVI, VYSHNAVY, VAISHNAVY]
+  - id: vyshali
+    members: [VYSHALI, VAISHALI]
+
+  # --- other common given names -----------------------------------------------------------------
+  - id: subrahmanyam        # Subrahmanyam, Subramanyam, Subramaniam
+    members: [SUBRAHMANYAM, SUBRAMANYAM, SUBRAMANIAM, SUBRAMANIYAM, SUBBRAMANYAM, SUBRAHMANYAMU]
+  - id: narasimha
+    members: [NARASIMHA, NARSIMHA, NARASINHA, NARASIMMA]
+  - id: narasimham          # the -m form is written as its own name in many registers
+    members: [NARASIMHAM, NARSIMHAM, NARASIMMAM]
+  - id: jagadeesh           # Jagadeesh, Jagadish, Jagdish
+    members: [JAGADEESH, JAGDISH, JAGADESH, JAGDEESH]
+  - id: yeswanth            # Yeswanth, Yashwanth, Yaswanth
+    members: [YESWANTH, YASHWANTH, YASWANTH, YESHWANTH, YASHWANT]
+  - id: murali
+    members: [MURALI, MURLI, MURALEE]
+  - id: sailaja
+    members: [SAILAJA, SHAILAJA, SYLAJA, SAILEJA]
+  - id: santhosh
+    members: [SANTHOSH, SANTOSH, SANTHOSHA, SANTHOSE]
+  - id: shanthi             # Shanthi, Santhi, Shanti
+    members: [SHANTHI, SANTHI, SHANTI, SANTI, SHAANTHI, SHANTY, SHANTHY, SANTHY]
+  - id: sireesha            # Sireesha, Sirisha, Shirisha
+    members: [SIREESHA, SIRISHA, SHIRISHA, SIRISA]
+  - id: munuswamy
+    members: [MUNUSWAMY, MUNISWAMY, MUNASWAMY, MUNUSAMY]
+  - id: gayathri
+    members: [GAYATHRI, GAYATRI, GAYATHREE, GAYITHRI]
+  - id: preethi
+    members: [PREETHI, PRITHI, PREETI, PRITI, PREETHY]
+  - id: saraswathi
+    members: [SARASWATHI, SARASWATI, SARASVATHI, SARASWATHY, SARASWTHI]
+  - id: yarlagadda          # house name; "Yaralagadda" is a frequent register spelling
+    members: [YARLAGADDA, YARALAGADDA]
+  - id: gorantla            # house name
+    members: [GORANTLA, GORANTALA]
+
+  # --- Muslim and Christian names common in AP registers --------------------------------------
+  - id: shaik               # Shaik, Shaikh, Sheik, Sk (the usual register abbreviation)
+    members: [SHAIK, SHAIKH, SHEIK, SHEIKH, SK, SHAK]
+  - id: mohammed            # Mohammed, Mohammad, Mahammad, Muhammad, Md
+    members: [MOHAMMED, MOHAMMAD, MOHAMAD, MOHAMED, MAHAMMAD, MAHAMMED, MUHAMMAD, MD, MOHD]
+  - id: hussain
+    members: [HUSSAIN, HUSAIN, HUSSEIN, HUSEN, HUSSAN]
+  - id: rahaman
+    members: [RAHAMAN, RAHMAN, REHMAN, RAHEMAN]
+  - id: begum
+    members: [BEGUM, BEGAM, BEGUMM, BEGAUM]
+  - id: fathima
+    members: [FATHIMA, FATIMA, FATHEMA, PHATHIMA]
+  - id: david               # Telugu registers often add -u
+    members: [DAVID, DAVIDU, DAVEED]
+  - id: joseph
+    members: [JOSEPH, JOSEF, YOSEPU]
+
+# Never equivalent: gender markers and different name forms. A tenant extension that would put
+# both members of a pair in one group is rejected, and the matcher never accepts one as a typo
+# or phonetic variant of the other.
+distinct:
+  - [KUMAR, KUMARI]
+  - [KRISHNA, KRISHNAN]
+  - [NARAYANA, NARAYANAN]
+  - [SRINIVASA, SRINIVASAN]
+  - [VENKATESH, VENKATESAN]
+  - [SRINIVASA, SRINIVASULU]
+  - [VENKATESWARA, VENKATESWARLU]
+  - [NARASIMHA, NARASIMHULU]

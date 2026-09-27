@@ -1,0 +1,40 @@
+# Name-matching policy (docs/02 §6, FR-DQ-003). Loaded and validated by app.dq.matching.MatchPolicy.
+#
+# `classes` lists the match classes in evaluation order with their default finding severity
+# (null = no finding) and bilingual explanation code (texts in explanations.yaml). Tenants may
+# override severities and thresholds later (MatchPolicy.with_overrides); the class order and
+# codes are fixed by the specification.
+#
+# Thresholds are starting values. docs/02 §6: they are tuned with labelled examples from the
+# design partner (with permission); change them only together with the labelled test set.
+version: 1
+
+thresholds:
+  # TYPO: a word (or joined words) on one side is accepted as a typing mistake of a word on the
+  # other side when EITHER metric reaches its threshold (the finding reports which one fired).
+  jaro_winkler_min: 0.92    # rapidfuzz JaroWinkler.similarity, prefix weight 0.1
+  trigram_min: 0.80         # pg_trgm-compatible trigram similarity (same as PostgreSQL similarity())
+  # Longest name (in tokens) that gets the full token-alignment search; longer inputs are only
+  # compared as EXACT / ORDER / SPACING (whole-string) and otherwise reported DIFFERENT.
+  max_tokens: 10
+  # Most adjacent words that may be joined into one when checking SPACING ("VENKATA SAI RAM" vs
+  # "VENKATASAIRAM" joins three).
+  max_join_tokens: 3
+  # Two-letter initials that registers write with a dot ("CH. VENKATA RAO"). A single letter is
+  # always an initial; these count as initials only when followed by a dot.
+  digraph_initials: [CH, SH, TH, KH, GH, BH, PH, DH]
+  # INITIALS and later classes need at least one full word that matches on both sides, so "K. V. S."
+  # is not accepted as "Kommineni Venkata Sai" (nothing but letters to compare).
+  require_full_word: true
+
+classes:
+  EXACT:     {severity: null,    explanation_code: NM-EXACT}
+  ORDER:     {severity: info,    explanation_code: NM-ORDER}
+  SPACING:   {severity: low,     explanation_code: NM-SPACING}
+  INITIALS:  {severity: medium,  explanation_code: NM-INITIALS}
+  VARIANT:   {severity: medium,  explanation_code: NM-VARIANT}
+  TYPO:      {severity: high,    explanation_code: NM-TYPO}
+  DIFFERENT: {severity: blocker, explanation_code: NM-DIFFERENT}
+  # One side has no name. Not a mismatch: missing values are reported by the missing-field rules
+  # (DQ-005, DQ-009) with their own severities, so the name comparison raises no finding.
+  MISSING:   {severity: null,    explanation_code: NM-MISSING}
