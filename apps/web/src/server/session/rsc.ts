@@ -6,6 +6,7 @@ import { callApi } from "@/server/bff/upstream";
 import type { SessionKind } from "@/server/config";
 import { getAuthRuntime } from "@/server/runtime";
 import { sessionCookieName } from "./cookies";
+import { applySchoolSettingsFromMe } from "./school-settings";
 import type { Session } from "./store";
 
 /**
@@ -112,6 +113,11 @@ export async function apiGetAsSession<T>(
       body = await response.json().catch(() => null);
     } else {
       await response.body?.cancel();
+    }
+    if (response.ok && path === "/api/v1/me") {
+      // The school's idle timeout follows its settings (FR-TEN-012, FR-IAM-003).
+      // A failure keeps the session's current timeout (the default after a school switch).
+      await applySchoolSettingsFromMe(runtime.store, session, body).catch(() => null);
     }
     const code =
       body && typeof body === "object" && typeof (body as { code?: unknown }).code === "string"

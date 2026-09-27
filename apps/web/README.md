@@ -37,6 +37,10 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
   AES-256-GCM (HKDF-SHA256 key from `SESSION_SECRET`, AAD binds each ciphertext to its session).
 - Idle timeout 15 min (sliding on each authenticated request; the session-info GET does not
   slide it), absolute 12 h for staff, 8 h for operators. Warning dialog 1 min before idle expiry.
+  Staff sessions take the active school's `idle_timeout_minutes` (5–30, clamped; FR-IAM-003)
+  from the API's answer to `POST /me/active-tenant` and from `GET /me` in the school layout;
+  a new school starts at the 15-minute default until its value is known, step-up keeps it,
+  and it never runs past the absolute limit. Operators always have 15 min.
 - CSRF: synchronizer token (from `GET /bff/auth/session`, memory only) in `X-CSRF-Token` on
   every POST/PUT/PATCH/DELETE, compared in constant time; plus SameSite=Lax and Origin /
   `Sec-Fetch-Site` checks.

@@ -21,6 +21,7 @@ import {
   sessionCookieName,
   transactionCookieName,
 } from "@/server/session/cookies";
+import { schoolIdleTimeoutFromMe } from "@/server/session/school-settings";
 import type { Session } from "@/server/session/store";
 import { sessionClaims } from "./oidc";
 import { DEFAULT_NEXT, safeNext } from "./redirect";
@@ -337,7 +338,9 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
   const existing = await store.load(cookies.get(sessionCookieName(kind, secure)), {
     touch: false,
   });
-  let carried: Partial<Pick<Session, "familyId" | "handle" | "csrfToken" | "activeTenantId">> = {};
+  let carried: Partial<
+    Pick<Session, "familyId" | "handle" | "csrfToken" | "activeTenantId" | "idleTimeoutMs">
+  > = {};
   let next = transaction.next;
   if (transaction.stepUpSessionId) {
     if (claims.authTime !== null && nowSeconds - claims.authTime > STEP_UP_MAX_AGE_SECONDS) {
@@ -354,6 +357,8 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
         handle: existing.handle,
         csrfToken: existing.csrfToken,
         activeTenantId: existing.activeTenantId,
+        // The school's idle timeout stays with the session (FR-IAM-003).
+        idleTimeoutMs: existing.idleTimeoutMs,
       };
     } else {
       // Someone else signed in at the step-up prompt: start clean, go home.
@@ -432,8 +437,11 @@ export async function handleLogout(request: Request, runtime: AuthRuntime) {
   return jsonResponse({ redirect_to: redirectTo }, { cookies: [clear], requestId });
 }
 
-/** Non-secret session facts for the UI. Never tokens (SEC-004). */
-export function sessionInfo(session: Session, now: number, idleTimeoutMs: number) {
+/**
+ * Non-secret session facts for the UI. Never tokens (SEC-004). `idle_timeout_ms` is only a
+ * hint for the warning dialog: the store enforces the timeout on every request.
+ */
+export function sessionInfo(session: Session, now: number) {
   return {
     authenticated: true as const,
     kind: session.kind,
@@ -441,7 +449,7 @@ export function sessionInfo(session: Session, now: number, idleTimeoutMs: number
     active_tenant_id: session.activeTenantId,
     mfa: session.mfa,
     csrf_token: session.csrfToken,
-    idle_timeout_ms: idleTimeoutMs,
+    idle_timeout_ms: session.idleTimeoutMs,
     idle_expires_at: new Date(session.idleExpiresAt).toISOString(),
     absolute_expires_at: new Date(session.absoluteExpiresAt).toISOString(),
     expires_in_ms: Math.max(0, Math.min(session.idleExpiresAt, session.absoluteExpiresAt) - now),
@@ -463,9 +471,7 @@ export async function handleSessionInfo(request: Request, runtime: AuthRuntime) 
     if (!csrfOk(request, session, runtime)) return csrfFailed(requestId);
     session = (await runtime.store.get(session.id, { touch: true })) ?? session;
   }
-  return jsonResponse(sessionInfo(session, runtime.now(), runtime.store.idleTimeoutMs), {
-    requestId,
-  });
+  return jsonResponse(sessionInfo(session, runtime.now()), { requestId });
 }
 
 function unauthenticated(requestId: string) {
@@ -544,6 +550,9 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
     });
   }
 
+  const chosen = tenantId.toLowerCase();
+  // The chosen school's idle timeout from the API's answer (MeOut `settings`), if any.
+  let idleTimeoutMinutes: number | null = null;
   // Ask the API (it re-checks membership on every request anyway; never reveals tenants).
   try {
     const fresh = await runtime.refresher.ensureFresh(session);
@@ -559,7 +568,12 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
       requestId,
       headersTimeoutMs: 10_000,
     });
-    await response.body?.cancel();
+    if (response.ok && (response.headers.get("content-type") ?? "").includes("json")) {
+      const me: unknown = await response.json().catch(() => null);
+      idleTimeoutMinutes = schoolIdleTimeoutFromMe(me, chosen);
+    } else {
+      await response.body?.cancel();
+    }
     if ([401, 403].includes(response.status)) {
       return problem(requestId, 403, "tenant_not_available", "You can't open this school", {
         detail: "Ask the school's office admin to give you access.",
@@ -573,7 +587,6 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
     return problem(requestId, 503, "service_unavailable", "Try again in a moment");
   }
 
-  const chosen = tenantId.toLowerCase();
   if (session.loginEventPending) {
     // First school chosen after sign-in: now the API can audit the login in its log.
     const stored = await runtime.store.tokens(session.id);
@@ -586,9 +599,10 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
       );
     }
   }
-  await runtime.store.setActiveTenant(session, chosen, { loginEventPending: false });
-  const updated = (await runtime.store.get(session.id)) ?? session;
-  return jsonResponse(sessionInfo(updated, runtime.now(), runtime.store.idleTimeoutMs), {
-    requestId,
+  await runtime.store.setActiveTenant(session, chosen, {
+    loginEventPending: false,
+    idleTimeoutMinutes,
   });
+  const updated = (await runtime.store.get(session.id)) ?? session;
+  return jsonResponse(sessionInfo(updated, runtime.now()), { requestId });
 }

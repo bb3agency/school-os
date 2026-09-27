@@ -346,6 +346,20 @@ describe("GET /bff/auth/step-up (SEC-005)", () => {
     expect(await h.runtime.store.get(before?.id ?? "")).toBeNull();
   });
 
+  it("keeps the school's idle timeout across step-up (FR-IAM-003)", async () => {
+    await h.signIn("staff", clerk);
+    const before = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
+    await h.runtime.store.applySchoolIdleTimeout({ id: before?.id ?? "" }, TENANT, 30);
+    const response = h.absorb(
+      await handleStepUp(h.request("/bff/auth/step-up"), h.runtime, "staff"),
+    );
+    const back = h.idp.staff.authorize(locationOf(response), clerk);
+    h.absorb(await handleCallback(h.request(back.href), h.runtime, "staff"));
+    const after = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
+    expect(after?.id).not.toBe(before?.id);
+    expect(after?.idleTimeoutMs).toBe(30 * 60_000);
+  });
+
   it("refuses a stale auth_time on step-up", async () => {
     await h.signIn("staff", clerk);
     const response = h.absorb(
@@ -429,6 +443,56 @@ describe("POST /bff/auth/active-tenant", () => {
     await expect(response.json()).resolves.toMatchObject({ active_tenant_id: TENANT });
     const call = h.apiCalls.find((r) => r.url.endsWith("/api/v1/me/active-tenant"));
     expect(call?.headers.get("x-active-tenant")).toBe(TENANT);
+  });
+
+  async function switchTo(tenantId: string, answer: () => Response) {
+    h.setApi((request) =>
+      request.url.endsWith("/api/v1/me/active-tenant") ? answer() : defaultApi(request),
+    );
+    return handleActiveTenant(
+      h.request("/bff/auth/active-tenant", {
+        method: "POST",
+        body: JSON.stringify({ tenant_id: tenantId }),
+        headers: { "x-csrf-token": await h.csrf(), "content-type": "application/json" },
+      }),
+      h.runtime,
+    );
+  }
+
+  function meIn(tenantId: string, idleTimeoutMinutes: unknown): Response {
+    return Response.json({
+      tenant_id: tenantId,
+      settings: {
+        idle_timeout_minutes: idleTimeoutMinutes,
+        date_format: "DD/MM/YYYY",
+        languages: ["en"],
+      },
+    });
+  }
+
+  it("applies the new school's idle timeout from the API's answer (FR-IAM-003, FR-TEN-012)", async () => {
+    await h.signIn("staff", clerk);
+    const response = await switchTo(OTHER_TENANT, () => meIn(OTHER_TENANT, 30));
+    expect(response.status).toBe(200);
+    const info = (await response.json()) as { idle_timeout_ms: number; expires_in_ms: number };
+    expect(info.idle_timeout_ms).toBe(30 * 60_000);
+    expect(info.expires_in_ms).toBeLessThanOrEqual(30 * 60_000);
+    expect(info.expires_in_ms).toBeGreaterThan(29 * 60_000);
+
+    const back = await switchTo(TENANT, () => meIn(TENANT, 5));
+    await expect(back.json()).resolves.toMatchObject({ idle_timeout_ms: 5 * 60_000 });
+  });
+
+  it("clamps an out-of-range value and falls back to 15 minutes when settings are missing", async () => {
+    await h.signIn("staff", clerk);
+    const long = await switchTo(OTHER_TENANT, () => meIn(OTHER_TENANT, 240));
+    await expect(long.json()).resolves.toMatchObject({ idle_timeout_ms: 30 * 60_000 });
+    // No settings in the answer: never keep the previous school's longer timeout.
+    const bare = await switchTo(TENANT, () => new Response(null, { status: 204 }));
+    await expect(bare.json()).resolves.toMatchObject({ idle_timeout_ms: 15 * 60_000 });
+    // Settings for a different school than the one chosen are ignored.
+    const mismatch = await switchTo(OTHER_TENANT, () => meIn(TENANT, 30));
+    await expect(mismatch.json()).resolves.toMatchObject({ idle_timeout_ms: 15 * 60_000 });
   });
 
   it("refuses a school the API says the user cannot open", async () => {
