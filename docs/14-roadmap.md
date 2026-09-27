@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.4 · 2026-09-27 |
+| Version | 0.5 · 2026-09-27 |
 | Approach | Module by module on a shared core; real school needs decide order after M1; no calendar commitments |
-| Related | 01-BRD §7, §11, 02-PRD §3, 03-TRD, 16-Platform admin panel |
-| Changes | 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
+| Related | 01-BRD §7, §11, 02-PRD §3, 03-TRD, 12-Testing strategy, 16-Platform admin panel |
+| Changes | 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
 
 ---
 
@@ -90,6 +90,66 @@ The M0 code is merged on the session branch (not yet on `main`). What exists, pe
 - Pre-check report used before a real CISCE registration; post-submission corrections for pre-checked batches = 0
 - DQ precision on seeded mismatches ≥ 0.95 for blocker/high rules
 - SEC-012..017, SEC-021 and SEC-029 (emergency break-glass) implemented; pilot-ready gate passed before real data
+
+### M1 status (2026-09-27)
+
+Checked against the code and tests on the session branch (migrations `0008_sis_students` … `0019_export_access`), not against earlier doc claims. Paths are relative to `apps/api/` unless they start with `apps/`, `infra/` or `deploy/`. "In progress" means another work package is open on it today.
+
+| Scope item | Status | Evidence (code · tests) | Missing |
+|---|---|---|---|
+| Promotions with preview/commit/undo (FR-TEN-011, US-202 AC2) | **Not started** | None: no route, service, table or screen. 09 §3 lists `/academic-years/{id}/promotions:preview` · `:commit` · `:undo` | Everything (see decision 1 below) |
+| Invoice PDFs (before the first paid invoice) | **Not started** | Invoices are issued and paid without a document (16 §1: "PDF download arrives later") | Template, render job, platform-side storage, download route and screen |
+| Students, enrolments, guardians (FR-STU-001..008, 010..012; US-301..303) | **Done** (API); web editing in progress | `0008_sis_students`; `app/students/` (routes for students, values, verify, sensitive reveal, guardians, enrolments; search in `search.py`); `tests/students/` (incl. `test_search_performance.py` for FR-STU-011, `test_log_redaction.py`); BOLA and scope rows in `tests/security/test_bola.py`; web `/students`, `/students/new`, `/students/[id]` | Guardian and enrolment editing screens (in progress) |
+| Attribute catalog, per-source values, canonical projection (FR-STU-002..006) | **Done** | `app/students/attributes.yaml` seeded into `sis.attribute_definitions`; append-only values with supersession and verification; `canonical.py` resolves on read with the admission-register anchor (BR-01) · `tests/students/test_definitions.py`, `test_canonical.py`, `test_service.py`, `test_values_changed_event.py` | — |
+| Excel/CSV/Sheets import with mapping, validation, commit, revert (FR-IMP-001..007; US-401) | **Done**; follow-ups in progress | `0012_imports`; `app/imports/` (sheet parsing with zip-bomb and entity guards, EN/TE header mapping and templates, row validation, atomic commit, 24 h revert, 90-day raw-file purge) · `tests/imports/` covers every FR-IMP-001..007 ID, SEC-013, SEC-015, SEC-017 and the 2,000-row timing; web `/imports` | `import.reverted` follow-ups (in progress) |
+| Register-photo extraction with verification queue and Aadhaar redaction (FR-IMP-020..024, PRV-016; US-402) | **Partial** | `0016_extraction`, `0018_extraction_redaction`; `app/extraction/` (provider interface, queue, confirm/reject with the page as evidence, page-image black-out and re-read) · `tests/extraction/` (FR-IMP-020..024, PRV-016, SEC-008); web `/register-photos` | **No real provider**: only `fake` (local/ci); staging/prod default to `not-configured` (`SOS_EXTRACTION_PROVIDER`). **PDF pages refused** (`accepted_mime_types` is JPEG/PNG; no approved rasteriser) although FR-IMP-020 lists PDF |
+| DQ engine, DQ-001..012, name matching (FR-DQ-001..006) | **Done**; timing test in progress | `app/dq/` (`config/rules.yaml` with 12 rules, `checks.py`, `matching.py`, `config/match_classes.yaml`, `config/variants.yaml`, EN/TE `config/explanations.yaml`; on-demand and outbox-driven incremental runs) · `tests/dq/` (`test_checks.py`, `test_matching_*.py`, `test_precision.py` ≥ 0.95 on labelled sets for DQ-001/002/003/008/010, `test_performance.py` 2,000 students, `test_engine.py`) | DQ timing test (in progress) |
+| Findings workflow (FR-DQ-020; US-502) | **Done** | `/findings/{id}/resolve` · `/waive` (`dq.findings.waive`, reason) · `tests/dq/test_engine.py`, `test_api.py`; web `/findings`, `/findings/rules`, `/findings/runs/[id]` | — |
+| Change requests (maker-checker) and correction memo (FR-CR-001..005, SEC-014; US-601) | **Done** | `0014_change_requests` (DB CHECK against self-approval); `app/changes/` incl. `memo.py` (print-ready bilingual HTML) and daily expiry · `tests/changes/` (`test_SEC_014_database_refuses_self_approval_*`, FR-CR-001..005); web `/change-requests` | — |
+| Export profiles `cisce-registration-2026` pre-check and `udise-plus` check sheet (FR-EXP-001; US-501, US-901) | **Partial** | Profiles in `app/dq/config/profiles/*.yaml`, layouts in `app/exports/config.yaml`, `0017_exports`, `0019_export_access` (ADR-0021) · `tests/exports/test_config.py`, `test_service.py`, `test_report.py`; web `/exports/new/precheck` | Field lists are **minimal placeholders** (`TODO(board formats)`, `TODO(portal formats)`): exact council and UDISE+ field order, codes and date formats still to be taken from the official formats |
+| Bilingual reports PDF/XLSX (FR-EXP-002..004, SEC-017) | **Done in code**; image and storage in progress | `app/exports/report.py`, `pdf.py` (Chromium via Playwright, JS off, network blocked, bundled Noto Sans Telugu with checksum), `tables.py` (formula neutralising, Aadhaar masking), watermark, step-up per ADR-0021 · `tests/exports/` (`test_pdf.py` renders for real and skips only without Chromium) | Chromium in the worker image, S3 lifecycle and KMS for export files (in progress, infra) |
+| C3 field encryption (SEC-012, FR-STU-007) | **Done**; rotation not built | `app/core/crypto.py` (KMS key wrapper, AEAD with `tenant|table|column|row` AAD), `app/students/crypto.py` (keyring with ≤ 15 min cache, blind index) · `tests/students/test_crypto.py`, `tests/tenancy/test_key_wrapping.py`, C3 tests in imports, changes and exports | Scheduled DEK rotation with background re-encryption (07 §8); the ciphertext already carries `key_version` |
+| Break-glass workflow (SEC-021, SEC-029; US-103, FR-OPS-004) | **Done** for the shared tier | `0011_breakglass`; `app/breakglass/`, `app/platform/breakglass.py`, `app/authz/breakglass_guard.py` (read-only, audited `breakglass.access`) · `tests/breakglass/` (step-up approval, deny, revoke, expiry, `test_SEC_021_database_refuses_self_approval_and_approved_emergencies`, `test_SEC_029_emergency_access_needs_two_operators_and_notifies_the_school`); web `/break-glass` and `/platform/break-glass` | Dedicated hosts: requests cannot reach them (no control plane; heartbeat channel not built). How the operator signs in to the school: ADR in progress |
+
+**M1 security controls** (07 §15):
+
+| Control | Status | Evidence |
+|---|---|---|
+| SEC-012 Per-tenant DEKs; C3 encryption | Done (rotation job open) | see C3 row above |
+| SEC-013 Aadhaar input rejection + Verhoeff redaction in pipelines | Done | `app/students/api.py` and `service.py` (422 `aadhaar_full_number_rejected`), `app/core/redaction.py`; `tests/imports/` (`test_SEC_013_*`), `tests/extraction/` (`test_FR_IMP_022_PRV_016_*`), `tests/exports/` (`test_invariant_4_*`), `apps/web/src/lib/aadhaar.test.ts` |
+| SEC-014 Maker-checker with DB constraint | Done | `tests/changes/test_schema.py`, `test_service.py` (`test_SEC_014_*`) |
+| SEC-015 Scoped repositories + BOLA per resource | Done for every M1 resource | `tests/security/test_bola.py` (`test_SEC_015_every_id_route_is_covered`, students, change requests, extraction, exports), scope tests per module |
+| SEC-016 File upload controls | Done in code; deployment in progress | `app/documents/filetypes.py`, `scanning.py` (ClamAV `INSTREAM`; dev scanner refused in staging/prod), `storage.py` (presigned POST with size range, SSE-KMS condition) · `tests/documents/` (`test_SEC_016_*`, FR-DOC-001..008) |
+| SEC-017 Formula-injection-safe spreadsheets | Done | `app/exports/tables.py`, `app/imports/sheet.py` · `tests/exports/test_tables.py`, `tests/imports/` (`test_SEC_017_*`) |
+| SEC-021 Break-glass visible to school | Done (shared tier) | see break-glass row |
+| SEC-029 Two-person rule (offboarding M0, emergency break-glass M1) | Done | `tests/breakglass/test_breakglass.py`, `tests/platform/test_provisioning.py` |
+
+**Remaining before M1 exit** (besides the items in progress listed above):
+- **Promotions** (FR-TEN-011): preview, commit and undo within 24 h, with screens.
+- **Invoice PDFs**: before the first paid invoice.
+- **Extraction provider**: choose a real OCR/extraction provider by evaluation (FR-IMP-024), then add it; a new sub-processor needs an ADR and a privacy review (§5). PDF register pages need an approved rasteriser.
+- **Official export formats**: replace the placeholder field lists of `cisce-registration-2026` and `udise-plus` with the council's and the portal's exact formats.
+- **Synthetic student data**: `make seed-synthetic` creates schools, structure and staff only; 12 §3 also requires 2,000 students, guardians, per-source values with deliberate mismatches, rendered register pages and circulars. Needed for demos, the pilot rehearsal, the "DQ precision on seeded mismatches" exit check at school scale, and the M2 eval corpus.
+- **Usage meters**: students, storage and documents are still 0 (`core.tenant_usage_summary()` counts memberships, sections and years only); counting `sis`/`kb` rows means `definer_access` on those tables, which needs an ADR (CLAUDE.md §11).
+- **Test gates**: coverage ≥ 80 % on critical modules (12 §9) is not enforced (no `fail_under`); e2e journeys for the M1 screens (import → DQ → change request → pre-check) are not written; e2e runs nightly only.
+- **Carried from M0 and still open**: email delivery (invites, approvals), audit log CSV export (FR-AUD-005), everything that needs AWS or GitHub (M0 status above).
+- **Human evidence for the exit criteria**: design-partner batches imported and verified, a real CISCE pre-check used, post-submission corrections counted. None can be ticked from code.
+
+**Decisions needed** (owner):
+1. **Promotions design:** which module owns the batch (`tenancy` owns years, `students` owns enrolments), how detained, left and repeating students are chosen in the preview, and what "undo within 24 h" does when enrolments changed afterwards (refuse, like import revert?).
+2. **Extraction provider:** candidate providers, residency (ap-south-1), cost ceiling and the evaluation set; new ADR.
+3. **Export formats:** who supplies the official CISCE 2026 registration and UDISE+ formats, and whether M1 exits with the placeholders.
+4. **Invoice PDF:** CA confirmation of the invoice layout and GST fields (16 §19 Q2–Q3) before the template is fixed; where the PDF lives (control-plane bucket, not a school prefix).
+5. **Usage meters:** ADR extending `core.tenant_usage_summary()` (and `definer_access`) to `sis.students`, `kb.document_versions` sizes and document counts, or defer to M2.
+6. **Break-glass on dedicated hosts:** deliver requests with the heartbeat response, or support shared tier only in M1.
+
+**Pilot-ready gate (§3), items checkable in code** (none ticked; each still needs verification in staging):
+- SEC-001..017: implemented in code and tests (SEC-011 only as unapplied Terraform; SEC-016 needs ClamAV and SSE-KMS deployed).
+- SEC-021: implemented (shared tier). SEC-022: WAF managed rule groups and rate-based rules in `infra/terraform/modules/alb_waf/main.tf`, never applied. **SEC-023: not started** (no GuardDuty, CloudTrail with Object Lock, Config or Security Hub resources in `infra/terraform/`). SEC-024: dedicated-host drill script `deploy/dedicated/scripts/restore.sh` exists; no RDS restore drill script; no drill run.
+- SEC-026..029: implemented in code and tests.
+- Operator pool MFA ON: asserted by `infra/terraform/envs/prod/tests/prod.tftest.hcl`; not applied.
+- Synthetic data never in prod: `make seed-synthetic` refuses outside `local`/`ci` (`tests/devtools/test_seed_synthetic.py`); the purge of prod itself is a human check.
+- Everything else in §3 (restore drill, incident rehearsal, DPA/DPIA, ZDR, two platform owners, CA, data-handling permission, training) needs human evidence.
 
 ### M2 · Knowledge base and "Ask the school"
 **Scope:** document upload (presigned), AV scan, extraction/OCR, chunking, embeddings (provider chosen by eval, ADR-0006), hybrid retrieval, record tools, answer generation with search-result citations, citation validation, SSE UI with source chips, feedback, verified answers, budgets + search-only fallback, eval harness with hard gates.
