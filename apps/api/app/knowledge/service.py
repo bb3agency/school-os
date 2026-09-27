@@ -5,6 +5,9 @@ What other modules and the routes use:
 - :func:`get_service` -> :class:`SchoolKnowledgeService`, the :class:`KnowledgeService`:
   ``ask`` (the SSE events of docs/06 §5.1 for one question), ``search_documents`` (search-only
   retrieval, also the fallback mode), query feedback and verified answers (FR-KB-030).
+- :func:`reencrypt_queries` (DEK rotation, SEC-012): re-encrypts ``kb.queries`` to the
+  school's active key version in the caller's ``tenant_session``; register it with
+  ``register_reencryptor("kb_queries", reencrypt_queries)``.
 - :class:`IngestionPipeline` (worker jobs reacting to ``documents``' events; wired by the
   composition root, :mod:`app.knowledge.composition`).
 - The value types below, re-exported so callers never import ``app.knowledge.domain``.
@@ -26,7 +29,6 @@ from __future__ import annotations
 
 import datetime as dt
 import time
-import unicodedata
 import uuid
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Final
@@ -60,6 +62,7 @@ from app.knowledge.domain import (
 )
 from app.knowledge.gateway.errors import AiRateLimited
 from app.knowledge.interfaces import IngestionPipeline, KnowledgeService
+from app.knowledge.keys import QUESTION_PURPOSE, question_key, reencrypt_queries
 from app.knowledge.models import VerifiedAnswer
 from app.knowledge.schemas import (
     FeedbackIn,
@@ -83,13 +86,7 @@ ASK: Final = "kb.ask"
 SEARCH: Final = "document.read"
 MANAGE_VERIFIED: Final = "kb.verified_answer.manage"
 QUERIES_TABLE: Final = "kb.queries"
-QUESTION_PURPOSE: Final = "kb_question"
 MAX_QUESTION_CHARS: Final = 1000
-
-
-def _question_key(question: str) -> str:
-    """The HMAC input for repeat detection: NFC, casefolded, whitespace collapsed."""
-    return " ".join(unicodedata.normalize("NFC", question).casefold().split())
 
 
 def _error(field: str, code: str) -> dict[str, str]:
@@ -210,7 +207,7 @@ class SchoolKnowledgeService:
                 row_id=query_id,
             )
         digest, _ = crypto.blind_index(
-            session, _question_key(question), purpose=QUESTION_PURPOSE, key_version=version
+            session, question_key(question), purpose=QUESTION_PURPOSE, key_version=version
         )
         cited = {c.source for c in result.cited}
         repo.insert_query(
@@ -464,4 +461,5 @@ __all__ = [
     "SearchFilters",
     "TokenEvent",
     "get_service",
+    "reencrypt_queries",
 ]
