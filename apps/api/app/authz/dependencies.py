@@ -1,9 +1,12 @@
-"""FastAPI dependencies: ``require()``, ``require_principal()``, ``get_user_context``, DB.
+"""FastAPI dependencies: ``require()``, ``require_any()``, ``require_principal()``,
+``get_user_context``, DB.
 
 Every tenant route declares ``Depends(require("<permission>", scope=..., step_up=...))``
-(CLAUDE.md §6.2, SEC-003). The dependency object carries ``sos_permission`` (and
-``sos_step_up``/``sos_scope``) so the route-enumeration test can check every route against the
-catalog. Unknown or platform permissions fail when the route module is imported.
+(CLAUDE.md §6.2, SEC-003), or ``Depends(require_any("<permission>", "<alternative>", ...))``
+for a read that any one of several permissions may use. The dependency object carries
+``sos_permission`` (and ``sos_step_up``/``sos_scope``, plus ``sos_any_of`` for ``require_any``)
+so the route-enumeration test can check every route against the catalog. Unknown or platform
+permissions fail when the route module is imported.
 
 Order of checks per request: authenticate (401) -> resolve membership (403/409) -> permission
 (403) -> scope (403) -> step-up (428). The route then opens exactly one transaction with
@@ -131,6 +134,47 @@ def require(
     ``app.authz.scope``. ``step_up=True`` requires MFA within 5 minutes (428).
     """
     return Requirement(permission, scope=scope, step_up=step_up)
+
+
+class AnyOfRequirement(Requirement):
+    """Callable dependency returned by :func:`require_any`.
+
+    Satisfied by ``sos_permission`` or any of ``sos_any_of``; no scope rule and no step-up.
+    The route-enumeration and authorization-matrix tests read ``sos_any_of``.
+    """
+
+    def __init__(self, permission: str, *, any_of: tuple[str, ...]) -> None:
+        super().__init__(permission, scope=None, step_up=False)
+        for alternative in any_of:
+            tenant_permission(alternative)  # unknown or platform permissions fail at import
+        self.sos_any_of = any_of
+
+    def __repr__(self) -> str:
+        return f"require_any({self.sos_permission!r}, {', '.join(map(repr, self.sos_any_of))})"
+
+    def __call__(
+        self,
+        request: Request,
+        ctx: Annotated[UserContext, Depends(get_user_context)],
+        principal: Annotated[Principal, Depends(get_principal)],
+    ) -> UserContext:
+        held = next((p for p in (self.sos_permission, *self.sos_any_of) if ctx.has(p)), None)
+        if held is None:
+            raise Forbidden()
+        # Break-glass: read-only, recorded under the first listed permission the caller holds.
+        breakglass_guard.enforce(ctx, request, held)
+        return ctx
+
+
+def require_any(permission: str, *alternatives: str) -> AnyOfRequirement:
+    """Route guard: the caller's active membership must hold ``permission`` or one of
+    ``alternatives`` (e.g. a read screen shared by the maker and the checker).
+
+    Unlike :func:`require` it has no scope rule and no step-up: scoped holders pass and the
+    service filters objects by scope (404 outside it). Use it only for reads the service checks
+    again per object.
+    """
+    return AnyOfRequirement(permission, any_of=alternatives)
 
 
 class PrincipalRequirement:
