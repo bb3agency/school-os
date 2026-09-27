@@ -2286,7 +2286,10 @@ export interface paths {
          * Provision Tenant
          * @description Provision a school on the shared tier or register a dedicated host (FR-PLT-002/003).
          *
-         *     The dedicated heartbeat key is returned only in the first response.
+         *     Submitting the same request again (any Idempotency-Key) resumes an unfinished provisioning
+         *     or replays the finished one; the same code with a different request is 409 ``duplicate``;
+         *     a provisioning another request is running is 409 ``provisioning_in_progress``. The
+         *     dedicated heartbeat key is returned only in the first response.
          */
         post: operations["provision_tenant_api_v1_platform_tenants_post"];
         delete?: never;
@@ -2323,7 +2326,8 @@ export interface paths {
         put?: never;
         /**
          * Activate Tenant
-         * @description Go-live (provisioning -> active); refused by the database without a data key.
+         * @description Go-live (provisioning -> active). 409 ``provisioning_incomplete`` until provisioning has
+         *     finished; also refused by the database without a data key.
          */
         post: operations["activate_tenant_api_v1_platform_tenants__tenant_id__activate_post"];
         delete?: never;
@@ -2401,6 +2405,30 @@ export interface paths {
         put?: never;
         /** Resend Owner Invite */
         post: operations["resend_owner_invite_api_v1_platform_tenants__tenant_id__owner_invite_resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/provisioning:resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Provisioning
+         * @description Resume an unfinished or failed provisioning (FR-PLT-002, docs/16 §5.4).
+         *
+         *     Idempotent: a finished provisioning is returned as it is. 409 ``provisioning_in_progress``
+         *     while another request holds it; 409 ``resume_needs_request`` for a provisioning started
+         *     before resumable provisioning (submit the same request again).
+         */
+        post: operations["resume_provisioning_api_v1_platform_tenants__tenant_id__provisioning_resume_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5920,6 +5948,32 @@ export interface components {
              */
             tier: "shared" | "dedicated";
         };
+        /**
+         * ProvisioningOut
+         * @description Where a school's provisioning stands (FR-PLT-002, docs/16 §5.4). Codes only.
+         *
+         *     ``resumable``: not completed and no runner holds it; an operator may resume it
+         *     (``POST /platform/tenants/{id}/provisioning:resume``).
+         */
+        ProvisioningOut: {
+            /** Attempts */
+            attempts: number;
+            /** Failed Step */
+            failed_step: ("initialise" | "owner_invite") | null;
+            /** In Progress */
+            in_progress: boolean;
+            /** Last Error */
+            last_error: string | null;
+            /** Resumable */
+            resumable: boolean;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "initialised" | "completed" | "failed";
+            /** Updated At */
+            updated_at: string | null;
+        };
         /** ProvisionOut */
         ProvisionOut: {
             /**
@@ -6629,6 +6683,7 @@ export interface components {
             open_tickets: number;
             /** Plan Code */
             plan_code: string | null;
+            provisioning?: components["schemas"]["ProvisioningOut"] | null;
             /** School Name */
             school_name: string;
             subscription: components["schemas"]["SubscriptionOut"] | null;
@@ -11731,6 +11786,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_provisioning_api_v1_platform_tenants__tenant_id__provisioning_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvisionOut"];
                 };
             };
             /** @description Validation Error */
