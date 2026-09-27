@@ -1152,7 +1152,7 @@ Aadhaar numbers are **not** in any class because they are never stored (ADR-0007
 - AES-256-GCM with a per-tenant DEK; DEK wrapped by a KMS CMK (`core.tenant_keys`); unwrapped DEKs cached in memory ≤ 15 min.
 - Ciphertext format: `version(1) | key_version(2) | nonce(12) | ciphertext | tag(16)`; associated data = `tenant_id|table|column|row_id` to prevent row swapping.
 - Blind index (HMAC-SHA256 with tenant HMAC key) only where equality search is needed (e.g., guardian phone lookup).
-- Key rotation: new `key_version`; background re-encryption; old versions retired after re-encryption.
+- Key rotation: new `key_version` (newest unretired = current for writes); background re-encryption in place (same AAD; `app.students.rotation`, census by ciphertext header over the columns in `CIPHERTEXT_COLUMNS`); old versions retired (`retired_at`) only when no ciphertext uses them and the key cache has expired; wrapped keys are never deleted by rotation (07 §8, runbook 10 §9.1). `0026_dek_rotation` lets superseded `attribute_values` rows and decided `change_requests` change only by re-encryption to a newer key version.
 - Tenant deletion: destroy wrapped keys → remaining ciphertext (incl. in backups) becomes unreadable (crypto-shredding).
 
 ## 10. Canonical value resolution
