@@ -12,6 +12,8 @@ import type { Session } from "@/server/session/store";
 export const CSRF_HEADER = "x-csrf-token";
 const ERROR_TYPE = "https://docs.schoolos.example/errors/";
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const PROBLEM_CSP =
+  "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 export function isUnsafeMethod(method: string): boolean {
   return UNSAFE_METHODS.has(method.toUpperCase());
@@ -29,6 +31,9 @@ export function problem(
     { type: `${ERROR_TYPE}${code.replace(/_/g, "-")}`, title, status, code, ...extra },
     requestId,
   );
+  // JSON never needs to load anything. This also covers BFF paths where src/proxy.ts leaves
+  // the CSP to the handler (API pages with their own policy, e.g. the correction memo).
+  response.headers.set("Content-Security-Policy", PROBLEM_CSP);
   for (const [name, value] of Object.entries(headers)) response.headers.append(name, value);
   return response;
 }

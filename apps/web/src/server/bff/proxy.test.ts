@@ -371,7 +371,9 @@ describe("BFF proxy: background polls and API pages (FR-NOT-001, FR-CR-005)", ()
           },
         }),
     );
-    const memo = await call("/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo");
+    const memo = await call(
+      "/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo",
+    );
     expect(memo.headers.get("content-security-policy")).toBe(memoPolicy);
     expect(memo.headers.get("content-disposition")).toContain("inline");
 
@@ -381,7 +383,9 @@ describe("BFF proxy: background polls and API pages (FR-NOT-001, FR-CR-005)", ()
           headers: { "content-type": "text/html", "content-security-policy": "default-src *" },
         }),
     );
-    const loose = await call("/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo");
+    const loose = await call(
+      "/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo",
+    );
     expect(loose.headers.get("content-security-policy")).toContain("default-src 'none'");
     expect(loose.headers.get("content-security-policy")).not.toContain("default-src *");
   });
@@ -391,5 +395,36 @@ describe("BFF proxy: background polls and API pages (FR-NOT-001, FR-CR-005)", ()
     expect(isStrictPolicy("default-src 'none'")).toBe(false);
     expect(isStrictPolicy("default-src 'self'; frame-ancestors 'none'")).toBe(false);
     expect(isStrictPolicy(null)).toBe(false);
+  });
+
+  it("isStrictPolicy allows only 'none' and hash-pinned blocks in every directive", () => {
+    // The API's memo policy (apps/api/app/changes/memo.py STYLE_CSP).
+    expect(
+      isStrictPolicy(
+        "default-src 'none'; style-src 'sha256-AbC+/12='; img-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      ),
+    ).toBe(true);
+    for (const loose of [
+      "default-src 'none'; script-src 'unsafe-inline'; frame-ancestors 'none'",
+      "default-src 'none'; script-src *; frame-ancestors 'none'",
+      "default-src 'none'; img-src https://evil.example; frame-ancestors 'none'",
+      "default-src 'none'; style-src 'self'; frame-ancestors 'none'",
+      "default-src 'none'; script-src 'nonce-abc'; frame-ancestors 'none'",
+      "default-src 'none'; connect-src data:; frame-ancestors 'none'",
+      "default-src 'none' *; frame-ancestors 'none'",
+      "default-src 'none'; frame-ancestors 'none'; default-src *",
+      "default-src 'none'; sandbox; frame-ancestors 'none'",
+    ]) {
+      expect(isStrictPolicy(loose), loose).toBe(false);
+    }
+  });
+
+  it("every response on an API page path carries a CSP, also when the BFF answers itself", async () => {
+    // Signed out: the BFF answers 401 itself; src/proxy.ts sets no CSP on this path.
+    const signedOut = await call(
+      "/bff/api/v1/change-requests/0192f3a4-0000-7000-8000-00000000c001/memo",
+    );
+    expect(signedOut.status).toBe(401);
+    expect(signedOut.headers.get("content-security-policy")).toContain("default-src 'none'");
   });
 });

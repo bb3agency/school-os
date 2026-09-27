@@ -52,16 +52,34 @@ const FORWARDED_RESPONSE_HEADERS = [
 const PASSIVE_HEADER = "x-sos-passive";
 
 /** CSP for BFF responses whose API policy is missing or looser than this. */
-const STRICT_FALLBACK_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+const STRICT_FALLBACK_CSP =
+  "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
+/** A source that allows nothing, or exactly one inline block pinned by its hash. */
+const STRICT_SOURCE = /^('none'|'sha(256|384|512)-[A-Za-z0-9+/]+={0,2}')$/;
 
 /**
- * Same test as the API's `_at_least_as_strict` (apps/api/app/core/middleware.py): a route's own
- * policy is kept only when it still denies everything by default and forbids framing.
+ * An API page's own policy is kept only when it is at least as strict as
+ * STRICT_FALLBACK_CSP: `default-src 'none'` and `frame-ancestors 'none'` (the API's
+ * `_at_least_as_strict`, apps/api/app/core/middleware.py), and, stricter than the API's
+ * check, every other directive allows only `'none'` or hash-pinned inline blocks (no hosts,
+ * no schemes, no 'self', no 'unsafe-*', no nonces). A policy that could run scripts or load
+ * anything from anywhere is replaced.
  */
 export function isStrictPolicy(policy: string | null): policy is string {
   if (!policy) return false;
-  const directives = new Set(policy.split(";").map((part) => part.trim().toLowerCase()));
-  return directives.has("default-src 'none'") && directives.has("frame-ancestors 'none'");
+  const directives = new Map<string, string[]>();
+  for (const part of policy.split(";")) {
+    const [rawName, ...sources] = part.trim().split(/\s+/);
+    if (!rawName) continue;
+    const name = rawName.toLowerCase();
+    if (directives.has(name) || sources.length === 0) return false;
+    // Hashes are base64 (case-sensitive), so sources keep their spelling.
+    if (!sources.every((source) => STRICT_SOURCE.test(source))) return false;
+    directives.set(name, sources);
+  }
+  const only = (name: string) => directives.get(name)?.join(" ") === "'none'";
+  return only("default-src") && only("frame-ancestors");
 }
 
 class BodyTooLargeError extends Error {}

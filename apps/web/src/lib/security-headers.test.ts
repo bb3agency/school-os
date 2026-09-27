@@ -61,12 +61,9 @@ describe("SEC-010 content security policy (docs/07 §11)", () => {
     expect(prod({ filesOrigin: "https://x.example; script-src *" })).not.toContain("script-src *");
   });
 
-  it("lets the browser post uploads to the files origin, and nowhere else (FR-CR-001)", () => {
+  it("never adds the files origin to connect-src (docs/07 §11: connect-src 'self')", () => {
     const csp = directives(prod({ filesOrigin: "https://files.schoolos.example/bucket" }));
-    expect(csp.get("connect-src")).toEqual(["'self'", "https://files.schoolos.example"]);
-    expect(directives(prod({ filesOrigin: "http://files.example" })).get("connect-src")).toEqual([
-      "'self'",
-    ]);
+    expect(csp.get("connect-src")).toEqual(["'self'"]);
   });
 
   it("relaxes only what next dev needs, and never adds unsafe-inline to scripts", () => {

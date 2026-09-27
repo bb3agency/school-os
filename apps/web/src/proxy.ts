@@ -23,7 +23,9 @@ const NON_LOCALISED_PREFIXES = ["/bff/", "/healthz"] as const;
  * get every other security header here and their CSP from the BFF handler, which keeps the
  * API's policy only when it denies everything by default (server/bff/proxy.ts).
  */
-const OWN_CSP_PATHS: readonly RegExp[] = [/^\/bff\/api\/v1\/change-requests\/[0-9a-f-]{36}\/memo$/i];
+const OWN_CSP_PATHS: readonly RegExp[] = [
+  /^\/bff\/api\/v1\/change-requests\/[0-9a-f-]{36}\/memo$/i,
+];
 
 function isNonLocalised(pathname: string): boolean {
   return NON_LOCALISED_PREFIXES.some(
