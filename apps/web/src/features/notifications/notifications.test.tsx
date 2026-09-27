@@ -48,8 +48,20 @@ describe("bell polling (FR-NOT-001)", () => {
     expect(notificationHref({ resource_type: "breakglass_grant", resource_id: id })).toBe(
       `/break-glass/${id}`,
     );
-    expect(notificationHref({ resource_type: "export", resource_id: id })).toBeNull();
+    // export.ready / export.failed, import.validated / import.committed and
+    // extraction.batch.ready / .failed (app/notifications/templates.yaml resource_type).
+    expect(notificationHref({ resource_type: "export", resource_id: id })).toBe(`/exports/${id}`);
+    expect(notificationHref({ resource_type: "import_batch", resource_id: id })).toBe(
+      `/imports/${id}`,
+    );
+    expect(notificationHref({ resource_type: "extraction_batch", resource_id: id })).toBe(
+      `/register-photos/${id}`,
+    );
+    // No school screen for these (yet): shown without a link.
+    expect(notificationHref({ resource_type: "document", resource_id: id })).toBeNull();
+    expect(notificationHref({ resource_type: "announcement", resource_id: id })).toBeNull();
     expect(notificationHref({ resource_type: "change_request", resource_id: "../x" })).toBeNull();
+    expect(notificationHref({ resource_type: "export", resource_id: "../x" })).toBeNull();
   });
 });
 
@@ -130,15 +142,27 @@ describe("notifications page (FR-NOT-001)", () => {
     stub.routes["GET /bff/api/v1/notifications"] = () =>
       page([
         notification({
+          id: "0192f3a4-0000-7000-8000-00000000c0e1",
           template_key: "export.ready",
           resource_type: "export",
+          resource_id: "0192f3a4-0000-7000-8000-00000000e001",
           title: "Export ready",
+        }),
+        notification({
+          id: "0192f3a4-0000-7000-8000-00000000c0e2",
+          template_key: "document.quarantined",
+          resource_type: "document",
+          title: "File blocked",
         }),
       ]);
     renderWithIntl(<NotificationsScreen />);
-    expect(await screen.findByText("Export ready")).toBeInTheDocument();
-    // No screen for exports yet: no link, a plain "mark as read" button instead.
-    expect(screen.getByRole("button", { name: "Mark as read: Export ready" })).toBeInTheDocument();
+    // The export opens its screen.
+    expect(await screen.findByRole("link", { name: /Export ready/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/exports/0192f3a4-0000-7000-8000-00000000e001"),
+    );
+    // No school screen for documents: no link, a plain "mark as read" button instead.
+    expect(screen.getByRole("button", { name: "Mark as read: File blocked" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("checkbox", { name: "Show unread only" }));
     await waitFor(() =>
       expect(

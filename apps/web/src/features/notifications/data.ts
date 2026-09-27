@@ -33,6 +33,9 @@ const LINKS: Record<string, (id: string) => string> = {
   change_request: (id) => `/change-requests/${id}`,
   dq_run: (id) => `/findings/runs/${id}`,
   breakglass_grant: (id) => `/break-glass/${id}`,
+  export: (id) => `/exports/${id}`,
+  import_batch: (id) => `/imports/${id}`,
+  extraction_batch: (id) => `/register-photos/${id}`,
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
