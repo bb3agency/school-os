@@ -93,6 +93,33 @@ describe("SEC-010 content security policy (docs/07 §11)", () => {
     expect(csp.get("script-src")).not.toContain("'unsafe-inline'");
   });
 
+  it("allows a plain-http loopback files origin only under next dev (local SeaweedFS)", () => {
+    const local = "http://localhost:8333";
+    const dev = directives(prod({ isDev: true, filesOrigin: local }));
+    expect(dev.get("connect-src")).toContain(local);
+    expect(dev.get("img-src")).toContain(local);
+    for (const loopback of ["http://127.0.0.1:8333", "http://[::1]:8333"]) {
+      expect(directives(prod({ isDev: true, filesOrigin: loopback })).get("connect-src")).toContain(
+        loopback,
+      );
+    }
+    // Production never accepts http, not even loopback.
+    const production = directives(prod({ filesOrigin: local }));
+    expect(production.get("connect-src")).toEqual(["'self'"]);
+    expect(production.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
+    // Development accepts http only for loopback hosts, never another machine.
+    for (const remote of [
+      "http://files.example",
+      "http://192.168.1.10:8333",
+      "http://localhost.evil.example",
+      "http://127.0.0.1.nip.io:8333",
+    ]) {
+      const csp = directives(prod({ isDev: true, filesOrigin: remote }));
+      expect(csp.get("connect-src")).toEqual(["'self'", "ws:", "wss:"]);
+      expect(csp.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
+    }
+  });
+
   it("omits upgrade-insecure-requests for plain-http local runs", () => {
     expect(
       directives(prod({ upgradeInsecureRequests: false })).has("upgrade-insecure-requests"),

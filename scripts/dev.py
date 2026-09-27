@@ -149,6 +149,9 @@ def host_env(dotenv: dict[str, str]) -> dict[str, str]:
             "REDIS_URL": f"redis://localhost:{valkey}/1",
             "OIDC_ISSUER": "http://localhost:8080/schoolos",
             "PLATFORM_OIDC_ISSUER": "http://localhost:8080/platform",
+            # Browser uploads go straight to presigned SeaweedFS URLs; next dev accepts this
+            # plain-http loopback origin in img-src/connect-src (production is https-only).
+            "FILES_ORIGIN": "http://localhost:8333",
             "PYTHONUNBUFFERED": "1",
         }
     )

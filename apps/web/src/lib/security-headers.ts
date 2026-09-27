@@ -31,13 +31,26 @@ export function generateNonce(): string {
   return btoa(binary);
 }
 
-/** Only accept an https origin (scheme + host [+ port]); anything else is ignored. */
-export function normaliseFilesOrigin(value: string | undefined): string | undefined {
+/** Hosts a plain-http files origin may use under `next dev` (local SeaweedFS, docs/10). */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Only accept an https origin (scheme + host [+ port]); anything else is ignored. With
+ * `allowLoopbackHttp` (next dev only) a plain-http origin on a loopback host is accepted too,
+ * so local uploads to SeaweedFS work; production never accepts http.
+ */
+export function normaliseFilesOrigin(
+  value: string | undefined,
+  { allowLoopbackHttp = false }: { allowLoopbackHttp?: boolean } = {},
+): string | undefined {
   if (!value) return undefined;
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:") return undefined;
-    return url.origin;
+    if (url.protocol === "https:") return url.origin;
+    if (url.protocol === "http:" && allowLoopbackHttp && LOOPBACK_HOSTS.has(url.hostname)) {
+      return url.origin;
+    }
+    return undefined;
   } catch {
     return undefined;
   }
@@ -45,7 +58,7 @@ export function normaliseFilesOrigin(value: string | undefined): string | undefi
 
 export function buildContentSecurityPolicy(options: CspOptions): string {
   const { nonce, isDev } = options;
-  const filesOrigin = normaliseFilesOrigin(options.filesOrigin);
+  const filesOrigin = normaliseFilesOrigin(options.filesOrigin, { allowLoopbackHttp: isDev });
   const directives: string[] = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,

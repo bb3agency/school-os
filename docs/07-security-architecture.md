@@ -314,7 +314,7 @@ Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=()
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Resource-Policy: same-origin
 ```
-(`camera=(self)` allows photographing register pages from a phone browser. The files domain is in `connect-src` so the browser can send presigned-POST uploads straight to storage (§10); it is added only when configured, as an https origin without path or wildcard. The correction memo, served through the BFF, keeps the API's own policy only when every directive allows nothing but `'none'` or hash-pinned blocks.)
+(`camera=(self)` allows photographing register pages from a phone browser. The files domain is in `connect-src` so the browser can send presigned-POST uploads straight to storage (§10); it is added only when configured, as an https origin without path or wildcard (under `next dev` only, a plain-http loopback origin such as the local SeaweedFS `http://localhost:8333` is accepted too; production never accepts http). The correction memo, served through the BFF, keeps the API's own policy only when every directive allows nothing but `'none'` or hash-pinned blocks.)
 
 **OWASP API Security Top 10 mapping**
 
