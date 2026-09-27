@@ -1,7 +1,8 @@
 """``retrieval.yaml``: hybrid retrieval settings (docs/06 §6; FR-KB-001).
 
-Owned by the retrieval package (K3) after the skeleton. Boost factors, decay and rerank settings
-are added here by K3 once evaluation tunes them (``make eval``); nothing is tuned by preference.
+Owned by the retrieval package (K3). Boost factors and decay ship NEUTRAL (factor 1.0: no effect)
+until evaluation tunes them (``make eval``); nothing is tuned by preference. The ACL predicate is
+code (``knowledge.retrieval.acl``), never configuration (invariant 8).
 """
 
 from __future__ import annotations
@@ -27,15 +28,31 @@ class Branch(ConfigModel):
     limit: int = Field(ge=1, le=1000)
 
 
+class VectorBranch(Branch):
+    iterative_scan: Literal["off", "relaxed_order", "strict_order"]
+    """``SET LOCAL hnsw.iterative_scan`` (pgvector >= 0.8): keep scanning the shared HNSW graph
+    until ``limit`` rows pass the tenant/ACL filter (docs/05 §11)."""
+    max_scan_tuples: int = Field(ge=100, le=1_000_000)
+    """``SET LOCAL hnsw.max_scan_tuples``: upper bound on an iterative scan."""
+
+
 class FullTextBranch(Branch):
     ts_config: Literal["simple"]
     """No stemming: Telugu and code-mixed text (docs/06 §11)."""
+    match: Literal["any_term", "websearch"]
+    """``any_term``: OR of the query's lexemes, ranked by ``ts_rank_cd`` (a question rarely
+    contains every word of the answer); ``websearch``: ``websearch_to_tsquery`` (AND)."""
+
+
+class TrigramBranch(Branch):
+    word_similarity_threshold: float = Field(gt=0.0, le=1.0)
+    """``SET LOCAL pg_trgm.word_similarity_threshold`` for ``:q <% context_header``."""
 
 
 class Branches(ConfigModel):
-    vector: Branch
+    vector: VectorBranch
     full_text: FullTextBranch
-    trigram: Branch
+    trigram: TrigramBranch
 
 
 class Diversity(ConfigModel):
@@ -45,7 +62,13 @@ class Diversity(ConfigModel):
 
 class Boosts(ConfigModel):
     recency_when_latest_intent: bool
+    recency_max_factor: float = Field(ge=1.0, le=10.0)
+    """Multiplier for the newest ``issued_on`` among the candidates; 1.0 = neutral."""
+    recency_half_life_days: int = Field(ge=1, le=3650)
+    """The extra weight halves for every this many days older than the newest candidate."""
     verified_answers: bool
+    verified_answer_factor: float = Field(ge=1.0, le=10.0)
+    """Multiplier for ``doc_type = 'verified_answer'`` chunks; 1.0 = neutral."""
 
 
 class Toggle(ConfigModel):
@@ -69,6 +92,8 @@ class RetrievalConfig(ConfigModel):
         widest = max(b.limit for b in (self.branches.vector, self.branches.full_text))
         if self.final_k > widest:
             raise ValueError("final_k exceeds every candidate list's limit")
+        if self.hnsw_ef_search < self.branches.vector.limit:
+            raise ValueError("hnsw_ef_search must be at least the vector branch limit")
         return self
 
 
