@@ -1,4 +1,5 @@
-"""Student record tables in schema ``sis`` (migration 0008_sis_students, docs/05 §5).
+"""Student record tables in schema ``sis`` (migrations 0008_sis_students and 0022_promotions,
+docs/05 §5).
 
 Models describe tables for typed queries only; DDL (RLS, triggers, grants) lives in the
 migration. FKs into other modules' tables (``core.sections``, ``core.academic_years``,
@@ -205,4 +206,55 @@ class StudentGuardian(Base):
     guardian_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     relationship: Mapped[str] = mapped_column(Text)
     is_primary: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+
+
+PROMOTION_OUTCOMES = ("promoted", "held_back", "graduated")
+
+
+class PromotionRun(Base):
+    """One committed year-end promotion (migration 0022_promotions; FR-TEN-011)."""
+
+    __tablename__ = "promotion_runs"
+    __table_args__ = (UniqueConstraint("tenant_id", "id"), {"schema": SCHEMA})
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    from_academic_year_id: Mapped[uuid.UUID]
+    to_academic_year_id: Mapped[uuid.UUID]
+    status: Mapped[str] = mapped_column(Text, server_default=text("'committed'"))
+    promoted_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    held_back_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    graduated_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    skipped_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    plan_fingerprint: Mapped[str] = mapped_column(Text)
+    committed_by: Mapped[uuid.UUID | None]
+    committed_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    undone_by: Mapped[uuid.UUID | None]
+    undone_at: Mapped[dt.datetime | None]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class PromotionItem(Base):
+    """What one promotion did to one student: the enrolment it closed and the one it opened."""
+
+    __tablename__ = "promotion_items"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "run_id"], ["sis.promotion_runs.tenant_id", "sis.promotion_runs.id"]
+        ),
+        {"schema": SCHEMA},
+    )
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    outcome: Mapped[str] = mapped_column(Text)
+    from_enrollment_id: Mapped[uuid.UUID]
+    from_enrollment_version: Mapped[int] = mapped_column(Integer)
+    to_enrollment_id: Mapped[uuid.UUID | None]
+    to_enrollment_version: Mapped[int | None] = mapped_column(Integer)
+    previous_student_status: Mapped[str] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
