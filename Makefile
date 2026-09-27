@@ -18,6 +18,10 @@ TRIVY    = $(if $(shell command -v trivy 2>/dev/null),trivy,docker run --rm -v "
 
 # ARGS: extra flags for dev-host (--raw, --no-seed) and sync-system-roles (--apply, --prune, --tenant).
 ARGS ?=
+# seed-synthetic: PROFILE (students per school: none, small = 400, full = 2,000) and SEED_ARGS
+# (e.g. "--tenants 3 --students 800 --no-documents"; see python -m app.devtools.seed_synthetic -h).
+PROFILE   ?= full
+SEED_ARGS ?=
 
 .PHONY: help install dev dev-host dev-stop down logs migrate seed-synthetic sync-system-roles test test-api test-web test-security \
         migration-check e2e lint format typecheck security eval check db-shell openapi tf-validate
@@ -56,8 +60,8 @@ migrate: .env ## Apply database migrations and create audit partitions (as sos_m
 db-shell: ## psql into the local database as the admin
 	$(COMPOSE) exec db psql -U postgres -d schoolos
 
-seed-synthetic: ## Create synthetic tenants (NEVER real data)
-	$(UV) run python -m app.devtools.seed_synthetic
+seed-synthetic: ## Synthetic schools, staff, students, documents (NEVER real data; PROFILE=none|small|full)
+	$(UV) run python -m app.devtools.seed_synthetic --profile $(PROFILE) $(SEED_ARGS)
 
 sync-system-roles: ## Sync every school's system roles with roles.yaml (dry run; ARGS="--apply [--prune] [--tenant <id>]")
 	$(UV) run python -m app.identity.sync_system_roles $(ARGS)
