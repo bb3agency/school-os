@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
+| Version | 0.4 · 2026-09-27 |
 | Approach | Module by module on a shared core; real school needs decide order after M1; no calendar commitments |
 | Related | 01-BRD §7, §11, 02-PRD §3, 03-TRD, 16-Platform admin panel |
-| Changes | 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
+| Changes | 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
 
 ---
 
@@ -74,12 +74,12 @@ The M0 code is merged on the session branch (not yet on `main`). What exists, pe
 - **Security testing:** ZAP baseline (nightly job skips until staging exists); axe accessibility checks in Playwright; Schemathesis contract tests; e2e beyond the signed-out smoke test.
 - **School support form** in the web app (API routes exist).
 
-**Decisions needed** (docs and code disagree; recorded, not resolved):
-1. **School-chain audit events for platform actions are not atomic** with the control-plane change (ADR-0013 Amendment A6, 16 §16). Accept as documented, or add a definer function (ADR) that writes the tenant event inside the platform transaction? Affects invariant 7 and FR-AUD-001.
-2. **Shared provisioning is not one transaction** (FR-PLT-002 says "in one transaction"): the first transaction is atomic and later steps resume idempotently (16 §5.4). Amend FR-PLT-002, or change the code?
-3. **Suspended schools:** the API refuses every tenant route with `403 tenant_suspended`, including the owner's Plan & billing and full export promised by BR-08, FR-PLT-004 and 16 §5.5.
-4. **Control plane imports `app.tenancy.service` and opens `tenant_session()`** (ADR-0013 Amendment A10), while CLAUDE.md §4 and ADR-0017 say `platform` uses only `platform_session()` and never imports tenant modules. Proposed wording for the product owner to confirm: "`platform` may call `tenancy.service` only for provisioning and lifecycle (definer-function wrappers and key initialisation), and may use `tenant_session()` only to write school-chain audit events, serve the school-side billing/announcement/support routes and count active users; never for tenant data reads."
-5. **ADR process:** ADR-0013 received an appended Amendments section (adr/README step 5 was extended to allow it); confirm this practice, or require a new ADR for the deviations above.
+**Decisions** (docs and code disagreed; product owner decisions of 2026-09-27):
+1. **School-chain audit events for platform actions** — **settled:** guaranteed through a transactional outbox (`platform.tenant_audit_outbox`, queued in the platform transaction, delivered exactly once and in order per school by `platform.deliver_tenant_audit`); no definer function. [ADR-0020](adr/ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md), 16 §16.
+2. **Shared provisioning is not one transaction** (FR-PLT-002 says "in one transaction"): the first transaction is atomic and later steps resume idempotently (16 §5.4). **Still open:** amend FR-PLT-002, or change the code? (The school-chain `tenant.provisioned` copy is now queued atomically with the owner invite.)
+3. **Suspended schools** — **settled:** the owner and principal keep `GET /me`, school choice, the sign-in event and Plan & billing (and the full export once FR-ADM-001 exists); every other school route answers `403 tenant_suspended` for every role. One pinned allowlist in `app/authz/resolver.py` (16 §5.5).
+4. **Control plane and tenant modules** — **settled:** `platform` may call `tenancy.service` only for tenant lifecycle (register, initialise keys, activate, suspend, reactivate, offboard, usage counts) and never reads tenant data; enforced by `tests/platform/test_boundaries.py` (CLAUDE.md §4, ADR-0020).
+5. **ADR process** — **settled:** dated Amendments sections may record implementation facts that do not change the decision; any change to the decision needs a new ADR that amends or supersedes it (adr/README step 5).
 
 **Pilot-ready gate (§3) status:** not started except where M0 code covers controls: SEC-001..011 and SEC-026..029 are implemented in code and tests (SEC-029 emergency break-glass workflow is M1; SEC-011/SEC-022/SEC-023 exist only as unapplied Terraform); SEC-012..017, SEC-021 are M1; SEC-024 restore drill, incident rehearsal, DPA/DPIA, ZDR request, production accounts with two platform owners, CA confirmation of invoice format and GST, and staff training are all open.
 

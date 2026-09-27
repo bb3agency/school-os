@@ -9,9 +9,14 @@ Shared-tier provisioning (docs/16 §5.4):
    billing account, subscription, platform audit event (atomic: a failure leaves none of them);
 2. ``tenancy.initialise_tenant`` (wrapped DEK + HMAC key, post-provision hooks such as role
    templates) in the new tenant's own session;
-3. ``core.create_owner_invite`` (invited owner membership, owner role when present);
-4. ``tenant.provisioned`` in the school's own audit chain (actor_type ``platform``).
-Steps 2-4 are idempotent; a retry with the same code and school resumes them.
+3. ``core.create_owner_invite`` (invited owner membership, owner role when present) and, in the
+   same platform transaction, ``tenant.provisioned`` queued for the school's own audit chain
+   (``platform.tenant_audit``; actor_type ``platform``, delivered exactly once, ADR-0020).
+Steps 2-3 are idempotent; a retry with the same code and school resumes them.
+
+Lifecycle changes (activate, suspend, reactivate, offboard) queue their school-chain copy in
+the same platform transaction as the change; delivery is tried right after commit and
+guaranteed by the ``platform.deliver_tenant_audit`` task.
 
 Dedicated tier: the deployment (status ``provisioning``), billing account, subscription and a
 per-deployment heartbeat key (shown once) are created here; the tenant row is created on the
@@ -33,7 +38,7 @@ from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_logger
-from app.platform import billing
+from app.platform import billing, tenant_audit
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import (
@@ -45,7 +50,6 @@ from app.platform.common import (
     must,
     now,
     parse_cursor,
-    tenant_chain,
     today_ist,
 )
 from app.platform.schemas import (
@@ -335,13 +339,16 @@ def _finish_shared(
                 {"owner_role_assigned": bool(row["owner_role_assigned"])},
                 tenant_id=tenant_id,
             )
+            tenant_audit.enqueue(
+                s,
+                tenant_id,
+                actor,
+                "tenant.provisioned",
+                {"tier": "shared", "key_version": key_version},
+            )
     except Conflict:
         invite = "existing"  # resumed: the owner membership was created by an earlier attempt
-    if invite != "existing":
-        with tenant_chain(
-            tenant_id, actor, "tenant.provisioned", {"tier": "shared", "key_version": key_version}
-        ):
-            pass
+    tenant_audit.deliver_now(tenant_id)
     return invite
 
 
@@ -413,17 +420,7 @@ def _set_status(
 ) -> TenantDetailOut:
     dep0 = _deployment(tenant_id)
     shared = dep0["mode"] == "shared"
-    with (
-        tenant_chain(
-            tenant_id,
-            actor,
-            action,
-            {"from": dep0["tenant_status"], "to": target},
-            enabled=shared,
-        ),
-        platform_session() as s,
-        db_errors(),
-    ):
+    with platform_session() as s, db_errors():
         dep = repo.get(s, m.deployments, dep0["id"], for_update=True)
         dep = must(dep)
         if dep["tenant_status"] not in allowed_from:
@@ -448,6 +445,12 @@ def _set_status(
             {"from": dep["tenant_status"], "to": target, "tier": dep["mode"]},
             tenant_id=tenant_id,
         )
+        if shared:  # dedicated schools' chains live on their host
+            tenant_audit.enqueue(
+                s, tenant_id, actor, action, {"from": dep["tenant_status"], "to": target}
+            )
+    if shared:
+        tenant_audit.deliver_now(tenant_id)
     return get_tenant(tenant_id, with_counts=False)
 
 

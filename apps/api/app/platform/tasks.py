@@ -1,7 +1,8 @@
 """Celery tasks for the control plane (shared deployment) and the dedicated-host heartbeat client.
 
 Beat entries come from :func:`beat_schedule`, which registers control-plane jobs only when
-``SOS_DEPLOYMENT_MODE=shared`` and only the heartbeat client when ``dedicated`` (ADR-0017).
+``SOS_DEPLOYMENT_MODE=shared`` and the heartbeat client only when ``dedicated`` (ADR-0017);
+the school-chain audit delivery runs in both modes (ADR-0020).
 Times are UTC (celery ``timezone=UTC``); IST = UTC + 5:30. Tasks carry IDs/dates only.
 """
 
@@ -14,7 +15,15 @@ from celery import shared_task
 from celery.schedules import crontab
 
 from app.core.config import DeploymentMode, Settings, get_settings
-from app.platform import announcements, billing, fleet, heartbeat_client, support, usage
+from app.platform import (
+    announcements,
+    billing,
+    fleet,
+    heartbeat_client,
+    support,
+    tenant_audit,
+    usage,
+)
 from app.platform.common import today_ist
 
 
@@ -58,13 +67,38 @@ def send_heartbeat() -> dict[str, Any]:
     return heartbeat_client.send()
 
 
+@shared_task(name="platform.deliver_tenant_audit", acks_late=True, ignore_result=True)
+def deliver_tenant_audit() -> dict[str, int]:
+    """Both modes, every minute (queue ``maintenance``): copy queued platform actions into the
+    schools' own audit chains exactly once, in order per school (ADR-0020, FR-AUD-001)."""
+    result = tenant_audit.deliver_pending()
+    return {
+        "delivered": result.delivered,
+        "already_present": result.already_present,
+        "failed": result.failed,
+        "backlog": tenant_audit.check_backlog(),
+    }
+
+
+# Both deployment modes: the dedicated host's own provisioning queues school-chain copies too.
+_BOTH_MODES: dict[str, dict[str, Any]] = {
+    "platform-deliver-tenant-audit": {
+        "task": "platform.deliver_tenant_audit",
+        "schedule": 60.0,
+        "options": {"queue": "maintenance"},
+    },
+}
+
+
 def beat_schedule(settings: Settings | None = None) -> dict[str, dict[str, Any]]:
     settings = settings or get_settings()
     if settings.deployment_mode is DeploymentMode.DEDICATED:
         return {
             "fleet-send-heartbeat": {"task": "fleet.send_heartbeat", "schedule": 300.0},
+            **_BOTH_MODES,
         }
     return {
+        **_BOTH_MODES,
         "billing-generate-invoices": {
             "task": "billing.generate_invoices",
             "schedule": crontab(minute=30, hour=20),  # 02:00 IST

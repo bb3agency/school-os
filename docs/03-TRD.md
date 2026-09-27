@@ -219,12 +219,12 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-IAM-005 | Partial | Login rate limits and lockouts rely on the IdP; lockout/reset auditing and breached-password screening (Cognito Essentials) not built |
 | FR-IAM-010..014 | Built | Role keys pinned to 07 §6.2; permission catalog in `core.permissions`; scopes; school picker and invitation acceptance; changes effective within 60 s and audited |
 | FR-TEN-001..003, FR-TEN-010, FR-TEN-012 | Built | Provisioning via the control plane (16 §5.4); academic structure; settings (retention settings are M1) |
-| FR-AUD-001..004 | Built | Tenant and platform chains; daily signed archive and verification. School-chain copies of platform actions are not atomic with the platform change (ADR-0013 Amendment A6) |
+| FR-AUD-001..004 | Built | Tenant and platform chains; daily signed archive and verification. School-chain copies of platform actions are queued in the platform transaction and delivered exactly once (`platform.tenant_audit_outbox`, ADR-0020) |
 | FR-AUD-005 | Partial | Viewer with filters and chain verification built; CSV export not built |
 | FR-OPS-004 | Partial | `ops.break_glass_grants` and `platform.breakglass_requests` with the 8-hour and two-person rules in the database; workflow M1 |
 | FR-PLT-001, FR-PLT-003, FR-PLT-005, FR-PLT-010..018, FR-PLT-020, FR-PLT-022..030 | Built | 16 §8 route catalog. FR-PLT-005: two-person request/approval built; data deletion, key destruction and certificate are M1. FR-PLT-020: students, storage, documents and AI meters are 0 until `sis`/`kb` exist |
 | FR-PLT-002 | Partial | Built, but not "in one transaction": the first transaction (tenant row, deployment, billing account, subscription) is atomic; keys, roles, owner invite and the school-chain event follow as idempotent, resumable steps (decision pending) |
-| FR-PLT-004 | Partial | Suspend/reactivate built; the owner's Plan & billing and full-export access while suspended is not (every tenant route answers `403 tenant_suspended`) |
+| FR-PLT-004 | Partial | Suspend/reactivate built; while suspended the owner and principal keep `/me` and Plan & billing (pinned allowlist, 16 §5.5); the full export joins the allowlist when FR-ADM-001 is built |
 | FR-PLT-019, FR-PLT-021 | Partial | Void built; reminder and threshold emails not built (no email delivery in M0); threshold crossings recorded and audited |
 
 ---

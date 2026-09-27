@@ -19,7 +19,6 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
-from app.core.db import tenant_session
 from app.core.errors import BadRequest
 from app.core.logging import get_logger
 from app.platform import repository as repo
@@ -128,39 +127,6 @@ def audit_platform(  # noqa: PLR0917 - (session, actor, action, type, id, summar
         subject_tenant_id=tenant_id,
         request_id=actor.request_id,
     )
-
-
-@contextmanager
-def tenant_chain(
-    tenant_id: uuid.UUID,
-    actor: Actor,
-    action: str,
-    summary: Mapping[str, Any],
-    *,
-    enabled: bool = True,
-) -> Iterator[None]:
-    """Write ``action`` into the school's own audit chain (actor_type ``platform``).
-
-    The tenant event is written first (validation fails early) and committed only after the
-    wrapped control-plane transaction commits; if that transaction fails, the tenant event is
-    rolled back with it. ``enabled=False`` (dedicated schools, whose rows live on their host)
-    only runs the wrapped block.
-    """
-    if not enabled:
-        yield
-        return
-    with tenant_session(tenant_id) as ts:
-        audit.record(
-            ts,
-            action=action,
-            resource_type="tenant",
-            resource_id=tenant_id,
-            summary=summary,
-            actor_type="platform",
-            actor_id=actor.operator_id,
-            request_id=actor.request_id,
-        )
-        yield
 
 
 def page[M: BaseModel](

@@ -36,3 +36,7 @@ support:
     p3: {first_response: 24, resolution: 120}
     p4: {first_response: 48, resolution: 720}
   retention_days_after_close: 365
+# School-chain copies of platform actions (platform.tenant_audit_outbox; ADR-0020, docs/16 §16).
+tenant_audit:
+  stuck_after_attempts: 5       # log platform.tenant_audit.stuck from this attempt on
+  backlog_alert_minutes: 15     # log platform.tenant_audit.backlog when the oldest waits longer

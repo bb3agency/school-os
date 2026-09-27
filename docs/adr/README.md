@@ -24,7 +24,7 @@ If you are unsure, write a short ADR with status **Proposed** and ask for review
    - `Amended by ADR-00yy` when the new ADR changes part of the decision and the rest still holds;
    - `Superseded by ADR-00yy` when the new ADR replaces it completely.
 
-   Exception: an accepted ADR MAY get a dated **Amendments** section appended at the end that records implementation facts (names, grants, signatures) without rewriting the decision text. Any entry that changes behaviour the ADR promised is marked **(deviation)** and listed for a product decision in the roadmap. ADR-0013 has such a section (2026-09-26).
+   **Amendment policy** (product owner, 2026-09-27): an accepted ADR MAY get a dated **Amendments** section appended at the end. It may record only **implementation facts that do not change the decision**: names, grants, signatures, file locations, which later ADR settles an open point. **Any change to the decision itself** (what is allowed, what is promised, who may do what) **requires a new ADR** that amends or supersedes the old one, plus the status-line edit above. If code is found to deviate from an accepted ADR, record the fact in a dated Amendments entry marked **(deviation)**, list it for a product decision in the roadmap, and resolve it with a new ADR (or by fixing the code), never by rewording the Amendments entry. Example: ADR-0013's Amendments (2026-09-26) recorded deviations A6 and A10; [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) decided them.
 6. A rejected proposal keeps its file with status **Rejected** and a one-line reason, so the idea is not re-proposed without new facts.
 
 ### Status values
@@ -88,10 +88,11 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0010](ADR-0010-maker-checker.md) | Maker-checker for identity changes | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0011](ADR-0011-hash-chained-audit.md) | Hash-chained, append-only audit log | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013 |
 | [ADR-0012](ADR-0012-managed-oidc-identity.md) | Managed OIDC identity provider | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013, ADR-0018 |
-| [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths, platform privilege separation and platform identity | Accepted · Amended by ADR-0018, ADR-0019 · implementation amendments 2026-09-26 |
+| [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths, platform privilege separation and platform identity | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020 · implementation amendments 2026-09-26, 2026-09-27 |
 | [ADR-0014](ADR-0014-local-ci-service-images.md) | Local and CI service images: SeaweedFS and Valkey | Accepted |
 | [ADR-0015](ADR-0015-deployment-and-commercial-model.md) | Deployment and commercial model: managed SaaS, shared and dedicated tiers | Accepted |
 | [ADR-0016](ADR-0016-payments-provider.md) | Payments provider | Proposed |
-| [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) | Platform admin panel (control plane) architecture | Accepted |
+| [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) | Platform admin panel (control plane) architecture | Accepted · Amended by ADR-0020 |
 | [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) | MFA enforcement and step-up with Amazon Cognito | Accepted |
 | [ADR-0019](ADR-0019-invitation-acceptance-on-first-sign-in.md) | Invitation acceptance on first sign-in | Accepted |
+| [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) | Control-plane boundaries and guaranteed audit copies | Accepted |

@@ -101,12 +101,18 @@ def test_FR_IAM_013_malformed_active_tenant_header_is_400(world: Any, api: Any) 
 def test_FR_TEN_002_suspended_school_is_403_tenant_suspended(
     api: Any, admin_engine: Engine
 ) -> None:
+    """Staff are refused; the owner keeps /me (BR-08 allowlist, tests/api/test_suspended_school)."""
     tid = W.provision_school()
-    person = W.add_member(admin_engine, tid, ["owner"])
+    person = W.add_member(admin_engine, tid, ["office_staff"])
+    owner = W.add_member(admin_engine, tid, ["owner"])
     assert api.call(person, "GET", "/api/v1/me").status_code == 200
     with admin_engine.begin() as c:
         c.execute(text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"), {"t": tid})
     res = api.call(person, "GET", "/api/v1/me")
+    assert res.status_code == 403
+    assert res.json()["code"] == "tenant_suspended"
+    assert api.call(owner, "GET", "/api/v1/me").status_code == 200
+    res = api.call(owner, "GET", "/api/v1/academic-years")
     assert res.status_code == 403
     assert res.json()["code"] == "tenant_suspended"
 
