@@ -246,7 +246,10 @@ def prepare(env: dict[str, str], *, seed: bool) -> bool:
 def services(beat_schedule: Path) -> list[Service]:
     celery = [PY, "-m", "celery", "-A", "sos_worker.celery_app"]
     pool = ["--pool=solo"] if WINDOWS else ["--concurrency=2"]
-    npm = shutil.which("npm") or "npm"
+    # next dev started with node directly: through npm.cmd, Ctrl-C on Windows stops at cmd's
+    # "Terminate batch job (Y/N)?" prompt and can leave the dev server behind.
+    node = shutil.which("node") or "node"
+    next_bin = str(ROOT / "node_modules" / "next" / "dist" / "bin" / "next")
     return [
         Service(
             "api",
@@ -278,7 +281,13 @@ def services(beat_schedule: Path) -> list[Service]:
             None,
             "34",
         ),
-        Service("web", [npm, "run", "dev", "-w", "apps/web"], ROOT, "http://localhost:3000", "32"),
+        Service(
+            "web",
+            [node, next_bin, "dev", "--port", "3000"],
+            ROOT / "apps" / "web",
+            "http://localhost:3000",
+            "32",
+        ),
     ]
 
 
