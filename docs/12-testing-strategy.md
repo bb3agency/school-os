@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
-| Related | 03-TRD §9, 06-RAG §13, 07-Security §15, 13-Engineering standards, 16-Platform admin panel §18 |
-| Changes | 0.3: implemented suites with file paths (§4.0); §4.1/§4.5/§4.8/§4.12 match the code (catalog files, allowlist keys, grants checked); tools not yet in use marked in §2. 0.2: Valkey and SeaweedFS in integration tests; RLS catalog test with `definer_access` allowlist and platform exemption (§4.5); new suites §4.8–4.13 (platform privilege separation, definer allowlist, composite FKs, audit sequence concurrency, admin panel authz matrix, heartbeat); `mfa_required` in the authz matrix. 0.1: baseline |
+| Version | 0.4 · 2026-09-27 |
+| Related | 03-TRD §9, 06-RAG §13, 07-Security §15, 13-Engineering standards, 14-Roadmap (M1 status), 16-Platform admin panel §18 |
+| Changes | 0.4: M1 suites as built (§4.0.1): per-resource BOLA and scope, maker-checker, no personal data in URLs, deploy contract and dev OIDC stub pinning, worker wiring, notification catalog guard, system-role fingerprint, control-plane boundaries, web vitest (EN/TE parity, CSP), Playwright smoke and axe; how to run each (§4.0.2); what gates CI today versus the target (§9); §2 E2E and accessibility rows match the code. 0.3: implemented suites with file paths (§4.0); §4.1/§4.5/§4.8/§4.12 match the code (catalog files, allowlist keys, grants checked); tools not yet in use marked in §2. 0.2: Valkey and SeaweedFS in integration tests; RLS catalog test with `definer_access` allowlist and platform exemption (§4.5); new suites §4.8–4.13 (platform privilege separation, definer allowlist, composite FKs, audit sequence concurrency, admin panel authz matrix, heartbeat); `mfa_required` in the authz matrix. 0.1: baseline |
 
 ---
 
@@ -27,8 +27,9 @@
 | Contract (planned) | OpenAPI conformance and fuzzing | Schemathesis (not yet added) | Every PR (fast), nightly (deep) |
 | Migrations | Upgrade/downgrade on seeded DB; RLS present on new tables | pytest + Alembic | Every PR touching migrations |
 | Frontend | Components, forms, i18n keys | vitest + React Testing Library | Every PR |
-| E2E | Critical journeys in a browser (M0: signed-out smoke only, `apps/web/e2e/smoke.spec.ts`) | Playwright | Nightly (`make e2e`) |
-| Accessibility | Automated WCAG checks on core screens | axe (Playwright integration; not yet added, 14 · M0 status) | Nightly + release |
+| E2E | Critical journeys in a browser (as built: signed-out smoke `apps/web/e2e/smoke.spec.ts`; no M1 journeys yet, 14 · M1 status) | Playwright | Nightly (`make e2e`) |
+| Accessibility | Automated WCAG 2.2 AA checks and keyboard-only paths at 1366×768 (`apps/web/e2e/a11y.spec.ts`; signed-in school and platform pages need `E2E_STAND_IN=1`) | axe-core via `@axe-core/playwright` | Nightly + release |
+| Deploy contract | Deploy files vs the settings contract and the dev OIDC stub (§4.0.1) | pytest reading repository files (no Docker, Terraform or network) | Every PR |
 | Visual/print | PDF and print views (Telugu rendering) | Playwright screenshots + PDF snapshot diff | Nightly + release |
 | Performance | NFR-PERF targets | k6 or Locust (staging) | Weekly + before release |
 | RAG evaluation | Retrieval, faithfulness, citations, leakage, injection | `evals/` harness | PR subset when knowledge changes; full nightly |
@@ -68,7 +69,54 @@ Test names carry requirement IDs. Paths are relative to `apps/api/tests/`. `make
 | OpenAPI freshness | `core/test_openapi_fresh.py` | Committed `apps/api/openapi.json` equals the generated document |
 | Migrations | `migrations/test_migrations.py`, `migrations/test_migrations_populated.py`, `authz/test_seed_migration.py` | Upgrade → downgrade → upgrade on a fresh database; every revision walked down and back up on a **populated** synthetic database (one school with staff, roles, structure and audit events seeded through the real services; CLAUDE.md §6.12, §8); `core.permissions` equals the YAML catalog |
 
-Not yet implemented from §4.1–4.13: the log-capture and Aadhaar checks over OCR, ingestion, import and prompt paths (§4.6; those modules arrive in M1/M2), maker-checker tests (§4.7, M1), per-resource BOLA for students, documents and later resources (§4.3, M1+), and `TRUNCATE` in the platform privilege catalog check (§4.8 checks SELECT/INSERT/UPDATE/DELETE).
+At the end of M0 the M1 items of §4.3, §4.6 and §4.7 were still open; §4.0.1 lists the suites that now cover them.
+
+### 4.0.1 Suites added in M1 (2026-09-27)
+
+Same conventions as §4.0. New tenant tables are picked up automatically by the RLS catalog, generic isolation, composite-FK, route-enumeration and authz-matrix suites above; the table lists what M1 added on top.
+
+| Suite | File(s) | What it proves |
+|---|---|---|
+| Per-resource BOLA and scope (SEC-015, SEC-001, §4.3) | `security/test_bola.py` (generic ID-route sweep plus student, change-request, extraction and export sections), scope tests in `students/`, `imports/`, `changes/`, `documents/`, `exports/` (`test_SEC_015_*`) | Every ID route is covered (`test_SEC_015_every_id_route_is_covered`); another school's or a random ID → 404 and nothing changes; class/section outside scope → 404; lists, search bodies and request bodies never reach another school or another section; document ACLs fail closed |
+| Export access (ADR-0021) | `security/test_authz_matrix.py` (`test_ADR_0021_*`), `exports/test_access_migration.py`, `exports/test_api.py` | Who may list, read and download whose exports; step-up on every export request and download-any; C3 columns only with explicit inclusion and permission |
+| Maker-checker (SEC-014, §4.7) | `changes/test_schema.py`, `changes/test_service.py`, `changes/test_api.py`; `breakglass/test_breakglass.py` | Self-approval refused by the API **and** by the DB CHECK (even for the owner role); approval needs MFA ≤ 5 min; rejection needs a reason; decided requests frozen; expiry; failed decisions leave no audit event; break-glass self-approval and unconfirmed emergencies refused by the DB |
+| No personal data in URLs (SEC-008) | `security/test_no_pii_in_urls.py` | No query parameter in `openapi.json` looks like personal data or free text (explicit `NOT_PERSONAL` allowlist with reasons); legacy personal parameters are deprecated; student search takes personal data only in the body; the dedicated-tier Caddy access log redacts personal query parameters |
+| Aadhaar and log capture over M1 pipelines (SEC-013, SEC-008, §4.6) | `imports/` (`test_SEC_013_*`, `test_SEC_008_*`), `extraction/` (`test_FR_IMP_022_PRV_016_*`, `test_PRV_016_*`, `test_log_redaction.py`), `exports/test_tables.py` (Hypothesis: no Verhoeff-valid number survives any cell), `students/test_log_redaction.py`, `changes/test_log_redaction.py`, `exports/test_log_redaction.py`, `documents/` and `breakglass/` (`test_SEC_008_*`) | A full Aadhaar number is refused at input, masked in extracted text and export cells, blacked out of stored page images (re-read to check), and seeded names, DOBs, phones and file names never reach logs. Prompt paths follow in M2 |
+| C3 field encryption (SEC-012) | `students/test_crypto.py`, `tenancy/test_key_wrapping.py`, C3 cases in `imports/`, `changes/`, `exports/` | Ciphertext format and round trip; AAD binds tenant, table, column and row (swapped or tampered ciphertext fails); key cache ≤ 15 min; missing key version fails closed; blind index per tenant and purpose; C3 values stored only as ciphertext and masked in API, memo and exports unless permitted |
+| Upload controls (SEC-016) | `documents/test_filetypes.py`, `test_scanning.py`, `test_storage_s3.py`, `test_storage_origin.py`, `test_documents_api.py`, `test_tasks.py` | Magic-byte allowlist, polyglots and renamed files refused; presigned POST with size range, short expiry and SSE-KMS condition; intents bound to user and school; ClamAV `INSTREAM` verdicts, outage never "clean"; quarantine audited; dev scanner refused in staging/prod |
+| Formula injection (SEC-017) | `exports/test_tables.py` (incl. property test), `imports/test_sheet.py`, `imports/test_validation.py` | No exported cell can start a formula (CSV and XLSX, written as text); imported formulas are never evaluated and cached results ignored |
+| Module migrations with data | `students/test_migration.py`, `imports/test_migration_schema.py`, `dq/test_migration.py`, `changes/test_migration.py`, `extraction/test_migration.py`, `exports/test_migration.py`, `exports/test_access_migration.py` | Each M1 revision round-trips with rows present and its models match the database (CLAUDE.md §6.12), in addition to `migrations/` |
+| NFR timings | `imports/test_retention_performance.py` (FR-IMP-006), `dq/test_performance.py` (NFR-PERF-005), `students/test_search_performance.py` (FR-STU-011, incl. index use) | 2,000-row validation ≤ 60 s; DQ on 2,000 students ≤ 2 min; search p95 ≤ 300 ms |
+| DQ precision (M1 exit) | `dq/test_precision.py`, `dq/test_matching_*.py` | Precision ≥ 0.95 on labelled synthetic sets for blocker/high rules; match classes by table, generated and property tests |
+| PDF rendering | `exports/test_pdf.py` | Real headless-Chromium render with bundled Noto Sans Telugu; no request leaves the renderer; skipped only when Chromium is not installed |
+| Deploy contract and dev OIDC stub | `deploy/test_env_contract.py`, `deploy/test_dev_oidc_stub.py`, `deploy/test_provision_dedicated.py` | Every variable Terraform or `deploy/dedicated/compose.yaml` passes is a known `Settings` name and each container passes the staging/prod start-up guards; the stub runs only in the `dev` compose profile on loopback, no deploy file mentions it, and every stub issuer is refused in staging/prod; host-side dedicated provisioning is idempotent and resumable |
+| Worker wiring | `apps/worker/tests/test_wiring.py`, `test_celery_app.py`, `test_exports_routing.py` | Every outbox route names a registered task on a consumed queue and its consumer accepts the dispatcher's `tenant_id`, `event_id`, `payload`; every enqueued event has a consumer; every beat entry and every registered task is routed to a consumed queue |
+| Notification catalog guard (FR-NOT-001) | `notifications/test_templates.py` | Every notification the code sends (found by walking the source) has an EN and a TE template with exactly the declared parameters; ICU plural/select forms render in both languages |
+| System-role fingerprint (ADR-0022) | `authz/test_system_role_fingerprint.py` | A change to `roles.yaml` (keys, names, grants) fails until the pinned fingerprint is updated, so the release notes must call for `sync_system_roles` |
+| Control-plane boundaries (ADR-0020) | `platform/test_boundaries.py`, `platform/test_tenant_audit_outbox.py` | `platform` calls `tenancy.service` only for lifecycle, imports only pinned tenant-side modules, opens `tenant_session()` only in pinned files and names only pinned tenant relations; school-chain copies are delivered exactly once, in order |
+| Suspended schools | `authz/test_suspended_allowlist.py`, `api/test_suspended_school.py` | Only the pinned allowlist answers for a suspended school; everything else is `403 tenant_suspended` |
+| Docs-pinned catalogs | `authz/test_catalog.py`, `breakglass/test_guard_and_catalog.py` (docs/07), `dq/test_rules.py`, `dq/test_explanations.py` (docs/02), `core/test_config.py` (docs/10 §11) | Permission, rule and settings catalogs in code equal the tables in the docs |
+| Web unit (vitest) | `apps/web/src/i18n/messages.test.ts`, `lib/security-headers.test.ts`, `app/client-boundary.test.ts`, `proxy.test.ts`, `server/**/*.test.ts`, `features/**/*.test.tsx`, `lib/aadhaar.test.ts` | EN and TE catalogues have the same keys and ICU arguments, Telugu is really translated, English headings in sentence case; CSP uses a per-request nonce with `strict-dynamic` and matches the documented directives, the files origin is allowed only for images and presigned uploads; server components never call client functions; BFF session encryption, refresh rotation and proxying; every M1 screen renders its states; Aadhaar input check in the browser |
+| E2E and accessibility (Playwright) | `apps/web/e2e/smoke.spec.ts`, `apps/web/e2e/a11y.spec.ts` | Console pages redirect to sign-in keeping the return path; no CSP violations; Telugu switch; the BFF never answers without a session; axe WCAG 2.2 AA and keyboard-only paths on the signed-out page, and with `E2E_STAND_IN=1` on school pages, the school picker and platform pages |
+
+Still open: `TRUNCATE` in the platform privilege catalog check (§4.8 checks SELECT/INSERT/UPDATE/DELETE); browser journeys for the M1 flows (import → findings → change request → pre-check); print/PDF snapshot diffs; Schemathesis; prompt-path redaction and every RAG suite (M2).
+
+### 4.0.2 How to run
+
+| What | Command | Needs |
+|---|---|---|
+| Everything CI runs | `make check` | Docker (testcontainers), Node |
+| All Python tests with coverage | `make test-api` (`uv run pytest --cov …`; `testpaths` = `apps/api/tests`, `apps/worker/tests`) | Docker, or `SOS_TEST_ADMIN_DATABASE_URL` plus `psql`; database tests fail (never skip) without one |
+| Security suites only | `make test-security` (= `uv run pytest apps/api/tests/security -q`) | Docker |
+| Migration round trips | `make migration-check` (= `uv run pytest apps/api/tests/migrations -q`) | Docker |
+| One module or ID | `uv run pytest apps/api/tests/dq -q`, `uv run pytest apps/api/tests -k FR_CR_002 -q` | Docker for tests marked `db` |
+| Repository-file checks | `uv run pytest apps/api/tests/deploy apps/worker/tests apps/api/tests/authz/test_system_role_fingerprint.py -q` | Nothing else (no Docker, Terraform or network) |
+| PDF render | `uv run pytest apps/api/tests/exports/test_pdf.py -q` | Chromium under `PLAYWRIGHT_BROWSERS_PATH` (skipped otherwise) |
+| Web unit | `make test-web` (= `npm test`, vitest) | Node |
+| E2E | `make e2e` (= `npm run e2e`) after `next build`, or with `E2E_BASE_URL` pointing at a running stack; `E2E_STAND_IN=1` for signed-in pages | Valkey at `REDIS_URL` for the stand-in |
+| Lint, types, scans | `make lint`, `make typecheck`, `make security` | uv, Node; for `make security` the scanners on PATH (CI installs them with `.github/actions/install-tools`) |
+
+Test names carry requirement IDs, so `-k SEC_015` or `-k FR_IMP_005` selects a requirement across modules.
 
 ### 4.1 Route enumeration
 Iterate FastAPI's route table; assert every route (except allowlisted health checks) has exactly one of: `require()` with a permission that exists in `core.permissions`; `require_platform()` with a permission whose catalog entry has `is_platform: true` in `apps/api/app/authz/permissions.yaml` (control-plane routes, which must live under `/api/v1/platform/`); or `require_fleet_signature()` (only `POST /api/v1/fleet/heartbeat`). Routes that need no resolved school are pinned by a tenantless allowlist (`/me/schools`, `/me/accept-invitations`, `/me/active-tenant`, `/me/login-event`). Also assert that with `SOS_DEPLOYMENT_MODE=dedicated` no `/api/v1/platform/*` or `/api/v1/fleet/*` route is mounted.
@@ -196,6 +244,8 @@ Feature: Scope-limited Ask (FR-KB-010)
 | Coverage ≥ 80% on critical modules | Merge |
 | E2E, a11y, visual, RAG soft gates, performance | Release |
 | External pen test (annual / before paid go-live) | Paid go-live |
+
+**As wired today** (`.github/workflows/ci.yml`; the workflows have not yet run on GitHub, 14 · M0 status): the required check `ci-ok` needs every job green: `lint` (`make lint`: ruff, format check, import-linter, eslint, prettier), `typecheck` (`make typecheck`: mypy --strict, tsc), `test (test-api)` (`make test-api`: all of `apps/api/tests` and `apps/worker/tests` against testcontainers Postgres, Valkey and SeaweedFS, with coverage), `test (test-web)` (`make test-web`: vitest), `migrations` (`make migration-check`), `authz-suite` (`make test-security`), `security` (`make security`: gitleaks, semgrep, pip-audit, npm audit, trivy fs + config), `ci-config` (tests of the custom semgrep rules in `.semgrep/`, actionlint, zizmor), `terraform` (fmt, validate, tflint, trivy config) and `images` (build, SBOM, trivy image). `nightly.yml` reruns the full suite and the security scans, and runs `make e2e`, the ZAP baseline (skipped until staging exists) and `make eval` (placeholder until M2). Gaps against the table above: **coverage is reported but not enforced** (no `fail_under`); e2e and axe run nightly only, and the nightly job does not set `E2E_STAND_IN`, so only signed-out pages are checked there; no visual/print snapshot, Schemathesis or performance job exists yet (the NFR timing tests in §4.0.1 run on every PR instead); the RAG hard gates have nothing to gate until M2.
 
 ## 10. Definition of done (testing view)
 
