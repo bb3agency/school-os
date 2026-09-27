@@ -30,6 +30,10 @@ AAD = "aadhaar_as_printed"
 CHECKS_ALL = build_checks(load_rules())
 
 
+def det(finding: Finding) -> dict[str, Any]:
+    return dict(finding.details)
+
+
 def run(*students: Any, **kw: Any) -> list[Finding]:
     return evaluate(CS.context(students, **kw), CHECKS_ALL)
 
@@ -87,7 +91,7 @@ def test_FR_DQ_003_DQ_001_severity_follows_the_match_class(
     assert finding.attribute_key == "full_name"
     assert finding.sources == (AAD, REG)
     assert finding.route_codes == ("ROUTE-UIDAI", "ROUTE-SCHOOL-CR")
-    assert finding.details["match"]["explanation_code"] == f"NM-{match_class}"
+    assert det(finding)["match"]["explanation_code"] == f"NM-{match_class}"
 
 
 def test_FR_DQ_003_DQ_001_typo_is_high() -> None:
@@ -103,7 +107,7 @@ def test_FR_DQ_006_DQ_001_stores_masked_values_only() -> None:
     blob = json.dumps(dict(finding.details), ensure_ascii=False)
     for word in (*secret.split(), "Kommineni", "Venkata"):
         assert word.upper() not in blob.upper()
-    values = {v["source"]: v for v in finding.details["values"]}
+    values = {v["source"]: v for v in det(finding)["values"]}
     assert values[AAD]["masked"] == "P••• L••• C•••"
     assert values[AAD]["attribute_key"] == "aadhaar_name_as_printed"
     assert values[REG]["masked"] == mask_name("Kommineni Venkata Sai")
@@ -123,8 +127,8 @@ def test_DQ_002_dob_mismatch_is_a_blocker_with_differing_parts() -> None:
     f = CS.facts(values=identity(extra={("aadhaar_dob_as_printed", AAD): "2012-04-14"}))
     (finding,) = of(run(f), "DQ-002")
     assert finding.severity.value == "blocker"
-    assert finding.details["differs_in"] == ["month"]
-    assert {v["masked"] for v in finding.details["values"]} == {DATE_MASK}
+    assert det(finding)["differs_in"] == ["month"]
+    assert {v["masked"] for v in det(finding)["values"]} == {DATE_MASK}
     same = CS.facts(values=identity(extra={("aadhaar_dob_as_printed", AAD): "2012-03-14"}))
     assert of(run(same), "DQ-002") == []
 
@@ -164,15 +168,15 @@ def test_DQ_004_parent_names_are_clamped_to_medium_high() -> None:
 
 def test_DQ_005_missing_required_fields_are_blockers_per_profile() -> None:
     f = CS.facts(values=identity(extra={("admission_no", REG): "2019/0001"}))
-    del f.canonical["mother_name"]  # type: ignore[attr-defined]
+    del f.canonical["mother_name"]
     found = of(run(f, profiles=["cisce-registration-2026"]), "DQ-005")
     assert [(x.attribute_key, x.severity.value) for x in found] == [("mother_name", "blocker")]
     (finding,) = found
-    assert finding.details["params"] == {
+    assert det(finding)["params"] == {
         "profile": "cisce-registration-2026",
         "field": "mother_name",
     }
-    assert finding.details["reason"] == "missing"
+    assert det(finding)["reason"] == "missing"
     assert finding.explanation_code == "DQ-005"
     assert of(run(f), "DQ-005") == []  # profile rules need a profile
 
@@ -186,18 +190,18 @@ def test_DQ_005_provisional_identity_values_get_the_profile_severity() -> None:
     assert finding.attribute_key == "dob"
     assert finding.severity.value == "low"
     assert finding.explanation_code == "DQ-005-UNVERIFIED"
-    assert finding.details["canonical_source"] == "birth_certificate"
+    assert det(finding)["canonical_source"] == "birth_certificate"
     assert load_explanations().has("DQ-005-UNVERIFIED")
 
 
 def test_DQ_005_and_DQ_009_findings_differ_per_profile() -> None:
     f = CS.facts(values=identity(extra={("admission_no", REG): "2019/0003"}))
     found = run(f, profiles=["cisce-registration-2026", "udise-plus"])
-    dq5 = {(x.details["profile_key"], x.attribute_key) for x in of(found, "DQ-005")}
+    dq5 = {(det(x)["profile_key"], x.attribute_key) for x in of(found, "DQ-005")}
     assert dq5 == {("udise-plus", "mother_tongue"), ("udise-plus", "category")}
     (dq9,) = of(found, "DQ-009")
-    assert dq9.details["profile_key"] == "udise-plus"
-    assert dq9.details["missing"] == list(load_engine_config().apaar_attributes)
+    assert det(dq9)["profile_key"] == "udise-plus"
+    assert det(dq9)["missing"] == list(load_engine_config().apaar_attributes)
     assert dq9.severity.value == "medium"
     fps = [fingerprint_of(x) for x in found]
     assert len(fps) == len(set(fps))
@@ -237,8 +241,8 @@ def test_DQ_006_finding_names_the_first_issue_and_masks_the_value() -> None:
     f = CS.facts(values=identity("కొమ్మినేని వెంకట సాయి 2", {("admission_no", REG): "A1"}))
     (finding,) = of(run(f, profiles=["cisce-registration-2026"]), "DQ-006")
     assert finding.attribute_key == "full_name"
-    assert finding.details["params"] == {"profile": "cisce-registration-2026", "issue": "not_latin"}
-    assert finding.details["issues"] == ["not_latin", "digits"]
+    assert det(finding)["params"] == {"profile": "cisce-registration-2026", "issue": "not_latin"}
+    assert det(finding)["issues"] == ["not_latin", "digits"]
     assert "వెంకట" not in json.dumps(dict(finding.details), ensure_ascii=False)
 
 
@@ -251,7 +255,7 @@ def test_DQ_007_age_outside_the_class_band(dob: str, flagged: bool) -> None:
     found = of(run(f), "DQ-007")
     assert bool(found) is flagged
     if flagged:
-        assert found[0].details["params"] == {"n": 20, "c": "IX"}
+        assert det(found[0])["params"] == {"n": 20, "c": "IX"}
         assert found[0].severity.value == "medium"
 
 
@@ -268,12 +272,12 @@ def test_DQ_008_possible_duplicate_is_raised_for_both_students() -> None:
     a = CS.facts(values=identity(), admission_no="2019/0100")
     b = CS.facts(values=identity("K. Venkata Sai"), admission_no="2019/0101")
     found = of(run(a, population=[b]), "DQ-008")
-    assert {(x.student_id, x.details["related_student_id"]) for x in found} == {
+    assert {(x.student_id, det(x)["related_student_id"]) for x in found} == {
         (a.student_id, str(b.student_id)),
         (b.student_id, str(a.student_id)),
     }
     mine = next(x for x in found if x.student_id == a.student_id)
-    assert mine.details["params"] == {"student": "2019/0101"}
+    assert det(mine)["params"] == {"student": "2019/0101"}
     assert mine.severity.value == "high"
     assert mine.match_class == "INITIALS"
 
@@ -306,7 +310,7 @@ def test_DQ_010_board_record_differs_from_register() -> None:
     assert set(found) == {"full_name", "dob"}
     assert found["full_name"].match_class == "INITIALS"
     assert found["full_name"].severity.value == "high"
-    assert found["dob"].details["differs_in"] == ["day"]
+    assert det(found["dob"])["differs_in"] == ["day"]
     assert found["dob"].route_codes[0] == "ROUTE-BOARD"
 
 
@@ -326,7 +330,7 @@ def test_DQ_012_two_active_enrolments() -> None:
     )
     (finding,) = of(run(f), "DQ-012")
     assert finding.severity.value == "high"
-    assert len(finding.details["enrollment_ids"]) == 2
+    assert len(det(finding)["enrollment_ids"]) == 2
     single = CS.facts(values=identity(), enrolments=[CS.enrolment("IX")])
     assert of(run(single), "DQ-012") == []
 
@@ -360,7 +364,7 @@ def test_every_finding_explanation_renders_in_english_and_telugu() -> None:
     found = run(f, population=[twin], profiles=["cisce-registration-2026", "udise-plus"])
     assert {x.rule_id for x in found} >= {"DQ-001", "DQ-005", "DQ-006", "DQ-007", "DQ-008"}
     for x in found:
-        params = {k: str(v) for k, v in x.details["params"].items()}
+        params = {k: str(v) for k, v in det(x)["params"].items()}
         texts = catalog.bilingual(x.explanation_code, **params)
         assert all(texts.values())
 

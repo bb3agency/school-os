@@ -38,11 +38,11 @@ def facts(
             if REGISTER in sources:
                 canon[key] = CanonicalFact(sources[REGISTER].value, REGISTER, False)
     else:
-        for key, value in canonical.items():
+        for key, raw in canonical.items():
             canon[key] = (
-                value
-                if isinstance(value, CanonicalFact)
-                else CanonicalFact(value, REGISTER if value is not None else None, False)
+                raw
+                if isinstance(raw, CanonicalFact)
+                else CanonicalFact(raw, REGISTER if raw is not None else None, False)
             )
     return StudentFacts(
         student_id=student_id or uuid.uuid4(),

@@ -38,6 +38,7 @@ TASK_MODULES: list[str] = [
     "app.breakglass.tasks",
     "app.platform.tasks",
     "app.documents.tasks",
+    "app.dq.tasks",
 ]
 
 
@@ -64,6 +65,8 @@ def create_celery() -> Celery:
             "maintenance.*": {"queue": "maintenance"},
             # FR-DOC-002: AV scans run on the ingest queue (send_task honours routes only).
             "documents.scan": {"queue": "ingest"},
+            # FR-DQ-002: data-quality runs (outbox consumers and queued runs) on queue "dq".
+            "dq.*": {"queue": "dq"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).

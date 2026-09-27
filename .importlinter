@@ -156,7 +156,7 @@ forbidden_modules =
 allow_indirect_imports = True
 
 [importlinter:contract:dq-internals]
-name = dq: repository/models are private (use app.dq.service; wave 2 adds them)
+name = dq: repository/models are private (use app.dq.service)
 type = forbidden
 source_modules =
     app.main
@@ -168,6 +168,10 @@ source_modules =
     app.platform
     app.ops
     app.devtools
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -256,15 +260,19 @@ forbidden_modules =
     app.breakglass.models
 allow_indirect_imports = True
 
-# The name-matching library, rule types and explanation catalog stay pure (no database, web or
-# tenant modules), so the engine, imports and exports can reuse them anywhere (FR-DQ-003).
+# The name-matching library, rule types, explanation catalog, checks, masking and profiles stay
+# pure (no database, web or tenant modules), so the engine, imports and exports can reuse them
+# anywhere (FR-DQ-003). The engine, service, repository, tasks and routes use the database.
 [importlinter:contract:dq-pure-library]
-name = dq library modules (matching, rules, explanations) stay pure (no DB, web or feature modules)
+name = dq library modules (matching, rules, explanations, checks, masking, profiles) stay pure
 type = forbidden
 source_modules =
     app.dq.matching
     app.dq.rules
     app.dq.explanations
+    app.dq.checks
+    app.dq.masking
+    app.dq.profiles
 forbidden_modules =
     sqlalchemy
     fastapi
