@@ -232,10 +232,11 @@ Document errors: 413 `file_too_large`; 415 `unsupported_file_type` / `polyglot_s
 ### Knowledge
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/knowledge/ask` (SSE) | `kb.ask` |
-| POST | `/knowledge/queries/{id}/feedback` | `kb.ask` (own queries) |
-| GET/POST | `/knowledge/verified-answers` | read: `kb.ask`; write: `kb.verified_answer.manage` |
-| GET | `/knowledge/resolve?source=sos://…` | permission of the underlying resource |
+| POST | `/knowledge/ask` (SSE; body `question` 1-1000 characters, `session_id`) | `kb.ask`. `text/event-stream`: `meta` (`query_id`, `language`, `mode`), `token`, `citation` (`index`, `source`, `title`, `snippet`), `error` (`type`, `message_key`; e.g. `ai_budget_exhausted`, `ai_disabled`, `ai_unavailable`, then `mode: search_only` with cited passages and no prose), `done` (`latency_ms`, `cited_sources`); the question log row and audit event commit before the first event is sent. 429 `ai_rate_limited` when one user asks more than 10 questions a minute (`models.yaml`); 422 for an empty or too long question (**built**; docs/06 §5 as built) |
+| POST | `/knowledge/search` (body `query`, optional `doc_types`, `from_date`, `limit` ≤ 50) | `document.read`. Search-only ranked passages you can read (`source`, `document_id`, `version_no`, pages, `doc_type`, `title`, `issued_on`, `snippet`, `score`); the text never goes in the URL (SEC-008) (**built**) |
+| POST | `/knowledge/queries/{query_id}/feedback` (body `feedback`: `helpful`/`not_helpful`, optional `reason` code) | `kb.ask`, own questions only (anyone else's, or another school's, is 404); audited `kb.query.feedback` (**built**) |
+| GET/POST | `/knowledge/verified-answers` | read: `kb.ask` (cursor list, `status` filter; only answers whose cited documents you can all read); write: `kb.verified_answer.manage` (`Idempotency-Key`; `question`, `language`, `answer_text`, `citations` [`sos://doc/{id}/v{n}#p{page}` + `cited_text`], optional `review_due`; each citation must quote the current version of an active document you can read: 422 `citation_not_found`, `citation_not_current`, `citation_text_not_found`, `citation_source_unsupported`); audited `kb.verified_answer.created`; flagged `needs_review` when a cited document gets a new version or is deleted (**built**; FR-KB-030) |
+| GET | `/knowledge/resolve?source=sos://…` | permission of the underlying resource (not built) |
 
 ### Exports, audit, admin, jobs
 | Method | Path | Permission |
