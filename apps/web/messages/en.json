@@ -1443,7 +1443,23 @@
         "father": "Father",
         "mother": "Mother",
         "guardian": "Guardian"
-      }
+      },
+      "add": "Add a parent or guardian",
+      "addTitle": "Add a parent or guardian",
+      "edit": "Edit",
+      "editTitle": "Edit parent or guardian",
+      "formDescription": "Phone numbers and addresses are restricted: only staff allowed to see them can show them later.",
+      "fullName": "Full name",
+      "relationshipLabel": "Relationship",
+      "phone": "Phone number",
+      "phoneHint": "Optional. 10 digits, for example 9876543210.",
+      "keepHint": "Hidden for privacy. Leave this empty to keep the current one, or type a new one to replace it.",
+      "address": "Address",
+      "clearPhone": "Remove the phone number",
+      "clearAddress": "Remove the address",
+      "isPrimary": "Main contact for the school",
+      "addSubmit": "Add",
+      "editSubmit": "Save changes"
     },
     "errors": {
       "identity_change_required": {
@@ -1469,7 +1485,45 @@
       "student_not_found": {
         "title": "Student not found",
         "body": "The student may have been removed, or is not in your classes. Search for the student again."
+      },
+      "precondition_failed": {
+        "title": "Someone else changed this first",
+        "body": "Another person saved a change to this record while you were working. Choose “Reload the latest details”, check their change, then save yours again."
       }
+    },
+    "edit": {
+      "statusOpen": "Change status",
+      "statusTitle": "Change the record status",
+      "statusDescription": "Use “Left school” when a transfer certificate is issued and “Completed school” after the final year. Nothing else on the record changes.",
+      "status": "Status",
+      "statusHint": "The status decides where the student appears in lists and registers.",
+      "statusSubmit": "Save status",
+      "enrolOpen": "Change class or section",
+      "enrolOpenNew": "Put in a section",
+      "enrolTitle": "Class and section",
+      "enrolDescription": "Choose the section for this academic year. If the student is in another section now, that enrolment ends as a transfer and stays in the history.",
+      "section": "Section",
+      "sectionHint": "Sections of the current academic year.",
+      "rollNo": "Roll number",
+      "startedOn": "Start date",
+      "startedOnHint": "Use DD/MM/YYYY. Leave it empty for today.",
+      "enrolSubmit": "Save class and section",
+      "reload": "Reload the latest details",
+      "reloaded": "The latest details are loaded. Check them, then save again.",
+      "requestChange": "Request a change",
+      "change": "Change"
+    },
+    "bySource": {
+      "title": "Values by source",
+      "description": "The current value each source holds, side by side. A value that differs from the admission register is marked, so you can check it before a portal submission.",
+      "table": "Current values from each source",
+      "otherSources": "Other sources",
+      "differs": "Differs from the register",
+      "history": "History",
+      "historyTitle": "History of {field}",
+      "replaced": "Replaced",
+      "fromChangeRequest": "from a correction request",
+      "empty": "No values are recorded for this student yet."
     }
   },
   "imports": {
