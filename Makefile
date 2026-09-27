@@ -14,7 +14,10 @@ SEMGREP_VERSION ?= 1.178.0
 GITLEAKS = $(if $(shell command -v gitleaks 2>/dev/null),gitleaks,docker run --rm -v "$(CURDIR):/repo" -w /repo $(GITLEAKS_IMAGE))
 TRIVY    = $(if $(shell command -v trivy 2>/dev/null),trivy,docker run --rm -v "$(CURDIR):/repo" -w /repo $(TRIVY_IMAGE))
 
-.PHONY: help install dev down logs migrate seed-synthetic test test-api test-web test-security \
+# ARGS: extra flags for dev-host (--raw, --no-seed).
+ARGS ?=
+
+.PHONY: help install dev dev-host dev-stop down logs migrate seed-synthetic test test-api test-web test-security \
         migration-check e2e lint format typecheck security eval check db-shell openapi
 
 help: ## List targets
@@ -31,6 +34,12 @@ endif
 
 dev: .env ## Start the local stack (postgres+pgvector, valkey, seaweedfs, api, worker, beat, web)
 	$(COMPOSE) up -d --build --wait
+
+dev-host: .env ## Backing services in Docker; api, worker, beat and web on this machine with reload
+	$(UV) run python scripts/dev.py $(ARGS)
+
+dev-stop: ## Stop the dev-host backing containers (data volumes are kept)
+	$(COMPOSE) --profile dev stop db valkey s3 oidc
 
 down: ## Stop the local stack
 	$(COMPOSE) down

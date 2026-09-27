@@ -86,6 +86,7 @@ The product is built **module by module** on a shared core that does not change 
 cp .env.example .env          # dev-only placeholders; never commit .env
 make install                  # uv sync (Python 3.12) + npm ci (web)
 make dev                      # postgres+pgvector, valkey, seaweedfs (S3), migrate, api, worker, beat, web
+make dev-host                 # same backing services in Docker; api, worker, beat, web on this machine with reload
 make migrate                  # re-run migrations + audit partitions (as sos_migrator); make dev already does this
 make seed-synthetic           # synthetic schools only; never real data (refuses unless SOS_ENV is local/ci)
 make check                    # lint + typecheck + tests + security scans (what CI runs)

@@ -178,6 +178,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | Target | What it does |
 |---|---|
 | `make install` | `uv sync --locked --all-packages` and `npm ci` |
+| `make dev-host` / `dev-stop` | Backing services (db, valkey, s3, oidc) in Docker and the app processes on the host with reload (`scripts/dev.py`: api :8000, worker, beat, web :3000). Idempotent setup first: buckets, `alembic upgrade head` + audit partitions as `sos_migrator`, synthetic seed (`ARGS=--no-seed` skips it). Host processes use `localhost` URLs, including the OIDC issuer `http://localhost:8080/...` (`oidc.localhost` does not resolve outside browsers on Windows). `SOS_DB_PORT` / `SOS_VALKEY_PORT` in `.env` move the host ports when another project uses 5432/6379. `ARGS=--raw` shows every log line unformatted. `dev-stop` stops the containers and keeps their volumes |
 | `make dev` / `down` / `logs` | Start (creating `.env` from `.env.example` if missing; builds, waits for health), stop, tail the stack. Migrations run as part of `make dev` (`migrate` service) |
 | `make migrate` | Starts `db` and runs the `migrate` service (migrations + audit partitions) |
 | `make db-shell` | `psql` as the local admin |

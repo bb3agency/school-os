@@ -88,6 +88,7 @@ Modules call other modules **only via their `service.py` public functions**. Nev
 ```bash
 make install          # uv sync --locked --all-packages + npm ci
 make dev              # local stack (db, valkey, s3, migrate, api, worker, beat, web); creates .env from .env.example
+make dev-host         # backing services in Docker; api, worker, beat, web on the host with reload (scripts/dev.py)
 make migrate          # alembic upgrade head + audit partitions, as sos_migrator (also runs inside make dev)
 make seed-synthetic   # synthetic schools, structure and staff; NEVER real data (refuses outside SOS_ENV=local|ci)
 make openapi          # regenerate apps/api/openapi.json and the TS client (a test fails when it is stale)

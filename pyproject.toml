@@ -50,6 +50,8 @@ known-first-party = ["app", "sos_worker"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S311", "S101", "S105", "S106", "S603", "S607", "S608", "PLR2004", "PLC0415", "N802"]
 "apps/api/migrations/**" = ["E501"]
+# Developer CLIs: they print to the terminal and start local processes (fixed argv lists).
+"scripts/**" = ["T201", "S603", "S607"]
 
 [tool.mypy]
 python_version = "3.12"
