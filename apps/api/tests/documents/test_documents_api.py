@@ -18,6 +18,7 @@ from sqlalchemy import Engine, text
 
 from app.core.config import Environment, Settings
 from app.core.db import tenant_session
+from app.core.errors import Conflict
 from app.documents import service
 from app.documents.scanning import DevNoopScanner, ScannerUnavailable, ScanResult
 
@@ -875,6 +876,79 @@ def test_FR_DOC_007_retention_guard_blocks_delete(
     assert res.status_code == 409
     assert res.json()["code"] == "evidence_in_use"
     assert api.call(owner, "GET", f"/api/v1/documents/{doc}").status_code == 200
+
+
+def _audit_rows(admin: Engine, tenant_id: uuid.UUID, action: str, doc: uuid.UUID) -> list[Any]:
+    with admin.connect() as c:
+        return list(
+            c.execute(
+                text(
+                    "SELECT actor_type, actor_id, summary FROM audit.events WHERE tenant_id = :t "
+                    "AND action = :a AND resource_id = :d ORDER BY seq"
+                ),
+                {"t": tenant_id, "a": action, "d": doc},
+            )
+        )
+
+
+def test_FR_DOC_007_system_retention_delete_removes_rows_audits_and_purges_objects(
+    world: Any, admin_engine: Engine
+) -> None:
+    """A retention job deletes a document without a user (docs/05 §13): rows now, objects after
+    commit through the outbox; audited with the system as actor and the reason."""
+    owner = world.person("owner")
+    doc = S.make_document(admin_engine, world.a.tenant_id, owner.user_id, acl=[("role", "teacher")])
+    store = S.memory_store()
+    prefix = f"t/{world.a.tenant_id}/docs/{doc}/"
+    assert any(k.startswith(prefix) for k in store.objects)
+    with tenant_session(world.a.tenant_id) as s:
+        assert service.delete_for_retention(s, doc, reason="import_raw_file") is True
+    with tenant_session(world.a.tenant_id) as s:
+        assert service.delete_for_retention(s, doc, reason="import_raw_file") is False  # gone
+    with admin_engine.connect() as c:
+        left: Any = c.execute(
+            text("SELECT count(*) FROM kb.document_versions WHERE document_id = :d"), {"d": doc}
+        ).scalar_one()
+    assert left == 0
+    events = _audit_rows(admin_engine, world.a.tenant_id, "document.deleted", doc)
+    assert [(e.actor_type, e.actor_id) for e in events] == [("system", None)]
+    assert events[0].summary == {"purpose": "circular", "versions": 1, "reason": "import_raw_file"}
+    payload = next(
+        p
+        for p in S.outbox_events(admin_engine, world.a.tenant_id, "document.deleted")
+        if p["document_id"] == str(doc)
+    )
+    assert payload["batch_ids"] == []
+    assert service.purge_document_objects(world.a.tenant_id, doc, [], store=store) >= 1
+    assert not any(k.startswith(prefix) for k in store.objects)
+
+
+def test_FR_DOC_007_system_retention_delete_keeps_guards_reasons_and_tenant(
+    world: Any, admin_engine: Engine
+) -> None:
+    owner = world.person("owner")
+    doc = S.make_document(admin_engine, world.a.tenant_id, owner.user_id)
+    with (
+        pytest.raises(ValueError, match="unknown retention reason"),
+        tenant_session(world.a.tenant_id) as s,
+    ):
+        service.delete_for_retention(s, doc, reason="because I said so")
+    service.DELETE_GUARDS.append(lambda s, d: "import_file_retained" if d == doc else None)
+    try:
+        with pytest.raises(Conflict) as err, tenant_session(world.a.tenant_id) as s:
+            service.delete_for_retention(s, doc, reason="import_raw_file")
+    finally:
+        service.DELETE_GUARDS.pop()
+    assert err.value.code == "import_file_retained"
+    # Another school's job never reaches this school's document (RLS): nothing happens.
+    with tenant_session(world.b.tenant_id) as s:
+        assert service.delete_for_retention(s, doc, reason="import_raw_file") is False
+    with admin_engine.connect() as c:
+        kept: Any = c.execute(
+            text("SELECT count(*) FROM kb.documents WHERE id = :d"), {"d": doc}
+        ).scalar_one()
+    assert kept == 1
+    assert _audit_rows(admin_engine, world.a.tenant_id, "document.deleted", doc) == []
 
 
 # --- service API for other modules and workers ----------------------------------------------

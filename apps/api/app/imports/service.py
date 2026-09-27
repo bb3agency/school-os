@@ -40,7 +40,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
-from app.authz.context import Scopes, UserContext
+from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
 from app.core.db import tenant_session
@@ -1384,20 +1384,6 @@ if _retention_guard not in documents.DELETE_GUARDS:
     documents.DELETE_GUARDS.append(_retention_guard)
 
 
-def _retention_context(tenant_id: uuid.UUID, user_id: uuid.UUID) -> UserContext:
-    """Just enough authority for documents.delete_document (school-wide ACL management)."""
-    return UserContext(
-        user_id=user_id,
-        tenant_id=tenant_id,
-        membership_id=uuid.UUID(int=0),
-        roles=frozenset({"system"}),
-        permissions=frozenset({"document.read", "document.manage_acl"}),
-        scopes=Scopes(school=True),
-        mfa=True,
-        auth_time=None,
-    )
-
-
 def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> int:
     """Delete raw import files kept past the retention period (daily job, FR-IMP-007); the
     parsed rows stay. Returns the number of documents deleted."""
@@ -1411,11 +1397,15 @@ def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> 
             if batch.document_id is not None:
                 by_document.setdefault(batch.document_id, []).append(batch)
         for document_id, batches in by_document.items():
-            ctx = _retention_context(tenant_id, batches[0].created_by)
             try:
-                documents.delete_document(s, ctx, document_id)
-            except (Conflict, NotFound):
-                continue  # kept by another batch, or already gone
+                with s.begin_nested():  # a refused delete must not abort the other documents
+                    deleted_now = documents.delete_for_retention(
+                        s, document_id, reason="import_raw_file"
+                    )
+            except Conflict:
+                continue  # kept by another batch, or still evidence for a record
+            if not deleted_now:
+                continue  # already gone
             repo.mark_raw_file_deleted(s, [b.id for b in batches], moment)
             for batch in batches:
                 audit.record(

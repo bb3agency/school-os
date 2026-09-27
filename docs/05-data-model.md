@@ -1140,7 +1140,7 @@ Identity attributes resolve to the verified admission-register value (BR-01). If
 | Data | Default | Notes |
 |---|---|---|
 | Student records (active/left) | Per school policy; admission-register-equivalent data kept long-term | School decides; many registers are permanent records |
-| Import raw files | 90 days after commit | Parsed values remain |
+| Import raw files | 90 days after commit | Parsed values remain. Daily `imports.purge_raw_files` calls `documents.delete_for_retention` (system actor, reason `import_raw_file`; objects purged after commit through the outbox); a file still linked as evidence is kept |
 | Register photos used as evidence | Life of the linked value | Evidence for official changes |
 | Exports | 7 days | Regenerate on demand |
 | `kb.queries` (encrypted Q/A) | 180 days | Metadata aggregates kept longer, de-identified |
