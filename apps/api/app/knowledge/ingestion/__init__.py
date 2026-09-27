@@ -25,6 +25,7 @@ As built (K5), one module per stage:
 - ``hooks``: documents hooks -> outbox events -> ``knowledge.*`` tasks (``app.knowledge.tasks``);
   ``runtime``: the pipeline factory the composition root sets.
 
-Not yet: PDF text layer (ADR-0027, proposed), OCR, XLSX, metadata extraction, the per-stage
-version statuses of FR-DOC-008 and the ``kb.document.ready`` notification.
+Not yet: OCR (scanned PDF pages fail with ``needs_ocr``), XLSX, metadata extraction, the
+per-stage version statuses of FR-DOC-008 and the ``kb.document.ready`` notification. The PDF text
+layer is read by ``pdf`` (ADR-0027, pypdfium2), loaded lazily by ``extract``.
 """
