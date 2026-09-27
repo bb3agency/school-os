@@ -1181,7 +1181,9 @@
       "sensitivity_below_minimum": "This kind of document needs a higher level. Choose the next one down the list.",
       "purpose_mismatch": "This file is for another kind of document. Reload the page and try again.",
       "upload_is_for_a_new_version": "Reload the page and upload the file again.",
-      "upload_is_for_another_document": "Reload the page and upload the file again."
+      "upload_is_for_another_document": "Reload the page and upload the file again.",
+      "different_class_or_year": "Choose a section of the same class and year. To change the class, use “Change class or section”.",
+      "before_start": "The end date is before the start date. Choose a later date."
     },
     "api": {
       "generic": {
@@ -1678,7 +1680,12 @@
       "clearAddress": "Remove the address",
       "isPrimary": "Main contact for the school",
       "addSubmit": "Add",
-      "editSubmit": "Save changes"
+      "editSubmit": "Save changes",
+      "remove": "Remove",
+      "removeTitle": "Remove {name} from this student?",
+      "removeBody": "They will no longer be listed as this student's parent or guardian. If no other student is linked to them, their details, phone number and address are deleted for good.",
+      "removeNote": "Brothers and sisters linked to the same parent or guardian keep them. The change is recorded in the audit log.",
+      "removeSubmit": "Remove"
     },
     "errors": {
       "identity_change_required": {
@@ -1691,7 +1698,7 @@
       },
       "already_enrolled": {
         "title": "Already in this section",
-        "body": "The student is already in this section. Choose a different section, or leave it as it is."
+        "body": "The student is already in this section. To correct only the roll number, choose “Correct” next to this year's enrolment below."
       },
       "not_sensitive": {
         "title": "Nothing to show",
@@ -1708,6 +1715,10 @@
       "precondition_failed": {
         "title": "Someone else changed this first",
         "body": "Another person saved a change to this record while you were working. Choose “Reload the latest details”, check their change, then save yours again."
+      },
+      "enrollment_not_active": {
+        "title": "This enrolment has already ended",
+        "body": "Someone ended this enrolment meanwhile, so it can't be ended again or moved to another section. Choose “Reload the latest details” to see it."
       }
     },
     "edit": {
@@ -1743,6 +1754,50 @@
       "replaced": "Replaced",
       "fromChangeRequest": "from a correction request",
       "empty": "No values are recorded for this student yet."
+    },
+    "enrolments": {
+      "description": "Every year the student was in a section, newest first. Correct a roll number here, or move the student to another section of the same class.",
+      "table": "Enrolments by year",
+      "colYear": "Academic year",
+      "colSection": "Class and section",
+      "colRollNo": "Roll number",
+      "colStatus": "Status",
+      "colDates": "Dates",
+      "dates": "{start} to {end}",
+      "ongoing": "now",
+      "unknownSection": "A section no longer listed",
+      "emptyTitle": "No enrolments yet",
+      "emptyBody": "Put the student in a section with “Put in a section”.",
+      "status": {
+        "active": "Current",
+        "completed": "Completed",
+        "transferred": "Transferred"
+      },
+      "edit": "Correct",
+      "editTitle": "Correct this enrolment",
+      "editDescription": "Correct the roll number, or move the student to another section of the same class this year. To change the class, use “Change class or section”.",
+      "editDescriptionClosed": "Correct the roll number of this enrolment. The class and section can't be changed.",
+      "section": "Section",
+      "sectionHint": "Sections of the same class and academic year.",
+      "rollNo": "Roll number",
+      "rollNoHint": "Leave it empty to remove the roll number.",
+      "editSubmit": "Save correction",
+      "end": "End",
+      "endTitle": "End this enrolment?",
+      "endDescription": "The student will no longer be in this section. The enrolment stays in the history.",
+      "endStatusLegend": "Why does it end?",
+      "endStatus": {
+        "completed": "Completed the year",
+        "transferred": "Transferred"
+      },
+      "endStatusHint": {
+        "completed": "The year finished, or the student left the school.",
+        "transferred": "The student moved to another school or section."
+      },
+      "endedOn": "End date",
+      "endedOnHint": "Use DD/MM/YYYY. Leave it empty for today.",
+      "endNote": "The record status does not change. If the student left the school, also use “Change status”.",
+      "endSubmit": "End enrolment"
     }
   },
   "imports": {

@@ -33,7 +33,13 @@ import {
 import { ProblemAlert, problemCode } from "./ProblemAlert";
 import { SensitiveValue } from "./SensitiveValue";
 import { ValuesBySource } from "./SourceCompare";
-import { EnrolmentDialog, GuardianDialog, StatusDialog, reloadOnConflict } from "./StudentEdit";
+import { EnrolmentsCard } from "./Enrolments";
+import {
+  GuardianDialog,
+  RemoveGuardianDialog,
+  StatusDialog,
+  reloadOnConflict,
+} from "./StudentEdit";
 import {
   VALUE_SOURCES,
   isValueSource,
@@ -456,7 +462,12 @@ function GuardiansCard({
           {
             key: "actions",
             header: <span className="sr-only">{tc("actions")}</span>,
-            cell: (row: Guardian) => <GuardianDialog studentId={student.id} guardian={row} />,
+            cell: (row: Guardian) => (
+              <span className="flex flex-wrap gap-1" data-print="hide">
+                <GuardianDialog studentId={student.id} guardian={row} />
+                <RemoveGuardianDialog studentId={student.id} guardian={row} />
+              </span>
+            ),
           },
         ]
       : []),
@@ -658,23 +669,8 @@ export function StudentDetailView({
         index={index}
         canReveal={permissions.has(PERM.readSensitive) && data.sensitive_revealable}
       />
-      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <GuardiansCard student={data} guardians={guardians} permissions={permissions} />
-        <Card title={t("classTitle")} actions={canEdit ? <EnrolmentDialog student={data} /> : null}>
-          {data.enrollment ? (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <dt className="text-ink-muted">{t("classSection")}</dt>
-              <dd className="font-semibold">{data.enrollment.label}</dd>
-              <dt className="text-ink-muted">{t("rollNo")}</dt>
-              <dd>
-                <Value>{data.enrollment.roll_no ?? null}</Value>
-              </dd>
-            </dl>
-          ) : (
-            <p className="text-sm text-ink-muted">{t("notEnrolled")}</p>
-          )}
-        </Card>
-      </div>
+      <GuardiansCard student={data} guardians={guardians} permissions={permissions} />
+      <EnrolmentsCard student={data} permissions={permissions} />
     </div>
   );
 }
