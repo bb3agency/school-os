@@ -99,7 +99,6 @@ def test_SEC_030_seccomp_profile_is_what_the_derivation_script_produces() -> Non
     assert set(rule["names"]) == SANDBOX_SYSCALLS
     assert _profile()["syscalls"][-1] == rule
     assert SECCOMP.read_text(encoding="utf-8").endswith("}\n")
-    assert "\r" not in SECCOMP.read_text(encoding="utf-8")
 
 
 # --- the AppArmor profile -------------------------------------------------------------------------

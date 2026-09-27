@@ -56,7 +56,8 @@ def main() -> int:
         return 2
     with open(sys.argv[1], encoding="utf-8") as fh:
         default = json.load(fh)
-    sys.stdout.write(json.dumps(derive(default), indent=2) + "\n")
+    # LF line endings on every platform.
+    sys.stdout.buffer.write((json.dumps(derive(default), indent=2) + "\n").encode("utf-8"))
     return 0
 
 
