@@ -130,8 +130,33 @@ If the Playwright browser download is blocked, run the same command inside
 ## Manual verification with the dev OIDC stub
 
 The compose `oidc` service (profile `dev`, `ghcr.io/navikt/mock-oauth2-server`, config
-`infra/docker/oidc.json`) issues 10-minute tokens for issuers `schoolos` and `platform`;
-operators get `sos:mfa: "true"`.
+`infra/docker/oidc.json`) issues 10-minute tokens for issuers `schoolos` and `platform`.
+Both issuers add `sos:mfa: "true"` and `amr: ["pwd", "mfa"]` to every token, so staff and
+operators alike only **type a subject** at the stub's login page (no claims JSON), including
+owner, principal and office_admin, whose roles require MFA.
+
+**Production MFA is unchanged.** Only the local fake identity provider says "MFA done"; the
+API and the BFF check MFA and step-up exactly as in staging/prod, where the identity provider
+is Cognito with real MFA (ADR-0012, ADR-0018). The stub runs only in the compose `dev`
+profile, bound to `127.0.0.1`, and the API refuses its issuers outside `SOS_ENV=local`
+(`apps/api/tests/deploy/test_dev_oidc_stub.py` pins all of this, including that no Terraform,
+dedicated-host, Dockerfile or deploy-workflow file mentions the stub). Because the stub's
+claims win over anything typed in its claims box, a non-MFA staff session cannot be simulated
+locally; the MFA-denial paths are covered by the API and BFF test suites.
+
+**Dev sign-in page:** under `next dev` (`make dev-host`) with a local issuer, open
+<http://localhost:3000/en/dev/sign-in> (the signed-out page links to it). It lists the
+synthetic subjects per school (`synth-a`, `synth-b`) and role, with "Copy" and "Sign in"
+(the normal `/bff/auth/login` flow). It is a 404 unless `NODE_ENV=development` **and**
+`OIDC_ISSUER` is on a loopback or `*.localhost` host, so `next start`/production builds
+(including the compose `web` container) never serve it. `make dev-host` also prints a short
+"Sign in as" list when it starts.
+
+**Step-up locally:** the stub does not put `auth_time` in its tokens, and the API only
+accepts a step-up when `auth_time` is at most 5 minutes old. When an action asks you to
+confirm it's you, select "Copy step-up claims" on the dev sign-in page (it copies
+`{"auth_time": <now>}`), paste it in the stub's claims box and sign in again with the same
+subject. Without it the action keeps asking for step-up: nothing is bypassed.
 
 **One issuer name everywhere:** `http://oidc.localhost:8080/<issuer>`. Browsers resolve any
 `*.localhost` name to loopback (RFC 6761), so they reach the stub on `127.0.0.1:8080`; inside
@@ -149,9 +174,9 @@ development issuer (allowed in `local`, refused in staging/prod).
    `synthetic|synth-a|principal|1`) and
    `uv run python -m app.platform.bootstrap_owner --subject <sub> --email … --display-name …`
    for the first operator.
-3. Open <http://localhost:3000/en/settings/structure>, sign in at the stub with a synthetic
-   subject (owner, principal and office_admin need MFA: add the claim `{"sos:mfa": "true"}`
-   if your stub version offers the claims box). One school → the page; several → the picker.
+3. Open <http://localhost:3000/en/settings/structure> and sign in at the stub by typing a
+   synthetic subject (for example `synthetic|synth-a|owner|1`; leave the claims box empty).
+   One school → the page; several → the picker.
 4. Check in the browser dev tools: cookie `sos_session` is HttpOnly; no `Authorization`
    header or token appears in any `/bff/*` response, `localStorage` or `sessionStorage`;
    POSTs carry `X-CSRF-Token` (creating POSTs also `Idempotency-Key`).
