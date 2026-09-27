@@ -142,7 +142,10 @@ def test_too_much_text_is_refused() -> None:
         extract_pages(("word " * 400).encode(), TEXT_MIME, limits)
 
 
-@pytest.mark.parametrize("mime", ["application/pdf", "image/png", "text/csv"])
+@pytest.mark.parametrize(
+    "mime",
+    ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "text/csv"],
+)
 def test_unsupported_types_are_refused(mime: str) -> None:
     with pytest.raises(ExtractionFailed, match="unsupported_type"):
         extract_pages(b"%PDF-1.7", mime, LIMITS)

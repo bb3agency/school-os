@@ -1,6 +1,6 @@
-"""Text extraction (docs/06 §4.2): DOCX and plain text. Output is RAW (not yet cleaned or
-redacted); :mod:`app.knowledge.ingestion.clean` must run before anything is stored, logged,
-chunked or embedded (invariant 4).
+"""Text extraction (docs/06 §4.2): DOCX, plain text and the PDF text layer. Output is RAW (not
+yet cleaned or redacted); :mod:`app.knowledge.ingestion.clean` must run before anything is
+stored, logged, chunked or embedded (invariant 4).
 
 - **DOCX** is read with the standard library ``zipfile`` and ``defusedxml`` (already a
   dependency; no XXE, entity expansion or DTDs), not python-docx: paragraphs in body order
@@ -11,7 +11,9 @@ chunked or embedded (invariant 4).
   codes, headers and footers are not read. Each XML part is size-capped before parsing
   (zip-bomb guard, ``extraction.max_xml_bytes``).
 - **Plain text** (UTF-8): paragraphs separated by blank lines; form feeds start a new page.
-- **PDF text layer**: not yet; the library choice is ADR-0027 (proposed).
+- **PDF text layer** (ADR-0027): :mod:`app.knowledge.ingestion.pdf` with pypdfium2, imported
+  only when a PDF is extracted (the ingest worker), with its own limits (``extraction.pdf``);
+  encrypted PDFs are refused and scanned or mojibake pages fail with ``needs_ocr``.
 
 Failures raise :class:`ExtractionFailed` with a code only; never the file's text.
 """
@@ -35,6 +37,7 @@ from app.knowledge.domain import BlockKind, ExtractedBlock, ExtractedPage
 
 DOCX_MIME: Final = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 TEXT_MIME: Final = "text/plain"
+PDF_MIME: Final = "application/pdf"
 
 _W: Final = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _HEADING_NAME: Final = re.compile(r"^heading\s*([1-9])$")
@@ -59,6 +62,11 @@ def extract_pages(data: bytes, mime_type: str, limits: ExtractionConfig) -> list
         pages = _docx(data, limits)
     elif mime == TEXT_MIME:
         pages = _plain(data)
+    elif mime == PDF_MIME:
+        # Lazy: only the ingest path loads the native PDFium library (ADR-0027).
+        from app.knowledge.ingestion.pdf import extract_pdf  # noqa: PLC0415
+
+        pages = extract_pdf(data, limits)
     else:  # pragma: no cover - configured but not implemented
         raise ExtractionFailed("unsupported_type")
     chars = sum(len(b.text) + sum(len(c) for c in b.table_header) for p in pages for b in p.blocks)
@@ -286,4 +294,4 @@ def _cell_text(tc: Element) -> str:
     return " ".join(paragraphs)
 
 
-__all__ = ["DOCX_MIME", "TEXT_MIME", "ExtractionFailed", "extract_pages"]
+__all__ = ["DOCX_MIME", "PDF_MIME", "TEXT_MIME", "ExtractionFailed", "extract_pages"]
