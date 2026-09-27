@@ -47,6 +47,7 @@ TASK_MODULES: list[str] = [
     "app.extraction.tasks",
     "app.exports.tasks",
     "app.knowledge.tasks",
+    "app.students.tasks",
 ]
 
 
