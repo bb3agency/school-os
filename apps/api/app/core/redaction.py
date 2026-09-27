@@ -12,6 +12,8 @@ Public API
 - ``redact(text)``: masks Aadhaar-like numbers, Indian mobile numbers and email addresses
   (logs, traces, error reports: last line of defence, docs/11 §2).
 - ``contains_full_aadhaar(text)``: input rejection (FR-STU-012).
+- ``find_aadhaar(text)``: where the numbers ``mask_aadhaar`` masks are (image redaction,
+  PRV-016: callers map the character ranges to OCR bounding boxes).
 
 Detection rules (defined and tested in ``tests/core/test_redaction.py``)
 -----------------------------------------------------------------------
@@ -41,7 +43,9 @@ from dataclasses import dataclass
 
 __all__ = [
     "EMAIL_MASK",
+    "AadhaarMatch",
     "contains_full_aadhaar",
+    "find_aadhaar",
     "mask_aadhaar",
     "redact",
     "verhoeff_check_digit",
@@ -205,16 +209,22 @@ def _merge(regions: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return merged
 
 
-def _aadhaar_regions(
-    text: str, groups: list[_Group], spans: list[tuple[int, int]]
-) -> list[tuple[int, int]]:
-    regions: list[tuple[int, int]] = []
+def _aadhaar_windows(
+    groups: list[_Group], spans: list[tuple[int, int]]
+) -> list[tuple[int, int, str, bool]]:
+    """Qualifying windows ``(i, j, digits, verhoeff_valid)``: Verhoeff-valid, or near a keyword."""
+    found: list[tuple[int, int, str, bool]] = []
     for i, j, digits in _windows(groups, _AADHAAR_LEN):
         if _is_explicit_phone(groups, i, digits):
             continue
-        if verhoeff_valid(digits) or _near_context(groups[i].start, groups[j].end, spans):
-            regions.append((i, j))
-    return _merge(regions)
+        valid = verhoeff_valid(digits)
+        if valid or _near_context(groups[i].start, groups[j].end, spans):
+            found.append((i, j, digits, valid))
+    return found
+
+
+def _aadhaar_regions(groups: list[_Group], spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    return _merge([(i, j) for i, j, _, _ in _aadhaar_windows(groups, spans)])
 
 
 def _is_mobile(digits: str) -> bool:
@@ -258,7 +268,7 @@ def _mask_runs(text: str, *, mobiles: bool) -> tuple[str, bool]:
     for run in _RUN_RE.finditer(view):
         groups = _groups(view, run)
         replacements: list[tuple[int, int, str]] = []
-        aadhaar = _aadhaar_regions(text, groups, spans)
+        aadhaar = _aadhaar_regions(groups, spans)
         taken: set[int] = set()
         for i, j in aadhaar:
             digits = "".join(g.digits for g in groups[i : j + 1])
@@ -306,3 +316,33 @@ def contains_full_aadhaar(text: str) -> bool:
             if verhoeff_valid(digits):
                 return True
     return False
+
+
+@dataclass(frozen=True, slots=True)
+class AadhaarMatch:
+    """One 12-digit window that :func:`mask_aadhaar` masks: ``text[start:end]`` holds it
+    (separators included), ``digits`` are its 12 digits in ASCII, ``verhoeff`` whether the
+    checksum passes (False: masked only because an Aadhaar keyword is near)."""
+
+    start: int
+    end: int
+    digits: str
+    verhoeff: bool
+
+
+def find_aadhaar(text: str) -> list[AadhaarMatch]:
+    """Every Aadhaar-like window in ``text``, in order, with its character range.
+
+    Same rules as :func:`mask_aadhaar` (first pass), but windows are reported one by one rather
+    than merged, and positions index ``text`` exactly as given: pass NFC-normalised text. Used
+    to locate numbers on an image through OCR boxes (PRV-016); the caller must never log or
+    store ``digits``.
+    """
+    spans = _context_spans(text)
+    view = _scan_view(text)
+    found: list[AadhaarMatch] = []
+    for run in _RUN_RE.finditer(view):
+        groups = _groups(view, run)
+        for i, j, digits, valid in _aadhaar_windows(groups, spans):
+            found.append(AadhaarMatch(groups[i].start, groups[j].end, digits, valid))
+    return found
