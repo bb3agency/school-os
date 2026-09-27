@@ -1237,5 +1237,206 @@
     "stillNone": "Still no access. Ask the office to send the invitation again.",
     "checkFailed": "We couldn't check right now. Try again in a minute.",
     "signIn": "Sign in"
+  },
+  "students": {
+    "nav": "Students",
+    "aadhaarNotAllowed": "This looks like a full Aadhaar number. SchoolOS never stores it: enter only the last 4 digits, in the Aadhaar last 4 digits field.",
+    "aadhaarWarningTitle": "No Aadhaar numbers",
+    "aadhaarWarningBody": "Don't enter full Aadhaar numbers anywhere. Only the last 4 digits are kept, in their own field.",
+    "dateHint": "Use DD/MM/YYYY, for example 14/03/2012.",
+    "dateInvalid": "Enter a real date as DD/MM/YYYY, for example 14/03/2012.",
+    "status": {
+      "provisional": "Provisional",
+      "active": "Studying",
+      "left": "Left school",
+      "graduated": "Completed school"
+    },
+    "sources": {
+      "admission_register": "Admission register",
+      "aadhaar_as_printed": "Aadhaar (as printed)",
+      "udise_plus": "UDISE+",
+      "board_registration": "Board registration",
+      "birth_certificate": "Birth certificate",
+      "parent_form": "Parent form",
+      "tc_incoming": "Transfer certificate (incoming)",
+      "manual_entry": "Entered by the office"
+    },
+    "sourceShort": {
+      "admission_register": "Register",
+      "aadhaar_as_printed": "Aadhaar",
+      "udise_plus": "UDISE+",
+      "board_registration": "Board",
+      "birth_certificate": "Birth cert.",
+      "parent_form": "Parent form",
+      "tc_incoming": "TC",
+      "manual_entry": "Office"
+    },
+    "verification": {
+      "verified": "verified",
+      "unverified": "not verified yet",
+      "rejected": "marked wrong",
+      "provisional": "provisional, waiting for verification"
+    },
+    "enumValues": {
+      "female": "Girl",
+      "male": "Boy",
+      "transgender": "Transgender",
+      "general": "General",
+      "ews": "EWS",
+      "obc": "OBC / BC",
+      "sc": "SC",
+      "st": "ST"
+    },
+    "sensitive": {
+      "show": "Show",
+      "showing": "Showing…",
+      "hide": "Hide",
+      "revealedLabel": "{field}:",
+      "hiddenLabel": "{field} is hidden. Showing it is recorded in the audit log."
+    },
+    "list": {
+      "title": "Students",
+      "description": "Find a student by name in English or Telugu, admission number, class and section, or a parent's name.",
+      "add": "Add a student",
+      "import": "Import from a spreadsheet",
+      "print": "Print this list",
+      "searchTitle": "Find students",
+      "searchLabel": "Name, admission number or class",
+      "searchHint": "For example: venkat sai 9b, 2019/0457 or a parent's name.",
+      "filterClass": "Class",
+      "filterSection": "Section",
+      "filterStatus": "Status",
+      "clear": "Clear the search",
+      "resultsTitle": "Students found",
+      "noMatchTitle": "No student matches",
+      "noMatchBody": "Check the spelling, try fewer words, or clear the class and section filters.",
+      "emptyTitle": "No students yet",
+      "emptyBody": "Add students one by one, or import your class lists from a spreadsheet.",
+      "pagesLabel": "Pages of results",
+      "previous": "Previous page",
+      "next": "Next page",
+      "pageNumber": "Page {page}",
+      "colName": "Name",
+      "colAdmissionNo": "Admission number",
+      "colClassSection": "Class and section",
+      "colStatus": "Status",
+      "unnamed": "Name not recorded",
+      "matchedOn": "Found by: {field}"
+    },
+    "create": {
+      "title": "Add a student",
+      "description": "Enter the details as written on the source you have in hand. Each value remembers where it came from.",
+      "noPermissionTitle": "You can't add students",
+      "noPermissionBody": "Ask your school's office admin if you need to add students.",
+      "source": "Where are these details from?",
+      "sourceHint": "Usually the admission register. It is the legal record of the school.",
+      "detailsLegend": "Student details",
+      "admissionNo": "Admission number",
+      "admissionNoHint": "Letters, digits and / . _ - only, for example 2019/0457.",
+      "fullName": "Full name",
+      "fullNameHint": "Exactly as written on the source, including initials.",
+      "dob": "Date of birth",
+      "gender": "Gender",
+      "fatherName": "Father's name",
+      "motherName": "Mother's name",
+      "classLegend": "Class this year",
+      "section": "Class and section",
+      "sectionHint": "Leave empty to add the student to a section later.",
+      "noSection": "Not in a section yet",
+      "rollNo": "Roll number",
+      "status": "Record status",
+      "statusHint": "Choose Provisional if the details still need checking.",
+      "submit": "Add student"
+    },
+    "detail": {
+      "loadingTitle": "Student",
+      "unnamed": "Name not recorded",
+      "summary": "Admission number {admission} · {classSection}",
+      "noClass": "not in a section this year",
+      "relatedLabel": "Related pages",
+      "backToList": "Back to students",
+      "findingsLink": "Data checks for this student",
+      "changeRequestsLink": "Correction requests for this student",
+      "valuesTitle": "Details and their sources",
+      "valuesDescription": "The value used is the one from the most trusted source. For identity fields that is the verified admission register value. Other sources are shown beside it so differences are never hidden.",
+      "valuesTable": "Student details with every source",
+      "colField": "Field",
+      "colUsed": "Value used",
+      "colSources": "Values from each source",
+      "identityField": "Identity field: changes need a correction request",
+      "restrictedField": "Restricted: hidden until you choose Show",
+      "provisional": "Provisional",
+      "conflicts": "Differs from: {sources}",
+      "recordedOn": "Recorded {date}",
+      "hasEvidence": "evidence attached",
+      "fromImport": "from an import",
+      "markVerified": "Mark verified",
+      "markRejected": "Mark wrong",
+      "verifiedDone": "The value is marked verified.",
+      "rejectedDone": "The value is marked wrong. It is no longer used.",
+      "noValues": "No details are recorded for this student yet. Choose “Record a value” to add one.",
+      "classTitle": "Class and enrolment",
+      "classSection": "Class and section",
+      "rollNo": "Roll number",
+      "notEnrolled": "Not in a section this academic year."
+    },
+    "record": {
+      "open": "Record a value",
+      "title": "Record a value",
+      "description": "Add what one source says. The earlier value from that source stays in the history.",
+      "field": "Field",
+      "source": "Source",
+      "sourceHint": "Where you read this value.",
+      "value": "Value",
+      "digits4Hint": "Only the last 4 digits of the Aadhaar number, for example 1234.",
+      "digits4Invalid": "Enter exactly 4 digits: the last 4 digits of the Aadhaar number.",
+      "identityNote": "This is an identity field. Once the admission register value is recorded, changing it needs a correction request with evidence, approved by the principal.",
+      "submit": "Record value",
+      "goToChangeRequests": "Open correction requests for this student"
+    },
+    "guardians": {
+      "title": "Parents and guardians",
+      "description": "Phone numbers and addresses are restricted and hidden until you choose Show.",
+      "colName": "Name",
+      "colRelationship": "Relationship",
+      "colPhone": "Phone",
+      "colAddress": "Address",
+      "primary": "Main contact",
+      "emptyTitle": "No parent or guardian recorded",
+      "emptyBody": "Parents and guardians appear here once they are added to the student's record.",
+      "phoneOf": "Phone number of {name}",
+      "addressOf": "Address of {name}",
+      "relationship": {
+        "father": "Father",
+        "mother": "Mother",
+        "guardian": "Guardian"
+      }
+    },
+    "errors": {
+      "identity_change_required": {
+        "title": "This needs a correction request",
+        "body": "The admission register value of an identity field can't be changed directly. Raise a correction request with the evidence, and the principal will approve it."
+      },
+      "value_superseded": {
+        "title": "A newer value was recorded",
+        "body": "Someone recorded a newer value for this field. Reload the page and check the current value."
+      },
+      "already_enrolled": {
+        "title": "Already in this section",
+        "body": "The student is already in this section. Choose a different section, or leave it as it is."
+      },
+      "not_sensitive": {
+        "title": "Nothing to show",
+        "body": "This field is not restricted, so it is already shown on the page."
+      },
+      "aadhaar_full_number_rejected": {
+        "title": "Full Aadhaar numbers are not allowed",
+        "body": "SchoolOS never stores a full Aadhaar number. Remove it and enter only the last 4 digits in their own field."
+      },
+      "student_not_found": {
+        "title": "Student not found",
+        "body": "The student may have been removed, or is not in your classes. Search for the student again."
+      }
+    }
   }
 }

@@ -33,6 +33,9 @@ export function SchoolShell({
   const t = useTranslations();
   const all: SchoolNavItem[] = [
     { href: "/", label: t("school.nav.home"), exact: true },
+    { href: "/students", label: t("students.nav"), permission: "student.read_basic" },
+    { href: "/imports", label: t("imports.nav"), permission: "import.run" },
+    { href: "/register-photos", label: t("extraction.nav"), permission: "import.run" },
     { href: "/settings/structure", label: t("school.nav.structure") },
     { href: "/settings/users", label: t("school.nav.users"), permission: "user.manage" },
     {

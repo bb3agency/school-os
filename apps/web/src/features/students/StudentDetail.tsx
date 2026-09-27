@@ -1,0 +1,616 @@
+"use client";
+
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
+import { z } from "zod";
+import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SelectField } from "@/components/ui/Select";
+import { DataTable, type Column } from "@/components/ui/Table";
+import { Value } from "@/components/ui/Value";
+import { Link } from "@/i18n/navigation";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { formatDate, formatList } from "@/lib/format";
+import type { Loadable } from "@/lib/loadable";
+import type { Locale } from "@/i18n/routing";
+import { containsFullAadhaar } from "./aadhaar";
+import { toIsoDate } from "./dates";
+import { GuardedTextField } from "./fields";
+import { FormDialog } from "./FormDialog";
+import { PERM, useStaffPermissions, type Permissions } from "./me";
+import {
+  LoadGate,
+  SourceChip,
+  StudentStatusBadge,
+  useAttributeIndex,
+  useAttributes,
+  useValueFormatter,
+} from "./parts";
+import { ProblemAlert, problemCode } from "./ProblemAlert";
+import { SensitiveValue } from "./SensitiveValue";
+import {
+  VALUE_SOURCES,
+  isValueSource,
+  type Attribute,
+  type CanonicalValue,
+  type Guardian,
+  type SourceValue,
+  type Student,
+  type ValueSource,
+} from "./types";
+
+export const studentKey = (id: string) => ["staff", "students", id] as const;
+
+/** Findings and change requests are other screens: link to them by URL (filtered). */
+function RelatedLinks({ studentId, permissions }: { studentId: string; permissions: Permissions }) {
+  const t = useTranslations("students.detail");
+  const q = `student_id=${encodeURIComponent(studentId)}`;
+  const links = [
+    ...(permissions.has(PERM.findingsRead)
+      ? [{ href: `/findings?${q}`, label: t("findingsLink") }]
+      : []),
+    ...(permissions.has(PERM.requestChange) || permissions.has(PERM.approveChange)
+      ? [{ href: `/change-requests?${q}`, label: t("changeRequestsLink") }]
+      : []),
+  ];
+  return (
+    <nav aria-label={t("relatedLabel")} data-print="hide">
+      <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <li>
+          <Link href="/students" className="text-primary underline">
+            {t("backToList")}
+          </Link>
+        </li>
+        {links.map((link) => (
+          <li key={link.href}>
+            <Link href={link.href} className="text-primary underline">
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+function canonicalState(canonical: CanonicalValue): "verified" | "provisional" | "unverified" {
+  if (canonical.verified) return "verified";
+  return canonical.provisional ? "provisional" : "unverified";
+}
+
+interface RowProps {
+  student: Student;
+  attributeKey: string;
+  attribute: Attribute | undefined;
+  label: string;
+  permissions: Permissions;
+  onVerify: (value: SourceValue, status: "verified" | "rejected") => void;
+  verifying: string | null;
+}
+
+/** One attribute: the value SchoolOS uses, and every source's current value beside it. */
+function AttributeRow({
+  student,
+  attributeKey,
+  attribute,
+  label,
+  permissions,
+  onVerify,
+  verifying,
+}: RowProps) {
+  const t = useTranslations("students.detail");
+  const ts = useTranslations("students");
+  const locale = useLocale() as Locale;
+  const format = useValueFormatter();
+  const canonical = student.canonical[attributeKey];
+  const values = (student.values[attributeKey] ?? []).filter((value) => value.current);
+  const canReveal = permissions.has(PERM.readSensitive) && student.sensitive_revealable;
+  const canVerify = permissions.has(PERM.updateNonIdentity) && attribute?.is_identity === false;
+
+  const shown = (value: string | null, masked: boolean, valueId?: string) =>
+    masked ? (
+      <SensitiveValue
+        studentId={student.id}
+        attributeKey={attributeKey}
+        fieldLabel={label}
+        valueId={valueId}
+        canReveal={canReveal}
+      />
+    ) : (
+      <span className="font-semibold">
+        <Value>{format(value, attribute)}</Value>
+      </span>
+    );
+
+  const conflicts = canonical?.conflicts.filter(isValueSource) ?? [];
+
+  return (
+    <tr className="align-top">
+      <th scope="row" className="px-3 py-3 text-left font-semibold whitespace-normal">
+        {label}
+        {attribute?.is_identity ? (
+          <span className="block text-xs font-normal text-ink-muted">{t("identityField")}</span>
+        ) : null}
+        {attribute?.classification === "C3" ? (
+          <span className="block text-xs font-normal text-ink-muted">{t("restrictedField")}</span>
+        ) : null}
+      </th>
+      <td className="px-3 py-3">
+        {canonical ? (
+          <div className="space-y-1">
+            {shown(canonical.value, canonical.masked)}
+            <div className="flex flex-wrap items-center gap-2">
+              {canonical.source ? (
+                <SourceChip source={canonical.source} verification={canonicalState(canonical)} />
+              ) : null}
+              {canonical.provisional ? <Badge tone="warning">{t("provisional")}</Badge> : null}
+              {conflicts.length > 0 ? (
+                <Badge tone="warning">
+                  {t("conflicts", {
+                    sources: formatList(
+                      conflicts.map((source) => ts(`sourceShort.${source}`)),
+                      locale,
+                    ),
+                  })}
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <Value>{null}</Value>
+        )}
+      </td>
+      <td className="px-3 py-3">
+        {values.length === 0 ? (
+          <Value>{null}</Value>
+        ) : (
+          <ul className="space-y-3">
+            {values.map((value) => (
+              <li key={value.id} className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SourceChip source={value.source} verification={value.verification_status} />
+                  {shown(value.value, value.masked, value.id)}
+                </div>
+                <p className="text-xs text-ink-muted">
+                  {t("recordedOn", { date: formatDate(value.recorded_at) ?? "" })}
+                  {value.evidence_document_id ? ` · ${t("hasEvidence")}` : ""}
+                  {value.import_batch_id ? ` · ${t("fromImport")}` : ""}
+                </p>
+                {canVerify && value.verification_status === "unverified" ? (
+                  <div className="flex flex-wrap gap-2" data-print="hide">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={verifying === value.id}
+                      onClick={() => onVerify(value, "verified")}
+                    >
+                      {t("markVerified")}
+                      <span className="sr-only">
+                        : {label}, {ts(`sources.${isValueSource(value.source) ? value.source : "manual_entry"}`)}
+                      </span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={verifying === value.id}
+                      onClick={() => onVerify(value, "rejected")}
+                    >
+                      {t("markRejected")}
+                      <span className="sr-only">: {label}</span>
+                    </Button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/* ------------------------------------------------------------------ record a value */
+
+function valueSchema(attribute: Attribute | undefined) {
+  const base = z
+    .string()
+    .trim()
+    .min(1, { error: "required" })
+    .max(1000, { error: "tooLong" })
+    .refine((value) => !containsFullAadhaar(value), { error: "invalid" });
+  if (attribute?.data_type === "date") {
+    return base
+      .refine((value) => toIsoDate(value) !== null, { error: "invalidDate" })
+      .transform((value) => toIsoDate(value) ?? value);
+  }
+  if (attribute?.data_type === "digits4") {
+    return base.refine((value) => /^\d{4}$/.test(value), { error: "invalid" });
+  }
+  return base;
+}
+
+function recordSchema(attribute: Attribute | undefined) {
+  return z.object({
+    attribute_key: z.string().trim().min(1, { error: "chooseOption" }),
+    source: z.enum(VALUE_SOURCES, { error: "chooseOption" }),
+    value: valueSchema(attribute),
+  });
+}
+
+function RecordValueDialog({
+  student,
+  attributes,
+}: {
+  student: Student;
+  attributes: readonly Attribute[];
+}) {
+  const t = useTranslations("students.record");
+  const ts = useTranslations("students");
+  const tc = useTranslations("common");
+  const locale = useLocale();
+  const api = useBffClient("staff");
+  const [key, setKey] = useState("");
+  const [raw, setRaw] = useState("");
+  const format = useValueFormatter();
+  const attribute = attributes.find((item) => item.key === key);
+  const sources: readonly ValueSource[] = attribute?.allowed_sources
+    ? VALUE_SOURCES.filter((source) => attribute.allowed_sources?.includes(source))
+    : VALUE_SOURCES;
+
+  const valueError = (error: string | undefined) => {
+    if (!error) return undefined;
+    if (containsFullAadhaar(raw)) return ts("aadhaarNotAllowed");
+    if (attribute?.data_type === "date") return ts("dateInvalid");
+    if (attribute?.data_type === "digits4") return t("digits4Invalid");
+    return error;
+  };
+
+  return (
+    <FormDialog
+      triggerLabel={t("open")}
+      title={t("title")}
+      description={t("description")}
+      confirmLabel={t("submit")}
+      problems="students.errors"
+      problemAction={(error) =>
+        problemCode(error) === "identity_change_required" ? (
+          <Link
+            href={`/change-requests?student_id=${encodeURIComponent(student.id)}`}
+            className="font-semibold underline"
+          >
+            {t("goToChangeRequests")}
+          </Link>
+        ) : null
+      }
+      schema={recordSchema(attribute)}
+      onOpen={() => {
+        setKey("");
+        setRaw("");
+      }}
+      invalidate={[studentKey(student.id)]}
+      submit={(data, idempotencyKey) =>
+        unwrap(
+          api.POST("/api/v1/students/{student_id}/values", {
+            params: { path: { student_id: student.id } },
+            // If-Match: refuse to add a value on top of changes made since this page loaded.
+            headers: { "Idempotency-Key": idempotencyKey, "If-Match": `"${student.version}"` },
+            body: { attribute_key: data.attribute_key, source: data.source, value: data.value },
+          }),
+        )
+      }
+    >
+      {(errors) => (
+        <>
+          <SelectField
+            name="attribute_key"
+            label={t("field")}
+            placeholder={tc("chooseOne")}
+            error={errors.attribute_key}
+            value={key}
+            onChange={(event) => {
+              setKey(event.currentTarget.value);
+              setRaw("");
+            }}
+            options={attributes.map((item) => ({
+              value: item.key,
+              label: locale === "te" && item.label_te ? item.label_te : item.label_en,
+            }))}
+          />
+          <SelectField
+            name="source"
+            label={t("source")}
+            hint={t("sourceHint")}
+            error={errors.source}
+            defaultValue=""
+            placeholder={tc("chooseOne")}
+            options={sources.map((value) => ({ value, label: ts(`sources.${value}`) }))}
+            key={`source-${key}`}
+          />
+          {attribute?.data_type === "enum" && attribute.allowed_values ? (
+            <SelectField
+              name="value"
+              label={t("value")}
+              placeholder={tc("chooseOne")}
+              error={errors.value}
+              options={attribute.allowed_values.map((value) => ({
+                value,
+                label: format(value, attribute) ?? value,
+              }))}
+            />
+          ) : (
+            <GuardedTextField
+              name="value"
+              label={t("value")}
+              hint={
+                attribute?.data_type === "date"
+                  ? ts("dateHint")
+                  : attribute?.data_type === "digits4"
+                    ? t("digits4Hint")
+                    : undefined
+              }
+              error={valueError(errors.value)}
+              value={raw}
+              onChange={(event) => setRaw(event.currentTarget.value)}
+              autoComplete="off"
+              maxLength={attribute?.data_type === "digits4" ? 4 : 1000}
+              inputMode={
+                attribute?.data_type === "digits4" || attribute?.data_type === "date"
+                  ? "numeric"
+                  : undefined
+              }
+            />
+          )}
+          {attribute?.is_identity ? (
+            <Alert tone="info">{t("identityNote")}</Alert>
+          ) : null}
+        </>
+      )}
+    </FormDialog>
+  );
+}
+
+/* ------------------------------------------------------------------ guardians */
+
+function GuardiansCard({
+  student,
+  guardians,
+  permissions,
+}: {
+  student: Student;
+  guardians: Loadable<readonly Guardian[]>;
+  permissions: Permissions;
+}) {
+  const t = useTranslations("students.guardians");
+  const canReveal = permissions.has(PERM.readSensitive) && student.sensitive_revealable;
+  const relationship = (value: string) =>
+    value === "father" || value === "mother" || value === "guardian"
+      ? t(`relationship.${value}`)
+      : value;
+
+  const contact = (guardian: Guardian, kind: "phone" | "address") => {
+    const present = kind === "phone" ? guardian.has_phone : guardian.has_address;
+    const value = kind === "phone" ? guardian.phone : guardian.address;
+    if (!present) return <Value>{null}</Value>;
+    if (!guardian.masked) return <Value>{value}</Value>;
+    return (
+      <SensitiveValue
+        studentId={student.id}
+        attributeKey={kind === "phone" ? "guardian_phone" : "guardian_address"}
+        guardianId={guardian.id}
+        fieldLabel={t(kind === "phone" ? "phoneOf" : "addressOf", { name: guardian.full_name })}
+        canReveal={canReveal}
+      />
+    );
+  };
+
+  const columns: Column<Guardian>[] = [
+    {
+      key: "name",
+      header: t("colName"),
+      cell: (row) => (
+        <span className="flex flex-wrap items-center gap-2">
+          {row.full_name}
+          {row.is_primary ? <Badge tone="info">{t("primary")}</Badge> : null}
+        </span>
+      ),
+    },
+    { key: "relationship", header: t("colRelationship"), cell: (row) => relationship(row.relationship) },
+    { key: "phone", header: t("colPhone"), cell: (row) => contact(row, "phone") },
+    { key: "address", header: t("colAddress"), cell: (row) => contact(row, "address") },
+  ];
+
+  return (
+    <Card title={t("title")} description={t("description")}>
+      <DataTable
+        caption={t("title")}
+        captionHidden
+        columns={columns}
+        state={guardians}
+        rowKey={(row) => row.id}
+        emptyTitle={t("emptyTitle")}
+        emptyBody={t("emptyBody")}
+      />
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ the page */
+
+export interface StudentDetailViewProps {
+  student: Loadable<Student>;
+  attributes: Loadable<readonly Attribute[]>;
+  guardians: Loadable<readonly Guardian[]>;
+  permissions: Permissions;
+}
+
+/** US-301 / FR-STU-001..008: canonical profile with every source's value, guardians, class. */
+export function StudentDetailView({
+  student,
+  attributes,
+  guardians,
+  permissions,
+}: StudentDetailViewProps) {
+  const t = useTranslations("students.detail");
+  const index = useAttributeIndex(attributes);
+  const api = useBffClient("staff");
+  const [verifying, setVerifying] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<unknown>(undefined);
+  const [verified, setVerified] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  if (student.status !== "ready") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t("loadingTitle")} />
+        <LoadGate state={student} />
+      </div>
+    );
+  }
+  const data = student.data;
+  const name = data.canonical.full_name?.value ?? t("unnamed");
+  const keys = [
+    ...index.sorted.map((item) => item.key).filter((key) => key in data.canonical || key in data.values),
+    ...Object.keys(data.canonical).filter((key) => !index.byKey.has(key)),
+  ];
+
+  async function verify(value: SourceValue, status: "verified" | "rejected") {
+    setVerifying(value.id);
+    setVerifyError(undefined);
+    setVerified(null);
+    try {
+      await unwrap(
+        api.POST("/api/v1/students/{student_id}/values/{value_id}/verify", {
+          params: { path: { student_id: data.id, value_id: value.id } },
+          body: { status },
+        }),
+      );
+      setVerified(status);
+      await queryClient.invalidateQueries({ queryKey: studentKey(data.id) });
+    } catch (failure) {
+      setVerifyError(failure);
+    } finally {
+      setVerifying(null);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={name}
+        badge={<StudentStatusBadge status={data.status} />}
+        description={t("summary", {
+          admission: data.admission_no ?? "—",
+          classSection: data.enrollment?.label ?? t("noClass"),
+        })}
+      />
+      <RelatedLinks studentId={data.id} permissions={permissions} />
+      <Card
+        title={t("valuesTitle")}
+        description={t("valuesDescription")}
+        actions={
+          permissions.has(PERM.updateNonIdentity) && attributes.status === "ready" ? (
+            <RecordValueDialog student={data} attributes={index.sorted} />
+          ) : null
+        }
+      >
+        <div className="space-y-3">
+          <ProblemAlert error={verifyError} namespace="students.errors" />
+          {verified ? (
+            <Alert tone="success" live>
+              {verified === "verified" ? t("verifiedDone") : t("rejectedDone")}
+            </Alert>
+          ) : null}
+          {keys.length === 0 ? (
+            <p className="text-sm text-ink-muted">{t("noValues")}</p>
+          ) : (
+            <div
+              role="region"
+              aria-label={t("valuesTable")}
+              tabIndex={0}
+              className="overflow-x-auto rounded-md border border-border print:overflow-visible print:border-0"
+            >
+              <table className="w-full border-collapse text-left text-sm">
+                <caption className="sr-only">{t("valuesTable")}</caption>
+                <thead className="bg-surface-muted">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 font-semibold">
+                      {t("colField")}
+                    </th>
+                    <th scope="col" className="px-3 py-2 font-semibold">
+                      {t("colUsed")}
+                    </th>
+                    <th scope="col" className="px-3 py-2 font-semibold">
+                      {t("colSources")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {keys.map((key) => (
+                    <AttributeRow
+                      key={key}
+                      student={data}
+                      attributeKey={key}
+                      attribute={index.byKey.get(key)}
+                      label={index.label(key)}
+                      permissions={permissions}
+                      onVerify={verify}
+                      verifying={verifying}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Card>
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <GuardiansCard student={data} guardians={guardians} permissions={permissions} />
+        <Card title={t("classTitle")}>
+          {data.enrollment ? (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-ink-muted">{t("classSection")}</dt>
+              <dd className="font-semibold">{data.enrollment.label}</dd>
+              <dt className="text-ink-muted">{t("rollNo")}</dt>
+              <dd>
+                <Value>{data.enrollment.roll_no ?? null}</Value>
+              </dd>
+            </dl>
+          ) : (
+            <p className="text-sm text-ink-muted">{t("notEnrolled")}</p>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/** GET /students/{id} (404 outside the caller's scope or school), /attributes, guardians. */
+export function StudentDetailScreen({ studentId }: { studentId: string }) {
+  const api = useBffClient("staff");
+  const permissions = useStaffPermissions();
+  const student = useApiQuery(studentKey(studentId), () =>
+    unwrap(
+      api.GET("/api/v1/students/{student_id}", { params: { path: { student_id: studentId } } }),
+    ),
+  );
+  const attributes = useAttributes();
+  const guardians = useApiQuery([...studentKey(studentId), "guardians"], () =>
+    unwrap(
+      api.GET("/api/v1/students/{student_id}/guardians", {
+        params: { path: { student_id: studentId } },
+      }),
+    ),
+  );
+  return (
+    <StudentDetailView
+      student={student}
+      attributes={attributes}
+      guardians={guardians}
+      permissions={permissions}
+    />
+  );
+}
