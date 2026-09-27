@@ -26,6 +26,13 @@ UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 LONG_DIGIT_RUN_RE = re.compile(r"\d{10,}")
+# UUIDs embedded in a value (object keys ``t/<tenant>/docs/<doc>/...``): about 2-3% of random
+# UUIDs have a last group of 10+ decimal digits, which is an identifier, not a phone or Aadhaar
+# number. They are blanked before the digit-run check; any other run is still rejected.
+EMBEDDED_UUID_RE = re.compile(
+    r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"
+    r"(?![0-9A-Fa-f])"
+)
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 MAX_STRING_LEN = 200
@@ -93,7 +100,7 @@ def _clean_string(value: str, path: str) -> str:
         return value.lower()
     # Reject (never silently mask) long digit runs: they look like Aadhaar/phone numbers and
     # personal values do not belong in audit summaries at all. Checked on the ORIGINAL value.
-    if LONG_DIGIT_RUN_RE.search(value):
+    if LONG_DIGIT_RUN_RE.search(EMBEDDED_UUID_RE.sub("-", value)):
         raise SummaryError(f"{path}: long digit sequences are not allowed in audit summaries")
     redactor = _load_redactor()
     if redactor is not None:
