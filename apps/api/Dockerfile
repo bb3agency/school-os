@@ -19,12 +19,12 @@ COPY apps/worker/pyproject.toml apps/worker/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv --mount=type=secret,id=extra_ca,required=false \
     if [ -s /run/secrets/extra_ca ]; then export SSL_CERT_FILE=/run/secrets/extra_ca; fi; \
     mkdir -p apps/api/app apps/worker/sos_worker && touch apps/api/app/__init__.py apps/worker/sos_worker/__init__.py && \
-    uv sync --frozen --no-dev --all-packages --no-install-workspace
+    uv sync --frozen --no-dev --package sos-worker --no-install-workspace
 COPY apps/api apps/api
 COPY apps/worker apps/worker
 RUN --mount=type=cache,target=/root/.cache/uv --mount=type=secret,id=extra_ca,required=false \
     if [ -s /run/secrets/extra_ca ]; then export SSL_CERT_FILE=/run/secrets/extra_ca; fi; \
-    uv sync --frozen --no-dev --all-packages --no-editable
+    uv sync --frozen --no-dev --package sos-worker --no-editable
 
 FROM ${PYTHON_IMAGE} AS base
 # postgresql-client provides psql for the db-bootstrap one-off task (infra/db/bootstrap.sql on RDS).
