@@ -92,6 +92,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attributes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Attributes
+         * @description Student attributes with classification (C2/C3), identity flag, allowed sources and
+         *     English/Telugu labels (permission ``student.read_basic``).
+         */
+        get: operations["list_attributes_api_v1_attributes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit/events": {
         parameters: {
             query?: never;
@@ -129,6 +150,108 @@ export interface paths {
         get: operations["verify_audit_chain_api_v1_audit_verify_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/breakglass/grants/{grant_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Grant
+         * @description End support access now (step-up MFA), including emergency access.
+         */
+        post: operations["revoke_grant_api_v1_breakglass_grants__grant_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/breakglass/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Requests
+         * @description Support-access requests and grants of this school, newest first. New requests from
+         *     SchoolOS support are fetched first, so a pending request shows up here right away.
+         */
+        get: operations["list_requests_api_v1_breakglass_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/breakglass/requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Request
+         * @description One request or grant: reason, scope, duration, who asked and its current status.
+         */
+        get: operations["get_request_api_v1_breakglass_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/breakglass/requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Request
+         * @description Approve (step-up MFA). Access is read-only, limited to the request scope, starts now
+         *     and ends by itself after the requested duration (at most 8 hours).
+         */
+        post: operations["approve_request_api_v1_breakglass_requests__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/breakglass/requests/{request_id}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deny Request
+         * @description Deny (step-up MFA). SchoolOS support gets no access.
+         */
+        post: operations["deny_request_api_v1_breakglass_requests__request_id__deny_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -200,6 +323,151 @@ export interface paths {
          *     classes are kept (permission ``tenant.structure.manage``).
          */
         post: operations["add_default_classes_api_v1_classes_defaults_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Documents
+         * @description Documents you may see, newest first (permission ``document.read``; filtered by the
+         *     document ACL and your class/section scopes).
+         */
+        get: operations["list_documents_api_v1_documents_get"];
+        put?: never;
+        /**
+         * Register Document
+         * @description Register an uploaded file with its metadata and ACL (permission ``document.upload``).
+         *
+         *     The file is checked by content (not extension): a mismatch answers 415 and the object is
+         *     deleted; too large answers 413; the same file already visible to you answers 409
+         *     ``duplicate_document``. Class teachers must limit the ACL to their own sections/classes.
+         *     Answers 202: version 1 is ``queued`` for the malware scan. Accepts ``Idempotency-Key``.
+         */
+        post: operations["register_document_api_v1_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Document
+         * @description One document with its versions and processing status (permission ``document.read``;
+         *     404 outside your ACL/scopes).
+         */
+        get: operations["get_document_api_v1_documents__document_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Document
+         * @description Delete the document, all versions and stored files (permission ``document.manage_acl``).
+         *     Evidence still linked to a student record answers 409 ``document_in_use``.
+         */
+        delete: operations["delete_document_api_v1_documents__document_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/acl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Acl
+         * @description Replace who can see the document: roles, sections, classes or members (permission
+         *     ``document.manage_acl``; ``If-Match``). An empty list limits it to school-wide readers.
+         */
+        put: operations["set_acl_api_v1_documents__document_id__acl_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Download Url
+         * @description A download link valid for 5 minutes, always saved as a file (permission
+         *     ``document.read``). Only files that passed the malware scan are served (409 otherwise).
+         */
+        get: operations["get_download_url_api_v1_documents__document_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Version
+         * @description Register an uploaded file as the next version; history is kept (permission
+         *     ``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.
+         *     Accepts ``Idempotency-Key``.
+         */
+        post: operations["add_version_api_v1_documents__document_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Upload
+         * @description Get a presigned POST for one file (permission ``document.upload``).
+         *
+         *     Accepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,
+         *     PNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10
+         *     minutes with the returned fields; the key, Content-Type and size are fixed by the policy.
+         *     Send ``document_id`` to upload a new version. Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_upload_api_v1_documents_uploads_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -326,6 +594,86 @@ export interface paths {
          *     without MFA gets 403 ``mfa_required``, as on every other route (FR-IAM-002).
          */
         get: operations["list_my_schools_api_v1_me_schools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications
+         * @description Your notifications, newest first, in your language (English or Telugu).
+         */
+        get: operations["list_notifications_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Read
+         * @description Mark one of your notifications as read (repeating it changes nothing).
+         */
+        post: operations["mark_read_api_v1_notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark All Read
+         * @description Mark all your notifications as read.
+         */
+        post: operations["mark_all_read_api_v1_notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unread Count
+         * @description How many of your notifications are unread (for the bell badge).
+         */
+        get: operations["unread_count_api_v1_notifications_unread_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1413,6 +1761,195 @@ export interface paths {
         patch: operations["update_section_api_v1_sections__section_id__patch"];
         trace?: never;
     };
+    "/api/v1/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Students
+         * @description Find students by partial name in English or Telugu, admission number, class/section
+         *     (``9b``, ``IX-B``) or parent name (permission ``student.read_basic``; class and subject
+         *     teachers see only students in their sections/classes this year).
+         */
+        get: operations["search_students_api_v1_students_get"];
+        put?: never;
+        /**
+         * Create Student
+         * @description Add a student with first values, each with its source; optionally enrol in a section
+         *     (permission ``student.create``). Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_student_api_v1_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Student
+         * @description Canonical profile and current per-source values (permission ``student.read_basic``).
+         *     Sensitive fields are hidden without ``student.read_sensitive`` and masked with it.
+         */
+        get: operations["get_student_api_v1_students__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Student
+         * @description Change the record status, e.g. ``left`` (permission ``student.update_nonidentity``;
+         *     ``If-Match`` required).
+         */
+        patch: operations["update_student_api_v1_students__student_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/enrollments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrol Student
+         * @description Enrol in a section; an active enrolment in the same year becomes ``transferred``
+         *     (permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``.
+         */
+        post: operations["enrol_student_api_v1_students__student_id__enrollments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/guardians": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Guardians
+         * @description Parents and guardians (permission ``student.read_basic``); phone and address masked.
+         */
+        get: operations["list_guardians_api_v1_students__student_id__guardians_get"];
+        put?: never;
+        /**
+         * Add Guardian
+         * @description Add a guardian, or link an existing one by ``guardian_id`` (permission
+         *     ``student.update_nonidentity``). Accepts ``Idempotency-Key``.
+         */
+        post: operations["add_guardian_api_v1_students__student_id__guardians_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/guardians/{guardian_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Guardian
+         * @description Change a guardian's name, phone, address, relationship or primary flag (permission
+         *     ``student.update_nonidentity``; ``If-Match`` with the guardian's ETag).
+         */
+        patch: operations["update_guardian_api_v1_students__student_id__guardians__guardian_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/sensitive-reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal Sensitive
+         * @description Show one sensitive (C3) value; every reveal is audited (permission
+         *     ``student.read_sensitive``, class teachers only for their sections).
+         */
+        post: operations["reveal_sensitive_api_v1_students__student_id__sensitive_reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Values
+         * @description Full value history, newest first, for one attribute or all (permission
+         *     ``student.read_basic``).
+         */
+        get: operations["list_values_api_v1_students__student_id__values_get"];
+        put?: never;
+        /**
+         * Record Value
+         * @description Record a value from a source; the previous value of that source stays in history
+         *     (permission ``student.update_nonidentity``). Identity fields from the admission register
+         *     need a change request (403 ``identity_change_required``). Optional ``If-Match``.
+         */
+        post: operations["record_value_api_v1_students__student_id__values_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/values/{value_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Value
+         * @description Mark the current value of a non-identity attribute verified or rejected (permission
+         *     ``student.update_nonidentity``). Identity values are verified by change requests.
+         */
+        post: operations["verify_value_api_v1_students__student_id__values__value_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/support/tickets": {
         parameters: {
             query?: never;
@@ -1751,6 +2288,31 @@ export interface components {
             /** Accepted */
             accepted: string[];
         };
+        /** AclEntry */
+        AclEntry: {
+            /** Principal Ref */
+            principal_ref: string;
+            /**
+             * Principal Type
+             * @enum {string}
+             */
+            principal_type: "role" | "section" | "class" | "membership";
+        };
+        /** AclEntryOut */
+        AclEntryOut: {
+            /** Principal Ref */
+            principal_ref: string;
+            /**
+             * Principal Type
+             * @enum {string}
+             */
+            principal_type: "role" | "section" | "class" | "membership";
+        };
+        /** AclUpdate */
+        AclUpdate: {
+            /** Acl */
+            acl: components["schemas"]["AclEntry"][];
+        };
         /** ActiveTenantIn */
         ActiveTenantIn: {
             /**
@@ -1961,6 +2523,31 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** AttributeOut */
+        AttributeOut: {
+            /** Allowed Sources */
+            allowed_sources: string[] | null;
+            /** Allowed Values */
+            allowed_values: string[] | null;
+            /** Classification */
+            classification: string;
+            /** Data Type */
+            data_type: string;
+            /** Is Global */
+            is_global: boolean;
+            /** Is Identity */
+            is_identity: boolean;
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Precedence */
+            precedence: string[];
+            /** Sort Order */
+            sort_order: number;
+        };
         /** AuditEventOut */
         AuditEventOut: {
             /** Action */
@@ -2132,6 +2719,21 @@ export interface components {
              */
             tenant_id: string;
         };
+        /** CanonicalOut */
+        CanonicalOut: {
+            /** Conflicts */
+            conflicts: string[];
+            /** Masked */
+            masked: boolean;
+            /** Provisional */
+            provisional: boolean;
+            /** Source */
+            source: string | null;
+            /** Value */
+            value: string | null;
+            /** Verified */
+            verified: boolean;
+        };
         /** ChangePlanIn */
         ChangePlanIn: {
             /**
@@ -2178,6 +2780,28 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+        };
+        /** ClassSection */
+        ClassSection: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Label */
+            label: string;
+            /** Roll No */
+            roll_no?: string | null;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
         };
         /**
          * ClassUpdate
@@ -2298,6 +2922,215 @@ export interface components {
             /** Target Version */
             target_version?: string | null;
         };
+        /**
+         * DocumentCreate
+         * @description Register an uploaded object as a new document (metadata FR-DOC-005 + ACL).
+         */
+        DocumentCreate: {
+            /** Academic Year Id */
+            academic_year_id?: string | null;
+            /** Acl */
+            acl?: components["schemas"]["AclEntry"][];
+            /** Doc Type */
+            doc_type?: ("circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other" | "evidence" | "import_file") | null;
+            /** Issued On */
+            issued_on?: string | null;
+            /** Issuer */
+            issuer?: string | null;
+            /** Language */
+            language?: ("en" | "te" | "mixed") | null;
+            /** Sensitivity */
+            sensitivity?: ("C1" | "C2" | "C3") | null;
+            /** Title */
+            title: string;
+            /**
+             * Upload Id
+             * Format: uuid
+             */
+            upload_id: string;
+        };
+        /** DocumentDetail */
+        DocumentDetail: {
+            /** Academic Year Id */
+            academic_year_id: string | null;
+            /** Acl */
+            acl: components["schemas"]["AclEntryOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            current_version: components["schemas"]["VersionOut"] | null;
+            /**
+             * Doc Type
+             * @enum {string}
+             */
+            doc_type: "circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other" | "evidence" | "import_file";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issued On */
+            issued_on: string | null;
+            /** Issuer */
+            issuer: string | null;
+            /** Language */
+            language: ("en" | "te" | "mixed") | null;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file";
+            /**
+             * Sensitivity
+             * @enum {string}
+             */
+            sensitivity: "C1" | "C2" | "C3";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "archived";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+            /** Versions */
+            versions: components["schemas"]["VersionOut"][];
+        };
+        /** DocumentOut */
+        DocumentOut: {
+            /** Academic Year Id */
+            academic_year_id: string | null;
+            /** Acl */
+            acl: components["schemas"]["AclEntryOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            current_version: components["schemas"]["VersionOut"] | null;
+            /**
+             * Doc Type
+             * @enum {string}
+             */
+            doc_type: "circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other" | "evidence" | "import_file";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issued On */
+            issued_on: string | null;
+            /** Issuer */
+            issuer: string | null;
+            /** Language */
+            language: ("en" | "te" | "mixed") | null;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file";
+            /**
+             * Sensitivity
+             * @enum {string}
+             */
+            sensitivity: "C1" | "C2" | "C3";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "archived";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** DownloadUrlOut */
+        DownloadUrlOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Url */
+            url: string;
+            /** Version No */
+            version_no: number;
+        };
+        /**
+         * EnrollmentIn
+         * @description Enrol in a section; an active enrolment in the same academic year becomes ``transferred``.
+         */
+        EnrollmentIn: {
+            /** Roll No */
+            roll_no?: string | null;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+            /** Started On */
+            started_on?: string | null;
+        };
+        /** EnrollmentOut */
+        EnrollmentOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Ended On */
+            ended_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Roll No */
+            roll_no: string | null;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+            /** Started On */
+            started_on: string | null;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Version */
+            version: number;
+        };
         /** ExtendTrialIn */
         ExtendTrialIn: {
             /**
@@ -2343,6 +3176,132 @@ export interface components {
             deployments: number;
             /** Version */
             version: string;
+        };
+        /**
+         * GrantOut
+         * @description A support-access request and, once decided, its grant.
+         *
+         *     ``status``: requested (waiting for the school) · approved (emergency access confirmed by two
+         *     SchoolOS staff, not yet usable) · active (support can read until ``expires_at``) · expired ·
+         *     revoked (ended by the school) · denied. ``operator_display_name`` is the SchoolOS employee
+         *     who asked; ``membership_id`` is their temporary access in this school.
+         */
+        GrantOut: {
+            /** Approved By Membership */
+            approved_by_membership: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Denied By Membership */
+            denied_by_membership: string | null;
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /** Emergency */
+            emergency: boolean;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Membership Id */
+            membership_id: string | null;
+            /** Operator Display Name */
+            operator_display_name: string | null;
+            /** Platform Request Id */
+            platform_request_id: string | null;
+            /** Reason */
+            reason: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Requested At */
+            requested_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Revoked By Membership */
+            revoked_by_membership: string | null;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /** Starts At */
+            starts_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "requested" | "approved" | "active" | "expired" | "revoked" | "denied";
+        };
+        /**
+         * GuardianCreate
+         * @description Add a new guardian (``full_name`` ...) or link an existing one (``guardian_id``).
+         */
+        GuardianCreate: {
+            /** Address */
+            address?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Guardian Id */
+            guardian_id?: string | null;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Relationship
+             * @enum {string}
+             */
+            relationship: "father" | "mother" | "guardian";
+        };
+        /** GuardianOut */
+        GuardianOut: {
+            /** Address */
+            address: string | null;
+            /** Full Name */
+            full_name: string;
+            /** Has Address */
+            has_address: boolean;
+            /** Has Phone */
+            has_phone: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Primary */
+            is_primary: boolean;
+            /** Masked */
+            masked: boolean;
+            /** Phone */
+            phone: string | null;
+            /** Relationship */
+            relationship: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * GuardianPatch
+         * @description Omit a field to keep it; ``phone``/``address`` ``null`` clears it.
+         */
+        GuardianPatch: {
+            /** Address */
+            address?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Is Primary */
+            is_primary?: boolean | null;
+            /** Phone */
+            phone?: string | null;
+            /** Relationship */
+            relationship?: ("father" | "mother" | "guardian") | null;
         };
         /** HealthOut */
         HealthOut: {
@@ -2583,6 +3542,11 @@ export interface components {
              */
             tenant_id: string;
         };
+        /** MarkedReadOut */
+        MarkedReadOut: {
+            /** Updated */
+            updated: number;
+        };
         /**
          * MembershipStatusIn
          * @description Activate, suspend or remove a staff member's access to this school.
@@ -2593,6 +3557,43 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "suspended" | "removed";
+        };
+        /**
+         * NotificationOut
+         * @description One notification, rendered in the reader's language (``Accept-Language``: en or te).
+         */
+        NotificationOut: {
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te";
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Read At */
+            read_at: string | null;
+            /** Resource Id */
+            resource_id: string | null;
+            /** Resource Type */
+            resource_type: string | null;
+            /** Template Key */
+            template_key: string;
+            /** Title */
+            title: string;
         };
         /** OffboardRequestIn */
         OffboardRequestIn: {
@@ -2697,6 +3698,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[DocumentOut] */
+        Page_DocumentOut_: {
+            /** Data */
+            data: components["schemas"]["DocumentOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[FlagOut] */
         Page_FlagOut_: {
             /** Data */
@@ -2704,12 +3712,26 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[GrantOut] */
+        Page_GrantOut_: {
+            /** Data */
+            data: components["schemas"]["GrantOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[InvoiceOut] */
         Page_InvoiceOut_: {
             /** Data */
             data: components["schemas"]["InvoiceOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** Page[NotificationOut] */
+        Page_NotificationOut_: {
+            /** Data */
+            data: components["schemas"]["NotificationOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** Page[OperatorOut] */
         Page_OperatorOut_: {
@@ -2750,6 +3772,13 @@ export interface components {
         Page_SectionOut_: {
             /** Data */
             data: components["schemas"]["SectionOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Page[StudentSummary] */
+        Page_StudentSummary_: {
+            /** Data */
+            data: components["schemas"]["StudentSummary"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -3118,6 +4147,34 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * RevealIn
+         * @description Reveal one C3 field (audited). ``guardian_phone``/``guardian_address`` need
+         *     ``guardian_id``; ``value_id`` reveals a specific (possibly historical) value.
+         */
+        RevealIn: {
+            /** Attribute Key */
+            attribute_key: string;
+            /** Guardian Id */
+            guardian_id?: string | null;
+            /** Value Id */
+            value_id?: string | null;
+        };
+        /** RevealOut */
+        RevealOut: {
+            /** Attribute Key */
+            attribute_key: string;
+            /** Display */
+            display: string | null;
+            /** Guardian Id */
+            guardian_id: string | null;
+            /** Source */
+            source: string | null;
+            /** Value */
+            value: string | null;
+            /** Value Id */
+            value_id: string | null;
+        };
         /** RoleOut */
         RoleOut: {
             /**
@@ -3256,6 +4313,99 @@ export interface components {
             class_teacher_membership_id?: string | null;
             /** Name */
             name?: string | null;
+        };
+        /**
+         * StudentCreate
+         * @description New student with its first values (docs/09: source required per value).
+         *
+         *     ``values`` must include ``full_name``. ``section_id`` enrols the student in that section's
+         *     academic year.
+         */
+        StudentCreate: {
+            /** Roll No */
+            roll_no?: string | null;
+            /** Section Id */
+            section_id?: string | null;
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "provisional" | "active" | "left" | "graduated";
+            /** Values */
+            values: components["schemas"]["ValueIn"][];
+        };
+        /** StudentMatch */
+        StudentMatch: {
+            /** Field */
+            field: string | null;
+            /** Score */
+            score: number | null;
+        };
+        /**
+         * StudentOut
+         * @description Canonical profile + current per-source values (US-301).
+         */
+        StudentOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Canonical */
+            canonical: {
+                [key: string]: components["schemas"]["CanonicalOut"];
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            enrollment: components["schemas"]["ClassSection"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Sensitive Revealable */
+            sensitive_revealable: boolean;
+            /** Status */
+            status: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Values */
+            values: {
+                [key: string]: components["schemas"]["ValueOut"][];
+            };
+            /** Version */
+            version: number;
+        };
+        /** StudentPatch */
+        StudentPatch: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "provisional" | "active" | "left" | "graduated";
+        };
+        /** StudentSummary */
+        StudentSummary: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Class Section */
+            class_section: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            match: components["schemas"]["StudentMatch"];
+            /** Section Id */
+            section_id: string | null;
+            /** Status */
+            status: string;
         };
         /** SubscriptionOut */
         SubscriptionOut: {
@@ -3708,6 +4858,60 @@ export interface components {
             /** Status */
             status?: ("open" | "in_progress" | "waiting_on_school" | "resolved" | "closed") | null;
         };
+        /** UnreadCountOut */
+        UnreadCountOut: {
+            /** Count */
+            count: number;
+        };
+        /**
+         * UploadCreate
+         * @description Ask for a presigned POST. ``document_id`` asks to upload a new version of that document.
+         */
+        UploadCreate: {
+            /** Content Type */
+            content_type: string;
+            /** Document Id */
+            document_id?: string | null;
+            /** Filename */
+            filename: string;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file";
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** UploadOut */
+        UploadOut: {
+            /** Batch Id */
+            batch_id?: string | null;
+            /** Document Id */
+            document_id?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Fields */
+            fields: {
+                [key: string]: string;
+            };
+            /** Max Bytes */
+            max_bytes: number;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file";
+            /**
+             * Upload Id
+             * Format: uuid
+             */
+            upload_id: string;
+            /** Url */
+            url: string;
+        };
         /** UsageAgainstLimit */
         UsageAgainstLimit: {
             /** Limit */
@@ -3817,6 +5021,133 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * ValueIn
+         * @description One observed value from one source (FR-STU-002). Identity attributes from the admission
+         *     register cannot be changed here once recorded: use a change request.
+         */
+        ValueIn: {
+            /** Attribute Key */
+            attribute_key: string;
+            /** Evidence Document Id */
+            evidence_document_id?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "admission_register" | "aadhaar_as_printed" | "udise_plus" | "board_registration" | "birth_certificate" | "parent_form" | "tc_incoming" | "manual_entry";
+            /** Value */
+            value: string;
+        };
+        /** ValueOut */
+        ValueOut: {
+            /** Attribute Key */
+            attribute_key: string;
+            /** Change Request Id */
+            change_request_id: string | null;
+            /** Current */
+            current: boolean;
+            /** Evidence Document Id */
+            evidence_document_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Import Batch Id */
+            import_batch_id: string | null;
+            /** Masked */
+            masked: boolean;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /**
+             * Recorded By
+             * Format: uuid
+             */
+            recorded_by: string;
+            /** Source */
+            source: string;
+            /** Superseded By */
+            superseded_by: string | null;
+            /** Value */
+            value: string | null;
+            /**
+             * Verification Status
+             * @enum {string}
+             */
+            verification_status: "unverified" | "verified" | "rejected";
+            /** Verified At */
+            verified_at: string | null;
+            /** Verified By */
+            verified_by: string | null;
+        };
+        /** ValueRecorded */
+        ValueRecorded: {
+            /** Attribute Key */
+            attribute_key: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Source */
+            source: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Version */
+            student_version: number;
+            /** Superseded */
+            superseded: string | null;
+        };
+        /** VerifyIn */
+        VerifyIn: {
+            /**
+             * Status
+             * @default verified
+             * @enum {string}
+             */
+            status: "verified" | "rejected";
+        };
+        /** VersionCreate */
+        VersionCreate: {
+            /**
+             * Upload Id
+             * Format: uuid
+             */
+            upload_id: string;
+        };
+        /** VersionOut */
+        VersionOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "scanning" | "extracting" | "chunking" | "embedding" | "ready" | "failed" | "quarantined";
+            /** Version No */
+            version_no: number;
         };
     };
     responses: never;
@@ -4011,6 +5342,26 @@ export interface operations {
             };
         };
     };
+    list_attributes_api_v1_attributes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttributeOut"][];
+                };
+            };
+        };
+    };
     list_audit_events_api_v1_audit_events_get: {
         parameters: {
             query?: {
@@ -4068,6 +5419,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__audit__viewer__AuditVerifyOut"];
+                };
+            };
+        };
+    };
+    revoke_grant_api_v1_breakglass_grants__grant_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_requests_api_v1_breakglass_requests_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                /** @description Only this status. */
+                status?: ("requested" | "approved" | "active" | "expired" | "revoked" | "denied") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_GrantOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_request_api_v1_breakglass_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_request_api_v1_breakglass_requests__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deny_request_api_v1_breakglass_requests__request_id__deny_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4225,6 +5736,273 @@ export interface operations {
             };
         };
     };
+    list_documents_api_v1_documents_get: {
+        parameters: {
+            query?: {
+                academic_year_id?: string | null;
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                doc_type?: ("circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other" | "evidence" | "import_file") | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                purpose?: ("evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file") | null;
+                status?: ("active" | "archived") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DocumentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_document_api_v1_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_api_v1_documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_document_api_v1_documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_acl_api_v1_documents__document_id__acl_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AclUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_download_url_api_v1_documents__document_id__download_url_get: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadUrlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_version_api_v1_documents__document_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_upload_api_v1_documents_uploads_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     heartbeat_api_v1_fleet_heartbeat_post: {
         parameters: {
             query?: never;
@@ -4354,6 +6132,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchoolChoicesOut"];
+                };
+            };
+        };
+    };
+    list_notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                /** @description Only unread notifications. */
+                unread?: boolean;
+            };
+            header?: {
+                "Accept-Language"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_NotificationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_v1_notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_all_read_api_v1_notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkedReadOut"];
+                };
+            };
+        };
+    };
+    unread_count_api_v1_notifications_unread_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountOut"];
                 };
             };
         };
@@ -6806,6 +8695,420 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_students_api_v1_students_get: {
+        parameters: {
+            query?: {
+                admission_no?: string | null;
+                class_id?: string | null;
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                query?: string | null;
+                section_id?: string | null;
+                status?: ("provisional" | "active" | "left" | "graduated") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_StudentSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_student_api_v1_students_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_student_api_v1_students__student_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_student_api_v1_students__student_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enrol_student_api_v1_students__student_id__enrollments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_guardians_api_v1_students__student_id__guardians_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_guardian_api_v1_students__student_id__guardians_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuardianCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_guardian_api_v1_students__student_id__guardians__guardian_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guardian_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuardianPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_sensitive_api_v1_students__student_id__sensitive_reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevealIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevealOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_values_api_v1_students__student_id__values_get: {
+        parameters: {
+            query?: {
+                attribute?: string | null;
+            };
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_value_api_v1_students__student_id__values_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValueRecorded"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_value_api_v1_students__student_id__values__value_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                value_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["VerifyIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValueOut"];
                 };
             };
             /** @description Validation Error */
