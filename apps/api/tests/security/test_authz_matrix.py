@@ -106,6 +106,23 @@ D = _load_documents_support()
 IM = _load_imports_support()
 DQ = _load_dq_support()
 
+
+def _load_extraction_support() -> ModuleType:
+    """tests/extraction/support.py (register pages, batches and items via the real services)."""
+    name = "sos_test_extraction_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "extraction" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+X = _load_extraction_support()
+
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
 _years = itertools.count(2100)
@@ -332,6 +349,46 @@ def _cr_shared(w: Any, admin: Engine) -> uuid.UUID:
         w.a.ids["matrix_change_request"] = _cr_pending(w, admin)
     value: uuid.UUID = w.a.ids["matrix_change_request"]
     return value
+
+
+# --- register-photo extraction (US-402): import.run / import.commit, school-wide roles only ---
+
+
+def _x_page(w: Any, a: Engine) -> uuid.UUID:
+    page = X.page_png([X.register_row(f"Synthetica Matrix {W.unique()}")])
+    doc: uuid.UUID = X.register_scan(a, w.a.tenant_id, w.a.people["owner"].user_id, page)
+    return doc
+
+
+def _x_batch(w: Any, a: Engine) -> uuid.UUID:
+    """A processed school A batch with pending rows (created once)."""
+    if "matrix_extraction_batch" not in w.a.ids:
+        batch_id, items = X.processed_batch(a, w.a, [X.page_png([X.register_row("Synthetica M")])])
+        w.a.ids["matrix_extraction_batch"] = batch_id
+        w.a.ids["matrix_extraction_item"] = items[0]
+    value: uuid.UUID = w.a.ids["matrix_extraction_batch"]
+    return value
+
+
+def _x_item(w: Any, a: Engine) -> uuid.UUID:
+    _x_batch(w, a)
+    value: uuid.UUID = w.a.ids["matrix_extraction_item"]
+    return value
+
+
+def _x_create(w: Any, r: str, a: Engine) -> Request:
+    return "/api/v1/extraction-batches", {"document_ids": [str(_x_page(w, a))]}, {}
+
+
+def _x_confirm(w: Any, r: str, a: Engine) -> Request:
+    item = X.pending_item(a, w.a)
+    body = {"fields": {"full_name": f"Synthetica Matrix Confirm {W.unique()}"}}
+    return f"/api/v1/extraction-items/{item}/confirm", body, {}
+
+
+def _x_reject(w: Any, r: str, a: Engine) -> Request:
+    item = X.pending_item(a, w.a)
+    return f"/api/v1/extraction-items/{item}/reject", {"reason": "other"}, {}
 
 
 SPECS: dict[tuple[str, str], Builder] = {
@@ -675,6 +732,22 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         _if_match(1),
     ),
+    # Register-photo extraction (US-402, FR-IMP-020..023).
+    ("GET", "/api/v1/extraction-batches"): lambda w, r, a: ("/api/v1/extraction-batches", None, {}),
+    ("POST", "/api/v1/extraction-batches"): _x_create,
+    ("GET", "/api/v1/extraction-batches/{batch_id}"): lambda w, r, a: (
+        f"/api/v1/extraction-batches/{_x_batch(w, a)}",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/extraction-items"): lambda w, r, a: ("/api/v1/extraction-items", None, {}),
+    ("GET", "/api/v1/extraction-items/{item_id}"): lambda w, r, a: (
+        f"/api/v1/extraction-items/{_x_item(w, a)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/extraction-items/{item_id}/confirm"): _x_confirm,
+    ("POST", "/api/v1/extraction-items/{item_id}/reject"): _x_reject,
 }
 
 
@@ -772,6 +845,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/imports/{import_id}/validate",
         "/api/v1/imports/{import_id}/commit",
         "/api/v1/dq/runs",
+        "/api/v1/extraction-batches",
     }
     if method == "POST" and path in accepted:
         return 202

@@ -167,6 +167,17 @@ Imports notes (M1, as built; US-401, FR-IMP-001..007):
 - **Mapping**: columns are suggested from English/Telugu headers; a saved template with the same headers is applied automatically (`mapping_template_id`). `PUT …/mapping` replaces the mapping (`{"columns": [{"index", "target"}]}`) and clears earlier results; validate again with `POST …/validate`.
 - **Rows**: `errors`/`warnings` are `{field, code, message_key, ref?}` (e.g. `missing`, `invalid_date`, `ambiguous_date` (warning), `duplicate_in_file` with `ref` = other row, `identity_change_required`, `no_matching_student`, `section_out_of_scope`, `aadhaar_full_number_rejected`). Rows never show C3 values, only `sensitive` keys. The admission number matches existing students (`action: update`); only `admission_register`, `tc_incoming` and `manual_entry` rows may create students (and need `student.create`).
 - **Commit** is all-or-nothing (`409 import_has_errors` unless `skip_error_rows`); the worker re-reads and re-validates the file inside the commit transaction (failure → back to `validated` with `error_code`). Audit `import.committed`, outbox `import.committed {batch_id, student_ids_count}`, notification `import.committed` to the requester. **Revert** within 24 h (`409 revert_window_closed`), refused with `409 import_has_dependents` when records from the batch were changed or are referenced since; outbox `import.reverted {batch_id}`.
+| POST | `/imports` (multipart: file, `source`, `kind`) → 202 | `import.run` |
+| GET | `/imports/{id}` · `/imports/{id}/rows?status=error` | `import.run` |
+| PUT | `/imports/{id}/mapping` | `import.run` |
+| POST | `/imports/{id}/commit` · `/imports/{id}/revert` | `import.commit` |
+| GET | `/extraction-batches` · `/extraction-batches/{id}` (progress per page) | `import.run` |
+| POST | `/extraction-batches` (`document_ids` of `register_scan` JPG/PNG documents) → 202 | `import.run` |
+| GET | `/extraction-items?batch_id=&status=pending_review` (cursor) · `/extraction-items/{id}` (page image link, possible matches) | `import.run` |
+| POST | `/extraction-items/{id}/confirm` · `/reject` | `import.commit` |
+
+- Register photos (US-402): a batch reads each page with the configured provider; Aadhaar-like numbers are masked before storage and a page that showed one has `image_withheld` (no image link). Items carry per-field `confidence`, `bbox`, `masked`, `low_confidence`. PDFs answer 422 `pdf_not_supported` (M1).
+- Confirm body: `fields` (the values read on the page; `null` skips), optional `student_id` (add to an existing student) or `section_id`/`roll_no`/`student_status` (new student). Values are recorded with source `admission_register` and the page as evidence; identity values stay unverified (verification is a change request), others are recorded verified by the reviewer. 409 `item_already_reviewed`; 403 `identity_change_required` when a different register identity value exists; 422 `masked_value` for a masked number. Emits outbox `extraction.confirmed` {batch_id, item_id, student_id}.
 
 ### Data quality
 | Method | Path | Permission |

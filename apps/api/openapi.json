@@ -659,6 +659,308 @@
         "title": "AuditEventOut",
         "type": "object"
       },
+      "BatchCreate": {
+        "additionalProperties": false,
+        "description": "Start extraction for register-page photos already uploaded as ``register_scan``\ndocuments (JPG or PNG, one page each, malware scan passed).",
+        "properties": {
+          "document_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Document Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document_ids"
+        ],
+        "title": "BatchCreate",
+        "type": "object"
+      },
+      "BatchDetail": {
+        "description": "A batch with progress per page (US-402 AC4).",
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items_confirmed": {
+            "title": "Items Confirmed",
+            "type": "integer"
+          },
+          "items_low_confidence": {
+            "title": "Items Low Confidence",
+            "type": "integer"
+          },
+          "items_pending": {
+            "title": "Items Pending",
+            "type": "integer"
+          },
+          "items_rejected": {
+            "title": "Items Rejected",
+            "type": "integer"
+          },
+          "items_total": {
+            "title": "Items Total",
+            "type": "integer"
+          },
+          "page_count": {
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageOut"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "pages_done": {
+            "title": "Pages Done",
+            "type": "integer"
+          },
+          "pages_failed": {
+            "title": "Pages Failed",
+            "type": "integer"
+          },
+          "pages_withheld": {
+            "title": "Pages Withheld",
+            "type": "integer"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "processing",
+              "review",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "provider",
+          "error_code",
+          "page_count",
+          "pages_done",
+          "pages_failed",
+          "pages_withheld",
+          "items_total",
+          "items_pending",
+          "items_confirmed",
+          "items_rejected",
+          "items_low_confidence",
+          "created_by",
+          "created_at",
+          "processed_at",
+          "completed_at",
+          "version",
+          "pages"
+        ],
+        "title": "BatchDetail",
+        "type": "object"
+      },
+      "BatchOut": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items_confirmed": {
+            "title": "Items Confirmed",
+            "type": "integer"
+          },
+          "items_low_confidence": {
+            "title": "Items Low Confidence",
+            "type": "integer"
+          },
+          "items_pending": {
+            "title": "Items Pending",
+            "type": "integer"
+          },
+          "items_rejected": {
+            "title": "Items Rejected",
+            "type": "integer"
+          },
+          "items_total": {
+            "title": "Items Total",
+            "type": "integer"
+          },
+          "page_count": {
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "pages_done": {
+            "title": "Pages Done",
+            "type": "integer"
+          },
+          "pages_failed": {
+            "title": "Pages Failed",
+            "type": "integer"
+          },
+          "pages_withheld": {
+            "title": "Pages Withheld",
+            "type": "integer"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "processing",
+              "review",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "provider",
+          "error_code",
+          "page_count",
+          "pages_done",
+          "pages_failed",
+          "pages_withheld",
+          "items_total",
+          "items_pending",
+          "items_confirmed",
+          "items_rejected",
+          "items_low_confidence",
+          "created_by",
+          "created_at",
+          "processed_at",
+          "completed_at",
+          "version"
+        ],
+        "title": "BatchOut",
+        "type": "object"
+      },
       "Bilingual": {
         "properties": {
           "code": {
@@ -2755,6 +3057,56 @@
         "title": "ExtendTrialIn",
         "type": "object"
       },
+      "FieldOut": {
+        "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "low_confidence": {
+            "title": "Low Confidence",
+            "type": "boolean"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "confidence",
+          "bbox",
+          "masked",
+          "low_confidence"
+        ],
+        "title": "FieldOut",
+        "type": "object"
+      },
       "FindingOut": {
         "properties": {
           "attribute_key": {
@@ -4774,6 +5126,465 @@
         "title": "Issue",
         "type": "object"
       },
+      "ItemConfirm": {
+        "additionalProperties": false,
+        "description": "The values a person read on the page (edited where the machine was wrong).\n\nKeys are register fields (``admission_no``, ``full_name``, ``dob`` (YYYY-MM-DD), ``gender``,\n``father_name``, ``mother_name``, ``admission_date``, ``mother_tongue``, ``nationality``); an\nempty or ``null`` value is not recorded. Send ``student_id`` to add the values to an\nexisting student; otherwise a new student is created (``full_name`` required), optionally\nenrolled in ``section_id``.",
+        "properties": {
+          "fields": {
+            "maxProperties": 20,
+            "minProperties": 1,
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{1,63}$": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "title": "Fields",
+            "type": "object"
+          },
+          "roll_no": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "student_status": {
+            "default": "active",
+            "enum": [
+              "provisional",
+              "active",
+              "left",
+              "graduated"
+            ],
+            "title": "Student Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "title": "ItemConfirm",
+        "type": "object"
+      },
+      "ItemDetail": {
+        "description": "One row for review with its page image beside it (US-402 AC1).\n\n``image`` is a presigned link valid for 5 minutes, or ``null`` with ``image_unavailable``:\n``withheld_sensitive_number`` (the page showed a full Aadhaar number, PRV-016),\n``not_visible`` (you may not open the document) or ``not_ready``. ``possible_matches`` are\nstudents of this school with the same admission number (link instead of creating twice).",
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "corrected_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Corrected Fields",
+            "type": "array"
+          },
+          "created_student": {
+            "title": "Created Student",
+            "type": "boolean"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldOut"
+            },
+            "title": "Fields",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageImage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "image_unavailable": {
+            "anyOf": [
+              {
+                "enum": [
+                  "withheld_sensitive_number",
+                  "not_visible",
+                  "not_ready"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Unavailable"
+          },
+          "low_confidence": {
+            "title": "Low Confidence",
+            "type": "boolean"
+          },
+          "low_confidence_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Low Confidence Fields",
+            "type": "array"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "page_id": {
+            "format": "uuid",
+            "title": "Page Id",
+            "type": "string"
+          },
+          "page_no": {
+            "title": "Page No",
+            "type": "integer"
+          },
+          "possible_matches": {
+            "items": {
+              "$ref": "#/components/schemas/StudentSummary"
+            },
+            "title": "Possible Matches",
+            "type": "array"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_a_student_row",
+                  "duplicate",
+                  "unreadable",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending_review",
+              "confirmed",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "value_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Value Ids",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "batch_id",
+          "page_id",
+          "document_id",
+          "page_no",
+          "row_index",
+          "status",
+          "fields",
+          "low_confidence",
+          "low_confidence_fields",
+          "masked",
+          "reviewed_by",
+          "reviewed_at",
+          "reject_reason",
+          "student_id",
+          "value_ids",
+          "corrected_fields",
+          "created_student",
+          "version",
+          "image",
+          "image_unavailable",
+          "possible_matches"
+        ],
+        "title": "ItemDetail",
+        "type": "object"
+      },
+      "ItemOut": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "corrected_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Corrected Fields",
+            "type": "array"
+          },
+          "created_student": {
+            "title": "Created Student",
+            "type": "boolean"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldOut"
+            },
+            "title": "Fields",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "low_confidence": {
+            "title": "Low Confidence",
+            "type": "boolean"
+          },
+          "low_confidence_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Low Confidence Fields",
+            "type": "array"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "page_id": {
+            "format": "uuid",
+            "title": "Page Id",
+            "type": "string"
+          },
+          "page_no": {
+            "title": "Page No",
+            "type": "integer"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_a_student_row",
+                  "duplicate",
+                  "unreadable",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending_review",
+              "confirmed",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "value_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Value Ids",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "batch_id",
+          "page_id",
+          "document_id",
+          "page_no",
+          "row_index",
+          "status",
+          "fields",
+          "low_confidence",
+          "low_confidence_fields",
+          "masked",
+          "reviewed_by",
+          "reviewed_at",
+          "reject_reason",
+          "student_id",
+          "value_ids",
+          "corrected_fields",
+          "created_student",
+          "version"
+        ],
+        "title": "ItemOut",
+        "type": "object"
+      },
+      "ItemReject": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "not_a_student_row",
+              "duplicate",
+              "unreadable",
+              "other"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ItemReject",
+        "type": "object"
+      },
       "JobOut": {
         "properties": {
           "error": {
@@ -5227,6 +6038,120 @@
         "title": "OwnerIn",
         "type": "object"
       },
+      "PageImage": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "mime_type"
+        ],
+        "title": "PageImage",
+        "type": "object"
+      },
+      "PageOut": {
+        "properties": {
+          "aadhaar_detected": {
+            "title": "Aadhaar Detected",
+            "type": "boolean"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_version_no": {
+            "title": "Document Version No",
+            "type": "integer"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "image_withheld": {
+            "title": "Image Withheld",
+            "type": "boolean"
+          },
+          "low_confidence_count": {
+            "title": "Low Confidence Count",
+            "type": "integer"
+          },
+          "page_no": {
+            "title": "Page No",
+            "type": "integer"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "done",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "document_version_no",
+          "page_no",
+          "seq",
+          "status",
+          "error_code",
+          "aadhaar_detected",
+          "image_withheld",
+          "row_count",
+          "low_confidence_count",
+          "processed_at"
+        ],
+        "title": "PageOut",
+        "type": "object"
+      },
       "Page_AcademicYearOut_": {
         "properties": {
           "data": {
@@ -5308,6 +6233,34 @@
           "next_cursor"
         ],
         "title": "Page[AuditEventOut]",
+        "type": "object"
+      },
+      "Page_BatchOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BatchOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[BatchOut]",
         "type": "object"
       },
       "Page_BreakGlassOut_": {
@@ -5612,6 +6565,34 @@
           "data"
         ],
         "title": "Page[InvoiceOut]",
+        "type": "object"
+      },
+      "Page_ItemOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ItemOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[ItemOut]",
         "type": "object"
       },
       "Page_NotificationOut_": {
@@ -13215,6 +14196,414 @@
         "summary": "Get Summary",
         "tags": [
           "data-quality"
+        ]
+      }
+    },
+    "/api/v1/extraction-batches": {
+      "get": {
+        "description": "Register-photo batches, newest first, with progress counters (permission\n``import.run``).",
+        "operationId": "list_batches_api_v1_extraction_batches_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_BatchOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Batches",
+        "tags": [
+          "extraction"
+        ]
+      },
+      "post": {
+        "description": "Read register-page photos into the verification queue (permission ``import.run``).\n\nSend the ids of ``register_scan`` documents that passed the malware scan: JPG or PNG, one\npage each (PDF answers 422 ``pdf_not_supported`` for now: upload a photo of each page).\nAnswers 202; follow progress with ``GET /extraction-batches/{id}``. Accepts\n``Idempotency-Key``.",
+        "operationId": "create_batch_api_v1_extraction_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Batch",
+        "tags": [
+          "extraction"
+        ]
+      }
+    },
+    "/api/v1/extraction-batches/{batch_id}": {
+      "get": {
+        "description": "One batch with progress per page (US-402 AC4). A page with ``image_withheld`` showed a\nfull Aadhaar number: its image is not shown (permission ``import.run``).",
+        "operationId": "get_batch_api_v1_extraction_batches__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Batch",
+        "tags": [
+          "extraction"
+        ]
+      }
+    },
+    "/api/v1/extraction-items": {
+      "get": {
+        "description": "The verification queue in page order (permission ``import.run``). Each field carries its\nconfidence and region; ``low_confidence_fields`` lists the ones to check carefully.",
+        "operationId": "list_items_api_v1_extraction_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "batch_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batch Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending_review",
+                    "confirmed",
+                    "rejected"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ItemOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Items",
+        "tags": [
+          "extraction"
+        ]
+      }
+    },
+    "/api/v1/extraction-items/{item_id}": {
+      "get": {
+        "description": "One row with a 5-minute link to its page image and students with the same admission\nnumber (permission ``import.run``; the image also needs ``document.read`` on the page).",
+        "operationId": "get_item_api_v1_extraction_items__item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Item",
+        "tags": [
+          "extraction"
+        ]
+      }
+    },
+    "/api/v1/extraction-items/{item_id}/confirm": {
+      "post": {
+        "description": "Save the row as you read it on the page (permission ``import.commit``).\n\nCreates a student (or adds to ``student_id``) with source ``admission_register`` and the\npage as evidence. A row already checked answers 409 ``item_already_reviewed``; changing an\nexisting register identity value answers 403 ``identity_change_required`` (use a change\nrequest). Accepts ``Idempotency-Key``.",
+        "operationId": "confirm_item_api_v1_extraction_items__item_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Item",
+        "tags": [
+          "extraction"
+        ]
+      }
+    },
+    "/api/v1/extraction-items/{item_id}/reject": {
+      "post": {
+        "description": "Discard a row that is not a student entry; nothing is recorded (permission\n``import.commit``).",
+        "operationId": "reject_item_api_v1_extraction_items__item_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemReject"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Item",
+        "tags": [
+          "extraction"
         ]
       }
     },

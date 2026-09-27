@@ -43,6 +43,7 @@ TASK_MODULES: list[str] = [
     "app.imports.tasks",
     "app.dq.tasks",
     "app.changes.tasks",
+    "app.extraction.tasks",
 ]
 
 
@@ -76,6 +77,8 @@ def create_celery() -> Celery:
             "imports.purge_raw_files": {"queue": "maintenance"},
             # FR-DQ-002: data-quality runs (outbox consumers and queued runs) on queue "dq".
             "dq.*": {"queue": "dq"},
+            # US-402: register-photo extraction runs on the ocr queue.
+            "extraction.*": {"queue": "ocr"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).

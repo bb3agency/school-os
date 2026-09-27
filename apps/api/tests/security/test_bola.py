@@ -102,6 +102,10 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "reason": "Synthetic BOLA rejection"
     },
     ("POST", "/api/v1/change-requests/{change_request_id}/cancel"): None,
+    ("POST", "/api/v1/extraction-items/{item_id}/confirm"): {
+        "fields": {"full_name": "Synthetica BOLA"}
+    },
+    ("POST", "/api/v1/extraction-items/{item_id}/reject"): {"reason": "other"},
 }
 
 
@@ -146,6 +150,52 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
     ),
     "principal",
 )
+# Register-photo extraction needs import.run / import.commit (not held by the owner).
+ACTOR.update(
+    dict.fromkeys(
+        (
+            ("GET", "/api/v1/extraction-batches/{batch_id}"),
+            ("GET", "/api/v1/extraction-items/{item_id}"),
+            ("POST", "/api/v1/extraction-items/{item_id}/confirm"),
+            ("POST", "/api/v1/extraction-items/{item_id}/reject"),
+        ),
+        "office_admin",
+    )
+)
+
+
+def _load_extraction_support() -> ModuleType:
+    """tests/extraction/support.py (register pages, batches and items via the real services)."""
+    name = "sos_test_extraction_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "extraction" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+# The admin engine for fixtures that insert synthetic register pages (set per test below).
+_ADMIN: list[Engine] = []
+
+
+@pytest.fixture(autouse=True)
+def _remember_admin(admin_engine: Engine) -> None:
+    _ADMIN[:] = [admin_engine]
+
+
+def _b_extraction(w: Any) -> tuple[uuid.UUID, uuid.UUID]:
+    """A processed school B batch and one of its pending rows (US-402)."""
+    if "bola_extraction_batch" not in w.b.ids:
+        x = _load_extraction_support()
+        page = x.page_png([x.register_row("Synthetica School B Row")])
+        batch_id, items = x.processed_batch(_ADMIN[0], w.b, [page])
+        w.b.ids["bola_extraction_batch"] = batch_id
+        w.b.ids["bola_extraction_item"] = items[0]
+    return w.b.ids["bola_extraction_batch"], w.b.ids["bola_extraction_item"]
 
 
 def _b_ticket(w: Any) -> uuid.UUID:
@@ -286,6 +336,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "finding_id": _b_dq_finding,
     # Change requests (US-601): a pending request of school B (real services only).
     "change_request_id": lambda w: _changes().pending(w.b),
+    # Register-photo extraction (US-402): a batch / a pending row of school B.
+    "batch_id": lambda w: _b_extraction(w)[0],
+    "item_id": lambda w: _b_extraction(w)[1],
 }
 
 
@@ -556,3 +609,56 @@ def test_SEC_001_change_request_bodies_cannot_reference_other_school(
         json={**body, "student_id": str(cr.student(world.a)), "evidence_document_id": str(b_doc)},
     )
     assert (other_doc.status_code, other_doc.json()["code"]) == (422, "evidence_required")
+
+
+# --- register-photo extraction (US-402, SEC-001) --------------------------------------------
+
+
+def test_SEC_001_extraction_lists_never_show_other_school(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    b_batch, b_item = _b_extraction(world)
+    who = world.person("office_admin")
+    batches = api.call(who, "GET", "/api/v1/extraction-batches", params={"limit": 200})
+    assert batches.status_code == 200
+    assert str(b_batch) not in {b["id"] for b in batches.json()["data"]}
+    for params in ({"limit": 200}, {"batch_id": str(b_batch), "limit": 200}):
+        items = api.call(who, "GET", "/api/v1/extraction-items", params=params)
+        assert items.status_code == 200
+        assert str(b_item) not in {i["id"] for i in items.json()["data"]}
+
+
+def test_SEC_001_extraction_bodies_cannot_reference_other_school(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    x = _load_extraction_support()
+    who = world.person("office_admin")
+    b_doc = x.register_scan(
+        admin_engine,
+        world.b.tenant_id,
+        world.b.people["owner"].user_id,
+        x.page_png([x.register_row("Synthetica B Page")]),
+    )
+    res = api.call(who, "POST", "/api/v1/extraction-batches", json={"document_ids": [str(b_doc)]})
+    assert res.status_code == 422
+    assert res.json()["errors"][0]["code"] == "not_found"
+    item = x.pending_item(admin_engine, world.a)
+    b_student = SW.ensure_students(world)["b_sb"]
+    link = api.call(
+        who,
+        "POST",
+        f"/api/v1/extraction-items/{item}/confirm",
+        json={"student_id": str(b_student), "fields": {"nationality": "Indian"}},
+    )
+    assert link.status_code == 404
+    section = api.call(
+        who,
+        "POST",
+        f"/api/v1/extraction-items/{item}/confirm",
+        json={
+            "fields": {"full_name": "Synthetica Cross School"},
+            "section_id": str(world.b.ids["section_9a"]),
+        },
+    )
+    assert section.status_code == 422
+    assert x.row_of(admin_engine, "sis.extraction_items", item)["status"] == "pending_review"
