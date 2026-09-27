@@ -52,3 +52,7 @@ These were open questions 1-3 in `.handoff/HANDOFF.md` §3. The product owner de
 ## Related requirements
 
 FR-EXP-001..004, US-501, US-901, SEC-003, SEC-005, SEC-015, SEC-017, PRV-003; docs/05 §5.5, 07 §5.2 and §6.2, 08 §4, 09 Exports, `.handoff/HANDOFF.md` §3 items 1-3.
+
+## Amendments (2026-09-27)
+
+- Follow-up (a) is settled by [ADR-0022](ADR-0022-system-role-sync-for-existing-schools.md): operators run `python -m app.identity.sync_system_roles --apply` after the release's migrations, and existing schools then receive `export.read_all` (owner, principal, office_admin) and `export.download_any` (owner). The decision above is unchanged.
