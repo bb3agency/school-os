@@ -62,10 +62,18 @@ def test_SEC_008_export_flow_does_not_log_personal_data(
         json={"columns": ["full_name", "dob", "father_name", "health_notes"], "format": "csv"},
     )
     assert lst.status_code == 202, lst.text
+    owner = school.people["owner"]
     for body in (pre.json(), lst.json()):
         assert EX.run(school, body["id"]) == "ready"
         res = api.call(principal, "GET", f"/api/v1/exports/{body['id']}/download-url")
         assert res.status_code == 200, res.text
+        # ADR-0021: another member's export (details with the requester's name, download).
+        detail = api.call(owner, "GET", f"/api/v1/exports/{body['id']}")
+        assert detail.json()["requested_by"]["display_name"] == principal.display_name
+        res = api.call(owner, "GET", f"/api/v1/exports/{body['id']}/download-url")
+        assert res.status_code == 200, res.text
+    listed = api.call(owner, "GET", "/api/v1/exports", params={"requested_by": "all"})
+    assert listed.status_code == 200
     exports.purge_expired(school.tenant_id, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=8))
     out = capsys.readouterr()
     logs = out.out + out.err
@@ -73,3 +81,5 @@ def test_SEC_008_export_flow_does_not_log_personal_data(
     assert "exports.downloaded" in logs
     for secret in (NAME, "Kothapalli", "Harshavardhini", FATHER, NOTE, "2011-07-09", "09/07/2011"):
         assert secret not in logs, secret
+    # Staff names shown as the requester (ADR-0021) never reach the logs either.
+    assert principal.display_name not in logs

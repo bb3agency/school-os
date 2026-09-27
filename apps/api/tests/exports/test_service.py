@@ -229,6 +229,11 @@ def test_portal_precheck_masks_c3_unless_included(
     assert ready[1][ready[0].index("Social category")] == "OBC"
     requested = EX.audit_rows(admin_engine, school.tenant_id, shown.id)[0]["summary"]
     assert requested["include_sensitive"] is True
+    # ADR-0021 decision 2: the audit event names the restricted columns, never their values.
+    assert requested["sensitive_columns"] == ["category"]
+    assert "obc" not in str(requested).lower()
+    unmasked = EX.audit_rows(admin_engine, school.tenant_id, masked.id)[0]["summary"]
+    assert (unmasked["include_sensitive"], unmasked["sensitive_columns"]) == (False, [])
     # Aadhaar-as-printed values never appear in any file (PRV-013).
     for export_id in (masked.id, shown.id):
         for ws in _xlsx(export_id).worksheets:
@@ -257,6 +262,67 @@ def test_include_sensitive_needs_permission_and_step_up(school: Any, section: st
             include_sensitive=True,
             as_ctx=stale,
         )
+
+
+@pytest.mark.parametrize(
+    "auth",
+    [
+        {"auth_time": None},
+        {"auth_time": dt.datetime.now(dt.UTC) - dt.timedelta(minutes=6)},
+        {"mfa": False},
+    ],
+    ids=["no-sign-in-time", "stale", "no-mfa"],
+)
+def test_ADR_0021_every_export_request_needs_step_up(
+    school: Any, section: str, auth: dict[str, Any]
+) -> None:
+    """Decision 1: every pre-check (with or without restricted values) and every student list
+    needs MFA within 5 minutes; the service checks it too, not only the route guard."""
+    EX.student(school, section_key=section)
+    who = school.people["exam_coordinator"]
+    stale = dataclasses.replace(EX.ctx(school, who, "exam_coordinator"), **auth)
+    for profile in ("cisce-registration-2026", "udise-plus"):
+        with pytest.raises(StepUpRequired):
+            EX.request_precheck(
+                school,
+                who,
+                "exam_coordinator",
+                profile_key=profile,
+                section_keys=(section,),
+                as_ctx=stale,
+            )
+    with pytest.raises(StepUpRequired):
+        EX.request_list(school, who, "exam_coordinator", section_keys=(section,), as_ctx=stale)
+
+
+def test_ADR_0021_udise_category_masked_without_permission_even_if_asked(
+    school: Any, section: str
+) -> None:
+    """Decision 2: opting in without student.read_sensitive is refused (403), never silently
+    downgraded; a holder who does not opt in gets the masked sheet."""
+    EX.student(
+        school,
+        section_key=section,
+        extra=[ValueIn(attribute_key="category", source="parent_form", value="sc")],
+    )
+    coordinator = school.people["exam_coordinator"]
+    with pytest.raises(Forbidden) as exc:
+        EX.request_precheck(
+            school,
+            coordinator,
+            "exam_coordinator",
+            profile_key="udise-plus",
+            section_keys=(section,),
+            include_sensitive=True,
+        )
+    assert exc.value.code == "sensitive_not_allowed"
+    principal = school.people["principal"]
+    out = EX.request_precheck(
+        school, principal, "principal", profile_key="udise-plus", section_keys=(section,)
+    )
+    EX.run(school, out.id)
+    ready = _sheet(_xlsx(out.id), 2)
+    assert ready[1][ready[0].index("Social category")] == "••••"
 
 
 def test_precheck_permission_follows_profile_kind(school: Any, section: str) -> None:
@@ -524,6 +590,90 @@ def test_read_and_download_only_own_exports(
     ]
     assert len(downloaded) == 1
     assert downloaded[0]["summary"]["format"] == "xlsx"
+
+
+def test_ADR_0021_read_all_and_download_any_rules(
+    school: Any, section: str, admin_engine: Engine
+) -> None:
+    EX.student(school, section_key=section)
+    theirs = EX.ready_export(school, "exam_coordinator")
+    who = school.people["coordinator_2"]
+    base = EX.ctx(school, who, "exam_coordinator")
+    with tenant_session(school.tenant_id, who.user_id) as db:
+        # Neither permission: someone else's export does not exist for you.
+        with pytest.raises(NotFound):
+            exports.get_export(db, base, theirs)
+        with pytest.raises(NotFound):
+            exports.download_url(db, base, theirs)
+        with pytest.raises(Forbidden):
+            exports.list_exports(db, base, requested_by="all")
+        # export.read_all only: details yes, files no (403 not_own_export).
+        reader = dataclasses.replace(base, permissions=base.permissions | {"export.read_all"})
+        seen = exports.get_export(db, reader, theirs)
+        assert (seen.own, seen.can_download) == (False, False)
+        assert seen.requested_by.membership_id == school.people["exam_coordinator"].membership_id
+        assert theirs in {e.id for e in exports.list_exports(db, reader, requested_by="all").data}
+        with pytest.raises(Forbidden) as exc:
+            exports.download_url(db, reader, theirs)
+        assert exc.value.code == "not_own_export"
+        # export.download_any (custom role): files with step-up, but never beyond your reach.
+        anyone = dataclasses.replace(base, permissions=base.permissions | {"export.download_any"})
+        with pytest.raises(NotFound):
+            exports.get_export(db, anyone, theirs)  # details need export.read_all
+        stale = dataclasses.replace(anyone, auth_time=None)
+        with pytest.raises(StepUpRequired):
+            exports.download_url(db, stale, theirs)
+        scoped = dataclasses.replace(
+            anyone,
+            scoped_permissions=frozenset({"student.read_basic"}),
+            scopes=Scopes(school=False, section_ids=frozenset({school.ids[section]})),
+        )
+        with pytest.raises(Forbidden):
+            exports.download_url(db, scoped, theirs)
+        link = exports.download_url(db, anyone, theirs)
+    assert f"/exports/{theirs}/" in link.url
+    downloaded = [
+        r
+        for r in EX.audit_rows(admin_engine, school.tenant_id, theirs)
+        if r["action"] == "export.downloaded"
+    ]
+    assert len(downloaded) == 1
+    assert downloaded[0]["actor_id"] == who.user_id
+    assert downloaded[0]["summary"]["own_export"] is False
+
+
+def test_ADR_0021_download_any_of_restricted_values_needs_school_wide_sensitive(
+    school: Any, section: str
+) -> None:
+    EX.student(school, section_key=section)
+    admin = school.people["office_admin"]
+    out = EX.request_precheck(
+        school,
+        admin,
+        "office_admin",
+        profile_key="udise-plus",
+        section_keys=(section,),
+        formats=("xlsx",),
+        include_sensitive=True,
+    )
+    assert EX.run(school, out.id) == "ready"
+    owner = school.people["owner"]
+    c_owner = EX.ctx(school, owner, "owner")
+    no_sensitive = dataclasses.replace(
+        c_owner, permissions=c_owner.permissions - {"student.read_sensitive"}
+    )
+    scoped_sensitive = dataclasses.replace(
+        c_owner,
+        scoped_permissions=frozenset({"student.read_sensitive"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids[section]})),
+    )
+    with tenant_session(school.tenant_id, owner.user_id) as db:
+        for ctx in (no_sensitive, scoped_sensitive):
+            assert exports.get_export(db, ctx, out.id).can_download is False
+            with pytest.raises(Forbidden) as exc:
+                exports.download_url(db, ctx, out.id)
+            assert exc.value.code == "sensitive_not_allowed"
+        assert exports.download_url(db, c_owner, out.id).format == "xlsx"
 
 
 def test_FR_EXP_004_student_list_download_needs_step_up(school: Any, section: str) -> None:

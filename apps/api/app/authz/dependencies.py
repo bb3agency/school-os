@@ -5,7 +5,8 @@ Every tenant route declares ``Depends(require("<permission>", scope=..., step_up
 (CLAUDE.md §6.2, SEC-003), or ``Depends(require_any("<permission>", "<alternative>", ...))``
 for a read that any one of several permissions may use. The dependency object carries
 ``sos_permission`` (and ``sos_step_up``/``sos_scope``, plus ``sos_any_of`` for ``require_any``)
-so the route-enumeration test can check every route against the catalog. Unknown or platform
+so the route-enumeration test can check every route against the catalog; ``require_any`` takes
+``step_up=True`` when every listed permission is a step-up permission. Unknown or platform
 permissions fail when the route module is imported.
 
 Order of checks per request: authenticate (401) -> resolve membership (403/409) -> permission
@@ -139,18 +140,25 @@ def require(
 class AnyOfRequirement(Requirement):
     """Callable dependency returned by :func:`require_any`.
 
-    Satisfied by ``sos_permission`` or any of ``sos_any_of``; no scope rule and no step-up.
-    The route-enumeration and authorization-matrix tests read ``sos_any_of``.
+    Satisfied by ``sos_permission`` or any of ``sos_any_of``; no scope rule. With
+    ``step_up=True`` (every listed permission must be a step-up permission in the catalog) the
+    caller also needs MFA within 5 minutes (428), whichever permission they hold. The
+    route-enumeration and authorization-matrix tests read ``sos_any_of`` and ``sos_step_up``.
     """
 
-    def __init__(self, permission: str, *, any_of: tuple[str, ...]) -> None:
-        super().__init__(permission, scope=None, step_up=False)
+    def __init__(self, permission: str, *, any_of: tuple[str, ...], step_up: bool = False) -> None:
+        super().__init__(permission, scope=None, step_up=step_up)
         for alternative in any_of:
-            tenant_permission(alternative)  # unknown or platform permissions fail at import
+            adef = tenant_permission(alternative)  # unknown or platform permissions fail at import
+            if step_up and not adef.step_up:
+                raise CatalogError(f"{alternative} is not a step-up permission")
         self.sos_any_of = any_of
 
     def __repr__(self) -> str:
-        return f"require_any({self.sos_permission!r}, {', '.join(map(repr, self.sos_any_of))})"
+        listed = ", ".join(map(repr, (self.sos_permission, *self.sos_any_of)))
+        return (
+            f"require_any({listed}, step_up=True)" if self.sos_step_up else f"require_any({listed})"
+        )
 
     def __call__(
         self,
@@ -161,20 +169,24 @@ class AnyOfRequirement(Requirement):
         held = next((p for p in (self.sos_permission, *self.sos_any_of) if ctx.has(p)), None)
         if held is None:
             raise Forbidden()
+        if self.sos_step_up:
+            require_recent_auth(principal)
         # Break-glass: read-only, recorded under the first listed permission the caller holds.
         breakglass_guard.enforce(ctx, request, held)
         return ctx
 
 
-def require_any(permission: str, *alternatives: str) -> AnyOfRequirement:
+def require_any(permission: str, *alternatives: str, step_up: bool = False) -> AnyOfRequirement:
     """Route guard: the caller's active membership must hold ``permission`` or one of
     ``alternatives`` (e.g. a read screen shared by the maker and the checker).
 
-    Unlike :func:`require` it has no scope rule and no step-up: scoped holders pass and the
-    service filters objects by scope (404 outside it). Use it only for reads the service checks
-    again per object.
+    Unlike :func:`require` it has no scope rule: scoped holders pass and the service filters
+    objects by scope (404 outside it). Use it only where the service checks the particular
+    permission again per object or per request (e.g. ``export.board`` for board profiles).
+    ``step_up=True`` requires MFA within 5 minutes (428) and is allowed only when every listed
+    permission is a step-up permission (e.g. creating any pre-check export, ADR-0021).
     """
-    return AnyOfRequirement(permission, any_of=alternatives)
+    return AnyOfRequirement(permission, any_of=alternatives, step_up=step_up)
 
 
 class PrincipalRequirement:

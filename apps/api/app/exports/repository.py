@@ -52,14 +52,17 @@ def update_export(session: Session, export_id: uuid.UUID, values: Mapping[str, A
     return session.execute(stmt).scalar_one()
 
 
-def list_for_membership(
+def list_exports(
     session: Session,
-    membership_id: uuid.UUID,
+    membership_id: uuid.UUID | None,
     *,
     after: tuple[dt.datetime, uuid.UUID] | None,
     limit: int,
 ) -> list[Export]:
-    stmt = select(Export).where(Export.requested_by_membership == membership_id)
+    """This school's exports, newest first; only ``membership_id``'s unless it is ``None``."""
+    stmt = select(Export)
+    if membership_id is not None:
+        stmt = stmt.where(Export.requested_by_membership == membership_id)
     if after is not None:
         created, last = after
         stmt = stmt.where(

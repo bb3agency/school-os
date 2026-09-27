@@ -130,14 +130,24 @@ permissions:
     step_up: false
 
   # --- exports, audit, finance, insights ---------------------------------------------------
+  # Creating any export needs step-up (ADR-0021 decision 1).
   export.board:
     description: Board registration pre-check exports (e.g. CISCE)
     sensitivity: sensitive
-    step_up: false
+    step_up: true
   export.portal:
     description: Government portal pre-check exports (e.g. UDISE+)
     sensitivity: sensitive
+    step_up: true
+  # ADR-0021 decision 3 (migration 0019_export_access).
+  export.read_all:
+    description: See every export of the school (who made it, what, when and its status; not the files)
+    sensitivity: sensitive
     step_up: false
+  export.download_any:
+    description: Download exports made by other staff (recent MFA sign-in every time)
+    sensitivity: critical
+    step_up: true
   audit.read:
     description: See the school's audit log and verify its integrity
     sensitivity: sensitive

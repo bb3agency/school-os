@@ -16,22 +16,29 @@ Flow (docs/04 §6, §8.2)::
                                                         job succeeded, audit ``export.completed``,
                                                         notification ``export.ready``
     GET  /exports/{id}/download-url  download_url()     presigned GET <= 5 min, audit
-                                                        ``export.downloaded``
+                                                        ``export.downloaded`` (own or not)
     beat exports.purge_expired  purge_expired()         files deleted 7 days after completion
 
 Rules:
 
 - **Reach (SEC-015, invariant 3).** Students come only from ``students.list_students_in_scope``
-  with the requester's context; findings only from ``dq.service`` with the same context. An
-  export is visible and downloadable only by the member who requested it (404 for anyone else,
-  including other schools).
+  with the requester's context; findings only from ``dq.service`` with the same context.
+- **Who sees whose exports (ADR-0021).** Your own exports: always (the files while you still
+  hold the export's permission). Someone else's: the details with ``export.read_all``, the files
+  with ``export.download_any`` (always step-up, and only with school-wide ``student.read_basic``,
+  plus school-wide ``student.read_sensitive`` for exports with restricted values, so the
+  permission never widens what the downloader could see). Anyone else gets 404, like other
+  schools' ids; a holder of ``export.read_all`` without ``export.download_any`` gets 403
+  ``not_own_export`` on the download.
 - **Sensitive data (docs/07 §8, docs/08 §5).** Restricted (C3) values are masked (``••••``)
-  unless explicitly included by a holder of ``student.read_sensitive`` (pre-checks also need
-  step-up). The Aadhaar-as-printed fields are never exported; ``aadhaar_last4`` is shown only as
+  unless explicitly included by a holder of ``student.read_sensitive``; the audit event lists
+  the restricted columns included (``sensitive_columns``), never their values. The
+  Aadhaar-as-printed fields are never exported; ``aadhaar_last4`` is shown only as
   ``XXXX XXXX 1234``. Findings carry the masked values the DQ engine stored.
 - **Cells (SEC-017, invariant 4).** Every cell passes :func:`app.exports.tables.safe_cell`.
-- **Step-up (FR-EXP-004).** Student lists (bulk personal data) need MFA within 5 minutes to be
-  requested (route) and downloaded (here), as do pre-checks that include sensitive values.
+- **Step-up (FR-EXP-004, ADR-0021).** Every export needs MFA within 5 minutes to be requested
+  (route guard, checked again here). Downloading your own student list or an export with
+  restricted values needs it too, as does every download of someone else's export.
 - **Audit (FR-EXP-003, invariant 7)** in the same transaction, IDs/codes/counts only; the
   export row keeps the exact student ids and the audit event binds them with a digest.
 """
@@ -62,7 +69,7 @@ from app.documents import service as documents
 from app.dq import service as dq
 from app.exports import repository as repo
 from app.exports.config import ExportsConfig, Language, ProfileLayout, load_config
-from app.exports.models import Export, ExportFile
+from app.exports.models import Export
 from app.exports.pdf import PdfRenderer, get_renderer
 from app.exports.report import (
     FindingLine,
@@ -76,8 +83,10 @@ from app.exports.schemas import (
     ExportFileOut,
     ExportOut,
     ExportProfileOut,
+    ExportRequesterOut,
     ExportScopeIn,
     PrecheckCreate,
+    RequestedBy,
     StudentListCreate,
 )
 from app.exports.tables import CSV_MIME, PDF_MIME, XLSX_MIME, Table, write_csv, write_xlsx
@@ -96,6 +105,8 @@ DQ_READ: Final = "dq.findings.read"
 BOARD: Final = "export.board"
 PORTAL: Final = "export.portal"
 STUDENT_EXPORT: Final = "student.export"
+READ_ALL: Final = "export.read_all"
+DOWNLOAD_ANY: Final = "export.download_any"
 EXPORT_PERMISSIONS: Final = (BOARD, PORTAL, STUDENT_EXPORT)
 
 KIND_OF_LAYOUT: Final = {"board": "board_precheck", "portal": "portal_precheck"}
@@ -376,15 +387,17 @@ def _create(
         },
     )
     log.info("exports.requested", resource_type="export", resource_id=export_id, action=kind)
-    return _out(row, [])
+    return _outs(session, ctx, [row])[0]
 
 
 def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -> ExportOut:
     """``POST /exports``: a pre-check report for a DQ profile (US-501 AC4) as XLSX (summary,
     findings blockers first, "ready to enter" sheet in the profile's field order) and/or an A4
     PDF. Needs the profile's permission (``export.board`` for board profiles, ``export.portal``
-    for portal profiles), ``student.read_basic`` and ``dq.findings.read``; ``include_sensitive``
-    also needs ``student.read_sensitive`` and step-up. Audit: ``export.requested``."""
+    for portal profiles), ``student.read_basic``, ``dq.findings.read`` and step-up (ADR-0021);
+    ``include_sensitive`` also needs ``student.read_sensitive``. Restricted (C3) fields of the
+    layout stay masked unless included; the audit event ``export.requested`` lists the ones
+    included (``sensitive_columns``)."""
     profile = _profile(data.profile_key)
     _need(
         ctx,
@@ -400,8 +413,12 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
             code="sensitive_not_allowed",
             detail="Restricted details can be included only by staff allowed to see them.",
         )
-        _require_step_up(ctx)
+    _require_step_up(ctx)
     ids = _students_for(session, ctx, data.scope)
+    sensitive: list[str] = []
+    if data.include_sensitive:
+        classes = _exportable_columns(session, load_config())
+        sensitive = [k for k in profile.layout.fields if classes.get(k) == "C3"]
     return _create(
         session,
         ctx,
@@ -413,6 +430,7 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
         layout_version=profile.layout.layout_version,
         profile=profile,
         include_sensitive=data.include_sensitive,
+        sensitive_columns=sensitive,
     )
 
 
@@ -429,11 +447,12 @@ def _exportable_columns(session: Session, cfg: ExportsConfig) -> dict[str, str]:
 
 def request_student_list(session: Session, ctx: UserContext, data: StudentListCreate) -> ExportOut:
     """``POST /exports/student-list``: chosen columns for the students in scope as CSV or XLSX
-    (``student.export``, step-up at the route). Restricted (C3) columns need
+    (``student.export``, step-up at the route and here). Restricted (C3) columns need
     ``student.read_sensitive`` (403 ``sensitive_not_allowed``); Aadhaar-as-printed fields are
     never exportable (422 ``column_not_exportable``). Audit: ``export.requested``."""
     cfg = load_config()
     _need(ctx, STUDENT_READ, detail="You cannot see student records.")
+    _require_step_up(ctx)
     allowed = _exportable_columns(session, cfg)
     errors = [
         {
@@ -473,41 +492,91 @@ def request_student_list(session: Session, ctx: UserContext, data: StudentListCr
 # --- reads ----------------------------------------------------------------------------------------
 
 
-def _out(row: Export, files: Sequence[ExportFile]) -> ExportOut:
-    return ExportOut(
-        id=row.id,
-        kind=row.kind,
-        profile_key=row.profile_key,
-        profile_version=row.profile_version,
-        layout_version=row.layout_version,
-        formats=list(row.formats),
-        language=row.language,
-        scope={k: [uuid.UUID(str(v)) for v in vs] for k, vs in (row.scope or {}).items()},
-        columns=list(row.columns) if row.columns is not None else None,
-        include_sensitive=row.include_sensitive,
-        student_count=row.student_count,
-        status=row.status,
-        error_code=row.error_code,
-        created_at=row.created_at,
-        started_at=row.started_at,
-        finished_at=row.finished_at,
-        expires_at=row.expires_at,
-        files=[
-            ExportFileOut(
-                format=f.format,
-                content_type=f.content_type,
-                size_bytes=f.size_bytes,
-            )
-            for f in files
-            if row.files_deleted_at is None
-        ],
-    )
+def _own(ctx: UserContext, row: Export) -> bool:
+    return row.requested_by_membership == ctx.membership_id
 
 
-def _own(session: Session, ctx: UserContext, export_id: uuid.UUID) -> Export:
-    """The caller's own export (404 for anyone else's, another school's or unknown ids)."""
+def _download_problem(ctx: UserContext, row: Export) -> Forbidden | None:
+    """Why the caller may not download ``row``'s files (permissions only; step-up and the
+    export's state are checked by :func:`download_url`)."""
+    return _own_problem(ctx, row) if _own(ctx, row) else _others_problem(ctx, row)
+
+
+def _own_problem(ctx: UserContext, row: Export) -> Forbidden | None:
+    if not ctx.has(PERMISSION_OF_KIND[row.kind]):
+        return Forbidden("You can no longer download this export.")
+    if row.include_sensitive and not ctx.has(SENSITIVE):
+        return Forbidden(
+            "You can no longer download restricted details.", code="sensitive_not_allowed"
+        )
+    return None
+
+
+def _others_problem(ctx: UserContext, row: Export) -> Forbidden | None:
+    if not ctx.has(DOWNLOAD_ANY):
+        return Forbidden(
+            "You can download only your own exports. Ask the person who made it, or make a "
+            "new one.",
+            code="not_own_export",
+        )
+    # ADR-0021: export.download_any never widens what the downloader could see.
+    if not (ctx.has(STUDENT_READ) and ctx.scope_for(STUDENT_READ).school_wide):
+        return Forbidden("Downloading other staff's exports needs access to every student.")
+    if row.include_sensitive and not (ctx.has(SENSITIVE) and ctx.scope_for(SENSITIVE).school_wide):
+        return Forbidden(
+            "This export has restricted details you are not allowed to see.",
+            code="sensitive_not_allowed",
+        )
+    return None
+
+
+def _outs(session: Session, ctx: UserContext, rows: Sequence[Export]) -> list[ExportOut]:
+    """API view of ``rows``: files (while they exist), the requester's name, and whether the
+    row is the caller's own and downloadable by the caller."""
+    files = repo.files_of(session, [r.id for r in rows])
+    names = identity.member_display_names(session, {r.requested_by_membership for r in rows})
+    return [
+        ExportOut(
+            id=row.id,
+            kind=row.kind,
+            profile_key=row.profile_key,
+            profile_version=row.profile_version,
+            layout_version=row.layout_version,
+            formats=list(row.formats),
+            language=row.language,
+            scope={k: [uuid.UUID(str(v)) for v in vs] for k, vs in (row.scope or {}).items()},
+            columns=list(row.columns) if row.columns is not None else None,
+            include_sensitive=row.include_sensitive,
+            student_count=row.student_count,
+            status=row.status,
+            error_code=row.error_code,
+            created_at=row.created_at,
+            started_at=row.started_at,
+            finished_at=row.finished_at,
+            expires_at=row.expires_at,
+            files=[
+                ExportFileOut(format=f.format, content_type=f.content_type, size_bytes=f.size_bytes)
+                for f in files.get(row.id, [])
+                if row.files_deleted_at is None
+            ],
+            requested_by=ExportRequesterOut(
+                membership_id=row.requested_by_membership,
+                display_name=names.get(row.requested_by_membership),
+            ),
+            own=_own(ctx, row),
+            can_download=_download_problem(ctx, row) is None,
+        )
+        for row in rows
+    ]
+
+
+def _visible(
+    session: Session, ctx: UserContext, export_id: uuid.UUID, *, others: Collection[str]
+) -> Export:
+    """The caller's own export, or someone else's when the caller holds one of ``others``
+    (404 otherwise, and for other schools' or unknown ids: existence is never revealed)."""
     row = repo.get_export(session, export_id)
-    if row is None or row.requested_by_membership != ctx.membership_id:
+    if row is None or not (_own(ctx, row) or any(ctx.has(p) for p in others)):
         raise _not_found()
     return row
 
@@ -527,30 +596,38 @@ def _after(cursor: str | None) -> tuple[dt.datetime, uuid.UUID] | None:
 
 
 def list_exports(
-    session: Session, ctx: UserContext, *, limit: int = 50, cursor: str | None = None
+    session: Session,
+    ctx: UserContext,
+    *,
+    limit: int = 50,
+    cursor: str | None = None,
+    requested_by: RequestedBy = "me",
 ) -> Page[ExportOut]:
-    """The caller's own exports, newest first."""
-    rows = repo.list_for_membership(
-        session, ctx.membership_id, after=_after(cursor), limit=limit + 1
+    """Exports newest first: the caller's own (``requested_by="me"``, default) or every export
+    of the school (``"all"``: needs ``export.read_all``, else 403)."""
+    if requested_by == "all":
+        _need(ctx, READ_ALL, detail="You can see only your own exports.")
+    rows = repo.list_exports(
+        session,
+        None if requested_by == "all" else ctx.membership_id,
+        after=_after(cursor),
+        limit=limit + 1,
     )
     page = rows[:limit]
-    files = repo.files_of(session, [r.id for r in page])
     next_cursor = None
     if len(rows) > limit and page:
         last = page[-1]
         next_cursor = encode_cursor({"t": last.created_at.isoformat(), "i": str(last.id)})
-    return Page[ExportOut](
-        data=[_out(r, files.get(r.id, [])) for r in page], next_cursor=next_cursor
-    )
+    return Page[ExportOut](data=_outs(session, ctx, page), next_cursor=next_cursor)
 
 
 def get_export(session: Session, ctx: UserContext, export_id: uuid.UUID) -> ExportOut:
-    row = _own(session, ctx, export_id)
-    return _out(row, repo.files_of(session, [row.id]).get(row.id, []))
+    """One export: your own, or anyone's with ``export.read_all`` (404 otherwise)."""
+    return _outs(session, ctx, [_visible(session, ctx, export_id, others=(READ_ALL,))])[0]
 
 
-def _needs_step_up(row: Export) -> bool:
-    return row.kind == "student_list" or row.include_sensitive
+def _needs_step_up(ctx: UserContext, row: Export) -> bool:
+    return not _own(ctx, row) or row.kind == "student_list" or row.include_sensitive
 
 
 def _stem(row: Export) -> str:
@@ -560,19 +637,18 @@ def _stem(row: Export) -> str:
 def download_url(
     session: Session, ctx: UserContext, export_id: uuid.UUID, file_format: str | None = None
 ) -> ExportDownloadOut:
-    """A presigned GET (<= 5 minutes, attachment) for one file of the caller's own ready
-    export. The caller must still hold the export's permission; student lists and exports with
-    sensitive values need step-up (FR-EXP-004). Audit: ``export.downloaded``."""
-    row = _own(session, ctx, export_id)
-    _need(ctx, PERMISSION_OF_KIND[row.kind], detail="You can no longer download this export.")
-    if row.include_sensitive:
-        _need(
-            ctx,
-            SENSITIVE,
-            code="sensitive_not_allowed",
-            detail="You can no longer download restricted details.",
-        )
-    if _needs_step_up(row):
+    """A presigned GET (<= 5 minutes, attachment) for one file of a ready export.
+
+    Your own: you must still hold the export's permission; student lists and exports with
+    sensitive values need step-up (FR-EXP-004). Someone else's (ADR-0021): needs
+    ``export.download_any`` with school-wide reach, always with step-up (403 ``not_own_export``
+    for holders of ``export.read_all`` only; 404 for everyone else). Audit:
+    ``export.downloaded`` with ``own_export`` and the requester's membership id."""
+    row = _visible(session, ctx, export_id, others=(READ_ALL, DOWNLOAD_ANY))
+    problem = _download_problem(ctx, row)
+    if problem is not None:
+        raise problem
+    if _needs_step_up(ctx, row):
         _require_step_up(ctx)
     if row.status == "expired" or row.files_deleted_at is not None:
         raise Conflict(
@@ -606,9 +682,20 @@ def download_url(
         session,
         "export.downloaded",
         row.id,
-        {"kind": row.kind, "format": file.format, "file_id": file.id},
+        {
+            "kind": row.kind,
+            "format": file.format,
+            "file_id": file.id,
+            "own_export": _own(ctx, row),
+            "requested_by_membership": row.requested_by_membership,
+        },
     )
-    log.info("exports.downloaded", resource_type="export", resource_id=row.id)
+    log.info(
+        "exports.downloaded",
+        resource_type="export",
+        resource_id=row.id,
+        action="own" if _own(ctx, row) else "download_any",
+    )
     return ExportDownloadOut(
         url=url,
         expires_at=expires_at,
@@ -1190,11 +1277,13 @@ def purge_expired(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> in
 
 __all__ = [
     "BOARD",
+    "DOWNLOAD_ANY",
     "EXPORT_PERMISSIONS",
     "GENERATE_EVENT",
     "GENERATE_TASK",
     "PORTAL",
     "PURGE_TASK",
+    "READ_ALL",
     "RENDER_EVENT",
     "RENDER_TASK",
     "STUDENT_EXPORT",

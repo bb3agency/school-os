@@ -182,8 +182,10 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | document.manage_acl (also gates document delete) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | kb.ask | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | — |
 | kb.verified_answer.manage | — | ✓ | ✓ | — | — | — | — | — | — |
-| export.board | — | ✓ | ✓ | — | — | ✓ | — | — | — |
-| export.portal | — | ✓ | ✓ | — | — | ✓ | — | — | — |
+| export.board (create board pre-checks; step-up, ADR-0021) | — | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — |
+| export.portal (create portal pre-checks; step-up, ADR-0021) | — | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — |
+| export.read_all (see every export's details, not its files; ADR-0021) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| export.download_any (download other staff's exports; ADR-0021) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | audit.read | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
 | finance.read (M6) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
 | insights.read (M5) | ✓ | ✓ | — | — | — | — | S | — | — |

@@ -1,12 +1,15 @@
 """``require_any()``: a route guard satisfied by any one of several tenant permissions
 (SEC-003, CLAUDE.md §6.2).
 
-The guard passes exactly when the caller holds one of the listed permissions: no scope rule,
-no step-up (a read shared by the maker and the checker, or by the export permissions), 403 for
-everyone else. Objects outside the caller's scope or school are the service's 404, not the
-guard's. Break-glass sessions go through the same read-only guard as ``require()``, recorded
-under the first listed permission the caller holds. The matrix and route-enumeration tests read
-``sos_permission`` and ``sos_any_of``.
+The guard passes exactly when the caller holds one of the listed permissions: no scope rule
+and, unless ``step_up=True``, no step-up (a read shared by the maker and the checker, or by the
+export permissions), 403 for everyone else. With ``step_up=True`` (creating a pre-check export,
+ADR-0021) every listed permission must be a step-up permission and the caller also needs MFA
+within 5 minutes (428), checked after the permission (403 first). Objects outside the caller's
+scope or school are the service's 404, not the guard's. Break-glass sessions go through the
+same read-only guard as ``require()``, recorded under the first listed permission the caller
+holds. The matrix and route-enumeration tests read ``sos_permission``, ``sos_any_of`` and
+``sos_step_up``.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ from app.main import create_app
 REQUEST = "student.identity_change.request"
 APPROVE = "student.identity_change.approve"
 BOARD, PORTAL, STUDENT_EXPORT = "export.board", "export.portal", "student.export"
+READ_ALL, DOWNLOAD_ANY = "export.read_all", "export.download_any"
 
 
 def _ctx(*permissions: str, scoped: bool = False, breakglass: bool = False) -> UserContext:
@@ -215,16 +219,80 @@ def _any_of_guards() -> list[tuple[str, str, Any]]:
 
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
     guards = _any_of_guards()
+    readers = (PORTAL, STUDENT_EXPORT, READ_ALL)
     expected = {
-        ("GET", "/api/v1/change-requests"): (REQUEST, (APPROVE,)),
-        ("GET", "/api/v1/change-requests/{change_request_id}"): (REQUEST, (APPROVE,)),
-        ("GET", "/api/v1/change-requests/{change_request_id}/memo"): (REQUEST, (APPROVE,)),
-        ("GET", "/api/v1/export-profiles"): (BOARD, (PORTAL,)),
-        ("POST", "/api/v1/exports"): (BOARD, (PORTAL,)),
-        ("GET", "/api/v1/exports"): (BOARD, (PORTAL, STUDENT_EXPORT)),
-        ("GET", "/api/v1/exports/{export_id}"): (BOARD, (PORTAL, STUDENT_EXPORT)),
-        ("GET", "/api/v1/exports/{export_id}/download-url"): (BOARD, (PORTAL, STUDENT_EXPORT)),
+        ("GET", "/api/v1/change-requests"): (REQUEST, (APPROVE,), False),
+        ("GET", "/api/v1/change-requests/{change_request_id}"): (REQUEST, (APPROVE,), False),
+        ("GET", "/api/v1/change-requests/{change_request_id}/memo"): (REQUEST, (APPROVE,), False),
+        ("GET", "/api/v1/export-profiles"): (BOARD, (PORTAL,), False),
+        # ADR-0021 decision 1: creating any pre-check needs step-up.
+        ("POST", "/api/v1/exports"): (BOARD, (PORTAL,), True),
+        ("GET", "/api/v1/exports"): (BOARD, readers, False),
+        ("GET", "/api/v1/exports/{export_id}"): (BOARD, readers, False),
+        ("GET", "/api/v1/exports/{export_id}/download-url"): (
+            BOARD,
+            (PORTAL, STUDENT_EXPORT, DOWNLOAD_ANY),
+            False,
+        ),
     }
-    assert {(m, p): (g.sos_permission, g.sos_any_of) for m, p, g in guards} == expected
+    assert {
+        (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards
+    } == expected
     assert all(type(g) is AnyOfRequirement for _, _, g in guards)
-    assert all(g.sos_scope is None and g.sos_step_up is False for _, _, g in guards)
+    assert all(g.sos_scope is None for _, _, g in guards)
+
+
+# --- step_up=True (ADR-0021, SEC-005) ------------------------------------------------------------
+
+
+def test_SEC_005_require_any_step_up_carries_the_flag() -> None:
+    guard = require_any(BOARD, PORTAL, step_up=True)
+    assert guard.sos_step_up is True
+    assert (guard.sos_permission, guard.sos_any_of) == (BOARD, (PORTAL,))
+    assert repr(guard) == "require_any('export.board', 'export.portal', step_up=True)"
+
+
+@pytest.mark.parametrize(
+    "keys",
+    [
+        (BOARD, READ_ALL),  # export.read_all is not a step-up permission
+        (READ_ALL, BOARD),
+        (REQUEST, APPROVE),
+    ],
+)
+def test_SEC_005_require_any_step_up_only_with_step_up_permissions(
+    keys: tuple[str, str],
+) -> None:
+    with pytest.raises(CatalogError):
+        require_any(*keys, step_up=True)
+
+
+@pytest.mark.parametrize("held", [BOARD, PORTAL])
+def test_SEC_005_require_any_step_up_passes_with_recent_mfa(held: str) -> None:
+    with _client(require_any(BOARD, PORTAL, step_up=True), _ctx(held), _principal()) as client:
+        assert client.post("/probe").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "principal",
+    [_principal(age_s=301), _principal(mfa=False)],
+    ids=["stale-auth", "no-mfa"],
+)
+@pytest.mark.parametrize("held", [BOARD, PORTAL])
+def test_SEC_005_require_any_step_up_refuses_stale_or_non_mfa_sign_in(
+    held: str, principal: Principal
+) -> None:
+    with _client(require_any(BOARD, PORTAL, step_up=True), _ctx(held), principal) as client:
+        for method in ("GET", "POST"):
+            res = client.request(method, "/probe")
+            assert res.status_code == 428, res.text
+            assert res.json()["code"] == "step_up_required"
+
+
+def test_SEC_005_require_any_step_up_checks_permission_first() -> None:
+    # 403 before 428: a caller without the permission never learns step-up would help.
+    guard = require_any(BOARD, PORTAL, step_up=True)
+    with _client(guard, _ctx(STUDENT_EXPORT), _principal(age_s=3600)) as client:
+        res = client.post("/probe")
+    assert res.status_code == 403
+    assert res.json()["code"] == "forbidden"
