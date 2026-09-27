@@ -120,14 +120,35 @@ class InviteIn(_In):
         return v
 
 
-class MembershipStatusIn(_In):
-    """Activate, suspend or remove a staff member's access to this school."""
+class UserUpdateIn(_In):
+    """Change a staff member (``PATCH /users/{id}``): send only what changes, at least one field.
 
-    status: Literal["active", "suspended", "removed"]
+    ``status`` activates, suspends or removes their access to this school. ``display_name``,
+    ``email`` (``null`` clears it) and ``preferred_language`` edit the person's profile; the
+    sign-in account (IdP subject) never changes here.
+    """
+
+    status: Literal["active", "suspended", "removed"] | None = None
+    display_name: DisplayName | None = None
+    email: Email | None = None
+    preferred_language: Language | None = None
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("send at least one field to change")
+        for name in ("status", "display_name", "preferred_language"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
 
 
 class RolesIn(_In):
-    roles: list[RoleKey] = Field(max_length=20)
+    roles: list[RoleKey] = Field(
+        max_length=20,
+        description="The complete new set of roles. An empty list is refused (422 "
+        "``roles_required``): suspend or remove the member instead.",
+    )
 
     @field_validator("roles")
     @classmethod
@@ -160,6 +181,24 @@ class RoleOut(_Out):
     name_te: str
     is_system: bool
     permissions: list[str]
+    grantable: bool = Field(
+        description="Whether you may give (or take away) this role, by the rule the server "
+        "enforces: with ``role.assign``, when its permissions are within your own (owners may "
+        "give every role); without ``role.assign``, only non-privileged system roles and only "
+        "when inviting."
+    )
+    scoped: bool = Field(
+        description="Whether some of its permissions reach only the member's classes/sections "
+        "(set scopes for them); false when every permission is school-wide."
+    )
+
+
+class StaffMemberOut(_Out):
+    """One entry of the staff directory (e.g. choosing a class teacher): no contact details."""
+
+    membership_id: uuid.UUID
+    display_name: str
+    roles: list[str]
 
 
 class PermissionOut(_Out):
@@ -195,6 +234,14 @@ class SchoolChoicesOut(_Out):
     data: list[SchoolChoiceOut]
 
 
+class SessionSettingsOut(_Out):
+    """School settings the web applies to the signed-in session (FR-TEN-012, FR-IAM-003)."""
+
+    idle_timeout_minutes: int = Field(description="Sign out after this many idle minutes (5-30).")
+    date_format: Literal["DD/MM/YYYY", "DD-MM-YYYY", "YYYY-MM-DD"]
+    languages: list[Language] = Field(description="Languages the school uses, first is default.")
+
+
 class MeOut(_Out):
     user_id: uuid.UUID
     tenant_id: uuid.UUID
@@ -213,6 +260,7 @@ class MeOut(_Out):
         description="Status of the active school. While it is suspended or offboarding only "
         "the owner and principal can use SchoolOS, for Plan & billing (BR-08).",
     )
+    settings: SessionSettingsOut
 
 
 class LoginEventOut(_Out):

@@ -193,6 +193,20 @@ def display_names(session: Session, membership_ids: list[uuid.UUID]) -> dict[uui
     return {row.id: row.display_name for row in session.execute(stmt)}
 
 
+def members_by_user(
+    session: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
+    """User id -> (membership id, display name) in this school only (RLS)."""
+    if not user_ids:
+        return {}
+    stmt = (
+        select(Membership.user_id, Membership.id, User.display_name)
+        .join(User, User.id == Membership.user_id)
+        .where(Membership.user_id.in_(user_ids))
+    )
+    return {row.user_id: (row.id, row.display_name) for row in session.execute(stmt)}
+
+
 def list_memberships_for_user(session: Session, user_id: uuid.UUID) -> list[Membership]:
     """Memberships of ``user_id`` visible in the current tenant (at most one)."""
     return list(session.scalars(select(Membership).where(Membership.user_id == user_id)))
@@ -531,3 +545,23 @@ def active_membership_ids_with_role(session: Session, role_id: uuid.UUID) -> lis
         )
     )
     return list(session.scalars(stmt))
+
+
+def role_keys_by_membership(
+    session: Session, membership_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, set[str]]:
+    """Role keys per membership of this school (one query; staff directory)."""
+    out: dict[uuid.UUID, set[str]] = {}
+    if not membership_ids:
+        return out
+    rows = session.execute(
+        select(MembershipRole.membership_id, Role.key)
+        .join(
+            Role,
+            and_(Role.tenant_id == MembershipRole.tenant_id, Role.id == MembershipRole.role_id),
+        )
+        .where(MembershipRole.membership_id.in_(membership_ids))
+    ).all()
+    for membership_id, key in rows:
+        out.setdefault(membership_id, set()).add(key)
+    return out

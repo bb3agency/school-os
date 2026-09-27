@@ -71,8 +71,10 @@ from app.documents.schemas import (
     DocumentCreate,
     DocumentDetail,
     DocumentOut,
+    DocumentUpdate,
     DownloadUrlOut,
     UploadCreate,
+    UploaderOut,
     UploadOut,
     VersionCreate,
     VersionOut,
@@ -149,6 +151,11 @@ DELETE_GUARDS: list[DeleteGuard] = []
 AclChangedHook = Callable[[Session, uuid.UUID], None]
 ACL_CHANGED_HOOKS: list[AclChangedHook] = []
 """M2: rewrite ``acl_*`` arrays on the document's chunks (docs/05 §6)."""
+
+StatusChangedHook = Callable[[Session, uuid.UUID, str], None]
+STATUS_CHANGED_HOOKS: list[StatusChangedHook] = []
+"""``hook(session, document_id, status)`` after archive/unarchive, in the same transaction
+(M2: keep archived documents out of retrieval)."""
 
 
 # --- purpose rules --------------------------------------------------------------------------
@@ -296,7 +303,32 @@ def _reach(session: Session, grant: ScopeGrant) -> tuple[set[str], set[str]]:
     return sections, classes
 
 
-def _version_out(v: DocumentVersion) -> VersionOut:
+@dataclass(frozen=True, slots=True)
+class _Viewer:
+    """Who is looking (for ``uploaded_by_me``) and the uploaders' member refs."""
+
+    user_id: uuid.UUID | None
+    members: dict[uuid.UUID, tuple[uuid.UUID, str]]
+
+    def uploader(self, user_id: uuid.UUID) -> UploaderOut | None:
+        ref = self.members.get(user_id)
+        return UploaderOut(membership_id=ref[0], display_name=ref[1]) if ref else None
+
+
+def _viewer(
+    session: Session,
+    ctx: UserContext | None,
+    docs: Sequence[Document],
+    versions: Sequence[DocumentVersion],
+) -> _Viewer:
+    uploaders = {d.created_by for d in docs} | {v.created_by for v in versions}
+    return _Viewer(
+        user_id=ctx.user_id if ctx is not None else None,
+        members=identity.members_for_users(session, uploaders),
+    )
+
+
+def _version_out(v: DocumentVersion, viewer: _Viewer) -> VersionOut:
     return VersionOut(
         id=v.id,
         version_no=v.version_no,
@@ -305,6 +337,8 @@ def _version_out(v: DocumentVersion) -> VersionOut:
         status=v.status,
         error=v.error,
         created_at=v.created_at,
+        uploaded_by=viewer.uploader(v.created_by),
+        uploaded_by_me=v.created_by == viewer.user_id,
     )
 
 
@@ -312,6 +346,7 @@ def _document_out(
     doc: Document,
     versions: Sequence[DocumentVersion],
     acl: Sequence[DocumentAcl],
+    viewer: _Viewer,
     *,
     detail: bool = False,
 ) -> DocumentOut:
@@ -327,24 +362,29 @@ def _document_out(
         "language": doc.language,
         "sensitivity": doc.sensitivity,
         "status": doc.status,
-        "current_version": _version_out(current) if current else None,
+        "current_version": _version_out(current, viewer) if current else None,
         "acl": [
             AclEntryOut(principal_type=a.principal_type, principal_ref=a.principal_ref) for a in acl
         ],
         "created_by": doc.created_by,
+        "uploaded_by": viewer.uploader(doc.created_by),
+        "uploaded_by_me": doc.created_by == viewer.user_id,
         "created_at": doc.created_at,
         "updated_at": doc.updated_at,
         "version": doc.version,
     }
     if detail:
-        return DocumentDetail(**data, versions=[_version_out(v) for v in versions])
+        return DocumentDetail(**data, versions=[_version_out(v, viewer) for v in versions])
     return DocumentOut(**data)
 
 
-def _load_out(session: Session, doc: Document, *, detail: bool = False) -> DocumentOut:
+def _load_out(
+    session: Session, ctx: UserContext | None, doc: Document, *, detail: bool = False
+) -> DocumentOut:
     versions = repo.versions_of(session, [doc.id])
     acl = repo.acl_of(session, [doc.id])[doc.id]
-    return _document_out(doc, versions, acl, detail=detail)
+    viewer = _viewer(session, ctx, [doc], versions)
+    return _document_out(doc, versions, acl, viewer, detail=detail)
 
 
 # --- ACL validation -------------------------------------------------------------------------
@@ -730,7 +770,7 @@ def register_document(session: Session, ctx: UserContext, data: DocumentCreate) 
         )
         ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
     log.info("documents.registered", resource_type="document", resource_id=doc.id)
-    return _load_out(session, doc)
+    return _load_out(session, ctx, doc)
 
 
 def _insert_version(
@@ -806,7 +846,7 @@ def add_version(
             },
         )
         ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
-    return _load_out(session, updated)
+    return _load_out(session, ctx, updated)
 
 
 # --- reads ----------------------------------------------------------------------------------
@@ -843,7 +883,8 @@ def list_documents(
     by_doc: dict[uuid.UUID, list[DocumentVersion]] = {i: [] for i in ids}
     for v in versions:
         by_doc[v.document_id].append(v)
-    page = [_document_out(d, by_doc[d.id], acl[d.id]) for d in docs]
+    viewer = _viewer(session, ctx, docs, versions)
+    page = [_document_out(d, by_doc[d.id], acl[d.id], viewer) for d in docs]
     return page, (docs[-1].id if more and docs else None)
 
 
@@ -853,7 +894,7 @@ def get_document(session: Session, ctx: UserContext, document_id: uuid.UUID) -> 
     doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
     if doc is None:
         raise _not_found()
-    return DocumentDetail.model_validate(_load_out(session, doc, detail=True).model_dump())
+    return DocumentDetail.model_validate(_load_out(session, ctx, doc, detail=True).model_dump())
 
 
 def get_download_url(
@@ -941,7 +982,94 @@ def set_acl(
         )
         for hook in ACL_CHANGED_HOOKS:
             hook(session, doc.id)
-    return _load_out(session, updated)
+    return _load_out(session, ctx, updated)
+
+
+# --- metadata and archive (FR-DOC-005) --------------------------------------------------------
+
+METADATA_FIELDS: Final = ("title", "doc_type", "language", "issuer", "issued_on")
+
+
+def update_document(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    data: DocumentUpdate,
+    *,
+    expected_version: int,
+) -> DocumentOut:
+    """Change title, type, language, issuer or date (permission ``document.upload``; the
+    document must be visible to the caller, like adding a version; ``If-Match``).
+
+    404 outside the caller's ACL/scope, 412 for a stale version, 409 ``document_archived`` for
+    an archived document, 422 ``doc_type_not_allowed_for_purpose``. Unchanged values are
+    ignored (no new version). Audit: ``document.metadata_updated`` with the changed field
+    NAMES only (titles and issuers may name people).
+    """
+    doc = repo.get_document(
+        session, document_id, visibility=_visibility(session, ctx), for_update=True
+    )
+    if doc is None:
+        raise _not_found()
+    if doc.version != expected_version:
+        raise PreconditionFailed()
+    if doc.status == "archived":
+        raise Conflict("This document is archived. Unarchive it first.", code="document_archived")
+    values = {
+        k: getattr(data, k)
+        for k in METADATA_FIELDS
+        if k in data.model_fields_set and getattr(data, k) != getattr(doc, k)
+    }
+    if "doc_type" in values and values["doc_type"] not in purpose_rule(doc.purpose).doc_types:
+        raise _invalid("doc_type", "doc_type_not_allowed_for_purpose")
+    if not values:
+        return _load_out(session, ctx, doc)
+    with _db_errors():
+        updated = repo.update_document(session, doc.id, expected_version=expected_version, **values)
+        if updated is None:  # pragma: no cover - row locked above
+            raise PreconditionFailed()
+        _audit(session, "document.metadata_updated", doc.id, {"fields": sorted(values)})
+    return _load_out(session, ctx, updated)
+
+
+def set_document_status(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    *,
+    archived: bool,
+    expected_version: int,
+) -> DocumentOut:
+    """Archive or unarchive a document (permission ``document.manage_acl``, like the ACL and
+    delete; ``If-Match``). Archived documents are kept (history, evidence links, downloads)
+    and listed with ``status=archived``. Already in that state: returned unchanged. Audit:
+    ``document.archived`` / ``document.unarchived``; :data:`STATUS_CHANGED_HOOKS` run in the
+    same transaction."""
+    doc = repo.get_document(
+        session, document_id, visibility=_visibility(session, ctx), for_update=True
+    )
+    if doc is None:
+        raise _not_found()
+    if doc.version != expected_version:
+        raise PreconditionFailed()
+    status = "archived" if archived else "active"
+    if doc.status == status:
+        return _load_out(session, ctx, doc)
+    with _db_errors():
+        updated = repo.update_document(
+            session, doc.id, expected_version=expected_version, status=status
+        )
+        if updated is None:  # pragma: no cover - row locked above
+            raise PreconditionFailed()
+        _audit(
+            session,
+            "document.archived" if archived else "document.unarchived",
+            doc.id,
+            {"purpose": doc.purpose},
+        )
+        for hook in STATUS_CHANGED_HOOKS:
+            hook(session, doc.id, status)
+    return _load_out(session, ctx, updated)
 
 
 def delete_document(session: Session, ctx: UserContext, document_id: uuid.UUID) -> None:
@@ -1471,6 +1599,7 @@ __all__ = [
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
     "RETENTION_REASONS",
+    "STATUS_CHANGED_HOOKS",
     "FileTooLarge",
     "StoredObject",
     "UnsupportedFileType",
@@ -1496,8 +1625,10 @@ __all__ = [
     "replace_with_redacted",
     "scan_version",
     "set_acl",
+    "set_document_status",
     "store_export_file",
     "store_page_image",
     "sweep_discarded_objects",
+    "update_document",
     "validate_acl",
 ]

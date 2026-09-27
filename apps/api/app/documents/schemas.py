@@ -9,9 +9,16 @@ from __future__ import annotations
 import datetime as dt
 import unicodedata
 import uuid
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Any, Final, Literal, Self
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 Purpose = Literal["evidence", "register_scan", "circular", "policy", "other", "import_file"]
 DocType = Literal[
@@ -120,6 +127,30 @@ class AclUpdate(_In):
     acl: list[AclEntry] = Field(max_length=MAX_ACL_ENTRIES)
 
 
+class DocumentUpdate(_In):
+    """Change a document's metadata (FR-DOC-005): send only what changes, at least one field.
+
+    ``title`` and ``doc_type`` cannot be null; ``issuer``, ``issued_on`` and ``language`` may be
+    cleared with ``null``. The type must suit the document's purpose (422
+    ``doc_type_not_allowed_for_purpose``).
+    """
+
+    title: Title | None = None
+    doc_type: DocType | None = None
+    language: Language | None = None
+    issuer: Title | None = None
+    issued_on: dt.date | None = None
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("send at least one field to change")
+        for name in ("title", "doc_type"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
+
+
 # --- outputs --------------------------------------------------------------------------------
 
 
@@ -139,6 +170,14 @@ class AclEntryOut(_Out):
     principal_ref: str
 
 
+class UploaderOut(_Out):
+    """Who uploaded: the staff member's membership id and display name only (no contact
+    details). ``null`` in ``uploaded_by`` when the account is no longer a member here."""
+
+    membership_id: uuid.UUID
+    display_name: str
+
+
 class VersionOut(_Out):
     id: uuid.UUID
     version_no: int
@@ -147,6 +186,8 @@ class VersionOut(_Out):
     status: VersionStatus
     error: str | None
     created_at: dt.datetime
+    uploaded_by: UploaderOut | None = None
+    uploaded_by_me: bool = False
 
 
 class DocumentOut(_Out):
@@ -163,6 +204,10 @@ class DocumentOut(_Out):
     current_version: VersionOut | None
     acl: list[AclEntryOut]
     created_by: uuid.UUID
+    uploaded_by: UploaderOut | None = Field(
+        default=None, description="Who registered the document (version 1)."
+    )
+    uploaded_by_me: bool = Field(default=False, description="You registered this document.")
     created_at: dt.datetime
     updated_at: dt.datetime
     version: int

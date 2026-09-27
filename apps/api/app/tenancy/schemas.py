@@ -147,6 +147,9 @@ class AcademicYearOut(_Out):
     starts_on: dt.date
     ends_on: dt.date
     is_current: bool
+    archived_at: dt.datetime | None = Field(
+        default=None, description="When it was archived (hidden from lists); null while in use."
+    )
     version: int
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -176,6 +179,9 @@ class ClassOut(_Out):
     display_en: str
     display_te: str
     sort_order: int
+    archived_at: dt.datetime | None = Field(
+        default=None, description="When it was archived (hidden from lists); null while in use."
+    )
     version: int
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -204,6 +210,9 @@ class SectionOut(_Out):
     class_id: uuid.UUID
     name: str
     class_teacher_membership_id: uuid.UUID | None
+    archived_at: dt.datetime | None = Field(
+        default=None, description="When it was archived (hidden from lists); null while in use."
+    )
     version: int
     created_at: dt.datetime
     updated_at: dt.datetime

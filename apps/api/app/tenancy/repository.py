@@ -11,12 +11,13 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal, cast
 
 from sqlalchemy import Row, and_, func, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.errors import (
     Conflict,
@@ -47,8 +48,30 @@ _DUPLICATE_MESSAGES: dict[str, str] = {
 }
 
 
+# Archive guards (0023_api_gaps) -> 409 with a code the web can explain.
+_ARCHIVE_CONFLICTS: dict[str, tuple[str, str]] = {
+    "structure_active_enrolments": (
+        "structure_in_use",
+        "Students are still enrolled here. Move or close their enrolments first.",
+    ),
+    "academic_years_current_not_archived": (
+        "academic_year_current",
+        "The current academic year cannot be archived. Make another year current first.",
+    ),
+}
+
+
 def translate_db_error(exc: DBAPIError) -> DomainError | None:
     """Map a PostgreSQL error to a domain error (RFC 9457); ``None`` if it is unexpected."""
+    diag = getattr(exc.orig, "diag", None)
+    constraint = getattr(diag, "constraint_name", None) or ""
+    if constraint in _ARCHIVE_CONFLICTS:
+        code, message = _ARCHIVE_CONFLICTS[constraint]
+        return Conflict(message, code=code)
+    return _translate_state(exc)
+
+
+def _translate_state(exc: DBAPIError) -> DomainError | None:
     orig = exc.orig
     state = getattr(orig, "sqlstate", None)
     diag = getattr(orig, "diag", None)
@@ -399,3 +422,45 @@ def update_section(
         .returning(Section),
         execution_options={"populate_existing": True, "synchronize_session": False},
     ).one_or_none()
+
+
+# --- archive (0023_api_gaps) ----------------------------------------------------------------
+
+type StructureKind = Literal["academic_year", "class", "section"]
+type StructureRow = AcademicYear | SchoolClass | Section
+_STRUCTURE_MODELS: dict[str, type[AcademicYear] | type[SchoolClass] | type[Section]] = {
+    "academic_year": AcademicYear,
+    "class": SchoolClass,
+    "section": Section,
+}
+
+
+def get_structure_row(
+    session: Session, kind: StructureKind, row_id: uuid.UUID
+) -> StructureRow | None:
+    """One year, class or section of the current school (RLS), fresh from the database."""
+    row = session.get(_STRUCTURE_MODELS[kind], row_id, populate_existing=True)
+    return cast("StructureRow | None", row)
+
+
+def set_archived(
+    session: Session,
+    kind: StructureKind,
+    row_id: uuid.UUID,
+    *,
+    expected_version: int,
+    archived: bool,
+) -> StructureRow | None:
+    """Archive (``archived_at = now()``) or unarchive a year, class or section (optimistic);
+    ``None`` when the id is unknown or the version is stale. The database refuses to archive
+    one with active enrolments (``structure_active_enrolments``) or the current year."""
+    model = _STRUCTURE_MODELS[kind]
+    value: ColumnElement[Any] | None = func.now() if archived else None
+    row = session.scalars(
+        update(model)
+        .where(model.id == row_id, model.version == expected_version)
+        .values(archived_at=value, version=model.version + 1)
+        .returning(model),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+    return cast("StructureRow | None", row)

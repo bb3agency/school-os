@@ -296,8 +296,20 @@ def _precondition_or_missing(exists: bool, what: str) -> Exception:
     return NotFound(f"{what.capitalize()} not found")
 
 
-def list_academic_years(session: Session) -> list[AcademicYearOut]:
-    return [AcademicYearOut.model_validate(y) for y in repo.list_academic_years(session)]
+def _archived(what: str) -> Conflict:
+    return Conflict(f"This {what} is archived. Unarchive it first.", code="structure_archived")
+
+
+def list_academic_years(
+    session: Session, *, include_archived: bool = True
+) -> list[AcademicYearOut]:
+    """Academic years, newest first. Archived years are included unless ``include_archived``
+    is False (the API lists hide them by default; other modules still resolve old records)."""
+    return [
+        AcademicYearOut.model_validate(y)
+        for y in repo.list_academic_years(session)
+        if include_archived or y.archived_at is None
+    ]
 
 
 def get_academic_year(session: Session, year_id: uuid.UUID) -> AcademicYearOut:
@@ -405,6 +417,8 @@ def set_current_academic_year(
         raise _precondition_or_missing(True, "academic year")
     if year.is_current:
         return AcademicYearOut.model_validate(year)
+    if year.archived_at is not None:
+        raise _archived("academic year")
     previous = repo.get_current_academic_year(session)
     with _db_errors():
         repo.clear_current_academic_year(session, except_id=year_id)
@@ -440,8 +454,13 @@ def suggested_section_names() -> tuple[str, ...]:
     return tuple(str(n) for n in raw["section_names"])
 
 
-def list_classes(session: Session) -> list[ClassOut]:
-    return [ClassOut.model_validate(c) for c in repo.list_classes(session)]
+def list_classes(session: Session, *, include_archived: bool = True) -> list[ClassOut]:
+    """Classes in display order (archived ones unless ``include_archived`` is False)."""
+    return [
+        ClassOut.model_validate(c)
+        for c in repo.list_classes(session)
+        if include_archived or c.archived_at is None
+    ]
 
 
 def get_class(session: Session, class_id: uuid.UUID) -> ClassOut:
@@ -522,9 +541,11 @@ def list_sections(
     *,
     academic_year_id: uuid.UUID | None = None,
     class_id: uuid.UUID | None = None,
+    include_archived: bool = True,
 ) -> list[SectionOut]:
+    """Sections in class order (archived ones unless ``include_archived`` is False)."""
     rows = repo.list_sections(session, academic_year_id=academic_year_id, class_id=class_id)
-    return [SectionOut.model_validate(s) for s in rows]
+    return [SectionOut.model_validate(s) for s in rows if include_archived or s.archived_at is None]
 
 
 def get_section(session: Session, section_id: uuid.UUID) -> SectionOut:
@@ -537,9 +558,16 @@ def get_section(session: Session, section_id: uuid.UUID) -> SectionOut:
 def create_section(session: Session, data: SectionCreate) -> SectionOut:
     """Create a section; year, class and class teacher must belong to this school (composite FKs).
 
+    An archived year or class answers 409 ``structure_archived``.
     Audit: ``section.created`` (+ ``section.class_teacher_assigned`` when set).
     """
     tenant_id = repo.current_tenant_id(session)
+    year = repo.get_academic_year(session, data.academic_year_id)
+    if year is not None and year.archived_at is not None:
+        raise _archived("academic year")
+    klass = repo.get_class(session, data.class_id)
+    if klass is not None and klass.archived_at is not None:
+        raise _archived("class")
     with _db_errors():
         section = repo.insert_section(
             session,
@@ -599,6 +627,85 @@ def update_section(
             summary={"membership_id": values["class_teacher_membership_id"]},
         )
     return SectionOut.model_validate(section)
+
+
+# --- archive (US-202, FR-TEN-010; 0023_api_gaps) ---------------------------------------------
+
+
+def _set_archived(
+    session: Session,
+    kind: repo.StructureKind,
+    row_id: uuid.UUID,
+    *,
+    archived: bool,
+    expected_version: int,
+) -> Any:
+    """Archive or unarchive one year/class/section (``tenant.structure.manage``; If-Match).
+
+    404 for an unknown id (or another school's), 412 for a stale version; a row already in the
+    requested state is returned unchanged (no audit). The current year cannot be archived (409
+    ``academic_year_current``); nor can a year, class or section with active enrolments (409
+    ``structure_in_use``, enforced by the database). Audit: ``<kind>.archived`` /
+    ``<kind>.unarchived`` (no values).
+    """
+    what = kind.replace("_", " ")
+    repo.lock_academic_structure(session)
+    current = repo.get_structure_row(session, kind, row_id)
+    if current is None:
+        raise NotFound(f"{what.capitalize()} not found")
+    if current.version != expected_version:
+        raise _precondition_or_missing(True, what)
+    if (current.archived_at is not None) == archived:
+        return current
+    if archived and getattr(current, "is_current", False):
+        raise Conflict(
+            "The current academic year cannot be archived. Make another year current first.",
+            code="academic_year_current",
+        )
+    with _db_errors():
+        row = repo.set_archived(
+            session, kind, row_id, expected_version=expected_version, archived=archived
+        )
+    if row is None:  # pragma: no cover - serialised by the structure lock
+        raise _precondition_or_missing(True, what)
+    _audit(
+        session,
+        action=f"{kind}.{'archived' if archived else 'unarchived'}",
+        resource_type=kind,
+        resource_id=row_id,
+        summary={},
+    )
+    return row
+
+
+def archive_academic_year(
+    session: Session, year_id: uuid.UUID, *, archived: bool, expected_version: int
+) -> AcademicYearOut:
+    """Archive/unarchive an academic year (see :func:`_set_archived`)."""
+    row = _set_archived(
+        session, "academic_year", year_id, archived=archived, expected_version=expected_version
+    )
+    return AcademicYearOut.model_validate(row)
+
+
+def archive_class(
+    session: Session, class_id: uuid.UUID, *, archived: bool, expected_version: int
+) -> ClassOut:
+    """Archive/unarchive a class (see :func:`_set_archived`)."""
+    row = _set_archived(
+        session, "class", class_id, archived=archived, expected_version=expected_version
+    )
+    return ClassOut.model_validate(row)
+
+
+def archive_section(
+    session: Session, section_id: uuid.UUID, *, archived: bool, expected_version: int
+) -> SectionOut:
+    """Archive/unarchive a section (see :func:`_set_archived`)."""
+    row = _set_archived(
+        session, "section", section_id, archived=archived, expected_version=expected_version
+    )
+    return SectionOut.model_validate(row)
 
 
 # --- school profile and settings (tenant_session; FR-TEN-012) ---------------------------------
@@ -663,3 +770,9 @@ def update_tenant_settings(
         summary={"fields": sorted(k for k in changes if changes[k] != current.get(k))},
     )
     return _tenant_out(updated)
+
+
+def session_settings(session: Session) -> TenantSettings:
+    """The school settings a signed-in session applies (idle timeout, date format, languages),
+    read in the caller's ``tenant_session`` (FR-TEN-012, FR-IAM-003). Any member."""
+    return get_tenant(session).settings

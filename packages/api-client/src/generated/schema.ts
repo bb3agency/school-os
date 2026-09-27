@@ -11,7 +11,8 @@ export interface paths {
         };
         /**
          * List Academic Years
-         * @description Academic years, newest first (permission ``student.read_basic``).
+         * @description Academic years, newest first; archived years only with ``include_archived=true``
+         *     (permission ``student.read_basic``).
          */
         get: operations["list_academic_years_api_v1_academic_years_get"];
         put?: never;
@@ -49,6 +50,28 @@ export interface paths {
          * @description Change a year's label or dates (permission ``tenant.structure.manage``; ``If-Match``).
          */
         patch: operations["update_academic_year_api_v1_academic_years__year_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/academic-years/{year_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Academic Year
+         * @description Archive a year: it is hidden from lists but kept for old records (permission
+         *     ``tenant.structure.manage``; ``If-Match``). The current year answers 409
+         *     ``academic_year_current``; a year with active enrolments 409 ``structure_in_use``.
+         */
+        post: operations["archive_academic_year_api_v1_academic_years__year_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/academic-years/{year_id}/make-current": {
@@ -157,6 +180,27 @@ export interface paths {
          *     ``promotion_has_dependents`` when an enrolment it touched changed afterwards.
          */
         post: operations["undo_promotion_api_v1_academic_years__year_id__promotions_undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic-years/{year_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Academic Year
+         * @description Bring an archived year back into the lists (permission ``tenant.structure.manage``;
+         *     ``If-Match``).
+         */
+        post: operations["unarchive_academic_year_api_v1_academic_years__year_id__unarchive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -497,8 +541,8 @@ export interface paths {
         };
         /**
          * List Classes
-         * @description Classes in display order (permission ``student.read_basic``; scoped holders see only
-         *     their classes).
+         * @description Classes in display order; archived classes only with ``include_archived=true``
+         *     (permission ``student.read_basic``; scoped holders see only their classes).
          */
         get: operations["list_classes_api_v1_classes_get"];
         put?: never;
@@ -536,6 +580,49 @@ export interface paths {
          *     ``tenant.structure.manage``; ``If-Match``).
          */
         patch: operations["update_class_api_v1_classes__class_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/classes/{class_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Class
+         * @description Archive a class: hidden from lists, kept for old records (permission
+         *     ``tenant.structure.manage``; ``If-Match``). A class with active enrolments in any of its
+         *     sections answers 409 ``structure_in_use``.
+         */
+        post: operations["archive_class_api_v1_classes__class_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/{class_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Class
+         * @description Bring an archived class back into the lists (permission ``tenant.structure.manage``;
+         *     ``If-Match``).
+         */
+        post: operations["unarchive_class_api_v1_classes__class_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/classes/defaults": {
@@ -612,7 +699,14 @@ export interface paths {
         delete: operations["delete_document_api_v1_documents__document_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Document
+         * @description Change the title, type, language, issuer or date (permission ``document.upload``; the
+         *     document must be visible to you, as for a new version; ``If-Match``). An archived document
+         *     answers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with
+         *     the changed field names only.
+         */
+        patch: operations["update_document_api_v1_documents__document_id__patch"];
         trace?: never;
     };
     "/api/v1/documents/{document_id}/acl": {
@@ -636,6 +730,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Document
+         * @description Archive a document: kept with its versions, listed only with ``status=archived``
+         *     (permission ``document.manage_acl``; ``If-Match``).
+         */
+        post: operations["archive_document_api_v1_documents__document_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/download-url": {
         parameters: {
             query?: never;
@@ -651,6 +766,27 @@ export interface paths {
         get: operations["get_download_url_api_v1_documents__document_id__download_url_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Document
+         * @description Make an archived document active again (permission ``document.manage_acl``;
+         *     ``If-Match``).
+         */
+        post: operations["unarchive_document_api_v1_documents__document_id__unarchive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1379,8 +1515,9 @@ export interface paths {
         };
         /**
          * Get Me
-         * @description The signed-in user in the active school: roles, effective permissions, scopes, language
-         *     and the schools they can switch to (permission: any active member).
+         * @description The signed-in user in the active school: roles, effective permissions, scopes, language,
+         *     the schools they can switch to and the school's session settings (idle timeout, date format,
+         *     languages) the web applies (permission: any active member).
          */
         get: operations["get_me_api_v1_me_get"];
         put?: never;
@@ -2603,7 +2740,9 @@ export interface paths {
         };
         /**
          * List Roles
-         * @description Roles of this school with their permissions (permission ``user.manage``).
+         * @description Roles of this school with their permissions, whether you may give each one
+         *     (``grantable``) and whether it is limited to classes/sections (``scoped``) (permission
+         *     ``user.manage``).
          */
         get: operations["list_roles_api_v1_roles_get"];
         put?: never;
@@ -2623,15 +2762,17 @@ export interface paths {
         };
         /**
          * List Sections
-         * @description Sections, optionally for one year and/or class (permission ``student.read_basic``;
-         *     class teachers see only their sections).
+         * @description Sections, optionally for one year and/or class; archived sections only with
+         *     ``include_archived=true`` (permission ``student.read_basic``; class teachers see only
+         *     their sections).
          */
         get: operations["list_sections_api_v1_sections_get"];
         put?: never;
         /**
          * Create Section
          * @description Add a section to a class for an academic year, optionally with its class teacher
-         *     (permission ``tenant.structure.manage``). Accepts ``Idempotency-Key``.
+         *     (permission ``tenant.structure.manage``). An archived year or class answers 409
+         *     ``structure_archived``. Accepts ``Idempotency-Key``.
          */
         post: operations["create_section_api_v1_sections_post"];
         delete?: never;
@@ -2663,6 +2804,71 @@ export interface paths {
          *     ``tenant.structure.manage``; ``If-Match``).
          */
         patch: operations["update_section_api_v1_sections__section_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Section
+         * @description Archive a section: hidden from lists, kept for old records (permission
+         *     ``tenant.structure.manage``; ``If-Match``). A section with active enrolments answers 409
+         *     ``structure_in_use``.
+         */
+        post: operations["archive_section_api_v1_sections__section_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Section
+         * @description Bring an archived section back into the lists (permission ``tenant.structure.manage``;
+         *     ``If-Match``).
+         */
+        post: operations["unarchive_section_api_v1_sections__section_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Staff
+         * @description Active and invited staff with display name and role keys only, e.g. to choose a class
+         *     teacher (permission ``tenant.structure.manage`` or ``user.manage``, school-wide; no
+         *     step-up). No emails, phone numbers or sign-in details.
+         */
+        get: operations["list_staff_api_v1_staff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/students": {
@@ -3117,11 +3323,13 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Update User Status
-         * @description Activate, suspend or remove a staff member (permission ``user.manage``, step-up;
-         *     ``If-Match`` required). The last active owner cannot be suspended (409 ``last_owner``).
+         * Update User
+         * @description Activate, suspend or remove a staff member, and/or change their display name, email or
+         *     language (permission ``user.manage``, step-up; ``If-Match`` required). The last active
+         *     owner cannot be suspended (409 ``last_owner``); a removed member's profile cannot be
+         *     edited (409 ``invalid_state``). Audited with the changed field names only.
          */
-        patch: operations["update_user_status_api_v1_users__user_id__patch"];
+        patch: operations["update_user_api_v1_users__user_id__patch"];
         trace?: never;
     };
     "/api/v1/users/{user_id}/roles": {
@@ -3135,7 +3343,8 @@ export interface paths {
         /**
          * Replace User Roles
          * @description Replace a staff member's roles (permission ``role.assign``, step-up). Effective within
-         *     60 s (FR-IAM-014).
+         *     60 s (FR-IAM-014). An empty list answers 422 ``roles_required``: suspend or remove the
+         *     member instead.
          */
         put: operations["replace_user_roles_api_v1_users__user_id__roles_put"];
         post?: never;
@@ -3231,6 +3440,11 @@ export interface components {
         };
         /** AcademicYearOut */
         AcademicYearOut: {
+            /**
+             * Archived At
+             * @description When it was archived (hidden from lists); null while in use.
+             */
+            archived_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -3462,6 +3676,7 @@ export interface components {
             roles: string[];
             /** Scopes */
             scopes: components["schemas"]["ScopeOut"][];
+            settings: components["schemas"]["SessionSettingsOut"];
             /**
              * Tenant Id
              * Format: uuid
@@ -3988,6 +4203,11 @@ export interface components {
         };
         /** ClassOut */
         ClassOut: {
+            /**
+             * Archived At
+             * @description When it was archived (hidden from lists); null while in use.
+             */
+            archived_at?: string | null;
             /** Code */
             code: string;
             /**
@@ -4268,6 +4488,14 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** @description Who registered the document (version 1). */
+            uploaded_by?: components["schemas"]["UploaderOut"] | null;
+            /**
+             * Uploaded By Me
+             * @description You registered this document.
+             * @default false
+             */
+            uploaded_by_me: boolean;
             /** Version */
             version: number;
             /** Versions */
@@ -4328,8 +4556,36 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** @description Who registered the document (version 1). */
+            uploaded_by?: components["schemas"]["UploaderOut"] | null;
+            /**
+             * Uploaded By Me
+             * @description You registered this document.
+             * @default false
+             */
+            uploaded_by_me: boolean;
             /** Version */
             version: number;
+        };
+        /**
+         * DocumentUpdate
+         * @description Change a document's metadata (FR-DOC-005): send only what changes, at least one field.
+         *
+         *     ``title`` and ``doc_type`` cannot be null; ``issuer``, ``issued_on`` and ``language`` may be
+         *     cleared with ``null``. The type must suit the document's purpose (422
+         *     ``doc_type_not_allowed_for_purpose``).
+         */
+        DocumentUpdate: {
+            /** Doc Type */
+            doc_type?: ("circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other" | "evidence" | "import_file") | null;
+            /** Issued On */
+            issued_on?: string | null;
+            /** Issuer */
+            issuer?: string | null;
+            /** Language */
+            language?: ("en" | "te" | "mixed") | null;
+            /** Title */
+            title?: string | null;
         };
         /** DownloadUrlOut */
         DownloadUrlOut: {
@@ -5438,17 +5694,6 @@ export interface components {
             updated: number;
         };
         /**
-         * MembershipStatusIn
-         * @description Activate, suspend or remove a staff member's access to this school.
-         */
-        MembershipStatusIn: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "active" | "suspended" | "removed";
-        };
-        /**
          * NotificationOut
          * @description One notification, rendered in the reader's language (``Accept-Language``: en or te).
          */
@@ -5711,6 +5956,13 @@ export interface components {
         Page_SectionOut_: {
             /** Data */
             data: components["schemas"]["SectionOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Page[StaffMemberOut] */
+        Page_StaffMemberOut_: {
+            /** Data */
+            data: components["schemas"]["StaffMemberOut"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -6454,6 +6706,11 @@ export interface components {
         /** RoleOut */
         RoleOut: {
             /**
+             * Grantable
+             * @description Whether you may give (or take away) this role, by the rule the server enforces: with ``role.assign``, when its permissions are within your own (owners may give every role); without ``role.assign``, only non-privileged system roles and only when inviting.
+             */
+            grantable: boolean;
+            /**
              * Id
              * Format: uuid
              */
@@ -6468,10 +6725,18 @@ export interface components {
             name_te: string;
             /** Permissions */
             permissions: string[];
+            /**
+             * Scoped
+             * @description Whether some of its permissions reach only the member's classes/sections (set scopes for them); false when every permission is school-wide.
+             */
+            scoped: boolean;
         };
         /** RolesIn */
         RolesIn: {
-            /** Roles */
+            /**
+             * Roles
+             * @description The complete new set of roles. An empty list is refused (422 ``roles_required``): suspend or remove the member instead.
+             */
             roles: string[];
         };
         /** RuleCount */
@@ -6665,6 +6930,11 @@ export interface components {
              */
             academic_year_id: string;
             /**
+             * Archived At
+             * @description When it was archived (hidden from lists); null while in use.
+             */
+            archived_at?: string | null;
+            /**
              * Class Id
              * Format: uuid
              */
@@ -6701,6 +6971,27 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /**
+         * SessionSettingsOut
+         * @description School settings the web applies to the signed-in session (FR-TEN-012, FR-IAM-003).
+         */
+        SessionSettingsOut: {
+            /**
+             * Date Format
+             * @enum {string}
+             */
+            date_format: "DD/MM/YYYY" | "DD-MM-YYYY" | "YYYY-MM-DD";
+            /**
+             * Idle Timeout Minutes
+             * @description Sign out after this many idle minutes (5-30).
+             */
+            idle_timeout_minutes: number;
+            /**
+             * Languages
+             * @description Languages the school uses, first is default.
+             */
+            languages: ("en" | "te")[];
+        };
         /** SeverityPolicyOut */
         SeverityPolicyOut: {
             /** Cap */
@@ -6714,6 +7005,21 @@ export interface components {
              * @enum {string}
              */
             mode: "fixed" | "match_class";
+        };
+        /**
+         * StaffMemberOut
+         * @description One entry of the staff directory (e.g. choosing a class teacher): no contact details.
+         */
+        StaffMemberOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /** Roles */
+            roles: string[];
         };
         /**
          * StudentCreate
@@ -7415,6 +7721,20 @@ export interface components {
             /** Size Bytes */
             size_bytes: number;
         };
+        /**
+         * UploaderOut
+         * @description Who uploaded: the staff member's membership id and display name only (no contact
+         *     details). ``null`` in ``uploaded_by`` when the account is no longer a member here.
+         */
+        UploaderOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+        };
         /** UploadOut */
         UploadOut: {
             /** Batch Id */
@@ -7541,6 +7861,24 @@ export interface components {
             status: "invited" | "active" | "suspended" | "removed";
             /** Version */
             version: number;
+        };
+        /**
+         * UserUpdateIn
+         * @description Change a staff member (``PATCH /users/{id}``): send only what changes, at least one field.
+         *
+         *     ``status`` activates, suspends or removes their access to this school. ``display_name``,
+         *     ``email`` (``null`` clears it) and ``preferred_language`` edit the person's profile; the
+         *     sign-in account (IdP subject) never changes here.
+         */
+        UserUpdateIn: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Preferred Language */
+            preferred_language?: ("en" | "te") | null;
+            /** Status */
+            status?: ("active" | "suspended" | "removed") | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -7679,6 +8017,12 @@ export interface components {
              * @enum {string}
              */
             status: "queued" | "scanning" | "extracting" | "chunking" | "embedding" | "ready" | "failed" | "quarantined";
+            uploaded_by?: components["schemas"]["UploaderOut"] | null;
+            /**
+             * Uploaded By Me
+             * @default false
+             */
+            uploaded_by_me: boolean;
             /** Version No */
             version_no: number;
         };
@@ -7701,6 +8045,8 @@ export interface operations {
             query?: {
                 /** @description Opaque cursor from next_cursor. */
                 cursor?: string | null;
+                /** @description Also list archived rows (hidden by default; US-202, FR-TEN-010). */
+                include_archived?: boolean;
                 /** @description Page size (max 200). */
                 limit?: number;
             };
@@ -7808,6 +8154,37 @@ export interface operations {
                 "application/json": components["schemas"]["AcademicYearUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcademicYearOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_academic_year_api_v1_academic_years__year_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -7979,6 +8356,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PromotionRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_academic_year_api_v1_academic_years__year_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcademicYearOut"];
                 };
             };
             /** @description Validation Error */
@@ -8490,6 +8898,8 @@ export interface operations {
             query?: {
                 /** @description Opaque cursor from next_cursor. */
                 cursor?: string | null;
+                /** @description Also list archived rows (hidden by default; US-202, FR-TEN-010). */
+                include_archived?: boolean;
                 /** @description Page size (max 200). */
                 limit?: number;
             };
@@ -8597,6 +9007,68 @@ export interface operations {
                 "application/json": components["schemas"]["ClassUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_class_api_v1_classes__class_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_class_api_v1_classes__class_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -8769,6 +9241,41 @@ export interface operations {
             };
         };
     };
+    update_document_api_v1_documents__document_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_acl_api_v1_documents__document_id__acl_put: {
         parameters: {
             query?: never;
@@ -8783,6 +9290,37 @@ export interface operations {
                 "application/json": components["schemas"]["AclUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_document_api_v1_documents__document_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -8824,6 +9362,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DownloadUrlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_document_api_v1_documents__document_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
                 };
             };
             /** @description Validation Error */
@@ -12532,6 +13101,8 @@ export interface operations {
                 class_id?: string | null;
                 /** @description Opaque cursor from next_cursor. */
                 cursor?: string | null;
+                /** @description Also list archived rows (hidden by default; US-202, FR-TEN-010). */
+                include_archived?: boolean;
                 /** @description Page size (max 200). */
                 limit?: number;
             };
@@ -12647,6 +13218,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_section_api_v1_sections__section_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_section_api_v1_sections__section_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_staff_api_v1_staff_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_StaffMemberOut_"];
                 };
             };
             /** @description Validation Error */
@@ -13572,7 +14239,7 @@ export interface operations {
             };
         };
     };
-    update_user_status_api_v1_users__user_id__patch: {
+    update_user_api_v1_users__user_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -13583,7 +14250,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MembershipStatusIn"];
+                "application/json": components["schemas"]["UserUpdateIn"];
             };
         };
         responses: {

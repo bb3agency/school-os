@@ -508,6 +508,26 @@ REVOKE ALL ON core.tenant_keys FROM sos_readonly;
 
 Writes to `core.academic_years`, `core.classes` and `core.sections` require `tenant.structure.manage` (07 §6.2). `POST /classes/defaults` adds the missing classes from `apps/api/app/tenancy/academic_defaults.yaml` (Nursery–XII, EN/TE names).
 
+**Archive (migration `0023_api_gaps`; US-202, FR-TEN-010).** The three structure tables gain `archived_at timestamptz` (NULL while in use). Archived rows are never deleted or rewritten: enrolments, documents, exports and membership scopes keep referring to them, and codes/labels stay taken (the unique keys are unchanged). The API hides them from its lists unless `include_archived=true`; other modules' service calls still see them.
+
+```sql
+ALTER TABLE core.academic_years ADD COLUMN archived_at timestamptz;
+ALTER TABLE core.classes        ADD COLUMN archived_at timestamptz;
+ALTER TABLE core.sections       ADD COLUMN archived_at timestamptz;
+ALTER TABLE core.academic_years ADD CONSTRAINT academic_years_current_not_archived
+  CHECK (NOT (is_current AND archived_at IS NOT NULL));
+-- SECURITY INVOKER (RLS applies), search_path pinned; fires only on the NULL -> timestamp
+-- transition: an active sis.enrollments row in the year / section / any section of the class
+-- raises object_not_in_prerequisite_state, CONSTRAINT structure_active_enrolments (API 409
+-- structure_in_use).
+CREATE FUNCTION core.tg_structure_archive_guard() RETURNS trigger ...;
+CREATE TRIGGER academic_years_archive_guard BEFORE UPDATE OF archived_at ON core.academic_years ...;
+CREATE TRIGGER classes_archive_guard        BEFORE UPDATE OF archived_at ON core.classes ...;
+CREATE TRIGGER sections_archive_guard       BEFORE UPDATE OF archived_at ON core.sections ...;
+```
+
+Downgrade drops the triggers, function, CHECK and columns; archived rows become ordinary rows again (their `*.archived` audit events remain). Enrolling a student into an archived section is not refused by the database yet (students module).
+
 ## 5. Student information schema (`sis`)
 
 ```sql
@@ -885,6 +905,8 @@ Visibility (the documents service; retrieval in M2 uses the same keys): holders 
 - **`kb.embedding_cache`** has primary key `(tenant_id, model, input_type, content_sha256)` and a `created_at` column for the query-vector TTL. There is no cross-tenant sharing (ADR-0006).
 - **`kb.queries`** has no plaintext. `question_ciphertext` and `answer_ciphertext` are encrypted under the tenant DEK, with `key_version`. `question_hmac` is keyed with the tenant HMAC key, never a bare sha256 of the question, which could be guessed. `mode`, `route` and `status` are enums. `error` and `feedback_reason` are codes. `tools`, `retrieved`, `citations` and `model_ids` are JSON arrays of IDs, source URIs and scores only.
 - **`kb.verified_answers`** adds `document_id`, the `verified_answer` document that indexes it; its FK is `ON DELETE SET NULL (document_id)`. It also adds `created_at`, `updated_at` and `version`. `citations` must be a non-empty array.
+
+Metadata and status (no schema change): `title`, `doc_type` (within the purpose's types), `language`, `issuer` and `issued_on` can be changed by `document.upload` holders who can see the document (audit `document.metadata_updated` with field names only). `status` moves between `active` and `archived` for `document.manage_acl` holders (audit `document.archived` / `document.unarchived`; `documents.STATUS_CHANGED_HOOKS` run in the same transaction for M2 retrieval). `created_by` of a document and of each version is shown as the uploader's membership id and display name (through `identity.service`; never contact details).
 
 ## 7. Audit and ops schemas
 

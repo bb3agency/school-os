@@ -164,6 +164,65 @@ def _new_year(w: Any, role: str, admin: Engine) -> Request:
     return "/api/v1/academic-years", body, {}
 
 
+_STRUCTURE_TABLES = {
+    "academic-years": "core.academic_years",
+    "classes": "core.classes",
+    "sections": "core.sections",
+}
+
+
+def _fresh_structure(w: Any, kind: str, *, archived: bool) -> uuid.UUID:
+    """A new school A year/class/section (optionally archived) so archiving never touches the
+    shared world (US-202, 0023_api_gaps)."""
+    owner = w.a.people["owner"]
+    with W.tenant_session(w.a.tenant_id, owner.user_id) as db:
+        if kind == "academic-years":
+            y = next(_years)
+            row: Any = W.tenancy.create_academic_year(
+                db,
+                W.AcademicYearCreate(
+                    label=f"{y}-{(y + 1) % 100:02d}",
+                    starts_on=f"{y}-06-01",
+                    ends_on=f"{y + 1}-03-31",
+                ),
+            )
+            archive: Any = W.tenancy.archive_academic_year
+        elif kind == "classes":
+            row = W.tenancy.create_class(
+                db,
+                W.ClassCreate(
+                    code=W.unique("A")[:12],
+                    display_en="Matrix archive class",
+                    display_te="తరగతి",
+                    sort_order=950,
+                ),
+            )
+            archive = W.tenancy.archive_class
+        else:
+            row = W.tenancy.create_section(
+                db,
+                W.SectionCreate(
+                    academic_year_id=w.a.ids["year"],
+                    class_id=w.a.ids["class_ix"],
+                    name=W.unique("R")[:10],
+                ),
+            )
+            archive = W.tenancy.archive_section
+        if archived:
+            archive(db, row.id, archived=True, expected_version=row.version)
+    value: uuid.UUID = row.id
+    return value
+
+
+def _archive(kind: str, action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        rid = _fresh_structure(w, kind, archived=action == "unarchive")
+        version = W.version_of(a, _STRUCTURE_TABLES[kind], rid)
+        return f"/api/v1/{kind}/{rid}/{action}", None, _if_match(version)
+
+    return build
+
+
 def _target(w: Any) -> Any:
     return w.a.people["target"]
 
@@ -300,6 +359,33 @@ def _doc_acl_put(w: Any, r: str, a: Engine) -> Request:
         {"acl": _doc_acl(w)},
         _if_match(D.document_version(a, doc)),
     )
+
+
+def _doc_patch(w: Any, r: str, a: Engine) -> Request:
+    doc = _shared_doc(w, a, "patch")
+    return (
+        f"/api/v1/documents/{doc}",
+        {"title": "Matrix circular"},
+        _if_match(D.document_version(a, doc)),
+    )
+
+
+def _doc_archive(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        doc = D.make_document(
+            a,
+            w.a.tenant_id,
+            w.a.people["owner"].user_id,
+            acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)],
+        )
+        if action == "unarchive":
+            with W.tenant_session(w.a.tenant_id) as db:
+                db.execute(
+                    text("UPDATE kb.documents SET status = 'archived' WHERE id = :d"), {"d": doc}
+                )
+        return f"/api/v1/documents/{doc}/{action}", None, _if_match(D.document_version(a, doc))
+
+    return build
 
 
 def _doc_delete(w: Any, r: str, a: Engine) -> Request:
@@ -562,6 +648,7 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/roles"): lambda w, r, a: ("/api/v1/roles", None, {}),
     ("GET", "/api/v1/permissions"): lambda w, r, a: ("/api/v1/permissions", None, {}),
+    ("GET", "/api/v1/staff"): lambda w, r, a: ("/api/v1/staff", None, {}),
     ("GET", "/api/v1/tenant"): lambda w, r, a: ("/api/v1/tenant", None, {}),
     ("PATCH", "/api/v1/tenant"): lambda w, r, a: (
         "/api/v1/tenant",
@@ -627,6 +714,13 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
         _if_match(W.version_of(a, "core.sections", w.a.ids["section_9a"])),
     ),
+    # Archive / unarchive (US-202, FR-TEN-010): a fresh row per call.
+    ("POST", "/api/v1/academic-years/{year_id}/archive"): _archive("academic-years", "archive"),
+    ("POST", "/api/v1/academic-years/{year_id}/unarchive"): _archive("academic-years", "unarchive"),
+    ("POST", "/api/v1/classes/{class_id}/archive"): _archive("classes", "archive"),
+    ("POST", "/api/v1/classes/{class_id}/unarchive"): _archive("classes", "unarchive"),
+    ("POST", "/api/v1/sections/{section_id}/archive"): _archive("sections", "archive"),
+    ("POST", "/api/v1/sections/{section_id}/unarchive"): _archive("sections", "unarchive"),
     ("GET", "/api/v1/audit/events"): lambda w, r, a: ("/api/v1/audit/events", None, {}),
     # Documents (FR-DOC-001..006, SEC-016).
     ("POST", "/api/v1/documents/uploads"): lambda w, r, a: (
@@ -654,6 +748,9 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("PUT", "/api/v1/documents/{document_id}/acl"): _doc_acl_put,
     ("DELETE", "/api/v1/documents/{document_id}"): _doc_delete,
+    ("PATCH", "/api/v1/documents/{document_id}"): _doc_patch,
+    ("POST", "/api/v1/documents/{document_id}/archive"): _doc_archive("archive"),
+    ("POST", "/api/v1/documents/{document_id}/unarchive"): _doc_archive("unarchive"),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
     # School-side routes backed by the control plane (app/platform/tenant_api.py).
     ("GET", "/api/v1/tenant/billing"): lambda w, r, a: ("/api/v1/tenant/billing", None, {}),
