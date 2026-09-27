@@ -6,6 +6,7 @@ to a provider that fails with an operator-facing error until a real one is chose
 
 from __future__ import annotations
 
+import io
 import sys
 
 import pytest
@@ -14,12 +15,15 @@ from pydantic import SecretStr
 from app.core.config import Environment, ExtractionProviderKind, KeyWrapperKind, Settings
 from app.core.redaction import contains_full_aadhaar
 from app.extraction.providers import (
+    FAKE_INK,
+    FAKE_PAPER,
     ExtractionFailed,
     ExtractionUnavailable,
     FakeExtractionProvider,
     NotConfiguredProvider,
     ProviderNotConfigured,
     ProviderRefused,
+    TextSpan,
     build_provider,
     fake_script_png,
     provider_kind,
@@ -112,3 +116,64 @@ def test_FR_IMP_024_scripted_png_is_a_valid_png_for_the_upload_checks() -> None:
 
     png = X.page_png([X.register_row("Synthetica Page")])
     assert filetypes.sniff(png) is filetypes.PNG
+
+
+# --- PRV-016 geometry: text spans with pixel boxes ------------------------------------------
+
+
+def _rendered(spans: list[dict[str, object]], size: tuple[int, int] = (200, 100)) -> bytes:
+    return fake_script_png({"size": list(size), "spans": spans, "rows": []})
+
+
+def test_PRV_016_rendered_script_is_a_real_page_read_back_with_span_boxes() -> None:
+    from PIL import Image
+
+    png = _rendered([{"text": "Synthetica", "box": [10, 10, 60, 20]}, {"text": "Rao"}])
+    with Image.open(io.BytesIO(png)) as page:
+        assert page.size == (200, 100)
+        assert page.convert("RGB").getpixel((20, 15)) == FAKE_INK
+        assert page.convert("RGB").getpixel((150, 80)) == FAKE_PAPER
+    result = FakeExtractionProvider(_settings(Environment.CI)).extract(png, language_hints=HINTS)
+    assert result.spans == [
+        TextSpan("Synthetica", (10, 10, 60, 20)),
+        TextSpan("Rao", None),  # an engine may give text without geometry
+    ]
+    assert result.raw_text == "Synthetica Rao"
+
+
+def test_PRV_016_blacked_out_regions_are_not_read_back() -> None:
+    from PIL import Image, ImageDraw, PngImagePlugin
+
+    png = _rendered(
+        [{"text": "keep", "box": [10, 10, 40, 20]}, {"text": "gone", "box": [100, 50, 150, 70]}]
+    )
+    with Image.open(io.BytesIO(png)) as opened:
+        script = opened.info["sos-fake-extraction"]
+        page = opened.convert("RGB")
+    ImageDraw.Draw(page).rectangle((98, 48, 152, 72), fill=(0, 0, 0))
+    info = PngImagePlugin.PngInfo()
+    info.add_text("sos-fake-extraction", script)  # test only: keep the script to read it back
+    out = io.BytesIO()
+    page.save(out, "PNG", pnginfo=info)
+    result = FakeExtractionProvider(_settings(Environment.CI)).extract(
+        out.getvalue(), language_hints=HINTS
+    )
+    assert [s.text for s in result.spans] == ["keep"]
+    assert result.raw_text == "keep"
+
+
+def test_PRV_016_generated_pages_report_cell_spans_in_pixels() -> None:
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGB", (400, 300), (255, 255, 255)).save(out, "PNG")
+    result = FakeExtractionProvider(_settings(Environment.CI)).extract(
+        out.getvalue(), language_hints=HINTS
+    )
+    cells = [r for row in result.rows for r in row.values()]
+    assert len(result.spans) == len(cells) > 0
+    for span in result.spans:
+        assert span.box is not None
+        left, top, right, bottom = span.box
+        assert 0 <= left < right <= 400
+        assert 0 <= top < bottom <= 300

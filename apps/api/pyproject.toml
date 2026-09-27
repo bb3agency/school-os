@@ -34,6 +34,9 @@ dependencies = [
   "opentelemetry-instrumentation-celery==0.66b0",
   "opentelemetry-instrumentation-redis==0.66b0",
   "playwright==1.56.0",
+  # Image redaction of register photos (PRV-016, ADR-0007): decode, black out, re-encode without
+  # metadata. Licence MIT-CMU (HPND); no known vulnerabilities for 12.3.0 (PyPI/pip-audit).
+  "pillow==12.3.0",
 ]
 
 [build-system]
