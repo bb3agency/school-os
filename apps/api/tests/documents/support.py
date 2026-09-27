@@ -102,6 +102,7 @@ class MemoryStore:
     objects: dict[str, StoredObj] = field(default_factory=dict)
     posts: list[dict[str, Any]] = field(default_factory=list)
     gets: list[dict[str, Any]] = field(default_factory=list)
+    discarded: list[str] = field(default_factory=list)
     kms_key_id: str | None = None
     # Test hook: runs right before a conditional copy (simulates a concurrent re-upload).
     before_copy: Any = None
@@ -182,6 +183,12 @@ class MemoryStore:
         self.objects[key] = StoredObj(data, content_type)
 
     def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
+
+    def discard(self, key: str) -> None:
+        if not key.startswith("t/") or ".." in key.split("/"):
+            raise ValueError("refusing to discard outside a tenant prefix")
+        self.discarded.append(key)
         self.objects.pop(key, None)
 
     def delete_prefix(self, prefix: str) -> int:

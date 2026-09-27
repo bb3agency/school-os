@@ -222,6 +222,57 @@ def test_FR_DOC_003_sse_kms_is_required_by_policy_and_sent_on_writes() -> None:
         stub.assert_no_pending_responses()
 
 
+def test_PRV_016_discard_tags_then_deletes_and_is_idempotent(s3_store: S3ObjectStore) -> None:
+    key = storage.document_key(uuid.uuid4(), uuid.uuid4(), 1, "png")
+    s3_store.put(key, S.png(), "image/png")
+    s3_store.discard(key)
+    assert s3_store.head(key) is None
+    s3_store.discard(key)  # already gone: nothing to do, no error
+    with pytest.raises(ValueError, match="tenant prefix"):
+        s3_store.discard("elsewhere/original.png")
+
+
+def _stubbed_store() -> tuple[S3ObjectStore, Any]:
+    client = boto3.client(
+        "s3",
+        region_name="ap-south-1",
+        aws_access_key_id="synthetic-access",
+        aws_secret_access_key="synthetic-secret",
+        config=Config(signature_version="s3v4"),
+    )
+    return S3ObjectStore(client, BUCKET), client
+
+
+def test_PRV_016_discard_marks_the_object_for_the_short_lifecycle_rule() -> None:
+    """The files bucket is versioned: a plain delete keeps the bytes as a noncurrent version for
+    the 90-day recovery window. ``discard`` tags the object first so the lifecycle rule
+    ``discarded-1d`` (infra/terraform) expires that noncurrent version after one day."""
+    store, client = _stubbed_store()
+    key = "t/a/docs/b/v1/original.png"
+    with Stubber(client) as stub:
+        stub.add_response(
+            "put_object_tagging",
+            {},
+            {
+                "Bucket": BUCKET,
+                "Key": key,
+                "Tagging": {"TagSet": [{"Key": "sos-lifecycle", "Value": "discarded"}]},
+            },
+        )
+        stub.add_response("delete_object", {}, {"Bucket": BUCKET, "Key": key})
+        store.discard(key)
+        stub.assert_no_pending_responses()
+    for missing in ("NoSuchKey", "MethodNotAllowed"):  # gone, or only a delete marker is left
+        with Stubber(client) as stub:
+            stub.add_client_error("put_object_tagging", service_error_code=missing)
+            store.discard(key)
+            stub.assert_no_pending_responses()
+    with Stubber(client) as stub:
+        stub.add_client_error("put_object_tagging", service_error_code="AccessDenied")
+        with pytest.raises(storage.ObjectStoreError):
+            store.discard(key)
+
+
 @pytest.mark.db
 def test_FR_DOC_001_browser_to_s3_to_api_round_trip(
     s3_store: S3ObjectStore, world: Any, api: Any

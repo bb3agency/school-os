@@ -23,7 +23,14 @@ other ``document.read`` holders see a document when an ACL entry matches their r
 membership, section or class; a document with an EMPTY ACL is visible only to school-wide
 readers. Out-of-scope documents answer 404 (never reveal existence).
 
-Requirements: FR-DOC-001..006, FR-DOC-008 (status tracking), SEC-016, FR-DOC-007 (storage part).
+PRV-016 (images that showed a full Aadhaar number): :func:`replace_with_redacted` stores a
+worker-made redacted copy as the next version and :func:`discard_version` retires the original.
+A discarded version keeps its row (history, audit) as ``quarantined`` with the reason in
+``error``; its object is deleted after commit (outbox ``document.version.discarded`` ->
+``documents.discard_object``, plus a daily sweep), tagged for the bucket's one-day lifecycle rule.
+
+Requirements: FR-DOC-001..006, FR-DOC-008 (status tracking), SEC-016, FR-DOC-007 (storage part),
+PRV-016.
 """
 
 from __future__ import annotations
@@ -97,10 +104,13 @@ MANAGE: Final = "document.manage_acl"
 
 SCAN_EVENT: Final = "document.version.registered"
 DELETED_EVENT: Final = "document.deleted"
+DISCARDED_EVENT: Final = "document.version.discarded"
 SCAN_TASK: Final = "documents.scan"
 PURGE_TASK: Final = "documents.purge_objects"
+DISCARD_TASK: Final = "documents.discard_object"
 ops.register_outbox_route(SCAN_EVENT, SCAN_TASK)
 ops.register_outbox_route(DELETED_EVENT, PURGE_TASK)
+ops.register_outbox_route(DISCARDED_EVENT, DISCARD_TASK)
 
 # An intent can be registered for a while after its presigned POST expired (slow uploads).
 INTENT_GRACE: Final = dt.timedelta(minutes=30)
@@ -1165,11 +1175,13 @@ WITHHOLD_REASONS: Final = frozenset({"aadhaar_detected"})
 def withhold_version(
     session: Session, document_id: uuid.UUID, version_no: int, reason_code: str
 ) -> bool:
-    """Withhold a version from every download path (PRV-016; e.g. a register page whose text
-    showed a full Aadhaar number). The version becomes ``quarantined`` with ``error`` =
-    ``reason_code``; download URLs are only issued for ``ready`` versions. Returns True if the
-    version changed, False if it was already withheld/unusable. Audited once
+    """Withhold a version from every download path. The version becomes ``quarantined`` with
+    ``error`` = ``reason_code``; download URLs are only issued for ``ready`` versions. Returns
+    True if the version changed, False if it was already withheld/unusable. Audited once
     (``document.version_withheld``, system actor) in the caller's transaction.
+
+    The stored object is kept. For a file that must not be kept at all (PRV-016: a page that
+    showed a full Aadhaar number) use :func:`discard_version` or :func:`replace_with_redacted`.
     """
     if reason_code not in WITHHOLD_REASONS:
         raise ValueError(f"unknown withhold reason: {reason_code}")
@@ -1195,6 +1207,192 @@ def withhold_version(
         system=True,
     )
     return True
+
+
+DISCARD_REASONS: Final = frozenset({"aadhaar_redacted", "aadhaar_unredactable"})
+"""``error`` codes of discarded versions: replaced by a redacted copy, or not redactable."""
+DISCARD_SWEEP_WINDOW: Final = dt.timedelta(days=7)
+REDACTED_KINDS: Final = ("jpg", "png")
+
+
+def _locked_version(
+    session: Session, document_id: uuid.UUID, version_no: int
+) -> tuple[Document, DocumentVersion]:
+    doc = repo.get_document(session, document_id, for_update=True)
+    if doc is None:
+        raise _not_found()
+    version = repo.get_version(session, document_id, version_no, for_update=True)
+    if version is None:
+        raise NotFound("Version not found")
+    return doc, version
+
+
+def _discard_version(session: Session, version: DocumentVersion, reason_code: str) -> bool:
+    if version.status == "quarantined" and version.error in DISCARD_REASONS:
+        return False
+    updated = repo.set_version_status(session, version.id, "quarantined", error=reason_code)
+    if updated is None:  # pragma: no cover - row locked by the caller
+        return False
+    _audit(
+        session,
+        "document.version_discarded",
+        version.document_id,
+        {"version_no": version.version_no, "reason": reason_code},
+        system=True,
+    )
+    ops.enqueue_event(
+        session,
+        DISCARDED_EVENT,
+        {
+            "document_id": version.document_id,
+            "version_id": version.id,
+            "object_key": version.object_key,
+        },
+    )
+    return True
+
+
+def discard_version(
+    session: Session, document_id: uuid.UUID, version_no: int, reason_code: str
+) -> bool:
+    """PRV-016: a version whose file must not be kept (e.g. a register page that showed a full
+    Aadhaar number and could not be redacted). Workers only, in the caller's transaction.
+
+    The version becomes ``quarantined`` with ``error`` = ``reason_code`` (never served, not
+    usable evidence) and its object is deleted after commit (outbox ``document.version.discarded``
+    -> ``documents.discard_object``; :func:`sweep_discarded_objects` retries daily). The row is
+    kept for history and audit (``document.version_discarded``, system actor). Returns False if
+    the version was already discarded.
+    """
+    if reason_code not in DISCARD_REASONS:
+        raise ValueError(f"unknown discard reason: {reason_code}")
+    _doc, version = _locked_version(session, document_id, version_no)
+    return _discard_version(session, version, reason_code)
+
+
+def replace_with_redacted(
+    session: Session,
+    document_id: uuid.UUID,
+    version_no: int,
+    data: bytes,
+    mime_type: str,
+    *,
+    regions: int,
+    store: ObjectStore | None = None,
+) -> int:
+    """PRV-016: store ``data``, a redacted copy of version ``version_no`` made by a worker
+    (sensitive regions blacked out, metadata stripped), as the next version, make it current,
+    and discard the original (:func:`discard_version`, reason ``aadhaar_redacted``). Returns the
+    new version number. Workers only, in the caller's transaction.
+
+    The copy goes through the normal version lifecycle: stored (SSE-KMS) under
+    ``v<n>/original.<ext>``, recorded ``queued`` with its SHA-256 and size, and malware-scanned
+    (outbox ``document.version.registered``) before any download; like every queued version it
+    is usable evidence at once. Audit ``document.version_redacted`` (system actor; IDs, counts
+    and codes only). JPEG or PNG within the purpose's size limit only.
+    """
+    kind = filetypes.kind_for_content_type(mime_type)
+    if kind is None or kind.key not in REDACTED_KINDS or filetypes.sniff(data) is not kind:
+        raise UnsupportedFileType("A redacted copy must be a JPEG or PNG image.")
+    doc, original = _locked_version(session, document_id, version_no)
+    if original.status in UNUSABLE_STATUSES:
+        raise Conflict("The original file is no longer available.", code="document_not_ready")
+    if len(data) > purpose_rule(doc.purpose).max_bytes:
+        raise FileTooLarge("The redacted copy is larger than allowed.")
+    tenant_id = repo.current_tenant_id(session)
+    new_no = repo.max_version_no(session, doc.id) + 1
+    key = document_key(tenant_id, doc.id, new_no, kind.ext)
+    store = store or get_object_store()
+    try:
+        store.put(key, data, kind.mime)
+    except ObjectStoreError as exc:
+        raise Conflict(
+            "The redacted copy could not be stored. Try again.", code="storage_unavailable"
+        ) from exc
+    with _undo_object_on_error(store, key), _db_errors():
+        version = repo.insert_version(
+            session,
+            id=new_id(),
+            tenant_id=tenant_id,
+            document_id=doc.id,
+            version_no=new_no,
+            object_key=key,
+            sha256=hashlib.sha256(data).digest(),
+            mime_type=kind.mime,
+            size_bytes=len(data),
+            status="queued",
+            created_by=original.created_by,
+        )
+        updated = repo.update_document(
+            session, doc.id, expected_version=None, current_version_id=version.id
+        )
+        if updated is None:  # pragma: no cover - row locked above
+            raise _not_found()
+        _discard_version(session, original, "aadhaar_redacted")
+        _audit(
+            session,
+            "document.version_redacted",
+            doc.id,
+            {
+                "version_no": original.version_no,
+                "redacted_version_no": new_no,
+                "regions": regions,
+                "mime_type": kind.mime,
+                "size_bytes": len(data),
+            },
+            system=True,
+        )
+        ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
+    log.info("documents.version.redacted", resource_type="document", resource_id=doc.id)
+    return new_no
+
+
+def discard_object(
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    object_key: str,
+    *,
+    store: ObjectStore | None = None,
+) -> bool:
+    """Worker (outbox ``document.version.discarded``): delete a discarded version's object.
+
+    Idempotent. Refuses (returns False) unless the key lies under this school's document and is
+    the key of that version, and the version is discarded. If the document was deleted
+    meanwhile (no version row), the key is discarded anyway: its objects are being purged.
+    """
+    if not key_in_tenant(object_key, tenant_id) or not object_key.startswith(
+        document_prefix(tenant_id, document_id)
+    ):
+        return False
+    with tenant_session(tenant_id) as s:
+        version = repo.get_version(s, document_id, version_id=version_id)
+        if version is not None and (
+            version.object_key != object_key
+            or version.status != "quarantined"
+            or version.error not in DISCARD_REASONS
+        ):
+            return False
+    (store or get_object_store()).discard(object_key)
+    log.info("documents.version.discarded", resource_type="document", resource_id=document_id)
+    return True
+
+
+def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
+    """Worker (daily): discard again the objects of versions discarded in the last 7 days, in
+    case the outbox task gave up (idempotent; PRV-016). Returns how many keys were handled."""
+    store = store or get_object_store()
+    with tenant_session(tenant_id) as s:
+        keys = [
+            v.object_key
+            for v in repo.discarded_versions(
+                s, sorted(DISCARD_REASONS), since=_now() - DISCARD_SWEEP_WINDOW, limit=500
+            )
+            if key_in_tenant(v.object_key, tenant_id)
+        ]
+    for key in keys:
+        store.discard(key)
+    return len(keys)
 
 
 def store_page_image(
@@ -1278,6 +1476,9 @@ def delete_export_files(
 __all__ = [
     "ACL_CHANGED_HOOKS",
     "DELETE_GUARDS",
+    "DISCARDED_EVENT",
+    "DISCARD_REASONS",
+    "DISCARD_TASK",
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
     "WITHHOLD_REASONS",
@@ -1288,6 +1489,8 @@ __all__ = [
     "create_upload",
     "delete_document",
     "delete_export_files",
+    "discard_object",
+    "discard_version",
     "document_object",
     "evidence_exists",
     "export_download_url",
@@ -1300,10 +1503,12 @@ __all__ = [
     "purge_expired_uploads",
     "read_document_object",
     "register_document",
+    "replace_with_redacted",
     "scan_version",
     "set_acl",
     "store_export_file",
     "store_page_image",
+    "sweep_discarded_objects",
     "validate_acl",
     "withhold_version",
 ]

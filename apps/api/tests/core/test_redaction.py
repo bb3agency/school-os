@@ -16,7 +16,9 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from app.core.redaction import (
+    AadhaarMatch,
     contains_full_aadhaar,
+    find_aadhaar,
     mask_aadhaar,
     redact,
     verhoeff_check_digit,
@@ -369,3 +371,65 @@ def test_SEC_008_numbers_next_to_hex_ids_are_still_masked() -> None:
     assert "9876543210" not in masked
     assert number not in masked
     assert contains_full_aadhaar(text)
+
+
+# --- positions for image redaction (PRV-016) ------------------------------------------------
+
+
+def test_PRV_016_find_aadhaar_reports_positions_digits_and_checksum() -> None:
+    spaced = f"{VALID[:4]} {VALID[4:8]} {VALID[8:]}"
+    text = f"Name: Synthetica  UID {spaced} / roll 12"
+    found = find_aadhaar(text)
+    assert found == [
+        AadhaarMatch(text.index(spaced), text.index(spaced) + len(spaced), VALID, verhoeff=True)
+    ]
+    assert text[found[0].start : found[0].end] == spaced
+
+
+def test_PRV_016_find_aadhaar_matches_what_mask_aadhaar_masks() -> None:
+    # Keyword-near invalid numbers are masked too, so they are reported (verhoeff=False).
+    text = f"Aadhaar {INVALID} and {VALID_2} and plain {INVALID}"
+    found = find_aadhaar(text)
+    assert [(m.digits, m.verhoeff) for m in found] == [(INVALID, False), (VALID_2, True)]
+    masked = mask_aadhaar(text)
+    assert masked.count(INVALID) == 1, "only the plain invalid number is left"
+    assert VALID_2 not in masked
+    assert text[found[0].start : found[0].end] == INVALID
+
+
+def test_PRV_016_find_aadhaar_reports_windows_not_merged_regions() -> None:
+    # Each qualifying 12-digit window is reported on its own (mask_aadhaar merges overlapping
+    # ones), so callers can compare the windows found in different texts of one page.
+    second = VALID[4:] + "123" + verhoeff_check_digit(VALID[4:] + "123")
+    text = f"{VALID[:4]} {VALID[4:8]} {VALID[8:]} {second[-4:]}"
+    found = find_aadhaar(text)
+    assert [m.digits for m in found] == [VALID, second]
+    assert found[0].start < found[1].start < found[0].end
+
+
+def test_PRV_016_aadhaar_match_repr_never_shows_the_digits() -> None:
+    # A match that ends up in a log line, an assertion message or a traceback must not carry
+    # the number (invariants 4 and 5).
+    match = find_aadhaar(f"{VALID[:4]} {VALID[4:8]} {VALID[8:]}")[0]
+    for shown in (repr(match), str(match), f"{match!r}"):
+        assert VALID not in shown
+        assert VALID[:4] not in shown
+
+
+def test_PRV_016_find_aadhaar_ignores_phones_uuids_and_long_blocks() -> None:
+    assert find_aadhaar("+91 98765 43210") == []
+    assert find_aadhaar(str(KNOWN_COLLISION)) == []
+    assert find_aadhaar(VALID + "7") == []
+    assert find_aadhaar("") == []
+
+
+@settings(max_examples=200)
+@given(prefix=NON_DIGIT_TEXT, suffix=NON_DIGIT_TEXT, data=st.data(), number=valid_numbers())
+def test_PRV_016_property_every_valid_number_is_located(
+    prefix: str, suffix: str, data: st.DataObject, number: str
+) -> None:
+    text = unicodedata.normalize("NFC", prefix + data.draw(formatted(number)) + suffix)
+    found = [m for m in find_aadhaar(text) if m.digits == number]
+    assert found
+    assert found[0].verhoeff
+    assert digits_only(text[found[0].start : found[0].end]) == number

@@ -11,8 +11,8 @@ import pytest
 
 from app.core.redaction import contains_full_aadhaar
 from app.devtools.fake_ids import invalid_aadhaar_like
-from app.extraction.providers import FieldReading, PageExtraction
-from app.extraction.sanitize import clean_page
+from app.extraction.providers import FieldReading, PageExtraction, TextSpan
+from app.extraction.sanitize import clean_page, page_has_aadhaar
 from app.extraction.settings import extraction_config
 
 X = sys.modules["sos_test_extraction_support"]
@@ -70,6 +70,31 @@ def test_PRV_016_number_only_in_page_text_or_dropped_column_flags_the_page() -> 
     assert in_dropped.aadhaar_detected
     assert in_dropped.dropped_fields == 1
     assert "uid" not in in_dropped.rows[0].fields
+
+
+@pytest.mark.parametrize("split", [False, True], ids=["one-span", "word-spans"])
+def test_PRV_016_number_only_in_the_text_layer_spans_flags_the_page(split: bool) -> None:
+    number = X.valid_aadhaar_like(11)
+    words = [number[0:4], number[4:8], number[8:12]] if split else [number]
+    page = PageExtraction(
+        rows=[{"full_name": FieldReading("Synthetica Span", 0.9)}],
+        spans=[TextSpan("Synthetica", (0, 0, 9, 9)), *(TextSpan(w, (0, 0, 9, 9)) for w in words)],
+    )
+    assert page_has_aadhaar(page)
+    clean = clean_page(page, CFG, threshold=0.7)
+    assert clean.aadhaar_detected
+    # The text layer is scanned, never kept.
+    assert number not in json.dumps([r.fields for r in clean.rows])
+    assert number[8:] not in json.dumps([r.fields for r in clean.rows])
+
+
+def test_PRV_016_page_has_aadhaar_is_false_for_a_clean_page() -> None:
+    page = PageExtraction(
+        rows=[{"admission_no": FieldReading("A-1024", 0.9)}],
+        raw_text="Synthetica 2012-06-15",
+        spans=[TextSpan("Synthetica", (0, 0, 9, 9))],
+    )
+    assert not page_has_aadhaar(page)
 
 
 def test_PRV_015_invalid_checksum_numbers_are_neither_masked_nor_flagged() -> None:

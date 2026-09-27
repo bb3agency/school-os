@@ -5499,7 +5499,13 @@ export interface components {
             /** Url */
             url: string;
         };
-        /** PageOut */
+        /**
+         * PageOut
+         * @description One register page. ``aadhaar_detected``: its text showed a full Aadhaar number (PRV-016);
+         *     the image is then either ``image_redacted`` (number blacked out; ``document_version_no`` is
+         *     the redacted copy) or ``image_withheld`` (could not be redacted: the original was discarded
+         *     and the page's rows cannot be confirmed).
+         */
         PageOut: {
             /** Aadhaar Detected */
             aadhaar_detected: boolean;
@@ -5517,6 +5523,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Image Redacted */
+            image_redacted: boolean;
             /** Image Withheld */
             image_withheld: boolean;
             /** Low Confidence Count */

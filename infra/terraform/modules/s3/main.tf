@@ -98,6 +98,14 @@ module "files" {
       expiration_days = 90
     },
     {
+      # PRV-016: images that showed a full Aadhaar number are tagged before the app deletes
+      # them (documents.storage discard), so no copy outlives the 90-day recovery window.
+      id                                 = "discarded-1d"
+      tags                               = { "sos-lifecycle" = "discarded" }
+      expiration_days                    = 1
+      noncurrent_version_expiration_days = 1
+    },
+    {
       id                                 = "noncurrent-and-multipart"
       noncurrent_version_expiration_days = var.files_noncurrent_version_days
       abort_incomplete_multipart_days    = 7

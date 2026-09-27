@@ -75,6 +75,8 @@ module "files" {
     { id = "exports-7d", tags = { "sos-lifecycle" = "export-7d" }, expiration_days = 7 },
     { id = "tenant-export-2d", tags = { "sos-lifecycle" = "tenant-export-2d" }, expiration_days = 2 },
     { id = "import-raw-90d", tags = { "sos-lifecycle" = "import-raw-90d" }, expiration_days = 90 },
+    # PRV-016: images that showed a full Aadhaar number (tagged by the app before it deletes them).
+    { id = "discarded-1d", tags = { "sos-lifecycle" = "discarded" }, expiration_days = 1, noncurrent_version_expiration_days = 1 },
     { id = "noncurrent-and-multipart", noncurrent_version_expiration_days = 90, abort_incomplete_multipart_days = 7 },
   ]
   tags = local.tags

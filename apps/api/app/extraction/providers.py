@@ -10,6 +10,10 @@ Built here (M1):
   tests; it refuses to run in staging/prod. A PNG may carry a scripted result in a ``tEXt``
   chunk with keyword ``sos-fake-extraction`` (JSON ``{"rows": [...], "raw_text": "...",
   "fail": "unavailable" | "unreadable"}``); otherwise rows are derived from the image hash.
+  A script with ``"size": [w, h]`` and ``"spans": [{"text": ..., "box": [l, t, r, b]}]`` is
+  rendered as a real ``w x h`` image by :func:`fake_script_png` (each span box drawn in grey)
+  and read back like OCR would: a span or cell whose region is entirely black (redacted) is not
+  read, and the page text is the text of the spans still readable.
 - :class:`NotConfiguredProvider` (``not-configured``, the staging/prod default): every page
   fails with an operator-facing error until a real provider is chosen.
 
@@ -18,13 +22,24 @@ Extension point (M2, chosen by evaluation on Telugu + English, printed and handw
 (CLAUDE.md §11: no LLM SDK outside the gateway; ZDR; model IDs in config). Add a
 ``ExtractionProviderKind`` value, an adapter class implementing :class:`ExtractionProvider`, and
 a branch in :func:`build_provider`. Adapters return raw readings; they never mask, store or log.
+
+Geometry contract (PRV-016 image redaction): an adapter returns the page's whole text layer as
+:class:`TextSpan` s (words or lines, in reading order) with pixel boxes ``(left, top, right,
+bottom)`` in the page **as displayed** (EXIF orientation applied; origin top-left; right and
+bottom exclusive). An engine that gives no geometry for some text returns that span with
+``box=None``. The pipeline blacks out the boxes of every span (and every cell ``bbox``) holding
+an Aadhaar-like number; a number it cannot place on the image means the page cannot be
+redacted, so its image is discarded. Keep boxes tight but complete: the redacted image is read
+again and discarded if a number is still legible.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import io
 import json
+import math
 import random
 import struct
 import zlib
@@ -32,12 +47,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final, Protocol
 
+from PIL import Image, ImageDraw, ImageOps, PngImagePlugin
+
 from app.core.config import ExtractionProviderKind, Settings
 from app.extraction.settings import extraction_config
 
 PNG_SIGNATURE: Final = b"\x89PNG\r\n\x1a\n"
 FAKE_SCRIPT_KEYWORD: Final = b"sos-fake-extraction"
 _MAX_SCRIPT_BYTES: Final = 256 * 1024
+_MAX_FAKE_PIXELS: Final = 40_000_000
 
 
 class ProviderRefused(RuntimeError):
@@ -73,12 +91,27 @@ class FieldReading:
     bbox: tuple[float, float, float, float] | None = None
 
 
+PixelBox = tuple[int, int, int, int]
+"""``(left, top, right, bottom)`` in pixels of the page as displayed; right/bottom exclusive."""
+
+
+@dataclass(frozen=True, slots=True)
+class TextSpan:
+    """One piece of the page's text layer (a word or a line) and where it is on the image."""
+
+    text: str
+    box: PixelBox | None = None
+    confidence: float | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class PageExtraction:
-    """Provider output for one page: candidate rows (field -> reading) and the page text."""
+    """Provider output for one page: candidate rows (field -> reading), the page text and the
+    text layer with geometry (``spans``; see the module docstring for the contract)."""
 
     rows: list[dict[str, FieldReading]] = field(default_factory=list)
     raw_text: str = ""
+    spans: list[TextSpan] = field(default_factory=list)
 
 
 class ExtractionProvider(Protocol):
@@ -116,21 +149,82 @@ def _png_text_chunks(data: bytes) -> dict[bytes, bytes]:
     return out
 
 
+FAKE_INK: Final = (90, 90, 90)
+FAKE_PAPER: Final = (255, 255, 255)
+
+
+def _script_text(script: Mapping[str, Any]) -> str:
+    return json.dumps(script, ensure_ascii=True, separators=(",", ":"))
+
+
+def _script_size(script: Mapping[str, Any]) -> tuple[int, int] | None:
+    size = script.get("size")
+    if isinstance(size, list | tuple) and len(size) == 2 and all(isinstance(v, int) for v in size):
+        width, height = int(size[0]), int(size[1])
+        if 1 <= width <= 10_000 and 1 <= height <= 10_000:
+            return width, height
+    return None
+
+
+def _script_box(raw: Any) -> PixelBox | None:
+    if isinstance(raw, list | tuple) and len(raw) == 4 and all(isinstance(v, int) for v in raw):
+        return (int(raw[0]), int(raw[1]), int(raw[2]), int(raw[3]))
+    return None
+
+
 def fake_script_png(script: Mapping[str, Any]) -> bytes:
-    """A minimal valid 1x1 PNG carrying a fake-provider script (tests and local demos only)."""
+    """A valid PNG carrying a fake-provider script (tests and local demos only): 1x1, or the
+    script's ``size`` with every span box drawn in grey ink on white."""
+    size = _script_size(script)
+    if size is not None:
+        return _rendered_script_png(script, size)
 
     def chunk(kind: bytes, body: bytes) -> bytes:
         crc = zlib.crc32(kind + body) & 0xFFFFFFFF
         return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", crc)
 
     ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 0, 0, 0, 0)
-    text = json.dumps(script, ensure_ascii=True, separators=(",", ":")).encode("ascii")
+    text = _script_text(script).encode("ascii")
     return (
         PNG_SIGNATURE
         + chunk(b"IHDR", ihdr)
         + chunk(b"tEXt", FAKE_SCRIPT_KEYWORD + b"\x00" + text)
         + chunk(b"IDAT", zlib.compress(b"\x00\x00"))
         + chunk(b"IEND", b"")
+    )
+
+
+def _rendered_script_png(script: Mapping[str, Any], size: tuple[int, int]) -> bytes:
+    page = Image.new("RGB", size, FAKE_PAPER)
+    draw = ImageDraw.Draw(page)
+    for raw in script.get("spans", []):
+        box = _script_box(raw.get("box")) if isinstance(raw, Mapping) else None
+        if box is not None and box[0] < box[2] and box[1] < box[3]:
+            draw.rectangle((box[0], box[1], box[2] - 1, box[3] - 1), fill=FAKE_INK)
+    info = PngImagePlugin.PngInfo()
+    info.add_text(FAKE_SCRIPT_KEYWORD.decode("ascii"), _script_text(script))
+    out = io.BytesIO()
+    page.save(out, "PNG", pnginfo=info)
+    return out.getvalue()
+
+
+def _all_black(page: Image.Image, box: PixelBox) -> bool:
+    """True when the region (clamped to the page) is empty or entirely black: unreadable."""
+    left, top = max(box[0], 0), max(box[1], 0)
+    right, bottom = min(box[2], page.width), min(box[3], page.height)
+    if right <= left or bottom <= top:
+        return False
+    extrema = page.crop((left, top, right, bottom)).getextrema()
+    return all(high == 0 for _low, high in extrema)  # type: ignore[misc]
+
+
+def _fraction_box(bbox: tuple[float, float, float, float], size: tuple[int, int]) -> PixelBox:
+    x, y, w, h = bbox
+    return (
+        math.floor(x * size[0]),
+        math.floor(y * size[1]),
+        math.ceil((x + w) * size[0]),
+        math.ceil((y + h) * size[1]),
     )
 
 
@@ -168,24 +262,46 @@ class FakeExtractionProvider:
         self._refuse()
         script = _png_text_chunks(page_image).get(FAKE_SCRIPT_KEYWORD)
         if script is not None:
-            return self._scripted(json.loads(script.decode("ascii")))
+            return self._scripted(json.loads(script.decode("ascii")), page_image)
         return self._generated(page_image)
 
     @staticmethod
-    def _scripted(script: Mapping[str, Any]) -> PageExtraction:
+    def _scripted(script: Mapping[str, Any], page_image: bytes) -> PageExtraction:
         fail = script.get("fail")
         if fail == "unavailable":
             raise ExtractionUnavailable("scripted transient failure")
         if fail == "unreadable":
             raise ExtractionFailed("scripted unreadable page")
+        page = _open_page(page_image) if _script_size(script) is not None else None
+
+        def legible(box: PixelBox | None) -> bool:
+            return page is None or box is None or not _all_black(page, box)
+
         rows: list[dict[str, FieldReading]] = []
         for raw_row in script.get("rows", []):
             if not isinstance(raw_row, Mapping):
                 continue
-            row = {str(k): r for k, v in raw_row.items() if (r := _reading(v)) is not None}
+            row = {
+                str(k): r
+                for k, v in raw_row.items()
+                if (r := _reading(v)) is not None
+                and (page is None or r.bbox is None or legible(_fraction_box(r.bbox, page.size)))
+            }
             rows.append(row)
-        raw_text = script.get("raw_text", "")
-        return PageExtraction(rows=rows, raw_text=raw_text if isinstance(raw_text, str) else "")
+        spans = [
+            TextSpan(str(raw["text"]), _script_box(raw.get("box")))
+            for raw in script.get("spans", [])
+            if isinstance(raw, Mapping) and isinstance(raw.get("text"), str)
+        ]
+        spans = [span for span in spans if legible(span.box)]
+        if page is not None:
+            # A rendered page is read from its pixels: the text is what is still legible.
+            raw_text = " ".join(span.text for span in spans)
+        else:
+            raw_text = script.get("raw_text", "")
+        return PageExtraction(
+            rows=rows, raw_text=raw_text if isinstance(raw_text, str) else "", spans=spans
+        )
 
     @staticmethod
     def _generated(page_image: bytes) -> PageExtraction:
@@ -200,6 +316,8 @@ class FakeExtractionProvider:
         base_no = rng.randint(1000, 8999)
         rows: list[dict[str, FieldReading]] = []
         lines: list[str] = []
+        spans: list[TextSpan] = []
+        page = _open_page(page_image)
         height = 0.9 / max(count, 1)
 
         def conf() -> float:
@@ -225,9 +343,22 @@ class FakeExtractionProvider:
             for col, (key, value) in enumerate(cells.items()):
                 box = (round(0.02 + col * 0.14, 4), y, 0.13, round(height * 0.8, 4))
                 row[key] = FieldReading(value, conf(), box)
+                if page is not None:
+                    spans.append(TextSpan(value, _fraction_box(box, page.size), 0.9))
             rows.append(row)
             lines.append(" | ".join(cells.values()))
-        return PageExtraction(rows=rows, raw_text="\n".join(lines))
+        return PageExtraction(rows=rows, raw_text="\n".join(lines), spans=spans)
+
+
+def _open_page(page_image: bytes) -> Image.Image | None:
+    """The page as displayed (EXIF orientation applied), RGB; None if it is not an image."""
+    try:
+        with Image.open(io.BytesIO(page_image), formats=["PNG", "JPEG"]) as opened:
+            if opened.width * opened.height > _MAX_FAKE_PIXELS:
+                return None
+            return ImageOps.exif_transpose(opened).convert("RGB")
+    except (OSError, ValueError, Image.DecompressionBombError):
+        return None
 
 
 # --- not configured (staging/prod default) --------------------------------------------------
@@ -270,8 +401,10 @@ __all__ = [
     "FieldReading",
     "NotConfiguredProvider",
     "PageExtraction",
+    "PixelBox",
     "ProviderNotConfigured",
     "ProviderRefused",
+    "TextSpan",
     "build_provider",
     "fake_script_png",
     "provider_kind",

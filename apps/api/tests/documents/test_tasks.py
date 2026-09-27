@@ -25,6 +25,24 @@ def test_FR_OPS_004_outbox_events_route_to_document_tasks() -> None:
     assert "documents-purge-expired-uploads" in tasks.beat_schedule()
 
 
+def test_PRV_016_discarded_versions_route_to_the_maintenance_queue() -> None:
+    from sos_worker.celery_app import celery_app
+
+    assert ops.OUTBOX_ROUTES[service.DISCARDED_EVENT] == service.DISCARD_TASK
+    assert tasks.discard_object.name == service.DISCARD_TASK == "documents.discard_object"
+    assert "documents-sweep-discarded-objects" in tasks.beat_schedule()
+    celery_app.loader.import_default_modules()
+    for name in (service.DISCARD_TASK, "documents.sweep_discarded_objects"):
+        assert name in celery_app.tasks
+        # send_task (used by the outbox dispatcher) honours task_routes, not the task's queue.
+        assert celery_app.amqp.router.route({}, name)["queue"].name == "maintenance"
+
+
+def test_PRV_016_sweep_task_walks_every_school(world: Any) -> None:
+    result = tasks.sweep_discarded_objects.apply().get()
+    assert result["discarded"] >= 0
+
+
 def _dispatch_payload(admin: Engine, tenant_id: uuid.UUID, event: str, key: str, value: str) -> Any:
     return next(p for p in S.outbox_events(admin, tenant_id, event) if p[key] == value)
 

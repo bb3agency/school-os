@@ -69,6 +69,7 @@ class ExtractionPage(Base):
     error_code: Mapped[str | None] = mapped_column(Text)
     aadhaar_detected: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     image_withheld: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    image_redacted: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     row_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     low_confidence_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     dropped_field_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))

@@ -93,6 +93,25 @@ def page_png(rows: list[dict[str, Any]], raw_text: str = "", **script: Any) -> b
     )
 
 
+def rendered_page(
+    rows: list[dict[str, Any]], spans: list[dict[str, Any]], size: tuple[int, int] = (600, 300)
+) -> bytes:
+    """A real ``size`` image whose text layer is ``spans`` (``{"text", "box": [l, t, r, b]}``,
+    drawn in grey) and whose rows are ``rows``: the fake provider reads it like OCR (PRV-016)."""
+    return fake_script_png(
+        {"size": list(size), "spans": spans, "rows": rows, "nonce": uuid.uuid4().hex}
+    )
+
+
+def number_spans(number: str, top: int = 200) -> list[dict[str, Any]]:
+    """``number`` as word-level OCR returns it: three spans side by side."""
+    return [
+        {"text": number[0:4], "box": [300, top, 340, top + 20]},
+        {"text": number[4:8], "box": [345, top, 385, top + 20]},
+        {"text": number[8:12], "box": [390, top, 430, top + 20]},
+    ]
+
+
 # --- documents ------------------------------------------------------------------------------
 
 

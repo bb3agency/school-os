@@ -29,6 +29,14 @@ limits:
 # Only images in M1. PDFs need a rasteriser (no approved dependency yet): refused with a message.
 accepted_mime_types: [image/jpeg, image/png]
 
+# PRV-016 image redaction: a page whose text showed a full Aadhaar number is stored only with the
+# number regions blacked out (OCR boxes), re-encoded without metadata and read again to check.
+redaction:
+  padding_px: 3                # black margin added around every box, in pixels ...
+  padding_ratio: 0.15          # ... or this share of the box height, whichever is larger
+  max_pixels: 40000000         # larger images are not decoded: the page is discarded instead
+  jpeg_quality: 90             # JPEG pages stay JPEG; PNG pages stay PNG
+
 # Deterministic synthetic output of the fake provider (local/ci only).
 fake:
   rows_min: 3

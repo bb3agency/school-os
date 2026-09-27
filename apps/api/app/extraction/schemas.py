@@ -92,6 +92,11 @@ class FieldOut(_Out):
 
 
 class PageOut(_Out):
+    """One register page. ``aadhaar_detected``: its text showed a full Aadhaar number (PRV-016);
+    the image is then either ``image_redacted`` (number blacked out; ``document_version_no`` is
+    the redacted copy) or ``image_withheld`` (could not be redacted: the original was discarded
+    and the page's rows cannot be confirmed)."""
+
     id: uuid.UUID
     document_id: uuid.UUID
     document_version_no: int
@@ -101,6 +106,7 @@ class PageOut(_Out):
     error_code: str | None
     aadhaar_detected: bool
     image_withheld: bool
+    image_redacted: bool
     row_count: int
     low_confidence_count: int
     processed_at: dt.datetime | None
