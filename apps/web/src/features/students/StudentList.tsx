@@ -63,7 +63,7 @@ export function filtersFromForm(form: HTMLFormElement): StudentFilters {
   };
 }
 
-/** Filters → API query (ignores anything malformed rather than failing the page). */
+/** Filters → search body (ignores anything malformed rather than failing the page). */
 export function cleanFilters(filters: StudentFilters): CleanFilters {
   const q = filters.q?.trim().slice(0, 200) ?? "";
   return {
@@ -343,7 +343,11 @@ export function StudentListView({
   );
 }
 
-/** GET /students with the filters held in memory, cursor paging (Next / Previous). */
+/**
+ * POST /students/search with the filters held in memory, cursor paging (Next / Previous).
+ * Names and admission numbers go in the JSON body, never in a URL: URLs end up in proxy and
+ * load-balancer access logs (SEC-008).
+ */
 export function StudentsScreen() {
   const api = useBffClient("staff");
   const permissions = useStaffPermissions();
@@ -355,14 +359,14 @@ export function StudentsScreen() {
   const pages = useCursorStack();
   const cursor = pages.cursor;
   const aadhaarBlocked = Boolean(clean.query && containsFullAadhaar(clean.query));
-  const query = {
+  const body = {
     ...clean,
     limit: PAGE_SIZE,
     ...(cursor ? { cursor } : {}),
   };
   const results = useApiQuery(
-    ["staff", "students", "search", query],
-    () => unwrap(api.GET("/api/v1/students", { params: { query } })),
+    ["staff", "students", "search", body],
+    () => unwrap(api.POST("/api/v1/students/search", { body })),
     { enabled: !aadhaarBlocked },
   );
   const next = results.status === "ready" ? results.data.next_cursor : null;

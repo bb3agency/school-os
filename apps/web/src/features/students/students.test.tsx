@@ -2,7 +2,14 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import {
+  CSRF,
+  installBffStub,
+  page,
+  problem,
+  uninstallBffStub,
+  type BffStub,
+} from "@/test/bff-stub";
 import {
   ALL_RECORD_PERMISSIONS,
   ATTRIBUTES,
@@ -21,7 +28,7 @@ import { CreateStudentForm, createBody, createStudentSchema } from "./CreateStud
 import { toIsoDate } from "./dates";
 import { permissionsFrom } from "./me";
 import { StudentDetailView } from "./StudentDetail";
-import { StudentsScreen } from "./StudentList";
+import { PAGE_SIZE, StudentsScreen } from "./StudentList";
 
 const push = vi.fn();
 vi.mock("next/navigation", async (importOriginal) => {
@@ -89,8 +96,10 @@ describe("FR-STU-012 / BR-02: full Aadhaar numbers are recognised and refused", 
 describe("US-302 / FR-STU-010: find students", () => {
   it("searches without putting the name in the page URL, and respects permissions", async () => {
     stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["student.read_basic"]));
-    stub.routes["GET /bff/api/v1/students"] = (_request, url) =>
-      url.searchParams.get("query") ? page([summary()]) : page([]);
+    stub.routes["POST /bff/api/v1/students/search"] = async (request) => {
+      const body = (await request.json()) as { query?: string };
+      return body.query ? page([summary()]) : page([]);
+    };
     const user = userEvent.setup();
     const before = window.location.href;
     renderWithIntl(<StudentsScreen />);
@@ -104,8 +113,18 @@ describe("US-302 / FR-STU-010: find students", () => {
       `/en/students/${ID.student}`,
     );
     expect(window.location.href).toBe(before);
-    const searches = stub.callsTo("GET /bff/api/v1/students");
-    expect(searches.at(-1)?.url.searchParams.get("query")).toBe("venkat sai 9b");
+    // SEC-008: the name travels in the POST body, never in the request URL (access logs).
+    const searches = stub.callsTo("POST /bff/api/v1/students/search");
+    expect(JSON.parse(searches.at(-1)?.body ?? "{}")).toEqual({
+      query: "venkat sai 9b",
+      limit: PAGE_SIZE,
+    });
+    expect(searches.at(-1)?.headers.get("x-csrf-token")).toBe(CSRF);
+    expect(stub.callsTo("GET /bff/api/v1/students")).toHaveLength(0);
+    for (const call of stub.calls) {
+      expect(call.url.search).not.toMatch(/venkat/i);
+      expect(decodeURIComponent(call.url.href)).not.toMatch(/venkat/i);
+    }
     // Without student.create / import.run the actions are not offered.
     expect(screen.queryByRole("link", { name: sm.list.add })).toBeNull();
     expect(screen.queryByRole("link", { name: sm.list.import })).toBeNull();
@@ -116,19 +135,46 @@ describe("US-302 / FR-STU-010: find students", () => {
     await waitFor(() => expect(screen.getByLabelText(sm.list.searchLabel)).toHaveFocus());
   });
 
-  it("never sends a search that holds a full Aadhaar number", async () => {
-    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(ALL_RECORD_PERMISSIONS));
-    stub.routes["GET /bff/api/v1/students"] = () => page([]);
+  it("pages with the cursor in the POST body, keeping the name out of every URL", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["student.read_basic"]));
+    stub.routes["POST /bff/api/v1/students/search"] = async (request) => {
+      const body = (await request.json()) as { query?: string; cursor?: string };
+      if (!body.query) return page([]);
+      return body.cursor
+        ? page([summary({ id: ID.student2, display_name: "Lakshmi D." })])
+        : Response.json({ data: [summary()], next_cursor: "cursor-2" });
+    };
     const user = userEvent.setup();
     renderWithIntl(<StudentsScreen />);
     await screen.findByText(sm.list.emptyTitle);
-    const calls = stub.callsTo("GET /bff/api/v1/students").length;
+    await user.type(screen.getByLabelText(sm.list.searchLabel), "Venkata");
+    await user.click(screen.getByRole("button", { name: messages.en.common.search }));
+    await screen.findByRole("link", { name: "Venkata Sai K." });
+
+    await user.click(screen.getByRole("button", { name: sm.list.next }));
+    expect(await screen.findByRole("link", { name: "Lakshmi D." })).toBeInTheDocument();
+    const bodies = stub
+      .callsTo("POST /bff/api/v1/students/search")
+      .map((call) => JSON.parse(call.body) as Record<string, unknown>);
+    expect(bodies.at(-1)).toEqual({ query: "Venkata", limit: PAGE_SIZE, cursor: "cursor-2" });
+    expect(stub.calls.filter((call) => /venkata/i.test(decodeURIComponent(call.url.href)))).toEqual(
+      [],
+    );
+  });
+
+  it("never sends a search that holds a full Aadhaar number", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(ALL_RECORD_PERMISSIONS));
+    stub.routes["POST /bff/api/v1/students/search"] = () => page([]);
+    const user = userEvent.setup();
+    renderWithIntl(<StudentsScreen />);
+    await screen.findByText(sm.list.emptyTitle);
+    const calls = stub.callsTo("POST /bff/api/v1/students/search").length;
 
     await user.type(screen.getByLabelText(sm.list.searchLabel), fakeAadhaar());
     await user.click(screen.getByRole("button", { name: messages.en.common.search }));
 
     expect((await screen.findAllByText(sm.aadhaarNotAllowed)).length).toBeGreaterThan(0);
-    expect(stub.callsTo("GET /bff/api/v1/students")).toHaveLength(calls);
+    expect(stub.callsTo("POST /bff/api/v1/students/search")).toHaveLength(calls);
     expect(screen.getByRole("link", { name: sm.list.add })).toBeInTheDocument();
   });
 });

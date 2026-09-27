@@ -53,9 +53,21 @@
 			wrap json
 			fields {
 				# OIDC callback parameters are credentials; never log them.
+				# Personal data must never be sent in a query string (docs/09 §1, docs/13): searches
+				# use POST .../search with a JSON body. Defense in depth for clients still using the
+				# deprecated GET /api/v1/students?query=&admission_no= and for common PII names
+				# (SEC-008, invariant 5).
 				request>uri query {
 					replace code REDACTED
 					replace state REDACTED
+					replace query REDACTED
+					replace q REDACTED
+					replace admission_no REDACTED
+					replace name REDACTED
+					replace phone REDACTED
+					replace email REDACTED
+					replace dob REDACTED
+					replace address REDACTED
 				}
 				request>headers>Authorization delete
 				request>headers>Cookie delete

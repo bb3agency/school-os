@@ -383,4 +383,10 @@ resource "aws_wafv2_web_acl_logging_configuration" "this" {
       name = "x-service-token"
     }
   }
+  # The query string can hold the OIDC callback code/state and, from old clients, the deprecated
+  # personal-data search parameters (GET /api/v1/students?query=). WAF can only redact it whole.
+  # The ALB access log cannot redact anything, so personal data never goes in a URL (SEC-008).
+  redacted_fields {
+    query_string {}
+  }
 }

@@ -33,6 +33,7 @@ from app.students.schemas import (
     StudentCreate,
     StudentOut,
     StudentPatch,
+    StudentSearchIn,
     StudentStatus,
     StudentSummary,
     ValueIn,
@@ -90,22 +91,40 @@ def list_attributes(ctx: Reader, db: TenantDB) -> list[AttributeOut]:
 # --- students ------------------------------------------------------------------------------------
 
 
+_PII_IN_URL = (
+    "Deprecated: names and admission numbers in the URL end up in proxy and load-balancer "
+    "access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008)."
+)
+# RFC 9745 ``Deprecation`` date (2026-09-27) for GET /students with personal-data parameters.
+_SEARCH_DEPRECATED_AT = "@1790467200"
+
+
 @router.get("/students", response_model=Page[StudentSummary])
 def search_students(
     *,
     ctx: Reader,
     db: TenantDB,
-    query: Annotated[str | None, Query(max_length=200)] = None,
+    response: Response,
+    query: Annotated[
+        str | None, Query(max_length=200, deprecated=True, description=_PII_IN_URL)
+    ] = None,
     section_id: uuid.UUID | None = None,
     class_id: uuid.UUID | None = None,
     status: StudentStatus | None = None,
-    admission_no: Annotated[str | None, Query(max_length=32)] = None,
+    admission_no: Annotated[
+        str | None, Query(max_length=32, deprecated=True, description=_PII_IN_URL)
+    ] = None,
     limit: Limit = 50,
     cursor: Cursor = None,
 ) -> Page[StudentSummary]:
-    """Find students by partial name in English or Telugu, admission number, class/section
-    (``9b``, ``IX-B``) or parent name (permission ``student.read_basic``; class and subject
-    teachers see only students in their sections/classes this year)."""
+    """List students by class, section and status (permission ``student.read_basic``; class
+    and subject teachers see only students in their sections/classes this year). To search by
+    name, parent name or admission number use ``POST /students/search``: the ``query`` and
+    ``admission_no`` parameters still work but are deprecated (answered with a ``Deprecation``
+    header) because URLs are logged by proxies and load balancers."""
+    if query or admission_no:
+        response.headers["Deprecation"] = _SEARCH_DEPRECATED_AT
+        response.headers["Link"] = '</api/v1/students/search>; rel="successor-version"'
     filters = SearchFilters(
         query=query,
         section_id=section_id,
@@ -114,6 +133,23 @@ def search_students(
         admission_no=admission_no,
     )
     return students.search(db, ctx, filters, limit=limit, cursor=cursor)
+
+
+@router.post("/students/search", response_model=Page[StudentSummary])
+def search_students_by_body(
+    ctx: Reader,
+    _aadhaar: AadhaarGuard,
+    db: TenantDB,
+    body: StudentSearchIn,
+) -> Page[StudentSummary]:
+    """Find students by partial name in English or Telugu, admission number, class/section
+    (``9b``, ``IX-B``) or parent name, with the filters in the JSON body so personal data never
+    appears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see
+    only students in their sections/classes this year). Same results, page size and cursor as
+    ``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:
+    nothing is written, so no ``Idempotency-Key``. A full Aadhaar number anywhere in the body is
+    refused (422 ``aadhaar_full_number_rejected``)."""
+    return students.search(db, ctx, body.filters(), limit=body.limit, cursor=body.cursor)
 
 
 @router.post("/students", response_model=StudentOut, status_code=201)

@@ -58,8 +58,8 @@ run "waf_rules" {
   }
 
   assert {
-    condition     = length(aws_wafv2_web_acl_logging_configuration.this.redacted_fields) == 3
-    error_message = "WAF logs redact authorization, cookie and service-token headers."
+    condition     = length(aws_wafv2_web_acl_logging_configuration.this.redacted_fields) == 4
+    error_message = "WAF logs redact authorization, cookie and service-token headers and the query string (SEC-008)."
   }
 }
 

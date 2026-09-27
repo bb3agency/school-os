@@ -9622,6 +9622,101 @@
         "title": "StudentRef",
         "type": "object"
       },
+      "StudentSearchIn": {
+        "additionalProperties": false,
+        "description": "``POST /students/search`` body (SEC-008): names and admission numbers are personal data\nand never travel in the URL, where proxies and load balancers log them. Same filters, page\nsize and cursor as ``GET /students``.",
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque cursor from next_cursor.",
+            "title": "Cursor"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Page size (max 200).",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Partial name (English or Telugu), parent name, admission number or class/section token such as 9b or IX-B.",
+            "title": "Query"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "provisional",
+                  "active",
+                  "left",
+                  "graduated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "StudentSearchIn",
+        "type": "object"
+      },
       "StudentSummary": {
         "properties": {
           "admission_no": {
@@ -20511,10 +20606,12 @@
     },
     "/api/v1/students": {
       "get": {
-        "description": "Find students by partial name in English or Telugu, admission number, class/section\n(``9b``, ``IX-B``) or parent name (permission ``student.read_basic``; class and subject\nteachers see only students in their sections/classes this year).",
+        "description": "List students by class, section and status (permission ``student.read_basic``; class\nand subject teachers see only students in their sections/classes this year). To search by\nname, parent name or admission number use ``POST /students/search``: the ``query`` and\n``admission_no`` parameters still work but are deprecated (answered with a ``Deprecation``\nheader) because URLs are logged by proxies and load balancers.",
         "operationId": "search_students_api_v1_students_get",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).",
             "in": "query",
             "name": "query",
             "required": false,
@@ -20528,6 +20625,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).",
               "title": "Query"
             }
           },
@@ -20588,6 +20687,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).",
             "in": "query",
             "name": "admission_no",
             "required": false,
@@ -20601,6 +20702,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).",
               "title": "Admission No"
             }
           },
@@ -20701,6 +20804,48 @@
           }
         },
         "summary": "Create Student",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/search": {
+      "post": {
+        "description": "Find students by partial name in English or Telugu, admission number, class/section\n(``9b``, ``IX-B``) or parent name, with the filters in the JSON body so personal data never\nappears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see\nonly students in their sections/classes this year). Same results, page size and cursor as\n``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:\nnothing is written, so no ``Idempotency-Key``. A full Aadhaar number anywhere in the body is\nrefused (422 ``aadhaar_full_number_rejected``).",
+        "operationId": "search_students_by_body_api_v1_students_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentSearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_StudentSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Students By Body",
         "tags": [
           "students"
         ]

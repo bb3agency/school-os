@@ -556,6 +556,24 @@ def test_SEC_015_student_lists_respect_scope(world: Any, api: Any) -> None:
     assert not got & {str(ids["s9c"]), str(ids["s10a"])}
 
 
+def test_SEC_015_student_search_body_respects_scope(world: Any, api: Any) -> None:
+    """POST /students/search (SEC-008) applies the same section scope as the list."""
+    ids = SW.ensure_students(world)
+    for body in ({"limit": 200}, {"query": "synthetica", "limit": 200}):
+        res = api.call(world.person("class_teacher"), "POST", "/api/v1/students/search", json=body)
+        assert res.status_code == 200, res.text
+        got = {item["id"] for item in res.json()["data"]}
+        assert str(ids["s9a"]) in got
+        assert not got & {str(ids["s9c"]), str(ids["s10a"])}
+    hidden = api.call(
+        world.person("class_teacher"),
+        "POST",
+        "/api/v1/students/search",
+        json={"section_id": str(world.a.ids["section_9c"])},
+    )
+    assert hidden.json()["data"] == []
+
+
 def test_SEC_001_student_lists_never_show_other_school(world: Any, api: Any) -> None:
     ids = SW.ensure_students(world)
     for query in (None, "synthetica", "9a"):
@@ -566,6 +584,9 @@ def test_SEC_001_student_lists_never_show_other_school(world: Any, api: Any) -> 
         assert res.status_code == 200
         got = {item["id"] for item in res.json()["data"]}
         assert str(ids["b_sb"]) not in got
+        searched = api.call(world.person("owner"), "POST", "/api/v1/students/search", json=params)
+        assert searched.status_code == 200
+        assert str(ids["b_sb"]) not in {item["id"] for item in searched.json()["data"]}
 
 
 def test_SEC_001_student_bodies_cannot_reference_other_school(world: Any, api: Any) -> None:

@@ -188,6 +188,8 @@ AADHAAR_CASES = [
     ("PATCH", "/{sid}/guardians/{gid}", lambda w, s, n: {"address": f"UID {n}"}, "address"),
     ("POST", "/{sid}/sensitive-reveal", lambda w, s, n: {"attribute_key": n}, "attribute_key"),
     ("PATCH", "/{sid}", lambda w, s, n: {"status": n}, "status"),
+    ("POST", "/search", lambda w, s, n: {"query": grouped(n)}, "query"),
+    ("POST", "/search", lambda w, s, n: {"admission_no": n}, "admission_no"),
 ]
 
 
