@@ -51,6 +51,16 @@ templates:
       title: సవరణ ఆమోదించబడలేదు
       body: మీ సవరణ అభ్యర్థన ఆమోదించబడలేదు. కారణం తెలుసుకోవడానికి దాన్ని తెరవండి.
 
+  change_request.expired:
+    params: [change_request_id, student_id]
+    resource_type: change_request
+    en:
+      title: Correction request expired
+      body: Nobody decided your correction request in time, so it has expired. Submit it again if the correction is still needed.
+    te:
+      title: సవరణ అభ్యర్థన గడువు ముగిసింది
+      body: మీ సవరణ అభ్యర్థనపై సమయానికి ఎవరూ నిర్ణయం తీసుకోలేదు, కాబట్టి దాని గడువు ముగిసింది. సవరణ ఇంకా అవసరమైతే మళ్లీ సమర్పించండి.
+
   dq.run.completed:
     params: [run_id, blockers, warnings]
     resource_type: dq_run

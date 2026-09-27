@@ -15,6 +15,7 @@ from celery.schedules import crontab
 from kombu import Queue
 
 from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
+from app.changes.tasks import beat_schedule as changes_beat_schedule
 from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
@@ -38,6 +39,7 @@ TASK_MODULES: list[str] = [
     "app.breakglass.tasks",
     "app.platform.tasks",
     "app.documents.tasks",
+    "app.changes.tasks",
 ]
 
 
@@ -83,6 +85,8 @@ def create_celery() -> Celery:
             **breakglass_beat_schedule(),
             # FR-DOC-007: purge expired upload intents and staging objects.
             **documents_beat_schedule(),
+            # FR-CR-004: pending change requests expire after 30 days (daily).
+            **changes_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

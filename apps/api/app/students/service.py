@@ -860,6 +860,27 @@ def record_verified_identity_value(
     )
 
 
+def validate_identity_value(
+    session: Session,
+    attribute_key: str,
+    source: str,
+    value: str,
+    *,
+    field_name: str = "value",
+) -> tuple[AttributeDef, CleanValue]:
+    """Validate a proposed value of an IDENTITY attribute without recording it (read-only).
+
+    For ``app.changes.service`` before it stores a change request (FR-CR-001): the same rules as
+    :func:`record_verified_identity_value` will apply on approval (source allowed, format,
+    dates, full-Aadhaar rejection). 422 ``unknown_attribute`` / ``not_identity_attribute`` on
+    ``attribute_key``.
+    """
+    definition = _definition_for(_definitions(session), attribute_key, "attribute_key")
+    if not definition.is_identity:
+        raise ValidationFailed([error("attribute_key", "not_identity_attribute")])
+    return definition, validate_value(definition, source, value, field_name=field_name)
+
+
 def verify_value(
     session: Session,
     ctx: UserContext,

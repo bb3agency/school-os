@@ -17,7 +17,7 @@
 # import-linter fails on modules that do not exist, so only modules that exist today are
 # listed. When a new module lands, add it to every `source_modules` list below and add its
 # own "<module>-internals" contract. Future modules (CLAUDE.md §4):
-#   imports, changes, knowledge, exports, admin
+#   imports, knowledge, exports, admin
 # Note for knowledge: also forbid app.knowledge.gateway internals once it exists, and keep
 # the semgrep rule `sos-llm-sdk-outside-gateway` for third-party SDK imports.
 
@@ -45,6 +45,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.changes
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -67,6 +68,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.changes
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -89,6 +91,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.changes
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -114,6 +117,7 @@ forbidden_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.changes
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
@@ -130,6 +134,7 @@ source_modules =
     app.students
     app.documents
     app.notifications
+    app.changes
 forbidden_modules =
     app.platform
 
@@ -150,6 +155,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.changes
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -168,6 +174,7 @@ source_modules =
     app.platform
     app.ops
     app.devtools
+    app.changes
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -187,6 +194,7 @@ source_modules =
     app.ops
     app.devtools
     app.dq
+    app.changes
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -207,6 +215,7 @@ source_modules =
     app.devtools
     app.dq
     app.students
+    app.changes
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -229,6 +238,7 @@ source_modules =
     app.students
     app.documents
     app.breakglass
+    app.changes
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -251,6 +261,7 @@ source_modules =
     app.students
     app.documents
     app.notifications
+    app.changes
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -275,3 +286,26 @@ forbidden_modules =
     app.tenancy
     app.platform
     app.ops
+
+[importlinter:contract:changes-internals]
+name = changes: repository/models are private (use app.changes.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+forbidden_modules =
+    app.changes.repository
+    app.changes.models
+allow_indirect_imports = True

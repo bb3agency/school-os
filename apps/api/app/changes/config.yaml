@@ -1,0 +1,12 @@
+# Change-request settings (FR-CR-004, ADR-0010; CLAUDE.md §6.13: thresholds live in config).
+# Shipped inside the package (the API image does not copy /config). Per-school overrides are a
+# later tenant setting; until then every school uses these defaults.
+version: 1
+
+# Pending requests expire this many days after submission (FR-CR-004: 30, configurable).
+expiry_days: 30
+
+# Minimum and maximum length of the reason (submit) and the decision note (approve/reject). The
+# same bounds are CHECK constraints in migration 0014_change_requests.
+text_min_length: 10
+text_max_length: 1000
