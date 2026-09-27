@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.4 · 2026-09-27 |
+| Version | 0.5 · 2026-09-27 |
 | Cloud | AWS ap-south-1 (Mumbai) primary · ap-south-2 (Hyderabad) backups/DR |
 | Tooling | Terraform · Docker · GitHub Actions · OpenTelemetry |
 | Related | 04-Architecture §11, §16–17, 07-Security §13–14, 11-Operations, 16-Platform admin panel §12–13, ADR-0014, ADR-0015, ADR-0018 |
-| Changes | 0.4: edge access logs keep full URLs, so no personal data in query strings; Caddy and WAF log redaction (§4, §15.2; SEC-008). 0.3: Terraform module and root list as built (§5); CI jobs as in `ci.yml` (§7); migrate + partition step (§9); local stack, make targets and every `SOS_*` setting from `config.py` (§11). 0.2: dedicated tier (§15: Terraform module `dedicated_host`, `deploy/dedicated/compose.yaml`, Caddy TLS, WAL-G/`pg_dump` backups to ap-south-2, hardening, patching, fleet upgrades); local compose with SeaweedFS, Valkey, `migrate`, `beat`, OIDC stub and `infra/db/bootstrap.sql` (§11); Valkey and two Cognito pools (§4–5, ADR-0018); fleet step in CD (§8). 0.1: baseline |
+| Changes | 0.5: §11 lists the documents, malware-scan, SSE-KMS, presign and extraction settings (a test now checks every setting is listed). 0.4: edge access logs keep full URLs, so no personal data in query strings; Caddy and WAF log redaction (§4, §15.2; SEC-008). 0.3: Terraform module and root list as built (§5); CI jobs as in `ci.yml` (§7); migrate + partition step (§9); local stack, make targets and every `SOS_*` setting from `config.py` (§11). 0.2: dedicated tier (§15: Terraform module `dedicated_host`, `deploy/dedicated/compose.yaml`, Caddy TLS, WAL-G/`pg_dump` backups to ap-south-2, hardening, patching, fleet upgrades); local compose with SeaweedFS, Valkey, `migrate`, `beat`, OIDC stub and `infra/db/bootstrap.sql` (§11); Valkey and two Cognito pools (§4–5, ADR-0018); fleet step in CD (§8). 0.1: baseline |
 
 ---
 
@@ -224,6 +224,15 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_DB_STATEMENT_TIMEOUT_MS`, `SOS_WORKER_STATEMENT_TIMEOUT_MS` | 5000, 120000 | Transaction-local statement timeouts (requests; long worker jobs) |
 | `SOS_REDIS_URL` | `redis://localhost:6379/0` | Valkey |
 | `SOS_S3_ENDPOINT_URL`, `SOS_S3_BUCKET_FILES`, `SOS_S3_BUCKET_AUDIT` | none, `sos-local-files`, `sos-local-audit-archive` | Object storage (endpoint only for SeaweedFS) |
+| `SOS_S3_PRESIGN_ENDPOINT_URL` | none | Endpoint used only to sign browser-facing presigned URLs (locally `http://localhost:8333`); unset in staging/prod |
+| `SOS_S3_KMS_KEY_ID` | none | KMS key for SSE-KMS on uploaded files (FR-DOC-003); unset locally (SeaweedFS) |
+| `SOS_DOCUMENTS_MAX_UPLOAD_BYTES`, `SOS_DOCUMENTS_IMPORT_MAX_UPLOAD_BYTES` | 25 MiB, 10 MiB (at most 100 MiB) | Largest document / spreadsheet import upload (FR-DOC-001, SEC-016) |
+| `SOS_DOCUMENTS_UPLOAD_URL_TTL_S`, `SOS_DOCUMENTS_DOWNLOAD_URL_TTL_S` | 600, 300 (at most 600, 300) | Presigned POST and GET lifetimes (FR-DOC-004) |
+| `SOS_DOCUMENTS_ALLOWED_KINDS`, `SOS_DOCUMENTS_IMPORT_ALLOWED_KINDS` | `pdf,jpg,png,docx,xlsx`, `xlsx,csv` | File kinds accepted by content sniffing (never by extension) |
+| `SOS_AV_SCANNER` | `dev-noop` | `clamav` or `dev-noop`; a `dev-noop` scan refuses to run in staging/prod (FR-DOC-002) |
+| `SOS_CLAMAV_HOST`, `SOS_CLAMAV_PORT`, `SOS_CLAMAV_TIMEOUT_S` | `localhost`, 3310, 30 | clamd connection when `SOS_AV_SCANNER=clamav` |
+| `SOS_EXTRACTION_PROVIDER` | unset: `fake` in local/ci, `not-configured` in staging/prod | Register-photo extraction provider (FR-IMP-024); `fake` refuses to run in staging/prod |
+| `SOS_EXTRACTION_LOW_CONFIDENCE_THRESHOLD` | 0.8 | Fields read below this confidence are highlighted for the reviewer (US-402 AC4) |
 | `AWS_REGION` (no prefix) | `ap-south-1` | AWS SDK region |
 | `SOS_OIDC_ISSUER`, `SOS_OIDC_AUDIENCE` | local stub `/schoolos`, `schoolos-web` | Staff tokens (Cognito: audience = app client ID) |
 | `SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE` | local stub `/platform`, `schoolos-platform` | Operator tokens |
@@ -242,7 +251,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 
 Deployments use exactly these names: Terraform `shared_platform` (§5) and `deploy/dedicated/compose.yaml` (§15.2) give every app container (api, worker, beat, migrate) the full set it needs, and `apps/api/tests/deploy/test_env_contract.py` enforces it. Names that reach app containers without being settings are allowlisted there with the reader: `AWS_DEFAULT_REGION` (AWS SDK), `SOS_HOST_STATE_DIR` (dedicated host state mount), `SOS_ANTHROPIC_API_KEY` and `SOS_EMBEDDINGS_API_KEY` (until the knowledge gateway adds its settings, M2).
 
-Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
+Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test), `SOS_WEB_TEST_LOGS` (print the web app's JSON logs during vitest). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
 
 **Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`.
 

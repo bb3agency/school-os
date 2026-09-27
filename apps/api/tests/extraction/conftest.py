@@ -1,5 +1,5 @@
-"""Fixtures for extraction tests: the synthetic world, shared students, in-memory S3 and the
-proposed notification templates (see support.py). Synthetic data only."""
+"""Fixtures for extraction tests: the synthetic world, shared students, in-memory S3 and a
+check that the notification templates ship (see support.py). Synthetic data only."""
 
 from __future__ import annotations
 

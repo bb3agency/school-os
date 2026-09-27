@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -72,3 +75,17 @@ def test_FR_PLT_016_dedicated_hosts_do_not_need_a_supplier_identity() -> None:
         billing_supplier_legal_name=DEV_SUPPLIER_NAME,
     )
     assert s.deployment_mode is DeploymentMode.DEDICATED
+
+
+def test_every_setting_is_documented_in_docs_10_section_11() -> None:
+    """CLAUDE.md §4/§5: every SOS_* setting and its default is listed in docs/10 §11."""
+    docs = (
+        Path(__file__).resolve().parents[4] / "docs" / "10-infrastructure-and-devops.md"
+    ).read_text("utf-8")
+    section = docs[docs.index("## 11. Local development") : docs.index("## 12.")]
+    documented = set(re.findall(r"`([A-Z][A-Z0-9_]+)`", section))
+    names = set()
+    for field_name, field in Settings.model_fields.items():
+        alias = field.validation_alias
+        names.add(alias if isinstance(alias, str) else f"SOS_{field_name.upper()}")
+    assert sorted(names - documented) == []

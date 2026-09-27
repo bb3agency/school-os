@@ -67,7 +67,7 @@ export function buildContentSecurityPolicy(options: CspOptions): string {
     `img-src 'self' data: blob:${filesOrigin ? ` ${filesOrigin}` : ""}`,
     // Files origin (only when configured, https origin only, as for img-src): the browser
     // posts uploads straight to the presigned storage URL (docs/07 §10: presigned POST; the
-    // BFF never carries file bodies). Lead decision 2026-09-27; docs/07 §11 to be updated.
+    // BFF never carries file bodies). Lead decision 2026-09-27, recorded in docs/07 §11.
     // `next dev` uses a websocket for hot reload.
     `connect-src 'self'${filesOrigin ? ` ${filesOrigin}` : ""}${isDev ? " ws: wss:" : ""}`,
     "font-src 'self'",

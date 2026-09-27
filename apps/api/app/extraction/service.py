@@ -166,8 +166,9 @@ def _item_not_found() -> NotFound:
 def _notify(
     session: Session, batch: ExtractionBatch, template_key: str, params: Mapping[str, Any]
 ) -> None:
-    """Tell the person who started the batch (FR-NOT-001). Best effort: a missing template
-    (notifications owns templates.yaml) must not lose the extraction result."""
+    """Tell the person who started the batch (FR-NOT-001). Both templates ship in
+    app/notifications/templates.yaml (tests/notifications/test_templates.py checks every key
+    the code sends). Still best effort: a template error must not lose the extraction result."""
     try:
         notifications.notify(
             session,

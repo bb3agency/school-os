@@ -1182,6 +1182,9 @@ def withhold_version(
 
     The stored object is kept. For a file that must not be kept at all (PRV-016: a page that
     showed a full Aadhaar number) use :func:`discard_version` or :func:`replace_with_redacted`.
+
+    No production caller since PRV-016 (extraction now redacts or discards the page instead);
+    kept as a public documents primitive for withholding a version without deleting its file.
     """
     if reason_code not in WITHHOLD_REASONS:
         raise ValueError(f"unknown withhold reason: {reason_code}")
