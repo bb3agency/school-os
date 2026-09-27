@@ -315,6 +315,24 @@ def _b_dq_run(w: Any) -> uuid.UUID:
     return run_id
 
 
+def _b_export(w: Any) -> uuid.UUID:
+    """A ready export of school B (a student list of its owner; tests/exports/objects.py)."""
+    name = "sos_test_exports_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "exports" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    if "bola_export" not in w.b.ids:
+        SW.ensure_students(w)
+        w.b.ids["bola_export"] = sys.modules[name].ready_export(w.b, "owner")
+    value: uuid.UUID = w.b.ids["bola_export"]
+    return value
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -339,6 +357,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # Register-photo extraction (US-402): a batch / a pending row of school B.
     "batch_id": lambda w: _b_extraction(w)[0],
     "item_id": lambda w: _b_extraction(w)[1],
+    # Exports (US-501 AC4, US-901): a ready export of school B.
+    "export_id": _b_export,
 }
 
 

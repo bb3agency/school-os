@@ -391,6 +391,60 @@ def _x_reject(w: Any, r: str, a: Engine) -> Request:
     return f"/api/v1/extraction-items/{item}/reject", {"reason": "other"}, {}
 
 
+# --- exports (US-501 AC4, US-901, FR-EXP-*): export.board/portal, student.export (step-up) ------
+
+
+def _ex() -> ModuleType:
+    """tests/exports/objects.py (exports through the real services; fake PDF renderer)."""
+    name = "sos_test_exports_objects"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "exports" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+_EXPORT_PERMISSIONS = ("export.board", "export.portal", "student.export")
+
+
+def _exporter(role: str) -> bool:
+    held = system_roles()[role].permission_keys
+    return any(p in held for p in _EXPORT_PERMISSIONS)
+
+
+def _export_id(w: Any, role: str, *, ready: bool) -> uuid.UUID:
+    """The role's own export in school A (exports are visible only to their requester); a
+    random id for roles without export permissions (they stop at 403 first)."""
+    if not _exporter(role):
+        return uuid.uuid4()
+    SW.ensure_students(w)
+    ex = _ex()
+    value: uuid.UUID = (ex.ready_export if ready else ex.queued_export)(w.a, role)
+    return value
+
+
+def _precheck_body(w: Any) -> dict[str, Any]:
+    SW.ensure_students(w)
+    return {
+        "profile_key": "cisce-registration-2026",
+        "scope": {"section_ids": [str(w.a.ids["section_9a"])]},
+        "format": ["xlsx"],
+    }
+
+
+def _list_body(w: Any) -> dict[str, Any]:
+    SW.ensure_students(w)
+    return {
+        "columns": ["admission_no", "full_name"],
+        "scope": {"section_ids": [str(w.a.ids["section_9a"])]},
+        "format": "csv",
+    }
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -748,6 +802,25 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("POST", "/api/v1/extraction-items/{item_id}/confirm"): _x_confirm,
     ("POST", "/api/v1/extraction-items/{item_id}/reject"): _x_reject,
+    # Exports (app/exports/api.py; docs/09 Exports).
+    ("GET", "/api/v1/export-profiles"): lambda w, r, a: ("/api/v1/export-profiles", None, {}),
+    ("POST", "/api/v1/exports"): lambda w, r, a: ("/api/v1/exports", _precheck_body(w), {}),
+    ("POST", "/api/v1/exports/student-list"): lambda w, r, a: (
+        "/api/v1/exports/student-list",
+        _list_body(w),
+        {},
+    ),
+    ("GET", "/api/v1/exports"): lambda w, r, a: ("/api/v1/exports", None, {}),
+    ("GET", "/api/v1/exports/{export_id}"): lambda w, r, a: (
+        f"/api/v1/exports/{_export_id(w, r, ready=False)}",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/exports/{export_id}/download-url"): lambda w, r, a: (
+        f"/api/v1/exports/{_export_id(w, r, ready=True)}/download-url",
+        None,
+        {},
+    ),
 }
 
 
@@ -846,6 +919,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/imports/{import_id}/commit",
         "/api/v1/dq/runs",
         "/api/v1/extraction-batches",
+        "/api/v1/exports",
+        "/api/v1/exports/student-list",
     }
     if method == "POST" and path in accepted:
         return 202

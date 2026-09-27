@@ -20,6 +20,8 @@ REQUIRED = {
     "breakglass.approved",
     "breakglass.expired",
     "announcement.new",
+    "export.ready",
+    "export.failed",
 }
 NUMERIC = {
     "blockers",
@@ -29,6 +31,7 @@ NUMERIC = {
     "rows",
     "minutes",
     "low_confidence_rows",
+    "students",
 }
 
 

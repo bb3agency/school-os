@@ -804,6 +804,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/export-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Export Profiles
+         * @description Board and portal pre-check profiles (e.g. ``cisce-registration-2026``, ``udise-plus``)
+         *     with their field order for the "ready to enter" sheet (permission ``export.board`` or
+         *     ``export.portal``). ``allowed`` says whether you can run each one.
+         */
+        get: operations["list_export_profiles_api_v1_export_profiles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Exports
+         * @description Your own exports, newest first (any export permission).
+         */
+        get: operations["list_exports_api_v1_exports_get"];
+        put?: never;
+        /**
+         * Create Precheck Export
+         * @description Make a pre-check report for a board or portal profile (``export.board`` for board
+         *     profiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and
+         *     ``dq.findings.read``). Choose sections or classes (empty = every student you can see), the
+         *     formats (``xlsx``, ``pdf``) and the language (``en``, ``te``). The students are checked again
+         *     and the files are made in the background (202); you are notified when they are ready.
+         *     Restricted values are hidden unless ``include_sensitive`` is true (needs
+         *     ``student.read_sensitive`` and a recent sign-in, 428 ``step_up_required``). Errors: 422
+         *     ``unknown_profile``, ``no_students``, ``too_many_students``. Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_precheck_export_api_v1_exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{export_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Export
+         * @description One of your exports: status (``queued``, ``running``, ``ready``, ``failed``,
+         *     ``expired``), files and when they are deleted.
+         */
+        get: operations["get_export_api_v1_exports__export_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{export_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Export Download Url
+         * @description A download link for one file of your ready export, valid at most 5 minutes (the first
+         *     format unless ``format`` is given). Student lists and exports with restricted values need a
+         *     recent sign-in with MFA (428). Errors: 409 ``export_not_ready``, ``export_failed``,
+         *     ``export_expired``. Every download is recorded in the audit log.
+         */
+        get: operations["get_export_download_url_api_v1_exports__export_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/student-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Student List Export
+         * @description Export a student list with the columns you choose as CSV or XLSX (permission
+         *     ``student.export``, recent sign-in with MFA). Columns are attribute keys (``GET
+         *     /attributes``) or ``class``, ``section``, ``roll_no``; restricted (C3) columns need
+         *     ``student.read_sensitive`` (403 ``sensitive_not_allowed``) and the Aadhaar-as-printed fields
+         *     are never exported (422 ``column_not_exportable``). Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_student_list_export_api_v1_exports_student_list_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/extraction-batches": {
         parameters: {
             query?: never;
@@ -4058,6 +4179,130 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ExportDownloadOut */
+        ExportDownloadOut: {
+            /** Content Type */
+            content_type: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "xlsx" | "pdf" | "csv";
+            /** Url */
+            url: string;
+        };
+        /** ExportFileOut */
+        ExportFileOut: {
+            /** Content Type */
+            content_type: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "xlsx" | "pdf" | "csv";
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** ExportOut */
+        ExportOut: {
+            /** Columns */
+            columns: string[] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Files */
+            files: components["schemas"]["ExportFileOut"][];
+            /** Finished At */
+            finished_at: string | null;
+            /** Formats */
+            formats: ("xlsx" | "pdf" | "csv")[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Include Sensitive */
+            include_sensitive: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "board_precheck" | "portal_precheck" | "student_list";
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te";
+            /** Layout Version */
+            layout_version: number;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Profile Version */
+            profile_version: number | null;
+            /** Scope */
+            scope: {
+                [key: string]: string[];
+            };
+            /** Started At */
+            started_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "ready" | "failed" | "expired";
+            /** Student Count */
+            student_count: number;
+        };
+        /** ExportProfileOut */
+        ExportProfileOut: {
+            /** Allowed */
+            allowed: boolean;
+            /** Fields */
+            fields: string[];
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "board" | "portal";
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Layout Version */
+            layout_version: number;
+            /** Permission */
+            permission: string;
+            /** Required Fields */
+            required_fields: string[];
+            /** Version */
+            version: number;
+        };
+        /**
+         * ExportScopeIn
+         * @description Sections or classes of the current academic year (at most one of the two); empty = every
+         *     student you can see.
+         */
+        ExportScopeIn: {
+            /** Class Ids */
+            class_ids?: string[] | null;
+            /** Section Ids */
+            section_ids?: string[] | null;
+        };
         /** ExtendTrialIn */
         ExtendTrialIn: {
             /**
@@ -5102,6 +5347,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[ExportOut] */
+        Page_ExportOut_: {
+            /** Data */
+            data: components["schemas"]["ExportOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[FindingOut] */
         Page_FindingOut_: {
             /** Data */
@@ -5519,6 +5771,34 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * PrecheckCreate
+         * @description US-501 AC4: a board or portal pre-check report.
+         */
+        PrecheckCreate: {
+            /**
+             * Format
+             * @default [
+             *       "xlsx",
+             *       "pdf"
+             *     ]
+             */
+            format: ("xlsx" | "pdf")[];
+            /**
+             * Include Sensitive
+             * @default false
+             */
+            include_sensitive: boolean;
+            /**
+             * Language
+             * @default en
+             * @enum {string}
+             */
+            language: "en" | "te";
+            /** Profile Key */
+            profile_key: string;
+            scope?: components["schemas"]["ExportScopeIn"];
         };
         /** PriceOverrideIn */
         PriceOverrideIn: {
@@ -5945,6 +6225,27 @@ export interface components {
             status: "provisional" | "active" | "left" | "graduated";
             /** Values */
             values: components["schemas"]["ValueIn"][];
+        };
+        /**
+         * StudentListCreate
+         * @description A student list with chosen columns (``student.export``, step-up).
+         */
+        StudentListCreate: {
+            /** Columns */
+            columns: string[];
+            /**
+             * Format
+             * @default xlsx
+             * @enum {string}
+             */
+            format: "csv" | "xlsx";
+            /**
+             * Language
+             * @default en
+             * @enum {string}
+             */
+            language: "en" | "te";
+            scope?: components["schemas"]["ExportScopeIn"];
         };
         /** StudentMatch */
         StudentMatch: {
@@ -8194,6 +8495,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_export_profiles_api_v1_export_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportProfileOut"][];
+                };
+            };
+        };
+    };
+    list_exports_api_v1_exports_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ExportOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_precheck_export_api_v1_exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrecheckCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_api_v1_exports__export_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_download_url_api_v1_exports__export_id__download_url_get: {
+        parameters: {
+            query?: {
+                format?: ("xlsx" | "pdf" | "csv") | null;
+            };
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportDownloadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_student_list_export_api_v1_exports_student_list_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentListCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
                 };
             };
             /** @description Validation Error */

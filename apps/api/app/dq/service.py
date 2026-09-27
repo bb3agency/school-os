@@ -806,6 +806,33 @@ def findings_for_student(
     return _render(session, rows, reach)
 
 
+def findings_for_students(
+    session: Session,
+    ctx: UserContext,
+    student_ids: Collection[uuid.UUID],
+    *,
+    profile_key: str | None = None,
+    limit: int = 20_000,
+) -> list[FindingOut]:
+    """Unresolved findings (``open``, ``reopened``) of ``student_ids``, most severe first, for
+    pre-check exports (US-501 AC4). ``profile_key`` keeps the base rules plus that profile's.
+    Students outside the caller's reach are silently left out (the caller asked for a list, not
+    for one object); at most ``limit`` findings are returned."""
+    _check_profile(profile_key)
+    reach = _reach(session, ctx)
+    wanted = frozenset(student_ids)
+    ids = wanted if reach is None else wanted & reach
+    if not ids:
+        return []
+    rows = repo.list_findings(
+        session,
+        repo.FindingFilter(student_ids=ids, statuses=ACTIVE_STATUSES, profile_key=profile_key),
+        offset=0,
+        limit=max(1, min(limit, 100_000)),
+    )
+    return _render(session, rows, reach)
+
+
 # --- findings: workflow ---------------------------------------------------------------------------
 
 
@@ -1051,6 +1078,7 @@ __all__ = [
     "WAIVE",
     "execute_queued_run",
     "findings_for_student",
+    "findings_for_students",
     "get_finding",
     "get_run",
     "link_change_request",
