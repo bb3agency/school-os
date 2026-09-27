@@ -138,10 +138,27 @@ def test_BR_01_identity_register_value_needs_a_change_request(world: Any, fresh:
         )
 
 
+def _evidence_document(admin: Engine, tenant_id: uuid.UUID, created_by: uuid.UUID) -> uuid.UUID:
+    """A synthetic evidence document row (the value's evidence FK points at kb.documents)."""
+    doc_id = uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, sensitivity, "
+                "created_by) VALUES (:d, :t, 'evidence', 'evidence', 'Synthetic evidence', 'C3', :u)"
+            ),
+            {"d": doc_id, "t": tenant_id, "u": created_by},
+        )
+    return doc_id
+
+
 def test_BR_01_approved_change_request_records_a_verified_value(
     world: Any, fresh: uuid.UUID, admin_engine: Engine
 ) -> None:
-    cr, evidence = uuid.uuid4(), uuid.uuid4()
+    cr = uuid.uuid4()
+    evidence = _evidence_document(
+        admin_engine, world.a.tenant_id, world.a.people["principal"].user_id
+    )
     approver = SW.ctx_for(world.a.tenant_id, world.a.people["principal"], "principal")
     out = run(
         world,

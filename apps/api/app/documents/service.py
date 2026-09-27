@@ -1,0 +1,1208 @@
+"""Documents public API: uploads, registration, versions, ACLs, downloads, scanning.
+
+Other modules call only these functions (CLAUDE.md §4). Routes in ``documents.api`` wrap them
+with ``require(...)``; the permission assumed is stated per function. Mutations audit in the
+caller's transaction (CLAUDE.md §6.7) and hand follow-up work to workers through the
+transactional outbox (``ops.enqueue_event``), so a scan is queued if and only if the document
+row commits.
+
+Upload flow (docs/04 §8.2, docs/07 §10, SEC-016)::
+
+    create_upload()  -> kb.upload_intents row + presigned POST (exact staging key
+                        t/<tenant>/uploads/<intent>/..., Content-Type, size)
+    browser          -> POST file straight to S3
+    register_document() / add_version()
+                     -> intent checks (same user, unused, unexpired) -> HEAD (size) ->
+                        one GET: magic bytes / text sniffing, SHA-256, ETag -> dedupe ->
+                        copy to the final key only if the ETag is unchanged -> document +
+                        version (queued) + ACL -> audit -> outbox "scan"
+    worker           -> scan_version(): AV scan -> ready | quarantined (+ audit)
+
+Visibility (docs/05 §6, fail closed): holders of ``document.manage_acl`` see every document;
+other ``document.read`` holders see a document when an ACL entry matches their role,
+membership, section or class; a document with an EMPTY ACL is visible only to school-wide
+readers. Out-of-scope documents answer 404 (never reveal existence).
+
+Requirements: FR-DOC-001..006, FR-DOC-008 (status tracking), SEC-016, FR-DOC-007 (storage part).
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import uuid
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any, Final
+
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session
+
+from app.audit import service as audit
+from app.authz.context import ScopeGrant, UserContext
+from app.core.config import Settings, get_settings
+from app.core.db import tenant_session
+from app.core.errors import (
+    Conflict,
+    DomainError,
+    Forbidden,
+    NotFound,
+    PreconditionFailed,
+    ValidationFailed,
+)
+from app.core.ids import new_id
+from app.core.logging import get_context, get_logger
+from app.documents import filetypes
+from app.documents import repository as repo
+from app.documents.filetypes import FileKind
+from app.documents.models import Document, DocumentAcl, DocumentVersion, UploadIntent
+from app.documents.scanning import AvScanner, ScanResult, Verdict, build_scanner
+from app.documents.schemas import (
+    AclEntry,
+    AclEntryOut,
+    DocumentCreate,
+    DocumentDetail,
+    DocumentOut,
+    DownloadUrlOut,
+    UploadCreate,
+    UploadOut,
+    VersionCreate,
+    VersionOut,
+)
+from app.documents.storage import (
+    ObjectChanged,
+    ObjectStore,
+    ObjectStoreError,
+    derived_key,
+    document_key,
+    document_prefix,
+    get_object_store,
+    import_key,
+    key_in_tenant,
+    tenant_prefix,
+    upload_key,
+)
+from app.identity import service as identity
+from app.ops import service as ops
+from app.tenancy import service as tenancy
+
+log = get_logger(__name__)
+
+UPLOAD: Final = "document.upload"
+READ: Final = "document.read"
+MANAGE: Final = "document.manage_acl"
+
+SCAN_EVENT: Final = "document.version.registered"
+DELETED_EVENT: Final = "document.deleted"
+SCAN_TASK: Final = "documents.scan"
+PURGE_TASK: Final = "documents.purge_objects"
+ops.register_outbox_route(SCAN_EVENT, SCAN_TASK)
+ops.register_outbox_route(DELETED_EVENT, PURGE_TASK)
+
+# An intent can be registered for a while after its presigned POST expired (slow uploads).
+INTENT_GRACE: Final = dt.timedelta(minutes=30)
+UNUSABLE_STATUSES: Final = ("quarantined", "failed")
+SENSITIVITY_ORDER: Final = {"C1": 1, "C2": 2, "C3": 3}
+
+
+# --- errors ---------------------------------------------------------------------------------
+
+
+class UnsupportedFileType(DomainError):
+    status, code, title = 415, "unsupported_file_type", "This type of file is not accepted"
+
+
+class FileTooLarge(DomainError):
+    status, code, title = 413, "file_too_large", "The file is too large"
+
+
+# --- extension hooks (M2 ingestion, notifications, retention) --------------------------------
+
+VersionHook = Callable[[Session, uuid.UUID, uuid.UUID], None]
+"""``hook(session, document_id, version_id)`` in the worker's tenant transaction."""
+
+QUARANTINE_HOOKS: list[VersionHook] = []
+"""Called when a version is quarantined (notifications: tell the uploader/office admin)."""
+
+READY_HOOKS: list[VersionHook] = []
+"""Called when a version becomes ``ready`` (M2: text extraction, chunking, embeddings)."""
+
+DeleteGuard = Callable[[Session, uuid.UUID], str | None]
+"""``guard(session, document_id)`` returns an error code to refuse deletion (retention)."""
+
+DELETE_GUARDS: list[DeleteGuard] = []
+
+AclChangedHook = Callable[[Session, uuid.UUID], None]
+ACL_CHANGED_HOOKS: list[AclChangedHook] = []
+"""M2: rewrite ``acl_*`` arrays on the document's chunks (docs/05 §6)."""
+
+
+# --- purpose rules --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class PurposeRule:
+    kinds: tuple[str, ...]
+    max_bytes: int
+    doc_types: tuple[str, ...]
+    default_doc_type: str
+    min_sensitivity: str
+    versionable: bool = True
+
+
+_GENERAL_DOC_TYPES: Final = (
+    "circular",
+    "policy",
+    "minutes",
+    "certificate",
+    "letter",
+    "form",
+    "report",
+    "other",
+)
+
+
+def purpose_rule(purpose: str, settings: Settings | None = None) -> PurposeRule:
+    s = settings or get_settings()
+    allowed = tuple(k for k in s.documents_allowed_kinds if k in filetypes.KINDS)
+    scans = tuple(k for k in ("pdf", "jpg", "png") if k in allowed)
+    if purpose == "evidence":
+        return PurposeRule(
+            scans,
+            s.documents_max_upload_bytes,
+            ("evidence", "certificate", "letter", "form", "other"),
+            "evidence",
+            "C3",  # identity evidence scans are C3 (docs/05 §8)
+        )
+    if purpose == "register_scan":
+        return PurposeRule(
+            scans, s.documents_max_upload_bytes, ("register_scan",), "register_scan", "C2"
+        )
+    if purpose == "import_file":
+        kinds = tuple(k for k in s.documents_import_allowed_kinds if k in ("xlsx", "csv"))
+        return PurposeRule(
+            kinds,
+            s.documents_import_max_upload_bytes,
+            ("import_file",),
+            "import_file",
+            "C2",
+            versionable=False,
+        )
+    if purpose in ("circular", "policy", "other"):
+        default = purpose if purpose != "other" else "other"
+        return PurposeRule(allowed, s.documents_max_upload_bytes, _GENERAL_DOC_TYPES, default, "C1")
+    raise ValueError(f"unknown purpose {purpose!r}")
+
+
+# --- helpers --------------------------------------------------------------------------------
+
+
+def _now() -> dt.datetime:
+    return dt.datetime.now(dt.UTC)
+
+
+def _request_id() -> str | None:
+    value = get_context().get("request_id")
+    return value if isinstance(value, str) else None
+
+
+def _audit(
+    session: Session,
+    action: str,
+    document_id: uuid.UUID,
+    summary: dict[str, Any],
+    *,
+    system: bool = False,
+) -> None:
+    audit.record(
+        session,
+        action=action,
+        resource_type="document",
+        resource_id=document_id,
+        summary=summary,
+        actor_type="system" if system else "user",
+        request_id=_request_id(),
+    )
+
+
+@contextmanager
+def _db_errors() -> Iterator[None]:
+    try:
+        yield
+    except DBAPIError as exc:
+        mapped = repo.translate_db_error(exc)
+        if mapped is None:
+            raise
+        raise mapped from exc
+
+
+def _error(field: str, code: str) -> dict[str, str]:
+    return {"field": field, "code": code, "message_key": f"errors.{code}"}
+
+
+def _invalid(field: str, code: str) -> ValidationFailed:
+    return ValidationFailed([_error(field, code)])
+
+
+def _not_found() -> NotFound:
+    return NotFound("Document not found")
+
+
+def _visibility(session: Session, ctx: UserContext) -> repo.Visibility:
+    everything = ctx.has(MANAGE) and ctx.scope_for(MANAGE).school_wide
+    read = ctx.has(READ)
+    grant = ctx.scope_for(READ)
+    sections: set[str] = set()
+    classes: set[str] = set()
+    if read and not grant.school_wide:
+        sections, classes = _reach(session, grant)
+    return repo.Visibility(
+        everything=everything,
+        read=read,
+        school_wide=read and grant.school_wide,
+        roles=frozenset(ctx.roles),
+        membership_ref=str(ctx.membership_id),
+        section_refs=frozenset(sections),
+        class_refs=frozenset(classes),
+    )
+
+
+def _reach(session: Session, grant: ScopeGrant) -> tuple[set[str], set[str]]:
+    """Sections and classes a scoped grant reaches (class scope covers its sections; a section
+    scope makes its class match class-level ACL entries)."""
+    all_sections = tenancy.list_sections(session)
+    sections = {
+        str(s.id)
+        for s in all_sections
+        if s.id in grant.section_ids or s.class_id in grant.class_ids
+    }
+    classes = {str(c) for c in grant.class_ids} | {
+        str(s.class_id) for s in all_sections if s.id in grant.section_ids
+    }
+    return sections, classes
+
+
+def _version_out(v: DocumentVersion) -> VersionOut:
+    return VersionOut(
+        id=v.id,
+        version_no=v.version_no,
+        mime_type=v.mime_type,
+        size_bytes=v.size_bytes,
+        status=v.status,
+        error=v.error,
+        created_at=v.created_at,
+    )
+
+
+def _document_out(
+    doc: Document,
+    versions: Sequence[DocumentVersion],
+    acl: Sequence[DocumentAcl],
+    *,
+    detail: bool = False,
+) -> DocumentOut:
+    current = next((v for v in versions if v.id == doc.current_version_id), None)
+    data: dict[str, Any] = {
+        "id": doc.id,
+        "purpose": doc.purpose,
+        "doc_type": doc.doc_type,
+        "title": doc.title,
+        "issuer": doc.issuer,
+        "issued_on": doc.issued_on,
+        "academic_year_id": doc.academic_year_id,
+        "language": doc.language,
+        "sensitivity": doc.sensitivity,
+        "status": doc.status,
+        "current_version": _version_out(current) if current else None,
+        "acl": [
+            AclEntryOut(principal_type=a.principal_type, principal_ref=a.principal_ref) for a in acl
+        ],
+        "created_by": doc.created_by,
+        "created_at": doc.created_at,
+        "updated_at": doc.updated_at,
+        "version": doc.version,
+    }
+    if detail:
+        return DocumentDetail(**data, versions=[_version_out(v) for v in versions])
+    return DocumentOut(**data)
+
+
+def _load_out(session: Session, doc: Document, *, detail: bool = False) -> DocumentOut:
+    versions = repo.versions_of(session, [doc.id])
+    acl = repo.acl_of(session, [doc.id])[doc.id]
+    return _document_out(doc, versions, acl, detail=detail)
+
+
+# --- ACL validation -------------------------------------------------------------------------
+
+
+def _parse_uuid(value: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
+
+
+def _known_refs(session: Session, principal_type: str) -> set[str]:
+    """Valid references of one principal type in the current school (normalised strings)."""
+    if principal_type == "role":
+        return {r.key for r in identity.list_roles(session)}
+    if principal_type == "section":
+        return {str(s.id) for s in tenancy.list_sections(session)}
+    if principal_type == "class":
+        return {str(c.id) for c in tenancy.list_classes(session)}
+    users, _ = identity.list_users(session, limit=100_000)
+    return {str(u.membership_id) for u in users}
+
+
+def validate_acl(
+    session: Session, entries: Sequence[AclEntry], *, upload_grant: ScopeGrant | None = None
+) -> list[tuple[str, str]]:
+    """Check every polymorphic reference inside this tenant (docs/05 §3.5) and, for scoped
+    uploaders, that the ACL stays within their sections/classes. Returns normalised pairs."""
+    errors: list[dict[str, str]] = []
+    out: list[tuple[str, str]] = []
+    known: dict[str, set[str]] = {}
+    for i, entry in enumerate(entries):
+        ref = entry.principal_ref
+        if entry.principal_type != "role":
+            parsed = _parse_uuid(ref)
+            if parsed is None:
+                errors.append(_error(f"acl.{i}.principal_ref", "invalid"))
+                continue
+            ref = str(parsed)
+        if entry.principal_type not in known:
+            known[entry.principal_type] = _known_refs(session, entry.principal_type)
+        if ref not in known[entry.principal_type]:
+            errors.append(_error(f"acl.{i}.principal_ref", "not_found"))
+            continue
+        out.append((entry.principal_type, ref))
+    if errors:
+        raise ValidationFailed(errors)
+    if upload_grant is not None and not upload_grant.school_wide:
+        _check_scoped_acl(session, out, upload_grant)
+    return out
+
+
+def _check_scoped_acl(session: Session, acl: Sequence[tuple[str, str]], grant: ScopeGrant) -> None:
+    """A scoped uploader (e.g. class teacher) must restrict the document to their own sections
+    or classes; otherwise a document could be hidden from them or shown school-wide."""
+    if not acl:
+        raise _invalid("acl", "acl_required_for_scoped_upload")
+    sections, _ = _reach(session, grant)
+    for i, (ptype, ref) in enumerate(acl):
+        allowed = (ptype == "section" and ref in sections) or (
+            ptype == "class" and ref in {str(c) for c in grant.class_ids}
+        )
+        if not allowed:
+            raise _invalid(f"acl.{i}", "acl_outside_scope")
+
+
+# --- uploads --------------------------------------------------------------------------------
+
+
+def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> UploadOut:
+    """Issue a presigned POST for one file (permission ``document.upload``).
+
+    The declared kind must be allowlisted for the purpose and agree with the file extension;
+    the size must be within the purpose's limit (FR-DOC-001: 25 MB, imports 10 MB).
+    ``document_id`` asks for a new version of a document the caller can see.
+    """
+    settings = get_settings()
+    rule = purpose_rule(data.purpose, settings)
+    kind = filetypes.kind_for_content_type(data.content_type)
+    if kind is None or kind.key not in rule.kinds:
+        raise UnsupportedFileType(
+            "Upload a PDF, JPG, PNG, DOCX or XLSX file (spreadsheet imports: XLSX or CSV)."
+        )
+    if filetypes.kind_for_filename(data.filename) is not kind:
+        raise UnsupportedFileType("The file name extension does not match the file type.")
+    if data.size_bytes > rule.max_bytes:
+        raise FileTooLarge(f"Files for this purpose can be at most {rule.max_bytes // 2**20} MB.")
+
+    tenant_id = repo.current_tenant_id(session)
+    batch_id: uuid.UUID | None = None
+    if data.document_id is not None:
+        doc = repo.get_document(
+            session, data.document_id, visibility=_visibility(session, ctx), for_update=True
+        )
+        if doc is None:
+            raise _not_found()
+        if doc.purpose != data.purpose:
+            raise _invalid("purpose", "purpose_mismatch")
+        if not purpose_rule(doc.purpose, settings).versionable:
+            raise Conflict("Import files cannot get new versions.", code="not_versionable")
+        document_id = doc.id
+        version_no = repo.max_version_no(session, doc.id) + 1
+    else:
+        document_id, version_no = new_id(), 1
+        if data.purpose == "import_file":
+            batch_id = new_id()
+
+    now = _now()
+    ttl = settings.documents_upload_url_ttl_s
+    intent_id = new_id()
+    key = upload_key(tenant_id, intent_id, kind.ext)
+    with _db_errors():
+        intent = repo.insert_intent(
+            session,
+            id=intent_id,
+            tenant_id=tenant_id,
+            purpose=data.purpose,
+            document_id=document_id,
+            version_no=version_no,
+            batch_id=batch_id,
+            object_key=key,
+            declared_content_type=kind.mime,
+            declared_size=data.size_bytes,
+            max_bytes=rule.max_bytes,
+            created_by=ctx.user_id,
+            created_at=now,
+            expires_at=now + dt.timedelta(seconds=ttl) + INTENT_GRACE,
+        )
+    post = get_object_store().presigned_post(
+        key=key, content_type=kind.mime, max_bytes=data.size_bytes, expires_s=ttl
+    )
+    log.info("documents.upload.issued", resource_type="upload_intent", resource_id=intent.id)
+    return UploadOut(
+        upload_id=intent.id,
+        url=post.url,
+        fields=post.fields,
+        expires_at=post.expires_at,
+        max_bytes=data.size_bytes,
+        purpose=data.purpose,
+        document_id=document_id if data.document_id is not None else None,
+        batch_id=batch_id,
+    )
+
+
+def _claim_intent(
+    session: Session, ctx: UserContext, upload_id: uuid.UUID, *, document_id: uuid.UUID | None
+) -> UploadIntent:
+    intent = repo.lock_intent(session, upload_id)
+    if intent is None or intent.created_by != ctx.user_id:
+        raise NotFound("Upload not found")
+    if intent.consumed_at is not None:
+        raise Conflict("This upload was registered already.", code="upload_already_used")
+    if intent.expires_at <= _now():
+        raise Conflict("This upload expired. Please upload the file again.", code="upload_expired")
+    if document_id is None and intent.version_no != 1:
+        raise _invalid("upload_id", "upload_is_for_a_new_version")
+    if document_id is not None and intent.document_id != document_id:
+        raise _invalid("upload_id", "upload_is_for_another_document")
+    if not key_in_tenant(intent.object_key, repo.current_tenant_id(session)):
+        # Defence in depth: the DB CHECK already pins the tenant prefix.
+        raise NotFound("Upload not found")
+    return intent
+
+
+@dataclass(frozen=True, slots=True)
+class _Verified:
+    sha256: bytes
+    size: int
+    kind: FileKind
+    etag: str
+
+
+def _discard(store: ObjectStore, key: str) -> None:
+    try:
+        store.delete(key)
+    except ObjectStoreError:
+        log.warning("documents.upload.discard_failed", error_code="delete_failed")
+
+
+def _reject(store: ObjectStore, intent: UploadIntent, code: str) -> UnsupportedFileType:
+    _discard(store, intent.object_key)
+    log.warning(
+        "documents.upload.rejected",
+        resource_type="upload_intent",
+        resource_id=intent.id,
+        error_code=code,
+    )
+    return UnsupportedFileType(
+        "The file's content is not the type it claims to be. Upload the original PDF, image or "
+        "office file.",
+        code="unsupported_file_type" if code == "type_mismatch" else code,
+    )
+
+
+def _check_stored_head(store: ObjectStore, intent: UploadIntent) -> int:
+    """HEAD: the object exists, has the declared size within the limit, and is encrypted."""
+    try:
+        head = store.head(intent.object_key)
+    except ObjectStoreError as exc:
+        raise Conflict(
+            "The file could not be checked. Try again.", code="storage_unavailable"
+        ) from exc
+    if head is None:
+        raise Conflict("Upload the file before registering it.", code="upload_missing")
+    if head.size > intent.max_bytes:
+        _discard(store, intent.object_key)
+        raise FileTooLarge("The uploaded file is larger than allowed.")
+    if head.size != intent.declared_size:
+        _discard(store, intent.object_key)
+        raise _invalid("upload_id", "size_mismatch")
+    kms = getattr(store, "kms_key_id", None)
+    if kms and head.sse != "aws:kms":
+        _discard(store, intent.object_key)
+        raise Conflict("The file was not stored encrypted. Upload it again.", code="not_encrypted")
+    return head.size
+
+
+def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
+    """HEAD, size, magic bytes (or CSV text), structural tail check and streamed SHA-256."""
+    kind = filetypes.kind_for_content_type(intent.declared_content_type)
+    if kind is None:  # pragma: no cover - CHECK constraint on the column
+        raise UnsupportedFileType()
+    size = _check_stored_head(store, intent)
+    # One GET: every check below runs on exactly the bytes whose ETag is then copied.
+    opened = store.open(intent.object_key)
+    digest = hashlib.sha256()
+    csv = filetypes.CsvChecker() if kind.key == "csv" else None
+    first = bytearray()
+    tail = b""
+    total = 0
+    try:
+        for chunk in opened.chunks:
+            total += len(chunk)
+            if total > intent.max_bytes:
+                _discard(store, intent.object_key)
+                raise FileTooLarge("The uploaded file is larger than allowed.")
+            digest.update(chunk)
+            if len(first) < filetypes.HEAD_BYTES:
+                first += chunk[: filetypes.HEAD_BYTES - len(first)]
+            tail = (tail + chunk)[-filetypes.TAIL_BYTES :]
+            if csv is not None:
+                csv.feed(chunk)
+    finally:
+        opened.close()
+    if total != size:
+        _discard(store, intent.object_key)
+        raise _invalid("upload_id", "size_mismatch")
+    code = filetypes.check_head(kind, bytes(first))
+    if code is None and csv is None:
+        code = filetypes.check_tail(kind, tail)
+    if code is None and csv is not None:
+        code = csv.finish()
+    if code is not None:
+        raise _reject(store, intent, code)
+    return _Verified(digest.digest(), total, kind, opened.etag)
+
+
+def _final_key(intent: UploadIntent, kind: FileKind) -> str:
+    if intent.batch_id is not None:
+        return import_key(intent.tenant_id, intent.batch_id, kind.ext)
+    return document_key(intent.tenant_id, intent.document_id, intent.version_no, kind.ext)
+
+
+def _promote(store: ObjectStore, intent: UploadIntent, verified: _Verified) -> str:
+    """Copy the verified bytes to the final key (only if unchanged) and drop the staging copy."""
+    final = _final_key(intent, verified.kind)
+    try:
+        store.copy(
+            intent.object_key, final, if_match=verified.etag, content_type=verified.kind.mime
+        )
+    except ObjectChanged as exc:
+        _discard(store, intent.object_key)
+        raise Conflict(
+            "The file changed while it was being checked. Upload it again.", code="upload_changed"
+        ) from exc
+    except ObjectStoreError as exc:
+        raise Conflict(
+            "The file could not be stored. Try again.", code="storage_unavailable"
+        ) from exc
+    _discard(store, intent.object_key)
+    return final
+
+
+@contextmanager
+def _undo_object_on_error(store: ObjectStore, key: str) -> Iterator[None]:
+    try:
+        yield
+    except BaseException:
+        _discard(store, key)
+        raise
+
+
+def _check_duplicate(
+    session: Session, ctx: UserContext, store: ObjectStore, intent: UploadIntent, sha: bytes
+) -> None:
+    """Dedupe within the school. Only a duplicate the caller can see is reported (with its id);
+    an invisible one is not revealed and the upload proceeds."""
+    matches = repo.versions_with_sha(session, sha, exclude_statuses=UNUSABLE_STATUSES)
+    if not matches:
+        return
+    visibility = _visibility(session, ctx)
+    for match in matches:
+        if repo.get_document(session, match.document_id, visibility=visibility) is not None:
+            _discard(store, intent.object_key)
+            raise Conflict(
+                f"This file is already in SchoolOS as document {match.document_id}.",
+                code="duplicate_document",
+            )
+
+
+def _resolve_metadata(data: DocumentCreate, rule: PurposeRule) -> tuple[str, str]:
+    doc_type = data.doc_type or rule.default_doc_type
+    if doc_type not in rule.doc_types:
+        raise _invalid("doc_type", "doc_type_not_allowed_for_purpose")
+    sensitivity = data.sensitivity or rule.min_sensitivity
+    if SENSITIVITY_ORDER[sensitivity] < SENSITIVITY_ORDER[rule.min_sensitivity]:
+        raise _invalid("sensitivity", "sensitivity_below_minimum")
+    return doc_type, sensitivity
+
+
+def register_document(session: Session, ctx: UserContext, data: DocumentCreate) -> DocumentOut:
+    """Register an uploaded object as a new document (permission ``document.upload``).
+
+    Returns the document with version 1 ``queued``; the malware scan runs in a worker.
+    """
+    intent = _claim_intent(session, ctx, data.upload_id, document_id=None)
+    rule = purpose_rule(intent.purpose)
+    doc_type, sensitivity = _resolve_metadata(data, rule)
+    if data.academic_year_id is not None:
+        try:
+            tenancy.get_academic_year(session, data.academic_year_id)
+        except NotFound as exc:
+            raise _invalid("academic_year_id", "not_found") from exc
+    acl = validate_acl(session, data.acl, upload_grant=ctx.scope_for(UPLOAD))
+    store = get_object_store()
+    verified = _verify_object(store, intent)
+    _check_duplicate(session, ctx, store, intent, verified.sha256)
+    final_key = _promote(store, intent, verified)
+
+    tenant_id = repo.current_tenant_id(session)
+    version_id = new_id()
+    with _undo_object_on_error(store, final_key), _db_errors():
+        doc = repo.insert_document(
+            session,
+            id=intent.document_id,
+            tenant_id=tenant_id,
+            purpose=intent.purpose,
+            doc_type=doc_type,
+            title=data.title,
+            issuer=data.issuer,
+            issued_on=data.issued_on,
+            academic_year_id=data.academic_year_id,
+            language=data.language,
+            sensitivity=sensitivity,
+            current_version_id=version_id,
+            created_by=ctx.user_id,
+        )
+        version = _insert_version(
+            session,
+            ctx=ctx,
+            intent=intent,
+            version_id=version_id,
+            verified=verified,
+            object_key=final_key,
+        )
+        repo.replace_acl(session, tenant_id, doc.id, acl)
+        repo.consume_intent(session, intent.id, _now())
+        _audit(
+            session,
+            "document.registered",
+            doc.id,
+            {
+                "version_no": version.version_no,
+                "purpose": doc.purpose,
+                "doc_type": doc.doc_type,
+                "sensitivity": doc.sensitivity,
+                "mime_type": version.mime_type,
+                "size_bytes": version.size_bytes,
+                "acl_entries": len(acl),
+                "batch_id": intent.batch_id,
+            },
+        )
+        ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
+    log.info("documents.registered", resource_type="document", resource_id=doc.id)
+    return _load_out(session, doc)
+
+
+def _insert_version(
+    session: Session,
+    *,
+    ctx: UserContext,
+    intent: UploadIntent,
+    version_id: uuid.UUID,
+    verified: _Verified,
+    object_key: str,
+) -> DocumentVersion:
+    return repo.insert_version(
+        session,
+        id=version_id,
+        tenant_id=intent.tenant_id,
+        document_id=intent.document_id,
+        version_no=intent.version_no,
+        object_key=object_key,
+        sha256=verified.sha256,
+        mime_type=verified.kind.mime,
+        size_bytes=verified.size,
+        status="queued",
+        created_by=ctx.user_id,
+    )
+
+
+def add_version(
+    session: Session, ctx: UserContext, document_id: uuid.UUID, data: VersionCreate
+) -> DocumentOut:
+    """Register an uploaded object as the next version (permission ``document.upload``; the
+    document must be visible to the caller). History is kept (FR-DOC-006)."""
+    doc = repo.get_document(
+        session, document_id, visibility=_visibility(session, ctx), for_update=True
+    )
+    if doc is None:
+        raise _not_found()
+    intent = _claim_intent(session, ctx, data.upload_id, document_id=doc.id)
+    if intent.version_no != repo.max_version_no(session, doc.id) + 1:
+        raise Conflict(
+            "A newer version was added meanwhile. Upload the file again.", code="version_conflict"
+        )
+    store = get_object_store()
+    verified = _verify_object(store, intent)
+    latest = repo.get_version(session, doc.id)
+    if latest is not None and latest.sha256 == verified.sha256:
+        _discard(store, intent.object_key)
+        raise Conflict("This file is the same as the current version.", code="version_unchanged")
+    final_key = _promote(store, intent, verified)
+    version_id = new_id()
+    with _undo_object_on_error(store, final_key), _db_errors():
+        version = _insert_version(
+            session,
+            ctx=ctx,
+            intent=intent,
+            version_id=version_id,
+            verified=verified,
+            object_key=final_key,
+        )
+        updated = repo.update_document(
+            session, doc.id, expected_version=None, current_version_id=version.id
+        )
+        if updated is None:  # pragma: no cover - row locked above
+            raise _not_found()
+        repo.consume_intent(session, intent.id, _now())
+        _audit(
+            session,
+            "document.version_added",
+            doc.id,
+            {
+                "version_no": version.version_no,
+                "mime_type": version.mime_type,
+                "size_bytes": version.size_bytes,
+            },
+        )
+        ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
+    return _load_out(session, updated)
+
+
+# --- reads ----------------------------------------------------------------------------------
+
+
+def list_documents(
+    session: Session,
+    ctx: UserContext,
+    *,
+    limit: int,
+    before_id: uuid.UUID | None = None,
+    purpose: str | None = None,
+    doc_type: str | None = None,
+    academic_year_id: uuid.UUID | None = None,
+    status: str | None = None,
+) -> tuple[list[DocumentOut], uuid.UUID | None]:
+    """Documents the caller may see, newest first (permission ``document.read``); returns the
+    page and the id to continue before, if there are more."""
+    docs = repo.list_documents(
+        session,
+        _visibility(session, ctx),
+        limit=limit + 1,
+        before_id=before_id,
+        purpose=purpose,
+        doc_type=doc_type,
+        academic_year_id=academic_year_id,
+        status=status,
+    )
+    more = len(docs) > limit
+    docs = docs[:limit]
+    ids = [d.id for d in docs]
+    versions = repo.versions_of(session, ids)
+    acl = repo.acl_of(session, ids)
+    by_doc: dict[uuid.UUID, list[DocumentVersion]] = {i: [] for i in ids}
+    for v in versions:
+        by_doc[v.document_id].append(v)
+    page = [_document_out(d, by_doc[d.id], acl[d.id]) for d in docs]
+    return page, (docs[-1].id if more and docs else None)
+
+
+def get_document(session: Session, ctx: UserContext, document_id: uuid.UUID) -> DocumentDetail:
+    """One document with its version history (permission ``document.read``; 404 when the
+    caller's ACL/scope does not reach it)."""
+    doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
+    if doc is None:
+        raise _not_found()
+    return DocumentDetail.model_validate(_load_out(session, doc, detail=True).model_dump())
+
+
+def get_download_url(
+    session: Session, ctx: UserContext, document_id: uuid.UUID, version_no: int | None = None
+) -> DownloadUrlOut:
+    """A presigned GET valid <= 5 minutes, forced to download as an attachment with the
+    verified content type (FR-DOC-004). Only scanned (``ready``) versions are served; C3
+    documents also need ``student.read_sensitive`` unless the caller uploaded them."""
+    doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
+    if doc is None:
+        raise _not_found()
+    if doc.sensitivity == "C3" and not (
+        ctx.has("student.read_sensitive") or doc.created_by == ctx.user_id
+    ):
+        raise Forbidden(
+            "Restricted (C3) files can be opened only by staff allowed to see sensitive data.",
+            code="sensitive_document",
+        )
+    if version_no is None:
+        version = repo.latest_version_with_status(session, doc.id, ("ready",))
+        if version is None:
+            raise Conflict(
+                "The file is still being checked. Try again shortly.", code="document_not_ready"
+            )
+    else:
+        version = repo.get_version(session, doc.id, version_no)
+        if version is None:
+            raise NotFound("Version not found")
+        if version.status != "ready":
+            raise Conflict("This version cannot be downloaded yet.", code="document_not_ready")
+    kind = filetypes.kind_for_content_type(version.mime_type)
+    ext = kind.ext if kind else "bin"
+    filename = f"{doc.doc_type}-{str(doc.id)[:8]}-v{version.version_no}.{ext}"
+    ttl = get_settings().documents_download_url_ttl_s
+    url, expires_at = get_object_store().presigned_get(
+        key=version.object_key, content_type=version.mime_type, filename=filename, expires_s=ttl
+    )
+    _audit(session, "document.download_url_issued", doc.id, {"version_no": version.version_no})
+    return DownloadUrlOut(
+        url=url,
+        expires_at=expires_at,
+        version_no=version.version_no,
+        mime_type=version.mime_type,
+        filename=filename,
+    )
+
+
+# --- ACL and delete -------------------------------------------------------------------------
+
+
+def set_acl(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    entries: Sequence[AclEntry],
+    *,
+    expected_version: int,
+) -> DocumentOut:
+    """Replace who can see a document (permission ``document.manage_acl``; ``If-Match``)."""
+    doc = repo.get_document(
+        session, document_id, visibility=_visibility(session, ctx), for_update=True
+    )
+    if doc is None:
+        raise _not_found()
+    if doc.version != expected_version:
+        raise PreconditionFailed()
+    acl = validate_acl(session, entries)
+    before = {(a.principal_type, a.principal_ref) for a in repo.acl_of(session, [doc.id])[doc.id]}
+    after = set(acl)
+    with _db_errors():
+        repo.replace_acl(session, doc.tenant_id, doc.id, acl)
+        updated = repo.update_document(session, doc.id, expected_version=expected_version)
+        if updated is None:  # pragma: no cover - row locked above
+            raise PreconditionFailed()
+        _audit(
+            session,
+            "document.acl_changed",
+            doc.id,
+            {
+                "added": len(after - before),
+                "removed": len(before - after),
+                "entries": len(after),
+                "principal_types": sorted({t for t, _ in after}),
+            },
+        )
+        for hook in ACL_CHANGED_HOOKS:
+            hook(session, doc.id)
+    return _load_out(session, updated)
+
+
+def delete_document(session: Session, ctx: UserContext, document_id: uuid.UUID) -> None:
+    """Hard-delete a document, its versions and ACL; objects are purged by a worker after
+    commit (permission ``document.manage_acl``). Evidence still linked to a student record, or
+    refused by a retention guard, answers 409 ``document_in_use``."""
+    doc = repo.get_document(
+        session, document_id, visibility=_visibility(session, ctx), for_update=True
+    )
+    if doc is None:
+        raise _not_found()
+    for guard in DELETE_GUARDS:
+        code = guard(session, doc.id)
+        if code is not None:
+            raise Conflict("This document must be kept (retention rules).", code=code)
+    keys = repo.object_keys_of(session, doc.id)
+    batch_ids = sorted({k.split("/")[3] for k in keys if k.split("/")[2] == "imports"})
+    with _db_errors():
+        repo.delete_document(session, doc.id)
+        _audit(
+            session,
+            "document.deleted",
+            doc.id,
+            {"purpose": doc.purpose, "versions": len(keys)},
+        )
+        ops.enqueue_event(session, DELETED_EVENT, {"document_id": doc.id, "batch_ids": batch_ids})
+
+
+def purge_document_objects(
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    batch_ids: Sequence[uuid.UUID] = (),
+    *,
+    store: ObjectStore | None = None,
+) -> int:
+    """Worker: remove every stored object of a deleted document (FR-DOC-007 storage part)."""
+    store = store or get_object_store()
+    deleted = store.delete_prefix(document_prefix(tenant_id, document_id))
+    for batch_id in batch_ids:
+        deleted += store.delete_prefix(f"{tenant_prefix(tenant_id)}imports/{batch_id}/")
+    return deleted
+
+
+# --- scanning (worker) ----------------------------------------------------------------------
+
+
+def scan_version(
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    *,
+    scanner: AvScanner | None = None,
+    store: ObjectStore | None = None,
+) -> str:
+    """Scan one version and move it to ``ready`` or ``quarantined`` (FR-DOC-002, FR-DOC-008).
+
+    Idempotent: a version already past scanning is left alone and its status returned.
+    Raises ``ScannerUnavailable`` (the task retries) without changing a verdict.
+    """
+    scanner = scanner or build_scanner(get_settings())
+    store = store or get_object_store()
+    with tenant_session(tenant_id) as s:
+        version = repo.set_version_status(
+            s, version_id, "scanning", from_statuses=("queued", "scanning")
+        )
+        if version is None:
+            current = repo.get_version(s, document_id, version_id=version_id)
+            return current.status if current is not None else "missing"
+        key = version.object_key
+    result: ScanResult = scanner.scan(store.iter_chunks(key))
+    with tenant_session(tenant_id) as s:
+        if result.verdict is Verdict.INFECTED:
+            updated = repo.set_version_status(
+                s, version_id, "quarantined", error="malware_detected", from_statuses=("scanning",)
+            )
+            if updated is None:
+                return "unchanged"
+            _audit(
+                s,
+                "document.quarantined",
+                document_id,
+                {
+                    "version_no": updated.version_no,
+                    "engine": result.engine,
+                    "signature": result.signature or "unknown",
+                },
+                system=True,
+            )
+            for hook in QUARANTINE_HOOKS:
+                hook(s, document_id, version_id)
+            log.warning(
+                "documents.scan.quarantined", resource_type="document", resource_id=document_id
+            )
+            return "quarantined"
+        # M1: evidence, register scans and import files are usable once clean. Text extraction,
+        # chunking and embeddings (M2) plug in through READY_HOOKS.
+        updated = repo.set_version_status(s, version_id, "ready", from_statuses=("scanning",))
+        if updated is None:
+            return "unchanged"
+        for hook in READY_HOOKS:
+            hook(s, document_id, version_id)
+        log.info("documents.scan.clean", resource_type="document", resource_id=document_id)
+        return "ready"
+
+
+def mark_scan_failed(
+    tenant_id: uuid.UUID, document_id: uuid.UUID, version_id: uuid.UUID, error_code: str
+) -> None:
+    """Worker gave up retrying (scanner unavailable): the version is ``failed``, never served."""
+    with tenant_session(tenant_id) as s:
+        updated = repo.set_version_status(
+            s, version_id, "failed", error=error_code, from_statuses=("queued", "scanning")
+        )
+        if updated is not None:
+            _audit(
+                s,
+                "document.scan_failed",
+                document_id,
+                {"version_no": updated.version_no, "code": error_code},
+                system=True,
+            )
+
+
+def purge_expired_uploads(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
+    """Worker (daily): delete expired, never-registered uploads and their objects."""
+    store = store or get_object_store()
+    purged = 0
+    with tenant_session(tenant_id) as s:
+        now = _now()
+        stale = repo.expired_intents(s, now, limit=500)
+        for intent in stale:
+            if key_in_tenant(intent.object_key, tenant_id):
+                _discard(store, intent.object_key)
+        # A presigned POST stays usable for a few minutes after registration: drop any staging
+        # object re-created meanwhile, then the used intent rows.
+        used = repo.consumed_intents_before(s, now - dt.timedelta(days=1), limit=500)
+        for intent in used:
+            if key_in_tenant(intent.object_key, tenant_id):
+                _discard(store, intent.object_key)
+        repo.delete_intents(s, [i.id for i in (*stale, *used)])
+        purged = len(stale)
+    return purged
+
+
+# --- service API for other modules (CONTRACT §8) --------------------------------------------
+
+
+def evidence_exists(session: Session, document_id: uuid.UUID) -> bool:
+    """True when ``document_id`` is a document of the current school with at least one version
+    that is not quarantined/failed (used by change requests before accepting evidence)."""
+    if repo.get_document(session, document_id) is None:
+        return False
+    usable = repo.latest_version_with_status(
+        session,
+        document_id,
+        ("queued", "scanning", "extracting", "chunking", "embedding", "ready"),
+    )
+    return usable is not None
+
+
+def is_visible(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
+    """Whether the caller's ACL/scope reaches the document (for other modules' scoped reads)."""
+    return repo.get_document(session, document_id, visibility=_visibility(session, ctx)) is not None
+
+
+@dataclass(frozen=True, slots=True)
+class StoredObject:
+    """Location and facts of one stored version, for workers (imports, extraction)."""
+
+    document_id: uuid.UUID
+    version_id: uuid.UUID
+    version_no: int
+    purpose: str
+    object_key: str
+    mime_type: str
+    size_bytes: int
+    sha256_hex: str
+    status: str
+
+
+def document_object(
+    session: Session,
+    document_id: uuid.UUID,
+    version_no: int | None = None,
+    *,
+    require_ready: bool = True,
+) -> StoredObject:
+    """The stored object of a version (latest ``ready`` one by default) in the current tenant.
+
+    Workers only: no caller scope is applied here; the job that calls it was authorised when it
+    was started. Unscanned/quarantined versions are refused unless ``require_ready=False``.
+    """
+    doc = repo.get_document(session, document_id)
+    if doc is None:
+        raise _not_found()
+    if version_no is None and require_ready:
+        version = repo.latest_version_with_status(session, document_id, ("ready",))
+    else:
+        version = repo.get_version(session, document_id, version_no)
+    if version is None or (require_ready and version.status != "ready"):
+        raise Conflict("The file has not passed the malware scan.", code="document_not_ready")
+    return StoredObject(
+        document_id=doc.id,
+        version_id=version.id,
+        version_no=version.version_no,
+        purpose=doc.purpose,
+        object_key=version.object_key,
+        mime_type=version.mime_type,
+        size_bytes=version.size_bytes,
+        sha256_hex=version.sha256.hex(),
+        status=version.status,
+    )
+
+
+def read_document_object(
+    session: Session, obj: StoredObject, *, store: ObjectStore | None = None
+) -> bytes:
+    """Read a whole stored object (bounded by the upload limit) and check its SHA-256."""
+    tenant_id = repo.current_tenant_id(session)
+    if not key_in_tenant(obj.object_key, tenant_id):
+        raise _not_found()
+    store = store or get_object_store()
+    data = b"".join(store.iter_chunks(obj.object_key))
+    if hashlib.sha256(data).hexdigest() != obj.sha256_hex:
+        raise Conflict("The stored file changed after upload.", code="integrity_mismatch")
+    return data
+
+
+def store_page_image(
+    session: Session,
+    document_id: uuid.UUID,
+    version_no: int,
+    page_no: int,
+    png: bytes,
+    *,
+    store: ObjectStore | None = None,
+) -> str:
+    """Store a rendered page (PNG) under the version's ``derived/pages/`` (extraction, M1
+    wave 2; citation previews, M2). Returns the object key."""
+    if filetypes.sniff(png) is not filetypes.PNG:
+        raise UnsupportedFileType("Page images must be PNG.")
+    if repo.get_version(session, document_id, version_no) is None:
+        raise _not_found()
+    key = derived_key(
+        repo.current_tenant_id(session), document_id, version_no, f"pages/{page_no}.png"
+    )
+    (store or get_object_store()).put(key, png, filetypes.PNG.mime)
+    return key
+
+
+__all__ = [
+    "ACL_CHANGED_HOOKS",
+    "DELETE_GUARDS",
+    "QUARANTINE_HOOKS",
+    "READY_HOOKS",
+    "FileTooLarge",
+    "StoredObject",
+    "UnsupportedFileType",
+    "add_version",
+    "create_upload",
+    "delete_document",
+    "document_object",
+    "evidence_exists",
+    "get_document",
+    "get_download_url",
+    "is_visible",
+    "list_documents",
+    "mark_scan_failed",
+    "purge_document_objects",
+    "purge_expired_uploads",
+    "read_document_object",
+    "register_document",
+    "scan_version",
+    "set_acl",
+    "store_page_image",
+    "validate_acl",
+]

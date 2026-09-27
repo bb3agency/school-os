@@ -30,6 +30,16 @@ class KeyWrapperKind(StrEnum):
     LOCAL_DEV = "local-dev"
 
 
+class AvScannerKind(StrEnum):
+    """Malware scanner for uploads (FR-DOC-002). ``dev-noop`` refuses to run in staging/prod."""
+
+    CLAMAV = "clamav"
+    DEV_NOOP = "dev-noop"
+
+
+MIB = 1024 * 1024
+
+
 # Placeholder supplier identity for local/CI invoices; refused in staging/prod (FR-PLT-016).
 DEV_SUPPLIER_NAME = "SchoolOS Synthetic Supplier (dev)"
 DEV_SUPPLIER_GSTIN = "37AAAAA0000A1Z5"
@@ -66,6 +76,26 @@ class Settings(BaseSettings):
     s3_bucket_files: str = "sos-local-files"
     s3_bucket_audit: str = "sos-local-audit-archive"
     aws_region: str = Field(default="ap-south-1", validation_alias="AWS_REGION")
+    # Endpoint used only to SIGN browser-facing presigned URLs (the browser must reach it);
+    # locally http://localhost:8333 while the API itself talks to http://s3:8333.
+    s3_presign_endpoint_url: str | None = None
+    # KMS key for SSE-KMS on uploaded files (FR-DOC-003). Unset locally (SeaweedFS).
+    s3_kms_key_id: str | None = None
+
+    # Documents and uploads (FR-DOC-001..004, SEC-016, docs/07 §10).
+    documents_max_upload_bytes: int = Field(default=25 * MIB, ge=1, le=100 * MIB)
+    documents_import_max_upload_bytes: int = Field(default=10 * MIB, ge=1, le=100 * MIB)
+    # Presigned POST lifetime (<= 10 min) and presigned GET lifetime (<= 5 min, FR-DOC-004).
+    documents_upload_url_ttl_s: int = Field(default=600, ge=30, le=600)
+    documents_download_url_ttl_s: int = Field(default=300, ge=30, le=300)
+    # Kinds accepted by magic bytes (never by extension); subset of pdf, jpg, png, docx, xlsx.
+    documents_allowed_kinds: tuple[str, ...] = ("pdf", "jpg", "png", "docx", "xlsx")
+    # Spreadsheet imports: xlsx by magic bytes, csv by text sniffing (UTF-8, no NUL bytes).
+    documents_import_allowed_kinds: tuple[str, ...] = ("xlsx", "csv")
+    av_scanner: AvScannerKind = AvScannerKind.DEV_NOOP
+    clamav_host: str = "localhost"
+    clamav_port: int = Field(default=3310, ge=1, le=65535)
+    clamav_timeout_s: float = Field(default=30.0, gt=0, le=300)
 
     oidc_issuer: str = "http://localhost:8080/schoolos"
     oidc_audience: str = "schoolos-web"

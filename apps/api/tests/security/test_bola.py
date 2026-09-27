@@ -43,6 +43,22 @@ W = _load_world()
 world = W.world
 api = W.api
 
+
+def _load_documents_support() -> ModuleType:
+    name = "sos_test_documents_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "documents" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+D = _load_documents_support()
+
 # Minimal valid bodies so the request reaches the object lookup.
 BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/users/{user_id}"): {"status": "active"},
@@ -68,6 +84,9 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/students/{student_id}/enrollments"): {
         "section_id": "01a0df6d-0000-7000-8000-000000000001"
     },
+    ("POST", "/api/v1/documents/{document_id}/versions"): {"upload_id": str(uuid.uuid4())},
+    ("PUT", "/api/v1/documents/{document_id}/acl"): {"acl": []},
+    ("DELETE", "/api/v1/documents/{document_id}"): None,
 }
 
 
@@ -116,6 +135,12 @@ def _b_ticket(w: Any) -> uuid.UUID:
     ).id
 
 
+def _b_document(w: Any) -> uuid.UUID:
+    """A school B document created through the real upload -> register path."""
+    doc_id: uuid.UUID = D.service_document(w.b.tenant_id, w.b.people["owner"])
+    return doc_id
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -126,6 +151,7 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "student_id": lambda w: SW.ensure_students(w)["b_sb"],
     "value_id": lambda w: SW.ensure_students(w)["b_sb"],
     "guardian_id": lambda w: SW.ensure_students(w)["b_gb"],
+    "document_id": _b_document,
 }
 
 

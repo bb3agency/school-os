@@ -798,6 +798,18 @@ CREATE TABLE kb.verified_answers (
 
 When a document's ACL changes, a job rewrites `acl_*` arrays on its chunks (same transaction for small docs; job for large). Retrieval MUST treat an empty ACL as "no one except holders of `document.read` at school scope" (fail closed), never as public.
 
+#### 6.1 Documents as built in M1 (migration `0009_kb_documents`)
+
+M1 creates `kb.documents`, `kb.document_versions`, `kb.document_acl` and `kb.upload_intents` (chunks, embeddings and queries arrive in M2). Differences from the DDL above:
+
+- `kb.documents.purpose` (`evidence`, `register_scan`, `circular`, `policy`, `other`, `import_file`) sets the accepted kinds, size limit, minimum sensitivity (evidence C3, register scans and import files C2) and S3 layout (04 §8.2; import files use `t/<tenant>/imports/<batch_id>/raw.<ext>` and never get versions). `doc_type` also allows `evidence` and `import_file`. `updated_at` is added. `current_version_id` is a composite FK `DEFERRABLE INITIALLY DEFERRED`.
+- `kb.document_versions.object_key` and `kb.upload_intents.object_key` are checked for shape and must start with `t/<tenant_id>/`. `mime_type` is limited to PDF, JPEG, PNG, DOCX, XLSX and CSV (CSV only for imports). `error` holds a code, never free text.
+- `kb.upload_intents` records every presigned POST (purpose, target document and version, staging key `t/<tenant>/uploads/<intent_id>/original.<ext>`, declared type and size, uploader, expiry ≤ 1 hour, `consumed_at`). An object can be registered once, by the uploader, before expiry, and only if its bytes match the declared kind (magic bytes; CSV: UTF-8 text without NUL). The checked bytes are then copied to the final key, on condition that their ETag is unchanged. No presigned POST can write a final key, so a file cannot be swapped after it was checked. A daily job removes expired and used staging objects.
+- `kb.document_acl.principal_ref` is a role key or a section, class or membership UUID, checked by the documents service within the tenant.
+- The composite FK `sis.attribute_values (tenant_id, evidence_document_id) → kb.documents` is added by this migration when that column exists (§3.5), so evidence still linked to a value cannot be deleted.
+
+Visibility (the documents service; retrieval in M2 uses the same keys): holders of `document.manage_acl` see every document of their school. Other `document.read` holders see a document when an ACL entry matches their role, membership, section or class. A class scope covers its sections, and a section scope matches its class. School-wide readers match every section and class entry. An empty ACL is visible only to school-wide readers. Scoped uploaders (class teachers) must restrict new documents to their own sections or classes. Only scanned (`ready`) versions can be downloaded. C3 files also need `student.read_sensitive`, unless the caller uploaded them.
+
 ## 7. Audit and ops schemas
 
 ### 7.1 Audit (ADR-0011 as amended by ADR-0013)

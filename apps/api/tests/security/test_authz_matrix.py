@@ -60,7 +60,21 @@ def _load_students() -> ModuleType:
     return sys.modules[name]
 
 
+def _load_documents_support() -> ModuleType:
+    name = "sos_test_documents_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "documents" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 SW = _load_students()
+D = _load_documents_support()
 
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
@@ -122,6 +136,57 @@ def _enrol(w: Any, r: str, a: Engine) -> Request:
     current = SW.active_section(a, mover)
     target = w.a.ids["section_9c"] if current == w.a.ids["section_9a"] else w.a.ids["section_9a"]
     return f"/api/v1/students/{mover}/enrollments", {"section_id": str(target)}, {}
+
+
+# --- documents (FR-DOC-*): every reader role sees these; class teacher via 9A, teacher via X --
+
+
+def _doc_acl(w: Any) -> list[dict[str, str]]:
+    return [
+        {"principal_type": "section", "principal_ref": str(w.a.ids["section_9a"])},
+        {"principal_type": "class", "principal_ref": str(w.a.ids["class_x"])},
+    ]
+
+
+def _shared_doc(w: Any, admin: Engine, slot: str) -> uuid.UUID:
+    """A ready (scanned) school A document visible to every document.read holder."""
+    key = f"matrix_doc_{slot}"
+    if key not in w.a.ids:
+        w.a.ids[key] = D.make_document(
+            admin,
+            w.a.tenant_id,
+            w.a.people["owner"].user_id,
+            acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)],
+        )
+    value: uuid.UUID = w.a.ids[key]
+    return value
+
+
+def _doc_register(w: Any, r: str, a: Engine) -> Request:
+    intent = D.make_intent(a, w.a.tenant_id, w.person(r).user_id, D.pdf())
+    # Scoped uploaders (class teacher) may only share with their own sections.
+    body = {"upload_id": str(intent), "title": "Matrix circular", "acl": _doc_acl(w)[:1]}
+    return "/api/v1/documents", body, {}
+
+
+def _doc_version(w: Any, r: str, a: Engine) -> Request:
+    doc = _shared_doc(w, a, "versions")
+    intent = D.make_intent(a, w.a.tenant_id, w.person(r).user_id, D.pdf(), document_id=doc)
+    return f"/api/v1/documents/{doc}/versions", {"upload_id": str(intent)}, {}
+
+
+def _doc_acl_put(w: Any, r: str, a: Engine) -> Request:
+    doc = _shared_doc(w, a, "acl")
+    return (
+        f"/api/v1/documents/{doc}/acl",
+        {"acl": _doc_acl(w)},
+        _if_match(D.document_version(a, doc)),
+    )
+
+
+def _doc_delete(w: Any, r: str, a: Engine) -> Request:
+    doc = D.make_document(a, w.a.tenant_id, w.a.people["owner"].user_id)
+    return f"/api/v1/documents/{doc}", None, {}
 
 
 SPECS: dict[tuple[str, str], Builder] = {
@@ -236,6 +301,32 @@ SPECS: dict[tuple[str, str], Builder] = {
         _if_match(W.version_of(a, "core.sections", w.a.ids["section_9a"])),
     ),
     ("GET", "/api/v1/audit/events"): lambda w, r, a: ("/api/v1/audit/events", None, {}),
+    # Documents (FR-DOC-001..006, SEC-016).
+    ("POST", "/api/v1/documents/uploads"): lambda w, r, a: (
+        "/api/v1/documents/uploads",
+        {
+            "filename": "matrix.pdf",
+            "content_type": "application/pdf",
+            "size_bytes": 100,
+            "purpose": "circular",
+        },
+        {},
+    ),
+    ("POST", "/api/v1/documents"): _doc_register,
+    ("GET", "/api/v1/documents"): lambda w, r, a: ("/api/v1/documents", None, {}),
+    ("GET", "/api/v1/documents/{document_id}"): lambda w, r, a: (
+        f"/api/v1/documents/{_shared_doc(w, a, 'read')}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/documents/{document_id}/versions"): _doc_version,
+    ("GET", "/api/v1/documents/{document_id}/download-url"): lambda w, r, a: (
+        f"/api/v1/documents/{_shared_doc(w, a, 'read')}/download-url",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/documents/{document_id}/acl"): _doc_acl_put,
+    ("DELETE", "/api/v1/documents/{document_id}"): _doc_delete,
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
     # School-side routes backed by the control plane (app/platform/tenant_api.py).
     ("GET", "/api/v1/tenant/billing"): lambda w, r, a: ("/api/v1/tenant/billing", None, {}),
@@ -356,7 +447,13 @@ def _success(method: str, path: str) -> int:
         "/api/v1/students/{student_id}/values",
         "/api/v1/students/{student_id}/guardians",
         "/api/v1/students/{student_id}/enrollments",
+        "/api/v1/documents/uploads",
     }
+    accepted = {"/api/v1/documents", "/api/v1/documents/{document_id}/versions"}
+    if method == "POST" and path in accepted:
+        return 202
+    if method == "DELETE" and path == "/api/v1/documents/{document_id}":
+        return 204
     return 201 if method == "POST" and path in creates else 200
 
 
