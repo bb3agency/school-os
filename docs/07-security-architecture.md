@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
+| Version | 0.4 · 2026-09-27 |
 | Target | OWASP ASVS (current version) Level 2 · OWASP API Security Top 10 · OWASP Top 10 for LLM Applications (2025) |
 | Related | 05-Data model (RLS, encryption), 06-RAG, 08-Privacy, 10-Infrastructure, 11-Operations (incident response), 16-Platform admin panel, ADR-0013, ADR-0015, ADR-0017, ADR-0018 |
-| Changes | 0.3: platform catalog files as built (§6.5); non-atomic school-chain copies of platform actions and suspended-school behaviour noted (§6.6); CODEOWNERS paths (§14). 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
+| Changes | 0.4: logging and URLs (§11): personal data never in query strings because ALB access logs keep full URLs; `POST /students/search`; Caddy and WAF log redaction (SEC-008). 0.3: platform catalog files as built (§6.5); non-atomic school-chain copies of platform actions and suspended-school behaviour noted (§6.6); CODEOWNERS paths (§14). 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
 
 ---
 
@@ -95,7 +95,7 @@ flowchart LR
 | T8 | BOLA: guessing another student/document ID within tenant | I | Scoped repositories, UUIDs, 404 for out-of-scope, per-resource BOLA tests | Low |
 | T9 | AI reveals data outside the user's scope | I | Filter-before-rank retrieval, tools run under user context, leakage evals as hard gate | Low |
 | T10 | Prompt injection in documents causes data exfiltration or misleading answers | I/T | Content treated as data (prompt), no network/write tools, no external links in output, citation validation, injection eval set | Low–medium |
-| T11 | PII leaks into logs, traces, error reports | I | Structured logging with allowlisted fields, `redact()`, log tests, no request-body logging | Low |
+| T11 | PII leaks into logs, traces, error reports | I | Structured logging with allowlisted fields, `redact()`, log tests, no request-body logging; no personal data in URLs (edge access logs keep them; §11) | Low |
 | T12 | Backup/snapshot exposure | I | KMS encryption, restricted IAM, separate backup vault account (Stage 1), crypto-shredding | Low |
 | T13 | LLM provider retains/uses prompts | I | Commercial API terms, ZDR requested, data minimization, sub-processor disclosure in DPA | Low–medium |
 | T14 | Resource exhaustion (bulk uploads, OCR floods) | D | Per-tenant quotas, queue fairness, size/page limits, WAF rate rules | Low |
@@ -330,6 +330,13 @@ Cross-Origin-Resource-Policy: same-origin
 | API8 Security misconfiguration | IaC with policy checks, security headers, no debug in prod, CIS-aligned images |
 | API9 Improper inventory management | Single versioned OpenAPI, no undocumented endpoints, staging isolated |
 | API10 Unsafe consumption of APIs | Validate third-party responses, timeouts, circuit breakers, treat LLM output as untrusted |
+
+**Logging and URLs (SEC-008, CLAUDE.md invariant 5).** Our own logs are structured and allowlisted: the API access log records the route template (`GET /api/v1/students/{student_id}`), never the concrete path or query string (uvicorn's access log is off), and the BFF logs only event names, codes, statuses, methods and request IDs. The edge is different:
+
+- **Shared tier:** the ALB access log (S3, prefix `alb/`) records the full request line, query string included, for every request, and cannot filter or redact parameters. WAF logs redact `Authorization`, `Cookie`, `X-Service-Token` and the whole query string (`infra/terraform/modules/alb_waf`).
+- **Dedicated tier:** Caddy logs JSON with `request>uri` through a `query` filter that replaces the values of `code` and `state` (OIDC callback) and of `query`, `q`, `admission_no`, `name`, `phone`, `email`, `dob` and `address` with `REDACTED`, and deletes the `Authorization`, `Cookie` and `Set-Cookie` headers (`deploy/dedicated/Caddyfile`). This is defense in depth, not permission.
+
+Therefore: **No personal data in URLs.** Names (student, parent, staff), phone numbers, emails, dates of birth, addresses, admission numbers, Aadhaar-like input and free-text searches never go in a path or query string: the shared-tier ALB access logs record every full request URL in S3 and cannot filter parameters, and proxies and browsers keep URLs too. Searches and filters that can carry such values use `POST …/search` with a JSON body (e.g. `POST /api/v1/students/search`); query strings carry only IDs, codes, enums, record dates, cursors and page sizes. `apps/api/tests/security/test_no_pii_in_urls.py` fails on a new tenant query parameter that looks like personal data or free text (SEC-008). `GET /api/v1/students?query=&admission_no=` still works for old clients but is deprecated (OpenAPI `deprecated`, `Deprecation` and `Link: rel="successor-version"` headers); the web app uses `POST /api/v1/students/search`.
 
 **Other:** CORS disabled for API (BFF same-origin); request size limits; idempotency keys on POSTs that create resources; `statement_timeout` 5 s for API transactions (longer for workers); problem+json errors without stack traces; 404 (not 403) when revealing existence would leak information.
 

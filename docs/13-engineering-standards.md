@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
+| Version | 0.4 · 2026-09-27 |
 | Applies to | All code, infra, prompts and docs in this repository |
 | Related | CLAUDE.md, 07-Security, 12-Testing, 16-Platform admin panel |
-| Changes | 0.3: repository layout as built (config inside the API package, `infra/docker/`, terraform roots; `evals/` and root `config/` planned); CODEOWNERS paths (§13). 0.2: layout adds `platform/`, `deploy/dedicated/`, `infra/db/`, platform config; session-branch policy for AI-assisted work (§2); security review scope incl. `platform/` (§3); ownership and CODEOWNERS (§13). 0.1: baseline |
+| Changes | 0.4: no personal data in URLs (§6, §8; SEC-008). 0.3: repository layout as built (config inside the API package, `infra/docker/`, terraform roots; `evals/` and root `config/` planned); CODEOWNERS paths (§13). 0.2: layout adds `platform/`, `deploy/dedicated/`, `infra/db/`, platform config; session-branch policy for AI-assisted work (§2); security review scope incl. `platform/` (§3); ownership and CODEOWNERS (§13). 0.1: baseline |
 
 ---
 
@@ -86,6 +86,7 @@ schoolos/
 - Backward-compatible changes only within `/v1`; never repurpose a field.
 - Pagination mandatory for collections; hard caps on `limit`.
 - Idempotency keys on create/start-job POSTs.
+- **No personal data in URLs** (paths or query strings): names, phones, emails, DOB, addresses, admission numbers, Aadhaar-like input and free-text search go in a JSON body (`POST …/search` for searches). Load-balancer and proxy access logs keep full URLs. Query parameters are for IDs, codes, enums, record dates, cursors and limits; `tests/security/test_no_pii_in_urls.py` enforces it from the OpenAPI document.
 
 ## 7. Database rules
 
@@ -97,6 +98,7 @@ schoolos/
 ## 8. Logging, errors, observability
 
 - Use `core.logging.get_logger(__name__)` with structured fields; never f-string personal data into messages.
+- Never log a concrete URL or query string (log the route template); edge access logs are covered by the no-personal-data-in-URLs rule (§6).
 - One `INFO` business event per meaningful action; `ERROR` only for actionable failures.
 - Add spans for new external calls and heavy computations; attributes allowlisted.
 

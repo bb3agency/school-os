@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
+| Version | 0.4 · 2026-09-27 |
 | Cloud | AWS ap-south-1 (Mumbai) primary · ap-south-2 (Hyderabad) backups/DR |
 | Tooling | Terraform · Docker · GitHub Actions · OpenTelemetry |
 | Related | 04-Architecture §11, §16–17, 07-Security §13–14, 11-Operations, 16-Platform admin panel §12–13, ADR-0014, ADR-0015, ADR-0018 |
-| Changes | 0.3: Terraform module and root list as built (§5); CI jobs as in `ci.yml` (§7); migrate + partition step (§9); local stack, make targets and every `SOS_*` setting from `config.py` (§11). 0.2: dedicated tier (§15: Terraform module `dedicated_host`, `deploy/dedicated/compose.yaml`, Caddy TLS, WAL-G/`pg_dump` backups to ap-south-2, hardening, patching, fleet upgrades); local compose with SeaweedFS, Valkey, `migrate`, `beat`, OIDC stub and `infra/db/bootstrap.sql` (§11); Valkey and two Cognito pools (§4–5, ADR-0018); fleet step in CD (§8). 0.1: baseline |
+| Changes | 0.4: edge access logs keep full URLs, so no personal data in query strings; Caddy and WAF log redaction (§4, §15.2; SEC-008). 0.3: Terraform module and root list as built (§5); CI jobs as in `ci.yml` (§7); migrate + partition step (§9); local stack, make targets and every `SOS_*` setting from `config.py` (§11). 0.2: dedicated tier (§15: Terraform module `dedicated_host`, `deploy/dedicated/compose.yaml`, Caddy TLS, WAL-G/`pg_dump` backups to ap-south-2, hardening, patching, fleet upgrades); local compose with SeaweedFS, Valkey, `migrate`, `beat`, OIDC stub and `infra/db/bootstrap.sql` (§11); Valkey and two Cognito pools (§4–5, ADR-0018); fleet step in CD (§8). 0.1: baseline |
 
 ---
 
@@ -55,6 +55,8 @@ Endpoints: S3 (gateway), ECR, Secrets Manager, KMS, CloudWatch Logs (interface; 
 | Identity | Two Cognito user pools in ap-south-1 on the Essentials plan: staff (MFA optional, `sos:mfa` claim) and operators (MFA on); pre-token-generation Lambda; access tokens 10 min (ADR-0018) | Same | Same |
 | Observability | CloudWatch Logs/Metrics, X-Ray via OTel collector sidecar | + dashboards, synthetic checks | + tracing sampling policies |
 | Backups | RDS automated (14 days) + daily snapshot copy to ap-south-2 | AWS Backup cross-account vault, 35-day PITR | Warm standby option |
+
+**Edge access logs keep full URLs (SEC-008).** The ALB writes an access log line for every request to the access-log bucket (prefix `alb/`), including the complete path and query string; ALB access logs have no field filter or redaction. CloudFront logs (Stage 1+) do the same. So personal data (names, phone numbers, emails, dates of birth, addresses, admission numbers, Aadhaar-like input, free-text searches) must **never** be sent in a URL: every endpoint, including new ones, takes such values in a JSON body (searches: `POST …/search`, e.g. `POST /api/v1/students/search`), and query strings carry only IDs, codes, enums, record dates, cursors and page sizes (09 §2, 13 §6, 07 §11). WAF logs (CloudWatch `aws-waf-logs-*`) redact the `authorization`, `cookie` and `x-service-token` headers and the whole query string.
 
 ## 5. Terraform
 
@@ -274,7 +276,7 @@ A dedicated-tier school gets its own host running the same images as the shared 
 
 ### 15.2 Runtime: `deploy/dedicated/compose.yaml`
 
-Services: `caddy` (TLS termination, ACME certificates for the default and custom domains, HSTS, security headers), `web`, `api`, `worker`, `beat`, `postgres` (`pgvector/pgvector:0.8.6-pg16-bookworm`), `valkey` (`valkey/valkey:8.1-alpine`). Images are pulled **by digest**. Only `caddy` publishes ports (80/443); Postgres and Valkey listen on the internal container network only. `SOS_DEPLOYMENT_MODE=dedicated` removes control-plane routes and schedules. `beat` schedules the heartbeat and the worker sends it (16 §12). The `api`, `worker`, `beat` and one-off `migrate` services share one settings block (`x-app-env`, names as in §11), so each passes the production start-up guards.
+Services: `caddy` (TLS termination, ACME certificates for the default and custom domains, HSTS, security headers), `web`, `api`, `worker`, `beat`, `postgres` (`pgvector/pgvector:0.8.6-pg16-bookworm`), `valkey` (`valkey/valkey:8.1-alpine`). Images are pulled **by digest**. Only `caddy` publishes ports (80/443); Postgres and Valkey listen on the internal container network only. Caddy's JSON access log (stdout, shipped with the host logs) keeps the request URI but its `format filter` replaces the values of the query parameters `code` and `state` (OIDC callback) and `query`, `q`, `admission_no`, `name`, `phone`, `email`, `dob` and `address` with `REDACTED`, and deletes `Authorization`, `Cookie` and `Set-Cookie`. This is defense in depth for old clients of the deprecated `GET /api/v1/students?query=`; the rule is still that personal data never goes in a URL (§4). `SOS_DEPLOYMENT_MODE=dedicated` removes control-plane routes and schedules. `beat` schedules the heartbeat and the worker sends it (16 §12). The `api`, `worker`, `beat` and one-off `migrate` services share one settings block (`x-app-env`, names as in §11), so each passes the production start-up guards.
 
 After `db-bootstrap` and `migrate`, the school is created on the host with `python -m app.platform.provision_dedicated` (run in the api image via `scripts/compose.sh run --rm api ...`; see `deploy/dedicated/README.md`, Provisioning step 6). It refuses unless `SOS_DEPLOYMENT_MODE=dedicated` and `--tenant-id` equals `SOS_DEDICATED_TENANT_ID` (the tenant ID the control plane chose, 16 §5.4), and it refuses a second school on the same host. It registers the tenant with that ID, creates its keys and system roles, invites the owner and activates the school; it is resumable and audited.
 
