@@ -1,0 +1,15 @@
+Bundled font for PDF exports (CLAUDE.md §3 and §10: self-hosted, no external font CDNs)
+
+File:     NotoSansTelugu-VF.ttf (variable font, axes wdth 62.5-100, wght 100-900)
+Family:   Noto Sans Telugu (Telugu, Latin and Latin Extended subsets)
+Version:  NotoSansTelugu v2.005
+Source:   https://github.com/google/fonts/blob/main/ofl/notosanstelugu/NotoSansTelugu%5Bwdth%2Cwght%5D.ttf
+          upstream https://github.com/notofonts/telugu (commit af5b949ed1906ead47608577d092fb013d3145d3)
+Licence:  SIL Open Font License 1.1 (OFL.txt in this folder). Bundling in software is permitted;
+          the font is not sold on its own and keeps its name and licence.
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/telugu)
+SHA-256:  e618af7bf999df192ed4f388eba2e563f2b5015034e9cbb317b5bd793bd7334d  NotoSansTelugu-VF.ttf
+          481c72a8f1b4f645a7e6b10326be41b2da2c15cb470ff48a07fab773eed00102  OFL.txt
+
+The renderer (app/exports/pdf.py) checks the SHA-256 above before use and serves the file to
+Chromium from memory; Chromium makes no other network request.

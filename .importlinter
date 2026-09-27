@@ -17,7 +17,7 @@
 # import-linter fails on modules that do not exist, so only modules that exist today are
 # listed. When a new module lands, add it to every `source_modules` list below and add its
 # own "<module>-internals" contract. Future modules (CLAUDE.md §4):
-#   knowledge, exports, admin
+#   knowledge, admin
 # Note for knowledge: also forbid app.knowledge.gateway internals once it exists, and keep
 # the semgrep rule `sos-llm-sdk-outside-gateway` for third-party SDK imports.
 
@@ -47,6 +47,7 @@ source_modules =
     app.breakglass
     app.imports
     app.changes
+    app.exports
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -71,6 +72,7 @@ source_modules =
     app.breakglass
     app.imports
     app.changes
+    app.exports
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -95,6 +97,7 @@ source_modules =
     app.breakglass
     app.imports
     app.changes
+    app.exports
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -122,6 +125,7 @@ forbidden_modules =
     app.breakglass
     app.imports
     app.changes
+    app.exports
 
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
@@ -140,6 +144,7 @@ source_modules =
     app.notifications
     app.imports
     app.changes
+    app.exports
 forbidden_modules =
     app.platform
 
@@ -162,6 +167,7 @@ source_modules =
     app.breakglass
     app.imports
     app.changes
+    app.exports
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -186,6 +192,7 @@ source_modules =
     app.notifications
     app.breakglass
     app.changes
+    app.exports
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -210,6 +217,7 @@ source_modules =
     app.notifications
     app.breakglass
     app.changes
+    app.exports
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -234,6 +242,7 @@ source_modules =
     app.notifications
     app.breakglass
     app.changes
+    app.exports
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -258,6 +267,7 @@ source_modules =
     app.breakglass
     app.imports
     app.changes
+    app.exports
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -282,6 +292,7 @@ source_modules =
     app.notifications
     app.imports
     app.changes
+    app.exports
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -330,6 +341,7 @@ source_modules =
     app.notifications
     app.breakglass
     app.changes
+    app.exports
 forbidden_modules =
     app.imports.repository
     app.imports.models
@@ -378,7 +390,56 @@ source_modules =
     app.notifications
     app.breakglass
     app.imports
+    app.exports
 forbidden_modules =
     app.changes.repository
     app.changes.models
 allow_indirect_imports = True
+
+[importlinter:contract:exports-internals]
+name = exports: repository/models are private (use app.exports.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+forbidden_modules =
+    app.exports.repository
+    app.exports.models
+allow_indirect_imports = True
+
+# Cells, writers, report layout and config stay pure (no database, web or tenant modules), so
+# SEC-017 and the Aadhaar masking of every cell are tested without infrastructure.
+[importlinter:contract:exports-pure-library]
+name = exports cells/writers/report/config modules stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.exports.tables
+    app.exports.report
+    app.exports.config
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.students
+    app.documents
+    app.dq

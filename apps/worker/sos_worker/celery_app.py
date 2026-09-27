@@ -20,6 +20,7 @@ from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
+from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
@@ -43,6 +44,7 @@ TASK_MODULES: list[str] = [
     "app.imports.tasks",
     "app.dq.tasks",
     "app.changes.tasks",
+    "app.exports.tasks",
 ]
 
 
@@ -76,6 +78,11 @@ def create_celery() -> Celery:
             "imports.purge_raw_files": {"queue": "maintenance"},
             # FR-DQ-002: data-quality runs (outbox consumers and queued runs) on queue "dq".
             "dq.*": {"queue": "dq"},
+            # FR-EXP-002..004: spreadsheets on "exports"; anything with a PDF on "pdf"
+            # (Chromium workers); the daily file purge on "maintenance".
+            "exports.generate": {"queue": "exports"},
+            "exports.render": {"queue": "pdf"},
+            "exports.purge_expired": {"queue": "maintenance"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
@@ -99,6 +106,8 @@ def create_celery() -> Celery:
             **imports_beat_schedule(),
             # FR-CR-004: pending change requests expire after 30 days (daily).
             **changes_beat_schedule(),
+            # docs/05 §13: export files deleted 7 days after they were ready (daily).
+            **exports_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },
