@@ -46,3 +46,8 @@ crash.log
 .idea/
 .vscode/
 .claude/worktrees/
+
+# Written and re-added by `next dev` (Next.js agent rules). Agent instructions in this repo are
+# governed by the root CLAUDE.md, so these generated files are not committed.
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
