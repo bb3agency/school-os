@@ -130,10 +130,10 @@ def test_SEC_001_other_school_never_sees_or_writes_requests(
             == 0
         )
         updated = s.execute(
-            text("UPDATE sis.change_requests SET status = 'cancelled' WHERE id = :i"),
+            text("UPDATE sis.change_requests SET status = 'cancelled' WHERE id = :i RETURNING id"),
             {"i": req.id},
-        )
-        assert updated.rowcount == 0
+        ).all()
+        assert updated == []
     with context_free_session() as s:
         assert s.execute(text("SELECT count(*) FROM sis.change_requests")).scalar_one() == 0
 
@@ -177,7 +177,7 @@ def test_docs_05_attribute_values_reference_change_requests(admin_engine: Engine
 
 def test_SEC_014_constraint_catalog(admin_engine: Engine) -> None:
     with admin_engine.connect() as c:
-        defs = dict(
+        defs: dict[str, str] = dict(
             c.execute(
                 text(
                     "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint "

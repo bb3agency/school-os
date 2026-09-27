@@ -192,7 +192,7 @@ def test_SEC_012_c3_values_are_encrypted_and_bound_to_the_row(
     assert PLACE_NEW.encode() not in blob
     assert PLACE_OLD.encode() not in bytes(row["old_value_ciphertext"])
     with admin_engine.connect() as c:
-        dump = c.execute(
+        dump: str = c.execute(
             text("SELECT CAST(r AS text) FROM sis.change_requests r WHERE id = :i"), {"i": req.id}
         ).scalar_one()
     assert "Tenali" not in dump

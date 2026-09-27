@@ -7,6 +7,7 @@ security suites (authz matrix, BOLA). Builds on ``tests/api/world.py`` (schools 
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
 import itertools
 import sys
@@ -46,17 +47,14 @@ REASON = "Birth certificate shows a different date of birth"
 
 def ctx(school: Any, person: Any, role: str, **scopes: Any) -> UserContext:
     """The role's permissions with a fresh MFA sign-in (step-up satisfied)."""
-    import dataclasses
     import datetime as dt
 
-    base = SW.ctx_for(school.tenant_id, person, role, **scopes)
+    base: UserContext = SW.ctx_for(school.tenant_id, person, role, **scopes)
     return dataclasses.replace(base, auth_time=dt.datetime.now(dt.UTC))
 
 
 def ctx_roles(school: Any, person: Any, *roles: str, **scopes: Any) -> UserContext:
     """Union of several system roles (a member holding e.g. office_admin AND principal)."""
-    import dataclasses
-
     parts = [ctx(school, person, r, **scopes) for r in roles]
     return dataclasses.replace(
         parts[0],
@@ -169,7 +167,7 @@ def submit(
             ChangeRequestCreate(
                 student_id=sid,
                 attribute_key=attribute_key,
-                target_source=target_source,  # type: ignore[arg-type]
+                target_source=target_source,
                 new_value=new_value,
                 reason=REASON,
                 evidence_document_id=doc,
@@ -177,12 +175,56 @@ def submit(
         )
 
 
-def pending(admin: Engine, school: Any) -> uuid.UUID:
-    """A pending request of ``school`` submitted by its office admin (or owner, for school B,
-    which has no office admin: the owner then acts with office-admin permissions)."""
-    people = school.people
-    requester = people.get("office_admin") or people["owner"]
-    return submit(admin, school, requester, "office_admin").id
+def service_evidence(school: Any, person: Any) -> uuid.UUID:
+    """An evidence document created through the real upload -> register path (no admin engine;
+    for cross-tenant fixtures of the BOLA suite). Its version is ``queued`` (usable evidence)."""
+    from app.documents import service as documents
+    from app.documents.schemas import DocumentCreate, UploadCreate
+
+    store = D.memory_store()
+    uploader = dataclasses.replace(
+        SW.ctx_for(school.tenant_id, person, "owner"),
+        permissions=frozenset({"document.upload", "document.read", "document.manage_acl"}),
+    )
+    data = D.pdf()
+    with tenant_session(school.tenant_id, person.user_id) as s:
+        up = documents.create_upload(
+            s,
+            uploader,
+            UploadCreate(
+                filename="birth-certificate.pdf",
+                content_type="application/pdf",
+                size_bytes=len(data),
+                purpose="evidence",
+            ),
+        )
+    assert store.browser_post(up.fields, data, "application/pdf") == 204
+    with tenant_session(school.tenant_id, person.user_id) as s:
+        doc = documents.register_document(
+            s, uploader, DocumentCreate(upload_id=up.upload_id, title="Synthetic birth certificate")
+        )
+    return doc.id
+
+
+def pending(school: Any) -> uuid.UUID:
+    """A pending request of ``school`` through the real services only, submitted by its office
+    admin (or, for school B which has none, by the owner acting with office-admin permissions)."""
+    requester = school.people.get("office_admin") or school.people["owner"]
+    SW.configure_keyring()
+    sid = student(school)
+    doc = service_evidence(school, requester)
+    with tenant_session(school.tenant_id, requester.user_id) as s:
+        return changes.submit(
+            s,
+            ctx(school, requester, "office_admin"),
+            ChangeRequestCreate(
+                student_id=sid,
+                attribute_key="dob",
+                new_value="2012-03-15",
+                reason=REASON,
+                evidence_document_id=doc,
+            ),
+        ).id
 
 
 def version(admin: Engine, request_id: uuid.UUID) -> int:

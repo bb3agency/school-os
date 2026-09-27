@@ -6,6 +6,7 @@ import dataclasses
 import datetime as dt
 import sys
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -132,7 +133,7 @@ def test_FR_CR_001_evidence_must_exist_be_visible_and_be_evidence(
     school: Any, world: Any, admin_engine: Engine, case: str, code: str
 ) -> None:
     staff = school.people["office_staff"]
-    doc = {
+    makers: dict[str, Callable[[], uuid.UUID]] = {
         "missing": uuid.uuid4,
         "circular": lambda: CR.evidence(admin_engine, school, staff, purpose="circular"),
         "quarantined": lambda: CR.evidence(admin_engine, school, staff, status="quarantined"),
@@ -144,7 +145,8 @@ def test_FR_CR_001_evidence_must_exist_be_visible_and_be_evidence(
             acl=[("membership", str(school.people["principal"].membership_id))],
         ),
         "other_school": lambda: CR.evidence(admin_engine, world.b, world.b.people["owner"]),
-    }[case]()
+    }
+    doc = makers[case]()
     sid = CR.student(school)
     with pytest.raises(changes.EvidenceRequired) as exc:
         _submit_as(school, "office_staff", "office_staff", _create(sid, doc))
@@ -443,7 +445,7 @@ def test_FR_CR_004_only_the_requester_cancels(school: Any, admin_engine: Engine)
 def test_FR_AUD_failed_decisions_leave_no_audit_event(school: Any, admin_engine: Engine) -> None:
     req = CR.submit(admin_engine, school, school.people["office_admin"], "office_admin")
     before = CR.actions(admin_engine, school.tenant_id, req.id)
-    for bad in (
+    bads: tuple[Callable[[], Any], ...] = (
         lambda: _approve(school, "principal", req.id, version=9),
         lambda: _approve(
             school,
@@ -451,7 +453,8 @@ def test_FR_AUD_failed_decisions_leave_no_audit_event(school: Any, admin_engine:
             req.id,
             ctx=CR.ctx(school, school.people["office_admin"], "office_admin"),
         ),
-    ):
+    )
+    for bad in bads:
         with pytest.raises((PreconditionFailed, NotFound)):
             bad()
     assert CR.actions(admin_engine, school.tenant_id, req.id) == before

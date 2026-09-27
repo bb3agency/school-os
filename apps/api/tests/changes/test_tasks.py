@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.changes import service as changes
 from app.changes import tasks
 from app.core.errors import Conflict
+from app.tenancy import service as tenancy
 
 pytestmark = pytest.mark.db
 CR = sys.modules["sos_test_changes_objects"]
@@ -26,7 +27,7 @@ def test_FR_CR_004_expiry_task_expires_each_school_separately(
     fresh = CR.submit(admin_engine, school, school.people["office_admin"], "office_admin")
     broken = uuid.uuid4()
     monkeypatch.setattr(
-        tasks.tenancy, "list_tenant_ids", lambda session, statuses: [broken, school.tenant_id]
+        tenancy, "list_tenant_ids", lambda session, statuses: [broken, school.tenant_id]
     )
     later = req.expires_at + dt.timedelta(seconds=1)
     real = changes.expire_due
