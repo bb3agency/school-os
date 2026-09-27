@@ -6,9 +6,7 @@ import { unwrap } from "@/lib/bff/query";
  *
  * 1. `POST /documents/uploads` (purpose `evidence`) → a presigned POST for exactly this file;
  * 2. the browser posts the file straight to storage (never through the BFF: no file bodies
- *    in the web tier). NOTE: the page CSP keeps `connect-src 'self'` (docs/07 §11), so this
- *    step is blocked in production until the files origin is allowed by a documented
- *    decision (open question); the failure is shown as "the file could not be uploaded";
+ *    in the web tier; CSP `connect-src` allows the configured FILES_ORIGIN);
  * 3. `POST /documents` registers it (202, version 1 queued for the virus scan) → document id.
  *
  * Evidence accepts PDF, JPG and PNG up to 25 MB (the API checks the content again).

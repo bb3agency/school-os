@@ -81,6 +81,21 @@ describe("change request list (US-601, FR-CR-002)", () => {
     expect(screen.getByRole("link", { name: "Request a correction" })).toBeInTheDocument();
   });
 
+  it("filters by a student ID from the URL (API filter), ignoring anything that is not a UUID", async () => {
+    expect(parseChangeRequestFilters({ student_id: "not-a-uuid", status: "bogus" })).toEqual({
+      status: null,
+      studentId: null,
+    });
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([REQUEST]));
+    stub.routes["GET /bff/api/v1/change-requests"] = () => page([changeRequest()]);
+    renderWithIntl(
+      <ChangeRequestsScreen filters={parseChangeRequestFilters({ student_id: STUDENT })} />,
+    );
+    expect(await screen.findByText("Showing one student only.")).toBeInTheDocument();
+    const call = stub.callsTo("GET /bff/api/v1/change-requests")[0];
+    expect(call?.url.searchParams.get("student_id")).toBe(STUDENT);
+  });
+
   it("keeps masked values masked", async () => {
     stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([APPROVE]));
     stub.routes["GET /bff/api/v1/change-requests"] = () =>

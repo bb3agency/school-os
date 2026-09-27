@@ -11,7 +11,10 @@ export interface CspOptions {
   nonce: string;
   /** `next dev` needs 'unsafe-eval' (React debugging) and inline styles (dev overlay). */
   isDev: boolean;
-  /** Origin that serves presigned file URLs, e.g. https://files.schoolos.example. */
+  /**
+   * Origin that serves presigned file URLs and takes presigned uploads, e.g.
+   * https://files.schoolos.example (img-src and connect-src).
+   */
   filesOrigin?: string | undefined;
   /** Add `upgrade-insecure-requests` (skip it only for plain-http local runs). */
   upgradeInsecureRequests: boolean;
@@ -49,10 +52,11 @@ export function buildContentSecurityPolicy(options: CspOptions): string {
     // Production: stylesheets only from our origin (no inline styles, no style attributes).
     `style-src 'self'${isDev ? " 'unsafe-inline'" : ""}`,
     `img-src 'self' data: blob:${filesOrigin ? ` ${filesOrigin}` : ""}`,
-    // `next dev` uses a websocket for hot reload. The files origin is deliberately NOT added
-    // here (docs/07 §11 says connect-src 'self'); browser uploads to presigned URLs need a
-    // documented decision first (open question in the web-findings handoff).
-    `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
+    // Files origin (only when configured, https origin only, as for img-src): the browser
+    // posts uploads straight to the presigned storage URL (docs/07 §10: presigned POST; the
+    // BFF never carries file bodies). Lead decision 2026-09-27; docs/07 §11 to be updated.
+    // `next dev` uses a websocket for hot reload.
+    `connect-src 'self'${filesOrigin ? ` ${filesOrigin}` : ""}${isDev ? " ws: wss:" : ""}`,
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
