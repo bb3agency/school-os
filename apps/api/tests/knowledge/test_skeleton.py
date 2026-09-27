@@ -63,7 +63,7 @@ def test_SEC_020_knowledge_routes_are_exactly_docs_09_with_their_permissions() -
         if not isinstance(route, APIRoute) or not str(rc.path).startswith("/api/v1/knowledge"):
             continue
         guards = [
-            d.call.sos_permission
+            str(getattr(d.call, "sos_permission", ""))
             for d in route.dependant.dependencies
             if hasattr(d.call, "sos_permission")
         ]
@@ -93,6 +93,18 @@ def test_SEC_020_provider_sdks_only_inside_the_gateway() -> None:
         if found:
             offenders.append(f"{path.relative_to(KNOWLEDGE)}: {sorted(found)}")
     assert not offenders, offenders
+
+
+def test_docs_06_s13_production_code_never_imports_the_eval_harness() -> None:
+    """The eval bridge lives in tests/ (tests/knowledge/eval_bridge.py); app code stays free of
+    sos_evals so the harness scores the product through its adapter protocols only."""
+    app_root = KNOWLEDGE.parent
+    offenders = [
+        str(path.relative_to(app_root))
+        for path in app_root.rglob("*.py")
+        if "sos_evals" in _imported_roots(path)
+    ]
+    assert offenders == []
 
 
 def test_knowledge_never_reads_the_environment() -> None:

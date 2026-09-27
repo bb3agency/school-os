@@ -254,6 +254,13 @@ def test_FR_KB_007_no_tool_results_answers_not_found_in_the_question_language() 
     assert answer.text == CONFIG.answer_checks.not_found.te
 
 
+def test_FR_KB_006_code_mixed_telugu_question_gets_the_telugu_not_found() -> None:
+    gw = ScriptedGateway([turn(AnswerSegment("Nothing."))])
+    answer = run(engine(gw, [search_tool()]), question="9B ఫీల్డ్ ట్రిప్ ఎప్పుడు?")
+    assert answer.language == "mixed"
+    assert answer.text == CONFIG.answer_checks.not_found.te
+
+
 def test_docs_06_s9_rule3_mostly_uncited_facts_fall_back_to_search_only() -> None:
     gw = ScriptedGateway(
         [

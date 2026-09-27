@@ -24,6 +24,7 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.knowledge import composition
+from app.knowledge.config.llm import load_llm_config
 
 pytestmark = pytest.mark.db
 
@@ -262,7 +263,7 @@ def test_invariant_2_ask_needs_kb_ask(world: Any, api: Any, fake: Any) -> None:
 def test_docs_06_s5_per_user_question_rate_limit(
     world: Any, api: Any, docs: dict[str, uuid.UUID]
 ) -> None:
-    llm = composition.load_llm_config()
+    llm = load_llm_config()
     limited = llm.model_copy(
         update={
             "rate_limit": llm.rate_limit.model_copy(update={"questions_per_minute_per_user": 1})

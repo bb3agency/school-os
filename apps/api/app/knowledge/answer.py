@@ -386,8 +386,9 @@ class AnswerEngine:
     # --- results ------------------------------------------------------------------------------
 
     def _not_found(self, language: Locale) -> str:
+        # Telugu for any question written with Telugu script (FR-KB-006; code-mixed accepts either).
         texts = self._config.answer_checks.not_found
-        return texts.te if language == "te" else texts.en
+        return texts.en if language == "en" else texts.te
 
     @staticmethod
     def _route(runs: Sequence[ToolRun]) -> Route:

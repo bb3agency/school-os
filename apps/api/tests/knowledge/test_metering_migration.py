@@ -138,7 +138,7 @@ def test_invariant_12_0024_round_trips_on_a_populated_database(
     assert "llm_calls" in _tables(admin)
     with admin.connect() as c:
         assert c.execute(text("SELECT count(*) FROM kb.llm_calls")).scalar_one() == 0
-        forced = c.execute(
+        forced: bool = c.execute(
             text(
                 "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class "
                 "WHERE oid = 'kb.llm_calls'::regclass"
