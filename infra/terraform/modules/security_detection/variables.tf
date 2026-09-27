@@ -3,6 +3,17 @@ variable "name_prefix" {
   type        = string
 }
 
+variable "region" {
+  description = "Region to manage (AWS provider v6 per-resource region). Null = the provider's region. IAM resources are global and ignore it."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.region == null || contains(["ap-south-1", "ap-south-2"], coalesce(var.region, "x"))
+    error_message = "SchoolOS runs only in ap-south-1 and ap-south-2 (NFR-PRV-001)."
+  }
+}
+
 variable "is_primary" {
   description = "True in the home region (ap-south-1): records global resource types (IAM) and runs the account-wide Config rules. Exactly one region per account is primary."
   type        = bool

@@ -97,6 +97,7 @@ run "secondary_region_forwards_and_skips_global" {
   command = plan
 
   variables {
+    region                   = "ap-south-2"
     is_primary               = false
     forward_to_event_bus_arn = "arn:aws:events:ap-south-1:111122223333:event-bus/default"
     tamper_event_sources     = ["guardduty.amazonaws.com"]
@@ -126,6 +127,21 @@ run "secondary_region_forwards_and_skips_global" {
     condition     = output.posture.guardduty_features["S3_DATA_EVENTS"] == "ENABLED"
     error_message = "S3 Protection stays on in every region."
   }
+
+  assert {
+    condition     = output.region == "ap-south-2" && alltrue([for a in output.posture.securityhub_standards : startswith(a, "arn:aws:securityhub:ap-south-2::")])
+    error_message = "Resources are managed in the requested region (provider v6 per-resource region)."
+  }
+}
+
+run "regions_outside_india_rejected" {
+  command = plan
+
+  variables {
+    region = "us-east-1"
+  }
+
+  expect_failures = [var.region]
 }
 
 run "s3_protection_cannot_be_disabled" {

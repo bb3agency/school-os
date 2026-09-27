@@ -12,13 +12,15 @@ data "aws_region" "current" {}
 locals {
   account_id = data.aws_caller_identity.current.account_id
   partition  = data.aws_partition.current.partition
-  region     = data.aws_region.current.region
+  region     = coalesce(var.region, data.aws_region.current.region)
   forwarding = var.forward_to_event_bus_arn != null
 }
 
 # --- GuardDuty ----------------------------------------------------------------------------
 
 resource "aws_guardduty_detector" "this" {
+  region = var.region
+
   enable                       = true
   finding_publishing_frequency = "FIFTEEN_MINUTES"
   tags                         = var.tags
@@ -26,6 +28,7 @@ resource "aws_guardduty_detector" "this" {
 
 resource "aws_guardduty_detector_feature" "this" {
   for_each = var.guardduty_features
+  region   = var.region
 
   detector_id = aws_guardduty_detector.this.id
   name        = each.key
@@ -41,7 +44,8 @@ resource "aws_guardduty_detector_feature" "this" {
 }
 
 resource "aws_guardduty_publishing_destination" "s3" {
-  count = var.guardduty_export == null ? 0 : 1
+  count  = var.guardduty_export == null ? 0 : 1
+  region = var.region
 
   detector_id      = aws_guardduty_detector.this.id
   destination_type = "S3"
@@ -52,6 +56,8 @@ resource "aws_guardduty_publishing_destination" "s3" {
 # --- AWS Config ---------------------------------------------------------------------------
 
 resource "aws_config_configuration_recorder" "this" {
+  region = var.region
+
   name     = "${var.name_prefix}-recorder"
   role_arn = var.config_role_arn
 
@@ -67,6 +73,8 @@ resource "aws_config_configuration_recorder" "this" {
 }
 
 resource "aws_config_delivery_channel" "this" {
+  region = var.region
+
   name           = "${var.name_prefix}-delivery"
   s3_bucket_name = var.config_bucket_name
   s3_key_prefix  = var.config_s3_key_prefix
@@ -80,6 +88,8 @@ resource "aws_config_delivery_channel" "this" {
 }
 
 resource "aws_config_configuration_recorder_status" "this" {
+  region = var.region
+
   name       = aws_config_configuration_recorder.this.name
   is_enabled = true
 
@@ -88,6 +98,7 @@ resource "aws_config_configuration_recorder_status" "this" {
 
 resource "aws_config_config_rule" "managed" {
   for_each = var.is_primary ? var.config_rules : {}
+  region   = var.region
 
   name = "${var.name_prefix}-${each.key}"
 
@@ -103,6 +114,8 @@ resource "aws_config_config_rule" "managed" {
 # --- Security Hub -------------------------------------------------------------------------
 
 resource "aws_securityhub_account" "this" {
+  region = var.region
+
   # Standards are subscribed explicitly below; consolidated control findings (one finding per control).
   enable_default_standards  = false
   control_finding_generator = "SECURITY_CONTROL"
@@ -113,6 +126,7 @@ resource "aws_securityhub_account" "this" {
 
 resource "aws_securityhub_standards_subscription" "this" {
   for_each = toset(var.securityhub_standards)
+  region   = var.region
 
   standards_arn = "arn:${local.partition}:securityhub:${local.region}::standards/${each.value}"
 
@@ -180,7 +194,8 @@ locals {
 }
 
 resource "aws_cloudwatch_event_rule" "forward" {
-  count = local.forwarding ? 1 : 0
+  count  = local.forwarding ? 1 : 0
+  region = var.region
 
   name          = "${var.name_prefix}-security-forward"
   description   = "SEC-023: forward GuardDuty findings and security-service tampering in ${local.region} to the primary region."
@@ -196,7 +211,8 @@ resource "aws_cloudwatch_event_rule" "forward" {
 }
 
 resource "aws_cloudwatch_event_target" "forward" {
-  count = local.forwarding ? 1 : 0
+  count  = local.forwarding ? 1 : 0
+  region = var.region
 
   rule     = aws_cloudwatch_event_rule.forward[0].name
   arn      = var.forward_to_event_bus_arn
