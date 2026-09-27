@@ -37,6 +37,15 @@ dependencies = [
   # Image redaction of register photos (PRV-016, ADR-0007): decode, black out, re-encode without
   # metadata. Licence MIT-CMU (HPND); no known vulnerabilities for 12.3.0 (PyPI/pip-audit).
   "pillow==12.3.0",
+  # Anthropic Messages API client, imported ONLY under app/knowledge/gateway (ADR-0005, CLAUDE.md
+  # §11; semgrep sos-llm-sdk-outside-gateway). Licence MIT; runtime deps anyio, distro (Apache-2.0),
+  # docstring-parser, httpx (already pinned), jiter, pydantic, sniffio, typing-extensions: no AGPL;
+  # no known vulnerabilities (OSV, 2026-09-27). 0.125.0 is the last 0.x release (2026-08-19) and
+  # has every API feature the gateway uses (search_result blocks, thinking disabled,
+  # output_config). 1.x (1.8.0 current) moves to httpx2, and installing httpx2 silently switches
+  # Starlette's TestClient from httpx to httpx2 across every test module; that migration is a
+  # separate, repo-wide change (CLAUDE.md §3 lists httpx), so it is deferred, not smuggled in here.
+  "anthropic==0.125.0",
 ]
 
 [build-system]
