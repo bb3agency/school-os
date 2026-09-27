@@ -210,7 +210,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `make eval` | Placeholder until the knowledge module exists (M2) |
 | `make check` | `lint typecheck test security` |
 
-**API and worker settings** (`apps/api/app/core/config.py`, the only code that reads the environment; prefix `SOS_`, unknown variables ignored). In `staging`/`prod` the process refuses to start with `SOS_KEY_WRAPPER=local-dev`, with a `dev-only` value in `SOS_DATABASE_URL`, `SOS_PLATFORM_DATABASE_URL` or `SOS_SERVICE_TOKEN_KEY`, or with the placeholder invoice supplier name or GSTIN.
+**API and worker settings** (`apps/api/app/core/config.py`, the only code that reads the environment; prefix `SOS_`, unknown variables ignored). In `staging`/`prod` the process refuses to start with `SOS_KEY_WRAPPER=local-dev`, with a `dev-only` value in `SOS_DATABASE_URL`, `SOS_PLATFORM_DATABASE_URL`, `SOS_SERVICE_TOKEN_KEY`, `SOS_ANTHROPIC_API_KEY` or `SOS_EMBEDDINGS_API_KEY`, with the placeholder invoice supplier name or GSTIN, with `SOS_KB_PROVIDER_MODE=fake`, or with `SOS_KB_ENABLED=true` and no `SOS_ANTHROPIC_API_KEY`.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -233,6 +233,10 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_CLAMAV_HOST`, `SOS_CLAMAV_PORT`, `SOS_CLAMAV_TIMEOUT_S` | `localhost`, 3310, 30 | clamd connection when `SOS_AV_SCANNER=clamav` |
 | `SOS_EXTRACTION_PROVIDER` | unset: `fake` in local/ci, `not-configured` in staging/prod | Register-photo extraction provider (FR-IMP-024); `fake` refuses to run in staging/prod |
 | `SOS_EXTRACTION_LOW_CONFIDENCE_THRESHOLD` | 0.8 | Fields read below this confidence are highlighted for the reviewer (US-402 AC4) |
+| `SOS_KB_ENABLED` | `false` | Knowledge module master switch ("Ask the school", M2); a school also needs the feature flag `kb.ask.enabled`. In staging/prod `true` requires `SOS_ANTHROPIC_API_KEY` |
+| `SOS_KB_PROVIDER_MODE` | unset: `fake` in local/ci, `live` in staging/prod | `fake` = offline deterministic providers (refused in staging/prod); `live` = the providers and models in `app/knowledge/config/*.yaml` through `knowledge/gateway`. Model IDs, budgets and thresholds are versioned files, not settings (invariant 13) |
+| `SOS_ANTHROPIC_API_KEY` | none | Anthropic organization API key for the LLM gateway (ADR-0005; never a personal subscription; `dev-only` values refused in staging/prod) |
+| `SOS_EMBEDDINGS_API_KEY` | none | Embeddings provider API key, when the provider chosen by ADR-0006 needs one (`dev-only` values refused in staging/prod) |
 | `AWS_REGION` (no prefix) | `ap-south-1` | AWS SDK region |
 | `SOS_OIDC_ISSUER`, `SOS_OIDC_AUDIENCE` | local stub `/schoolos`, `schoolos-web` | Staff tokens (Cognito: audience = app client ID) |
 | `SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE` | local stub `/platform`, `schoolos-platform` | Operator tokens |
@@ -249,7 +253,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_DEPLOYMENT_ID`, `SOS_DEDICATED_TENANT_ID` | none | Dedicated hosts: identity in the heartbeat |
 | `SOS_HEARTBEAT_KEY_ID`, `SOS_HEARTBEAT_KEY` | none | Dedicated hosts: heartbeat HMAC key (base64url, shown once by the panel) |
 
-Deployments use exactly these names: Terraform `shared_platform` (§5) and `deploy/dedicated/compose.yaml` (§15.2) give every app container (api, worker, beat, migrate) the full set it needs, and `apps/api/tests/deploy/test_env_contract.py` enforces it. Names that reach app containers without being settings are allowlisted there with the reader: `AWS_DEFAULT_REGION` (AWS SDK), `SOS_HOST_STATE_DIR` (dedicated host state mount), `SOS_ANTHROPIC_API_KEY` and `SOS_EMBEDDINGS_API_KEY` (until the knowledge gateway adds its settings, M2).
+Deployments use exactly these names: Terraform `shared_platform` (§5) and `deploy/dedicated/compose.yaml` (§15.2) give every app container (api, worker, beat, migrate) the full set it needs, and `apps/api/tests/deploy/test_env_contract.py` enforces it. Names that reach app containers without being settings are allowlisted there with the reader: `AWS_DEFAULT_REGION` (AWS SDK) and `SOS_HOST_STATE_DIR` (dedicated host state mount).
 
 Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test), `SOS_WEB_TEST_LOGS` (print the web app's JSON logs during vitest). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
 
@@ -266,7 +270,7 @@ Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of te
 In staging/prod `SOS_S3_ENDPOINT_URL` and `SOS_S3_PRESIGN_ENDPOINT_URL` stay unset: the API then signs virtual-hosted, regional URLs (`documents/storage.py`). A school's custom domain added after the host was created needs a Terraform apply of its `dedicated_host` stack so the files bucket's CORS rule includes it.
 
 - Local identity: the dev OIDC stub serves both staff and operator logins; the stub's `http://localhost:8080` issuer is not reachable from inside the web container, so for browser sign-in run the web app on the host (`apps/web/README.md`). `SOS_KEY_WRAPPER=local-dev` replaces KMS locally only.
-- LLM calls in local/CI will default to recorded fixtures unless `LIVE_LLM=1` (M2, with the knowledge module).
+- Model calls in local/CI use the offline deterministic fake (`SOS_KB_PROVIDER_MODE` unset); `SOS_KB_PROVIDER_MODE=live` with an organization key calls real providers (M2, knowledge module).
 - To try the dedicated tier locally, run `deploy/dedicated/compose.yaml` with `SOS_DEPLOYMENT_MODE=dedicated` against a separate project name.
 
 ## 12. Cost management

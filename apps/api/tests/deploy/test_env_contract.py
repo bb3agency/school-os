@@ -44,9 +44,6 @@ NOT_SETTINGS: dict[str, str] = {
     "AWS_DEFAULT_REGION": "AWS SDK default region on dedicated hosts",
     # Mount point of /var/lib/schoolos/state (backup.json from scripts/backup.sh) for the heartbeat.
     "SOS_HOST_STATE_DIR": "dedicated host state mount",
-    # Knowledge gateway / embeddings (M2): remove from this list when their settings land.
-    "SOS_ANTHROPIC_API_KEY": "knowledge gateway (M2)",
-    "SOS_EMBEDDINGS_API_KEY": "embeddings provider (M2)",
 }
 
 SYNTHETIC_TENANT = "0192a0de-0000-7000-8000-00000000a001"
