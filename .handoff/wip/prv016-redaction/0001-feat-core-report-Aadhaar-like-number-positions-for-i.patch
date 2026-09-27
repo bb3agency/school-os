@@ -1,0 +1,188 @@
+From 531ed744dd01d32116120da0090adde538736703 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 27 Sep 2026 03:25:24 +0000
+Subject: [PATCH 1/3] feat(core): report Aadhaar-like number positions for
+ image redaction (PRV-016, ADR-0007)
+
+find_aadhaar(text) returns every 12-digit window mask_aadhaar masks (Verhoeff-valid, or
+near an Aadhaar keyword) with its character range, ASCII digits and checksum flag, so a
+caller can map numbers to OCR bounding boxes. Same rules as the masking pass (one shared
+window scan); core stays pure.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016kfZp3PwLmjG15cWz7WoQd
+---
+ apps/api/app/core/redaction.py        | 56 +++++++++++++++++++++++----
+ apps/api/tests/core/test_redaction.py | 55 ++++++++++++++++++++++++++
+ 2 files changed, 103 insertions(+), 8 deletions(-)
+
+diff --git a/apps/api/app/core/redaction.py b/apps/api/app/core/redaction.py
+index 433fa40..5a1ee82 100644
+--- a/apps/api/app/core/redaction.py
++++ b/apps/api/app/core/redaction.py
+@@ -12,6 +12,8 @@ Public API
+ - ``redact(text)``: masks Aadhaar-like numbers, Indian mobile numbers and email addresses
+   (logs, traces, error reports: last line of defence, docs/11 §2).
+ - ``contains_full_aadhaar(text)``: input rejection (FR-STU-012).
++- ``find_aadhaar(text)``: where the numbers ``mask_aadhaar`` masks are (image redaction,
++  PRV-016: callers map the character ranges to OCR bounding boxes).
+ 
+ Detection rules (defined and tested in ``tests/core/test_redaction.py``)
+ -----------------------------------------------------------------------
+@@ -41,7 +43,9 @@ from dataclasses import dataclass
+ 
+ __all__ = [
+     "EMAIL_MASK",
++    "AadhaarMatch",
+     "contains_full_aadhaar",
++    "find_aadhaar",
+     "mask_aadhaar",
+     "redact",
+     "verhoeff_check_digit",
+@@ -205,16 +209,22 @@ def _merge(regions: list[tuple[int, int]]) -> list[tuple[int, int]]:
+     return merged
+ 
+ 
+-def _aadhaar_regions(
+-    text: str, groups: list[_Group], spans: list[tuple[int, int]]
+-) -> list[tuple[int, int]]:
+-    regions: list[tuple[int, int]] = []
++def _aadhaar_windows(
++    groups: list[_Group], spans: list[tuple[int, int]]
++) -> list[tuple[int, int, str, bool]]:
++    """Qualifying windows ``(i, j, digits, verhoeff_valid)``: Verhoeff-valid, or near a keyword."""
++    found: list[tuple[int, int, str, bool]] = []
+     for i, j, digits in _windows(groups, _AADHAAR_LEN):
+         if _is_explicit_phone(groups, i, digits):
+             continue
+-        if verhoeff_valid(digits) or _near_context(groups[i].start, groups[j].end, spans):
+-            regions.append((i, j))
+-    return _merge(regions)
++        valid = verhoeff_valid(digits)
++        if valid or _near_context(groups[i].start, groups[j].end, spans):
++            found.append((i, j, digits, valid))
++    return found
++
++
++def _aadhaar_regions(groups: list[_Group], spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
++    return _merge([(i, j) for i, j, _, _ in _aadhaar_windows(groups, spans)])
+ 
+ 
+ def _is_mobile(digits: str) -> bool:
+@@ -258,7 +268,7 @@ def _mask_runs(text: str, *, mobiles: bool) -> tuple[str, bool]:
+     for run in _RUN_RE.finditer(view):
+         groups = _groups(view, run)
+         replacements: list[tuple[int, int, str]] = []
+-        aadhaar = _aadhaar_regions(text, groups, spans)
++        aadhaar = _aadhaar_regions(groups, spans)
+         taken: set[int] = set()
+         for i, j in aadhaar:
+             digits = "".join(g.digits for g in groups[i : j + 1])
+@@ -306,3 +316,33 @@ def contains_full_aadhaar(text: str) -> bool:
+             if verhoeff_valid(digits):
+                 return True
+     return False
++
++
++@dataclass(frozen=True, slots=True)
++class AadhaarMatch:
++    """One 12-digit window that :func:`mask_aadhaar` masks: ``text[start:end]`` holds it
++    (separators included), ``digits`` are its 12 digits in ASCII, ``verhoeff`` whether the
++    checksum passes (False: masked only because an Aadhaar keyword is near)."""
++
++    start: int
++    end: int
++    digits: str
++    verhoeff: bool
++
++
++def find_aadhaar(text: str) -> list[AadhaarMatch]:
++    """Every Aadhaar-like window in ``text``, in order, with its character range.
++
++    Same rules as :func:`mask_aadhaar` (first pass), but windows are reported one by one rather
++    than merged, and positions index ``text`` exactly as given: pass NFC-normalised text. Used
++    to locate numbers on an image through OCR boxes (PRV-016); the caller must never log or
++    store ``digits``.
++    """
++    spans = _context_spans(text)
++    view = _scan_view(text)
++    found: list[AadhaarMatch] = []
++    for run in _RUN_RE.finditer(view):
++        groups = _groups(view, run)
++        for i, j, digits, valid in _aadhaar_windows(groups, spans):
++            found.append(AadhaarMatch(groups[i].start, groups[j].end, digits, valid))
++    return found
+diff --git a/apps/api/tests/core/test_redaction.py b/apps/api/tests/core/test_redaction.py
+index f52a7ee..163daa9 100644
+--- a/apps/api/tests/core/test_redaction.py
++++ b/apps/api/tests/core/test_redaction.py
+@@ -16,7 +16,9 @@ from hypothesis import assume, given, settings
+ from hypothesis import strategies as st
+ 
+ from app.core.redaction import (
++    AadhaarMatch,
+     contains_full_aadhaar,
++    find_aadhaar,
+     mask_aadhaar,
+     redact,
+     verhoeff_check_digit,
+@@ -369,3 +371,56 @@ def test_SEC_008_numbers_next_to_hex_ids_are_still_masked() -> None:
+     assert "9876543210" not in masked
+     assert number not in masked
+     assert contains_full_aadhaar(text)
++
++
++# --- positions for image redaction (PRV-016) ------------------------------------------------
++
++
++def test_PRV_016_find_aadhaar_reports_positions_digits_and_checksum() -> None:
++    spaced = f"{VALID[:4]} {VALID[4:8]} {VALID[8:]}"
++    text = f"Name: Synthetica  UID {spaced} / roll 12"
++    found = find_aadhaar(text)
++    assert found == [
++        AadhaarMatch(text.index(spaced), text.index(spaced) + len(spaced), VALID, verhoeff=True)
++    ]
++    assert text[found[0].start : found[0].end] == spaced
++
++
++def test_PRV_016_find_aadhaar_matches_what_mask_aadhaar_masks() -> None:
++    # Keyword-near invalid numbers are masked too, so they are reported (verhoeff=False).
++    text = f"Aadhaar {INVALID} and {VALID_2} and plain {INVALID}"
++    found = find_aadhaar(text)
++    assert [(m.digits, m.verhoeff) for m in found] == [(INVALID, False), (VALID_2, True)]
++    masked = mask_aadhaar(text)
++    assert masked.count(INVALID) == 1, "only the plain invalid number is left"
++    assert VALID_2 not in masked
++    assert text[found[0].start : found[0].end] == INVALID
++
++
++def test_PRV_016_find_aadhaar_reports_windows_not_merged_regions() -> None:
++    # Each qualifying 12-digit window is reported on its own (mask_aadhaar merges overlapping
++    # ones), so callers can compare the windows found in different texts of one page.
++    second = VALID[4:] + "123" + verhoeff_check_digit(VALID[4:] + "123")
++    text = f"{VALID[:4]} {VALID[4:8]} {VALID[8:]} {second[-4:]}"
++    found = find_aadhaar(text)
++    assert [m.digits for m in found] == [VALID, second]
++    assert found[0].start < found[1].start < found[0].end
++
++
++def test_PRV_016_find_aadhaar_ignores_phones_uuids_and_long_blocks() -> None:
++    assert find_aadhaar("+91 98765 43210") == []
++    assert find_aadhaar(str(KNOWN_COLLISION)) == []
++    assert find_aadhaar(VALID + "7") == []
++    assert find_aadhaar("") == []
++
++
++@settings(max_examples=200)
++@given(prefix=NON_DIGIT_TEXT, suffix=NON_DIGIT_TEXT, data=st.data(), number=valid_numbers())
++def test_PRV_016_property_every_valid_number_is_located(
++    prefix: str, suffix: str, data: st.DataObject, number: str
++) -> None:
++    text = unicodedata.normalize("NFC", prefix + data.draw(formatted(number)) + suffix)
++    found = [m for m in find_aadhaar(text) if m.digits == number]
++    assert found
++    assert found[0].verhoeff
++    assert digits_only(text[found[0].start : found[0].end]) == number
+-- 
+2.43.0
+

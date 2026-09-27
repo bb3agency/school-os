@@ -1,0 +1,3268 @@
+From 30cceabcab0db1b611de64fa2cd7112539e7d8b2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 27 Sep 2026 05:54:27 +0000
+Subject: [PATCH] wip(web-students-imports-extraction): unfinished work at
+ cloud handoff (not reviewed, not tested)
+
+---
+ apps/web/messages/en.json                     | 201 ++++++
+ apps/web/messages/te.json                     | 201 ++++++
+ .../(school)/students/[studentId]/page.tsx    |  16 +
+ .../[locale]/(school)/students/new/page.tsx   |   9 +
+ .../app/[locale]/(school)/students/page.tsx   |  22 +
+ apps/web/src/components/shell/SchoolShell.tsx |   3 +
+ .../src/features/imports/ImportsScreen.tsx    | 318 +++++++++
+ apps/web/src/features/imports/poll.ts         |  35 +
+ apps/web/src/features/imports/types.ts        |  74 +++
+ apps/web/src/features/imports/upload.ts       | 167 +++++
+ .../src/features/students/CreateStudent.tsx   | 256 ++++++++
+ apps/web/src/features/students/FormDialog.tsx | 176 +++++
+ .../src/features/students/ProblemAlert.tsx    |  79 +++
+ .../src/features/students/SensitiveValue.tsx  | 114 ++++
+ .../src/features/students/StudentDetail.tsx   | 616 ++++++++++++++++++
+ .../web/src/features/students/StudentList.tsx | 332 ++++++++++
+ apps/web/src/features/students/aadhaar.ts     |  54 ++
+ apps/web/src/features/students/dates.ts       |  28 +
+ apps/web/src/features/students/fields.tsx     |  48 ++
+ apps/web/src/features/students/me.ts          |  57 ++
+ apps/web/src/features/students/paging.tsx     |  48 ++
+ apps/web/src/features/students/parts.tsx      | 155 +++++
+ apps/web/src/features/students/types.ts       |  53 ++
+ 23 files changed, 3062 insertions(+)
+ create mode 100644 apps/web/src/app/[locale]/(school)/students/[studentId]/page.tsx
+ create mode 100644 apps/web/src/app/[locale]/(school)/students/new/page.tsx
+ create mode 100644 apps/web/src/app/[locale]/(school)/students/page.tsx
+ create mode 100644 apps/web/src/features/imports/ImportsScreen.tsx
+ create mode 100644 apps/web/src/features/imports/poll.ts
+ create mode 100644 apps/web/src/features/imports/types.ts
+ create mode 100644 apps/web/src/features/imports/upload.ts
+ create mode 100644 apps/web/src/features/students/CreateStudent.tsx
+ create mode 100644 apps/web/src/features/students/FormDialog.tsx
+ create mode 100644 apps/web/src/features/students/ProblemAlert.tsx
+ create mode 100644 apps/web/src/features/students/SensitiveValue.tsx
+ create mode 100644 apps/web/src/features/students/StudentDetail.tsx
+ create mode 100644 apps/web/src/features/students/StudentList.tsx
+ create mode 100644 apps/web/src/features/students/aadhaar.ts
+ create mode 100644 apps/web/src/features/students/dates.ts
+ create mode 100644 apps/web/src/features/students/fields.tsx
+ create mode 100644 apps/web/src/features/students/me.ts
+ create mode 100644 apps/web/src/features/students/paging.tsx
+ create mode 100644 apps/web/src/features/students/parts.tsx
+ create mode 100644 apps/web/src/features/students/types.ts
+
+diff --git a/apps/web/messages/en.json b/apps/web/messages/en.json
+index bd80c54..afd3997 100644
+--- a/apps/web/messages/en.json
++++ b/apps/web/messages/en.json
+@@ -1237,5 +1237,206 @@
+     "stillNone": "Still no access. Ask the office to send the invitation again.",
+     "checkFailed": "We couldn't check right now. Try again in a minute.",
+     "signIn": "Sign in"
++  },
++  "students": {
++    "nav": "Students",
++    "aadhaarNotAllowed": "This looks like a full Aadhaar number. SchoolOS never stores it: enter only the last 4 digits, in the Aadhaar last 4 digits field.",
++    "aadhaarWarningTitle": "No Aadhaar numbers",
++    "aadhaarWarningBody": "Don't enter full Aadhaar numbers anywhere. Only the last 4 digits are kept, in their own field.",
++    "dateHint": "Use DD/MM/YYYY, for example 14/03/2012.",
++    "dateInvalid": "Enter a real date as DD/MM/YYYY, for example 14/03/2012.",
++    "status": {
++      "provisional": "Provisional",
++      "active": "Studying",
++      "left": "Left school",
++      "graduated": "Completed school"
++    },
++    "sources": {
++      "admission_register": "Admission register",
++      "aadhaar_as_printed": "Aadhaar (as printed)",
++      "udise_plus": "UDISE+",
++      "board_registration": "Board registration",
++      "birth_certificate": "Birth certificate",
++      "parent_form": "Parent form",
++      "tc_incoming": "Transfer certificate (incoming)",
++      "manual_entry": "Entered by the office"
++    },
++    "sourceShort": {
++      "admission_register": "Register",
++      "aadhaar_as_printed": "Aadhaar",
++      "udise_plus": "UDISE+",
++      "board_registration": "Board",
++      "birth_certificate": "Birth cert.",
++      "parent_form": "Parent form",
++      "tc_incoming": "TC",
++      "manual_entry": "Office"
++    },
++    "verification": {
++      "verified": "verified",
++      "unverified": "not verified yet",
++      "rejected": "marked wrong",
++      "provisional": "provisional, waiting for verification"
++    },
++    "enumValues": {
++      "female": "Girl",
++      "male": "Boy",
++      "transgender": "Transgender",
++      "general": "General",
++      "ews": "EWS",
++      "obc": "OBC / BC",
++      "sc": "SC",
++      "st": "ST"
++    },
++    "sensitive": {
++      "show": "Show",
++      "showing": "Showing…",
++      "hide": "Hide",
++      "revealedLabel": "{field}:",
++      "hiddenLabel": "{field} is hidden. Showing it is recorded in the audit log."
++    },
++    "list": {
++      "title": "Students",
++      "description": "Find a student by name in English or Telugu, admission number, class and section, or a parent's name.",
++      "add": "Add a student",
++      "import": "Import from a spreadsheet",
++      "print": "Print this list",
++      "searchTitle": "Find students",
++      "searchLabel": "Name, admission number or class",
++      "searchHint": "For example: venkat sai 9b, 2019/0457 or a parent's name.",
++      "filterClass": "Class",
++      "filterSection": "Section",
++      "filterStatus": "Status",
++      "clear": "Clear the search",
++      "resultsTitle": "Students found",
++      "noMatchTitle": "No student matches",
++      "noMatchBody": "Check the spelling, try fewer words, or clear the class and section filters.",
++      "emptyTitle": "No students yet",
++      "emptyBody": "Add students one by one, or import your class lists from a spreadsheet.",
++      "pagesLabel": "Pages of results",
++      "previous": "Previous page",
++      "next": "Next page",
++      "pageNumber": "Page {page}",
++      "colName": "Name",
++      "colAdmissionNo": "Admission number",
++      "colClassSection": "Class and section",
++      "colStatus": "Status",
++      "unnamed": "Name not recorded",
++      "matchedOn": "Found by: {field}"
++    },
++    "create": {
++      "title": "Add a student",
++      "description": "Enter the details as written on the source you have in hand. Each value remembers where it came from.",
++      "noPermissionTitle": "You can't add students",
++      "noPermissionBody": "Ask your school's office admin if you need to add students.",
++      "source": "Where are these details from?",
++      "sourceHint": "Usually the admission register. It is the legal record of the school.",
++      "detailsLegend": "Student details",
++      "admissionNo": "Admission number",
++      "admissionNoHint": "Letters, digits and / . _ - only, for example 2019/0457.",
++      "fullName": "Full name",
++      "fullNameHint": "Exactly as written on the source, including initials.",
++      "dob": "Date of birth",
++      "gender": "Gender",
++      "fatherName": "Father's name",
++      "motherName": "Mother's name",
++      "classLegend": "Class this year",
++      "section": "Class and section",
++      "sectionHint": "Leave empty to add the student to a section later.",
++      "noSection": "Not in a section yet",
++      "rollNo": "Roll number",
++      "status": "Record status",
++      "statusHint": "Choose Provisional if the details still need checking.",
++      "submit": "Add student"
++    },
++    "detail": {
++      "loadingTitle": "Student",
++      "unnamed": "Name not recorded",
++      "summary": "Admission number {admission} · {classSection}",
++      "noClass": "not in a section this year",
++      "relatedLabel": "Related pages",
++      "backToList": "Back to students",
++      "findingsLink": "Data checks for this student",
++      "changeRequestsLink": "Correction requests for this student",
++      "valuesTitle": "Details and their sources",
++      "valuesDescription": "The value used is the one from the most trusted source. For identity fields that is the verified admission register value. Other sources are shown beside it so differences are never hidden.",
++      "valuesTable": "Student details with every source",
++      "colField": "Field",
++      "colUsed": "Value used",
++      "colSources": "Values from each source",
++      "identityField": "Identity field: changes need a correction request",
++      "restrictedField": "Restricted: hidden until you choose Show",
++      "provisional": "Provisional",
++      "conflicts": "Differs from: {sources}",
++      "recordedOn": "Recorded {date}",
++      "hasEvidence": "evidence attached",
++      "fromImport": "from an import",
++      "markVerified": "Mark verified",
++      "markRejected": "Mark wrong",
++      "verifiedDone": "The value is marked verified.",
++      "rejectedDone": "The value is marked wrong. It is no longer used.",
++      "noValues": "No details are recorded for this student yet. Choose “Record a value” to add one.",
++      "classTitle": "Class and enrolment",
++      "classSection": "Class and section",
++      "rollNo": "Roll number",
++      "notEnrolled": "Not in a section this academic year."
++    },
++    "record": {
++      "open": "Record a value",
++      "title": "Record a value",
++      "description": "Add what one source says. The earlier value from that source stays in the history.",
++      "field": "Field",
++      "source": "Source",
++      "sourceHint": "Where you read this value.",
++      "value": "Value",
++      "digits4Hint": "Only the last 4 digits of the Aadhaar number, for example 1234.",
++      "digits4Invalid": "Enter exactly 4 digits: the last 4 digits of the Aadhaar number.",
++      "identityNote": "This is an identity field. Once the admission register value is recorded, changing it needs a correction request with evidence, approved by the principal.",
++      "submit": "Record value",
++      "goToChangeRequests": "Open correction requests for this student"
++    },
++    "guardians": {
++      "title": "Parents and guardians",
++      "description": "Phone numbers and addresses are restricted and hidden until you choose Show.",
++      "colName": "Name",
++      "colRelationship": "Relationship",
++      "colPhone": "Phone",
++      "colAddress": "Address",
++      "primary": "Main contact",
++      "emptyTitle": "No parent or guardian recorded",
++      "emptyBody": "Parents and guardians appear here once they are added to the student's record.",
++      "phoneOf": "Phone number of {name}",
++      "addressOf": "Address of {name}",
++      "relationship": {
++        "father": "Father",
++        "mother": "Mother",
++        "guardian": "Guardian"
++      }
++    },
++    "errors": {
++      "identity_change_required": {
++        "title": "This needs a correction request",
++        "body": "The admission register value of an identity field can't be changed directly. Raise a correction request with the evidence, and the principal will approve it."
++      },
++      "value_superseded": {
++        "title": "A newer value was recorded",
++        "body": "Someone recorded a newer value for this field. Reload the page and check the current value."
++      },
++      "already_enrolled": {
++        "title": "Already in this section",
++        "body": "The student is already in this section. Choose a different section, or leave it as it is."
++      },
++      "not_sensitive": {
++        "title": "Nothing to show",
++        "body": "This field is not restricted, so it is already shown on the page."
++      },
++      "aadhaar_full_number_rejected": {
++        "title": "Full Aadhaar numbers are not allowed",
++        "body": "SchoolOS never stores a full Aadhaar number. Remove it and enter only the last 4 digits in their own field."
++      },
++      "student_not_found": {
++        "title": "Student not found",
++        "body": "The student may have been removed, or is not in your classes. Search for the student again."
++      }
++    }
+   }
+ }
+diff --git a/apps/web/messages/te.json b/apps/web/messages/te.json
+index 5401e8e..6a057d5 100644
+--- a/apps/web/messages/te.json
++++ b/apps/web/messages/te.json
+@@ -1237,5 +1237,206 @@
+     "stillNone": "ఇంకా యాక్సెస్ లేదు. ఆహ్వానాన్ని మళ్లీ పంపమని ఆఫీసును అడగండి.",
+     "checkFailed": "ఇప్పుడు తనిఖీ చేయలేకపోయాము. ఒక నిమిషం తర్వాత ప్రయత్నించండి.",
+     "signIn": "సైన్ ఇన్ చేయండి"
++  },
++  "students": {
++    "nav": "విద్యార్థులు",
++    "aadhaarNotAllowed": "ఇది పూర్తి ఆధార్ నంబర్‌లా ఉంది. SchoolOS దాన్ని ఎప్పుడూ నిల్వ చేయదు: ఆధార్ చివరి 4 అంకెల ఫీల్డ్‌లో చివరి 4 అంకెలు మాత్రమే నమోదు చేయండి.",
++    "aadhaarWarningTitle": "ఆధార్ నంబర్లు వద్దు",
++    "aadhaarWarningBody": "ఎక్కడా పూర్తి ఆధార్ నంబర్ నమోదు చేయవద్దు. చివరి 4 అంకెలు మాత్రమే, వాటి సొంత ఫీల్డ్‌లో, ఉంచబడతాయి.",
++    "dateHint": "DD/MM/YYYY రూపంలో ఇవ్వండి, ఉదాహరణకు 14/03/2012.",
++    "dateInvalid": "సరైన తేదీని DD/MM/YYYY రూపంలో ఇవ్వండి, ఉదాహరణకు 14/03/2012.",
++    "status": {
++      "provisional": "తాత్కాలికం",
++      "active": "చదువుతున్నారు",
++      "left": "పాఠశాల వదిలి వెళ్లారు",
++      "graduated": "చదువు పూర్తయింది"
++    },
++    "sources": {
++      "admission_register": "ప్రవేశ రిజిస్టర్",
++      "aadhaar_as_printed": "ఆధార్ (ముద్రించినట్లు)",
++      "udise_plus": "UDISE+",
++      "board_registration": "బోర్డు నమోదు",
++      "birth_certificate": "జనన ధృవీకరణ పత్రం",
++      "parent_form": "తల్లిదండ్రుల ఫారం",
++      "tc_incoming": "బదిలీ ధృవీకరణ పత్రం (వచ్చినది)",
++      "manual_entry": "కార్యాలయం నమోదు చేసింది"
++    },
++    "sourceShort": {
++      "admission_register": "రిజిస్టర్",
++      "aadhaar_as_printed": "ఆధార్",
++      "udise_plus": "UDISE+",
++      "board_registration": "బోర్డు",
++      "birth_certificate": "జనన పత్రం",
++      "parent_form": "తల్లిదండ్రుల ఫారం",
++      "tc_incoming": "TC",
++      "manual_entry": "కార్యాలయం"
++    },
++    "verification": {
++      "verified": "ధృవీకరించబడింది",
++      "unverified": "ఇంకా ధృవీకరించలేదు",
++      "rejected": "తప్పుగా గుర్తించబడింది",
++      "provisional": "తాత్కాలికం, ధృవీకరణ కోసం వేచి ఉంది"
++    },
++    "enumValues": {
++      "female": "బాలిక",
++      "male": "బాలుడు",
++      "transgender": "ట్రాన్స్‌జెండర్",
++      "general": "జనరల్",
++      "ews": "EWS",
++      "obc": "OBC / BC",
++      "sc": "SC",
++      "st": "ST"
++    },
++    "sensitive": {
++      "show": "చూపించండి",
++      "showing": "చూపిస్తోంది…",
++      "hide": "దాచండి",
++      "revealedLabel": "{field}:",
++      "hiddenLabel": "{field} దాచబడింది. దీన్ని చూపిస్తే ఆడిట్ లాగ్‌లో నమోదవుతుంది."
++    },
++    "list": {
++      "title": "విద్యార్థులు",
++      "description": "విద్యార్థిని ఇంగ్లీష్ లేదా తెలుగులో పేరు, ప్రవేశ సంఖ్య, తరగతి మరియు సెక్షన్, లేదా తల్లిదండ్రుల పేరుతో వెతకండి.",
++      "add": "విద్యార్థిని జోడించండి",
++      "import": "స్ప్రెడ్‌షీట్ నుండి దిగుమతి చేయండి",
++      "print": "ఈ జాబితాను ప్రింట్ చేయండి",
++      "searchTitle": "విద్యార్థులను వెతకండి",
++      "searchLabel": "పేరు, ప్రవేశ సంఖ్య లేదా తరగతి",
++      "searchHint": "ఉదాహరణకు: venkat sai 9b, 2019/0457 లేదా తల్లిదండ్రుల పేరు.",
++      "filterClass": "తరగతి",
++      "filterSection": "సెక్షన్",
++      "filterStatus": "స్థితి",
++      "clear": "వెతుకులాటను తీసివేయండి",
++      "resultsTitle": "దొరికిన విద్యార్థులు",
++      "noMatchTitle": "ఏ విద్యార్థీ సరిపోలలేదు",
++      "noMatchBody": "అక్షరక్రమం చూడండి, తక్కువ పదాలతో ప్రయత్నించండి, లేదా తరగతి, సెక్షన్ ఫిల్టర్లను తీసివేయండి.",
++      "emptyTitle": "ఇంకా విద్యార్థులు లేరు",
++      "emptyBody": "విద్యార్థులను ఒక్కొక్కరిగా జోడించండి, లేదా మీ తరగతి జాబితాలను స్ప్రెడ్‌షీట్ నుండి దిగుమతి చేయండి.",
++      "pagesLabel": "ఫలితాల పేజీలు",
++      "previous": "మునుపటి పేజీ",
++      "next": "తదుపరి పేజీ",
++      "pageNumber": "పేజీ {page}",
++      "colName": "పేరు",
++      "colAdmissionNo": "ప్రవేశ సంఖ్య",
++      "colClassSection": "తరగతి మరియు సెక్షన్",
++      "colStatus": "స్థితి",
++      "unnamed": "పేరు నమోదు కాలేదు",
++      "matchedOn": "దీని ద్వారా దొరికింది: {field}"
++    },
++    "create": {
++      "title": "విద్యార్థిని జోడించండి",
++      "description": "మీ చేతిలో ఉన్న పత్రంలో రాసినట్లే వివరాలు నమోదు చేయండి. ప్రతి విలువ ఎక్కడి నుండి వచ్చిందో గుర్తుంచుకుంటుంది.",
++      "noPermissionTitle": "మీరు విద్యార్థులను జోడించలేరు",
++      "noPermissionBody": "విద్యార్థులను జోడించాల్సి ఉంటే మీ పాఠశాల ఆఫీస్ అడ్మిన్‌ను అడగండి.",
++      "source": "ఈ వివరాలు ఎక్కడి నుండి?",
++      "sourceHint": "సాధారణంగా ప్రవేశ రిజిస్టర్. అదే పాఠశాల చట్టబద్ధమైన రికార్డు.",
++      "detailsLegend": "విద్యార్థి వివరాలు",
++      "admissionNo": "ప్రవేశ సంఖ్య",
++      "admissionNoHint": "అక్షరాలు, అంకెలు మరియు / . _ - మాత్రమే, ఉదాహరణకు 2019/0457.",
++      "fullName": "పూర్తి పేరు",
++      "fullNameHint": "పత్రంలో రాసినట్లే, ఇనిషియల్స్‌తో సహా.",
++      "dob": "పుట్టిన తేదీ",
++      "gender": "లింగం",
++      "fatherName": "తండ్రి పేరు",
++      "motherName": "తల్లి పేరు",
++      "classLegend": "ఈ సంవత్సరం తరగతి",
++      "section": "తరగతి మరియు సెక్షన్",
++      "sectionHint": "విద్యార్థిని తర్వాత సెక్షన్‌లో చేర్చాలంటే ఖాళీగా వదిలేయండి.",
++      "noSection": "ఇంకా ఏ సెక్షన్‌లోనూ లేరు",
++      "rollNo": "రోల్ నంబర్",
++      "status": "రికార్డు స్థితి",
++      "statusHint": "వివరాలను ఇంకా తనిఖీ చేయాల్సి ఉంటే తాత్కాలికం ఎంచుకోండి.",
++      "submit": "విద్యార్థిని జోడించండి"
++    },
++    "detail": {
++      "loadingTitle": "విద్యార్థి",
++      "unnamed": "పేరు నమోదు కాలేదు",
++      "summary": "ప్రవేశ సంఖ్య {admission} · {classSection}",
++      "noClass": "ఈ సంవత్సరం ఏ సెక్షన్‌లోనూ లేరు",
++      "relatedLabel": "సంబంధిత పేజీలు",
++      "backToList": "విద్యార్థుల జాబితాకు తిరిగి వెళ్లండి",
++      "findingsLink": "ఈ విద్యార్థి డేటా తనిఖీలు",
++      "changeRequestsLink": "ఈ విద్యార్థి సవరణ అభ్యర్థనలు",
++      "valuesTitle": "వివరాలు మరియు వాటి మూలాలు",
++      "valuesDescription": "ఎక్కువ నమ్మదగిన మూలం నుండి వచ్చిన విలువనే ఉపయోగిస్తారు. గుర్తింపు ఫీల్డ్‌లకు అది ధృవీకరించిన ప్రవేశ రిజిస్టర్ విలువ. తేడాలు దాగకుండా ఇతర మూలాల విలువలు పక్కనే చూపబడతాయి.",
++      "valuesTable": "ప్రతి మూలంతో విద్యార్థి వివరాలు",
++      "colField": "ఫీల్డ్",
++      "colUsed": "ఉపయోగించే విలువ",
++      "colSources": "ప్రతి మూలం నుండి విలువలు",
++      "identityField": "గుర్తింపు ఫీల్డ్: మార్పులకు సవరణ అభ్యర్థన అవసరం",
++      "restrictedField": "పరిమితం: చూపించండి నొక్కే వరకు దాచబడి ఉంటుంది",
++      "provisional": "తాత్కాలికం",
++      "conflicts": "వీటితో తేడా ఉంది: {sources}",
++      "recordedOn": "{date} న నమోదైంది",
++      "hasEvidence": "ఆధారం జత చేయబడింది",
++      "fromImport": "దిగుమతి నుండి",
++      "markVerified": "ధృవీకరించినట్లు గుర్తించండి",
++      "markRejected": "తప్పుగా గుర్తించండి",
++      "verifiedDone": "విలువ ధృవీకరించినట్లు గుర్తించబడింది.",
++      "rejectedDone": "విలువ తప్పుగా గుర్తించబడింది. ఇకపై దాన్ని ఉపయోగించరు.",
++      "noValues": "ఈ విద్యార్థికి ఇంకా ఏ వివరాలూ నమోదు కాలేదు. జోడించడానికి “విలువను నమోదు చేయండి” నొక్కండి.",
++      "classTitle": "తరగతి మరియు నమోదు",
++      "classSection": "తరగతి మరియు సెక్షన్",
++      "rollNo": "రోల్ నంబర్",
++      "notEnrolled": "ఈ విద్యా సంవత్సరంలో ఏ సెక్షన్‌లోనూ లేరు."
++    },
++    "record": {
++      "open": "విలువను నమోదు చేయండి",
++      "title": "విలువను నమోదు చేయండి",
++      "description": "ఒక మూలం ఏమి చెబుతుందో జోడించండి. ఆ మూలం నుండి వచ్చిన పాత విలువ చరిత్రలో ఉంటుంది.",
++      "field": "ఫీల్డ్",
++      "source": "మూలం",
++      "sourceHint": "ఈ విలువను మీరు ఎక్కడ చదివారు.",
++      "value": "విలువ",
++      "digits4Hint": "ఆధార్ నంబర్ చివరి 4 అంకెలు మాత్రమే, ఉదాహరణకు 1234.",
++      "digits4Invalid": "సరిగ్గా 4 అంకెలు ఇవ్వండి: ఆధార్ నంబర్ చివరి 4 అంకెలు.",
++      "identityNote": "ఇది గుర్తింపు ఫీల్డ్. ప్రవేశ రిజిస్టర్ విలువ నమోదైన తర్వాత దాన్ని మార్చడానికి ఆధారంతో సవరణ అభ్యర్థన, ప్రిన్సిపాల్ ఆమోదం అవసరం.",
++      "submit": "విలువను నమోదు చేయండి",
++      "goToChangeRequests": "ఈ విద్యార్థి సవరణ అభ్యర్థనలు తెరవండి"
++    },
++    "guardians": {
++      "title": "తల్లిదండ్రులు మరియు సంరక్షకులు",
++      "description": "ఫోన్ నంబర్లు, చిరునామాలు పరిమితం: చూపించండి నొక్కే వరకు దాచబడి ఉంటాయి.",
++      "colName": "పేరు",
++      "colRelationship": "సంబంధం",
++      "colPhone": "ఫోన్",
++      "colAddress": "చిరునామా",
++      "primary": "ముఖ్య సంప్రదింపు",
++      "emptyTitle": "తల్లిదండ్రులు లేదా సంరక్షకులు నమోదు కాలేదు",
++      "emptyBody": "విద్యార్థి రికార్డులో చేర్చిన తర్వాత తల్లిదండ్రులు, సంరక్షకులు ఇక్కడ కనిపిస్తారు.",
++      "phoneOf": "{name} ఫోన్ నంబర్",
++      "addressOf": "{name} చిరునామా",
++      "relationship": {
++        "father": "తండ్రి",
++        "mother": "తల్లి",
++        "guardian": "సంరక్షకుడు"
++      }
++    },
++    "errors": {
++      "identity_change_required": {
++        "title": "దీనికి సవరణ అభ్యర్థన అవసరం",
++        "body": "గుర్తింపు ఫీల్డ్ యొక్క ప్రవేశ రిజిస్టర్ విలువను నేరుగా మార్చలేరు. ఆధారంతో సవరణ అభ్యర్థన పెట్టండి, ప్రిన్సిపాల్ ఆమోదిస్తారు."
++      },
++      "value_superseded": {
++        "title": "కొత్త విలువ నమోదైంది",
++        "body": "ఈ ఫీల్డ్‌కు ఎవరో కొత్త విలువను నమోదు చేశారు. పేజీని మళ్లీ లోడ్ చేసి ప్రస్తుత విలువను చూడండి."
++      },
++      "already_enrolled": {
++        "title": "ఇప్పటికే ఈ సెక్షన్‌లో ఉన్నారు",
++        "body": "విద్యార్థి ఇప్పటికే ఈ సెక్షన్‌లో ఉన్నారు. వేరే సెక్షన్ ఎంచుకోండి, లేదా అలాగే వదిలేయండి."
++      },
++      "not_sensitive": {
++        "title": "చూపించడానికి ఏమీ లేదు",
++        "body": "ఈ ఫీల్డ్ పరిమితం కాదు, కాబట్టి ఇది ఇప్పటికే పేజీలో చూపబడుతోంది."
++      },
++      "aadhaar_full_number_rejected": {
++        "title": "పూర్తి ఆధార్ నంబర్లు అనుమతించబడవు",
++        "body": "SchoolOS పూర్తి ఆధార్ నంబర్‌ను ఎప్పుడూ నిల్వ చేయదు. దాన్ని తీసివేసి, చివరి 4 అంకెలను మాత్రమే వాటి ఫీల్డ్‌లో నమోదు చేయండి."
++      },
++      "student_not_found": {
++        "title": "విద్యార్థి దొరకలేదు",
++        "body": "విద్యార్థిని తీసివేసి ఉండవచ్చు, లేదా మీ తరగతులలో లేకపోవచ్చు. విద్యార్థిని మళ్లీ వెతకండి."
++      }
++    }
+   }
+ }
+diff --git a/apps/web/src/app/[locale]/(school)/students/[studentId]/page.tsx b/apps/web/src/app/[locale]/(school)/students/[studentId]/page.tsx
+new file mode 100644
+index 0000000..c3882f7
+--- /dev/null
++++ b/apps/web/src/app/[locale]/(school)/students/[studentId]/page.tsx
+@@ -0,0 +1,16 @@
++import { notFound } from "next/navigation";
++import { StudentDetailScreen } from "@/features/students/StudentDetail";
++import { pageMetadata } from "@/lib/metadata";
++import { UUID_PATTERN } from "@/lib/validation";
++
++// The page title never carries the student's name (browser history on shared office PCs).
++export const generateMetadata = pageMetadata((t) => t("students.detail.loadingTitle"));
++
++type Props = { params: Promise<{ locale: string; studentId: string }> };
++
++/** US-301 / FR-STU-001..008: one student (404 outside the caller's scope or school). */
++export default async function StudentPage({ params }: Props) {
++  const { studentId } = await params;
++  if (!UUID_PATTERN.test(studentId)) notFound();
++  return <StudentDetailScreen studentId={studentId} />;
++}
+diff --git a/apps/web/src/app/[locale]/(school)/students/new/page.tsx b/apps/web/src/app/[locale]/(school)/students/new/page.tsx
+new file mode 100644
+index 0000000..6948c0a
+--- /dev/null
++++ b/apps/web/src/app/[locale]/(school)/students/new/page.tsx
+@@ -0,0 +1,9 @@
++import { CreateStudentScreen } from "@/features/students/CreateStudent";
++import { pageMetadata } from "@/lib/metadata";
++
++export const generateMetadata = pageMetadata((t) => t("students.create.title"));
++
++/** US-301 / FR-STU-001..003: POST /students (student.create). */
++export default function NewStudentPage() {
++  return <CreateStudentScreen />;
++}
+diff --git a/apps/web/src/app/[locale]/(school)/students/page.tsx b/apps/web/src/app/[locale]/(school)/students/page.tsx
+new file mode 100644
+index 0000000..8889ecb
+--- /dev/null
++++ b/apps/web/src/app/[locale]/(school)/students/page.tsx
+@@ -0,0 +1,22 @@
++import { StudentsScreen } from "@/features/students/StudentList";
++import { pageMetadata } from "@/lib/metadata";
++
++export const generateMetadata = pageMetadata((t) => t("students.list.title"));
++
++type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
++
++const first = (value: string | string[] | undefined) =>
++  typeof value === "string" ? value : undefined;
++
++/** US-302 / FR-STU-010: GET /students through the BFF, filtered by the URL (GET form). */
++export default async function StudentsPage({ searchParams }: Props) {
++  const params = await searchParams;
++  const filters = {
++    q: first(params.q),
++    classId: first(params.class_id),
++    sectionId: first(params.section_id),
++    status: first(params.status),
++  };
++  // A new search starts again at page 1 (the key resets the cursor history).
++  return <StudentsScreen key={JSON.stringify(filters)} filters={filters} />;
++}
+diff --git a/apps/web/src/components/shell/SchoolShell.tsx b/apps/web/src/components/shell/SchoolShell.tsx
+index d94ace1..e381fde 100644
+--- a/apps/web/src/components/shell/SchoolShell.tsx
++++ b/apps/web/src/components/shell/SchoolShell.tsx
+@@ -33,6 +33,9 @@ export function SchoolShell({
+   const t = useTranslations();
+   const all: SchoolNavItem[] = [
+     { href: "/", label: t("school.nav.home"), exact: true },
++    { href: "/students", label: t("students.nav"), permission: "student.read_basic" },
++    { href: "/imports", label: t("imports.nav"), permission: "import.run" },
++    { href: "/register-photos", label: t("extraction.nav"), permission: "import.run" },
+     { href: "/settings/structure", label: t("school.nav.structure") },
+     { href: "/settings/users", label: t("school.nav.users"), permission: "user.manage" },
+     {
+diff --git a/apps/web/src/features/imports/ImportsScreen.tsx b/apps/web/src/features/imports/ImportsScreen.tsx
+new file mode 100644
+index 0000000..6645470
+--- /dev/null
++++ b/apps/web/src/features/imports/ImportsScreen.tsx
+@@ -0,0 +1,318 @@
++"use client";
++
++import { useLocale, useTranslations } from "next-intl";
++import { useId, useRef, useState, type FormEvent } from "react";
++import { Alert } from "@/components/ui/Alert";
++import { Badge } from "@/components/ui/Badge";
++import { Button } from "@/components/ui/Button";
++import { Card } from "@/components/ui/Card";
++import { Field } from "@/components/ui/Input";
++import { PageHeader } from "@/components/ui/PageHeader";
++import { SelectField } from "@/components/ui/Select";
++import { DataTable, type Column } from "@/components/ui/Table";
++import { Value } from "@/components/ui/Value";
++import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
++import { Pager, useCursorStack } from "@/features/students/paging";
++import { ProblemAlert } from "@/features/students/ProblemAlert";
++import { VALUE_SOURCES, isValueSource } from "@/features/students/types";
++import { Link, useRouter } from "@/i18n/navigation";
++import type { Locale } from "@/i18n/routing";
++import { ApiError, newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
++import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
++import type { Loadable } from "@/lib/loadable";
++import {
++  CREATING_SOURCES,
++  importTone,
++  type ImportBatch,
++  type ImportSource,
++  type ImportSummary,
++  type ImportTemplate,
++} from "./types";
++import { extensionOf, uploadDocument, type UploadProgress } from "./upload";
++
++export const IMPORTS_KEY = ["staff", "imports"] as const;
++/** FR-IMP-001: XLSX or CSV (a Google Sheets download), at most 10 MB. */
++export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
++const ACCEPT = ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
++
++export function ImportStatusBadge({ status }: { status: ImportBatch["status"] }) {
++  const t = useTranslations("imports.status");
++  return <Badge tone={importTone[status]}>{t(status)}</Badge>;
++}
++
++export function SourceName({ source }: { source: string }) {
++  const t = useTranslations("students.sources");
++  return <>{isValueSource(source) ? t(source) : source}</>;
++}
++
++type FileProblem = "fileMissing" | "fileType" | "fileTooLarge";
++
++export function checkSpreadsheet(file: File | null | undefined): FileProblem | null {
++  if (!file) return "fileMissing";
++  if (!["xlsx", "csv"].includes(extensionOf(file.name))) return "fileType";
++  if (file.size > MAX_IMPORT_BYTES) return "fileTooLarge";
++  return null;
++}
++
++const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
++
++/** US-401 AC1: upload a spreadsheet and start reading it (documents upload → POST /imports). */
++export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatch) => void }) {
++  const t = useTranslations("imports.upload");
++  const ts = useTranslations("students");
++  const locale = useLocale() as Locale;
++  const api = useBffClient("staff");
++  const fileRef = useRef<HTMLInputElement>(null);
++  const statusId = useId();
++  const [problem, setProblem] = useState<FileProblem | null>(null);
++  const [progress, setProgress] = useState<UploadProgress | null>(null);
++  const [error, setError] = useState<unknown>(undefined);
++  const busy = progress !== null && progress.stage !== "ready";
++
++  async function start(file: File, source: ImportSource) {
++    const documentId = await uploadDocument(api, file, "import_file", { onProgress: setProgress });
++    const key = newIdempotencyKey();
++    // The scan result can take a moment to reach the import service: retry briefly.
++    for (let attempt = 0; ; attempt += 1) {
++      try {
++        return await unwrap(
++          api.POST("/api/v1/imports", {
++            headers: { "Idempotency-Key": key },
++            body: { document_id: documentId, source, kind: "spreadsheet" },
++          }),
++        );
++      } catch (failure) {
++        if (!(failure instanceof ApiError && failure.code === "document_not_ready") || attempt >= 4) {
++          throw failure;
++        }
++        await sleep(2000);
++      }
++    }
++  }
++
++  function onSubmit(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    const form = event.currentTarget;
++    const file = fileRef.current?.files?.[0];
++    const found = checkSpreadsheet(file);
++    setProblem(found);
++    setError(undefined);
++    if (found || !file) {
++      fileRef.current?.focus();
++      return;
++    }
++    const source = new FormData(form).get("source");
++    const chosen = VALUE_SOURCES.find((value) => value === source) ?? "admission_register";
++    start(file, chosen)
++      .then((batch) => {
++        form.reset();
++        setProgress(null);
++        onStarted(batch);
++      })
++      .catch((failure: unknown) => {
++        setProgress(null);
++        setError(failure);
++      });
++  }
++
++  const stageText = (value: UploadProgress) =>
++    value.stage === "uploading" && value.percent !== undefined
++      ? t("stage.uploadingPercent", { percent: value.percent })
++      : t(`stage.${value.stage}`);
++
++  return (
++    <form noValidate onSubmit={onSubmit} className="space-y-4" aria-describedby={statusId}>
++      <Field
++        label={t("file")}
++        hint={t("fileHint", { size: formatBytes(MAX_IMPORT_BYTES, locale) ?? "10 MB" })}
++        error={problem ? t(problem) : undefined}
++      >
++        {({ id, describedBy, invalid }) => (
++          <input
++            ref={fileRef}
++            id={id}
++            name="file"
++            type="file"
++            accept={ACCEPT}
++            aria-describedby={describedBy}
++            aria-invalid={invalid || undefined}
++            disabled={busy}
++            onChange={() => setProblem(null)}
++            className="block w-full rounded-md border border-border-strong bg-surface p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:font-semibold file:text-primary"
++          />
++        )}
++      </Field>
++      <SelectField
++        name="source"
++        label={t("source")}
++        hint={t("sourceHint")}
++        defaultValue="admission_register"
++        disabled={busy}
++        options={VALUE_SOURCES.map((value) => ({
++          value,
++          label: CREATING_SOURCES.includes(value)
++            ? ts(`sources.${value}`)
++            : t("sourceMatchOnly", { source: ts(`sources.${value}`) }),
++        }))}
++      />
++      <Alert tone="warning" title={ts("aadhaarWarningTitle")}>
++        {t("aadhaarColumn")}
++      </Alert>
++      <div id={statusId} role="status" aria-live="polite" className="min-h-6 space-y-2">
++        {progress ? (
++          <>
++            <p className="text-sm font-semibold">{stageText(progress)}</p>
++            {progress.stage === "uploading" ? (
++              <progress
++                max={100}
++                value={progress.percent ?? 0}
++                aria-label={t("progressLabel")}
++                className="h-2 w-full"
++              />
++            ) : null}
++          </>
++        ) : null}
++      </div>
++      <ProblemAlert error={error} namespace="imports.errors" />
++      <div className="flex justify-end">
++        <Button type="submit" disabled={busy}>
++          {busy ? t("working") : t("submit")}
++        </Button>
++      </div>
++    </form>
++  );
++}
++
++export interface ImportsViewProps {
++  imports: Loadable<readonly ImportSummary[]>;
++  templates: Loadable<readonly ImportTemplate[]>;
++  permissions: Permissions;
++  page: number;
++  onNext?: (() => void) | undefined;
++  onPrevious?: (() => void) | undefined;
++  onStarted: (batch: ImportBatch) => void;
++}
++
++/** US-401 / FR-IMP-001..007: the school's spreadsheet imports and saved column templates. */
++export function ImportsView({
++  imports,
++  templates,
++  permissions,
++  page,
++  onNext,
++  onPrevious,
++  onStarted,
++}: ImportsViewProps) {
++  const t = useTranslations("imports.list");
++  const locale = useLocale() as Locale;
++  const count = (value: number) => formatCount(value, locale) ?? String(value);
++
++  const columns: Column<ImportSummary>[] = [
++    {
++      key: "started",
++      header: t("colStarted"),
++      cell: (row) => (
++        <Link href={`/imports/${row.id}`} className="font-semibold text-primary underline">
++          {formatDateTime(row.created_at) ?? t("open")}
++        </Link>
++      ),
++    },
++    { key: "source", header: t("colSource"), cell: (row) => <SourceName source={row.source} /> },
++    { key: "rows", header: t("colRows"), cell: (row) => count(row.row_count) },
++    {
++      key: "errors",
++      header: t("colErrors"),
++      cell: (row) =>
++        row.error_count > 0 ? (
++          <Badge tone="danger">{count(row.error_count)}</Badge>
++        ) : (
++          count(row.error_count)
++        ),
++    },
++    { key: "status", header: t("colStatus"), cell: (row) => <ImportStatusBadge status={row.status} /> },
++  ];
++
++  const templateColumns: Column<ImportTemplate>[] = [
++    { key: "name", header: t("templateName"), cell: (row) => row.name },
++    { key: "source", header: t("colSource"), cell: (row) => <SourceName source={row.source} /> },
++    {
++      key: "columns",
++      header: t("templateColumns"),
++      cell: (row) => count(Object.keys(row.mapping).length),
++    },
++    {
++      key: "used",
++      header: t("templateLastUsed"),
++      cell: (row) => <Value>{formatDateTime(row.last_used_at)}</Value>,
++    },
++  ];
++
++  const canUpload = permissions.has(PERM.importRun) && permissions.has(PERM.documentUpload);
++
++  return (
++    <div className="space-y-6">
++      <PageHeader title={t("title")} description={t("description")} />
++      <div className="grid gap-6 xl:grid-cols-[2fr_3fr]">
++        {canUpload ? (
++          <Card title={t("uploadTitle")} description={t("uploadDescription")}>
++            <UploadSpreadsheet onStarted={onStarted} />
++          </Card>
++        ) : null}
++        <Card title={t("historyTitle")} className={canUpload ? undefined : "xl:col-span-2"}>
++          <div className="space-y-3">
++            <DataTable
++              caption={t("historyTitle")}
++              captionHidden
++              columns={columns}
++              state={imports}
++              rowKey={(row) => row.id}
++              emptyTitle={t("emptyTitle")}
++              emptyBody={t("emptyBody")}
++            />
++            <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
++          </div>
++        </Card>
++      </div>
++      <Card title={t("templatesTitle")} description={t("templatesDescription")}>
++        <DataTable
++          caption={t("templatesTitle")}
++          captionHidden
++          columns={templateColumns}
++          state={templates}
++          rowKey={(row) => row.id}
++          emptyTitle={t("templatesEmptyTitle")}
++          emptyBody={t("templatesEmptyBody")}
++        />
++      </Card>
++    </div>
++  );
++}
++
++/** GET /imports (cursor), GET /import-templates. */
++export function ImportsScreen() {
++  const api = useBffClient("staff");
++  const router = useRouter();
++  const permissions = useStaffPermissions();
++  const pages = useCursorStack();
++  const query = { limit: 25, ...(pages.cursor ? { cursor: pages.cursor } : {}) };
++  const list = useApiQuery([...IMPORTS_KEY, "list", query], () =>
++    unwrap(api.GET("/api/v1/imports", { params: { query } })),
++  );
++  const templates = useApiQuery([...IMPORTS_KEY, "templates"], () =>
++    unwrap(api.GET("/api/v1/import-templates")),
++  );
++  const imports: Loadable<readonly ImportSummary[]> =
++    list.status === "ready" ? { status: "ready", data: list.data.data } : list;
++  const next = list.status === "ready" ? list.data.next_cursor : null;
++  return (
++    <ImportsView
++      imports={imports}
++      templates={templates}
++      permissions={permissions}
++      page={pages.page}
++      onNext={next ? () => pages.next(next) : undefined}
++      onPrevious={pages.hasPrevious ? pages.previous : undefined}
++      onStarted={(batch) => router.push(`/imports/${batch.id}`)}
++    />
++  );
++}
+diff --git a/apps/web/src/features/imports/poll.ts b/apps/web/src/features/imports/poll.ts
+new file mode 100644
+index 0000000..3a63838
+--- /dev/null
++++ b/apps/web/src/features/imports/poll.ts
+@@ -0,0 +1,35 @@
++"use client";
++
++import { useQuery, type QueryKey } from "@tanstack/react-query";
++import { AuthRedirectError } from "@/lib/bff/fetch";
++import { ApiError, NotAvailableError, toLoadable } from "@/lib/bff/query";
++import type { Loadable } from "@/lib/loadable";
++
++/** How often a screen asks again while a worker is busy (slow connections: not too often). */
++export const POLL_MS = 3000;
++
++/**
++ * Like useApiQuery, but asks again every `interval(data)` ms while that returns a number
++ * (e.g. while an import is being read or checked). Same retry rules as useApiQuery.
++ */
++export function usePolledQuery<T>(
++  queryKey: QueryKey,
++  load: () => Promise<T>,
++  interval: (data: T | undefined) => number | false,
++  options: { enabled?: boolean } = {},
++): Loadable<T> {
++  const query = useQuery({
++    queryKey,
++    queryFn: load,
++    enabled: options.enabled ?? true,
++    refetchInterval: (current) => interval(current.state.data),
++    // A slow office PC in another tab should not keep polling.
++    refetchIntervalInBackground: false,
++    retry: (count, error) =>
++      count < 1 &&
++      !(error instanceof NotAvailableError) &&
++      !(error instanceof AuthRedirectError) &&
++      !(error instanceof ApiError && error.status < 500),
++  });
++  return toLoadable(query);
++}
+diff --git a/apps/web/src/features/imports/types.ts b/apps/web/src/features/imports/types.ts
+new file mode 100644
+index 0000000..9d154c7
+--- /dev/null
++++ b/apps/web/src/features/imports/types.ts
+@@ -0,0 +1,74 @@
++import type { components, operations } from "@schoolos/api-client";
++import type { BadgeTone } from "@/components/ui/Badge";
++
++/** Import types from the generated OpenAPI schema (never hand-written). */
++type Schemas = components["schemas"];
++
++export type ImportBatch = Schemas["ImportOut"];
++export type ImportSummary = Schemas["ImportSummary"];
++export type ImportColumn = Schemas["ColumnOut"];
++export type ImportRow = Schemas["ImportRowOut"];
++export type RowIssue = Schemas["Issue"];
++export type ImportTemplate = Schemas["TemplateOut"];
++export type ImportStatus = ImportBatch["status"];
++export type ImportSource = Schemas["ImportCreate"]["source"];
++type RowQuery = NonNullable<
++  operations["list_rows_api_v1_imports__import_id__rows_get"]["parameters"]["query"]
++>;
++export type RowStatusFilter = NonNullable<RowQuery["status"]>;
++
++type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
++
++const importStatuses = [
++  "uploaded",
++  "parsing",
++  "parsed",
++  "validating",
++  "validated",
++  "committing",
++  "committed",
++  "reverting",
++  "reverted",
++  "failed",
++] as const satisfies readonly ImportStatus[];
++export const IMPORT_STATUSES: Exhaustive<ImportStatus, typeof importStatuses> = importStatuses;
++
++export const importTone: Record<ImportStatus, BadgeTone> = {
++  uploaded: "info",
++  parsing: "info",
++  parsed: "warning",
++  validating: "info",
++  validated: "info",
++  committing: "info",
++  committed: "success",
++  reverting: "info",
++  reverted: "neutral",
++  failed: "danger",
++};
++
++/** A worker is busy with the batch: poll until it settles. */
++export const IMPORT_BUSY: ReadonlySet<ImportStatus> = new Set([
++  "uploaded",
++  "parsing",
++  "validating",
++  "committing",
++  "reverting",
++]);
++
++/** The mapping may be changed (API: EDITABLE statuses). */
++export const MAPPING_EDITABLE: ReadonlySet<ImportStatus> = new Set(["parsed", "validated"]);
++
++/** Mapping targets that are not student attributes (imports/mapping.py SPECIAL_TARGETS). */
++export const SPECIAL_TARGETS = ["class", "section", "class_section", "roll_no"] as const;
++export type SpecialTarget = (typeof SPECIAL_TARGETS)[number];
++
++export function isSpecialTarget(value: string): value is SpecialTarget {
++  return (SPECIAL_TARGETS as readonly string[]).includes(value);
++}
++
++/** Sources whose rows may create students (imports/config.yaml creating_sources). */
++export const CREATING_SOURCES: readonly ImportSource[] = [
++  "admission_register",
++  "tc_incoming",
++  "manual_entry",
++];
+diff --git a/apps/web/src/features/imports/upload.ts b/apps/web/src/features/imports/upload.ts
+new file mode 100644
+index 0000000..5c024e7
+--- /dev/null
++++ b/apps/web/src/features/imports/upload.ts
+@@ -0,0 +1,167 @@
++"use client";
++
++import type { ApiClient, components } from "@schoolos/api-client";
++import { newIdempotencyKey, unwrap } from "@/lib/bff/query";
++
++/**
++ * Upload one file the documents way (docs/09 §4 Documents; FR-DOC-001..005):
++ *
++ * 1. POST /documents/uploads → a presigned POST (exact key, Content-Type and size, ≤ 10 min).
++ * 2. The browser posts the file straight to storage (never through the BFF; no token needed).
++ * 3. POST /documents registers it (202: version 1 queued for the malware scan).
++ * 4. GET /documents/{id} until the scan passed (`ready`); `quarantined`/`failed` stop.
++ *
++ * Nothing about the file's contents is logged or sent anywhere else.
++ */
++
++export type UploadPurpose = components["schemas"]["UploadCreate"]["purpose"];
++
++export type UploadStage = "requesting" | "uploading" | "registering" | "scanning" | "ready";
++
++export interface UploadProgress {
++  stage: UploadStage;
++  /** 0–100 while uploading, when the browser reports it. */
++  percent?: number;
++}
++
++export type UploadErrorCode =
++  "network" | "storage_rejected" | "scan_failed" | "quarantined" | "scan_timeout";
++
++/** A failure outside the API's problem+json answers (storage, scan outcome, time-out). */
++export class UploadError extends Error {
++  constructor(readonly code: UploadErrorCode) {
++    super(`upload failed: ${code}`);
++    this.name = "UploadError";
++  }
++}
++
++/** Declared types by extension: browsers report CSV inconsistently (Windows says ms-excel). */
++const TYPES: Record<string, string> = {
++  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
++  csv: "text/csv",
++  jpg: "image/jpeg",
++  jpeg: "image/jpeg",
++  png: "image/png",
++  pdf: "application/pdf",
++};
++
++export function contentTypeOf(file: Pick<File, "name" | "type">): string {
++  const ext = file.name.includes(".") ? (file.name.split(".").pop() ?? "").toLowerCase() : "";
++  return TYPES[ext] ?? (file.type || "application/octet-stream");
++}
++
++export function extensionOf(name: string): string {
++  return name.includes(".") ? (name.split(".").pop() ?? "").toLowerCase() : "";
++}
++
++/** Document title from the file name (API: 1–200 characters, no control characters). */
++export function titleOf(name: string): string {
++  // eslint-disable-next-line no-control-regex -- strip control characters the API refuses
++  const clean = name.replace(/[\u0000-\u001f\u007f]/g, " ").trim();
++  return (clean || "file").slice(0, 200);
++}
++
++export type StoragePost = (
++  url: string,
++  fields: Readonly<Record<string, string>>,
++  file: File,
++  onProgress: (fraction: number) => void,
++) => Promise<void>;
++
++/**
++ * Presigned POST with XMLHttpRequest, which (unlike fetch) reports upload progress: office
++ * connections are slow and a 10 MB file should never look stuck.
++ */
++export const xhrStoragePost: StoragePost = (url, fields, file, onProgress) =>
++  new Promise((resolve, reject) => {
++    const form = new FormData();
++    for (const [name, value] of Object.entries(fields)) form.append(name, value);
++    form.append("file", file); // must be the last field of a presigned POST
++    const xhr = new XMLHttpRequest();
++    xhr.open("POST", url);
++    xhr.upload.onprogress = (event) => {
++      if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total);
++    };
++    xhr.onload = () =>
++      xhr.status >= 200 && xhr.status < 300
++        ? resolve()
++        : reject(new UploadError("storage_rejected"));
++    xhr.onerror = () => reject(new UploadError("network"));
++    xhr.onabort = () => reject(new UploadError("network"));
++    xhr.send(form);
++  });
++
++let storagePostOverride: StoragePost | undefined;
++/** Tests only: replace the storage POST (jsdom has no network). */
++export function setStoragePostForTesting(post: StoragePost | undefined): void {
++  storagePostOverride = post;
++}
++
++export interface UploadOptions {
++  onProgress?: (progress: UploadProgress) => void;
++  /** Poll interval while the malware scan runs. */
++  pollMs?: number;
++  /** Give up waiting for the scan after this long (the document stays; try again later). */
++  timeoutMs?: number;
++}
++
++const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
++
++/** Wait for GET /documents/{id} to report the current version `ready`. */
++export async function waitUntilScanned(
++  api: ApiClient,
++  documentId: string,
++  { pollMs = 2000, timeoutMs = 180_000 }: Pick<UploadOptions, "pollMs" | "timeoutMs"> = {},
++): Promise<void> {
++  const started = Date.now();
++  for (;;) {
++    const doc = await unwrap(
++      api.GET("/api/v1/documents/{document_id}", {
++        params: { path: { document_id: documentId } },
++      }),
++    );
++    const status = doc.current_version?.status;
++    if (status === "ready") return;
++    if (status === "quarantined") throw new UploadError("quarantined");
++    if (status === "failed") throw new UploadError("scan_failed");
++    if (Date.now() - started > timeoutMs) throw new UploadError("scan_timeout");
++    await sleep(pollMs);
++  }
++}
++
++/** Upload, register and wait for the scan; returns the new document's id. */
++export async function uploadDocument(
++  api: ApiClient,
++  file: File,
++  purpose: UploadPurpose,
++  options: UploadOptions = {},
++): Promise<string> {
++  const report = options.onProgress ?? (() => undefined);
++  report({ stage: "requesting" });
++  const upload = await unwrap(
++    api.POST("/api/v1/documents/uploads", {
++      headers: { "Idempotency-Key": newIdempotencyKey() },
++      body: {
++        filename: file.name.slice(0, 255) || "file",
++        content_type: contentTypeOf(file),
++        size_bytes: file.size,
++        purpose,
++      },
++    }),
++  );
++  report({ stage: "uploading", percent: 0 });
++  await (storagePostOverride ?? xhrStoragePost)(upload.url, upload.fields, file, (fraction) =>
++    report({ stage: "uploading", percent: Math.round(fraction * 100) }),
++  );
++  report({ stage: "registering" });
++  const doc = await unwrap(
++    api.POST("/api/v1/documents", {
++      headers: { "Idempotency-Key": newIdempotencyKey() },
++      body: { upload_id: upload.upload_id, title: titleOf(file.name) },
++    }),
++  );
++  report({ stage: "scanning" });
++  await waitUntilScanned(api, doc.id, options);
++  report({ stage: "ready" });
++  return doc.id;
++}
+diff --git a/apps/web/src/features/students/CreateStudent.tsx b/apps/web/src/features/students/CreateStudent.tsx
+new file mode 100644
+index 0000000..2e23ab6
+--- /dev/null
++++ b/apps/web/src/features/students/CreateStudent.tsx
+@@ -0,0 +1,256 @@
++"use client";
++
++import { useTranslations } from "next-intl";
++import { useRef } from "react";
++import { z } from "zod";
++import { Alert } from "@/components/ui/Alert";
++import { Button } from "@/components/ui/Button";
++import { Card } from "@/components/ui/Card";
++import { PageHeader } from "@/components/ui/PageHeader";
++import { SelectField } from "@/components/ui/Select";
++import { Link, useRouter } from "@/i18n/navigation";
++import { unwrap, useBffClient } from "@/lib/bff/query";
++import { useApiForm } from "@/lib/forms";
++import { containsFullAadhaar } from "./aadhaar";
++import { toIsoDate } from "./dates";
++import { GuardedTextField } from "./fields";
++import { PERM, useStaffPermissions, type Permissions } from "./me";
++import { ProblemAlert } from "./ProblemAlert";
++import { useSchoolStructure, useSectionOptions } from "./StudentList";
++import { STUDENT_STATUSES, VALUE_SOURCES, type Student, type ValueInput } from "./types";
++
++/** Fields in the order of the admission register (PRD §8: tab order follows the paper form). */
++export const CREATE_FIELDS = [
++  "admission_no",
++  "full_name",
++  "dob",
++  "gender",
++  "father_name",
++  "mother_name",
++] as const;
++type CreateField = (typeof CREATE_FIELDS)[number];
++
++const GENDERS = ["female", "male", "transgender"] as const;
++
++const noAadhaar = (value: string) => !containsFullAadhaar(value);
++const optionalName = z
++  .string()
++  .trim()
++  .max(120, { error: "tooLong" })
++  .refine(noAadhaar, { error: "invalid" });
++
++export const createStudentSchema = z.object({
++  source: z.enum(VALUE_SOURCES, { error: "chooseOption" }),
++  admission_no: z
++    .string()
++    .trim()
++    .max(32, { error: "tooLong" })
++    .refine((value) => value === "" || /^[A-Za-z0-9][A-Za-z0-9/._-]{0,31}$/.test(value), {
++      error: "invalid",
++    }),
++  full_name: z
++    .string()
++    .trim()
++    .min(1, { error: "required" })
++    .max(120, { error: "tooLong" })
++    .refine(noAadhaar, { error: "invalid" }),
++  dob: z
++    .string()
++    .trim()
++    .refine((value) => value === "" || toIsoDate(value) !== null, { error: "invalid" })
++    .transform((value) => (value === "" ? "" : (toIsoDate(value) ?? ""))),
++  gender: z.union([z.enum(GENDERS), z.literal("")], { error: "chooseOption" }),
++  father_name: optionalName,
++  mother_name: optionalName,
++  section_id: z.string().trim(),
++  roll_no: z.string().trim().max(16, { error: "tooLong" }),
++  status: z.enum(STUDENT_STATUSES, { error: "chooseOption" }),
++});
++export type CreateStudentInput = z.output<typeof createStudentSchema>;
++
++/** Form values → POST /students body: one value per filled field, all from the chosen source. */
++export function createBody(data: CreateStudentInput) {
++  const values: ValueInput[] = CREATE_FIELDS.filter((key) => data[key] !== "").map((key) => ({
++    attribute_key: key,
++    source: data.source,
++    value: data[key],
++  }));
++  return {
++    values,
++    status: data.status,
++    ...(data.section_id ? { section_id: data.section_id } : {}),
++    ...(data.section_id && data.roll_no ? { roll_no: data.roll_no } : {}),
++  };
++}
++
++export interface CreateStudentFormProps {
++  permissions: Permissions;
++  onCreated?: (student: Student) => void;
++}
++
++/** US-301 / FR-STU-001..003: add a student with first values, each with its source. */
++export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormProps) {
++  const t = useTranslations("students.create");
++  const ts = useTranslations("students");
++  const tc = useTranslations("common");
++  const api = useBffClient("staff");
++  const structure = useSchoolStructure();
++  const sections = useSectionOptions(structure);
++  const sent = useRef<string[]>([]);
++
++  const form = useApiForm({
++    schema: createStudentSchema,
++    invalidate: [["staff", "students"]],
++    submit: (data, key) => {
++      const body = createBody(data);
++      sent.current = body.values.map((value) => value.attribute_key);
++      return unwrap(
++        api.POST("/api/v1/students", { headers: { "Idempotency-Key": key }, body }),
++      );
++    },
++    // `values.2.value` → the form field of the third value sent.
++    fieldMap: (field) => {
++      const match = /^values\.(\d+)\./.exec(field);
++      if (match) return sent.current[Number(match[1])];
++      return field.split(".").pop();
++    },
++    onSuccess: (student) => onCreated?.(student),
++  });
++
++  if (permissions.loaded && !permissions.has(PERM.create)) {
++    return (
++      <div className="space-y-6">
++        <PageHeader title={t("title")} />
++        <Alert tone="info" title={t("noPermissionTitle")}>
++          {t("noPermissionBody")}
++        </Alert>
++      </div>
++    );
++  }
++
++  const dateHint = ts("dateHint");
++  const err = (field: CreateField) =>
++    form.errors[field] && field === "dob" ? ts("dateInvalid") : form.errors[field];
++
++  return (
++    <div className="space-y-6">
++      <PageHeader title={t("title")} description={t("description")} />
++      <Alert tone="warning" title={ts("aadhaarWarningTitle")}>
++        {ts("aadhaarWarningBody")}
++      </Alert>
++      <Card>
++        <form noValidate onSubmit={form.onSubmit} className="space-y-6">
++          <SelectField
++            name="source"
++            label={t("source")}
++            hint={t("sourceHint")}
++            defaultValue="admission_register"
++            error={form.errors.source}
++            options={VALUE_SOURCES.map((value) => ({ value, label: ts(`sources.${value}`) }))}
++          />
++          <fieldset className="grid gap-4 md:grid-cols-2">
++            <legend className="mb-2 text-lg font-semibold">{t("detailsLegend")}</legend>
++            <GuardedTextField
++              name="admission_no"
++              label={t("admissionNo")}
++              hint={t("admissionNoHint")}
++              error={err("admission_no")}
++              maxLength={32}
++              autoComplete="off"
++              spellCheck={false}
++            />
++            <GuardedTextField
++              name="full_name"
++              label={t("fullName")}
++              hint={t("fullNameHint")}
++              error={err("full_name")}
++              maxLength={120}
++              autoComplete="off"
++              required
++              aria-required="true"
++            />
++            <GuardedTextField
++              name="dob"
++              label={t("dob")}
++              hint={dateHint}
++              error={err("dob")}
++              inputMode="numeric"
++              placeholder="DD/MM/YYYY"
++              autoComplete="off"
++            />
++            <SelectField
++              name="gender"
++              label={t("gender")}
++              placeholder={tc("chooseOne")}
++              error={form.errors.gender}
++              options={GENDERS.map((value) => ({ value, label: ts(`enumValues.${value}`) }))}
++            />
++            <GuardedTextField
++              name="father_name"
++              label={t("fatherName")}
++              error={err("father_name")}
++              maxLength={120}
++              autoComplete="off"
++            />
++            <GuardedTextField
++              name="mother_name"
++              label={t("motherName")}
++              error={err("mother_name")}
++              maxLength={120}
++              autoComplete="off"
++            />
++          </fieldset>
++          <fieldset className="grid gap-4 md:grid-cols-2">
++            <legend className="mb-2 text-lg font-semibold">{t("classLegend")}</legend>
++            <SelectField
++              name="section_id"
++              label={t("section")}
++              hint={t("sectionHint")}
++              placeholder={t("noSection")}
++              error={form.errors.section_id}
++              options={sections}
++            />
++            <GuardedTextField
++              name="roll_no"
++              label={t("rollNo")}
++              error={form.errors.roll_no}
++              maxLength={16}
++              autoComplete="off"
++            />
++            <SelectField
++              name="status"
++              label={t("status")}
++              hint={t("statusHint")}
++              defaultValue="active"
++              error={form.errors.status}
++              options={STUDENT_STATUSES.map((value) => ({ value, label: ts(`status.${value}`) }))}
++            />
++          </fieldset>
++          <ProblemAlert error={form.error} namespace="students.errors" />
++          <div className="flex flex-wrap justify-end gap-2">
++            <Link
++              href="/students"
++              className="inline-flex min-h-10 items-center rounded-md px-4 py-2 text-sm font-semibold text-primary underline"
++            >
++              {tc("cancel")}
++            </Link>
++            <Button type="submit" disabled={form.pending}>
++              {form.pending ? tc("working") : t("submit")}
++            </Button>
++          </div>
++        </form>
++      </Card>
++    </div>
++  );
++}
++
++export function CreateStudentScreen() {
++  const permissions = useStaffPermissions();
++  const router = useRouter();
++  return (
++    <CreateStudentForm
++      permissions={permissions}
++      onCreated={(student) => router.push(`/students/${student.id}`)}
++    />
++  );
++}
+diff --git a/apps/web/src/features/students/FormDialog.tsx b/apps/web/src/features/students/FormDialog.tsx
+new file mode 100644
+index 0000000..e503d25
+--- /dev/null
++++ b/apps/web/src/features/students/FormDialog.tsx
+@@ -0,0 +1,176 @@
++"use client";
++
++import type { QueryKey } from "@tanstack/react-query";
++import { useTranslations } from "next-intl";
++import { useCallback, useId, useRef, useState, type ReactNode } from "react";
++import type { z } from "zod";
++import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
++import { useApiForm, type FieldErrors } from "@/lib/forms";
++import { ProblemAlert, type ProblemNamespace } from "./ProblemAlert";
++
++export interface FormDialogProps<TSchema extends z.ZodType, TResult> {
++  triggerLabel: ReactNode;
++  triggerVariant?: ButtonVariant;
++  triggerSize?: ButtonSize;
++  /** Extra accessible description for the trigger (which row it acts on). */
++  triggerDescription?: string;
++  title: ReactNode;
++  description?: ReactNode;
++  confirmLabel: ReactNode;
++  confirmVariant?: ButtonVariant;
++  schema: TSchema;
++  submit: (data: z.output<TSchema>, idempotencyKey: string) => Promise<TResult>;
++  invalidate?: readonly QueryKey[];
++  extra?: (form: HTMLFormElement) => Record<string, unknown>;
++  fieldMap?: (serverField: string) => string | undefined;
++  children?: (errors: FieldErrors) => ReactNode;
++  onSuccess?: (result: TResult) => void;
++  /** Called when the dialog opens (reset per-open state held by the caller). */
++  onOpen?: () => void;
++  /** Feature messages for API codes (e.g. `identity_change_required`). */
++  problems: ProblemNamespace;
++  /** Extra help under a failure, e.g. a link to the change-request workflow. */
++  problemAction?: (error: unknown) => ReactNode;
++}
++
++/**
++ * Confirm-and-submit dialog on the native <dialog> (focus trap, Escape closes, focus returns to
++ * the trigger), like the shared ActionDialog, but failures are explained with this feature's
++ * messages (ProblemAlert) so a refusal such as `identity_change_required` says what to do
++ * instead of a generic "no permission".
++ */
++export function FormDialog<TSchema extends z.ZodType, TResult>({
++  triggerLabel,
++  triggerVariant = "secondary",
++  triggerSize = "md",
++  triggerDescription,
++  title,
++  description,
++  confirmLabel,
++  confirmVariant = "primary",
++  schema,
++  submit,
++  invalidate,
++  extra,
++  fieldMap,
++  children,
++  onSuccess,
++  onOpen,
++  problems,
++  problemAction,
++}: FormDialogProps<TSchema, TResult>) {
++  const tc = useTranslations("common");
++  const dialogRef = useRef<HTMLDialogElement>(null);
++  const triggerRef = useRef<HTMLButtonElement>(null);
++  const titleId = useId();
++  const descriptionId = useId();
++  const hintId = useId();
++  const [open, setOpen] = useState(false);
++  const close = useCallback(() => dialogRef.current?.close(), []);
++
++  const form = useApiForm({
++    schema,
++    submit,
++    ...(invalidate ? { invalidate } : {}),
++    ...(extra ? { extra } : {}),
++    ...(fieldMap ? { fieldMap } : {}),
++    onSuccess: (result) => {
++      onSuccess?.(result);
++      close();
++    },
++  });
++
++  const show = () => {
++    form.reset();
++    onOpen?.();
++    setOpen(true);
++    dialogRef.current?.showModal();
++  };
++
++  return (
++    <>
++      <Button
++        ref={triggerRef}
++        variant={triggerVariant}
++        size={triggerSize}
++        onClick={show}
++        aria-haspopup="dialog"
++        aria-describedby={triggerDescription ? hintId : undefined}
++      >
++        {triggerLabel}
++      </Button>
++      {triggerDescription ? (
++        <span id={hintId} className="sr-only">
++          {triggerDescription}
++        </span>
++      ) : null}
++      <dialog
++        ref={dialogRef}
++        aria-labelledby={titleId}
++        aria-describedby={description ? descriptionId : undefined}
++        onClose={() => {
++          setOpen(false);
++          triggerRef.current?.focus();
++        }}
++        className="m-auto w-[min(36rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-ink shadow-xl"
++      >
++        {open ? (
++          <>
++            <div className="flex items-start justify-between gap-4 border-b border-border p-5">
++              <div className="space-y-1">
++                <h2 id={titleId} className="text-lg font-semibold">
++                  {title}
++                </h2>
++                {description ? (
++                  <p id={descriptionId} className="text-sm text-ink-muted">
++                    {description}
++                  </p>
++                ) : null}
++              </div>
++              <button
++                type="button"
++                onClick={close}
++                aria-label={tc("close")}
++                className="rounded-md p-1 text-ink-muted hover:bg-surface-muted hover:text-ink"
++              >
++                <svg
++                  aria-hidden="true"
++                  viewBox="0 0 24 24"
++                  className="size-5"
++                  fill="none"
++                  stroke="currentColor"
++                  strokeWidth={2}
++                >
++                  <path d="M6 6l12 12M18 6 6 18" />
++                </svg>
++              </button>
++            </div>
++            <form noValidate onSubmit={form.onSubmit}>
++              <div className="max-h-[60vh] space-y-4 overflow-y-auto p-5">
++                {children?.(form.errors)}
++                <ProblemAlert
++                  error={form.error}
++                  namespace={problems}
++                  action={form.error !== undefined ? problemAction?.(form.error) : undefined}
++                />
++              </div>
++              <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
++                <Button variant="secondary" onClick={close}>
++                  {tc("cancel")}
++                </Button>
++                <Button
++                  type="submit"
++                  variant={confirmVariant}
++                  disabled={form.pending}
++                  aria-disabled={form.pending || undefined}
++                >
++                  {form.pending ? tc("working") : confirmLabel}
++                </Button>
++              </div>
++            </form>
++          </>
++        ) : null}
++      </dialog>
++    </>
++  );
++}
+diff --git a/apps/web/src/features/students/ProblemAlert.tsx b/apps/web/src/features/students/ProblemAlert.tsx
+new file mode 100644
+index 0000000..73e5a7a
+--- /dev/null
++++ b/apps/web/src/features/students/ProblemAlert.tsx
+@@ -0,0 +1,79 @@
++"use client";
++
++import { useTranslations } from "next-intl";
++import type { ReactNode } from "react";
++import { Alert } from "@/components/ui/Alert";
++import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
++import { ApiError } from "@/lib/bff/query";
++
++/** Message namespaces that hold `<code>.title` / `<code>.body` for feature-specific codes. */
++export type ProblemNamespace = "students.errors" | "imports.errors" | "extraction.errors";
++
++type Loose = ((key: string, values?: Record<string, string | number>) => string) & {
++  has: (key: string) => boolean;
++};
++
++/** An error with a feature code that is not an API problem (e.g. an upload that timed out). */
++export interface CodedError {
++  code: string;
++}
++
++function codeOf(error: unknown): string | undefined {
++  if (error instanceof ApiError) return error.code;
++  if (error instanceof Error && "code" in error && typeof error.code === "string") {
++    return error.code;
++  }
++  return undefined;
++}
++
++/**
++ * A failed call explained in plain language (en/te). Codes these features know (for example
++ * `identity_change_required`, `revert_window_closed`, `file_too_large`) get their own message
++ * that says how to fix it; everything else falls back to the shared <ApiErrorAlert>. Never
++ * shows raw API text. With several namespaces the first that knows the code wins.
++ */
++export function ProblemAlert({
++  error,
++  namespace,
++  action,
++  className,
++}: {
++  error: unknown;
++  namespace: ProblemNamespace | readonly ProblemNamespace[];
++  /** Extra content under the message, e.g. a link to the correct workflow. */
++  action?: ReactNode;
++  className?: string;
++}) {
++  const ts = useTranslations("students.errors") as unknown as Loose;
++  const ti = useTranslations("imports.errors") as unknown as Loose;
++  const tx = useTranslations("extraction.errors") as unknown as Loose;
++  const tapi = useTranslations("errors.api");
++  if (error === undefined || error === null) return null;
++  const code = codeOf(error);
++  const tables: Record<ProblemNamespace, Loose> = {
++    "students.errors": ts,
++    "imports.errors": ti,
++    "extraction.errors": tx,
++  };
++  const namespaces: readonly ProblemNamespace[] = typeof namespace === "string" ? [namespace] : namespace;
++  const t = code ? namespaces.map((ns) => tables[ns]).find((table) => table.has(`${code}.title`)) : undefined;
++  if (t && code) {
++    const requestId =
++      error instanceof ApiError && typeof error.problem.request_id === "string"
++        ? error.problem.request_id
++        : "";
++    return (
++      <Alert tone="danger" live title={t(`${code}.title`)} className={className}>
++        <p>{t(`${code}.body`)}</p>
++        {action ? <div className="mt-2">{action}</div> : null}
++        {requestId ? <p className="mt-1 text-xs">{tapi("reference", { id: requestId })}</p> : null}
++      </Alert>
++    );
++  }
++  return <ApiErrorAlert error={error} {...(className ? { className } : {})} />;
++}
++
++/** The code of a failed call, if any (to decide on an extra action link). */
++export function problemCode(error: unknown): string | undefined {
++  return codeOf(error);
++}
+diff --git a/apps/web/src/features/students/SensitiveValue.tsx b/apps/web/src/features/students/SensitiveValue.tsx
+new file mode 100644
+index 0000000..a79fd9c
+--- /dev/null
++++ b/apps/web/src/features/students/SensitiveValue.tsx
+@@ -0,0 +1,114 @@
++"use client";
++
++import { useTranslations } from "next-intl";
++import { useEffect, useRef, useState } from "react";
++import { Button } from "@/components/ui/Button";
++import { unwrap, useBffClient } from "@/lib/bff/query";
++import { ProblemAlert } from "./ProblemAlert";
++
++/** Shared office PCs: a revealed value hides itself again after this long. */
++export const REVEAL_SECONDS = 60;
++
++export interface SensitiveValueProps {
++  studentId: string;
++  attributeKey: string;
++  /** Field name for the button's accessible name ("Show Aadhaar last 4 digits"). */
++  fieldLabel: string;
++  valueId?: string | undefined;
++  guardianId?: string | undefined;
++  /** False when the user lacks `student.read_sensitive` (or the API says not revealable). */
++  canReveal: boolean;
++}
++
++/**
++ * A restricted (C3) value shown as •••• until the user asks for it (US-301 AC3). "Show" calls
++ * POST /students/{id}/sensitive-reveal, which the API audits; the answer is kept only in this
++ * component's state (never in the query cache or browser storage) and hidden again after
++ * REVEAL_SECONDS, on "Hide", or when the page changes.
++ */
++export function SensitiveValue({
++  studentId,
++  attributeKey,
++  fieldLabel,
++  valueId,
++  guardianId,
++  canReveal,
++}: SensitiveValueProps) {
++  const t = useTranslations("students.sensitive");
++  const api = useBffClient("staff");
++  const [shown, setShown] = useState<string | null>(null);
++  const [pending, setPending] = useState(false);
++  const [error, setError] = useState<unknown>(undefined);
++  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
++
++  useEffect(
++    () => () => {
++      if (timer.current) clearTimeout(timer.current);
++    },
++    [],
++  );
++
++  function hide() {
++    if (timer.current) clearTimeout(timer.current);
++    timer.current = null;
++    setShown(null);
++  }
++
++  async function reveal() {
++    setPending(true);
++    setError(undefined);
++    try {
++      const result = await unwrap(
++        api.POST("/api/v1/students/{student_id}/sensitive-reveal", {
++          params: { path: { student_id: studentId } },
++          body: {
++            attribute_key: attributeKey,
++            ...(valueId ? { value_id: valueId } : {}),
++            ...(guardianId ? { guardian_id: guardianId } : {}),
++          },
++        }),
++      );
++      setShown(result.display ?? result.value ?? "");
++      if (timer.current) clearTimeout(timer.current);
++      timer.current = setTimeout(hide, REVEAL_SECONDS * 1000);
++    } catch (failure) {
++      setError(failure);
++    } finally {
++      setPending(false);
++    }
++  }
++
++  return (
++    <div className="flex flex-wrap items-center gap-2">
++      <span aria-live="polite" className="font-mono">
++        {shown !== null ? (
++          <>
++            <span className="sr-only">{t("revealedLabel", { field: fieldLabel })} </span>
++            {shown}
++          </>
++        ) : (
++          <>
++            <span aria-hidden="true">••••</span>
++            <span className="sr-only">{t("hiddenLabel", { field: fieldLabel })}</span>
++          </>
++        )}
++      </span>
++      {canReveal ? (
++        shown === null ? (
++          <Button size="sm" variant="ghost" onClick={reveal} disabled={pending} data-print="hide">
++            {pending ? t("showing") : t("show")}
++            <span className="sr-only">: {fieldLabel}</span>
++          </Button>
++        ) : (
++          <Button size="sm" variant="ghost" onClick={hide} data-print="hide">
++            {t("hide")}
++            <span className="sr-only">: {fieldLabel}</span>
++          </Button>
++        )
++      ) : null}
++      {error !== undefined ? (
++        <ProblemAlert error={error} namespace="students.errors" className="w-full" />
++      ) : null}
++    </div>
++  );
++}
+diff --git a/apps/web/src/features/students/StudentDetail.tsx b/apps/web/src/features/students/StudentDetail.tsx
+new file mode 100644
+index 0000000..48daf32
+--- /dev/null
++++ b/apps/web/src/features/students/StudentDetail.tsx
+@@ -0,0 +1,616 @@
++"use client";
++
++import { useQueryClient } from "@tanstack/react-query";
++import { useLocale, useTranslations } from "next-intl";
++import { useState } from "react";
++import { z } from "zod";
++import { Alert } from "@/components/ui/Alert";
++import { Badge } from "@/components/ui/Badge";
++import { Button } from "@/components/ui/Button";
++import { Card } from "@/components/ui/Card";
++import { PageHeader } from "@/components/ui/PageHeader";
++import { SelectField } from "@/components/ui/Select";
++import { DataTable, type Column } from "@/components/ui/Table";
++import { Value } from "@/components/ui/Value";
++import { Link } from "@/i18n/navigation";
++import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
++import { formatDate, formatList } from "@/lib/format";
++import type { Loadable } from "@/lib/loadable";
++import type { Locale } from "@/i18n/routing";
++import { containsFullAadhaar } from "./aadhaar";
++import { toIsoDate } from "./dates";
++import { GuardedTextField } from "./fields";
++import { FormDialog } from "./FormDialog";
++import { PERM, useStaffPermissions, type Permissions } from "./me";
++import {
++  LoadGate,
++  SourceChip,
++  StudentStatusBadge,
++  useAttributeIndex,
++  useAttributes,
++  useValueFormatter,
++} from "./parts";
++import { ProblemAlert, problemCode } from "./ProblemAlert";
++import { SensitiveValue } from "./SensitiveValue";
++import {
++  VALUE_SOURCES,
++  isValueSource,
++  type Attribute,
++  type CanonicalValue,
++  type Guardian,
++  type SourceValue,
++  type Student,
++  type ValueSource,
++} from "./types";
++
++export const studentKey = (id: string) => ["staff", "students", id] as const;
++
++/** Findings and change requests are other screens: link to them by URL (filtered). */
++function RelatedLinks({ studentId, permissions }: { studentId: string; permissions: Permissions }) {
++  const t = useTranslations("students.detail");
++  const q = `student_id=${encodeURIComponent(studentId)}`;
++  const links = [
++    ...(permissions.has(PERM.findingsRead)
++      ? [{ href: `/findings?${q}`, label: t("findingsLink") }]
++      : []),
++    ...(permissions.has(PERM.requestChange) || permissions.has(PERM.approveChange)
++      ? [{ href: `/change-requests?${q}`, label: t("changeRequestsLink") }]
++      : []),
++  ];
++  return (
++    <nav aria-label={t("relatedLabel")} data-print="hide">
++      <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
++        <li>
++          <Link href="/students" className="text-primary underline">
++            {t("backToList")}
++          </Link>
++        </li>
++        {links.map((link) => (
++          <li key={link.href}>
++            <Link href={link.href} className="text-primary underline">
++              {link.label}
++            </Link>
++          </li>
++        ))}
++      </ul>
++    </nav>
++  );
++}
++
++function canonicalState(canonical: CanonicalValue): "verified" | "provisional" | "unverified" {
++  if (canonical.verified) return "verified";
++  return canonical.provisional ? "provisional" : "unverified";
++}
++
++interface RowProps {
++  student: Student;
++  attributeKey: string;
++  attribute: Attribute | undefined;
++  label: string;
++  permissions: Permissions;
++  onVerify: (value: SourceValue, status: "verified" | "rejected") => void;
++  verifying: string | null;
++}
++
++/** One attribute: the value SchoolOS uses, and every source's current value beside it. */
++function AttributeRow({
++  student,
++  attributeKey,
++  attribute,
++  label,
++  permissions,
++  onVerify,
++  verifying,
++}: RowProps) {
++  const t = useTranslations("students.detail");
++  const ts = useTranslations("students");
++  const locale = useLocale() as Locale;
++  const format = useValueFormatter();
++  const canonical = student.canonical[attributeKey];
++  const values = (student.values[attributeKey] ?? []).filter((value) => value.current);
++  const canReveal = permissions.has(PERM.readSensitive) && student.sensitive_revealable;
++  const canVerify = permissions.has(PERM.updateNonIdentity) && attribute?.is_identity === false;
++
++  const shown = (value: string | null, masked: boolean, valueId?: string) =>
++    masked ? (
++      <SensitiveValue
++        studentId={student.id}
++        attributeKey={attributeKey}
++        fieldLabel={label}
++        valueId={valueId}
++        canReveal={canReveal}
++      />
++    ) : (
++      <span className="font-semibold">
++        <Value>{format(value, attribute)}</Value>
++      </span>
++    );
++
++  const conflicts = canonical?.conflicts.filter(isValueSource) ?? [];
++
++  return (
++    <tr className="align-top">
++      <th scope="row" className="px-3 py-3 text-left font-semibold whitespace-normal">
++        {label}
++        {attribute?.is_identity ? (
++          <span className="block text-xs font-normal text-ink-muted">{t("identityField")}</span>
++        ) : null}
++        {attribute?.classification === "C3" ? (
++          <span className="block text-xs font-normal text-ink-muted">{t("restrictedField")}</span>
++        ) : null}
++      </th>
++      <td className="px-3 py-3">
++        {canonical ? (
++          <div className="space-y-1">
++            {shown(canonical.value, canonical.masked)}
++            <div className="flex flex-wrap items-center gap-2">
++              {canonical.source ? (
++                <SourceChip source={canonical.source} verification={canonicalState(canonical)} />
++              ) : null}
++              {canonical.provisional ? <Badge tone="warning">{t("provisional")}</Badge> : null}
++              {conflicts.length > 0 ? (
++                <Badge tone="warning">
++                  {t("conflicts", {
++                    sources: formatList(
++                      conflicts.map((source) => ts(`sourceShort.${source}`)),
++                      locale,
++                    ),
++                  })}
++                </Badge>
++              ) : null}
++            </div>
++          </div>
++        ) : (
++          <Value>{null}</Value>
++        )}
++      </td>
++      <td className="px-3 py-3">
++        {values.length === 0 ? (
++          <Value>{null}</Value>
++        ) : (
++          <ul className="space-y-3">
++            {values.map((value) => (
++              <li key={value.id} className="space-y-1">
++                <div className="flex flex-wrap items-center gap-2">
++                  <SourceChip source={value.source} verification={value.verification_status} />
++                  {shown(value.value, value.masked, value.id)}
++                </div>
++                <p className="text-xs text-ink-muted">
++                  {t("recordedOn", { date: formatDate(value.recorded_at) ?? "" })}
++                  {value.evidence_document_id ? ` · ${t("hasEvidence")}` : ""}
++                  {value.import_batch_id ? ` · ${t("fromImport")}` : ""}
++                </p>
++                {canVerify && value.verification_status === "unverified" ? (
++                  <div className="flex flex-wrap gap-2" data-print="hide">
++                    <Button
++                      size="sm"
++                      variant="secondary"
++                      disabled={verifying === value.id}
++                      onClick={() => onVerify(value, "verified")}
++                    >
++                      {t("markVerified")}
++                      <span className="sr-only">
++                        : {label}, {ts(`sources.${isValueSource(value.source) ? value.source : "manual_entry"}`)}
++                      </span>
++                    </Button>
++                    <Button
++                      size="sm"
++                      variant="ghost"
++                      disabled={verifying === value.id}
++                      onClick={() => onVerify(value, "rejected")}
++                    >
++                      {t("markRejected")}
++                      <span className="sr-only">: {label}</span>
++                    </Button>
++                  </div>
++                ) : null}
++              </li>
++            ))}
++          </ul>
++        )}
++      </td>
++    </tr>
++  );
++}
++
++/* ------------------------------------------------------------------ record a value */
++
++function valueSchema(attribute: Attribute | undefined) {
++  const base = z
++    .string()
++    .trim()
++    .min(1, { error: "required" })
++    .max(1000, { error: "tooLong" })
++    .refine((value) => !containsFullAadhaar(value), { error: "invalid" });
++  if (attribute?.data_type === "date") {
++    return base
++      .refine((value) => toIsoDate(value) !== null, { error: "invalidDate" })
++      .transform((value) => toIsoDate(value) ?? value);
++  }
++  if (attribute?.data_type === "digits4") {
++    return base.refine((value) => /^\d{4}$/.test(value), { error: "invalid" });
++  }
++  return base;
++}
++
++function recordSchema(attribute: Attribute | undefined) {
++  return z.object({
++    attribute_key: z.string().trim().min(1, { error: "chooseOption" }),
++    source: z.enum(VALUE_SOURCES, { error: "chooseOption" }),
++    value: valueSchema(attribute),
++  });
++}
++
++function RecordValueDialog({
++  student,
++  attributes,
++}: {
++  student: Student;
++  attributes: readonly Attribute[];
++}) {
++  const t = useTranslations("students.record");
++  const ts = useTranslations("students");
++  const tc = useTranslations("common");
++  const locale = useLocale();
++  const api = useBffClient("staff");
++  const [key, setKey] = useState("");
++  const [raw, setRaw] = useState("");
++  const format = useValueFormatter();
++  const attribute = attributes.find((item) => item.key === key);
++  const sources: readonly ValueSource[] = attribute?.allowed_sources
++    ? VALUE_SOURCES.filter((source) => attribute.allowed_sources?.includes(source))
++    : VALUE_SOURCES;
++
++  const valueError = (error: string | undefined) => {
++    if (!error) return undefined;
++    if (containsFullAadhaar(raw)) return ts("aadhaarNotAllowed");
++    if (attribute?.data_type === "date") return ts("dateInvalid");
++    if (attribute?.data_type === "digits4") return t("digits4Invalid");
++    return error;
++  };
++
++  return (
++    <FormDialog
++      triggerLabel={t("open")}
++      title={t("title")}
++      description={t("description")}
++      confirmLabel={t("submit")}
++      problems="students.errors"
++      problemAction={(error) =>
++        problemCode(error) === "identity_change_required" ? (
++          <Link
++            href={`/change-requests?student_id=${encodeURIComponent(student.id)}`}
++            className="font-semibold underline"
++          >
++            {t("goToChangeRequests")}
++          </Link>
++        ) : null
++      }
++      schema={recordSchema(attribute)}
++      onOpen={() => {
++        setKey("");
++        setRaw("");
++      }}
++      invalidate={[studentKey(student.id)]}
++      submit={(data, idempotencyKey) =>
++        unwrap(
++          api.POST("/api/v1/students/{student_id}/values", {
++            params: { path: { student_id: student.id } },
++            // If-Match: refuse to add a value on top of changes made since this page loaded.
++            headers: { "Idempotency-Key": idempotencyKey, "If-Match": `"${student.version}"` },
++            body: { attribute_key: data.attribute_key, source: data.source, value: data.value },
++          }),
++        )
++      }
++    >
++      {(errors) => (
++        <>
++          <SelectField
++            name="attribute_key"
++            label={t("field")}
++            placeholder={tc("chooseOne")}
++            error={errors.attribute_key}
++            value={key}
++            onChange={(event) => {
++              setKey(event.currentTarget.value);
++              setRaw("");
++            }}
++            options={attributes.map((item) => ({
++              value: item.key,
++              label: locale === "te" && item.label_te ? item.label_te : item.label_en,
++            }))}
++          />
++          <SelectField
++            name="source"
++            label={t("source")}
++            hint={t("sourceHint")}
++            error={errors.source}
++            defaultValue=""
++            placeholder={tc("chooseOne")}
++            options={sources.map((value) => ({ value, label: ts(`sources.${value}`) }))}
++            key={`source-${key}`}
++          />
++          {attribute?.data_type === "enum" && attribute.allowed_values ? (
++            <SelectField
++              name="value"
++              label={t("value")}
++              placeholder={tc("chooseOne")}
++              error={errors.value}
++              options={attribute.allowed_values.map((value) => ({
++                value,
++                label: format(value, attribute) ?? value,
++              }))}
++            />
++          ) : (
++            <GuardedTextField
++              name="value"
++              label={t("value")}
++              hint={
++                attribute?.data_type === "date"
++                  ? ts("dateHint")
++                  : attribute?.data_type === "digits4"
++                    ? t("digits4Hint")
++                    : undefined
++              }
++              error={valueError(errors.value)}
++              value={raw}
++              onChange={(event) => setRaw(event.currentTarget.value)}
++              autoComplete="off"
++              maxLength={attribute?.data_type === "digits4" ? 4 : 1000}
++              inputMode={
++                attribute?.data_type === "digits4" || attribute?.data_type === "date"
++                  ? "numeric"
++                  : undefined
++              }
++            />
++          )}
++          {attribute?.is_identity ? (
++            <Alert tone="info">{t("identityNote")}</Alert>
++          ) : null}
++        </>
++      )}
++    </FormDialog>
++  );
++}
++
++/* ------------------------------------------------------------------ guardians */
++
++function GuardiansCard({
++  student,
++  guardians,
++  permissions,
++}: {
++  student: Student;
++  guardians: Loadable<readonly Guardian[]>;
++  permissions: Permissions;
++}) {
++  const t = useTranslations("students.guardians");
++  const canReveal = permissions.has(PERM.readSensitive) && student.sensitive_revealable;
++  const relationship = (value: string) =>
++    value === "father" || value === "mother" || value === "guardian"
++      ? t(`relationship.${value}`)
++      : value;
++
++  const contact = (guardian: Guardian, kind: "phone" | "address") => {
++    const present = kind === "phone" ? guardian.has_phone : guardian.has_address;
++    const value = kind === "phone" ? guardian.phone : guardian.address;
++    if (!present) return <Value>{null}</Value>;
++    if (!guardian.masked) return <Value>{value}</Value>;
++    return (
++      <SensitiveValue
++        studentId={student.id}
++        attributeKey={kind === "phone" ? "guardian_phone" : "guardian_address"}
++        guardianId={guardian.id}
++        fieldLabel={t(kind === "phone" ? "phoneOf" : "addressOf", { name: guardian.full_name })}
++        canReveal={canReveal}
++      />
++    );
++  };
++
++  const columns: Column<Guardian>[] = [
++    {
++      key: "name",
++      header: t("colName"),
++      cell: (row) => (
++        <span className="flex flex-wrap items-center gap-2">
++          {row.full_name}
++          {row.is_primary ? <Badge tone="info">{t("primary")}</Badge> : null}
++        </span>
++      ),
++    },
++    { key: "relationship", header: t("colRelationship"), cell: (row) => relationship(row.relationship) },
++    { key: "phone", header: t("colPhone"), cell: (row) => contact(row, "phone") },
++    { key: "address", header: t("colAddress"), cell: (row) => contact(row, "address") },
++  ];
++
++  return (
++    <Card title={t("title")} description={t("description")}>
++      <DataTable
++        caption={t("title")}
++        captionHidden
++        columns={columns}
++        state={guardians}
++        rowKey={(row) => row.id}
++        emptyTitle={t("emptyTitle")}
++        emptyBody={t("emptyBody")}
++      />
++    </Card>
++  );
++}
++
++/* ------------------------------------------------------------------ the page */
++
++export interface StudentDetailViewProps {
++  student: Loadable<Student>;
++  attributes: Loadable<readonly Attribute[]>;
++  guardians: Loadable<readonly Guardian[]>;
++  permissions: Permissions;
++}
++
++/** US-301 / FR-STU-001..008: canonical profile with every source's value, guardians, class. */
++export function StudentDetailView({
++  student,
++  attributes,
++  guardians,
++  permissions,
++}: StudentDetailViewProps) {
++  const t = useTranslations("students.detail");
++  const index = useAttributeIndex(attributes);
++  const api = useBffClient("staff");
++  const [verifying, setVerifying] = useState<string | null>(null);
++  const [verifyError, setVerifyError] = useState<unknown>(undefined);
++  const [verified, setVerified] = useState<string | null>(null);
++  const queryClient = useQueryClient();
++
++  if (student.status !== "ready") {
++    return (
++      <div className="space-y-6">
++        <PageHeader title={t("loadingTitle")} />
++        <LoadGate state={student} />
++      </div>
++    );
++  }
++  const data = student.data;
++  const name = data.canonical.full_name?.value ?? t("unnamed");
++  const keys = [
++    ...index.sorted.map((item) => item.key).filter((key) => key in data.canonical || key in data.values),
++    ...Object.keys(data.canonical).filter((key) => !index.byKey.has(key)),
++  ];
++
++  async function verify(value: SourceValue, status: "verified" | "rejected") {
++    setVerifying(value.id);
++    setVerifyError(undefined);
++    setVerified(null);
++    try {
++      await unwrap(
++        api.POST("/api/v1/students/{student_id}/values/{value_id}/verify", {
++          params: { path: { student_id: data.id, value_id: value.id } },
++          body: { status },
++        }),
++      );
++      setVerified(status);
++      await queryClient.invalidateQueries({ queryKey: studentKey(data.id) });
++    } catch (failure) {
++      setVerifyError(failure);
++    } finally {
++      setVerifying(null);
++    }
++  }
++
++  return (
++    <div className="space-y-6">
++      <PageHeader
++        title={name}
++        badge={<StudentStatusBadge status={data.status} />}
++        description={t("summary", {
++          admission: data.admission_no ?? "—",
++          classSection: data.enrollment?.label ?? t("noClass"),
++        })}
++      />
++      <RelatedLinks studentId={data.id} permissions={permissions} />
++      <Card
++        title={t("valuesTitle")}
++        description={t("valuesDescription")}
++        actions={
++          permissions.has(PERM.updateNonIdentity) && attributes.status === "ready" ? (
++            <RecordValueDialog student={data} attributes={index.sorted} />
++          ) : null
++        }
++      >
++        <div className="space-y-3">
++          <ProblemAlert error={verifyError} namespace="students.errors" />
++          {verified ? (
++            <Alert tone="success" live>
++              {verified === "verified" ? t("verifiedDone") : t("rejectedDone")}
++            </Alert>
++          ) : null}
++          {keys.length === 0 ? (
++            <p className="text-sm text-ink-muted">{t("noValues")}</p>
++          ) : (
++            <div
++              role="region"
++              aria-label={t("valuesTable")}
++              tabIndex={0}
++              className="overflow-x-auto rounded-md border border-border print:overflow-visible print:border-0"
++            >
++              <table className="w-full border-collapse text-left text-sm">
++                <caption className="sr-only">{t("valuesTable")}</caption>
++                <thead className="bg-surface-muted">
++                  <tr>
++                    <th scope="col" className="px-3 py-2 font-semibold">
++                      {t("colField")}
++                    </th>
++                    <th scope="col" className="px-3 py-2 font-semibold">
++                      {t("colUsed")}
++                    </th>
++                    <th scope="col" className="px-3 py-2 font-semibold">
++                      {t("colSources")}
++                    </th>
++                  </tr>
++                </thead>
++                <tbody className="divide-y divide-border">
++                  {keys.map((key) => (
++                    <AttributeRow
++                      key={key}
++                      student={data}
++                      attributeKey={key}
++                      attribute={index.byKey.get(key)}
++                      label={index.label(key)}
++                      permissions={permissions}
++                      onVerify={verify}
++                      verifying={verifying}
++                    />
++                  ))}
++                </tbody>
++              </table>
++            </div>
++          )}
++        </div>
++      </Card>
++      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
++        <GuardiansCard student={data} guardians={guardians} permissions={permissions} />
++        <Card title={t("classTitle")}>
++          {data.enrollment ? (
++            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
++              <dt className="text-ink-muted">{t("classSection")}</dt>
++              <dd className="font-semibold">{data.enrollment.label}</dd>
++              <dt className="text-ink-muted">{t("rollNo")}</dt>
++              <dd>
++                <Value>{data.enrollment.roll_no ?? null}</Value>
++              </dd>
++            </dl>
++          ) : (
++            <p className="text-sm text-ink-muted">{t("notEnrolled")}</p>
++          )}
++        </Card>
++      </div>
++    </div>
++  );
++}
++
++/** GET /students/{id} (404 outside the caller's scope or school), /attributes, guardians. */
++export function StudentDetailScreen({ studentId }: { studentId: string }) {
++  const api = useBffClient("staff");
++  const permissions = useStaffPermissions();
++  const student = useApiQuery(studentKey(studentId), () =>
++    unwrap(
++      api.GET("/api/v1/students/{student_id}", { params: { path: { student_id: studentId } } }),
++    ),
++  );
++  const attributes = useAttributes();
++  const guardians = useApiQuery([...studentKey(studentId), "guardians"], () =>
++    unwrap(
++      api.GET("/api/v1/students/{student_id}/guardians", {
++        params: { path: { student_id: studentId } },
++      }),
++    ),
++  );
++  return (
++    <StudentDetailView
++      student={student}
++      attributes={attributes}
++      guardians={guardians}
++      permissions={permissions}
++    />
++  );
++}
+diff --git a/apps/web/src/features/students/StudentList.tsx b/apps/web/src/features/students/StudentList.tsx
+new file mode 100644
+index 0000000..b1cf86c
+--- /dev/null
++++ b/apps/web/src/features/students/StudentList.tsx
+@@ -0,0 +1,332 @@
++"use client";
++
++import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
++import { useLocale, useTranslations } from "next-intl";
++import { useState } from "react";
++import { Button, ButtonLink } from "@/components/ui/Button";
++import { Card } from "@/components/ui/Card";
++import { TextField } from "@/components/ui/Input";
++import { PageHeader } from "@/components/ui/PageHeader";
++import { SelectField, type SelectOption } from "@/components/ui/Select";
++import { DataTable, type Column } from "@/components/ui/Table";
++import { Value } from "@/components/ui/Value";
++import { className as classDisplay } from "@/features/school/StructureView";
++import { Link } from "@/i18n/navigation";
++import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
++import { type Loadable } from "@/lib/loadable";
++import { UUID_PATTERN } from "@/lib/validation";
++import { containsFullAadhaar } from "./aadhaar";
++import { PERM, useStaffPermissions, type Permissions } from "./me";
++import { Pager, useCursorStack } from "./paging";
++import { StudentStatusBadge, useAttributeIndex, useAttributes } from "./parts";
++import { STUDENT_STATUSES, isStudentStatus, type StudentStatus, type StudentSummary } from "./types";
++
++export const PAGE_SIZE = 50;
++
++export interface StudentFilters {
++  q?: string | undefined;
++  classId?: string | undefined;
++  sectionId?: string | undefined;
++  status?: string | undefined;
++}
++
++interface CleanFilters {
++  query?: string;
++  class_id?: string;
++  section_id?: string;
++  status?: StudentStatus;
++}
++
++/** URL values → API query (ignores anything malformed rather than failing the page). */
++export function cleanFilters(filters: StudentFilters): CleanFilters {
++  const q = filters.q?.trim().slice(0, 200) ?? "";
++  return {
++    ...(q ? { query: q } : {}),
++    ...(filters.classId && UUID_PATTERN.test(filters.classId) ? { class_id: filters.classId } : {}),
++    ...(filters.sectionId && UUID_PATTERN.test(filters.sectionId)
++      ? { section_id: filters.sectionId }
++      : {}),
++    ...(filters.status && isStudentStatus(filters.status) ? { status: filters.status } : {}),
++  };
++}
++
++interface StructureData {
++  years: Loadable<readonly AcademicYear[]>;
++  classes: Loadable<readonly SchoolClass[]>;
++  sections: Loadable<readonly Section[]>;
++}
++
++/** Classes and sections for filters and forms (GET /academic-years, /classes, /sections). */
++export function useSchoolStructure(): StructureData {
++  const api = useBffClient("staff");
++  const query = { limit: 200 } as const;
++  const years = useApiQuery(
++    ["staff", "academic-years"],
++    async () => (await unwrap(api.GET("/api/v1/academic-years", { params: { query } }))).data,
++  );
++  const classes = useApiQuery(
++    ["staff", "classes"],
++    async () => (await unwrap(api.GET("/api/v1/classes", { params: { query } }))).data,
++  );
++  const sections = useApiQuery(
++    ["staff", "sections"],
++    async () => (await unwrap(api.GET("/api/v1/sections", { params: { query } }))).data,
++  );
++  return { years, classes, sections };
++}
++
++/** "Class 9 · A" options for the current academic year, optionally for one class. */
++export function useSectionOptions(
++  structure: StructureData,
++  classId?: string,
++): readonly SelectOption[] {
++  const locale = useLocale();
++  if (structure.sections.status !== "ready" || structure.classes.status !== "ready") return [];
++  const current =
++    structure.years.status === "ready"
++      ? structure.years.data.find((year) => year.is_current)?.id
++      : undefined;
++  const classes = new Map(structure.classes.data.map((row) => [row.id, row] as const));
++  return structure.sections.data
++    .filter((section) => !current || section.academic_year_id === current)
++    .filter((section) => !classId || section.class_id === classId)
++    .map((section) => {
++      const parent = classes.get(section.class_id);
++      return {
++        section,
++        order: parent?.sort_order ?? 0,
++        label: `${parent ? classDisplay(parent, locale) : ""} · ${section.name}`,
++      };
++    })
++    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
++    .map(({ section, label }) => ({ value: section.id, label }));
++}
++
++export interface StudentPage {
++  data: readonly StudentSummary[];
++  next_cursor: string | null;
++}
++
++export interface StudentListViewProps {
++  filters: StudentFilters;
++  results: Loadable<StudentPage> | null;
++  structure: StructureData;
++  permissions: Permissions;
++  pageNumber: number;
++  onNext?: (() => void) | undefined;
++  onPrevious?: (() => void) | undefined;
++  /** The search text looked like a full Aadhaar number: it was not sent. */
++  aadhaarBlocked?: boolean;
++}
++
++/** US-302 / FR-STU-010: find students by name (EN/TE), admission number, class/section, parent. */
++export function StudentListView({
++  filters,
++  results,
++  structure,
++  permissions,
++  pageNumber,
++  onNext,
++  onPrevious,
++  aadhaarBlocked = false,
++}: StudentListViewProps) {
++  const t = useTranslations("students.list");
++  const ts = useTranslations("students");
++  const tc = useTranslations("common");
++  const locale = useLocale();
++  const [classId, setClassId] = useState(filters.classId ?? "");
++  const attributes = useAttributes(results !== null);
++  const index = useAttributeIndex(attributes);
++
++  const classOptions: SelectOption[] =
++    structure.classes.status === "ready"
++      ? [...structure.classes.data]
++          .sort((a, b) => a.sort_order - b.sort_order)
++          .map((row) => ({ value: row.id, label: classDisplay(row, locale) }))
++      : [];
++  const sectionOptions = useSectionOptions(structure, classId || undefined);
++
++  const columns: Column<StudentSummary>[] = [
++    {
++      key: "name",
++      header: t("colName"),
++      cell: (row) => (
++        <div>
++          <Link
++            href={`/students/${row.id}`}
++            className="font-semibold text-primary underline underline-offset-2"
++          >
++            {row.display_name ?? t("unnamed")}
++          </Link>
++          {row.match.field && !["full_name", "admission_no"].includes(row.match.field) ? (
++            <p className="text-xs text-ink-muted" data-print="hide">
++              {t("matchedOn", { field: index.label(row.match.field) })}
++            </p>
++          ) : null}
++        </div>
++      ),
++    },
++    {
++      key: "admission",
++      header: t("colAdmissionNo"),
++      cell: (row) => <Value>{row.admission_no}</Value>,
++    },
++    {
++      key: "class",
++      header: t("colClassSection"),
++      cell: (row) => <Value>{row.class_section}</Value>,
++    },
++    {
++      key: "status",
++      header: t("colStatus"),
++      cell: (row) => <StudentStatusBadge status={row.status} />,
++    },
++  ];
++
++  const rows: Loadable<readonly StudentSummary[]> | null =
++    results === null
++      ? null
++      : results.status === "ready"
++        ? { status: "ready", data: results.data.data }
++        : results;
++  const hasFilters = Boolean(filters.q || filters.classId || filters.sectionId || filters.status);
++
++  return (
++    <div className="space-y-6">
++      <PageHeader
++        title={t("title")}
++        description={t("description")}
++        actions={
++          <>
++            {permissions.has(PERM.create) ? (
++              <ButtonLink href="/students/new">{t("add")}</ButtonLink>
++            ) : null}
++            {permissions.has(PERM.importRun) ? (
++              <ButtonLink href="/imports" variant="secondary">
++                {t("import")}
++              </ButtonLink>
++            ) : null}
++            <Button variant="secondary" onClick={() => window.print()}>
++              {t("print")}
++            </Button>
++          </>
++        }
++      />
++      <div data-print="hide">
++        <Card title={t("searchTitle")}>
++          {/* GET form: the search lives in the URL, works without JavaScript and can be bookmarked. */}
++          <form method="get" role="search" aria-label={t("searchTitle")} className="space-y-4">
++            <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_auto]">
++              <TextField
++                name="q"
++                type="search"
++                label={t("searchLabel")}
++                hint={t("searchHint")}
++                defaultValue={filters.q ?? ""}
++                maxLength={200}
++                autoComplete="off"
++                spellCheck={false}
++                error={aadhaarBlocked ? ts("aadhaarNotAllowed") : undefined}
++              />
++              <SelectField
++                name="class_id"
++                label={t("filterClass")}
++                placeholder={tc("all")}
++                options={classOptions}
++                value={classId}
++                onChange={(event) => setClassId(event.currentTarget.value)}
++              />
++              <SelectField
++                name="section_id"
++                label={t("filterSection")}
++                placeholder={tc("all")}
++                options={sectionOptions}
++                defaultValue={filters.sectionId ?? ""}
++                key={`section-${classId}`}
++              />
++              <SelectField
++                name="status"
++                label={t("filterStatus")}
++                placeholder={tc("all")}
++                options={STUDENT_STATUSES.map((value) => ({
++                  value,
++                  label: ts(`status.${value}`),
++                }))}
++                defaultValue={filters.status ?? ""}
++              />
++              <div className="flex gap-2">
++                <Button type="submit">{tc("search")}</Button>
++              </div>
++            </div>
++            {hasFilters ? (
++              <p className="text-sm">
++                <Link href="/students" className="text-primary underline">
++                  {t("clear")}
++                </Link>
++              </p>
++            ) : null}
++          </form>
++        </Card>
++      </div>
++
++      {rows === null ? null : (
++        <section aria-labelledby="student-results" className="space-y-3">
++          <h2 id="student-results" className="text-lg font-semibold">
++            {t("resultsTitle")}
++          </h2>
++          <DataTable
++            caption={t("resultsTitle")}
++            captionHidden
++            columns={columns}
++            state={rows}
++            rowKey={(row) => row.id}
++            emptyTitle={hasFilters ? t("noMatchTitle") : t("emptyTitle")}
++            emptyBody={hasFilters ? t("noMatchBody") : t("emptyBody")}
++          />
++          {results?.status === "ready" ? (
++            <Pager
++              label={t("pagesLabel")}
++              page={pageNumber}
++              onPrevious={onPrevious}
++              onNext={onNext}
++            />
++          ) : null}
++        </section>
++      )}
++    </div>
++  );
++}
++
++/** GET /students with the URL's filters, cursor paging (Next / Previous). */
++export function StudentsScreen({ filters = {} }: { filters?: StudentFilters }) {
++  const api = useBffClient("staff");
++  const permissions = useStaffPermissions();
++  const structure = useSchoolStructure();
++  const clean = cleanFilters(filters);
++  const pages = useCursorStack();
++  const cursor = pages.cursor;
++  const aadhaarBlocked = Boolean(clean.query && containsFullAadhaar(clean.query));
++  const query = {
++    ...clean,
++    limit: PAGE_SIZE,
++    ...(cursor ? { cursor } : {}),
++  };
++  const results = useApiQuery(
++    ["staff", "students", "search", query],
++    () => unwrap(api.GET("/api/v1/students", { params: { query } })),
++    { enabled: !aadhaarBlocked },
++  );
++  const next = results.status === "ready" ? results.data.next_cursor : null;
++  return (
++    <StudentListView
++      filters={filters}
++      results={aadhaarBlocked ? null : results}
++      structure={structure}
++      permissions={permissions}
++      pageNumber={pages.page}
++      aadhaarBlocked={aadhaarBlocked}
++      onNext={next ? () => pages.next(next) : undefined}
++      onPrevious={pages.hasPrevious ? pages.previous : undefined}
++    />
++  );
++}
+diff --git a/apps/web/src/features/students/aadhaar.ts b/apps/web/src/features/students/aadhaar.ts
+new file mode 100644
+index 0000000..ec6bb6b
+--- /dev/null
++++ b/apps/web/src/features/students/aadhaar.ts
+@@ -0,0 +1,54 @@
++/**
++ * US-303 / FR-STU-012 / BR-02: nobody should type or paste a full Aadhaar number. The API
++ * refuses one in any field (422 `aadhaar_full_number_rejected`); this client check only
++ * explains it before the request is sent. Same rule as the API: 12 digits (spaces or hyphens
++ * allowed between groups) that pass the Verhoeff check, first digit 2–9.
++ */
++
++const D = [
++  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
++  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
++  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
++  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
++  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
++  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
++  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
++  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
++  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
++  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
++] as const;
++
++const P = [
++  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
++  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
++  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
++  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
++  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
++  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
++  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
++  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
++] as const;
++
++/** Verhoeff checksum over a digit string (the last digit is the check digit). */
++export function verhoeffValid(digits: string): boolean {
++  if (!/^\d+$/.test(digits)) return false;
++  let check = 0;
++  const reversed = [...digits].reverse();
++  for (let i = 0; i < reversed.length; i += 1) {
++    const digit = Number(reversed[i]);
++    const permuted = P[i % 8]?.[digit] ?? 0;
++    check = D[check]?.[permuted] ?? 0;
++  }
++  return check === 0;
++}
++
++const CANDIDATE = /(?<!\d)([2-9]\d{3})[\s-]?(\d{4})[\s-]?(\d{4})(?!\d)/g;
++
++/** True when the text holds something that looks like a full Aadhaar number. */
++export function containsFullAadhaar(text: string): boolean {
++  for (const match of text.matchAll(CANDIDATE)) {
++    const digits = `${match[1] ?? ""}${match[2] ?? ""}${match[3] ?? ""}`;
++    if (verhoeffValid(digits)) return true;
++  }
++  return false;
++}
+diff --git a/apps/web/src/features/students/dates.ts b/apps/web/src/features/students/dates.ts
+new file mode 100644
+index 0000000..f2bb2a8
+--- /dev/null
++++ b/apps/web/src/features/students/dates.ts
+@@ -0,0 +1,28 @@
++/**
++ * Dates as offices write them (PRD §8: DD/MM/YYYY) ↔ ISO dates for the API (YYYY-MM-DD).
++ * Accepts `14/03/2012`, `14-03-2012`, `14.03.2012`, `4/3/2012` and ISO; rejects impossible
++ * dates (31/02) and two-digit years (which century is a guess the office must make).
++ */
++const DMY = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
++const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
++
++function valid(year: number, month: number, day: number): string | null {
++  const iso = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
++  const date = new Date(`${iso}T00:00:00Z`);
++  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(iso) ? iso : null;
++}
++
++export function toIsoDate(value: string): string | null {
++  const text = value.trim();
++  const dmy = DMY.exec(text);
++  if (dmy) return valid(Number(dmy[3]), Number(dmy[2]), Number(dmy[1]));
++  const iso = ISO.exec(text);
++  if (iso) return valid(Number(iso[1]), Number(iso[2]), Number(iso[3]));
++  return null;
++}
++
++/** ISO → DD/MM/YYYY for an input's starting value; anything else is returned unchanged. */
++export function isoToDmy(value: string): string {
++  const iso = ISO.exec(value.trim());
++  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : value;
++}
+diff --git a/apps/web/src/features/students/fields.tsx b/apps/web/src/features/students/fields.tsx
+new file mode 100644
+index 0000000..e6ef39f
+--- /dev/null
++++ b/apps/web/src/features/students/fields.tsx
+@@ -0,0 +1,48 @@
++"use client";
++
++import { useTranslations } from "next-intl";
++import { useState, type ClipboardEvent, type ComponentProps, type ReactNode } from "react";
++import { TextField } from "@/components/ui/Input";
++import { containsFullAadhaar } from "./aadhaar";
++
++export interface GuardedTextFieldProps
++  extends Omit<ComponentProps<typeof TextField>, "error" | "onPaste"> {
++  error?: ReactNode;
++}
++
++/**
++ * A text field that refuses a pasted full Aadhaar number and explains why (US-303 AC1,
++ * FR-STU-012). Typing one shows the same explanation; the API refuses it anyway (422
++ * `aadhaar_full_number_rejected`). The explanation is announced (role="alert").
++ */
++export function GuardedTextField({ error, onChange, ...props }: GuardedTextFieldProps) {
++  const t = useTranslations("students");
++  const [blocked, setBlocked] = useState(false);
++
++  function onPaste(event: ClipboardEvent<HTMLInputElement>) {
++    const text = event.clipboardData.getData("text");
++    if (containsFullAadhaar(text)) {
++      event.preventDefault();
++      setBlocked(true);
++    }
++  }
++
++  return (
++    <div>
++      <TextField
++        {...props}
++        error={blocked ? t("aadhaarNotAllowed") : error}
++        onPaste={onPaste}
++        onChange={(event) => {
++          setBlocked(containsFullAadhaar(event.currentTarget.value));
++          onChange?.(event);
++        }}
++      />
++      {blocked ? (
++        <p role="alert" className="sr-only">
++          {t("aadhaarNotAllowed")}
++        </p>
++      ) : null}
++    </div>
++  );
++}
+diff --git a/apps/web/src/features/students/me.ts b/apps/web/src/features/students/me.ts
+new file mode 100644
+index 0000000..692b613
+--- /dev/null
++++ b/apps/web/src/features/students/me.ts
+@@ -0,0 +1,57 @@
++"use client";
++
++import { useQuery } from "@tanstack/react-query";
++import { useMemo } from "react";
++import { unwrap, useBffClient } from "@/lib/bff/query";
++import type { StaffMe } from "./types";
++
++/** Query key of GET /me (shared by every school screen that hides actions). */
++export const STAFF_ME_KEY = ["staff", "me"] as const;
++
++/** The signed-in staff member in the active school: roles and effective permissions. */
++export function useStaffMe(): StaffMe | undefined {
++  const api = useBffClient("staff");
++  const query = useQuery({
++    queryKey: STAFF_ME_KEY,
++    queryFn: () => unwrap(api.GET("/api/v1/me")),
++    staleTime: 60_000,
++    retry: false,
++  });
++  return query.data;
++}
++
++export interface Permissions {
++  /** False until GET /me has answered. */
++  loaded: boolean;
++  /**
++   * True only when /me lists the permission. Actions stay hidden until /me has loaded, so
++   * nobody is offered something the server will refuse (UX only: the API checks every call).
++   */
++  has: (permission: string) => boolean;
++}
++
++export function permissionsFrom(list: readonly string[] | null | undefined): Permissions {
++  return {
++    loaded: Boolean(list),
++    has: (permission) => Boolean(list?.includes(permission)),
++  };
++}
++
++export function useStaffPermissions(): Permissions {
++  const me = useStaffMe();
++  return useMemo(() => permissionsFrom(me?.permissions), [me]);
++}
++
++/** Permission names used by the student, import and extraction screens (authz/permissions.yaml). */
++export const PERM = {
++  readBasic: "student.read_basic",
++  readSensitive: "student.read_sensitive",
++  create: "student.create",
++  updateNonIdentity: "student.update_nonidentity",
++  requestChange: "student.identity_change.request",
++  approveChange: "student.identity_change.approve",
++  findingsRead: "dq.findings.read",
++  importRun: "import.run",
++  importCommit: "import.commit",
++  documentUpload: "document.upload",
++} as const;
+diff --git a/apps/web/src/features/students/paging.tsx b/apps/web/src/features/students/paging.tsx
+new file mode 100644
+index 0000000..1a46427
+--- /dev/null
++++ b/apps/web/src/features/students/paging.tsx
+@@ -0,0 +1,48 @@
++"use client";
++
++import { useTranslations } from "next-intl";
++import { useState } from "react";
++import { Button } from "@/components/ui/Button";
++
++/**
++ * Cursor paging (docs/09 §2: `?cursor=` with `next_cursor`): the cursors of the pages already
++ * seen, so "Previous page" can go back without the API offering one.
++ */
++export function useCursorStack() {
++  const [cursors, setCursors] = useState<string[]>([]);
++  return {
++    cursor: cursors.at(-1),
++    page: cursors.length + 1,
++    hasPrevious: cursors.length > 0,
++    next: (cursor: string) => setCursors((list) => [...list, cursor]),
++    previous: () => setCursors((list) => list.slice(0, -1)),
++    reset: () => setCursors([]),
++  };
++}
++
++/** Previous / Next buttons with the page number between them. Hidden when printing. */
++export function Pager({
++  label,
++  page,
++  onPrevious,
++  onNext,
++}: {
++  label: string;
++  page: number;
++  onPrevious?: (() => void) | undefined;
++  onNext?: (() => void) | undefined;
++}) {
++  const t = useTranslations("students.list");
++  if (!onPrevious && !onNext) return null;
++  return (
++    <nav aria-label={label} className="flex flex-wrap items-center gap-3" data-print="hide">
++      <Button variant="secondary" onClick={onPrevious} disabled={!onPrevious}>
++        {t("previous")}
++      </Button>
++      <span className="text-sm text-ink-muted">{t("pageNumber", { page })}</span>
++      <Button variant="secondary" onClick={onNext} disabled={!onNext}>
++        {t("next")}
++      </Button>
++    </nav>
++  );
++}
+diff --git a/apps/web/src/features/students/parts.tsx b/apps/web/src/features/students/parts.tsx
+new file mode 100644
+index 0000000..2332d8c
+--- /dev/null
++++ b/apps/web/src/features/students/parts.tsx
+@@ -0,0 +1,155 @@
++"use client";
++
++import { useLocale, useTranslations } from "next-intl";
++import { useMemo } from "react";
++import { Alert } from "@/components/ui/Alert";
++import { Badge, type BadgeTone } from "@/components/ui/Badge";
++import { LoadingState } from "@/components/ui/LoadingState";
++import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
++import { cn } from "@/lib/cn";
++import { formatDate } from "@/lib/format";
++import type { Loadable } from "@/lib/loadable";
++import {
++  isStudentStatus,
++  isValueSource,
++  type Attribute,
++  type SourceValue,
++  type StudentStatus,
++} from "./types";
++
++type Loose = ((key: string) => string) & { has: (key: string) => boolean };
++
++/* ------------------------------------------------------------------ status badges */
++
++export const studentStatusTone: Record<StudentStatus, BadgeTone> = {
++  provisional: "warning",
++  active: "success",
++  left: "neutral",
++  graduated: "info",
++};
++
++export function StudentStatusBadge({ status }: { status: string }) {
++  const t = useTranslations("students.status");
++  if (!isStudentStatus(status)) return <Badge>{status}</Badge>;
++  return <Badge tone={studentStatusTone[status]}>{t(status)}</Badge>;
++}
++
++/* ------------------------------------------------------------------ source chips */
++
++function CheckIcon() {
++  return (
++    <svg
++      aria-hidden="true"
++      viewBox="0 0 24 24"
++      className="size-3.5"
++      fill="none"
++      stroke="currentColor"
++      strokeWidth={3}
++      strokeLinecap="round"
++      strokeLinejoin="round"
++    >
++      <path d="m5 12.5 4.5 4.5L19 7.5" />
++    </svg>
++  );
++}
++
++/**
++ * Where a value came from (PRD §8: "Register · Aadhaar · UDISE+ · Board"), with a tick when it
++ * is verified. The tick is never the only signal: screen readers hear "verified".
++ */
++export function SourceChip({
++  source,
++  verification,
++}: {
++  source: string;
++  verification?: SourceValue["verification_status"] | "provisional" | undefined;
++}) {
++  const t = useTranslations("students");
++  const label = isValueSource(source) ? t(`sourceShort.${source}`) : source;
++  const full = isValueSource(source) ? t(`sources.${source}`) : source;
++  return (
++    <span
++      className={cn(
++        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap",
++        verification === "verified"
++          ? "border-success-ink/40 bg-success-soft text-success-ink"
++          : verification === "rejected"
++            ? "border-danger/40 bg-danger-soft text-danger line-through"
++            : "border-border-strong bg-surface text-ink",
++      )}
++    >
++      <span aria-hidden="true">{label}</span>
++      <span className="sr-only">{full}</span>
++      {verification === "verified" ? <CheckIcon /> : null}
++      {verification ? (
++        <span className="sr-only">
++          {", "}
++          {t(`verification.${verification}`)}
++        </span>
++      ) : null}
++    </span>
++  );
++}
++
++/* ------------------------------------------------------------------ attributes */
++
++export function attributeLabel(attribute: Attribute | undefined, key: string, locale: string) {
++  if (!attribute) return key;
++  return locale === "te" && attribute.label_te ? attribute.label_te : attribute.label_en;
++}
++
++/** GET /attributes: labels (en/te), classification, identity flag, allowed sources and values. */
++export function useAttributes(enabled = true): Loadable<readonly Attribute[]> {
++  const api = useBffClient("staff");
++  return useApiQuery(["staff", "attributes"], () => unwrap(api.GET("/api/v1/attributes")), {
++    enabled,
++  });
++}
++
++export function useAttributeIndex(attributes: Loadable<readonly Attribute[]>) {
++  const locale = useLocale();
++  return useMemo(() => {
++    const list = attributes.status === "ready" ? attributes.data : [];
++    const byKey = new Map(list.map((item) => [item.key, item] as const));
++    return {
++      byKey,
++      sorted: [...list].sort((a, b) => a.sort_order - b.sort_order),
++      label: (key: string) => attributeLabel(byKey.get(key), key, locale),
++    };
++  }, [attributes, locale]);
++}
++
++/** A stored value for display: ISO dates as DD/MM/YYYY, known codes (gender…) translated. */
++export function useValueFormatter() {
++  const t = useTranslations("students.enumValues") as unknown as Loose;
++  return (value: string | null | undefined, attribute: Attribute | undefined): string | null => {
++    if (value === null || value === undefined || value === "") return null;
++    if (attribute?.data_type === "date") return formatDate(value) ?? value;
++    if (attribute?.data_type === "enum" && t.has(value)) return t(value);
++    return value;
++  };
++}
++
++/* ------------------------------------------------------------------ load states */
++
++/** Loading/error/unavailable for one resource; renders nothing when it is ready. */
++export function LoadGate<T>({ state }: { state: Loadable<T> }) {
++  const tc = useTranslations("common");
++  const te = useTranslations("errors");
++  if (state.status === "loading") return <LoadingState label={tc("loading")} rows={6} />;
++  if (state.status === "error") {
++    return (
++      <Alert tone="danger" title={tc("loadErrorTitle")}>
++        {state.reason ? te(`load.${state.reason}`) : tc("loadErrorBody")}
++      </Alert>
++    );
++  }
++  if (state.status === "unavailable") {
++    return (
++      <Alert tone="info" title={tc("notAvailableYetTitle")}>
++        {tc("notAvailableYetBody")}
++      </Alert>
++    );
++  }
++  return null;
++}
+diff --git a/apps/web/src/features/students/types.ts b/apps/web/src/features/students/types.ts
+new file mode 100644
+index 0000000..a57a58d
+--- /dev/null
++++ b/apps/web/src/features/students/types.ts
+@@ -0,0 +1,53 @@
++import type { components } from "@schoolos/api-client";
++
++/**
++ * Student-record types, all taken from the generated OpenAPI schema (apps/api/openapi.json →
++ * @schoolos/api-client). Only runtime lists for forms are written here, and each is checked
++ * against the generated union so it fails to compile if the API adds a value.
++ */
++type Schemas = components["schemas"];
++
++export type StudentSummary = Schemas["StudentSummary"];
++export type Student = Schemas["StudentOut"];
++export type StudentCreate = Schemas["StudentCreate"];
++export type StudentStatus = NonNullable<StudentCreate["status"]>;
++export type CanonicalValue = Schemas["CanonicalOut"];
++export type SourceValue = Schemas["ValueOut"];
++export type ValueInput = Schemas["ValueIn"];
++export type ValueSource = ValueInput["source"];
++export type Attribute = Schemas["AttributeOut"];
++export type Guardian = Schemas["GuardianOut"];
++export type RevealResult = Schemas["RevealOut"];
++export type ClassSection = Schemas["ClassSection"];
++export type StaffMe = Schemas["app__identity__schemas__MeOut"];
++
++type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
++
++const valueSources = [
++  "admission_register",
++  "aadhaar_as_printed",
++  "udise_plus",
++  "board_registration",
++  "birth_certificate",
++  "parent_form",
++  "tc_incoming",
++  "manual_entry",
++] as const satisfies readonly ValueSource[];
++/** FR-STU-002 sources, in the order offices think of them (register first, BR-01). */
++export const VALUE_SOURCES: Exhaustive<ValueSource, typeof valueSources> = valueSources;
++
++const studentStatuses = [
++  "provisional",
++  "active",
++  "left",
++  "graduated",
++] as const satisfies readonly StudentStatus[];
++export const STUDENT_STATUSES: Exhaustive<StudentStatus, typeof studentStatuses> = studentStatuses;
++
++export function isValueSource(value: string): value is ValueSource {
++  return (VALUE_SOURCES as readonly string[]).includes(value);
++}
++
++export function isStudentStatus(value: string): value is StudentStatus {
++  return (STUDENT_STATUSES as readonly string[]).includes(value);
++}
+-- 
+2.43.0
+

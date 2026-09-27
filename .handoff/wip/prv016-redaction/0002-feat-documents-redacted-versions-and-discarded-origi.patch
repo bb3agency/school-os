@@ -1,0 +1,846 @@
+From 035a21f5833966fc8093f314b9eee37de4debabf Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 27 Sep 2026 03:25:31 +0000
+Subject: [PATCH 2/3] feat(documents): redacted versions and discarded
+ originals (PRV-016, ADR-0007)
+
+- replace_with_redacted(): stores a worker-made redacted copy (JPEG/PNG, size limit) as the
+  next version (queued -> normal malware scan via the outbox; usable evidence at once),
+  makes it current and discards the original; audit document.version_redacted.
+- discard_version(): the version stays as a row (quarantined, error aadhaar_redacted |
+  aadhaar_unredactable; audit document.version_discarded) and its object is deleted after
+  commit by the outbox task documents.discard_object (retries; refuses live versions and
+  foreign keys) plus a daily sweep of the last 7 days.
+- ObjectStore.discard(): tag sos-lifecycle=discarded, then delete, so the versioned bucket
+  does not keep the bytes for the 90-day recovery window; lifecycle rule discarded-1d on the
+  shared and dedicated files buckets expires tagged versions after one day.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016kfZp3PwLmjG15cWz7WoQd
+---
+ apps/api/app/documents/repository.py          |  19 ++
+ apps/api/app/documents/service.py             | 215 +++++++++++++++++-
+ apps/api/app/documents/storage.py             |  30 +++
+ apps/api/app/documents/tasks.py               |  53 +++++
+ apps/api/tests/documents/support.py           |   7 +
+ .../api/tests/documents/test_documents_api.py | 184 +++++++++++++++
+ apps/api/tests/documents/test_storage_s3.py   |  51 +++++
+ apps/api/tests/documents/test_tasks.py        |  18 ++
+ apps/worker/sos_worker/celery_app.py          |   3 +
+ .../terraform/modules/dedicated_host/main.tf  |   2 +
+ infra/terraform/modules/s3/main.tf            |   8 +
+ 11 files changed, 585 insertions(+), 5 deletions(-)
+
+diff --git a/apps/api/app/documents/repository.py b/apps/api/app/documents/repository.py
+index dd9ba59..c2e1e1d 100644
+--- a/apps/api/app/documents/repository.py
++++ b/apps/api/app/documents/repository.py
+@@ -337,6 +337,25 @@ def set_version_status(
+     ).one_or_none()
+ 
+ 
++def discarded_versions(
++    session: Session, errors: Sequence[str], *, since: dt.datetime, limit: int
++) -> list[DocumentVersion]:
++    """Quarantined versions whose file must be gone (``error`` in ``errors``), changed since
++    ``since``, newest first (PRV-016 daily sweep)."""
++    return list(
++        session.scalars(
++            select(DocumentVersion)
++            .where(
++                DocumentVersion.status == "quarantined",
++                DocumentVersion.error.in_(list(errors)),
++                DocumentVersion.updated_at >= since,
++            )
++            .order_by(DocumentVersion.updated_at.desc())
++            .limit(limit)
++        )
++    )
++
++
+ def object_keys_of(session: Session, document_id: uuid.UUID) -> list[str]:
+     return list(
+         session.scalars(
+diff --git a/apps/api/app/documents/service.py b/apps/api/app/documents/service.py
+index fdc1093..317f0b1 100644
+--- a/apps/api/app/documents/service.py
++++ b/apps/api/app/documents/service.py
+@@ -23,7 +23,14 @@ other ``document.read`` holders see a document when an ACL entry matches their r
+ membership, section or class; a document with an EMPTY ACL is visible only to school-wide
+ readers. Out-of-scope documents answer 404 (never reveal existence).
+ 
+-Requirements: FR-DOC-001..006, FR-DOC-008 (status tracking), SEC-016, FR-DOC-007 (storage part).
++PRV-016 (images that showed a full Aadhaar number): :func:`replace_with_redacted` stores a
++worker-made redacted copy as the next version and :func:`discard_version` retires the original.
++A discarded version keeps its row (history, audit) as ``quarantined`` with the reason in
++``error``; its object is deleted after commit (outbox ``document.version.discarded`` ->
++``documents.discard_object``, plus a daily sweep), tagged for the bucket's one-day lifecycle rule.
++
++Requirements: FR-DOC-001..006, FR-DOC-008 (status tracking), SEC-016, FR-DOC-007 (storage part),
++PRV-016.
+ """
+ 
+ from __future__ import annotations
+@@ -95,10 +102,13 @@ MANAGE: Final = "document.manage_acl"
+ 
+ SCAN_EVENT: Final = "document.version.registered"
+ DELETED_EVENT: Final = "document.deleted"
++DISCARDED_EVENT: Final = "document.version.discarded"
+ SCAN_TASK: Final = "documents.scan"
+ PURGE_TASK: Final = "documents.purge_objects"
++DISCARD_TASK: Final = "documents.discard_object"
+ ops.register_outbox_route(SCAN_EVENT, SCAN_TASK)
+ ops.register_outbox_route(DELETED_EVENT, PURGE_TASK)
++ops.register_outbox_route(DISCARDED_EVENT, DISCARD_TASK)
+ 
+ # An intent can be registered for a while after its presigned POST expired (slow uploads).
+ INTENT_GRACE: Final = dt.timedelta(minutes=30)
+@@ -1163,11 +1173,13 @@ WITHHOLD_REASONS: Final = frozenset({"aadhaar_detected"})
+ def withhold_version(
+     session: Session, document_id: uuid.UUID, version_no: int, reason_code: str
+ ) -> bool:
+-    """Withhold a version from every download path (PRV-016; e.g. a register page whose text
+-    showed a full Aadhaar number). The version becomes ``quarantined`` with ``error`` =
+-    ``reason_code``; download URLs are only issued for ``ready`` versions. Returns True if the
+-    version changed, False if it was already withheld/unusable. Audited once
++    """Withhold a version from every download path. The version becomes ``quarantined`` with
++    ``error`` = ``reason_code``; download URLs are only issued for ``ready`` versions. Returns
++    True if the version changed, False if it was already withheld/unusable. Audited once
+     (``document.version_withheld``, system actor) in the caller's transaction.
++
++    The stored object is kept. For a file that must not be kept at all (PRV-016: a page that
++    showed a full Aadhaar number) use :func:`discard_version` or :func:`replace_with_redacted`.
+     """
+     if reason_code not in WITHHOLD_REASONS:
+         raise ValueError(f"unknown withhold reason: {reason_code}")
+@@ -1195,6 +1207,192 @@ def withhold_version(
+     return True
+ 
+ 
++DISCARD_REASONS: Final = frozenset({"aadhaar_redacted", "aadhaar_unredactable"})
++"""``error`` codes of discarded versions: replaced by a redacted copy, or not redactable."""
++DISCARD_SWEEP_WINDOW: Final = dt.timedelta(days=7)
++REDACTED_KINDS: Final = ("jpg", "png")
++
++
++def _locked_version(
++    session: Session, document_id: uuid.UUID, version_no: int
++) -> tuple[Document, DocumentVersion]:
++    doc = repo.get_document(session, document_id, for_update=True)
++    if doc is None:
++        raise _not_found()
++    version = repo.get_version(session, document_id, version_no, for_update=True)
++    if version is None:
++        raise NotFound("Version not found")
++    return doc, version
++
++
++def _discard_version(session: Session, version: DocumentVersion, reason_code: str) -> bool:
++    if version.status == "quarantined" and version.error in DISCARD_REASONS:
++        return False
++    updated = repo.set_version_status(session, version.id, "quarantined", error=reason_code)
++    if updated is None:  # pragma: no cover - row locked by the caller
++        return False
++    _audit(
++        session,
++        "document.version_discarded",
++        version.document_id,
++        {"version_no": version.version_no, "reason": reason_code},
++        system=True,
++    )
++    ops.enqueue_event(
++        session,
++        DISCARDED_EVENT,
++        {
++            "document_id": version.document_id,
++            "version_id": version.id,
++            "object_key": version.object_key,
++        },
++    )
++    return True
++
++
++def discard_version(
++    session: Session, document_id: uuid.UUID, version_no: int, reason_code: str
++) -> bool:
++    """PRV-016: a version whose file must not be kept (e.g. a register page that showed a full
++    Aadhaar number and could not be redacted). Workers only, in the caller's transaction.
++
++    The version becomes ``quarantined`` with ``error`` = ``reason_code`` (never served, not
++    usable evidence) and its object is deleted after commit (outbox ``document.version.discarded``
++    -> ``documents.discard_object``; :func:`sweep_discarded_objects` retries daily). The row is
++    kept for history and audit (``document.version_discarded``, system actor). Returns False if
++    the version was already discarded.
++    """
++    if reason_code not in DISCARD_REASONS:
++        raise ValueError(f"unknown discard reason: {reason_code}")
++    _doc, version = _locked_version(session, document_id, version_no)
++    return _discard_version(session, version, reason_code)
++
++
++def replace_with_redacted(
++    session: Session,
++    document_id: uuid.UUID,
++    version_no: int,
++    data: bytes,
++    mime_type: str,
++    *,
++    regions: int,
++    store: ObjectStore | None = None,
++) -> int:
++    """PRV-016: store ``data``, a redacted copy of version ``version_no`` made by a worker
++    (sensitive regions blacked out, metadata stripped), as the next version, make it current,
++    and discard the original (:func:`discard_version`, reason ``aadhaar_redacted``). Returns the
++    new version number. Workers only, in the caller's transaction.
++
++    The copy goes through the normal version lifecycle: stored (SSE-KMS) under
++    ``v<n>/original.<ext>``, recorded ``queued`` with its SHA-256 and size, and malware-scanned
++    (outbox ``document.version.registered``) before any download; like every queued version it
++    is usable evidence at once. Audit ``document.version_redacted`` (system actor; IDs, counts
++    and codes only). JPEG or PNG within the purpose's size limit only.
++    """
++    kind = filetypes.kind_for_content_type(mime_type)
++    if kind is None or kind.key not in REDACTED_KINDS or filetypes.sniff(data) is not kind:
++        raise UnsupportedFileType("A redacted copy must be a JPEG or PNG image.")
++    doc, original = _locked_version(session, document_id, version_no)
++    if original.status in UNUSABLE_STATUSES:
++        raise Conflict("The original file is no longer available.", code="document_not_ready")
++    if len(data) > purpose_rule(doc.purpose).max_bytes:
++        raise FileTooLarge("The redacted copy is larger than allowed.")
++    tenant_id = repo.current_tenant_id(session)
++    new_no = repo.max_version_no(session, doc.id) + 1
++    key = document_key(tenant_id, doc.id, new_no, kind.ext)
++    store = store or get_object_store()
++    try:
++        store.put(key, data, kind.mime)
++    except ObjectStoreError as exc:
++        raise Conflict(
++            "The redacted copy could not be stored. Try again.", code="storage_unavailable"
++        ) from exc
++    with _undo_object_on_error(store, key), _db_errors():
++        version = repo.insert_version(
++            session,
++            id=new_id(),
++            tenant_id=tenant_id,
++            document_id=doc.id,
++            version_no=new_no,
++            object_key=key,
++            sha256=hashlib.sha256(data).digest(),
++            mime_type=kind.mime,
++            size_bytes=len(data),
++            status="queued",
++            created_by=original.created_by,
++        )
++        updated = repo.update_document(
++            session, doc.id, expected_version=None, current_version_id=version.id
++        )
++        if updated is None:  # pragma: no cover - row locked above
++            raise _not_found()
++        _discard_version(session, original, "aadhaar_redacted")
++        _audit(
++            session,
++            "document.version_redacted",
++            doc.id,
++            {
++                "version_no": original.version_no,
++                "redacted_version_no": new_no,
++                "regions": regions,
++                "mime_type": kind.mime,
++                "size_bytes": len(data),
++            },
++            system=True,
++        )
++        ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
++    log.info("documents.version.redacted", resource_type="document", resource_id=doc.id)
++    return new_no
++
++
++def discard_object(
++    tenant_id: uuid.UUID,
++    document_id: uuid.UUID,
++    version_id: uuid.UUID,
++    object_key: str,
++    *,
++    store: ObjectStore | None = None,
++) -> bool:
++    """Worker (outbox ``document.version.discarded``): delete a discarded version's object.
++
++    Idempotent. Refuses (returns False) unless the key lies under this school's document and is
++    the key of that version, and the version is discarded. If the document was deleted
++    meanwhile (no version row), the key is discarded anyway: its objects are being purged.
++    """
++    if not key_in_tenant(object_key, tenant_id) or not object_key.startswith(
++        document_prefix(tenant_id, document_id)
++    ):
++        return False
++    with tenant_session(tenant_id) as s:
++        version = repo.get_version(s, document_id, version_id=version_id)
++        if version is not None and (
++            version.object_key != object_key
++            or version.status != "quarantined"
++            or version.error not in DISCARD_REASONS
++        ):
++            return False
++    (store or get_object_store()).discard(object_key)
++    log.info("documents.version.discarded", resource_type="document", resource_id=document_id)
++    return True
++
++
++def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
++    """Worker (daily): discard again the objects of versions discarded in the last 7 days, in
++    case the outbox task gave up (idempotent; PRV-016). Returns how many keys were handled."""
++    store = store or get_object_store()
++    with tenant_session(tenant_id) as s:
++        keys = [
++            v.object_key
++            for v in repo.discarded_versions(
++                s, sorted(DISCARD_REASONS), since=_now() - DISCARD_SWEEP_WINDOW, limit=500
++            )
++            if key_in_tenant(v.object_key, tenant_id)
++        ]
++    for key in keys:
++        store.discard(key)
++    return len(keys)
++
++
+ def store_page_image(
+     session: Session,
+     document_id: uuid.UUID,
+@@ -1220,6 +1418,9 @@ def store_page_image(
+ __all__ = [
+     "ACL_CHANGED_HOOKS",
+     "DELETE_GUARDS",
++    "DISCARDED_EVENT",
++    "DISCARD_REASONS",
++    "DISCARD_TASK",
+     "QUARANTINE_HOOKS",
+     "READY_HOOKS",
+     "WITHHOLD_REASONS",
+@@ -1229,6 +1430,8 @@ __all__ = [
+     "add_version",
+     "create_upload",
+     "delete_document",
++    "discard_object",
++    "discard_version",
+     "document_object",
+     "evidence_exists",
+     "get_document",
+@@ -1240,9 +1443,11 @@ __all__ = [
+     "purge_expired_uploads",
+     "read_document_object",
+     "register_document",
++    "replace_with_redacted",
+     "scan_version",
+     "set_acl",
+     "store_page_image",
++    "sweep_discarded_objects",
+     "validate_acl",
+     "withhold_version",
+ ]
+diff --git a/apps/api/app/documents/storage.py b/apps/api/app/documents/storage.py
+index 04845b2..34e7e4d 100644
+--- a/apps/api/app/documents/storage.py
++++ b/apps/api/app/documents/storage.py
+@@ -12,6 +12,10 @@ per school)::
+   policy also requires SSE-KMS with that key (the bucket default encrypts as well).
+ - Downloads are presigned GETs valid at most 5 minutes that force
+   ``Content-Disposition: attachment`` and the verified content type. Nothing is ever public.
++- The bucket is versioned (90-day recovery window for overwrites and deletes). Objects that must
++  not be kept at all (PRV-016: an image that showed a full Aadhaar number) are removed with
++  :meth:`ObjectStore.discard`, which tags them ``sos-lifecycle=discarded`` before deleting; the
++  lifecycle rule ``discarded-1d`` (infra/terraform) expires such versions after one day.
+ 
+ ``ObjectStore`` is a Protocol so tests can swap in an in-memory store; the real implementation
+ is :class:`S3ObjectStore` (boto3; SeaweedFS locally and in CI via an endpoint override).
+@@ -40,6 +44,8 @@ MAX_UPLOAD_URL_TTL_S: Final = 600
+ MAX_DOWNLOAD_URL_TTL_S: Final = 300
+ CHUNK_BYTES: Final = 1024 * 1024
+ SSE_KMS: Final = "aws:kms"
++LIFECYCLE_TAG: Final = "sos-lifecycle"
++DISCARDED: Final = "discarded"
+ 
+ 
+ class ObjectStoreError(RuntimeError):
+@@ -142,6 +148,10 @@ class ObjectStore(Protocol):
+ 
+     def delete(self, key: str) -> None: ...
+ 
++    def discard(self, key: str) -> None:
++        """Delete an object that must not be kept (see module docstring); idempotent."""
++        ...
++
+     def delete_prefix(self, prefix: str) -> int: ...
+ 
+ 
+@@ -310,6 +320,26 @@ class S3ObjectStore:
+         except ClientError as exc:
+             raise ObjectStoreError("delete_failed") from exc
+ 
++    def discard(self, key: str) -> None:
++        """Tag the current version ``sos-lifecycle=discarded``, then delete it. The versioned
++        bucket keeps the bytes as a noncurrent version, which the lifecycle rule
++        ``discarded-1d`` expires after one day instead of the 90-day recovery window. A key that
++        is gone already (no object, or only a delete marker) is fine: retries are safe."""
++        if not key.startswith("t/") or ".." in key.split("/"):
++            raise ValueError("refusing to discard outside a tenant prefix")
++        try:
++            self._client.put_object_tagging(
++                Bucket=self._bucket,
++                Key=key,
++                Tagging={"TagSet": [{"Key": LIFECYCLE_TAG, "Value": DISCARDED}]},
++            )
++        except ClientError as exc:
++            code = str(exc.response.get("Error", {}).get("Code", ""))
++            if code in ("404", "NoSuchKey", "NotFound", "405", "MethodNotAllowed"):
++                return
++            raise ObjectStoreError("tag_failed") from exc
++        self.delete(key)
++
+     def delete_prefix(self, prefix: str) -> int:
+         """Delete every object under ``prefix`` (must be inside a tenant prefix)."""
+         if not prefix.startswith("t/") or prefix.count("/") < 3:
+diff --git a/apps/api/app/documents/tasks.py b/apps/api/app/documents/tasks.py
+index 1418116..c39ec3f 100644
+--- a/apps/api/app/documents/tasks.py
++++ b/apps/api/app/documents/tasks.py
+@@ -6,6 +6,11 @@
+ - ``documents.purge_objects`` (queue ``maintenance``): consumer of ``document.deleted``;
+   removes the stored objects of a deleted document.
+ - ``documents.purge_expired_uploads`` (beat, daily): unregistered uploads past expiry.
++- ``documents.discard_object`` (queue ``maintenance``): consumer of
++  ``document.version.discarded`` (PRV-016); deletes the object of a discarded version, tagged
++  for the short lifecycle rule. Retries with backoff while the store fails.
++- ``documents.sweep_discarded_objects`` (beat, daily): the same for versions discarded in the
++  last 7 days, in case the outbox task gave up.
+ 
+ Register this module in ``sos_worker.celery_app.TASK_MODULES`` and merge
+ :func:`beat_schedule` into the beat configuration.
+@@ -23,11 +28,13 @@ from app.core.db import context_free_session
+ from app.core.logging import get_logger
+ from app.documents import service
+ from app.documents.scanning import ScannerUnavailable
++from app.documents.storage import ObjectStoreError
+ from app.tenancy import service as tenancy
+ 
+ log = get_logger(__name__)
+ 
+ SCAN_MAX_RETRIES = 6
++DISCARD_MAX_RETRIES = 8
+ 
+ 
+ def _uuid(value: object) -> uuid.UUID:
+@@ -64,6 +71,48 @@ def purge_objects(tenant_id: str, event_id: str, payload: dict[str, Any]) -> int
+     )
+ 
+ 
++@shared_task(
++    name=service.DISCARD_TASK,
++    bind=True,
++    queue="maintenance",
++    acks_late=True,
++    max_retries=DISCARD_MAX_RETRIES,
++    ignore_result=True,
++)
++def discard_object(
++    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
++) -> bool:
++    document_id = _uuid(payload["document_id"])
++    try:
++        return service.discard_object(
++            _uuid(tenant_id),
++            document_id,
++            _uuid(payload["version_id"]),
++            str(payload["object_key"]),
++        )
++    except ObjectStoreError as exc:
++        if self.request.retries >= DISCARD_MAX_RETRIES:
++            # The daily sweep tries again; alert on this event.
++            log.error(
++                "documents.discard.failed",
++                error_code="storage_unavailable",
++                resource_type="document",
++                resource_id=document_id,
++            )
++            return False
++        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 3600)) from exc
++
++
++@shared_task(name="documents.sweep_discarded_objects", queue="maintenance", acks_late=True)
++def sweep_discarded_objects() -> dict[str, int]:
++    with context_free_session() as s:
++        tenant_ids = tenancy.list_tenant_ids(s, None)
++    total = 0
++    for tenant_id in tenant_ids:
++        total += service.sweep_discarded_objects(tenant_id)
++    return {"discarded": total}
++
++
+ @shared_task(name="documents.purge_expired_uploads", queue="maintenance", acks_late=True)
+ def purge_expired_uploads() -> dict[str, int]:
+     with context_free_session() as s:
+@@ -80,4 +129,8 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
+             "task": "documents.purge_expired_uploads",
+             "schedule": crontab(minute=20, hour=21),  # 02:50 IST
+         },
++        "documents-sweep-discarded-objects": {
++            "task": "documents.sweep_discarded_objects",
++            "schedule": crontab(minute=35, hour=21),  # 03:05 IST
++        },
+     }
+diff --git a/apps/api/tests/documents/support.py b/apps/api/tests/documents/support.py
+index c592f28..c0abaca 100644
+--- a/apps/api/tests/documents/support.py
++++ b/apps/api/tests/documents/support.py
+@@ -102,6 +102,7 @@ class MemoryStore:
+     objects: dict[str, StoredObj] = field(default_factory=dict)
+     posts: list[dict[str, Any]] = field(default_factory=list)
+     gets: list[dict[str, Any]] = field(default_factory=list)
++    discarded: list[str] = field(default_factory=list)
+     kms_key_id: str | None = None
+     # Test hook: runs right before a conditional copy (simulates a concurrent re-upload).
+     before_copy: Any = None
+@@ -184,6 +185,12 @@ class MemoryStore:
+     def delete(self, key: str) -> None:
+         self.objects.pop(key, None)
+ 
++    def discard(self, key: str) -> None:
++        if not key.startswith("t/") or ".." in key.split("/"):
++            raise ValueError("refusing to discard outside a tenant prefix")
++        self.discarded.append(key)
++        self.objects.pop(key, None)
++
+     def delete_prefix(self, prefix: str) -> int:
+         doomed = [k for k in self.objects if k.startswith(prefix)]
+         for k in doomed:
+diff --git a/apps/api/tests/documents/test_documents_api.py b/apps/api/tests/documents/test_documents_api.py
+index f945185..c67a696 100644
+--- a/apps/api/tests/documents/test_documents_api.py
++++ b/apps/api/tests/documents/test_documents_api.py
+@@ -989,3 +989,187 @@ def test_PRV_016_withhold_rejects_unknown_reason_codes(world: Any, api: Any) ->
+     doc = new_document(api, world.person("office_admin"))
+     with pytest.raises(ValueError, match="reason"), tenant_session(world.a.tenant_id) as s:
+         service.withhold_version(s, uuid.UUID(doc["id"]), 1, "because I said so")
++
++
++# --- PRV-016: redacted copies and discarded originals ---------------------------------------
++
++PNG_CT = "image/png"
++
++
++def _page_document(api: Any, who: Any, tenant_id: uuid.UUID) -> dict[str, Any]:
++    """A scanned register page (PNG) uploaded through the API."""
++    up = upload(
++        api, who, S.png(), purpose="register_scan", filename="page.png", content_type=PNG_CT
++    )
++    res = register(api, who, up["upload_id"], title="Register page")
++    assert res.status_code == 202, res.text
++    doc: dict[str, Any] = res.json()
++    assert scan(tenant_id, doc) == "ready"
++    return doc
++
++
++def _versions(admin: Engine, document_id: uuid.UUID) -> list[Any]:
++    with admin.connect() as c:
++        return list(
++            c.execute(
++                text(
++                    "SELECT id, version_no, status, error, object_key, mime_type, size_bytes "
++                    "FROM kb.document_versions WHERE document_id = :d ORDER BY version_no"
++                ),
++                {"d": document_id},
++            )
++        )
++
++
++def _discard_payload(admin: Engine, tenant_id: uuid.UUID, document_id: uuid.UUID) -> Any:
++    return next(
++        p
++        for p in S.outbox_events(admin, tenant_id, service.DISCARDED_EVENT)
++        if p["document_id"] == str(document_id)
++    )
++
++
++def _run_discard(tenant_id: uuid.UUID, payload: Any) -> Any:
++    from app.documents import tasks
++
++    return tasks.discard_object.apply(
++        kwargs={"tenant_id": str(tenant_id), "event_id": str(uuid.uuid4()), "payload": payload}
++    ).get()
++
++
++def test_PRV_016_redacted_copy_replaces_the_version_and_the_original_is_discarded(
++    world: Any, api: Any, admin_engine: Engine, store: Any
++) -> None:
++    who = world.person("office_admin")
++    tenant = world.a.tenant_id
++    doc = _page_document(api, who, tenant)
++    doc_id = uuid.UUID(doc["id"])
++    original_key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
++    assert original_key in store.objects
++    redacted = S.png("redacted-copy")
++    with tenant_session(tenant) as s:
++        new_no = service.replace_with_redacted(s, doc_id, 1, redacted, PNG_CT, regions=2)
++        # The copy is usable evidence at once (queued counts, like any new version).
++        assert service.evidence_exists(s, doc_id) is True
++    assert new_no == 2
++
++    v1, v2 = _versions(admin_engine, doc_id)
++    assert (v1.status, v1.error) == ("quarantined", "aadhaar_redacted")
++    assert (v2.status, v2.error, v2.mime_type) == ("queued", None, PNG_CT)
++    assert v2.object_key == f"t/{tenant}/docs/{doc_id}/v2/original.png"
++    assert store.objects[v2.object_key].data == redacted
++    assert v2.size_bytes == len(redacted)
++    detail = api.call(who, "GET", f"/api/v1/documents/{doc_id}").json()
++    assert detail["current_version"]["version_no"] == 2
++
++    # The copy is scanned like every other version (outbox), then it can be downloaded.
++    scans = [
++        p
++        for p in S.outbox_events(admin_engine, tenant, service.SCAN_EVENT)
++        if p["document_id"] == str(doc_id)
++    ]
++    assert {p["version_id"] for p in scans} == {str(v1.id), str(v2.id)}
++    assert service.scan_version(tenant, doc_id, v2.id, scanner=DEV_SCANNER) == "ready"
++    path = f"/api/v1/documents/{doc_id}/download-url"
++    assert api.call(who, "GET", path, params={"version": 2}).status_code == 200
++    assert api.call(who, "GET", path, params={"version": 1}).status_code == 409
++    assert api.call(who, "GET", path).json()["version_no"] == 2
++
++    # The original's bytes are deleted after commit by the outbox task (idempotent).
++    payload = _discard_payload(admin_engine, tenant, doc_id)
++    assert set(payload) == {"document_id", "version_id", "object_key"}
++    assert original_key in store.objects, "never before the transaction committed"
++    assert _run_discard(tenant, payload) is True
++    assert original_key not in store.objects
++    assert original_key in store.discarded, "tagged for the short lifecycle rule, not deleted"
++    assert _run_discard(tenant, payload) is True
++    assert v2.object_key in store.objects
++
++    events = W.audit_events(admin_engine, tenant)
++    mine = [e for e in events if str(e["resource_id"]) == str(doc_id)]
++    by_action = {e["action"]: e["summary"] for e in mine}
++    assert by_action["document.version_redacted"] == {
++        "version_no": 1,
++        "redacted_version_no": 2,
++        "regions": 2,
++        "mime_type": PNG_CT,
++        "size_bytes": len(redacted),
++    }
++    assert by_action["document.version_discarded"] == {
++        "version_no": 1,
++        "reason": "aadhaar_redacted",
++    }
++
++
++def test_PRV_016_discarded_version_without_a_copy_is_gone_for_good(
++    world: Any, api: Any, admin_engine: Engine, store: Any
++) -> None:
++    who = world.person("office_admin")
++    tenant = world.a.tenant_id
++    doc = _page_document(api, who, tenant)
++    doc_id = uuid.UUID(doc["id"])
++    key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
++    with tenant_session(tenant) as s:
++        assert service.discard_version(s, doc_id, 1, "aadhaar_unredactable") is True
++    with tenant_session(tenant) as s:
++        assert service.discard_version(s, doc_id, 1, "aadhaar_unredactable") is False
++        assert service.evidence_exists(s, doc_id) is False
++    (v1,) = _versions(admin_engine, doc_id)
++    assert (v1.status, v1.error) == ("quarantined", "aadhaar_unredactable")
++    path = f"/api/v1/documents/{doc_id}/download-url"
++    assert api.call(who, "GET", path, params={"version": 1}).status_code == 409
++    assert _run_discard(tenant, _discard_payload(admin_engine, tenant, doc_id)) is True
++    assert key not in store.objects
++    events = W.audit_events(admin_engine, tenant, "document.version_discarded")
++    mine = [e for e in events if str(e["resource_id"]) == str(doc_id)]
++    assert [e["summary"] for e in mine] == [{"version_no": 1, "reason": "aadhaar_unredactable"}]
++
++
++def test_PRV_016_daily_sweep_discards_what_the_task_missed(
++    world: Any, api: Any, admin_engine: Engine, store: Any
++) -> None:
++    who = world.person("office_admin")
++    tenant = world.a.tenant_id
++    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
++    key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
++    with tenant_session(tenant) as s:
++        service.discard_version(s, doc_id, 1, "aadhaar_unredactable")
++    assert key in store.objects  # the outbox task never ran (e.g. retries exhausted)
++    assert service.sweep_discarded_objects(tenant, store=store) >= 1
++    assert key not in store.objects
++
++
++def test_PRV_016_discard_task_never_deletes_a_usable_version(
++    world: Any, api: Any, admin_engine: Engine, store: Any
++) -> None:
++    who = world.person("office_admin")
++    tenant = world.a.tenant_id
++    doc = _page_document(api, who, tenant)
++    doc_id = uuid.UUID(doc["id"])
++    key = f"t/{tenant}/docs/{doc_id}/v1/original.png"
++    forged = {"document_id": str(doc_id), "version_id": doc["current_version"]["id"]}
++    assert _run_discard(tenant, {**forged, "object_key": key}) is False
++    other = f"t/{world.b.tenant_id}/docs/{doc_id}/v1/original.png"
++    assert _run_discard(tenant, {**forged, "object_key": other}) is False
++    assert key in store.objects
++
++
++def test_PRV_016_replace_with_redacted_checks_its_input(
++    world: Any, api: Any, admin_engine: Engine
++) -> None:
++    who = world.person("office_admin")
++    tenant = world.a.tenant_id
++    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
++    with tenant_session(tenant) as s, pytest.raises(service.UnsupportedFileType):
++        service.replace_with_redacted(s, doc_id, 1, S.pdf(), PNG_CT, regions=1)
++    with tenant_session(tenant) as s, pytest.raises(service.UnsupportedFileType):
++        service.replace_with_redacted(s, doc_id, 1, S.png(), PDF_CT, regions=1)
++    with tenant_session(tenant) as s, pytest.raises(ValueError, match="reason"):
++        service.discard_version(s, doc_id, 1, "because I said so")
++    with tenant_session(world.b.tenant_id) as s, pytest.raises(Exception, match="not found"):
++        service.replace_with_redacted(s, doc_id, 1, S.png(), PNG_CT, regions=1)
++    with tenant_session(tenant) as s:
++        service.discard_version(s, doc_id, 1, "aadhaar_unredactable")
++    with tenant_session(tenant) as s, pytest.raises(Exception, match="no longer available"):
++        service.replace_with_redacted(s, doc_id, 1, S.png(), PNG_CT, regions=1)
++    assert [v.version_no for v in _versions(admin_engine, doc_id)] == [1]
+diff --git a/apps/api/tests/documents/test_storage_s3.py b/apps/api/tests/documents/test_storage_s3.py
+index f037f34..07352e5 100644
+--- a/apps/api/tests/documents/test_storage_s3.py
++++ b/apps/api/tests/documents/test_storage_s3.py
+@@ -222,6 +222,57 @@ def test_FR_DOC_003_sse_kms_is_required_by_policy_and_sent_on_writes() -> None:
+         stub.assert_no_pending_responses()
+ 
+ 
++def test_PRV_016_discard_tags_then_deletes_and_is_idempotent(s3_store: S3ObjectStore) -> None:
++    key = storage.document_key(uuid.uuid4(), uuid.uuid4(), 1, "png")
++    s3_store.put(key, S.png(), "image/png")
++    s3_store.discard(key)
++    assert s3_store.head(key) is None
++    s3_store.discard(key)  # already gone: nothing to do, no error
++    with pytest.raises(ValueError, match="tenant prefix"):
++        s3_store.discard("elsewhere/original.png")
++
++
++def _stubbed_store() -> tuple[S3ObjectStore, Any]:
++    client = boto3.client(
++        "s3",
++        region_name="ap-south-1",
++        aws_access_key_id="synthetic-access",
++        aws_secret_access_key="synthetic-secret",
++        config=Config(signature_version="s3v4"),
++    )
++    return S3ObjectStore(client, BUCKET), client
++
++
++def test_PRV_016_discard_marks_the_object_for_the_short_lifecycle_rule() -> None:
++    """The files bucket is versioned: a plain delete keeps the bytes as a noncurrent version for
++    the 90-day recovery window. ``discard`` tags the object first so the lifecycle rule
++    ``discarded-1d`` (infra/terraform) expires that noncurrent version after one day."""
++    store, client = _stubbed_store()
++    key = "t/a/docs/b/v1/original.png"
++    with Stubber(client) as stub:
++        stub.add_response(
++            "put_object_tagging",
++            {},
++            {
++                "Bucket": BUCKET,
++                "Key": key,
++                "Tagging": {"TagSet": [{"Key": "sos-lifecycle", "Value": "discarded"}]},
++            },
++        )
++        stub.add_response("delete_object", {}, {"Bucket": BUCKET, "Key": key})
++        store.discard(key)
++        stub.assert_no_pending_responses()
++    for missing in ("NoSuchKey", "MethodNotAllowed"):  # gone, or only a delete marker is left
++        with Stubber(client) as stub:
++            stub.add_client_error("put_object_tagging", service_error_code=missing)
++            store.discard(key)
++            stub.assert_no_pending_responses()
++    with Stubber(client) as stub:
++        stub.add_client_error("put_object_tagging", service_error_code="AccessDenied")
++        with pytest.raises(storage.ObjectStoreError):
++            store.discard(key)
++
++
+ @pytest.mark.db
+ def test_FR_DOC_001_browser_to_s3_to_api_round_trip(
+     s3_store: S3ObjectStore, world: Any, api: Any
+diff --git a/apps/api/tests/documents/test_tasks.py b/apps/api/tests/documents/test_tasks.py
+index e34cf1d..6d8f8ed 100644
+--- a/apps/api/tests/documents/test_tasks.py
++++ b/apps/api/tests/documents/test_tasks.py
+@@ -25,6 +25,24 @@ def test_FR_OPS_004_outbox_events_route_to_document_tasks() -> None:
+     assert "documents-purge-expired-uploads" in tasks.beat_schedule()
+ 
+ 
++def test_PRV_016_discarded_versions_route_to_the_maintenance_queue() -> None:
++    from sos_worker.celery_app import celery_app
++
++    assert ops.OUTBOX_ROUTES[service.DISCARDED_EVENT] == service.DISCARD_TASK
++    assert tasks.discard_object.name == service.DISCARD_TASK == "documents.discard_object"
++    assert "documents-sweep-discarded-objects" in tasks.beat_schedule()
++    celery_app.loader.import_default_modules()
++    for name in (service.DISCARD_TASK, "documents.sweep_discarded_objects"):
++        assert name in celery_app.tasks
++        # send_task (used by the outbox dispatcher) honours task_routes, not the task's queue.
++        assert celery_app.amqp.router.route({}, name)["queue"].name == "maintenance"
++
++
++def test_PRV_016_sweep_task_walks_every_school(world: Any) -> None:
++    result = tasks.sweep_discarded_objects.apply().get()
++    assert result["discarded"] >= 0
++
++
+ def _dispatch_payload(admin: Engine, tenant_id: uuid.UUID, event: str, key: str, value: str) -> Any:
+     return next(p for p in S.outbox_events(admin, tenant_id, event) if p[key] == value)
+ 
+diff --git a/apps/worker/sos_worker/celery_app.py b/apps/worker/sos_worker/celery_app.py
+index 871bdd4..17c2d72 100644
+--- a/apps/worker/sos_worker/celery_app.py
++++ b/apps/worker/sos_worker/celery_app.py
+@@ -70,6 +70,9 @@ def create_celery() -> Celery:
+             "maintenance.*": {"queue": "maintenance"},
+             # FR-DOC-002: AV scans run on the ingest queue (send_task honours routes only).
+             "documents.scan": {"queue": "ingest"},
++            # PRV-016: deleting the files of discarded versions (outbox consumer + daily sweep).
++            "documents.discard_object": {"queue": "maintenance"},
++            "documents.sweep_discarded_objects": {"queue": "maintenance"},
+             # FR-IMP-001..004: spreadsheet parsing, checking and commit (outbox consumers).
+             "imports.parse": {"queue": "ingest"},
+             "imports.validate": {"queue": "ingest"},
+diff --git a/infra/terraform/modules/dedicated_host/main.tf b/infra/terraform/modules/dedicated_host/main.tf
+index d8b8bfb..05a4046 100644
+--- a/infra/terraform/modules/dedicated_host/main.tf
++++ b/infra/terraform/modules/dedicated_host/main.tf
+@@ -75,6 +75,8 @@ module "files" {
+     { id = "exports-7d", tags = { "sos-lifecycle" = "export-7d" }, expiration_days = 7 },
+     { id = "tenant-export-2d", tags = { "sos-lifecycle" = "tenant-export-2d" }, expiration_days = 2 },
+     { id = "import-raw-90d", tags = { "sos-lifecycle" = "import-raw-90d" }, expiration_days = 90 },
++    # PRV-016: images that showed a full Aadhaar number (tagged by the app before it deletes them).
++    { id = "discarded-1d", tags = { "sos-lifecycle" = "discarded" }, expiration_days = 1, noncurrent_version_expiration_days = 1 },
+     { id = "noncurrent-and-multipart", noncurrent_version_expiration_days = 90, abort_incomplete_multipart_days = 7 },
+   ]
+   tags = local.tags
+diff --git a/infra/terraform/modules/s3/main.tf b/infra/terraform/modules/s3/main.tf
+index 16939ee..30fc72c 100644
+--- a/infra/terraform/modules/s3/main.tf
++++ b/infra/terraform/modules/s3/main.tf
+@@ -97,6 +97,14 @@ module "files" {
+       tags            = { "sos-lifecycle" = "import-raw-90d" }
+       expiration_days = 90
+     },
++    {
++      # PRV-016: images that showed a full Aadhaar number are tagged before the app deletes
++      # them (documents.storage discard), so no copy outlives the 90-day recovery window.
++      id                                 = "discarded-1d"
++      tags                               = { "sos-lifecycle" = "discarded" }
++      expiration_days                    = 1
++      noncurrent_version_expiration_days = 1
++    },
+     {
+       id                                 = "noncurrent-and-multipart"
+       noncurrent_version_expiration_days = var.files_noncurrent_version_days
+-- 
+2.43.0
+
