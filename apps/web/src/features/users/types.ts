@@ -41,12 +41,10 @@ export const STATUS_ACTIONS: Record<MemberStatus, readonly StatusChange[]> = {
 };
 
 /**
- * Roles whose holders may give and take away every role (roles.yaml `assign_any_role`).
- * UX only: used to grey out roles the API would refuse (403 role_not_grantable).
+ * Roles that need two-step sign-in (roles.yaml `mfa_required`; FR-IAM-002). Only for the
+ * "Needs two-step sign-in" hint next to a role: which roles may be given comes from the API
+ * (`RoleOut.grantable`), never from rules copied here.
  */
-export const ASSIGN_ANY_ROLES: readonly string[] = ["owner"];
-
-/** Roles that need two-step sign-in (roles.yaml `mfa_required`; FR-IAM-002). */
 export const MFA_ROLES: readonly string[] = ["owner", "principal", "office_admin"];
 
 /** The temporary SchoolOS support role: changed only on the Support access page (07 §6.4). */

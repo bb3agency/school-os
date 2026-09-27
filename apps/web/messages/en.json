@@ -219,8 +219,9 @@
       "rolesForm": {
         "hint": "Changes take effect within a minute.",
         "needsMfa": "Needs two-step sign-in (MFA).",
-        "schoolRole": "Made for this school: works only in the classes and sections chosen below.",
-        "notGrantable": "You can't give or take away this role: it has more access than your own."
+        "schoolRole": "Made for this school.",
+        "notGrantable": "You can't give or take away this role: it has more access than your own, or needs the permission to assign roles.",
+        "scopedRole": "Works only in the classes and sections chosen below."
       },
       "scopeForm": {
         "legend": "Classes and sections",
@@ -261,7 +262,7 @@
         "invitedOn": "Invited on",
         "accessEnds": "Access ends",
         "noEnd": "No end date",
-        "detailsNote": "Name, email and language can't be changed here yet. Contact support if they are wrong.",
+        "detailsNote": "Only people who can manage users (for example the principal or office admin) can change these details.",
         "rolesTitle": "Roles",
         "rolesDescription": "What this person can do. Changes are recorded in the audit log.",
         "rolesLegend": "Roles for this person",
@@ -273,7 +274,6 @@
         "saved": "Saved. It takes effect within a minute.",
         "loadingRoles": "Loading roles…",
         "status": {
-          "selfNote": "This is your own account. You will lose access to this school.",
           "activate": {
             "button": "Give access back",
             "title": "Give {name} access again?",
@@ -290,6 +290,19 @@
             "body": "They lose access to this school for good. This can't be undone; to add them again you must send a new invitation.",
             "invitedBody": "The invitation is cancelled and can't be used. To add them later, send a new invitation."
           }
+        },
+        "selfNoStatus": "This is your own account, so you can't suspend or remove it here. Ask another person who manages users if that is needed.",
+        "edit": {
+          "trigger": "Edit details",
+          "title": "Edit name, email and language",
+          "description": "Correct how this person is shown and how SchoolOS writes to them. Their sign-in ID does not change. The change is recorded in the audit log.",
+          "name": "Name",
+          "nameHint": "As the staff will see it, for example \"Lakshmi K\".",
+          "email": "Email (optional)",
+          "emailHint": "Leave it empty to remove the email address.",
+          "language": "Language",
+          "languageHint": "The language SchoolOS uses for this person.",
+          "submit": "Save details"
         }
       },
       "errors": {
@@ -316,6 +329,10 @@
         "precondition_failed": {
           "title": "Someone else changed this person first",
           "body": "Reload the page to see their change, then make yours again."
+        },
+        "roles_required": {
+          "title": "Choose at least one role",
+          "body": "A staff member keeps at least one role. To stop their access, use Suspend or Remove instead."
         }
       },
       "inviteForm": {
@@ -1183,7 +1200,8 @@
       "upload_is_for_a_new_version": "Reload the page and upload the file again.",
       "upload_is_for_another_document": "Reload the page and upload the file again.",
       "different_class_or_year": "Choose a section of the same class and year. To change the class, use “Change class or section”.",
-      "before_start": "The end date is before the start date. Choose a later date."
+      "before_start": "The end date is before the start date. Choose a later date.",
+      "roles_required": "Choose at least one role. To stop their access, use Suspend or Remove instead."
     },
     "api": {
       "generic": {
@@ -1442,7 +1460,8 @@
     "fileTooLarge": "This file is larger than 25 MB. Scan at a lower resolution or split it.",
     "chooseWhoCanSee": "Choose at least one role, class, section or staff member, or choose \"Whole school\".",
     "tooManyAclEntries": "Choose at most 50, or choose \"Whole school\".",
-    "invalidIssueDate": "Choose a date, or leave it empty."
+    "invalidIssueDate": "Choose a date, or leave it empty.",
+    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",

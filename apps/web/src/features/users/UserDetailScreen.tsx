@@ -10,17 +10,20 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SelectField } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { STAFF_ME_KEY, useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime, formatList } from "@/lib/format";
+import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { formList, useApiForm } from "@/lib/forms";
+import { optionalEmail, text } from "@/lib/validation";
 import { USER_KEYS, useRoles, useUser } from "./data";
 import {
-  canGrantRole,
   refineScopes,
   RoleCheckboxes,
   rolesField,
@@ -34,12 +37,16 @@ import {
   userFieldMap,
 } from "./parts";
 import {
+  EMAIL_MAX,
   ifMatch,
   isBreakGlass,
+  NAME_MAX,
   STATUS_ACTIONS,
+  USER_LANGUAGES,
   USER_PERM,
   type StaffUser,
   type StatusChange,
+  type UserLanguage,
 } from "./types";
 
 const rolesSchema = z.object({ roles: rolesField });
@@ -63,12 +70,13 @@ const STATUS_COPY: Record<StatusChange, "activate" | "suspend" | "remove"> = {
 
 /**
  * Give access back, suspend or remove (PATCH /users/{id}; `user.manage`, step-up, If-Match).
- * Only the changes the API allows from the current status are offered.
+ * Only the changes the API allows from the current status are offered. Never on your own
+ * account: locking yourself out is done by someone else, not by a slip of the mouse.
  */
-function StatusActions({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
+function StatusActions({ user }: { user: StaffUser }) {
   const t = useTranslations("school.users.detail.status");
   const api = useBffClient("staff");
-  const invalidate = [USER_KEYS.all, ...(isSelf ? [STAFF_ME_KEY] : [])];
+  const invalidate = [USER_KEYS.all];
   return (
     <>
       {STATUS_ACTIONS[user.status].map((change) => {
@@ -85,7 +93,6 @@ function StatusActions({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
             }
             confirmLabel={t(`${copy}.button`)}
             confirmVariant={removing ? "danger" : "primary"}
-            note={isSelf && change !== "active" ? t("selfNote") : undefined}
             stepUp
             schema={z.object({})}
             invalidate={invalidate}
@@ -103,6 +110,109 @@ function StatusActions({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
         );
       })}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ profile */
+
+/** Client checks mirroring `UserUpdateIn` (display name 1–200, email ≤ 254 or empty). */
+export const profileSchema = z
+  .object({
+    display_name: text(NAME_MAX),
+    email: optionalEmail,
+    preferred_language: z.enum(USER_LANGUAGES, { error: "chooseOption" }),
+  })
+  .superRefine((data, context) => {
+    // Invariant 4: never a full Aadhaar number, not even in a name or an email address.
+    if (containsAadhaarNumber(data.display_name)) {
+      context.addIssue({ code: "custom", path: ["display_name"], message: "noAadhaar" });
+    }
+    if (data.email !== null && containsAadhaarNumber(data.email)) {
+      context.addIssue({ code: "custom", path: ["email"], message: "noAadhaar" });
+    }
+  });
+export type ProfileInput = z.output<typeof profileSchema>;
+
+/** PATCH body with only what changed (`email: null` clears it; docs/09 UserUpdateIn). */
+export function profileBody(current: StaffUser, data: ProfileInput) {
+  const body: {
+    display_name?: string;
+    email?: string | null;
+    preferred_language?: UserLanguage;
+  } = {};
+  if (data.display_name !== current.display_name) body.display_name = data.display_name;
+  if (data.email !== (current.email?.toLowerCase() ?? null)) body.email = data.email;
+  if (data.preferred_language !== current.preferred_language) {
+    body.preferred_language = data.preferred_language;
+  }
+  return body;
+}
+
+/**
+ * Correct a staff member's name, email or language (PATCH /users/{id}; `user.manage`,
+ * step-up through the global prompt, If-Match). The sign-in account never changes here. The
+ * API audits the changed field names only; a removed member answers 409 `invalid_state`.
+ */
+function EditProfile({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
+  const t = useTranslations("school.users.detail.edit");
+  const tl = useTranslations("language");
+  const api = useBffClient("staff");
+  return (
+    <ActionDialog
+      triggerLabel={t("trigger")}
+      title={t("title")}
+      description={t("description")}
+      confirmLabel={t("submit")}
+      stepUp
+      schema={profileSchema}
+      fieldMap={userFieldMap}
+      invalidate={[USER_KEYS.all, ...(isSelf ? [STAFF_ME_KEY] : [])]}
+      errorNamespace="school.users"
+      submit={(data) => {
+        const body = profileBody(user, data);
+        if (Object.keys(body).length === 0) return Promise.resolve(user);
+        return unwrap(
+          api.PATCH("/api/v1/users/{user_id}", {
+            params: { path: { user_id: user.id } },
+            headers: { "If-Match": ifMatch(user.version) },
+            body,
+          }),
+        );
+      }}
+    >
+      {(errors) => (
+        <>
+          <TextField
+            name="display_name"
+            label={t("name")}
+            hint={t("nameHint")}
+            defaultValue={user.display_name}
+            error={errors.display_name}
+            maxLength={NAME_MAX}
+            autoComplete="off"
+            required
+          />
+          <TextField
+            name="email"
+            type="email"
+            label={t("email")}
+            hint={t("emailHint")}
+            defaultValue={user.email ?? ""}
+            error={errors.email}
+            maxLength={EMAIL_MAX}
+            autoComplete="off"
+          />
+          <SelectField
+            name="preferred_language"
+            label={t("language")}
+            hint={t("languageHint")}
+            defaultValue={user.preferred_language}
+            error={errors.preferred_language}
+            options={USER_LANGUAGES.map((value) => ({ value, label: tl(value) }))}
+          />
+        </>
+      )}
+    </ActionDialog>
   );
 }
 
@@ -144,7 +254,6 @@ function SaveRow({
 function RolesForm({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
   const t = useTranslations("school.users.detail");
   const api = useBffClient("staff");
-  const me = useStaffMe();
   const roles = useRoles(true);
   const [saved, setSaved] = useState(false);
   const form = useApiForm({
@@ -172,7 +281,6 @@ function RolesForm({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
       <RoleCheckboxes
         roles={roles.data}
         selected={user.roles}
-        grantable={(role) => (me ? canGrantRole(role, me, "assign") : false)}
         error={form.errors.roles}
         legend={t("rolesLegend")}
       />
@@ -274,7 +382,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
         }
         actions={
           <>
-            {canManage ? <StatusActions user={user} isSelf={isSelf} /> : null}
+            {canManage && !isSelf ? <StatusActions user={user} /> : null}
             {back}
           </>
         }
@@ -303,7 +411,10 @@ export function UserDetailScreen({ userId }: { userId: string }) {
         </Alert>
       ) : null}
 
-      <Card title={td("aboutTitle")}>
+      <Card
+        title={td("aboutTitle")}
+        actions={canManage && !removed ? <EditProfile user={user} isSelf={isSelf} /> : null}
+      >
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Item label={t("colEmail")}>
             <Value>{user.email}</Value>
@@ -322,7 +433,12 @@ export function UserDetailScreen({ userId }: { userId: string }) {
             {user.expires_at ? <Value>{formatDateTime(user.expires_at)}</Value> : td("noEnd")}
           </Item>
         </dl>
-        <p className="mt-4 text-sm text-ink-muted">{td("detailsNote")}</p>
+        {isSelf && canManage && !removed ? (
+          <p className="mt-4 text-sm text-ink-muted">{td("selfNoStatus")}</p>
+        ) : null}
+        {!canManage && !breakGlass ? (
+          <p className="mt-4 text-sm text-ink-muted">{td("detailsNote")}</p>
+        ) : null}
       </Card>
 
       <Card title={td("rolesTitle")} description={td("rolesDescription")}>

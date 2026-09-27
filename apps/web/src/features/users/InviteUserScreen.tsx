@@ -17,7 +17,6 @@ import { formList, useApiForm } from "@/lib/forms";
 import { optionalEmail, text } from "@/lib/validation";
 import { USER_KEYS, useRoles } from "./data";
 import {
-  canGrantRole,
   refineScopes,
   RoleCheckboxes,
   rolesField,
@@ -184,7 +183,7 @@ export function InviteUserScreen() {
             <RoleCheckboxes
               roles={roles.data}
               selected={[]}
-              grantable={(role) => (me ? canGrantRole(role, me, "invite") : false)}
+
               error={errors.roles}
               legend={t("rolesLegend")}
             />

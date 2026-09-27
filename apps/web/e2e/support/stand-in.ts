@@ -243,13 +243,14 @@ const TENANT = {
 };
 
 const ROLES = [
-  { key: "office_admin", name_en: "Office admin", name_te: "ఆఫీసు అడ్మిన్" },
-  { key: "class_teacher", name_en: "Class teacher", name_te: "తరగతి ఉపాధ్యాయులు" },
+  { key: "office_admin", name_en: "Office admin", name_te: "ఆఫీసు అడ్మిన్", scoped: false },
+  { key: "class_teacher", name_en: "Class teacher", name_te: "తరగతి ఉపాధ్యాయులు", scoped: true },
 ].map((role, index) => ({
   id: `0192f3a4-0000-7000-8000-0000000007${index}0`,
   ...role,
   is_system: true,
   permissions: ["student.read_basic"],
+  grantable: true,
 }));
 
 const USER = {

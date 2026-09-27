@@ -6,14 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SchoolShell } from "@/components/shell/SchoolShell";
 import { registerStepUpHandler } from "@/lib/bff/step-up";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
-import { intlErrors, renderWithIntl } from "@/test/render";
+import { fakeAadhaar } from "@/test/records-fixtures";
+import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me, SECTION, structureRoutes } from "@/test/school-fixtures";
 import { InviteUserScreen } from "./InviteUserScreen";
-import { canGrantRole, scopesBody } from "./parts";
+import { scopesBody } from "./parts";
+import { profileBody, profileSchema } from "./UserDetailScreen";
 import { UserDetailScreen } from "./UserDetailScreen";
 import { UsersScreen } from "./UsersScreen";
 
 type Schemas = components["schemas"];
+const detailCopy = messages.en.school.users.detail;
 
 const push = vi.hoisted(() => vi.fn());
 
@@ -69,6 +72,7 @@ const ROLES: Schemas["RoleOut"][] = [
   role("class_teacher", [READ_BASIC], {
     name_en: "Class teacher",
     name_te: "తరగతి ఉపాధ్యాయులు",
+    scoped: true,
   }),
   role("librarian", [READ_BASIC, "document.read"], {
     name_en: "Librarian",
@@ -100,6 +104,12 @@ let unregisterStepUp: (() => void) | null = null;
 
 function setMe(permissions: string[], roles: string[] = ["office_admin"]) {
   stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(permissions, { roles }));
+}
+
+/** GET /roles as the API answers it for the caller: `grantable` false for the given keys. */
+function serveRoles(notGrantable: string[]) {
+  stub.routes["GET /bff/api/v1/roles"] = () =>
+    page(ROLES.map((item) => ({ ...item, grantable: !notGrantable.includes(item.key) })));
 }
 
 function body(key: string, index = 0): Record<string, unknown> {
@@ -233,8 +243,9 @@ describe("invite user (US-102 AC1, FR-IAM-010..012)", () => {
     });
   });
 
-  it("greys out roles needing more than user.manage, and explains 403 role_not_grantable", async () => {
+  it("greys out the roles the API marks not grantable, and explains 403 role_not_grantable", async () => {
     setMe([MANAGE, READ_BASIC], ["office_staff"]);
+    serveRoles(["owner", "office_admin", "librarian"]);
     stub.routes["POST /bff/api/v1/users"] = () => problem(403, "role_not_grantable");
     renderWithIntl(<InviteUserScreen />);
     expect(await screen.findByLabelText("Office admin")).toBeDisabled();
@@ -311,6 +322,7 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
 
   it("replaces roles with PUT and keeps a held role the member cannot change", async () => {
     setMe([MANAGE, ASSIGN, READ_BASIC], ["principal"]);
+    serveRoles(["owner", "librarian"]);
     serveUser(user({ roles: ["class_teacher", "librarian"] }));
     stub.routes[`PUT /bff/api/v1/users/${USER}/roles`] = () =>
       Response.json(user({ roles: ["office_staff", "librarian"] }));
@@ -430,22 +442,149 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
     expect(screen.queryByRole("button", { name: "Save roles" })).not.toBeInTheDocument();
   });
 
-  it("marks your own account and warns before you suspend yourself", async () => {
+  it("marks your own account and offers no suspend or remove for it", async () => {
     setMe([MANAGE, READ_BASIC]);
     serveUser(user({ id: ME_USER }));
     renderWithIntl(<UserDetailScreen userId={ME_USER} />);
     expect(await screen.findByText("This is you")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Suspend" }));
-    const dialog = screen.getByRole("dialog", { name: "Suspend Lakshmi Sample?" });
-    expect(
-      within(dialog).getByText("This is your own account. You will lose access to this school."),
-    ).toBeInTheDocument();
+    expect(screen.getByText(messages.en.school.users.detail.selfNoStatus)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Suspend" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    // Your own name, email and language can still be corrected.
+    expect(screen.getByRole("button", { name: detailCopy.edit.trigger })).toBeInTheDocument();
   });
 
   it("404: says the person was not found", async () => {
     setMe([MANAGE, READ_BASIC]);
     renderWithIntl(<UserDetailScreen userId={USER} />, "te");
     expect(await screen.findByText("ఈ వ్యక్తి కనబడలేదు")).toBeInTheDocument();
+  });
+
+  it("explains 422 roles_required on the role choice", async () => {
+    setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
+    serveUser(user());
+    stub.routes[`PUT /bff/api/v1/users/${USER}/roles`] = () =>
+      problem(422, "roles_required", {
+        errors: [{ field: "roles", code: "roles_required", message_key: "errors.roles_required" }],
+      });
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    await userEvent.click(await screen.findByLabelText("Office staff"));
+    await userEvent.click(screen.getByRole("button", { name: "Save roles" }));
+    expect(await screen.findByText(messages.en.errors.field.roles_required)).toBeInTheDocument();
+  });
+
+  it("notes the roles that reach only the chosen classes (RoleOut.scoped)", async () => {
+    setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
+    serveUser(user());
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    const teacher = await screen.findByLabelText("Class teacher");
+    expect(teacher).toHaveAccessibleDescription(messages.en.school.users.rolesForm.scopedRole);
+    expect(screen.getByLabelText("Office staff")).not.toHaveAccessibleDescription();
+  });
+});
+
+describe("edit a staff member's details (US-102, FR-IAM-010)", () => {
+  const PATCH = `PATCH /bff/api/v1/users/${USER}`;
+
+  async function openEdit() {
+    await userEvent.click(await screen.findByRole("button", { name: detailCopy.edit.trigger }));
+    return screen.getByRole("dialog", { name: detailCopy.edit.title });
+  }
+
+  it("builds a body with only what changed; an emptied email is null", () => {
+    const current = user();
+    expect(
+      profileBody(
+        current,
+        profileSchema.parse({
+          display_name: " Lakshmi K ",
+          email: "",
+          preferred_language: "te",
+        }),
+      ),
+    ).toEqual({ display_name: "Lakshmi K", email: null });
+    expect(
+      profileBody(
+        current,
+        profileSchema.parse({
+          display_name: "Lakshmi Sample",
+          email: "LAKSHMI@school.example",
+          preferred_language: "en",
+        }),
+      ),
+    ).toEqual({ preferred_language: "en" });
+    expect(
+      profileSchema.safeParse({
+        display_name: `Lakshmi ${fakeAadhaar()}`,
+        email: "",
+        preferred_language: "en",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("edits name, email and language with If-Match; the global step-up retries the same call", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    serveUser(user());
+    const prompt = vi.fn(async () => true);
+    unregisterStepUp = registerStepUpHandler("staff", prompt);
+    let attempts = 0;
+    stub.routes[PATCH] = () => {
+      attempts += 1;
+      return attempts === 1
+        ? problem(428, "step_up_required", { step_up_url: "/bff/auth/step-up?next=%2Fen" })
+        : Response.json(user({ display_name: "Lakshmi K", email: null, version: 4 }));
+    };
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    const dialog = await openEdit();
+    const name = within(dialog).getByLabelText(detailCopy.edit.name);
+    expect(name).toHaveValue("Lakshmi Sample");
+    await userEvent.clear(name);
+    await userEvent.type(name, "Lakshmi K");
+    await userEvent.clear(within(dialog).getByLabelText(detailCopy.edit.email));
+    await userEvent.click(within(dialog).getByRole("button", { name: detailCopy.edit.submit }));
+    await waitFor(() => expect(stub.callsTo(PATCH)).toHaveLength(2));
+    expect(prompt).toHaveBeenCalledTimes(1);
+    const call = stub.callsTo(PATCH)[1];
+    expect(call?.headers.get("if-match")).toBe('W/"3"');
+    expect(body(PATCH, 1)).toEqual({ display_name: "Lakshmi K", email: null });
+  });
+
+  it("refuses a full Aadhaar number in the name before sending", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    serveUser(user());
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    const dialog = await openEdit();
+    await userEvent.type(within(dialog).getByLabelText(detailCopy.edit.name), ` ${fakeAadhaar()}`);
+    await userEvent.click(within(dialog).getByRole("button", { name: detailCopy.edit.submit }));
+    expect(await within(dialog).findByText(messages.en.validation.noAadhaar)).toBeInTheDocument();
+    expect(stub.callsTo(PATCH)).toHaveLength(0);
+  });
+
+  it("explains 409 invalid_state (the person was removed meanwhile)", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    serveUser(user());
+    stub.routes[PATCH] = () => problem(409, "invalid_state");
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    const dialog = await openEdit();
+    await userEvent.selectOptions(within(dialog).getByLabelText(detailCopy.edit.language), "en");
+    await userEvent.click(within(dialog).getByRole("button", { name: detailCopy.edit.submit }));
+    expect(
+      await within(dialog).findByText(messages.en.school.users.errors.invalid_state.title),
+    ).toBeInTheDocument();
+  });
+
+  it("is not offered for a removed person or without user.manage", async () => {
+    setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
+    serveUser(user({ status: "removed" }));
+    const { unmount } = renderWithIntl(<UserDetailScreen userId={USER} />);
+    expect(await screen.findByText("This person has been removed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: detailCopy.edit.trigger })).toBeNull();
+    unmount();
+    setMe([ASSIGN, READ_BASIC], ["owner"]);
+    serveUser(user());
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    expect(await screen.findByRole("button", { name: "Save roles" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: detailCopy.edit.trigger })).toBeNull();
   });
 });
 
@@ -463,22 +602,19 @@ describe("helpers", () => {
     ]);
   });
 
-  it("canGrantRole mirrors the API's grant rules (owner any; invite of non-MFA built-in roles)", () => {
-    const [owner, officeAdmin, officeStaff, , librarian] = ROLES as [
-      Schemas["RoleOut"],
-      Schemas["RoleOut"],
-      Schemas["RoleOut"],
-      Schemas["RoleOut"],
-      Schemas["RoleOut"],
-    ];
-    const clerk = { roles: ["office_staff"], permissions: [MANAGE, READ_BASIC] };
-    expect(canGrantRole(officeStaff, clerk, "invite")).toBe(true);
-    expect(canGrantRole(officeAdmin, clerk, "invite")).toBe(false);
-    expect(canGrantRole(librarian, clerk, "invite")).toBe(false);
-    const principal = { roles: ["principal"], permissions: [MANAGE, ASSIGN, READ_BASIC] };
-    expect(canGrantRole(officeAdmin, principal, "assign")).toBe(true);
-    expect(canGrantRole(owner, principal, "assign")).toBe(false);
-    expect(canGrantRole(librarian, principal, "invite")).toBe(false);
-    expect(canGrantRole(owner, { roles: ["owner"], permissions: [] }, "assign")).toBe(true);
+  it("greyed-out roles come only from the API's grantable (no grant rules copied into the web app)", async () => {
+    // Even for an owner, a role the API says is not grantable stays greyed out; and a role it
+    // says is grantable is offered to a clerk whose own permissions the web app never compares.
+    setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
+    serveRoles(["owner"]);
+    const { unmount } = renderWithIntl(<InviteUserScreen />);
+    expect(await screen.findByLabelText("Owner")).toBeDisabled();
+    expect(screen.getByLabelText("Office admin")).toBeEnabled();
+    unmount();
+    setMe([MANAGE, READ_BASIC], ["office_staff"]);
+    serveRoles([]);
+    renderWithIntl(<InviteUserScreen />);
+    expect(await screen.findByLabelText("Office admin")).toBeEnabled();
+    expect(screen.getByLabelText("Librarian")).toBeEnabled();
   });
 });
