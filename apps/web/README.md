@@ -18,7 +18,8 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 | `src/instrumentation.ts`           | Validates the BFF config once at server start                                                                                                                            |
 | `src/features/platform/`           | Platform admin panel screens (C14): TanStack Query + `ActionDialog` forms against `/api/v1/platform/*`, incl. a school's provisioning state and "Resume provisioning"    |
 | `src/features/school/`             | School console screens (audit log and chain check, plan & billing, support, home, announcements banner)                                                                  |
-| `src/features/academic-structure/` | Academic structure (US-202, FR-TEN-010): years, classes and sections with add/edit for `tenant.structure.manage`, If-Match (412 → reload) (`/settings/structure`)        |
+| `src/features/academic-structure/` | Academic structure (US-202, FR-TEN-010): years, classes, sections; add/edit/archive (If-Match), "Show archived", class teacher from `/staff` (`/settings/structure`)     |
+| `src/features/promotions/`         | Year-end promotion (FR-TEN-011, US-202 AC2): preview, commit (Idempotency-Key, fingerprint), undo in 24 h (`/settings/structure/years/[yearId]/promotions`)              |
 | `src/features/settings/`           | School profile and settings (FR-TEN-012): languages, date format, idle timeout, AI switch and budget for `tenant.settings.manage`; step-up per call (`/settings/school`) |
 | `src/features/users/`              | Users and roles (US-102): staff list, invite, status, roles and class/section scopes (`/settings/users/*`; step-up per call)                                             |
 | `src/features/documents/`          | Documents (US-701, FR-DOC-001..008): list with filters in the URL, presigned upload straight to storage, versions, who can see it (`/documents/*`)                       |
@@ -121,7 +122,7 @@ the signed-out page, without an IdP.
 With `E2E_STAND_IN=1` (and Valkey at `REDIS_URL`) it also signs in through a scripted
 stand-in IdP and canned API (`e2e/support/stand-in.ts`; synthetic data only) and runs axe
 plus keyboard-only paths on school pages (billing, support, home, the picker, settings,
-structure, users, documents, the audit check) and platform pages (dashboard, schools, a school
+structure and promotions, users, documents, the audit check) and platform pages (dashboard, schools, a school
 whose provisioning stopped, invoices, plans, the provision wizard, dialogs). It also fails on
 horizontal overflow at 1366×768 and on any Tab stop without a visible focus indicator:
 

@@ -8,6 +8,8 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+/** Promotion screen of the stand-in's current year (e2e/support/stand-in.ts YEAR_ID). */
+const PROMOTIONS = "/en/settings/structure/years/0192f3a4-0000-7000-8000-0000000000a1/promotions";
 
 async function expectNoAxeViolations(page: Page, label: string) {
   const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -114,6 +116,8 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     const pages: Array<[string, string]> = [
       ["/en/settings/structure", "Class 6"],
       ["/te/settings/structure", "6వ తరగతి"],
+      [PROMOTIONS, "Plan the promotion"],
+      [PROMOTIONS.replace("/en/", "/te/"), "ప్రమోషన్ ప్రణాళిక"],
       ["/en/settings/school", "STATE_AP, CBSE"],
       ["/te/settings/school", "STATE_AP, CBSE"],
       ["/en/settings/users", "Synthetic Teacher"],
@@ -160,6 +164,34 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(add).toBeFocused();
+
+    // Show archived, then the class teacher picker in "Edit" of a section, keyboard only.
+    await page.getByLabel("Show archived years, classes and sections").focus();
+    await page.keyboard.press("Space");
+    await expect(page.getByLabel("Show archived years, classes and sections")).toBeChecked();
+    const editSection = page
+      .getByRole("region", { name: "Sections" })
+      .getByRole("button", { name: "Edit" })
+      .first();
+    await editSection.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog").getByLabel("Class teacher")).toBeVisible();
+    await expectNoAxeViolations(page, "edit section dialog");
+    await page.keyboard.press("Escape");
+
+    // Promotion (FR-TEN-011): preview by keyboard; the result and the section choice pass axe.
+    await page.goto(PROMOTIONS);
+    const preview = page.getByRole("button", { name: "Preview promotion" });
+    await preview.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("region", { name: "Preview: 2026-27 to 2027-28" })).toBeVisible();
+    await expect(page.getByLabel("Students of 6-A going to Class 6")).toBeVisible();
+    await expectNoAxeViolations(page, "promotion preview");
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, "promotion preview horizontal overflow").toBeLessThanOrEqual(0);
+    await expectVisibleFocusOnEveryStop(page, "promotion preview", 80);
 
     // Audit chain check by keyboard: the button runs it and the result is announced.
     await page.goto("/en/audit/verify");

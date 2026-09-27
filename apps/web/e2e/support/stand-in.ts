@@ -27,6 +27,7 @@ const USER_ID = "0192f3a4-0000-7000-8000-0000000000d1";
 const DOC_ID = "0192f3a4-0000-7000-8000-00000000d001";
 const YEAR_ID = "0192f3a4-0000-7000-8000-0000000000a1";
 const CLASS_ID = "0192f3a4-0000-7000-8000-0000000000c6";
+const NEXT_YEAR_ID = "0192f3a4-0000-7000-8000-0000000000a2";
 
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -202,6 +203,15 @@ const STRUCTURE = {
       is_current: true,
       ...STAMP,
     },
+    {
+      id: NEXT_YEAR_ID,
+      label: "2027-28",
+      starts_on: "2027-06-01",
+      ends_on: "2028-04-30",
+      is_current: false,
+      archived_at: null,
+      ...STAMP,
+    },
   ],
   classes: [
     {
@@ -221,6 +231,52 @@ const STRUCTURE = {
     class_teacher_membership_id: null,
     ...STAMP,
   })),
+};
+
+/** Staff directory (class teacher picker) and a promotion preview (FR-TEN-011). */
+const STAFF = [
+  {
+    membership_id: "0192f3a4-0000-7000-8000-0000000000e2",
+    display_name: "Synthetic Teacher",
+    roles: ["class_teacher"],
+  },
+];
+const PROMOTIONS_PATH = `/api/v1/academic-years/${YEAR_ID}/promotions`;
+const PROMOTION_PREVIEW = {
+  from_academic_year_id: YEAR_ID,
+  to_academic_year_id: NEXT_YEAR_ID,
+  counts: { promoted: 1, held_back: 0, graduated: 0, skipped: 0 },
+  groups: [
+    {
+      from_section_id: STRUCTURE.sections[0]?.id,
+      from_label: "6-A",
+      outcome: "promoted",
+      to_section_id: null,
+      to_label: null,
+      count: 1,
+    },
+  ],
+  problems: [
+    {
+      code: "no_target_section",
+      from_section_id: STRUCTURE.sections[0]?.id,
+      from_label: "6-A",
+      target_class_id: CLASS_ID,
+      count: 1,
+    },
+  ],
+  students: [
+    {
+      student_id: "0192f3a4-0000-7000-8000-00000000d001",
+      enrollment_id: "0192f3a4-0000-7000-8000-00000000e101",
+      from_section_id: STRUCTURE.sections[0]?.id,
+      outcome: "promoted",
+      to_section_id: null,
+      reason: "no_target_section",
+    },
+  ],
+  plan_fingerprint: "a".repeat(64),
+  can_commit: false,
 };
 
 const TENANT = {
@@ -432,6 +488,10 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
   if (path === "/api/v1/academic-years") return [200, page(STRUCTURE.years)];
   if (path === "/api/v1/classes") return [200, page(STRUCTURE.classes)];
   if (path === "/api/v1/sections") return [200, page(STRUCTURE.sections)];
+  if (path === "/api/v1/staff") return [200, page(STAFF)];
+  if (path === `/api/v1/academic-years/${YEAR_ID}`) return [200, STRUCTURE.years[0]];
+  if (path === PROMOTIONS_PATH) return [200, []];
+  if (path === `${PROMOTIONS_PATH}:preview` && method === "POST") return [200, PROMOTION_PREVIEW];
   if (path === "/api/v1/roles") return [200, page(ROLES)];
   if (path === "/api/v1/users") return [200, page([USER])];
   if (path === `/api/v1/users/${USER_ID}`) return [200, USER];
