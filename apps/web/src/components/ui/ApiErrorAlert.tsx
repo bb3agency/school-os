@@ -11,7 +11,14 @@ import { Alert } from "./Alert";
  * without such a message fall back to `errors.api.*`.
  */
 export type ErrorNamespace =
-  "findings" | "changeRequests" | "breakGlass" | "notifications" | "exports" | "school.users";
+  | "findings"
+  | "changeRequests"
+  | "breakGlass"
+  | "notifications"
+  | "exports"
+  | "school.users"
+  | "academicStructure"
+  | "schoolSettings";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 
