@@ -21,7 +21,7 @@ REQUIRED = {
     "breakglass.expired",
     "announcement.new",
 }
-NUMERIC = {"blockers", "warnings", "valid_rows", "error_rows", "rows", "minutes"}
+NUMERIC = {"blockers", "warnings", "valid_rows", "error_rows", "rows", "minutes", "low_confidence_rows"}
 
 
 def _sample(template: t.Template, number: int = 2) -> dict[str, Any]:
