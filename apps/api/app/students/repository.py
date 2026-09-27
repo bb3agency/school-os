@@ -42,6 +42,8 @@ from app.students.models import (
     AttributeValue,
     Enrollment,
     Guardian,
+    PromotionItem,
+    PromotionRun,
     Student,
     StudentGuardian,
     StudentProfile,
@@ -63,6 +65,13 @@ _DUPLICATE_MESSAGES: dict[str, str] = {
     "student_guardians_pkey": "This guardian is already linked to the student.",
     "student_guardians_one_primary": "The student already has a primary guardian.",
     "av_current": "Someone else recorded this value at the same time. Reload and try again.",
+    "promotion_runs_one_committed": (
+        "This year's students were already promoted. Undo that promotion first."
+    ),
+}
+_DUPLICATE_CODES: dict[str, str] = {
+    "students_adm_no": "duplicate_admission_no",
+    "promotion_runs_one_committed": "promotion_already_committed",
 }
 
 
@@ -73,7 +82,7 @@ def translate_db_error(exc: DBAPIError) -> DomainError | None:
     diag = getattr(orig, "diag", None)
     constraint = getattr(diag, "constraint_name", None) or ""
     if state == "23505":
-        code = "duplicate_admission_no" if constraint == "students_adm_no" else "duplicate"
+        code = _DUPLICATE_CODES.get(constraint, "duplicate")
         return Conflict(_DUPLICATE_MESSAGES.get(constraint, "This already exists."), code=code)
     if constraint == "attribute_values_immutable":
         return Conflict("Recorded values cannot be changed.", code="value_immutable")
@@ -321,6 +330,267 @@ def end_enrollment(
         .where(Enrollment.id == enrollment_id)
         .values(status=status, ended_on=ended_on, version=Enrollment.version + 1)
         .returning(Enrollment),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one()
+
+
+def enrollments_of(session: Session, student_id: uuid.UUID) -> list[Enrollment]:
+    """Every enrolment of one student, newest first."""
+    stmt = (
+        select(Enrollment)
+        .where(Enrollment.student_id == student_id)
+        .order_by(
+            Enrollment.started_on.desc().nulls_last(),
+            Enrollment.created_at.desc(),
+            Enrollment.id.desc(),
+        )
+    )
+    return list(session.scalars(stmt, execution_options={"populate_existing": True}))
+
+
+def get_enrollment(
+    session: Session, student_id: uuid.UUID, enrollment_id: uuid.UUID, *, lock: bool = False
+) -> Enrollment | None:
+    stmt = select(Enrollment).where(
+        Enrollment.id == enrollment_id, Enrollment.student_id == student_id
+    )
+    if lock:
+        stmt = stmt.with_for_update()
+    return session.scalars(stmt, execution_options={"populate_existing": True}).one_or_none()
+
+
+def update_enrollment(
+    session: Session, enrollment_id: uuid.UUID, *, expected_version: int, values: dict[str, Any]
+) -> Enrollment | None:
+    """Update + bump version; ``None`` when ``expected_version`` is stale."""
+    return session.scalars(
+        update(Enrollment)
+        .where(Enrollment.id == enrollment_id, Enrollment.version == expected_version)
+        .values(**values, version=Enrollment.version + 1)
+        .returning(Enrollment),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+
+
+# --- promotions (FR-TEN-011) ---------------------------------------------------------------
+
+
+def year_enrollments(
+    session: Session, academic_year_id: uuid.UUID, *, lock: bool = False
+) -> list[tuple[Enrollment, str]]:
+    """Active enrolments of one academic year with each student's record status."""
+    stmt = (
+        select(Enrollment, Student.status)
+        .join(
+            Student,
+            and_(Student.tenant_id == Enrollment.tenant_id, Student.id == Enrollment.student_id),
+        )
+        .where(Enrollment.academic_year_id == academic_year_id, Enrollment.status == "active")
+        .order_by(Enrollment.section_id, Enrollment.student_id)
+    )
+    if lock:
+        stmt = stmt.with_for_update(of=Enrollment)
+    rows = session.execute(stmt, execution_options={"populate_existing": True}).all()
+    return [(e, status) for e, status in rows]
+
+
+def students_active_in_year(
+    session: Session, student_ids: Collection[uuid.UUID], academic_year_id: uuid.UUID
+) -> set[uuid.UUID]:
+    if not student_ids:
+        return set()
+    stmt = select(Enrollment.student_id).where(
+        Enrollment.student_id.in_(list(student_ids)),
+        Enrollment.academic_year_id == academic_year_id,
+        Enrollment.status == "active",
+    )
+    return set(session.scalars(stmt))
+
+
+def close_enrollments(
+    session: Session, enrollment_ids: Collection[uuid.UUID], *, ended_on: dt.date
+) -> dict[uuid.UUID, int]:
+    """Mark enrolments ``completed`` on ``ended_on`` (never before their start); new versions."""
+    if not enrollment_ids:
+        return {}
+    end = case(
+        (
+            and_(Enrollment.started_on.is_not(None), Enrollment.started_on > ended_on),
+            Enrollment.started_on,
+        ),
+        else_=literal(ended_on),
+    )
+    rows = session.execute(
+        update(Enrollment)
+        .where(Enrollment.id.in_(list(enrollment_ids)), Enrollment.status == "active")
+        .values(status="completed", ended_on=end, version=Enrollment.version + 1)
+        .returning(Enrollment.id, Enrollment.version),
+        execution_options={"synchronize_session": False},
+    ).all()
+    return {r.id: r.version for r in rows}
+
+
+def insert_enrollments(session: Session, rows: Sequence[dict[str, Any]]) -> dict[uuid.UUID, int]:
+    """Insert many enrolments; returns ``{enrollment_id: version}``."""
+    if not rows:
+        return {}
+    out = session.execute(
+        insert(Enrollment).values(list(rows)).returning(Enrollment.id, Enrollment.version),
+        execution_options={"synchronize_session": False},
+    ).all()
+    return {r.id: r.version for r in out}
+
+
+def enrollment_states(
+    session: Session, enrollment_ids: Collection[uuid.UUID], *, lock: bool = False
+) -> dict[uuid.UUID, tuple[str, int]]:
+    """``{enrollment_id: (status, version)}`` for the enrolments that still exist."""
+    if not enrollment_ids:
+        return {}
+    stmt = select(Enrollment.id, Enrollment.status, Enrollment.version).where(
+        Enrollment.id.in_(list(enrollment_ids))
+    )
+    if lock:
+        stmt = stmt.with_for_update()
+    return {r.id: (r.status, r.version) for r in session.execute(stmt)}
+
+
+def delete_enrollments(session: Session, enrollment_ids: Collection[uuid.UUID]) -> int:
+    if not enrollment_ids:
+        return 0
+    result = session.execute(
+        delete(Enrollment).where(Enrollment.id.in_(list(enrollment_ids))).returning(Enrollment.id),
+        execution_options={"synchronize_session": False},
+    )
+    return len(result.all())
+
+
+def reopen_enrollments(session: Session, enrollment_ids: Collection[uuid.UUID]) -> int:
+    if not enrollment_ids:
+        return 0
+    result = session.execute(
+        update(Enrollment)
+        .where(Enrollment.id.in_(list(enrollment_ids)), Enrollment.status == "completed")
+        .values(status="active", ended_on=None, version=Enrollment.version + 1)
+        .returning(Enrollment.id),
+        execution_options={"synchronize_session": False},
+    )
+    return len(result.all())
+
+
+def student_statuses(
+    session: Session, student_ids: Collection[uuid.UUID], *, lock: bool = False
+) -> dict[uuid.UUID, str]:
+    if not student_ids:
+        return {}
+    stmt = select(Student.id, Student.status).where(Student.id.in_(list(student_ids)))
+    if lock:
+        stmt = stmt.with_for_update()
+    return {r.id: r.status for r in session.execute(stmt)}
+
+
+def set_student_status(session: Session, student_ids: Collection[uuid.UUID], status: str) -> None:
+    if not student_ids:
+        return
+    session.execute(
+        update(Student)
+        .where(Student.id.in_(list(student_ids)))
+        .values(status=status, version=Student.version + 1),
+        execution_options={"synchronize_session": False},
+    )
+
+
+def bump_student_versions(session: Session, student_ids: Collection[uuid.UUID]) -> None:
+    """New ETag for students whose enrolments changed (the student view shows the enrolment)."""
+    if not student_ids:
+        return
+    session.execute(
+        update(Student)
+        .where(Student.id.in_(list(student_ids)))
+        .values(version=Student.version + 1),
+        execution_options={"synchronize_session": False},
+    )
+
+
+def refresh_placements(session: Session, student_ids: Collection[uuid.UUID]) -> None:
+    """Set the profile's current section (latest active enrolment) and status for many
+    students in one statement (same rule as :func:`latest_active_section`)."""
+    if not student_ids:
+        return
+    latest = (
+        select(Enrollment.section_id)
+        .where(
+            Enrollment.tenant_id == StudentProfile.tenant_id,
+            Enrollment.student_id == StudentProfile.student_id,
+            Enrollment.status == "active",
+        )
+        .order_by(Enrollment.created_at.desc(), Enrollment.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    session.execute(
+        update(StudentProfile)
+        .where(
+            StudentProfile.student_id.in_(list(student_ids)),
+            Student.tenant_id == StudentProfile.tenant_id,
+            Student.id == StudentProfile.student_id,
+        )
+        .values(current_section_id=latest, status=Student.status, updated_at=func.now()),
+        execution_options={"synchronize_session": False},
+    )
+
+
+def committed_promotion(
+    session: Session, from_academic_year_id: uuid.UUID, *, lock: bool = False
+) -> PromotionRun | None:
+    stmt = select(PromotionRun).where(
+        PromotionRun.from_academic_year_id == from_academic_year_id,
+        PromotionRun.status == "committed",
+    )
+    if lock:
+        stmt = stmt.with_for_update()
+    return session.scalars(stmt, execution_options={"populate_existing": True}).one_or_none()
+
+
+def promotions_from(session: Session, from_academic_year_id: uuid.UUID) -> list[PromotionRun]:
+    stmt = (
+        select(PromotionRun)
+        .where(PromotionRun.from_academic_year_id == from_academic_year_id)
+        .order_by(PromotionRun.committed_at.desc(), PromotionRun.id.desc())
+    )
+    return list(session.scalars(stmt, execution_options={"populate_existing": True}))
+
+
+def insert_promotion(
+    session: Session, run: dict[str, Any], items: Sequence[dict[str, Any]]
+) -> PromotionRun:
+    row = session.scalars(
+        insert(PromotionRun).values(**run).returning(PromotionRun),
+        execution_options={"populate_existing": True},
+    ).one()
+    if items:
+        session.execute(insert(PromotionItem).values(list(items)))
+    return row
+
+
+def promotion_items(session: Session, run_id: uuid.UUID) -> list[PromotionItem]:
+    stmt = select(PromotionItem).where(PromotionItem.run_id == run_id)
+    return list(session.scalars(stmt.order_by(PromotionItem.student_id)))
+
+
+def mark_promotion_undone(
+    session: Session, run_id: uuid.UUID, *, undone_by: uuid.UUID | None
+) -> PromotionRun:
+    return session.scalars(
+        update(PromotionRun)
+        .where(PromotionRun.id == run_id)
+        .values(
+            status="undone",
+            undone_by=undone_by,
+            undone_at=func.now(),
+            version=PromotionRun.version + 1,
+        )
+        .returning(PromotionRun),
         execution_options={"populate_existing": True, "synchronize_session": False},
     ).one()
 
@@ -612,6 +882,25 @@ def guardians_of(session: Session, student_id: uuid.UUID) -> list[tuple[Guardian
         .order_by(StudentGuardian.is_primary.desc(), StudentGuardian.created_at, Guardian.id)
     ).all()
     return [(g, link) for g, link in rows]
+
+
+def unlink_guardian(session: Session, student_id: uuid.UUID, guardian_id: uuid.UUID) -> bool:
+    result = session.execute(
+        delete(StudentGuardian)
+        .where(StudentGuardian.student_id == student_id, StudentGuardian.guardian_id == guardian_id)
+        .returning(StudentGuardian.guardian_id),
+        execution_options={"synchronize_session": False},
+    )
+    return result.first() is not None
+
+
+def delete_guardian(session: Session, guardian_id: uuid.UUID) -> bool:
+    """Delete a guardian no student is linked to any more (its C3 phone/address go with it)."""
+    result = session.execute(
+        delete(Guardian).where(Guardian.id == guardian_id).returning(Guardian.id),
+        execution_options={"synchronize_session": False},
+    )
+    return result.first() is not None
 
 
 def guardian_student_ids(session: Session, guardian_id: uuid.UUID) -> list[uuid.UUID]:

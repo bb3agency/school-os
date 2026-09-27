@@ -22,11 +22,17 @@ from app.students import service as students
 from app.students.definitions import AADHAAR_DETAIL, aadhaar_error, find_full_aadhaar
 from app.students.schemas import (
     AttributeOut,
+    EnrollmentEnd,
     EnrollmentIn,
     EnrollmentOut,
+    EnrollmentPatch,
     GuardianCreate,
     GuardianOut,
     GuardianPatch,
+    PromotionCommitIn,
+    PromotionIn,
+    PromotionPreviewOut,
+    PromotionRunOut,
     RevealIn,
     RevealOut,
     SearchFilters,
@@ -48,6 +54,7 @@ Reader = Annotated[UserContext, Depends(require(students.READ))]
 Creator = Annotated[UserContext, Depends(require("student.create", scope="school"))]
 Updater = Annotated[UserContext, Depends(require(students.UPDATE))]
 Revealer = Annotated[UserContext, Depends(require(students.SENSITIVE))]
+Promoter = Annotated[UserContext, Depends(require(students.PROMOTE, scope="school"))]
 
 
 async def reject_full_aadhaar_body(request: Request) -> None:
@@ -335,3 +342,151 @@ def enrol_student(
         lambda: students.enrol(db, ctx, student_id, body),
         headers=lambda e: {"ETag": etag(e.version)},
     )
+
+
+@router.get("/students/{student_id}/enrollments", response_model=list[EnrollmentOut])
+def list_enrollments(ctx: Reader, db: TenantDB, student_id: uuid.UUID) -> list[EnrollmentOut]:
+    """Every enrolment of the student (any year, active or closed), newest first; each carries
+    its ``version`` for ``If-Match`` (permission ``student.read_basic``)."""
+    return students.list_enrollments(db, ctx, student_id)
+
+
+@router.patch("/students/{student_id}/enrollments/{enrollment_id}", response_model=EnrollmentOut)
+def update_enrollment(
+    *,
+    ctx: Updater,
+    _aadhaar: AadhaarGuard,
+    db: TenantDB,
+    student_id: uuid.UUID,
+    enrollment_id: uuid.UUID,
+    body: EnrollmentPatch,
+    version: IfMatch,
+    response: Response,
+) -> EnrollmentOut:
+    """Correct the roll number, or move an active enrolment to another section of the same
+    class and year (permission ``student.update_nonidentity``; ``If-Match`` with the
+    enrolment's version, 412 ``precondition_failed`` when stale). Moving to another class is a
+    new enrolment (``POST …/enrollments``)."""
+    out = students.update_enrollment(
+        db, ctx, student_id, enrollment_id, body, expected_version=version
+    )
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.post(
+    "/students/{student_id}/enrollments/{enrollment_id}/end",
+    response_model=EnrollmentOut,
+    status_code=200,
+)
+def end_enrollment(
+    *,
+    ctx: Updater,
+    _aadhaar: AadhaarGuard,
+    db: TenantDB,
+    student_id: uuid.UUID,
+    enrollment_id: uuid.UUID,
+    body: EnrollmentEnd | None = None,
+    version: IfMatch,
+    response: Response,
+) -> EnrollmentOut:
+    """Close an active enrolment as ``completed`` (default) or ``transferred`` on ``ended_on``
+    (default today); the record status is unchanged (permission
+    ``student.update_nonidentity``; ``If-Match`` with the enrolment's version). 409
+    ``enrollment_not_active`` when it is already closed."""
+    out = students.end_enrollment(
+        db, ctx, student_id, enrollment_id, body or EnrollmentEnd(), expected_version=version
+    )
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.delete("/students/{student_id}/guardians/{guardian_id}", status_code=204)
+def remove_guardian(
+    *,
+    ctx: Updater,
+    db: TenantDB,
+    student_id: uuid.UUID,
+    guardian_id: uuid.UUID,
+    version: IfMatch,
+) -> Response:
+    """Unlink a guardian from the student (permission ``student.update_nonidentity``;
+    ``If-Match`` with the guardian's ETag). A guardian no other student is linked to is deleted
+    with their phone and address."""
+    students.remove_guardian(db, ctx, student_id, guardian_id, expected_version=version)
+    return Response(status_code=204)
+
+
+# --- promotions (FR-TEN-011, US-202 AC2) -------------------------------------------------------
+
+
+def _promotion_headers(run: PromotionRunOut) -> dict[str, str]:
+    return {
+        "Location": f"/api/v1/academic-years/{run.from_academic_year_id}/promotions",
+        "ETag": etag(run.version),
+    }
+
+
+@router.post(
+    "/academic-years/{year_id}/promotions:preview",
+    response_model=PromotionPreviewOut,
+    tags=["promotions"],
+)
+def preview_promotion(
+    ctx: Promoter, db: TenantDB, year_id: uuid.UUID, body: PromotionIn
+) -> PromotionPreviewOut:
+    """Plan the year-end promotion of this academic year into ``to_academic_year_id`` without
+    changing anything (permission ``tenant.structure.manage``). Class N goes to N+1 by class
+    order; ``held_back_student_ids`` stay in their class; the last class graduates; students who
+    left are skipped. Sections keep their name unless ``section_map`` says otherwise.
+    ``problems`` lists students who cannot be placed; ``plan_fingerprint`` can be sent with the
+    commit to make sure nothing changed in between."""
+    return students.preview_promotion(db, ctx, year_id, body)
+
+
+@router.post(
+    "/academic-years/{year_id}/promotions:commit",
+    response_model=PromotionRunOut,
+    status_code=201,
+    tags=["promotions"],
+)
+def commit_promotion(
+    ctx: Promoter,
+    db: TenantDB,
+    year_id: uuid.UUID,
+    body: PromotionCommitIn,
+    idem: IdempotencyDep,
+) -> Response:
+    """Apply the promotion in one transaction (permission ``tenant.structure.manage``; accepts
+    ``Idempotency-Key``): old enrolments are closed, new ones opened, graduates marked
+    ``graduated``. 409 ``promotion_already_committed``, ``promotion_plan_changed`` or
+    ``nothing_to_promote``; 422 ``no_target_section``. Can be undone within 24 hours."""
+    return idem.run(
+        db,
+        body,
+        lambda: students.commit_promotion(db, ctx, year_id, body),
+        headers=_promotion_headers,
+    )
+
+
+@router.post(
+    "/academic-years/{year_id}/promotions:undo",
+    response_model=PromotionRunOut,
+    tags=["promotions"],
+)
+def undo_promotion(ctx: Promoter, db: TenantDB, year_id: uuid.UUID) -> PromotionRunOut:
+    """Undo this year's committed promotion within 24 hours (permission
+    ``tenant.structure.manage``). 409 ``no_promotion``, ``promotion_undo_expired``, or
+    ``promotion_has_dependents`` when an enrolment it touched changed afterwards."""
+    return students.undo_promotion(db, ctx, year_id)
+
+
+@router.get(
+    "/academic-years/{year_id}/promotions",
+    response_model=list[PromotionRunOut],
+    tags=["promotions"],
+)
+def list_promotions(ctx: Promoter, db: TenantDB, year_id: uuid.UUID) -> list[PromotionRunOut]:
+    """Promotions out of this academic year, newest first, with ``can_undo`` and
+    ``undo_until`` (permission ``tenant.structure.manage``)."""
+    return students.list_promotions(db, ctx, year_id)

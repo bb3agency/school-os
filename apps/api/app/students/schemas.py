@@ -172,6 +172,128 @@ class EnrollmentIn(_In):
     started_on: dt.date | None = None
 
 
+class EnrollmentPatch(_In):
+    """Correct an enrolment: roll number (``null`` clears it) and/or the section, which must be
+    another section of the same class in the same academic year (an active enrolment only).
+    Omit a field to keep it. Moving to another class is a new enrolment, not a correction."""
+
+    roll_no: RollNo | None = None
+    section_id: uuid.UUID | None = None
+
+
+EnrollmentEndStatus = Literal["completed", "transferred"]
+
+
+class EnrollmentEnd(_In):
+    """Close an active enrolment: ``completed`` (year finished, left the school) or
+    ``transferred`` (moved elsewhere). ``ended_on`` defaults to today (India time)."""
+
+    status: EnrollmentEndStatus = "completed"
+    ended_on: dt.date | None = None
+
+
+# --- promotions (FR-TEN-011, US-202 AC2) --------------------------------------------------------
+
+PromotionOutcome = Literal["promoted", "held_back", "graduated", "skipped"]
+PromotionSkipReason = Literal["left", "graduated", "already_enrolled"]
+PromotionRunStatus = Literal["committed", "undone"]
+MAX_PROMOTION_IDS = 5000
+
+
+class SectionMapEntry(_In):
+    """Send the students of ``from_section_id`` whose target class is the class of
+    ``to_section_id`` to that section (default: the section with the same name)."""
+
+    from_section_id: uuid.UUID
+    to_section_id: uuid.UUID
+
+
+class PromotionIn(_In):
+    """Move this year's active enrolments into ``to_academic_year_id``: class N -> N+1 by class
+    order, ``held_back_student_ids`` into the same class again, the final class graduates."""
+
+    to_academic_year_id: uuid.UUID
+    held_back_student_ids: list[uuid.UUID] = Field(
+        default_factory=list, max_length=MAX_PROMOTION_IDS
+    )
+    section_map: list[SectionMapEntry] = Field(default_factory=list, max_length=500)
+
+
+class PromotionCommitIn(PromotionIn):
+    """The preview request plus, optionally, the preview's ``plan_fingerprint``: when sent, the
+    commit is refused (409 ``promotion_plan_changed``) if enrolments changed since the preview."""
+
+    plan_fingerprint: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")] | None = None
+
+
+class PromotionStudentOut(_Out):
+    student_id: uuid.UUID
+    enrollment_id: uuid.UUID
+    from_section_id: uuid.UUID
+    outcome: PromotionOutcome
+    to_section_id: uuid.UUID | None
+    reason: str | None = Field(
+        default=None,
+        description="Why a student is skipped (left, graduated, already_enrolled) or cannot be "
+        "placed (no_target_section).",
+    )
+
+
+class PromotionGroupOut(_Out):
+    """Students moving from one section to one target section with one outcome."""
+
+    from_section_id: uuid.UUID
+    from_label: str
+    outcome: PromotionOutcome
+    to_section_id: uuid.UUID | None
+    to_label: str | None
+    count: int
+
+
+class PromotionProblemOut(_Out):
+    """Students who cannot be placed: add the section in the new year or map it."""
+
+    code: Literal["no_target_section"]
+    from_section_id: uuid.UUID
+    from_label: str
+    target_class_id: uuid.UUID
+    count: int
+
+
+class PromotionCounts(_Out):
+    promoted: int
+    held_back: int
+    graduated: int
+    skipped: int
+
+
+class PromotionPreviewOut(_Out):
+    from_academic_year_id: uuid.UUID
+    to_academic_year_id: uuid.UUID
+    counts: PromotionCounts
+    groups: list[PromotionGroupOut]
+    problems: list[PromotionProblemOut]
+    students: list[PromotionStudentOut]
+    plan_fingerprint: str
+    can_commit: bool
+
+
+class PromotionRunOut(_Out):
+    id: uuid.UUID
+    from_academic_year_id: uuid.UUID
+    to_academic_year_id: uuid.UUID
+    status: PromotionRunStatus
+    counts: PromotionCounts
+    plan_fingerprint: str
+    committed_by: uuid.UUID | None
+    committed_at: dt.datetime
+    undo_until: dt.datetime
+    can_undo: bool = Field(description="Committed and still within 24 hours of the commit.")
+    undone_by: uuid.UUID | None
+    undone_at: dt.datetime | None
+    version: int
+
+
 class ClassSection(_Out):
     section_id: uuid.UUID
     class_id: uuid.UUID

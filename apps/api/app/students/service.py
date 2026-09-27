@@ -1,5 +1,6 @@
 """Students public API: records, per-source values, canonical view, guardians, enrolments,
-search and sensitive reveal (M1: US-301..303; FR-STU-001..012; SEC-012, SEC-013, SEC-015).
+year-end promotions, search and sensitive reveal (M1: US-202 AC2, US-301..303; FR-TEN-011,
+FR-STU-001..012; SEC-012, SEC-013, SEC-015).
 
 Other modules call only these functions. Every function takes the caller's ``tenant_session``
 (RLS: one school) and, for user-facing reads and writes, the caller's
@@ -28,11 +29,18 @@ Other modules call only these functions. Every function takes the caller's ``ten
   ``student.values.changed`` event per transaction (``{student_ids, attribute_keys}``, at most 100
   ids per event) for the incremental data-quality checks. Values recorded by an import batch are
   left to the import's own ``import.committed`` event.
+- **Promotions (FR-TEN-011).** The students module owns them (enrolments live here; owner
+  decision 2026-09-27): preview, commit (one transaction, recorded in ``sis.promotion_runs`` /
+  ``sis.promotion_items``) and undo within 24 hours unless an enrolment it touched changed
+  since (409 ``promotion_has_dependents``, the import-revert rule).
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import itertools
+import json
 import uuid
 from collections.abc import Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -82,11 +90,21 @@ from app.students.schemas import (
     AttributeOut,
     CanonicalOut,
     ClassSection,
+    EnrollmentEnd,
     EnrollmentIn,
     EnrollmentOut,
+    EnrollmentPatch,
     GuardianCreate,
     GuardianOut,
     GuardianPatch,
+    PromotionCommitIn,
+    PromotionCounts,
+    PromotionGroupOut,
+    PromotionIn,
+    PromotionPreviewOut,
+    PromotionProblemOut,
+    PromotionRunOut,
+    PromotionStudentOut,
     RevealIn,
     RevealOut,
     SearchFilters,
@@ -1130,6 +1148,143 @@ def enrol(
     return out
 
 
+def list_enrollments(
+    session: Session, ctx: UserContext, student_id: uuid.UUID
+) -> list[EnrollmentOut]:
+    """Every enrolment of a student (any year and status), newest first
+    (``student.read_basic``; scoped holders only for students in their sections, else 404)."""
+    structure = _structure(session)
+    _visible_student(session, ctx, student_id, structure=structure)
+    return [EnrollmentOut.model_validate(e) for e in repo.enrollments_of(session, student_id)]
+
+
+def _owned_enrollment(
+    session: Session, ctx: UserContext, student_id: uuid.UUID, enrollment_id: uuid.UUID
+) -> tuple[Student, Any]:
+    """The student (in the caller's update scope) and one of its enrolments, locked; else 404."""
+    structure = _structure(session)
+    student = _visible_student(
+        session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
+    )
+    enrollment = repo.get_enrollment(session, student_id, enrollment_id, lock=True)
+    if enrollment is None:
+        raise NotFound("Enrolment not found")
+    return student, enrollment
+
+
+def update_enrollment(
+    session: Session,
+    ctx: UserContext,
+    student_id: uuid.UUID,
+    enrollment_id: uuid.UUID,
+    data: EnrollmentPatch,
+    *,
+    expected_version: int,
+) -> EnrollmentOut:
+    """Correct an enrolment's roll number and/or move an active enrolment to another section of
+    the same class and academic year (``If-Match``: enrolment version; 412 when stale).
+    Permission ``student.update_nonidentity``; a scoped holder may only move a student into a
+    section they reach. Audit: ``enrollment.updated`` (field names and section ids)."""
+    fields = data.model_fields_set
+    student, enrollment = _owned_enrollment(session, ctx, student_id, enrollment_id)
+    values: dict[str, Any] = {}
+    if "roll_no" in fields:
+        values["roll_no"] = data.roll_no
+    if "section_id" in fields:
+        if data.section_id is None:
+            raise ValidationFailed([error("section_id", "missing")])
+        if data.section_id != enrollment.section_id:
+            if enrollment.status != "active":
+                raise Conflict(
+                    "Only an active enrolment can move to another section.",
+                    code="enrollment_not_active",
+                )
+            current = _section_or_422(session, enrollment.section_id)
+            target = _section_or_422(session, data.section_id)
+            if (target.academic_year_id, target.class_id) != (
+                current.academic_year_id,
+                current.class_id,
+            ):
+                raise ValidationFailed([error("section_id", "different_class_or_year")])
+            allowed = _allowed_sections(ctx, UPDATE, _structure(session))
+            if allowed is not None and target.id not in allowed:
+                raise ValidationFailed([error("section_id", "not_found")])
+            values["section_id"] = target.id
+    if not values:
+        if enrollment.version != expected_version:
+            raise PreconditionFailed(
+                "The enrolment was changed by someone else. Reload and try again."
+            )
+        return EnrollmentOut.model_validate(enrollment)
+    with _db_errors():
+        updated = repo.update_enrollment(
+            session, enrollment_id, expected_version=expected_version, values=values
+        )
+    if updated is None:
+        raise PreconditionFailed("The enrolment was changed by someone else. Reload and try again.")
+    _audit(
+        session,
+        action="enrollment.updated",
+        resource_type="enrollment",
+        resource_id=enrollment_id,
+        summary={
+            "student_id": student_id,
+            "fields": sorted(values),
+            "from_section_id": enrollment.section_id if "section_id" in values else None,
+            "to_section_id": values.get("section_id"),
+        },
+    )
+    _touch(session, student, _definitions(session))
+    if "section_id" in values:
+        _values_changed(session, student_id, [ENROLLMENT_KEY])
+    return EnrollmentOut.model_validate(updated)
+
+
+def end_enrollment(
+    session: Session,
+    ctx: UserContext,
+    student_id: uuid.UUID,
+    enrollment_id: uuid.UUID,
+    data: EnrollmentEnd,
+    *,
+    expected_version: int,
+) -> EnrollmentOut:
+    """Close an active enrolment as ``completed`` or ``transferred`` on ``ended_on`` (default
+    today), ``If-Match``: enrolment version. The student's record status is not changed (use
+    ``PATCH /students/{id}`` for ``left``). Permission ``student.update_nonidentity``.
+    Audit: ``enrollment.ended`` ({status, section_id, academic_year_id})."""
+    student, enrollment = _owned_enrollment(session, ctx, student_id, enrollment_id)
+    if enrollment.status != "active":
+        raise Conflict("This enrolment is already closed.", code="enrollment_not_active")
+    ended_on = data.ended_on or _today()
+    if enrollment.started_on is not None and ended_on < enrollment.started_on:
+        raise ValidationFailed([error("ended_on", "before_start")])
+    with _db_errors():
+        updated = repo.update_enrollment(
+            session,
+            enrollment_id,
+            expected_version=expected_version,
+            values={"status": data.status, "ended_on": ended_on},
+        )
+    if updated is None:
+        raise PreconditionFailed("The enrolment was changed by someone else. Reload and try again.")
+    _audit(
+        session,
+        action="enrollment.ended",
+        resource_type="enrollment",
+        resource_id=enrollment_id,
+        summary={
+            "student_id": student_id,
+            "status": data.status,
+            "section_id": enrollment.section_id,
+            "academic_year_id": enrollment.academic_year_id,
+        },
+    )
+    _touch(session, student, _definitions(session))
+    _values_changed(session, student_id, [ENROLLMENT_KEY])
+    return EnrollmentOut.model_validate(updated)
+
+
 # --- search and lists --------------------------------------------------------------------------
 
 
@@ -1826,3 +1981,527 @@ def update_guardian(
     _touch(session, student, _definitions(session))
     reveal = _can_reveal(session, ctx, student_id, structure)
     return _guardian_out(guardian, link.relationship, link.is_primary, reveal=reveal)
+
+
+def remove_guardian(
+    session: Session,
+    ctx: UserContext,
+    student_id: uuid.UUID,
+    guardian_id: uuid.UUID,
+    *,
+    expected_version: int,
+) -> None:
+    """Unlink a guardian from a student (``If-Match``: guardian version; 412 when stale).
+
+    A guardian still linked to another student (siblings) stays for them; one linked to nobody
+    any more is deleted with its encrypted phone and address (data minimisation, docs/08).
+    Permission ``student.update_nonidentity``. Audit: ``guardian.unlinked`` (and
+    ``guardian.deleted``).
+    """
+    structure = _structure(session)
+    student = _visible_student(
+        session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
+    )
+    link = repo.get_link(session, student_id, guardian_id)
+    guardian = repo.get_guardian(session, guardian_id) if link is not None else None
+    if link is None or guardian is None:
+        raise NotFound("Guardian not found")
+    if guardian.version != expected_version:
+        raise PreconditionFailed("The guardian was changed by someone else. Reload and try again.")
+    repo.unlink_guardian(session, student_id, guardian_id)
+    _audit(
+        session,
+        action="guardian.unlinked",
+        resource_type="guardian",
+        resource_id=guardian_id,
+        summary={
+            "student_id": student_id,
+            "relationship": link.relationship,
+            "was_primary": link.is_primary,
+        },
+    )
+    if not repo.guardian_student_ids(session, guardian_id):
+        repo.delete_guardian(session, guardian_id)
+        _audit(
+            session,
+            action="guardian.deleted",
+            resource_type="guardian",
+            resource_id=guardian_id,
+            summary={"student_id": student_id, "reason": "no_linked_students"},
+        )
+    _touch(session, student, _definitions(session))
+
+
+# --- promotions (FR-TEN-011, US-202 AC2; owner decisions 2026-09-27) ----------------------------
+
+PROMOTE: Final = "tenant.structure.manage"
+UNDO_WINDOW: Final = dt.timedelta(hours=24)
+_SKIP_STATUSES: Final = frozenset({"left", "graduated"})
+
+
+@dataclass(frozen=True, slots=True)
+class _PlannedStudent:
+    student_id: uuid.UUID
+    enrollment_id: uuid.UUID
+    enrollment_version: int
+    from_section_id: uuid.UUID
+    student_status: str
+    outcome: str  # promoted | held_back | graduated | skipped
+    to_section_id: uuid.UUID | None
+    target_class_id: uuid.UUID | None
+    reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _Plan:
+    from_year: Any
+    to_year: Any
+    students: tuple[_PlannedStudent, ...]
+    labels: dict[uuid.UUID, str]
+    fingerprint: str
+
+    def counts(self) -> PromotionCounts:
+        tally = dict.fromkeys(("promoted", "held_back", "graduated", "skipped"), 0)
+        for s in self.students:
+            tally[s.outcome] += 1
+        return PromotionCounts(**tally)
+
+    def problems(self) -> list[PromotionProblemOut]:
+        grouped: dict[tuple[uuid.UUID, uuid.UUID], int] = {}
+        for s in self.students:
+            if s.reason == "no_target_section" and s.target_class_id is not None:
+                key = (s.from_section_id, s.target_class_id)
+                grouped[key] = grouped.get(key, 0) + 1
+        return [
+            PromotionProblemOut(
+                code="no_target_section",
+                from_section_id=from_id,
+                from_label=self.labels.get(from_id, "?"),
+                target_class_id=class_id,
+                count=count,
+            )
+            for (from_id, class_id), count in sorted(grouped.items(), key=lambda kv: str(kv[0]))
+        ]
+
+
+def _promotion_error(field_name: str, code: str) -> ValidationFailed:
+    return ValidationFailed([error(field_name, code)])
+
+
+def _promotion_plan(
+    session: Session, year_id: uuid.UUID, data: PromotionIn, *, lock: bool
+) -> _Plan:
+    """Compute what a promotion of ``year_id`` into ``data.to_academic_year_id`` would do.
+
+    Read-only. Rules (owner decisions 2026-09-27): every active enrolment of the source year is
+    considered; a student whose record status is ``left`` or ``graduated`` is skipped (nothing
+    changes); a student already actively enrolled in the target year is skipped; a held-back
+    student goes to the same class again; the others go to the next class by ``sort_order``, and
+    students of the last class graduate (no new enrolment). The target section is the
+    ``section_map`` entry for (source section, target class), else the target year's section of
+    that class with the same name; without one the student cannot be placed (problem
+    ``no_target_section``).
+    """
+    from_year, to_year = _promotion_years(session, year_id, data.to_academic_year_id)
+    classes = sorted(tenancy.list_classes(session), key=lambda c: (c.sort_order, c.code))
+    next_class = {a.id: b.id for a, b in itertools.pairwise(classes)}
+    class_code = {c.id: c.code for c in classes}
+    sources = {s.id: s for s in tenancy.list_sections(session, academic_year_id=from_year.id)}
+    targets = {s.id: s for s in tenancy.list_sections(session, academic_year_id=to_year.id)}
+    by_name = {(s.class_id, s.name.casefold()): s.id for s in targets.values()}
+    labels = {
+        s.id: f"{class_code.get(s.class_id, '?')}-{s.name}"
+        for s in (*sources.values(), *targets.values())
+    }
+    overrides = _section_overrides(data, sources, targets)
+    rows = repo.year_enrollments(session, from_year.id, lock=lock)
+    enrolled = {e.student_id for e, _ in rows}
+    held = set(data.held_back_student_ids)
+    for i, sid in enumerate(data.held_back_student_ids):
+        if sid not in enrolled:
+            raise _promotion_error(f"held_back_student_ids.{i}", "not_in_year")
+    already = repo.students_active_in_year(session, enrolled, to_year.id)
+    planned: list[_PlannedStudent] = []
+    for enrollment, status in rows:
+        source = sources.get(enrollment.section_id)
+        outcome, reason, target_class, to_section = "skipped", None, None, None
+        if status in _SKIP_STATUSES:
+            reason = status
+        elif enrollment.student_id in already:
+            reason = "already_enrolled"
+        elif source is not None:
+            if enrollment.student_id in held:
+                outcome, target_class = "held_back", source.class_id
+            else:
+                target_class = next_class.get(source.class_id)
+                outcome = "promoted" if target_class is not None else "graduated"
+            if target_class is not None:
+                to_section = overrides.get((source.id, target_class)) or by_name.get(
+                    (target_class, source.name.casefold())
+                )
+                if to_section is None:
+                    reason = "no_target_section"
+        planned.append(
+            _PlannedStudent(
+                student_id=enrollment.student_id,
+                enrollment_id=enrollment.id,
+                enrollment_version=enrollment.version,
+                from_section_id=enrollment.section_id,
+                student_status=status,
+                outcome=outcome,
+                to_section_id=to_section,
+                target_class_id=target_class,
+                reason=reason,
+            )
+        )
+    return _Plan(
+        from_year=from_year,
+        to_year=to_year,
+        students=tuple(planned),
+        labels=labels,
+        fingerprint=_plan_fingerprint(from_year.id, to_year.id, planned),
+    )
+
+
+def _promotion_years(
+    session: Session, year_id: uuid.UUID, to_year_id: uuid.UUID
+) -> tuple[Any, Any]:
+    from_year = tenancy.get_academic_year(session, year_id)  # 404 for unknown/other school
+    try:
+        to_year = tenancy.get_academic_year(session, to_year_id)
+    except NotFound:
+        raise _promotion_error("to_academic_year_id", "not_found") from None
+    if to_year.id == from_year.id:
+        raise _promotion_error("to_academic_year_id", "same_year")
+    if to_year.starts_on <= from_year.starts_on:
+        raise _promotion_error("to_academic_year_id", "not_later")
+    return from_year, to_year
+
+
+def _section_overrides(
+    data: PromotionIn, sources: Mapping[uuid.UUID, Any], targets: Mapping[uuid.UUID, Any]
+) -> dict[tuple[uuid.UUID, uuid.UUID], uuid.UUID]:
+    """``section_map`` as {(source section, target class): target section}, validated."""
+    overrides: dict[tuple[uuid.UUID, uuid.UUID], uuid.UUID] = {}
+    for i, entry in enumerate(data.section_map):
+        if entry.from_section_id not in sources:
+            raise _promotion_error(f"section_map.{i}.from_section_id", "not_found")
+        target = targets.get(entry.to_section_id)
+        if target is None:
+            raise _promotion_error(f"section_map.{i}.to_section_id", "not_found")
+        key = (entry.from_section_id, target.class_id)
+        if key in overrides:
+            raise _promotion_error(f"section_map.{i}", "duplicate")
+        overrides[key] = target.id
+    return overrides
+
+
+def _plan_fingerprint(
+    from_year_id: uuid.UUID, to_year_id: uuid.UUID, planned: Sequence[_PlannedStudent]
+) -> str:
+    """SHA-256 over what the plan does (ids, enrolment versions, outcomes, target sections)."""
+    material = json.dumps(
+        {
+            "from": str(from_year_id),
+            "to": str(to_year_id),
+            "students": sorted(
+                [
+                    str(p.student_id),
+                    str(p.enrollment_id),
+                    str(p.enrollment_version),
+                    p.outcome,
+                    str(p.to_section_id or ""),
+                ]
+                for p in planned
+            ),
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(material.encode()).hexdigest()
+
+
+def _preview_out(plan: _Plan) -> PromotionPreviewOut:
+    groups: dict[tuple[uuid.UUID, str, uuid.UUID | None], int] = {}
+    for s in plan.students:
+        key = (s.from_section_id, s.outcome, s.to_section_id)
+        groups[key] = groups.get(key, 0) + 1
+    problems = plan.problems()
+    counts = plan.counts()
+    movers = counts.promoted + counts.held_back + counts.graduated
+    return PromotionPreviewOut(
+        from_academic_year_id=plan.from_year.id,
+        to_academic_year_id=plan.to_year.id,
+        counts=counts,
+        groups=[
+            PromotionGroupOut(
+                from_section_id=from_id,
+                from_label=plan.labels.get(from_id, "?"),
+                outcome=outcome,
+                to_section_id=to_id,
+                to_label=plan.labels.get(to_id) if to_id else None,
+                count=count,
+            )
+            for (from_id, outcome, to_id), count in sorted(
+                groups.items(), key=lambda kv: (plan.labels.get(kv[0][0], ""), kv[0][1])
+            )
+        ],
+        problems=problems,
+        students=[
+            PromotionStudentOut(
+                student_id=s.student_id,
+                enrollment_id=s.enrollment_id,
+                from_section_id=s.from_section_id,
+                outcome=s.outcome,
+                to_section_id=s.to_section_id,
+                reason=s.reason,
+            )
+            for s in plan.students
+        ],
+        plan_fingerprint=plan.fingerprint,
+        can_commit=not problems and movers > 0,
+    )
+
+
+def preview_promotion(
+    session: Session, ctx: UserContext, year_id: uuid.UUID, data: PromotionIn
+) -> PromotionPreviewOut:
+    """What promoting ``year_id`` into ``data.to_academic_year_id`` would do; writes nothing
+    (permission ``tenant.structure.manage``, school-wide). Unknown years or another school's
+    year: 404. Ids only (no names): the screen joins them with the student list."""
+    return _preview_out(_promotion_plan(session, year_id, data, lock=False))
+
+
+def _run_out(run: Any, now: dt.datetime) -> PromotionRunOut:
+    undo_until = run.committed_at + UNDO_WINDOW
+    return PromotionRunOut(
+        id=run.id,
+        from_academic_year_id=run.from_academic_year_id,
+        to_academic_year_id=run.to_academic_year_id,
+        status=run.status,
+        counts=PromotionCounts(
+            promoted=run.promoted_count,
+            held_back=run.held_back_count,
+            graduated=run.graduated_count,
+            skipped=run.skipped_count,
+        ),
+        plan_fingerprint=run.plan_fingerprint,
+        committed_by=run.committed_by,
+        committed_at=run.committed_at,
+        undo_until=undo_until,
+        can_undo=run.status == "committed" and now < undo_until,
+        undone_by=run.undone_by,
+        undone_at=run.undone_at,
+        version=run.version,
+    )
+
+
+def list_promotions(
+    session: Session, ctx: UserContext, year_id: uuid.UUID
+) -> list[PromotionRunOut]:
+    """Promotions out of ``year_id``, newest first, with whether each can still be undone."""
+    year = tenancy.get_academic_year(session, year_id)
+    now = repo.now(session)
+    return [_run_out(r, now) for r in repo.promotions_from(session, year.id)]
+
+
+def commit_promotion(
+    session: Session, ctx: UserContext, year_id: uuid.UUID, data: PromotionCommitIn
+) -> PromotionRunOut:
+    """Apply the promotion plan in the caller's transaction (all or nothing).
+
+    The plan is recomputed with the year's active enrolments locked. Refused with 409
+    ``promotion_already_committed`` while an earlier promotion of this year is not undone,
+    409 ``promotion_plan_changed`` when ``plan_fingerprint`` no longer matches, 409
+    ``nothing_to_promote`` when no student moves, and 422 ``no_target_section`` (field
+    ``section_map``) while a student cannot be placed. Old enrolments are closed as
+    ``completed`` on the source year's last day; new ones start on the target year's first day
+    (roll numbers are not carried over); graduates get record status ``graduated``.
+
+    Audit: one ``promotion.committed`` event (run id, year ids and counts; the per-student ids
+    are in ``sis.promotion_items``). Outbox: ``student.values.changed`` (enrolment marker) for
+    every moved student, for the incremental data-quality checks.
+    """
+    if repo.committed_promotion(session, year_id, lock=True) is not None:
+        raise Conflict(
+            "This year's students were already promoted. Undo that promotion first.",
+            code="promotion_already_committed",
+        )
+    plan = _promotion_plan(session, year_id, data, lock=True)
+    if data.plan_fingerprint is not None and data.plan_fingerprint != plan.fingerprint:
+        raise Conflict(
+            "Enrolments changed since the preview. Preview again and check the new plan.",
+            code="promotion_plan_changed",
+        )
+    if plan.problems():
+        raise ValidationFailed(
+            [error("section_map", "no_target_section")],
+            detail="Some students have no section in the new year. Add the sections or map them.",
+        )
+    movers = [s for s in plan.students if s.outcome != "skipped"]
+    if not movers:
+        raise Conflict("No student in this year can be promoted.", code="nothing_to_promote")
+    tenant_id = repo.current_tenant_id(session)
+    ended_on = plan.from_year.ends_on
+    closed = repo.close_enrollments(session, [s.enrollment_id for s in movers], ended_on=ended_on)
+    if len(closed) != len(movers):
+        raise Conflict(
+            "Enrolments changed while promoting. Preview again.", code="promotion_plan_changed"
+        )
+    new_ids: dict[uuid.UUID, uuid.UUID] = {}
+    rows: list[dict[str, Any]] = []
+    for s in movers:
+        if s.to_section_id is None:
+            continue
+        new_ids[s.student_id] = new_id()
+        rows.append(
+            {
+                "id": new_ids[s.student_id],
+                "tenant_id": tenant_id,
+                "student_id": s.student_id,
+                "section_id": s.to_section_id,
+                "academic_year_id": plan.to_year.id,
+                "roll_no": None,
+                "status": "active",
+                "started_on": plan.to_year.starts_on,
+                "created_by": ctx.user_id,
+            }
+        )
+    with _db_errors():
+        opened = repo.insert_enrollments(session, rows)
+    graduates = [s.student_id for s in movers if s.outcome == "graduated"]
+    repo.set_student_status(session, graduates, "graduated")
+    repo.bump_student_versions(session, [s.student_id for s in movers if s.outcome != "graduated"])
+    moved_ids = [s.student_id for s in movers]
+    repo.refresh_placements(session, moved_ids)
+    counts = plan.counts()
+    run_id = new_id()
+    with _db_errors():
+        run = repo.insert_promotion(
+            session,
+            {
+                "id": run_id,
+                "tenant_id": tenant_id,
+                "from_academic_year_id": plan.from_year.id,
+                "to_academic_year_id": plan.to_year.id,
+                "status": "committed",
+                "promoted_count": counts.promoted,
+                "held_back_count": counts.held_back,
+                "graduated_count": counts.graduated,
+                "skipped_count": counts.skipped,
+                "plan_fingerprint": plan.fingerprint,
+                "committed_by": ctx.user_id,
+            },
+            [
+                {
+                    "tenant_id": tenant_id,
+                    "run_id": run_id,
+                    "student_id": s.student_id,
+                    "outcome": s.outcome,
+                    "from_enrollment_id": s.enrollment_id,
+                    "from_enrollment_version": closed[s.enrollment_id],
+                    "to_enrollment_id": new_ids.get(s.student_id),
+                    "to_enrollment_version": (
+                        opened[new_ids[s.student_id]] if s.student_id in new_ids else None
+                    ),
+                    "previous_student_status": s.student_status,
+                }
+                for s in movers
+            ],
+        )
+    for sid in moved_ids:
+        _values_changed(session, sid, [ENROLLMENT_KEY])
+    _audit(
+        session,
+        action="promotion.committed",
+        resource_type="promotion",
+        resource_id=run.id,
+        summary={
+            "from_academic_year_id": plan.from_year.id,
+            "to_academic_year_id": plan.to_year.id,
+            "promoted_count": counts.promoted,
+            "held_back_count": counts.held_back,
+            "graduated_count": counts.graduated,
+            "skipped_count": counts.skipped,
+            "section_map_count": len(data.section_map),
+        },
+    )
+    log.info("promotion.committed", resource_type="promotion", resource_id=run.id)
+    return _run_out(run, repo.now(session))
+
+
+def _promotion_has_dependents() -> Conflict:
+    return Conflict(
+        "Some enrolments from this promotion were changed after it was committed, so it cannot "
+        "be undone. Correct those students one by one instead.",
+        code="promotion_has_dependents",
+    )
+
+
+def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> PromotionRunOut:
+    """Undo the committed promotion of ``year_id`` within 24 hours (FR-TEN-011).
+
+    Refused with 409 ``no_promotion`` when there is none, 409 ``promotion_undo_expired`` after
+    24 hours, and 409 ``promotion_has_dependents`` when anything was recorded on top of it: an
+    enrolment it closed or opened changed since (version or status), or a graduate's record
+    status changed. Otherwise, in the caller's transaction: the enrolments it opened are
+    removed, the ones it closed are active again, graduates get their previous status back.
+
+    Audit: ``promotion.undone`` (run id and counts). Outbox: ``student.values.changed`` for
+    every affected student.
+    """
+    year = tenancy.get_academic_year(session, year_id)
+    run = repo.committed_promotion(session, year.id, lock=True)
+    if run is None:
+        raise Conflict("There is no promotion of this year to undo.", code="no_promotion")
+    if repo.now(session) >= run.committed_at + UNDO_WINDOW:
+        raise Conflict(
+            "Promotions can be undone only within 24 hours. Correct students one by one instead.",
+            code="promotion_undo_expired",
+        )
+    items = repo.promotion_items(session, run.id)
+    old_ids = [i.from_enrollment_id for i in items]
+    new_ids = [i.to_enrollment_id for i in items if i.to_enrollment_id is not None]
+    states = repo.enrollment_states(session, [*old_ids, *new_ids], lock=True)
+    statuses = repo.student_statuses(session, [i.student_id for i in items], lock=True)
+    for item in items:
+        if states.get(item.from_enrollment_id) != ("completed", item.from_enrollment_version):
+            raise _promotion_has_dependents()
+        if item.to_enrollment_version is not None and (
+            item.to_enrollment_id is None
+            or states.get(item.to_enrollment_id) != ("active", item.to_enrollment_version)
+        ):
+            raise _promotion_has_dependents()
+        if item.outcome == "graduated" and statuses.get(item.student_id) != "graduated":
+            raise _promotion_has_dependents()
+    if repo.students_active_in_year(session, [i.student_id for i in items], year.id):
+        raise _promotion_has_dependents()  # re-enrolled in the old year since the commit
+    removed = repo.delete_enrollments(session, new_ids)
+    reopened = repo.reopen_enrollments(session, old_ids)
+    by_status: dict[str, list[uuid.UUID]] = {}
+    for item in items:
+        if item.outcome == "graduated":
+            by_status.setdefault(item.previous_student_status, []).append(item.student_id)
+    for status, ids in by_status.items():
+        repo.set_student_status(session, ids, status)
+    student_ids = [i.student_id for i in items]
+    repo.bump_student_versions(session, [i.student_id for i in items if i.outcome != "graduated"])
+    repo.refresh_placements(session, student_ids)
+    run = repo.mark_promotion_undone(session, run.id, undone_by=ctx.user_id)
+    for sid in student_ids:
+        _values_changed(session, sid, [ENROLLMENT_KEY])
+    _audit(
+        session,
+        action="promotion.undone",
+        resource_type="promotion",
+        resource_id=run.id,
+        summary={
+            "from_academic_year_id": run.from_academic_year_id,
+            "to_academic_year_id": run.to_academic_year_id,
+            "enrollments_removed": removed,
+            "enrollments_reopened": reopened,
+            "graduations_reverted": sum(len(v) for v in by_status.values()),
+        },
+    )
+    log.info("promotion.undone", resource_type="promotion", resource_id=run.id)
+    return _run_out(run, repo.now(session))
