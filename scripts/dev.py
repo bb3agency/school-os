@@ -23,6 +23,11 @@ WHAT IT DOES FIRST, all idempotent and additive (it never drops, resets or delet
 4. ``python -m app.devtools.seed_synthetic``: synthetic schools only (invariant 11); the tool
    refuses outside SOS_ENV=local|ci and re-running it is idempotent. ``--no-seed`` skips it.
 
+Then it prints a "Sign in as" cheat sheet (synthetic subjects from ``app.devtools.plan``, no
+database) and the dev sign-in page, http://localhost:3000/en/dev/sign-in. The local OIDC stub
+marks every staff sign-in as MFA, so typing a subject is enough; the app's MFA and step-up
+checks are unchanged (apps/web/README.md, "Manual verification with the dev OIDC stub").
+
 HOST NAMES. docker-compose.yml gives the app containers in-network URLs (db, valkey, s3, oidc).
 Here every process is on the host, so the same settings point at localhost. The OIDC issuer is
 ``http://localhost:8080/...`` for the API, the BFF and the browser alike: ``oidc.localhost``
@@ -240,6 +245,59 @@ def prepare(env: dict[str, str], *, seed: bool) -> bool:
     return ok
 
 
+# --- sign-in cheat sheet -----------------------------------------------------------------
+
+# First person of each role in the first synthetic school, from the pure seed plan (no
+# database, no secrets). Run with the project Python like the other steps so this file stays
+# stdlib-only.
+SIGN_IN_PLAN = """
+import json
+from app.devtools.plan import build_plan
+school = build_plan().tenants[0]
+print(json.dumps({"code": school.code,
+                  "staff": [[s.role, s.subject] for s in school.staff if s.ordinal == 1]}))
+"""
+CHEAT_SHEET_ROLES = (
+    "owner",
+    "principal",
+    "office_admin",
+    "office_staff",
+    "class_teacher",
+    "teacher",
+)
+DEV_SIGN_IN_URL = "http://localhost:3000/en/dev/sign-in"
+
+
+def sign_in_lines(plan_json: str) -> list[str]:
+    """The "Sign in as" cheat sheet from SIGN_IN_PLAN's output (empty if it is unusable)."""
+    try:
+        plan = json.loads(plan_json)
+        code = str(plan["code"])
+        subjects = {str(role): str(subject) for role, subject in plan["staff"]}
+    except (ValueError, KeyError, TypeError):
+        return []
+    lines = [f"  Sign in as ({code}; type the subject at the local sign-in page, no claims):"]
+    lines += [
+        f"    {role.ljust(14)} {subjects[role]}" for role in CHEAT_SHEET_ROLES if role in subjects
+    ]
+    lines.append(f"  All roles and schools: {DEV_SIGN_IN_URL}")
+    return lines
+
+
+def print_sign_in(env: dict[str, str]) -> None:
+    done = subprocess.run(
+        [PY, "-c", SIGN_IN_PLAN],
+        cwd=API_DIR,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    lines = sign_in_lines(done.stdout) if done.returncode == 0 else []
+    for line in lines or [f"  Dev sign-in: {DEV_SIGN_IN_URL}"]:
+        print(paint(line, "2") if line.startswith("    ") else line)
+
+
 # --- services ----------------------------------------------------------------------------
 
 
@@ -423,6 +481,7 @@ def main() -> int:
     procs: Running = []
     try:
         procs = launch(env, schedule_dir / "celerybeat-schedule", raw=raw)
+        print_sign_in(env)
         print(paint("  Ctrl-C stops everything; `make dev-stop` stops the containers.", "2"))
         print(paint("  " + "-" * 70, "2"))
         supervise(procs)
