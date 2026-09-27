@@ -5,8 +5,10 @@ import { useState, type ClipboardEvent, type ComponentProps, type ReactNode } fr
 import { TextField } from "@/components/ui/Input";
 import { containsFullAadhaar } from "./aadhaar";
 
-export interface GuardedTextFieldProps
-  extends Omit<ComponentProps<typeof TextField>, "error" | "onPaste"> {
+export interface GuardedTextFieldProps extends Omit<
+  ComponentProps<typeof TextField>,
+  "error" | "onPaste"
+> {
   error?: ReactNode;
 }
 

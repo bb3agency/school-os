@@ -42,6 +42,18 @@ export function verhoeffValid(digits: string): boolean {
   return check === 0;
 }
 
+/**
+ * The only way an Aadhaar reference is shown (ADR-0007): `XXXX XXXX 1234`. Anything that is
+ * not exactly four digits (e.g. the API's masked `••••`, or an already formatted value) is
+ * never widened into a longer number: masks stay masks.
+ */
+export function aadhaarDisplay(value: string): string {
+  const text = value.trim();
+  if (/^\d{4}$/.test(text)) return `XXXX XXXX ${text}`;
+  if (/^XXXX XXXX \d{4}$/.test(text)) return text;
+  return "••••";
+}
+
 const CANDIDATE = /(?<!\d)([2-9]\d{3})[\s-]?(\d{4})[\s-]?(\d{4})(?!\d)/g;
 
 /** True when the text holds something that looks like a full Aadhaar number. */

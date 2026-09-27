@@ -9,6 +9,7 @@ import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
+import { aadhaarDisplay } from "./aadhaar";
 import {
   isStudentStatus,
   isValueSource,
@@ -124,6 +125,8 @@ export function useValueFormatter() {
   const t = useTranslations("students.enumValues") as unknown as Loose;
   return (value: string | null | undefined, attribute: Attribute | undefined): string | null => {
     if (value === null || value === undefined || value === "") return null;
+    // Aadhaar is only ever shown as XXXX XXXX 1234 (ADR-0007, invariant 4).
+    if (attribute?.data_type === "digits4") return aadhaarDisplay(value);
     if (attribute?.data_type === "date") return formatDate(value) ?? value;
     if (attribute?.data_type === "enum" && t.has(value)) return t(value);
     return value;

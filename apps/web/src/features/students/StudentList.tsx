@@ -2,26 +2,34 @@
 
 import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { z } from "zod";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { className as classDisplay } from "@/features/school/StructureView";
 import { Link } from "@/i18n/navigation";
+import { formValues } from "@/lib/forms";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { type Loadable } from "@/lib/loadable";
 import { UUID_PATTERN } from "@/lib/validation";
 import { containsFullAadhaar } from "./aadhaar";
+import { GuardedTextField } from "./fields";
 import { PERM, useStaffPermissions, type Permissions } from "./me";
 import { Pager, useCursorStack } from "./paging";
 import { StudentStatusBadge, useAttributeIndex, useAttributes } from "./parts";
-import { STUDENT_STATUSES, isStudentStatus, type StudentStatus, type StudentSummary } from "./types";
+import {
+  STUDENT_STATUSES,
+  isStudentStatus,
+  type StudentStatus,
+  type StudentSummary,
+} from "./types";
 
 export const PAGE_SIZE = 50;
+const SEARCH_FIELD_ID = "student-search";
 
 export interface StudentFilters {
   q?: string | undefined;
@@ -37,7 +45,25 @@ interface CleanFilters {
   status?: StudentStatus;
 }
 
-/** URL values → API query (ignores anything malformed rather than failing the page). */
+const filtersSchema = z.object({
+  q: z.string().optional(),
+  class_id: z.string().optional(),
+  section_id: z.string().optional(),
+  status: z.string().optional(),
+});
+
+/** Search form values → filters (the zod schema only shapes them; cleanFilters checks them). */
+export function filtersFromForm(form: HTMLFormElement): StudentFilters {
+  const parsed = filtersSchema.parse(formValues(form));
+  return {
+    q: parsed.q?.trim() || undefined,
+    classId: parsed.class_id || undefined,
+    sectionId: parsed.section_id || undefined,
+    status: parsed.status || undefined,
+  };
+}
+
+/** Filters → API query (ignores anything malformed rather than failing the page). */
 export function cleanFilters(filters: StudentFilters): CleanFilters {
   const q = filters.q?.trim().slice(0, 200) ?? "";
   return {
@@ -117,6 +143,9 @@ export interface StudentListViewProps {
   onPrevious?: (() => void) | undefined;
   /** The search text looked like a full Aadhaar number: it was not sent. */
   aadhaarBlocked?: boolean;
+  /** New search (kept in memory only: names never go into the page URL or history). */
+  onSearch: (filters: StudentFilters) => void;
+  onClear: () => void;
 }
 
 /** US-302 / FR-STU-010: find students by name (EN/TE), admission number, class/section, parent. */
@@ -129,6 +158,8 @@ export function StudentListView({
   onNext,
   onPrevious,
   aadhaarBlocked = false,
+  onSearch,
+  onClear,
 }: StudentListViewProps) {
   const t = useTranslations("students.list");
   const ts = useTranslations("students");
@@ -191,6 +222,11 @@ export function StudentListView({
         : results;
   const hasFilters = Boolean(filters.q || filters.classId || filters.sectionId || filters.status);
 
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSearch(filtersFromForm(event.currentTarget));
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -214,10 +250,20 @@ export function StudentListView({
       />
       <div data-print="hide">
         <Card title={t("searchTitle")}>
-          {/* GET form: the search lives in the URL, works without JavaScript and can be bookmarked. */}
-          <form method="get" role="search" aria-label={t("searchTitle")} className="space-y-4">
+          {/*
+            The search stays in this page's memory: a student's or parent's name is personal
+            data and must never end up in the address bar, browser history or access logs.
+          */}
+          <form
+            role="search"
+            aria-label={t("searchTitle")}
+            className="space-y-4"
+            noValidate
+            onSubmit={submit}
+          >
             <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_auto]">
-              <TextField
+              <GuardedTextField
+                id={SEARCH_FIELD_ID}
                 name="q"
                 type="search"
                 label={t("searchLabel")}
@@ -259,11 +305,11 @@ export function StudentListView({
               </div>
             </div>
             {hasFilters ? (
-              <p className="text-sm">
-                <Link href="/students" className="text-primary underline">
+              <div>
+                <Button variant="ghost" size="sm" onClick={onClear}>
                   {t("clear")}
-                </Link>
-              </p>
+                </Button>
+              </div>
             ) : null}
           </form>
         </Card>
@@ -297,11 +343,14 @@ export function StudentListView({
   );
 }
 
-/** GET /students with the URL's filters, cursor paging (Next / Previous). */
-export function StudentsScreen({ filters = {} }: { filters?: StudentFilters }) {
+/** GET /students with the filters held in memory, cursor paging (Next / Previous). */
+export function StudentsScreen() {
   const api = useBffClient("staff");
   const permissions = useStaffPermissions();
   const structure = useSchoolStructure();
+  const [filters, setFilters] = useState<StudentFilters>({});
+  // Clearing remounts the search form so every field starts empty again.
+  const [formKey, setFormKey] = useState(0);
   const clean = cleanFilters(filters);
   const pages = useCursorStack();
   const cursor = pages.cursor;
@@ -317,8 +366,13 @@ export function StudentsScreen({ filters = {} }: { filters?: StudentFilters }) {
     { enabled: !aadhaarBlocked },
   );
   const next = results.status === "ready" ? results.data.next_cursor : null;
+  const search = (value: StudentFilters) => {
+    pages.reset();
+    setFilters(value);
+  };
   return (
     <StudentListView
+      key={formKey}
       filters={filters}
       results={aadhaarBlocked ? null : results}
       structure={structure}
@@ -327,6 +381,13 @@ export function StudentsScreen({ filters = {} }: { filters?: StudentFilters }) {
       aadhaarBlocked={aadhaarBlocked}
       onNext={next ? () => pages.next(next) : undefined}
       onPrevious={pages.hasPrevious ? pages.previous : undefined}
+      onSearch={search}
+      onClear={() => {
+        search({});
+        setFormKey((value) => value + 1);
+        // Keyboard users land back in the search box, not at the top of the page.
+        requestAnimationFrame(() => document.getElementById(SEARCH_FIELD_ID)?.focus());
+      }}
     />
   );
 }

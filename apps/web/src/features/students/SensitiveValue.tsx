@@ -4,10 +4,12 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { unwrap, useBffClient } from "@/lib/bff/query";
+import { aadhaarDisplay } from "./aadhaar";
 import { ProblemAlert } from "./ProblemAlert";
 
 /** Shared office PCs: a revealed value hides itself again after this long. */
 export const REVEAL_SECONDS = 60;
+const AADHAAR_LAST4 = "aadhaar_last4";
 
 export interface SensitiveValueProps {
   studentId: string;
@@ -68,7 +70,9 @@ export function SensitiveValue({
           },
         }),
       );
-      setShown(result.display ?? result.value ?? "");
+      const text = result.display ?? result.value ?? "";
+      // Belt and braces for invariant 4: Aadhaar is only ever shown as XXXX XXXX 1234.
+      setShown(attributeKey === AADHAAR_LAST4 ? aadhaarDisplay(text) : text);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(hide, REVEAL_SECONDS * 1000);
     } catch (failure) {

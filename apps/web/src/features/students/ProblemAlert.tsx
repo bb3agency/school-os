@@ -55,8 +55,11 @@ export function ProblemAlert({
     "imports.errors": ti,
     "extraction.errors": tx,
   };
-  const namespaces: readonly ProblemNamespace[] = typeof namespace === "string" ? [namespace] : namespace;
-  const t = code ? namespaces.map((ns) => tables[ns]).find((table) => table.has(`${code}.title`)) : undefined;
+  const namespaces: readonly ProblemNamespace[] =
+    typeof namespace === "string" ? [namespace] : namespace;
+  const t = code
+    ? namespaces.map((ns) => tables[ns]).find((table) => table.has(`${code}.title`))
+    : undefined;
   if (t && code) {
     const requestId =
       error instanceof ApiError && typeof error.problem.request_id === "string"

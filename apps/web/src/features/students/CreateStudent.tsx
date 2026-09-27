@@ -104,9 +104,7 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
     submit: (data, key) => {
       const body = createBody(data);
       sent.current = body.values.map((value) => value.attribute_key);
-      return unwrap(
-        api.POST("/api/v1/students", { headers: { "Idempotency-Key": key }, body }),
-      );
+      return unwrap(api.POST("/api/v1/students", { headers: { "Idempotency-Key": key }, body }));
     },
     // `values.2.value` → the form field of the third value sent.
     fieldMap: (field) => {

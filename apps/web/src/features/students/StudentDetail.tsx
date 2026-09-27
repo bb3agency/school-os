@@ -190,7 +190,10 @@ function AttributeRow({
                     >
                       {t("markVerified")}
                       <span className="sr-only">
-                        : {label}, {ts(`sources.${isValueSource(value.source) ? value.source : "manual_entry"}`)}
+                        : {label},{" "}
+                        {ts(
+                          `sources.${isValueSource(value.source) ? value.source : "manual_entry"}`,
+                        )}
                       </span>
                     </Button>
                     <Button
@@ -364,9 +367,7 @@ function RecordValueDialog({
               }
             />
           )}
-          {attribute?.is_identity ? (
-            <Alert tone="info">{t("identityNote")}</Alert>
-          ) : null}
+          {attribute?.is_identity ? <Alert tone="info">{t("identityNote")}</Alert> : null}
         </>
       )}
     </FormDialog>
@@ -418,7 +419,11 @@ function GuardiansCard({
         </span>
       ),
     },
-    { key: "relationship", header: t("colRelationship"), cell: (row) => relationship(row.relationship) },
+    {
+      key: "relationship",
+      header: t("colRelationship"),
+      cell: (row) => relationship(row.relationship),
+    },
     { key: "phone", header: t("colPhone"), cell: (row) => contact(row, "phone") },
     { key: "address", header: t("colAddress"), cell: (row) => contact(row, "address") },
   ];
@@ -473,7 +478,9 @@ export function StudentDetailView({
   const data = student.data;
   const name = data.canonical.full_name?.value ?? t("unnamed");
   const keys = [
-    ...index.sorted.map((item) => item.key).filter((key) => key in data.canonical || key in data.values),
+    ...index.sorted
+      .map((item) => item.key)
+      .filter((key) => key in data.canonical || key in data.values),
     ...Object.keys(data.canonical).filter((key) => !index.byKey.has(key)),
   ];
 
