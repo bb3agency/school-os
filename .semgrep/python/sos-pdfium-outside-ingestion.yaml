@@ -1,0 +1,34 @@
+rules:
+  - id: sos-pdfium-outside-ingestion
+    message: >-
+      pypdfium2 (native PDFium, ADR-0027) may only be imported by
+      apps/api/app/knowledge/ingestion/pdf.py, which extract.py loads lazily in the ingest worker
+      with the configured limits (pages, objects, characters, time budget). Call
+      app.knowledge.ingestion.extract.extract_pages instead.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+      references:
+        - docs/adr/ADR-0027-pdf-text-layer-extraction.md
+        - CLAUDE.md §11
+    paths:
+      include:
+        - "/apps/**"
+        - "/scripts/**"
+        - "/evals/**"
+      exclude:
+        - "/apps/api/app/knowledge/ingestion/pdf.py"
+        - "/apps/api/tests/**"
+    patterns:
+      - pattern-either:
+          - pattern: import $MOD
+          - pattern: import $MOD as $ALIAS
+          - pattern: from $MOD import $NAME
+          - pattern: from $MOD import $NAME as $ALIAS
+          - pattern: importlib.import_module("$MOD", ...)
+          - pattern: import_module("$MOD", ...)
+          - pattern: __import__("$MOD", ...)
+      - metavariable-regex:
+          metavariable: $MOD
+          regex: ^(pypdfium2|pypdfium2_raw)(\..+)?$
