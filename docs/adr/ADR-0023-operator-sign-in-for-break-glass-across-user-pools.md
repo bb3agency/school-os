@@ -198,3 +198,53 @@ T1, T2, T17 (07 §4); 05 §3.3–3.4; 07 §5, §6.4; 09 §1; 10 §5, §11; 16 §
 ## Acceptance (2026-09-27)
 
 Accepted by the product owner on 2026-09-27 ("go with your recommendations"). Option C adopted.
+
+## Amendments (2026-09-27)
+
+Implementation facts (the decision is unchanged).
+
+- **Migration `0027_identity_issuer` (expand).** `core.users.idp_issuer` is added nullable with
+  DEFAULT = the staff issuer of the migrating environment (this fills every existing row, the
+  backfill); existing break-glass identities (every membership holds only `platform_support`)
+  are moved to the operator issuer; `UNIQUE (idp_issuer, idp_subject)` is added. `NOT NULL`,
+  dropping `UNIQUE (idp_subject)` and giving `core.create_owner_invite` an issuer are the
+  contract step of a later release. Until then an operator whose `sub` equals a staff `sub`
+  cannot get a support identity at all: approval answers `409 breakglass_identity_conflict`
+  (fail closed).
+- **Definer signatures.** `core.resolve_login(p_subject, p_issuer DEFAULT NULL,
+  p_support_only DEFAULT false)`, `core.find_user_id_by_subject(p_subject, p_issuer DEFAULT
+  NULL)`, `core.create_user_for_invite(..., p_issuer DEFAULT NULL)`. NULL issuer = an API image
+  older than 0027 (rolling deploy/rollback; subject-only, as before). `p_support_only` selects
+  the support filter of item 3 (exactly `platform_support`, system role, `expires_at` in the
+  future); without it `platform_support` memberships are never returned (a staff token never
+  reaches a support membership). `sos_definer` got `SELECT` on `core.membership_roles` (already
+  a `definer_access` table). With an issuer, `create_user_for_invite` never returns another
+  issuer's identity (`unique_violation`).
+- **Settings.** `SOS_SUPPORT_OIDC_AUDIENCE` (support client ID; unset = off),
+  `SOS_SUPPORT_OIDC_ISSUER` (default `SOS_PLATFORM_OIDC_ISSUER`; must equal it on the shared
+  tier; never the staff issuer; public https in staging/prod), `SOS_SUPPORT_OIDC_JWKS_URI`.
+  Every verifier refuses tokens that name another app client (`client_id` or `aud`); the support
+  verifier also requires `token_use = access` and `client_id` = the support client.
+- **Resolution.** `app.identity.principal.get_principal` picks the support verifier only when the
+  (unverified) `iss` is the support issuer; the verifier then checks everything. The authz
+  resolver refuses a support principal on a membership that does not hold exactly
+  `platform_support` (`403 breakglass_only`) or has no active grant in `ops.break_glass_grants`
+  (`403 breakglass_grant_inactive`, via a hook `app.breakglass` installs, so `authz` does not
+  import the control-plane bridge), and refuses a staff principal on any `platform_support`
+  membership.
+- **Session start.** `POST /api/v1/breakglass/support-session {platform_request_id}` (guard
+  `session.authenticated`; the service accepts only a support principal on its own active
+  grant; step-up ≤ 5 min). The admin panel links with the control-plane request ID (the school's
+  grant is found by it). School chain: `breakglass.session_started` (grant, request, membership,
+  operator IDs, a 16-hex SHA-256 reference of the IdP session, `issuer_kind`), plus
+  `auth.login.succeeded` with `issuer_kind: operator_support` from `/me/login-event`. Platform
+  chain: `breakglass.session_started` written by `app.platform.breakglass.record_session_started`
+  before the school transaction commits (a failure refuses the session with 503). Dedicated hosts
+  have no control plane: school chain only.
+- **(deviation) Emergency path "find or create".** Item 5 says the emergency path can find **or
+  create** the operator's identity. `core.create_user_for_invite` still requires an active
+  inviter in the school, and the emergency path has none, so the code only **finds** the
+  `(operator issuer, subject)` identity (created by any earlier approval in any school); an
+  operator never approved anywhere still gets no emergency access (fail closed). Creating it
+  would need a change to the definer guard, which needs a product decision (listed in the
+  report of 2026-09-27).

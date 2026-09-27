@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020 · implementation amendments 2026-09-26, 2026-09-27 (see [Amendments](#amendments-2026-09-26)) |
+| Status | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028 · implementation amendments 2026-09-26, 2026-09-27 (see [Amendments](#amendments-2026-09-26)) |
 | Date | 2026-09-26 |
 | Deciders | Founder (product owner approval of build proposals B1–B25) |
 | Amends / supersedes | Amends [ADR-0003](ADR-0003-pool-tenancy-rls.md), [ADR-0011](ADR-0011-hash-chained-audit.md), [ADR-0012](ADR-0012-managed-oidc-identity.md) |
@@ -233,3 +233,5 @@ The school-chain copies (`tenant.provisioned`, `tenant.activated`, `tenant.suspe
 Reference only (implementation facts; the decisions are in the ADR named).
 
 **A12 · A6 and A10 settled by [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md).** They are no longer open deviations. School-chain copies of platform actions are queued in `platform.tenant_audit_outbox` (migration `0015_platform_decisions`) inside the platform transaction and delivered exactly once, in order per school, by the task `platform.deliver_tenant_audit`; the post-commit `tenant_session` write described in A6 no longer exists. What `platform` may call in `app.tenancy.service`, which files may open `tenant_session()`, and which tenant relations its raw SQL may name are pinned by `apps/api/tests/platform/test_boundaries.py`. No definer function, `definer_access` policy or tenant-table grant was added.
+
+**A13 · Definer allowlist after ADR-0023 and ADR-0028.** Decided by those ADRs; recorded here as facts. Migration `0027_identity_issuer` replaced `core.resolve_login(text)`, `core.find_user_id_by_subject(text)` and `core.create_user_for_invite(text, text, citext, text)` by `core.resolve_login(text, text DEFAULT NULL, boolean DEFAULT false)`, `core.find_user_id_by_subject(text, text DEFAULT NULL)` and `core.create_user_for_invite(text, text, citext, text, text DEFAULT NULL)` (the issuer; NULL only for API images older than 0027) and granted `sos_definer` `SELECT` on `core.membership_roles` (already a `definer_access` table). Migration `0028_profile_scope` added `core.user_membership_count(uuid)` (EXECUTE `sos_app`). Pinned by `tests/security/test_definer_functions.py` and `tests/security/rls_allowlist.yaml`.

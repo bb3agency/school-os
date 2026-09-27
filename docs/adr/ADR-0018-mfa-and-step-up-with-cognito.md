@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · Amended by [ADR-0023](ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) (a third app client: break-glass support, operator pool) |
 | Date | 2026-09-26 |
 | Deciders | Founder (on findings from the identity work for roadmap Task 9) |
 | Amends / supersedes | Amends [ADR-0012](ADR-0012-managed-oidc-identity.md) (how MFA and step-up are enforced with the reference provider) and refines the operator identity in [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) |
