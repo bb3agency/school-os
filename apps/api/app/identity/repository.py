@@ -193,6 +193,20 @@ def display_names(session: Session, membership_ids: list[uuid.UUID]) -> dict[uui
     return {row.id: row.display_name for row in session.execute(stmt)}
 
 
+def members_by_user(
+    session: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
+    """User id -> (membership id, display name) in this school only (RLS)."""
+    if not user_ids:
+        return {}
+    stmt = (
+        select(Membership.user_id, Membership.id, User.display_name)
+        .join(User, User.id == Membership.user_id)
+        .where(Membership.user_id.in_(user_ids))
+    )
+    return {row.user_id: (row.id, row.display_name) for row in session.execute(stmt)}
+
+
 def list_memberships_for_user(session: Session, user_id: uuid.UUID) -> list[Membership]:
     """Memberships of ``user_id`` visible in the current tenant (at most one)."""
     return list(session.scalars(select(Membership).where(Membership.user_id == user_id)))

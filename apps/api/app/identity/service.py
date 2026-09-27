@@ -428,6 +428,15 @@ def member_display_names(
     return repo.display_names(session, sorted(set(membership_ids)))
 
 
+def members_for_users(
+    session: Session, user_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
+    """User id -> (membership id, display name) of this school's members, for showing who did
+    something (e.g. who uploaded a document). Unknown ids are left out. No permission check and
+    no contact details: callers show them only next to records the caller may already see."""
+    return repo.members_by_user(session, sorted(set(user_ids)))
+
+
 def get_user(session: Session, user_id: uuid.UUID) -> UserOut:
     return _user_out(session, _membership_for_user(session, user_id))
 

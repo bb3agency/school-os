@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.authz.catalog import AUTHENTICATED, system_roles
 from app.main import create_app
@@ -288,6 +288,33 @@ def _doc_acl_put(w: Any, r: str, a: Engine) -> Request:
         {"acl": _doc_acl(w)},
         _if_match(D.document_version(a, doc)),
     )
+
+
+def _doc_patch(w: Any, r: str, a: Engine) -> Request:
+    doc = _shared_doc(w, a, "patch")
+    return (
+        f"/api/v1/documents/{doc}",
+        {"title": "Matrix circular"},
+        _if_match(D.document_version(a, doc)),
+    )
+
+
+def _doc_archive(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        doc = D.make_document(
+            a,
+            w.a.tenant_id,
+            w.a.people["owner"].user_id,
+            acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)],
+        )
+        if action == "unarchive":
+            with W.tenant_session(w.a.tenant_id) as db:
+                db.execute(
+                    text("UPDATE kb.documents SET status = 'archived' WHERE id = :d"), {"d": doc}
+                )
+        return f"/api/v1/documents/{doc}/{action}", None, _if_match(D.document_version(a, doc))
+
+    return build
 
 
 def _doc_delete(w: Any, r: str, a: Engine) -> Request:
@@ -650,6 +677,9 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("PUT", "/api/v1/documents/{document_id}/acl"): _doc_acl_put,
     ("DELETE", "/api/v1/documents/{document_id}"): _doc_delete,
+    ("PATCH", "/api/v1/documents/{document_id}"): _doc_patch,
+    ("POST", "/api/v1/documents/{document_id}/archive"): _doc_archive("archive"),
+    ("POST", "/api/v1/documents/{document_id}/unarchive"): _doc_archive("unarchive"),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
     # School-side routes backed by the control plane (app/platform/tenant_api.py).
     ("GET", "/api/v1/tenant/billing"): lambda w, r, a: ("/api/v1/tenant/billing", None, {}),

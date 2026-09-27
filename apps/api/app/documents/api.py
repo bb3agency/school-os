@@ -34,6 +34,7 @@ from app.documents.schemas import (
     DocumentDetail,
     DocumentOut,
     DocumentStatus,
+    DocumentUpdate,
     DownloadUrlOut,
     Purpose,
     UploadCreate,
@@ -134,6 +135,49 @@ def get_document(
     """One document with its versions and processing status (permission ``document.read``;
     404 outside your ACL/scopes)."""
     doc = service.get_document(db, ctx, document_id)
+    response.headers["ETag"] = etag(doc.version)
+    return doc
+
+
+@router.patch("/documents/{document_id}", response_model=DocumentOut)
+def update_document(
+    *,
+    ctx: Uploader,
+    db: TenantDB,
+    document_id: uuid.UUID,
+    body: DocumentUpdate,
+    version: IfMatch,
+    response: Response,
+) -> DocumentOut:
+    """Change the title, type, language, issuer or date (permission ``document.upload``; the
+    document must be visible to you, as for a new version; ``If-Match``). An archived document
+    answers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with
+    the changed field names only."""
+    doc = service.update_document(db, ctx, document_id, body, expected_version=version)
+    response.headers["ETag"] = etag(doc.version)
+    return doc
+
+
+@router.post("/documents/{document_id}/archive", response_model=DocumentOut)
+def archive_document(
+    ctx: Manager, db: TenantDB, document_id: uuid.UUID, version: IfMatch, response: Response
+) -> DocumentOut:
+    """Archive a document: kept with its versions, listed only with ``status=archived``
+    (permission ``document.manage_acl``; ``If-Match``)."""
+    doc = service.set_document_status(db, ctx, document_id, archived=True, expected_version=version)
+    response.headers["ETag"] = etag(doc.version)
+    return doc
+
+
+@router.post("/documents/{document_id}/unarchive", response_model=DocumentOut)
+def unarchive_document(
+    ctx: Manager, db: TenantDB, document_id: uuid.UUID, version: IfMatch, response: Response
+) -> DocumentOut:
+    """Make an archived document active again (permission ``document.manage_acl``;
+    ``If-Match``)."""
+    doc = service.set_document_status(
+        db, ctx, document_id, archived=False, expected_version=version
+    )
     response.headers["ETag"] = etag(doc.version)
     return doc
 
