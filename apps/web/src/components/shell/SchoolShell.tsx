@@ -6,8 +6,8 @@ import { Link } from "@/i18n/navigation";
 import { SkipLink } from "./SkipLink";
 
 interface SchoolNavItem extends NavItem {
-  /** Effective permission needed to see the item (UX only: the API checks every call). */
-  permission?: string;
+  /** Effective permission (or any of several) needed to see the item (UX only: the API checks every call). */
+  permission?: string | readonly string[];
 }
 
 /**
@@ -40,12 +40,24 @@ export function SchoolShell({
       label: t("school.nav.billing"),
       permission: "tenant.billing.read",
     },
+    { href: "/findings", label: t("findings.nav"), permission: "dq.findings.read" },
+    {
+      href: "/change-requests",
+      label: t("changeRequests.nav"),
+      permission: ["student.identity_change.request", "student.identity_change.approve"],
+    },
+    { href: "/break-glass", label: t("breakGlass.nav"), permission: "breakglass.approve" },
     { href: "/support", label: t("school.nav.support"), permission: "support.ticket.create" },
     { href: "/audit", label: t("school.nav.audit"), permission: "audit.read" },
   ];
   const items: NavItem[] = all
     .filter(
-      (item) => !item.permission || permissions === null || permissions.includes(item.permission),
+      (item) =>
+        !item.permission ||
+        permissions === null ||
+        (typeof item.permission === "string" ? [item.permission] : item.permission).some((key) =>
+          permissions.includes(key),
+        ),
     )
     .map(({ href, label, exact }) => ({ href, label, ...(exact ? { exact } : {}) }));
   return (

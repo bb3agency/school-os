@@ -1689,5 +1689,104 @@
     "unreadOnly": "Show unread only",
     "seeAll": "See all notifications",
     "showMore": "Show more"
+  },
+  "breakGlass": {
+    "nav": "Support access",
+    "title": "Support access",
+    "description": "Requests from SchoolOS support to see this school's records, and the access you gave.",
+    "howTitle": "How support access works",
+    "howBody": "SchoolOS staff never see your school's records on their own. When they need to help, they ask here with a reason, what they want to see and for how long (at most 8 hours). Access is read-only, ends by itself, and every screen they open is written to your audit log. You can end it at any time.",
+    "waitingCount": "{count, plural, one {# request is waiting for your decision.} other {# requests are waiting for your decision.}}",
+    "noAccessTitle": "Only the owner and the principal can see this",
+    "noAccessBody": "Support access is approved by the school's owner or principal. Ask them if SchoolOS support needs to look at something.",
+    "filtersTitle": "Filters",
+    "filterStatus": "Status",
+    "auditLink": "See what support looked at (audit log)",
+    "colRequested": "Asked on",
+    "colWho": "Who asked",
+    "colWhy": "Why",
+    "colDuration": "For how long",
+    "colStatus": "Status",
+    "decide": "Decide",
+    "open": "Open",
+    "endsAt": "Ends {time}",
+    "emergency": "Emergency",
+    "emptyTitle": "No support access requests",
+    "emptyBody": "When SchoolOS support asks to see your records, the request appears here and in the bell.",
+    "showMore": "Show more",
+    "durationHours": "{hours, plural, one {# hour} other {# hours}}",
+    "durationMinutes": "{minutes} minutes",
+    "scopeWholeSchool": "The whole school",
+    "status": {
+      "requested": "Waiting for you",
+      "approved": "Confirmed by SchoolOS",
+      "active": "Open now",
+      "expired": "Ended",
+      "revoked": "Ended by the school",
+      "denied": "Denied"
+    },
+    "reasonCodes": {
+      "support_request": "The school asked for help",
+      "security_incident": "Security incident",
+      "legal_obligation": "Legal obligation",
+      "other": "Other reason"
+    },
+    "scopeKeys": {
+      "section_id": "Section",
+      "class_id": "Class",
+      "student_id": "Student",
+      "import_batch_id": "Import",
+      "extraction_batch_id": "Register photos",
+      "document_id": "Document",
+      "other": "Limited to"
+    },
+    "errors": {
+      "invalid_state": {
+        "title": "This request can't be changed now",
+        "body": "It was already decided, or it has ended. Reload the page to see its status."
+      },
+      "request_expired": {
+        "title": "This request is too old",
+        "body": "Requests expire after 24 hours. Ask SchoolOS support to send a new one if they still need access."
+      },
+      "request_withdrawn": {
+        "title": "SchoolOS support withdrew this request",
+        "body": "Nothing needs to be done. Reload the page to see its status."
+      },
+      "operator_inactive": {
+        "title": "The person who asked can no longer sign in",
+        "body": "Deny this request. SchoolOS support can send a new one if needed."
+      }
+    },
+    "detail": {
+      "title": "Support access request",
+      "requestTitle": "What SchoolOS support asked for",
+      "whoNote": "A SchoolOS employee. They do not become a member of your school's staff.",
+      "scope": "What they can see",
+      "canSee": "Allowed",
+      "seeStudents": "basic student details (no sensitive fields)",
+      "seeFindings": "data-quality problems",
+      "seeDocuments": "uploaded documents",
+      "readOnly": "Read-only: they cannot change anything. Every screen they open is written to the audit log.",
+      "timelineTitle": "Timeline",
+      "decidedAt": "Decided on",
+      "startsAt": "Access started",
+      "expiresAt": "Access ends",
+      "revokedAt": "Ended by the school on",
+      "activeTitle": "Support can see your records now",
+      "activeBody": "Access ends by itself on {time}. End it now if it is no longer needed.",
+      "emergencyTitle": "Emergency access",
+      "emergencyBody": "Two SchoolOS staff confirmed this for a security incident or a legal obligation, without waiting for you. You can end it now; the audit log shows everything they opened.",
+      "approve": "Approve",
+      "approveTitle": "Give SchoolOS support access",
+      "approveBody": "Support gets read-only access to what they asked for, starting now and ending by itself after {duration}. You will be asked to confirm it's you.",
+      "deny": "Deny",
+      "denyTitle": "Deny this request",
+      "denyBody": "SchoolOS support gets no access. You will be asked to confirm it's you.",
+      "revoke": "End access now",
+      "revokeTitle": "End support access now",
+      "revokeBody": "Support loses access immediately. You will be asked to confirm it's you.",
+      "backToList": "Back to support access"
+    }
   }
 }
