@@ -2558,8 +2558,11 @@ export interface paths {
          * @description List students by class, section and status (permission ``student.read_basic``; class
          *     and subject teachers see only students in their sections/classes this year). To search by
          *     name, parent name or admission number use ``POST /students/search``: the ``query`` and
-         *     ``admission_no`` parameters still work but are deprecated (answered with a ``Deprecation``
-         *     header) because URLs are logged by proxies and load balancers.
+         *     ``admission_no`` parameters still work but are deprecated because URLs are logged by
+         *     proxies and load balancers. A response to a request that used them carries a
+         *     ``Deprecation`` header (RFC 9745), a ``Sunset: Thu, 31 Dec 2026 23:59:59 GMT`` header
+         *     (RFC 8594; the parameters may stop working after that date) and
+         *     ``Link: </api/v1/students/search>; rel="successor-version"``.
          */
         get: operations["search_students_api_v1_students_get"];
         put?: never;
@@ -12055,7 +12058,7 @@ export interface operations {
             query?: {
                 /**
                  * @deprecated
-                 * @description Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).
+                 * @description Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008). Stops working after the Sunset date, Thu, 31 Dec 2026 23:59:59 GMT.
                  */
                 admission_no?: string | null;
                 class_id?: string | null;
@@ -12065,7 +12068,7 @@ export interface operations {
                 limit?: number;
                 /**
                  * @deprecated
-                 * @description Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008).
+                 * @description Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008). Stops working after the Sunset date, Thu, 31 Dec 2026 23:59:59 GMT.
                  */
                 query?: string | null;
                 section_id?: string | null;

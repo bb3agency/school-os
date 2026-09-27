@@ -12,7 +12,9 @@ from __future__ import annotations
 import io
 import json
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import replace
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -21,6 +23,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 
 from app.audit import service as audit
+from app.authz.catalog import CatalogError, RoleDef, permission_catalog, system_roles
 from app.core.config import DeploymentMode, Environment, KeyWrapperKind, Settings
 from app.core.db import tenant_session
 from app.identity import repository as repo
@@ -235,6 +238,7 @@ def test_SEC_007_apply_is_audited_in_the_school_chain_without_personal_data(
         "grants_added": 4,
         "grants_removed": 0,
         "roles_updated": 0,
+        "grants_protected": 0,
         "prune": False,
         "via": "system_role_sync",
     }
@@ -505,3 +509,119 @@ def test_ADR_0022_a_failing_school_does_not_stop_the_others(
     assert f"tenant={good} result=applied" in out
     assert grants(admin_engine, good) >= ADR_0021_GRANTS
     assert not ADR_0021_GRANTS & grants(admin_engine, bad)
+
+
+# --- lockout guard: protected grants are never pruned (ADR-0022 amendment 2026-09-27) ---------
+
+LOCKOUT_MINIMUM = {("owner", "role.assign"), ("owner", "user.manage")}
+
+
+def without_grants(drop: set[tuple[str, str]]) -> Callable[[], Mapping[str, RoleDef]]:
+    """A future roles.yaml that no longer lists ``drop`` (the templates, not the school)."""
+    real = system_roles()
+
+    def _templates() -> Mapping[str, RoleDef]:
+        return MappingProxyType(
+            {
+                key: replace(
+                    role,
+                    grants=tuple(g for g in role.grants if (key, g.permission) not in drop),
+                )
+                for key, role in real.items()
+            }
+        )
+
+    return _templates
+
+
+def test_ADR_0022_protected_grants_config_covers_school_administration() -> None:
+    protected = identity.protected_system_grants()
+    assert protected >= LOCKOUT_MINIMUM
+    # Every protected grant is one roles.yaml gives today, so new schools start with it.
+    assert protected <= expected_grants()
+    catalog = permission_catalog()
+    assert all(not catalog[p].is_platform for _, p in protected)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {"version": 2, "protected_grants": {"owner": ["role.assign"]}},
+        {"version": 1, "protected_grants": {}},
+        {"version": 1, "protected_grants": {"no_such_role": ["role.assign"]}},
+        {"version": 1, "protected_grants": {"owner": ["no.such_permission"]}},
+        {"version": 1, "protected_grants": {"owner": ["platform.tenants.read"]}},
+        {"version": 1, "protected_grants": {"owner": "role.assign"}},
+        {"version": 1, "protected_grants": {"owner": []}},
+        {"version": 1},
+    ],
+)
+def test_ADR_0022_invalid_protected_grants_config_is_refused(raw: dict[str, Any]) -> None:
+    with pytest.raises(CatalogError):
+        identity.parse_protected_grants(raw, system_roles(), permission_catalog())
+
+
+def test_ADR_0022_prune_never_removes_protected_grants(
+    admin_engine: Engine,
+    make_school: Callable[..., uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = make_school(pre_adr_0021=False)
+    # A roles.yaml edit that would take user and role administration away from the owner,
+    # next to an ordinary stale grant that pruning may remove.
+    monkeypatch.setattr(
+        identity, "system_roles", without_grants(LOCKOUT_MINIMUM | {("teacher", "kb.ask")})
+    )
+    assert ("teacher", "kb.ask") in grants(admin_engine, tid)
+    before = len(events(admin_engine, tid))
+
+    code, out, _ = run_cli("--tenant", str(tid))  # no prune: kept and reported as usual
+    assert code == cli.EXIT_OK
+    assert "  = owner role.assign (not in roles.yaml; kept" in out
+
+    code, out, _ = run_cli("--tenant", str(tid), "--prune")  # dry run
+    assert code == cli.EXIT_FAILED
+    assert "  ! owner role.assign protected (lockout guard); not removed\n" in out
+    assert "  ! owner user.manage protected (lockout guard); not removed\n" in out
+    assert "  - teacher kb.ask\n" in out
+    assert "  - owner " not in out
+    assert "conflict=1" in out
+
+    code, out, _ = run_cli("--tenant", str(tid), "--prune", "--apply")
+    assert code == cli.EXIT_FAILED
+    assert "grants_removed=1" in out
+    assert "grants_protected=2" in out
+    have = grants(admin_engine, tid)
+    assert have >= LOCKOUT_MINIMUM
+    assert ("teacher", "kb.ask") not in have
+    new = events(admin_engine, tid)[before:]
+    revoked = [
+        (e["summary"]["role_key"], e["summary"]["permission"])
+        for e in new
+        if e["action"] == "role.permission_revoked"
+    ]
+    assert revoked == [("teacher", "kb.ask")]
+    done = [e for e in new if e["action"] == "role.system_sync_applied"]
+    assert done[0]["summary"]["grants_protected"] == 2
+    assert done[0]["summary"]["grants_removed"] == 1
+
+    # Refused on every later run too: the guard is not a one-off warning.
+    code, out, _ = run_cli("--tenant", str(tid), "--prune", "--apply")
+    assert code == cli.EXIT_FAILED
+    assert grants(admin_engine, tid) >= LOCKOUT_MINIMUM
+
+
+def test_ADR_0022_protected_grants_are_guarded_only_for_their_role(
+    admin_engine: Engine,
+    make_school: Callable[..., uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = make_school(pre_adr_0021=False)
+    # role.assign is protected for the owner; the principal's copy may be pruned.
+    monkeypatch.setattr(identity, "system_roles", without_grants({("principal", "role.assign")}))
+    code, out, _ = run_cli("--tenant", str(tid), "--prune", "--apply")
+    assert code == cli.EXIT_OK
+    assert "grants_protected=0" in out
+    have = grants(admin_engine, tid)
+    assert ("principal", "role.assign") not in have
+    assert ("owner", "role.assign") in have
