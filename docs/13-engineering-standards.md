@@ -104,6 +104,7 @@ schoolos/
 
 - Add only with a reason in the PR: maintenance activity, licence (permissive preferred; no AGPL/SSPL in runtime without ADR), security history, size.
 - Pin with lockfiles and hashes; weekly automated update PRs; remove unused dependencies promptly.
+- npm dependencies never run install scripts (`.npmrc` `ignore-scripts=true`); choose packages that ship prebuilt platform binaries through `optionalDependencies`. `npm audit signatures` must pass. `eslint-import-resolver-typescript` is pinned to 3.7.0 (pure JavaScript) through root `overrides`, so the `unrs-resolver`/`napi-postinstall` native chain is never installed.
 
 ## 10. Documentation
 

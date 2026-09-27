@@ -24,6 +24,7 @@
   },
   "overrides": {
     "eslint": "10.11.0",
+    "eslint-import-resolver-typescript": "3.7.0",
     "openapi-typescript": {
       "typescript": "6.0.3"
     }

@@ -363,6 +363,7 @@ Cross-Origin-Resource-Policy: same-origin
 
 - Lockfiles with hashes (Python via `uv`/pip-tools, npm lockfile); Renovate/Dependabot updates weekly; auto-merge only for patch updates passing CI.
 - Scans: `pip-audit`, `npm audit`/OSV-Scanner, Trivy (images, IaC), Semgrep (SAST), `gitleaks`.
+- npm install scripts are disabled (`.npmrc` `ignore-scripts=true`) and registry signatures are checked with `npm audit signatures`; dependencies that need an install-time native build or download are avoided (docs/13 §9).
 - SBOM generated per build (Syft) and stored with the release; images tagged by commit SHA and optionally signed (cosign).
 - GitHub Actions pinned to commit SHAs; `GITHUB_TOKEN` least privilege; protected `main` with required checks; CODEOWNERS on `apps/api/app/{core,authz,audit,platform}/` (which includes the permission and billing YAML), `knowledge/gateway/`, migrations, `apps/api/tests/security/` (incl. `rls_allowlist.yaml`), `infra/`, `deploy/`, `.github/`, `.semgrep/`, `.importlinter`, `Makefile`, `CLAUDE.md` and `SECURITY.md` (owner handle is a placeholder until branch protection is configured).
 - Licence policy: permissive licences preferred; no AGPL/SSPL in core runtime without an ADR. Local/CI service images follow the same rule (ADR-0014: SeaweedFS, Valkey).
