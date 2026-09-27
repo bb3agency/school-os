@@ -60,6 +60,8 @@ The DPDP Rules' Fourth Schedule (Part A) exempts **educational institutions** fr
 | PRV-005 | No automated decisions with significant effects on a child; every flag requires a human to act. |
 | PRV-006 | Where the school chooses consent (e.g., optional features), SchoolOS records who consented, when, for what, and supports withdrawal. |
 
+**Exports (ADR-0021).** Board and portal pre-checks and student lists copy children's personal data out of the system in bulk, so creating any export needs a fresh MFA sign-in. Restricted values such as the UDISE+ social `category` are included only when a member allowed to see them explicitly asks (`include_sensitive`), and the audit log records which restricted columns were included (never the values). Only the requester, and members the school has given `export.download_any` (the owner by default; always with a fresh MFA sign-in), can download an export's files; every download is audited, including whether it was someone else's export. Files are deleted 7 days after they are ready (05 §13).
+
 ## 5. Aadhaar handling
 
 UIDAI circulars have directed organisations storing Aadhaar numbers in databases to keep them in a separate encrypted "Aadhaar Data Vault", and which organisations must comply has become unclear over time. SchoolOS avoids the question by design (ADR-0007):

@@ -41,6 +41,8 @@ roles:
       insights.read: school
       breakglass.approve: school_step_up
       tenant.export_all: school_step_up
+      export.read_all: school
+      export.download_any: school_step_up
       support.ticket.create: school
 
   principal:
@@ -70,8 +72,9 @@ roles:
       document.manage_acl: school
       kb.ask: school
       kb.verified_answer.manage: school
-      export.board: school
-      export.portal: school
+      export.board: school_step_up
+      export.portal: school_step_up
+      export.read_all: school
       audit.read: school
       finance.read: school
       insights.read: school
@@ -101,8 +104,9 @@ roles:
       document.manage_acl: school
       kb.ask: school
       kb.verified_answer.manage: school
-      export.board: school
-      export.portal: school
+      export.board: school_step_up
+      export.portal: school_step_up
+      export.read_all: school
       audit.read: school
       support.ticket.create: school
 
@@ -151,8 +155,8 @@ roles:
       document.upload: school
       document.read: school
       kb.ask: school
-      export.board: school
-      export.portal: school
+      export.board: school_step_up
+      export.portal: school_step_up
       support.ticket.create: school
 
   class_teacher:

@@ -417,8 +417,8 @@ def _exporter(role: str) -> bool:
 
 
 def _export_id(w: Any, role: str, *, ready: bool) -> uuid.UUID:
-    """The role's own export in school A (exports are visible only to their requester); a
-    random id for roles without export permissions (they stop at 403 first)."""
+    """The role's own export in school A (someone else's export is covered by the ADR-0021
+    tests at the end); a random id for roles without export permissions (403 first)."""
     if not _exporter(role):
         return uuid.uuid4()
     SW.ensure_students(w)
@@ -957,8 +957,10 @@ def test_SEC_003_role_route_matrix(
 def test_SEC_005_step_up_routes_need_recent_mfa(
     world: Any, api: Any, admin_engine: Engine, key: tuple[str, str]
 ) -> None:
-    permission = ROUTES[key].sos_permission
-    holders = [r for r in ROLES if permission in system_roles()[r].permission_keys]
+    guard = ROUTES[key]
+    # require_any(..., step_up=True) guards (POST /exports, ADR-0021): every alternative's holders.
+    permissions = (guard.sos_permission, *getattr(guard, "sos_any_of", ()))
+    holders = [r for r in ROLES if set(permissions) & system_roles()[r].permission_keys]
     assert holders
     for role in holders:
         res = _call(api, world, admin_engine, role, key, auth_age_s=301)
@@ -974,3 +976,74 @@ def test_FR_IAM_002_privileged_roles_need_mfa_on_every_route(
         res = _call(api, world, admin_engine, role, key, mfa=False)
         assert res.status_code == 403, (role, res.text)
         assert res.json()["code"] == "mfa_required"
+
+
+# --- ADR-0021: who sees and downloads whose exports (export.read_all, export.download_any) -------
+
+_READ_ALL, _DOWNLOAD_ANY = "export.read_all", "export.download_any"
+_READERS = (*_EXPORT_PERMISSIONS, _READ_ALL)
+_DOWNLOADERS = (*_EXPORT_PERMISSIONS, _DOWNLOAD_ANY)
+
+
+def _coordinator_export(w: Any) -> uuid.UUID:
+    """A ready pre-check of school A requested by its exam coordinator (one per session)."""
+    if "matrix_coordinator_export" not in w.a.ids:
+        SW.ensure_students(w)
+        w.a.ids["matrix_coordinator_export"] = _ex().ready_export(w.a, "exam_coordinator")
+    value: uuid.UUID = w.a.ids["matrix_coordinator_export"]
+    return value
+
+
+def _holds(role: str, permissions: tuple[str, ...]) -> bool:
+    return bool(set(permissions) & system_roles()[role].permission_keys)
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_ADR_0021_list_all_exports_matrix(world: Any, api: Any, role: str) -> None:
+    export_id = str(_coordinator_export(world))
+    params = {"requested_by": "all", "limit": 200}
+    res = api.call(world.person(role), "GET", "/api/v1/exports", params=params)
+    if _holds(role, (_READ_ALL,)):
+        assert res.status_code == 200, (role, res.text)
+        assert export_id in {e["id"] for e in res.json()["data"]}
+    else:
+        assert res.status_code == 403, (role, res.text)
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_ADR_0021_someone_elses_export_matrix(world: Any, api: Any, role: str) -> None:
+    """Detail: own or export.read_all -> 200; other export readers -> 404 (existence hidden);
+    everyone else -> 403 at the guard. Download: own or export.download_any -> 200 (step-up);
+    export.read_all only -> 403 not_own_export; other downloaders -> 404; others -> 403."""
+    export_id = _coordinator_export(world)
+    who = world.person(role)
+    own = role == "exam_coordinator"
+    detail = api.call(who, "GET", f"/api/v1/exports/{export_id}")
+    sees = own or _holds(role, (_READ_ALL,))
+    expected = 200 if sees else 404 if _holds(role, _READERS) else 403
+    assert detail.status_code == expected, (role, detail.text)
+    link = api.call(who, "GET", f"/api/v1/exports/{export_id}/download-url")
+    if own or _holds(role, (_DOWNLOAD_ANY,)):
+        assert link.status_code == 200, (role, link.text)
+    elif _holds(role, _DOWNLOADERS):
+        expected = 403 if _holds(role, (_READ_ALL,)) else 404
+        assert link.status_code == expected, (role, link.text)
+        if expected == 403:
+            assert link.json()["code"] == "not_own_export"
+    else:
+        assert link.status_code == 403, (role, link.text)
+        assert link.json()["code"] == "forbidden"
+
+
+def test_ADR_0021_download_any_needs_step_up_and_stays_in_school(world: Any, api: Any) -> None:
+    export_id = _coordinator_export(world)
+    holders = [r for r in ROLES if _holds(r, (_DOWNLOAD_ANY,))]
+    assert holders == ["owner"], "ADR-0021: only the owner by default"
+    path = f"/api/v1/exports/{export_id}/download-url"
+    stale = api.call(world.person("owner"), "GET", path, auth_age_s=301)
+    assert stale.status_code == 428
+    assert stale.json()["code"] == "step_up_required"
+    # School B's owner holds the same permissions in B: school A's export is not found.
+    b_owner = world.b.people["owner"]
+    for p in (path, f"/api/v1/exports/{export_id}"):
+        assert api.call(b_owner, "GET", p).status_code == 404

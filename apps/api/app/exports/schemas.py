@@ -15,6 +15,9 @@ PrecheckFormat = Literal["xlsx", "pdf"]
 ListFormat = Literal["csv", "xlsx"]
 FileFormat = Literal["xlsx", "pdf", "csv"]
 Language = Literal["en", "te"]
+# GET /exports?requested_by=: your own exports (default) or every export of the school
+# (export.read_all, ADR-0021).
+RequestedBy = Literal["me", "all"]
 PROFILE_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 COLUMN_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
 
@@ -81,6 +84,14 @@ class ExportFileOut(_Out):
     size_bytes: int
 
 
+class ExportRequesterOut(_Out):
+    """Who requested an export: the staff member's membership id and display name (``null``
+    when the account is no longer visible). Nothing else about the person (ADR-0021)."""
+
+    membership_id: uuid.UUID
+    display_name: str | None
+
+
 class ExportOut(_Out):
     id: uuid.UUID
     kind: ExportKind
@@ -100,6 +111,11 @@ class ExportOut(_Out):
     finished_at: dt.datetime | None
     expires_at: dt.datetime | None
     files: list[ExportFileOut]
+    requested_by: ExportRequesterOut
+    # For the screen: is this the caller's own export, and may the caller ask for a download
+    # link now (permissions only; a 428 step-up can still follow, and the export must be ready)?
+    own: bool
+    can_download: bool
 
 
 class ExportProfileOut(_Out):

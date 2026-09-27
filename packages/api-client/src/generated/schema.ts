@@ -835,7 +835,10 @@ export interface paths {
         };
         /**
          * List Exports
-         * @description Your own exports, newest first (any export permission).
+         * @description Exports, newest first (any export permission or ``export.read_all``).
+         *     ``requested_by=me`` (default): your own. ``requested_by=all``: every export of the school
+         *     (``export.read_all``, else 403). Each item says who requested it (``requested_by``), whether
+         *     it is yours (``own``) and whether you may download it (``can_download``).
          */
         get: operations["list_exports_api_v1_exports_get"];
         put?: never;
@@ -843,12 +846,14 @@ export interface paths {
          * Create Precheck Export
          * @description Make a pre-check report for a board or portal profile (``export.board`` for board
          *     profiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and
-         *     ``dq.findings.read``). Choose sections or classes (empty = every student you can see), the
-         *     formats (``xlsx``, ``pdf``) and the language (``en``, ``te``). The students are checked again
-         *     and the files are made in the background (202); you are notified when they are ready.
-         *     Restricted values are hidden unless ``include_sensitive`` is true (needs
-         *     ``student.read_sensitive`` and a recent sign-in, 428 ``step_up_required``). Errors: 422
-         *     ``unknown_profile``, ``no_students``, ``too_many_students``. Accepts ``Idempotency-Key``.
+         *     ``dq.findings.read``) with a recent sign-in with MFA (428 ``step_up_required``). Choose
+         *     sections or classes (empty = every student you can see), the formats (``xlsx``, ``pdf``)
+         *     and the language (``en``, ``te``). The students are checked again and the files are made
+         *     in the background (202); you are notified when they are ready. Restricted (C3) values such
+         *     as the UDISE+ ``category`` are hidden unless ``include_sensitive`` is true (needs
+         *     ``student.read_sensitive``, else 403 ``sensitive_not_allowed``); the audit log then lists
+         *     the restricted columns included. Errors: 422 ``unknown_profile``, ``no_students``,
+         *     ``too_many_students``. Accepts ``Idempotency-Key``.
          */
         post: operations["create_precheck_export_api_v1_exports_post"];
         delete?: never;
@@ -866,8 +871,9 @@ export interface paths {
         };
         /**
          * Get Export
-         * @description One of your exports: status (``queued``, ``running``, ``ready``, ``failed``,
-         *     ``expired``), files and when they are deleted.
+         * @description One export: status (``queued``, ``running``, ``ready``, ``failed``, ``expired``), files,
+         *     when they are deleted and who requested it. Your own, or anyone's with
+         *     ``export.read_all``; 404 otherwise.
          */
         get: operations["get_export_api_v1_exports__export_id__get"];
         put?: never;
@@ -887,10 +893,13 @@ export interface paths {
         };
         /**
          * Get Export Download Url
-         * @description A download link for one file of your ready export, valid at most 5 minutes (the first
-         *     format unless ``format`` is given). Student lists and exports with restricted values need a
-         *     recent sign-in with MFA (428). Errors: 409 ``export_not_ready``, ``export_failed``,
-         *     ``export_expired``. Every download is recorded in the audit log.
+         * @description A download link for one file of a ready export, valid at most 5 minutes (the first
+         *     format unless ``format`` is given). Your own export: student lists and exports with
+         *     restricted values need a recent sign-in with MFA (428). Someone else's export needs
+         *     ``export.download_any`` and always a recent sign-in with MFA (428); 403 ``not_own_export``
+         *     if you can see it (``export.read_all``) but not download it, 404 otherwise. Errors: 409
+         *     ``export_not_ready``, ``export_failed``, ``export_expired``. Every download is recorded in
+         *     the audit log.
          */
         get: operations["get_export_download_url_api_v1_exports__export_id__download_url_get"];
         put?: never;
@@ -4212,6 +4221,8 @@ export interface components {
         };
         /** ExportOut */
         ExportOut: {
+            /** Can Download */
+            can_download: boolean;
             /** Columns */
             columns: string[] | null;
             /**
@@ -4248,10 +4259,13 @@ export interface components {
             language: "en" | "te";
             /** Layout Version */
             layout_version: number;
+            /** Own */
+            own: boolean;
             /** Profile Key */
             profile_key: string | null;
             /** Profile Version */
             profile_version: number | null;
+            requested_by: components["schemas"]["ExportRequesterOut"];
             /** Scope */
             scope: {
                 [key: string]: string[];
@@ -4291,6 +4305,20 @@ export interface components {
             required_fields: string[];
             /** Version */
             version: number;
+        };
+        /**
+         * ExportRequesterOut
+         * @description Who requested an export: the staff member's membership id and display name (``null``
+         *     when the account is no longer visible). Nothing else about the person (ADR-0021).
+         */
+        ExportRequesterOut: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
         };
         /**
          * ExportScopeIn
@@ -8543,6 +8571,7 @@ export interface operations {
                 cursor?: string | null;
                 /** @description Page size (max 200). */
                 limit?: number;
+                requested_by?: "me" | "all";
             };
             header?: never;
             path?: never;

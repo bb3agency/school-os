@@ -181,6 +181,18 @@ def get_membership(session: Session, membership_id: uuid.UUID) -> Membership | N
     return session.get(Membership, membership_id, populate_existing=True)
 
 
+def display_names(session: Session, membership_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Membership id -> the member's display name (this school only; RLS)."""
+    if not membership_ids:
+        return {}
+    stmt = (
+        select(Membership.id, User.display_name)
+        .join(User, User.id == Membership.user_id)
+        .where(Membership.id.in_(membership_ids))
+    )
+    return {row.id: row.display_name for row in session.execute(stmt)}
+
+
 def list_memberships_for_user(session: Session, user_id: uuid.UUID) -> list[Membership]:
     """Memberships of ``user_id`` visible in the current tenant (at most one)."""
     return list(session.scalars(select(Membership).where(Membership.user_id == user_id)))

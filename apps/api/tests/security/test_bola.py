@@ -445,6 +445,21 @@ def test_SEC_015_in_scope_objects_are_visible(world: Any, api: Any) -> None:
     assert api.call(ct, "GET", f"/api/v1/classes/{world.a.ids['class_ix']}").status_code == 200
 
 
+@pytest.mark.parametrize("role", ["owner", "principal", "office_admin"])
+def test_SEC_001_all_exports_list_never_shows_other_school(world: Any, api: Any, role: str) -> None:
+    """ADR-0021: ``export.read_all`` means every export of *this* school; school B's export
+    (and its requester) never appear, and its id stays 404 for the download_any holder."""
+    b_export = str(_b_export(world))
+    res = api.call(
+        world.person(role), "GET", "/api/v1/exports", params={"requested_by": "all", "limit": 200}
+    )
+    assert res.status_code == 200, res.text
+    items = res.json()["data"]
+    assert b_export not in {e["id"] for e in items}
+    b_members = {str(p.membership_id) for p in world.b.people.values()}
+    assert not {e["requested_by"]["membership_id"] for e in items} & b_members
+
+
 @pytest.mark.parametrize(
     "path", ["/api/v1/users", "/api/v1/academic-years", "/api/v1/classes", "/api/v1/sections"]
 )

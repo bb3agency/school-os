@@ -3111,6 +3111,10 @@
       },
       "ExportOut": {
         "properties": {
+          "can_download": {
+            "title": "Can Download",
+            "type": "boolean"
+          },
           "columns": {
             "anyOf": [
               {
@@ -3214,6 +3218,10 @@
             "title": "Layout Version",
             "type": "integer"
           },
+          "own": {
+            "title": "Own",
+            "type": "boolean"
+          },
           "profile_key": {
             "anyOf": [
               {
@@ -3235,6 +3243,9 @@
               }
             ],
             "title": "Profile Version"
+          },
+          "requested_by": {
+            "$ref": "#/components/schemas/ExportRequesterOut"
           },
           "scope": {
             "additionalProperties": {
@@ -3293,7 +3304,10 @@
           "started_at",
           "finished_at",
           "expires_at",
-          "files"
+          "files",
+          "requested_by",
+          "own",
+          "can_download"
         ],
         "title": "ExportOut",
         "type": "object"
@@ -3364,6 +3378,33 @@
           "allowed"
         ],
         "title": "ExportProfileOut",
+        "type": "object"
+      },
+      "ExportRequesterOut": {
+        "description": "Who requested an export: the staff member's membership id and display name (``null``\nwhen the account is no longer visible). Nothing else about the person (ADR-0021).",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "ExportRequesterOut",
         "type": "object"
       },
       "ExportScopeIn": {
@@ -14729,7 +14770,7 @@
     },
     "/api/v1/exports": {
       "get": {
-        "description": "Your own exports, newest first (any export permission).",
+        "description": "Exports, newest first (any export permission or ``export.read_all``).\n``requested_by=me`` (default): your own. ``requested_by=all``: every export of the school\n(``export.read_all``, else 403). Each item says who requested it (``requested_by``), whether\nit is yours (``own``) and whether you may download it (``can_download``).",
         "operationId": "list_exports_api_v1_exports_get",
         "parameters": [
           {
@@ -14764,6 +14805,20 @@
               "description": "Opaque cursor from next_cursor.",
               "title": "Cursor"
             }
+          },
+          {
+            "in": "query",
+            "name": "requested_by",
+            "required": false,
+            "schema": {
+              "default": "me",
+              "enum": [
+                "me",
+                "all"
+              ],
+              "title": "Requested By",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14794,7 +14849,7 @@
         ]
       },
       "post": {
-        "description": "Make a pre-check report for a board or portal profile (``export.board`` for board\nprofiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and\n``dq.findings.read``). Choose sections or classes (empty = every student you can see), the\nformats (``xlsx``, ``pdf``) and the language (``en``, ``te``). The students are checked again\nand the files are made in the background (202); you are notified when they are ready.\nRestricted values are hidden unless ``include_sensitive`` is true (needs\n``student.read_sensitive`` and a recent sign-in, 428 ``step_up_required``). Errors: 422\n``unknown_profile``, ``no_students``, ``too_many_students``. Accepts ``Idempotency-Key``.",
+        "description": "Make a pre-check report for a board or portal profile (``export.board`` for board\nprofiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and\n``dq.findings.read``) with a recent sign-in with MFA (428 ``step_up_required``). Choose\nsections or classes (empty = every student you can see), the formats (``xlsx``, ``pdf``)\nand the language (``en``, ``te``). The students are checked again and the files are made\nin the background (202); you are notified when they are ready. Restricted (C3) values such\nas the UDISE+ ``category`` are hidden unless ``include_sensitive`` is true (needs\n``student.read_sensitive``, else 403 ``sensitive_not_allowed``); the audit log then lists\nthe restricted columns included. Errors: 422 ``unknown_profile``, ``no_students``,\n``too_many_students``. Accepts ``Idempotency-Key``.",
         "operationId": "create_precheck_export_api_v1_exports_post",
         "requestBody": {
           "content": {
@@ -14878,7 +14933,7 @@
     },
     "/api/v1/exports/{export_id}": {
       "get": {
-        "description": "One of your exports: status (``queued``, ``running``, ``ready``, ``failed``,\n``expired``), files and when they are deleted.",
+        "description": "One export: status (``queued``, ``running``, ``ready``, ``failed``, ``expired``), files,\nwhen they are deleted and who requested it. Your own, or anyone's with\n``export.read_all``; 404 otherwise.",
         "operationId": "get_export_api_v1_exports__export_id__get",
         "parameters": [
           {
@@ -14922,7 +14977,7 @@
     },
     "/api/v1/exports/{export_id}/download-url": {
       "get": {
-        "description": "A download link for one file of your ready export, valid at most 5 minutes (the first\nformat unless ``format`` is given). Student lists and exports with restricted values need a\nrecent sign-in with MFA (428). Errors: 409 ``export_not_ready``, ``export_failed``,\n``export_expired``. Every download is recorded in the audit log.",
+        "description": "A download link for one file of a ready export, valid at most 5 minutes (the first\nformat unless ``format`` is given). Your own export: student lists and exports with\nrestricted values need a recent sign-in with MFA (428). Someone else's export needs\n``export.download_any`` and always a recent sign-in with MFA (428); 403 ``not_own_export``\nif you can see it (``export.read_all``) but not download it, 404 otherwise. Errors: 409\n``export_not_ready``, ``export_failed``, ``export_expired``. Every download is recorded in\nthe audit log.",
         "operationId": "get_export_download_url_api_v1_exports__export_id__download_url_get",
         "parameters": [
           {
