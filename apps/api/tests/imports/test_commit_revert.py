@@ -400,3 +400,41 @@ def test_FR_IMP_005_imports_never_write_student_record_tables_directly() -> None
             assert table not in source, f"{path.name} names {table}"
     service_source = (package / "service.py").read_text("utf-8")
     assert "app.students import crypto" not in service_source
+
+
+def _reverted_notices(admin: Engine, batch_id: uuid.UUID) -> list[Any]:
+    with admin.connect() as c:
+        return list(
+            c.execute(
+                text(
+                    "SELECT recipient_membership_id, params, resource_type FROM ops.notifications "
+                    "WHERE resource_id = :b AND template_key = 'import.reverted'"
+                ),
+                {"b": batch_id},
+            )
+        )
+
+
+def test_FR_NOT_001_importer_is_told_when_someone_else_reverts_their_import(
+    world: Any, admin_engine: Engine
+) -> None:
+    rows, _ = S.class_list(2)
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))  # by the office admin
+    _revert(world.a, batch_id, role="principal")
+    notices = _reverted_notices(admin_engine, batch_id)
+    assert [(n.recipient_membership_id, n.params, n.resource_type) for n in notices] == [
+        (
+            world.a.people["office_admin"].membership_id,
+            {"import_id": str(batch_id), "rows": 2},
+            "import_batch",
+        )
+    ]
+
+
+def test_FR_NOT_001_no_notice_when_the_importer_reverts_their_own_import(
+    world: Any, admin_engine: Engine
+) -> None:
+    rows, _ = S.class_list(1)
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    _revert(world.a, batch_id)
+    assert _reverted_notices(admin_engine, batch_id) == []

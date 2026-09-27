@@ -1307,6 +1307,28 @@ def run_commit(  # noqa: PLR0911 - one outcome code per exit path
 # --- revert ---------------------------------------------------------------------------------------
 
 
+def _notify_reverted(session: Session, ctx: UserContext, batch: ImportBatch, rows: int) -> None:
+    """Tell the person who uploaded the file that someone else undid it (FR-NOT-001). No
+    notice when they reverted it themselves, or when they are no longer an active member."""
+    if batch.created_by == ctx.user_id:
+        return
+    try:
+        importer = identity.get_user(session, batch.created_by)
+    except NotFound:
+        return
+    if importer.status != "active":
+        return
+    notifications.notify(
+        session,
+        tenant_id=batch.tenant_id,
+        recipients=[importer.membership_id],
+        template_key="import.reverted",
+        params={"import_id": str(batch.id), "rows": rows},
+        resource_id=batch.id,
+        dedupe_key=f"import.reverted:{batch.id}",
+    )
+
+
 def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut:
     """Undo a committed batch within 24 hours (``import.commit``; FR-IMP-005).
 
@@ -1348,6 +1370,7 @@ def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut
         },
     )
     ops.enqueue_event(session, REVERTED_EVENT, {"batch_id": batch.id})
+    _notify_reverted(session, ctx, batch, len(rows))
     log.info(
         "imports.reverted",
         resource_type="import_batch",

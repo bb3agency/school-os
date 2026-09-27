@@ -91,6 +91,17 @@ templates:
       title: రికార్డులు జోడించబడ్డాయి
       body: "{rows, plural, one {# వరుస} other {# వరుసలు}} విద్యార్థి రికార్డులకు జోడించబడ్డాయి."
 
+  # Sent to the person who uploaded the file when someone else reverts it (FR-IMP-005).
+  import.reverted:
+    params: [import_id, rows]
+    resource_type: import_batch
+    en:
+      title: A file you added was undone
+      body: "Another staff member undid your import. {rows, plural, =0 {No rows were changed.} one {# row was taken back out of the student records.} other {# rows were taken back out of the student records.}} Open the import to see the details."
+    te:
+      title: మీరు జోడించిన ఫైల్ వెనక్కి తీసుకోబడింది
+      body: "మీరు జోడించిన ఫైల్‌ను మరో సిబ్బంది వెనక్కి తీసుకున్నారు. {rows, plural, =0 {ఏ వరుసలూ మారలేదు.} one {# వరుస విద్యార్థి రికార్డుల నుండి తీసివేయబడింది.} other {# వరుసలు విద్యార్థి రికార్డుల నుండి తీసివేయబడ్డాయి.}} వివరాల కోసం దిగుమతిని తెరవండి."
+
   export.ready:
     params: [export_id, students]
     resource_type: export

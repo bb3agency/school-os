@@ -17,6 +17,7 @@ REQUIRED = {
     "dq.run.completed",
     "import.validated",
     "import.committed",
+    "import.reverted",
     "document.quarantined",
     "breakglass.requested",
     "breakglass.approved",
