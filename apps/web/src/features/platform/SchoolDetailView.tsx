@@ -22,6 +22,11 @@ import { BillingAccountFields } from "./BillingAccountFields";
 import { PK, ifMatch, useCan, usePlanDirectory } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { InvoiceTable } from "./InvoiceTable";
+import {
+  ProvisioningLabel,
+  ProvisioningStatus,
+  ResumeProvisioningAction,
+} from "./ProvisioningStatus";
 import { TicketTable } from "./SupportScreens";
 import { SCHOOL_TABS, type SchoolTab } from "./school-tabs";
 import { ReasonField, SubscriptionActions } from "./SubscriptionActions";
@@ -32,6 +37,8 @@ const reasonSchema = z.object({ reason });
 /**
  * FR-PLT-001..005 school detail (docs/16 §5.3, §5.5): tenant metadata, billing and fleet
  * only (no student data), with activate / suspend / reactivate and two-person offboarding.
+ * While the school is `provisioning` it shows where setup stands and offers "Resume
+ * provisioning" (FR-PLT-002, docs/16 §5.4); go-live is refused until setup has finished.
  */
 export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: SchoolTab }) {
   const t = useTranslations("platform.schoolDetail");
@@ -64,11 +71,17 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
       <>
         {status === "provisioning" && can("platform.tenants.provision") ? (
           <>
+            {data.provisioning?.resumable ? <ResumeProvisioningAction schoolId={schoolId} /> : null}
             <ActionDialog
               triggerLabel={t("activate")}
-              triggerVariant="primary"
+              triggerVariant={data.provisioning?.resumable ? "secondary" : "primary"}
               title={t("activateTitle")}
               description={t("activateBody")}
+              note={
+                data.provisioning && data.provisioning.state !== "completed"
+                  ? t("provisioning.activateIncomplete")
+                  : undefined
+              }
               confirmLabel={t("activate")}
               stepUp
               schema={z.object({})}
@@ -243,6 +256,7 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
           {t("offboardApprovedBody", { date: formatDateTime(school.offboard_approved_at) ?? "" })}
         </Alert>
       ) : null}
+      {school ? <ProvisioningStatus school={school} /> : null}
       <p className="text-sm text-ink-muted">{t("offboardNote")}</p>
       <TabNav label={t("tabsLabel")} items={tabs} activeId={tab} />
       <Card title={t(`tabs.${tab}`)}>{panel()}</Card>
@@ -266,6 +280,14 @@ function OverviewTab({ school }: { school: TenantDetail }) {
           {tschool(school.tenant_status)}
           {school.tenant_status_reason ? ` · ${school.tenant_status_reason}` : ""}
         </dd>
+        {school.provisioning ? (
+          <>
+            <dt className="text-ink-muted">{t("fields.setup")}</dt>
+            <dd>
+              <ProvisioningLabel school={school} />
+            </dd>
+          </>
+        ) : null}
         <dt className="text-ink-muted">{t("fields.deployment")}</dt>
         <dd>{tmode(school.tier)}</dd>
         <dt className="text-ink-muted">{t("fields.boards")}</dt>

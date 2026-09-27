@@ -297,6 +297,190 @@ describe("school detail actions (FR-PLT-004..005, SEC-027)", () => {
   });
 });
 
+describe("school provisioning state and resume (FR-PLT-002, docs/16 §5.4)", () => {
+  const RUN = {
+    state: "failed",
+    failed_step: "initialise",
+    last_error: "unexpected_error",
+    attempts: 2,
+    in_progress: false,
+    resumable: true,
+    updated_at: "2026-09-27T04:30:00Z",
+  };
+  const PROVISIONING = {
+    ...DETAIL,
+    tenant_status: "provisioning",
+    subscription_status: "trialing",
+    provisioning: RUN,
+  };
+  const RESUME = `POST /bff/api/v1/platform/tenants/${T}/provisioning:resume`;
+  const ACTIVATE = `POST /bff/api/v1/platform/tenants/${T}/activate`;
+  const sd = pm.schoolDetail;
+
+  beforeEach(() => {
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () => Response.json(PROVISIONING);
+  });
+
+  it("explains a failed run in plain language: step, error code for support, attempts", async () => {
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    const box = within(await screen.findByRole("region", { name: sd.provisioning.state.failed }));
+    expect(
+      box.getByText(sd.provisioning.failedAt.replace("{step}", sd.provisioning.steps.initialise)),
+    ).toBeVisible();
+    expect(
+      box.getByText(sd.provisioning.errorCode.replace("{code}", "unexpected_error")),
+    ).toBeVisible();
+    expect(box.getByText(sd.provisioning.attempts.replace("{count, number}", "2"))).toBeVisible();
+    expect(box.getByText(sd.provisioning.resumeHint)).toBeVisible();
+    expect(screen.getByRole("button", { name: sd.provisioning.resume })).toBeEnabled();
+    expect(screen.getByText(sd.provisioning.label.failed)).toBeVisible();
+  });
+
+  it("resume confirms first, then posts with CSRF and reloads the school", async () => {
+    let calls = 0;
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () => {
+      calls += 1;
+      return Response.json(
+        calls === 1
+          ? PROVISIONING
+          : {
+              ...PROVISIONING,
+              provisioning: {
+                ...RUN,
+                state: "completed",
+                failed_step: null,
+                last_error: null,
+                resumable: false,
+              },
+            },
+      );
+    };
+    stub.routes[RESUME] = () =>
+      Response.json({
+        tenant_id: T,
+        deployment_id: "0192f3a4-0000-7000-8000-00000000d001",
+        subscription_id: SUB.id,
+        billing_account_id: SUB.billing_account_id,
+        tier: "shared",
+        tenant_status: "provisioning",
+        owner_invite: "created",
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    await user.click(await screen.findByRole("button", { name: sd.provisioning.resume }));
+    const dialog = screen.getByRole("dialog", { name: sd.provisioning.resumeTitle });
+    expect(dialog).toHaveAccessibleDescription(sd.provisioning.resumeBody);
+    expect(within(dialog).getByText(cm.stepUpNote)).toBeVisible();
+    expect(stub.callsTo(RESUME)).toHaveLength(0);
+    await user.click(within(dialog).getByRole("button", { name: sd.provisioning.resume }));
+    await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
+    const [call] = stub.callsTo(RESUME);
+    expect(call?.headers.get("x-csrf-token")).toBe(CSRF);
+    expect(await screen.findByText(sd.provisioning.state.completed)).toBeVisible();
+    expect(screen.queryByRole("button", { name: sd.provisioning.resume })).toBeNull();
+  });
+
+  it.each([
+    ["provisioning_in_progress", 409],
+    ["resume_needs_request", 409],
+    ["provisioning_failed", 503],
+  ] as const)("resume refused with %s is explained in Telugu", async (code, status) => {
+    stub.routes[RESUME] = () => problem(status, code);
+    const user = userEvent.setup();
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />, "te");
+    const tsd = messages.te.platform.schoolDetail;
+    await user.click(await screen.findByRole("button", { name: tsd.provisioning.resume }));
+    const dialog = screen.getByRole("dialog", { name: tsd.provisioning.resumeTitle });
+    await user.click(within(dialog).getByRole("button", { name: tsd.provisioning.resume }));
+    expect(await within(dialog).findByText(messages.te.errors.api[code].title)).toBeVisible();
+    expect(within(dialog).getByText(messages.te.errors.api[code].body)).toBeVisible();
+    expect(within(dialog).getByText(/req_test/)).toBeInTheDocument();
+  });
+
+  it("step-up required (428) on resume leaves for re-authentication", async () => {
+    stub.routes[RESUME] = () =>
+      problem(428, "step_up_required", {
+        step_up_url: "/bff/auth/platform/step-up?next=%2Fen%2Fplatform",
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    await user.click(await screen.findByRole("button", { name: sd.provisioning.resume }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: sd.provisioning.resume }));
+    await waitFor(() =>
+      expect(stub.navigate).toHaveBeenCalledWith(
+        "/bff/auth/platform/step-up?next=%2Fen%2Fplatform",
+      ),
+    );
+  });
+
+  it("a run another request holds says so and offers no resume", async () => {
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
+      Response.json({
+        ...PROVISIONING,
+        provisioning: {
+          ...RUN,
+          state: "registered",
+          failed_step: null,
+          last_error: null,
+          in_progress: true,
+          resumable: false,
+        },
+      });
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    expect(await screen.findByText(sd.provisioning.state.registered)).toBeVisible();
+    expect(screen.getByText(sd.provisioning.inProgress)).toBeVisible();
+    expect(screen.queryByRole("button", { name: sd.provisioning.resume })).toBeNull();
+  });
+
+  it("resume is hidden without platform.tenants.provision (UX only; the API checks)", async () => {
+    stub.routes["GET /bff/api/v1/platform/me"] = () =>
+      Response.json({ ...ME, permissions: ["platform.tenants.read"] });
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    expect(await screen.findByText(sd.provisioning.state.failed)).toBeVisible();
+    expect(screen.queryByRole("button", { name: sd.provisioning.resume })).toBeNull();
+    expect(screen.queryByRole("button", { name: sd.activate })).toBeNull();
+  });
+
+  it("go live before setup finishes warns in the dialog and explains 409 provisioning_incomplete", async () => {
+    stub.routes[ACTIVATE] = () => problem(409, "provisioning_incomplete");
+    const user = userEvent.setup();
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    await user.click(await screen.findByRole("button", { name: sd.activate }));
+    const dialog = screen.getByRole("dialog", { name: sd.activateTitle });
+    expect(within(dialog).getByText(sd.provisioning.activateIncomplete)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: sd.activate }));
+    expect(
+      await within(dialog).findByText(messages.en.errors.api.provisioning_incomplete.title),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText(messages.en.errors.api.provisioning_incomplete.body),
+    ).toBeVisible();
+    expect(stub.callsTo(ACTIVATE)).toHaveLength(1);
+  });
+
+  it("a finished setup shows no warning and go live has no incomplete note", async () => {
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
+      Response.json({
+        ...PROVISIONING,
+        provisioning: {
+          ...RUN,
+          state: "completed",
+          failed_step: null,
+          last_error: null,
+          resumable: false,
+        },
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    expect(await screen.findByText(sd.provisioning.state.completed)).toBeVisible();
+    expect(screen.queryByText(sd.provisioning.state.failed)).toBeNull();
+    await user.click(screen.getByRole("button", { name: sd.activate }));
+    const dialog = screen.getByRole("dialog", { name: sd.activateTitle });
+    expect(within(dialog).queryByText(sd.provisioning.activateIncomplete)).toBeNull();
+  });
+});
+
 describe("plans, subscriptions and invoices (FR-PLT-010..019)", () => {
   it("publishes a draft plan version", async () => {
     stub.routes["POST /bff/api/v1/platform/plans/0192f3a4-0000-7000-8000-00000000a003/publish"] =

@@ -44,6 +44,11 @@ export const KNOWN_API_CODES = [
   "service_unavailable",
   "tenant_not_available",
   "step_up_cancelled",
+  // School provisioning (FR-PLT-002, docs/16 §5.4): resume and go-live refusals.
+  "provisioning_in_progress",
+  "provisioning_incomplete",
+  "provisioning_failed",
+  "resume_needs_request",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 
