@@ -693,7 +693,7 @@ CREATE TABLE sis.extraction_items (
   reviewed_by uuid, reviewed_at timestamptz, student_id uuid,
   FOREIGN KEY (tenant_id, batch_id)   REFERENCES sis.import_batches (tenant_id, id),
   FOREIGN KEY (tenant_id, student_id) REFERENCES sis.students (tenant_id, id)
-  -- (tenant_id, document_id) → kb.documents added with kb (§3.5)
+  -- (tenant_id, document_id) → kb.documents added with kb (§3.5); as built: §5.6
 );
 ```
 
@@ -709,6 +709,15 @@ The DDL above is the model; migration `0008_sis_students` implements `students`,
 - **`enrollments`** add `created_by`, `created_at`, `updated_at`, `version` and index `enrollments_section_active_idx (tenant_id, academic_year_id, section_id) WHERE status = 'active'`. Scope (SEC-015) is decided on active enrolments in the **current** academic year.
 - **`guardians`** add `updated_at` and `version` (ETag); phone (C3) is stored as 10 digits, encrypted, with a blind index (`guardians_phone_bidx`); `student_guardians_one_primary` allows one primary guardian per student.
 - **Encryption**: AAD `tenant_id|sis.attribute_values|value_ciphertext|<row id>` and `tenant_id|sis.guardians|phone_ciphertext|<guardian id>` (likewise `address_ciphertext`); blind index = HMAC-SHA256(tenant HMAC key, `schoolos/blind-index/v1|<purpose>|<value>`).
+
+### 5.6 Register-photo extraction as built (migration `0016_extraction`)
+
+US-402, FR-IMP-020..024, PRV-015/016. Photo batches have their own table (`sis.import_batches` belongs to spreadsheet imports), so `sis.extraction_items.batch_id` references `sis.extraction_batches`:
+
+- **`extraction_batches`**: `source` fixed to `admission_register` (BR-01); `status` `queued → processing → review → completed` or `failed` (`error_code` iff failed, e.g. `provider_not_configured`); `provider` (kind used); `created_by`, `created_by_membership` (composite FK to `core.memberships`, notification recipient); progress counters `page_count`, `pages_done`, `pages_failed`, `pages_withheld`, `items_total/pending/confirmed/rejected/low_confidence` with CHECKs that they add up; `version`.
+- **`extraction_pages`**: one row per page image (M1: one JPG/PNG `register_scan` document per page; PDFs are refused until a rasteriser is approved); composite FK to `kb.documents`; `document_version_no`, `seq`, `status` (`queued`, `done`, `failed` + `error_code`), `row_count`, `low_confidence_count`, `dropped_field_count`. `aadhaar_detected` (a Verhoeff-valid 12-digit number was in the page text or any cell) implies `image_withheld` (CHECK): the image is never served until image redaction exists. **No OCR text is stored.**
+- **`extraction_items`**: as §5 plus `page_id` (composite FK), `fields` = `{field: {value, confidence, bbox, masked, low_confidence}}` with values already masked (`XXXX XXXX 1234`), only C2 register fields (`app/extraction/config.yaml`); `low_confidence`, `masked`, `reject_reason`, `value_ids` (the `sis.attribute_values` rows created on confirmation), `corrected_fields` (fields the reviewer changed, for provider evaluation), `created_student`, `version`. `UNIQUE (tenant_id, page_id, row_index)` makes page processing idempotent. A CHECK ties the review outcome to the status; trigger `extraction_items_immutable` forbids changing extracted values and any change after review.
+- All three: RLS ENABLE + FORCE with `tenant_isolation`, `UNIQUE (tenant_id, id)`; the app role has no DELETE/TRUNCATE (provenance of confirmed register values). The FKs to `kb.documents` keep a register page from being deleted while rows point at it (409 `document_in_use`).
 
 ## 6. Knowledge schema (`kb`)
 
