@@ -176,7 +176,7 @@ Imports notes (M1, as built; US-401, FR-IMP-001..007):
 | GET | `/extraction-items?batch_id=&status=pending_review` (cursor) · `/extraction-items/{id}` (page image link, possible matches) | `import.run` |
 | POST | `/extraction-items/{id}/confirm` · `/reject` | `import.commit` |
 
-- Register photos (US-402): a batch reads each page with the configured provider; Aadhaar-like numbers are masked before storage and a page that showed one has `image_withheld` (no image link). Items carry per-field `confidence`, `bbox`, `masked`, `low_confidence`. PDFs answer 422 `pdf_not_supported` (M1).
+- Register photos (US-402): a batch reads each page with the configured provider; Aadhaar-like numbers are masked before storage. A page that showed one is `image_redacted` (its image link is the blacked-out copy, available once scanned) or, when it cannot be redacted, `image_withheld` (no image link; its rows answer 409 `evidence_unavailable` on confirm) (PRV-016). Items carry per-field `confidence`, `bbox`, `masked`, `low_confidence`. PDFs answer 422 `pdf_not_supported` (M1).
 - Confirm body: `fields` (the values read on the page; `null` skips), optional `student_id` (add to an existing student) or `section_id`/`roll_no`/`student_status` (new student). Values are recorded with source `admission_register` and the page as evidence; identity values stay unverified (verification is a change request), others are recorded verified by the reviewer. 409 `item_already_reviewed`; 403 `identity_change_required` when a different register identity value exists; 422 `masked_value` for a masked number. Emits outbox `extraction.confirmed` {batch_id, item_id, student_id}.
 
 ### Data quality
