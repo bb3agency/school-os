@@ -96,7 +96,11 @@ export function RulesScreen() {
       ),
     },
     { key: "required", header: t("colRequired"), cell: (row) => fields(row.required_fields) },
-    { key: "apaar", header: t("colApaar"), cell: (row) => (row.needs_apaar ? tc("yes") : tc("no")) },
+    {
+      key: "apaar",
+      header: t("colApaar"),
+      cell: (row) => (row.needs_apaar ? tc("yes") : tc("no")),
+    },
   ];
 
   return (

@@ -26,11 +26,22 @@ export type SourceKey = Schemas["ChangeRequestCreate"]["target_source"];
 
 type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
 
-const severities = ["blocker", "high", "medium", "low", "info"] as const satisfies readonly Severity[];
+const severities = [
+  "blocker",
+  "high",
+  "medium",
+  "low",
+  "info",
+] as const satisfies readonly Severity[];
 /** Most severe first (the API's order). */
 export const SEVERITIES: Exhaustive<Severity, typeof severities> = severities;
 
-const statuses = ["open", "reopened", "resolved", "waived"] as const satisfies readonly FindingStatus[];
+const statuses = [
+  "open",
+  "reopened",
+  "resolved",
+  "waived",
+] as const satisfies readonly FindingStatus[];
 export const FINDING_STATUSES: Exhaustive<FindingStatus, typeof statuses> = statuses;
 
 /** Unresolved findings: the API's default when no status is given. */

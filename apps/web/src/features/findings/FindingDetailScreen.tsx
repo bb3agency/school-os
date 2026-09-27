@@ -19,16 +19,27 @@ import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
 import { optionalText, text, UUID_PATTERN } from "@/lib/validation";
-import { attributeLabel, DQ_KEYS, ruleText, useAttributes, useRules } from "./data";
+import {
+  attributeLabel,
+  DQ_KEYS,
+  profileLabel,
+  ruleText,
+  useAttributes,
+  useProfiles,
+  useRules,
+} from "./data";
 import { FindingStatusBadge, SeverityBadge, SourceChip } from "./parts";
 import { isUnresolved, SCHOOL_RECORD_ROUTE, type Bilingual, type Finding } from "./types";
 
 const resolveSchema = z
   .object({
     note: optionalText(1000),
+    // Absent when the select is disabled (no pending requests, or no access to them).
     change_request_id: z
       .string()
       .trim()
+      .optional()
+      .transform((value) => value ?? "")
       .refine((value) => value === "" || UUID_PATTERN.test(value), { error: "chooseOption" })
       .transform((value) => (value === "" ? null : value)),
   })
@@ -86,6 +97,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
   const can = useStaffCan();
   const rules = useRules();
   const attributes = useAttributes();
+  const profiles = useProfiles();
   const finding = useApiQuery(DQ_KEYS.finding(findingId), () =>
     unwrap(
       api.GET("/api/v1/dq/findings/{finding_id}", {
@@ -266,7 +278,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
             {data.profile_key ? (
               <>
                 <dt className="font-semibold">{t("filterProfile")}</dt>
-                <dd>{data.profile_key}</dd>
+                <dd>{profileLabel(profiles.data, data.profile_key, locale)}</dd>
               </>
             ) : null}
           </dl>
@@ -387,10 +399,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
       </Card>
 
       <p>
-        <Link
-          href={`/findings?student_id=${data.student.id}`}
-          className="text-primary underline"
-        >
+        <Link href={`/findings?student_id=${data.student.id}`} className="text-primary underline">
           {td("allForStudent")}
         </Link>
         <span aria-hidden="true"> · </span>

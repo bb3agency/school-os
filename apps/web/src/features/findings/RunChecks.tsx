@@ -6,6 +6,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Select";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
@@ -83,7 +84,9 @@ export function RunProgress({ runId, initial }: { runId: string; initial?: DqRun
     body = (
       <Alert tone="danger" title={t("failedTitle")}>
         <p>{t("failedBody")}</p>
-        {run.error_code ? <p className="mt-1 text-xs">{t("errorCode", { code: run.error_code })}</p> : null}
+        {run.error_code ? (
+          <p className="mt-1 text-xs">{t("errorCode", { code: run.error_code })}</p>
+        ) : null}
       </Alert>
     );
   } else {
@@ -104,7 +107,9 @@ export function RunProgress({ runId, initial }: { runId: string; initial?: DqRun
           })}
         </p>
         {run.finished_at ? (
-          <p className="mt-1 text-xs">{t("finishedAt", { time: formatDateTime(run.finished_at) ?? "" })}</p>
+          <p className="mt-1 text-xs">
+            {t("finishedAt", { time: formatDateTime(run.finished_at) ?? "" })}
+          </p>
         ) : null}
       </Alert>
     );
@@ -166,16 +171,15 @@ export function RunChecksDialog({ defaultProfile }: { defaultProfile?: string | 
         <>
           <RunProgress runId={run.id} initial={run} />
           <div className="flex flex-wrap justify-end gap-2">
-            <Link href={`/findings/runs/${run.id}`} className="self-center text-sm text-primary underline">
+            <Link
+              href={`/findings/runs/${run.id}`}
+              className="self-center text-sm text-primary underline"
+            >
               {t("openRun")}
             </Link>
-            <button
-              type="button"
-              onClick={close}
-              className="min-h-10 rounded-md border border-border-strong px-4 text-sm font-semibold hover:bg-surface-muted"
-            >
+            <Button variant="secondary" onClick={close}>
               {tc("close")}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -205,7 +209,10 @@ export function RunChecksDialog({ defaultProfile }: { defaultProfile?: string | 
               [...byClass.entries()].map(([classLabel, list]) => (
                 <div key={classLabel || "none"} className="flex flex-wrap gap-x-4 gap-y-1">
                   {list.map((section) => (
-                    <label key={section.id} className="inline-flex min-h-8 items-center gap-2 text-sm">
+                    <label
+                      key={section.id}
+                      className="inline-flex min-h-8 items-center gap-2 text-sm"
+                    >
                       <input
                         type="checkbox"
                         name="section_ids"
