@@ -35,6 +35,8 @@ export default async function SchoolLayout({
   const me = await apiGetAsSession<Me>("staff", "/api/v1/me");
   if (me && me.code && CHOOSE_AGAIN.has(me.code)) redirect(picker);
   const profile = me?.data ?? null;
+  // School settings (FR-TEN-012); an older API answer may not carry them.
+  const settings: Partial<Me["settings"]> | undefined = profile?.settings;
   // BR-08 / 16 §5.5: while the school is paused, /me works only for the owner and principal.
   const suspended = me?.code === "tenant_suspended";
   const schoolStatus: SchoolStatus = profile?.tenant_status ?? (suspended ? "suspended" : "active");
@@ -52,6 +54,7 @@ export default async function SchoolLayout({
       }
       permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
+      languages={settings?.languages ?? null}
       banner={
         <>
           <SuspendedBanner initialStatus={schoolStatus} />

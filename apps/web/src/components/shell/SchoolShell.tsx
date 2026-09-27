@@ -21,12 +21,15 @@ export function SchoolShell({
   headerActions,
   permissions = null,
   canSwitchSchool = false,
+  languages = null,
   banner,
 }: {
   children: ReactNode;
   headerActions?: ReactNode;
   permissions?: readonly string[] | null;
   canSwitchSchool?: boolean;
+  /** The school's languages from GET /me `settings` (first is the default; FR-TEN-012). */
+  languages?: readonly string[] | null;
   /** Platform announcements (FR-PLT-026), shown above the page. */
   banner?: ReactNode;
 }) {
@@ -88,7 +91,7 @@ export function SchoolShell({
             </Link>
           ) : null}
           {headerActions}
-          <LanguageSwitcher />
+          <LanguageSwitcher languages={languages} />
         </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
