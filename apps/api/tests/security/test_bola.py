@@ -91,6 +91,10 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/breakglass/requests/{request_id}/approve"): None,
     ("POST", "/api/v1/breakglass/requests/{request_id}/deny"): None,
     ("POST", "/api/v1/breakglass/grants/{grant_id}/revoke"): None,
+    ("PUT", "/api/v1/imports/{import_id}/mapping"): {"columns": []},
+    ("POST", "/api/v1/imports/{import_id}/validate"): None,
+    ("POST", "/api/v1/imports/{import_id}/commit"): {},
+    ("POST", "/api/v1/imports/{import_id}/revert"): None,
 }
 
 
@@ -121,6 +125,13 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/students/{student_id}/guardians"),
         ("PATCH", "/api/v1/students/{student_id}/guardians/{guardian_id}"),
         ("POST", "/api/v1/students/{student_id}/enrollments"),
+        # Imports (import.run / import.commit are not owner permissions, docs/07 §6.2).
+        ("GET", "/api/v1/imports/{import_id}"),
+        ("GET", "/api/v1/imports/{import_id}/rows"),
+        ("PUT", "/api/v1/imports/{import_id}/mapping"),
+        ("POST", "/api/v1/imports/{import_id}/validate"),
+        ("POST", "/api/v1/imports/{import_id}/commit"),
+        ("POST", "/api/v1/imports/{import_id}/revert"),
     ),
     "principal",
 )
@@ -143,6 +154,25 @@ def _b_document(w: Any) -> uuid.UUID:
     """A school B document created through the real upload -> register path."""
     doc_id: uuid.UUID = D.service_document(w.b.tenant_id, w.b.people["owner"])
     return doc_id
+
+
+def _b_import(w: Any) -> uuid.UUID:
+    """A school B import batch (tests/imports/support.py; created through imports.service)."""
+    name = "sos_test_imports_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "imports" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    im = sys.modules[name]
+    if "bola_import" not in w.b.ids:
+        rows = im.class_list(1)[0]
+        w.b.ids["bola_import"] = im.start(None, w.b, im.xlsx_bytes(rows), role="owner")
+    value: uuid.UUID = w.b.ids["bola_import"]
+    return value
 
 
 def _b_notification(w: Any) -> uuid.UUID:
@@ -197,6 +227,7 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # Break-glass (US-103): a pending request / an active grant of school B.
     "request_id": lambda w: _bg().pending_grant(w.b.tenant_id),
     "grant_id": lambda w: _bg().active_grant(w.b.tenant_id, w.b.people["owner"]),
+    "import_id": _b_import,
 }
 
 

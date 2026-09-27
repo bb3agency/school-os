@@ -29,12 +29,13 @@ def _revert(school: Any, batch_id: uuid.UUID, role: str = "office_admin") -> Any
 
 
 def _students_with(admin: Engine, tenant_id: uuid.UUID, numbers: list[str]) -> int:
-    return S.count(
+    counted: int = S.count(
         admin,
         "SELECT count(*) FROM sis.students WHERE tenant_id = :t AND admission_no = ANY(:a)",
         t=tenant_id,
         a=numbers,
     )
+    return counted
 
 
 def test_FR_IMP_004_failure_midway_leaves_nothing(
@@ -59,7 +60,7 @@ def test_FR_IMP_004_failure_midway_leaves_nothing(
             )
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(service.students, "create_student", flaky)
+    monkeypatch.setattr(students, "create_student", flaky)
     audit_before = S.count(
         admin_engine, "SELECT count(*) FROM audit.events WHERE tenant_id = :t", t=world.a.tenant_id
     )
@@ -96,7 +97,7 @@ def test_FR_IMP_004_failure_midway_leaves_nothing(
         }
     ]
     # Fixed (the failure is gone): the same batch commits completely.
-    monkeypatch.setattr(service.students, "create_student", real)
+    monkeypatch.setattr(students, "create_student", real)
     assert S.commit(world.a, batch_id, skip_error_rows=True) == "committed"
 
 
@@ -136,7 +137,8 @@ def test_FR_IMP_005_revert_removes_created_students_in_one_transaction(
     batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
     sids = [S.student_by_adm(admin_engine, world.a.tenant_id, n) for n in numbers]
     out = _revert(world.a, batch_id)
-    assert out.status == "reverted" and out.reverted_at is not None
+    assert out.status == "reverted"
+    assert out.reverted_at is not None
     assert _students_with(admin_engine, world.a.tenant_id, numbers) == 0
     for table in ("sis.attribute_values", "sis.enrollments", "sis.student_profiles"):
         assert (
@@ -304,8 +306,13 @@ def test_FR_IMP_005_students_are_deleted_only_by_their_import_revert(
             pytest.raises(DBAPIError, match="only by reverting"),
             tenant_session(world.a.tenant_id) as s,
         ):
-            s.execute(text("DELETE FROM sis.enrollments WHERE student_id = :s"), {"s": target})
-            s.execute(text("DELETE FROM sis.students WHERE id = :s"), {"s": target})
+            s.execute(
+                text(
+                    "WITH e AS (DELETE FROM sis.enrollments WHERE student_id = :s) "
+                    "DELETE FROM sis.students WHERE id = :s"
+                ),
+                {"s": target},
+            )
     # sos_app still cannot delete recorded values directly (FR-STU-005).
     from sqlalchemy.exc import ProgrammingError
 

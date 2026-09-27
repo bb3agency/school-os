@@ -51,7 +51,7 @@ def test_FR_IMP_007_raw_file_kept_90_days_after_commit_then_deleted(
     with admin_engine.connect() as c:
         from sqlalchemy import text
 
-        key = c.execute(
+        key: str = c.execute(
             text("SELECT object_key FROM kb.document_versions WHERE document_id = :d"), {"d": doc}
         ).scalar_one()
     assert key in store.objects
@@ -70,7 +70,8 @@ def test_FR_IMP_007_raw_file_kept_90_days_after_commit_then_deleted(
     )
     assert service.purge_raw_files(world.a.tenant_id) >= 1
     after = S.batch(admin_engine, batch_id)
-    assert after["document_id"] is None and after["raw_file_deleted_at"] is not None
+    assert after["document_id"] is None
+    assert after["raw_file_deleted_at"] is not None
     assert S.count(admin_engine, "SELECT count(*) FROM kb.documents WHERE id = :d", d=doc) == 0
     assert len(S.rows(admin_engine, batch_id)) == 1
     assert S.student_by_adm(admin_engine, world.a.tenant_id, numbers[0]) is not None
@@ -79,7 +80,8 @@ def test_FR_IMP_007_raw_file_kept_90_days_after_commit_then_deleted(
         for e in W.audit_events(admin_engine, world.a.tenant_id, "import.raw_file_deleted")
         if str(e["resource_id"]) == str(batch_id)
     ]
-    assert events and events[0]["summary"] == {"document_id": str(doc), "reason": "retention"}
+    assert events
+    assert events[0]["summary"] == {"document_id": str(doc), "reason": "retention"}
     purge = next(
         p
         for p in S.D.outbox_events(admin_engine, world.a.tenant_id, "document.deleted")
@@ -113,7 +115,8 @@ def test_FR_IMP_006_2000_rows_validate_well_within_60_seconds(
     assert S.run_parse(world.a, batch_id) == "validated"  # parse + map + validate + store
     elapsed = time.perf_counter() - started
     batch = S.batch(admin_engine, batch_id)
-    assert batch["row_count"] == 2000 and batch["error_count"] == 0
+    assert batch["row_count"] == 2000
+    assert batch["error_count"] == 0
     assert elapsed < 20, f"2,000 rows took {elapsed:.1f}s (budget 60 s, NFR-PERF-004)"
 
 

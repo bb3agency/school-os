@@ -7,6 +7,7 @@ the test process (valid Verhoeff only where a test needs the rejection path).
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import datetime as dt
 import hashlib
@@ -15,7 +16,7 @@ import io
 import itertools
 import sys
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -110,8 +111,20 @@ def class_list(
 # --- import documents -----------------------------------------------------------------------------
 
 
+@contextlib.contextmanager
+def _writer(admin: Engine | None, tenant_id: uuid.UUID) -> Iterator[Any]:
+    if admin is not None:
+        with admin.begin() as c:
+            yield c
+        return
+    from app.core.db import tenant_session
+
+    with tenant_session(tenant_id) as s:
+        yield s
+
+
 def import_document(
-    admin: Engine,
+    admin: Engine | None,
     tenant_id: uuid.UUID,
     created_by: uuid.UUID,
     data: bytes,
@@ -120,12 +133,13 @@ def import_document(
     status: str = "ready",
 ) -> uuid.UUID:
     """A scanned ``import_file`` document with its raw object in the in-memory store (the
-    same shape documents.register_document produces: ``t/<tenant>/imports/<batch>/raw.<ext>``)."""
+    same shape documents.register_document produces: ``t/<tenant>/imports/<batch>/raw.<ext>``).
+    Without ``admin`` the rows are written as ``sos_app`` inside the school's tenant session."""
     store = D.memory_store()
     doc_id, version_id, batch_key = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     mime = XLSX_MIME if kind == "xlsx" else CSV_MIME
     key = f"t/{tenant_id}/imports/{batch_key}/raw.{kind}"
-    with admin.begin() as c:
+    with _writer(admin, tenant_id) as c:
         c.execute(
             text(
                 "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, sensitivity, "
@@ -164,7 +178,7 @@ def ctx(school: Any, role: str = "office_admin", **kw: Any) -> Any:
 
 
 def start(
-    admin: Engine,
+    admin: Engine | None,
     school: Any,
     data: bytes,
     *,
@@ -185,7 +199,7 @@ def start(
         out = service.create_import(
             s,
             ctx(school, role),
-            ImportCreate(document_id=doc, source=source),  # type: ignore[arg-type]
+            ImportCreate(document_id=doc, source=source),
         )
     if parse:
         run_parse(school, out.id, role=role)

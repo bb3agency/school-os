@@ -38,7 +38,8 @@ def test_US_401_full_flow_over_http(world: Any, api: Any, admin_engine: Engine) 
     assert res.status_code == 202, res.text
     body = res.json()
     assert res.headers["Location"] == f"/api/v1/imports/{body['id']}"
-    assert body["status"] == "uploaded" and body["job_id"]
+    assert body["status"] == "uploaded"
+    assert body["job_id"]
     batch_id = uuid.UUID(body["id"])
     S.run_parse(world.a, batch_id)
 
@@ -46,7 +47,8 @@ def test_US_401_full_flow_over_http(world: Any, api: Any, admin_engine: Engine) 
     assert got.status_code == 200
     detail = got.json()
     assert detail["status"] == "validated"
-    assert detail["error_count"] == 1 and detail["can_commit"] is True
+    assert detail["error_count"] == 1
+    assert detail["can_commit"] is True
     assert [c["target"] for c in detail["columns"]][:2] == ["admission_no", "full_name"]
     etag = got.headers["ETag"]
 
@@ -67,7 +69,8 @@ def test_US_401_full_flow_over_http(world: Any, api: Any, admin_engine: Engine) 
     assert nxt.json()["next_cursor"] is None
 
     refused = api.call(admin, "POST", f"/api/v1/imports/{batch_id}/commit", json={})
-    assert refused.status_code == 409 and refused.json()["code"] == "import_has_errors"
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "import_has_errors"
     ok = api.call(
         admin, "POST", f"/api/v1/imports/{batch_id}/commit", json={"skip_error_rows": True}
     )
@@ -75,7 +78,8 @@ def test_US_401_full_flow_over_http(world: Any, api: Any, admin_engine: Engine) 
     assert ok.json()["status"] == "committing"
     assert S.run_commit(world.a, batch_id, skip_error_rows=True) == "committed"
     done = api.call(admin, "GET", f"/api/v1/imports/{batch_id}").json()
-    assert done["status"] == "committed" and done["can_revert"] is True
+    assert done["status"] == "committed"
+    assert done["can_revert"] is True
     assert done["stats"]["created"] == 2
     listing = api.call(admin, "GET", "/api/v1/imports", params={"limit": 200}).json()
     assert str(batch_id) in {b["id"] for b in listing["data"]}
@@ -99,7 +103,7 @@ def test_FR_IMP_002_mapping_and_templates_over_http(
 ) -> None:
     staff = world.person("office_staff")
     rows = [
-        ["Ref", "Pupil", "Born", "Std", "Div"],
+        ["Ref", "Pupil", "Born", "Std", "Div", f"Layout {uuid.uuid4().hex[:8]}"],
         [S.adm(), "Synthetica Http", "14/03/2012", "9", "A"],
     ]
     doc = _doc(admin_engine, world.a, S.xlsx_bytes(rows), role="office_staff")
@@ -145,7 +149,8 @@ def test_FR_IMP_002_mapping_and_templates_over_http(
     assert put.status_code == 200, put.text
     assert put.headers["ETag"] != got.headers["ETag"]
     val = api.call(staff, "POST", f"/api/v1/imports/{batch_id}/validate")
-    assert val.status_code == 202 and val.json()["status"] == "validating"
+    assert val.status_code == 202
+    assert val.json()["status"] == "validating"
     assert S.run_validate(world.a, batch_id, role="office_staff") == "validated"
     name = f"Synthetic HTTP layout {uuid.uuid4().hex[:6]}"
     tpl = api.call(
@@ -182,10 +187,12 @@ def test_FR_IMP_001_create_import_checks_the_document(
     assert post(other_school).status_code == 404
     queued = _doc(admin_engine, world.a, data, status="queued")
     res = post(queued)
-    assert res.status_code == 409 and res.json()["code"] == "document_not_ready"
+    assert res.status_code == 409
+    assert res.json()["code"] == "document_not_ready"
     circular = S.D.make_document(admin_engine, world.a.tenant_id, world.a.people["owner"].user_id)
     res = post(circular)
-    assert res.status_code == 422 and res.json()["errors"][0]["code"] == "not_an_import_file"
+    assert res.status_code == 422
+    assert res.json()["errors"][0]["code"] == "not_an_import_file"
     big = _doc(admin_engine, world.a, data)
     with admin_engine.begin() as c:
         c.execute(
@@ -196,7 +203,8 @@ def test_FR_IMP_001_create_import_checks_the_document(
     ok = _doc(admin_engine, world.a, data)
     assert post(ok).status_code == 202
     again = post(ok)
-    assert again.status_code == 409 and again.json()["code"] == "import_exists"
+    assert again.status_code == 409
+    assert again.json()["code"] == "import_exists"
     bad_source = api.call(
         admin, "POST", "/api/v1/imports", json={"document_id": str(ok), "source": "gossip"}
     )
@@ -213,3 +221,14 @@ def test_FR_IMP_001_idempotent_create(world: Any, api: Any, admin_engine: Engine
     assert first.status_code == second.status_code == 202
     assert first.json()["id"] == second.json()["id"]
     assert second.headers.get("Idempotent-Replayed") == "true"
+
+
+def test_SEC_001_import_lists_never_show_other_school(world: Any, api: Any) -> None:
+    b_batch = S.start(None, world.b, S.xlsx_bytes(S.class_list(1)[0]), role="owner")
+    principal = world.person("principal")
+    listing = api.call(principal, "GET", "/api/v1/imports", params={"limit": 200})
+    assert listing.status_code == 200
+    assert str(b_batch) not in {b["id"] for b in listing.json()["data"]}
+    assert api.call(principal, "GET", "/api/v1/import-templates").status_code == 200
+    body = {"name": f"Cross school {uuid.uuid4().hex[:6]}", "import_id": str(b_batch)}
+    assert api.call(principal, "POST", "/api/v1/import-templates", json=body).status_code == 404

@@ -126,7 +126,7 @@ def test_FR_IMP_002_templates_by_header_signature() -> None:
 
 
 def test_FR_IMP_002_header_normalisation() -> None:
-    assert normalize_header("  Father’s   Name: ") == "fathers name"
+    assert normalize_header("  Father\u2019s   Name: ") == "fathers name"
     assert normalize_header("Class/Section") == "class section"
 
 
@@ -147,7 +147,7 @@ def test_FR_IMP_002_header_normalisation() -> None:
         (40982, dt.date(2012, 3, 14), None, False),  # Excel serial (1900 system)
         (40982.0, dt.date(2012, 3, 14), None, False),
         ("40982", dt.date(2012, 3, 14), None, False),
-        (dt.datetime(2012, 3, 14, 0, 0), dt.date(2012, 3, 14), None, False),
+        (dt.datetime(2012, 3, 14, 0, 0), dt.date(2012, 3, 14), None, False),  # noqa: DTZ001
         (dt.date(2012, 3, 14), dt.date(2012, 3, 14), None, False),
         ("03/14/2012", None, "invalid_date", False),  # month-first is not guessed
         ("31/02/2012", None, "invalid_date", False),
@@ -176,10 +176,10 @@ def test_FR_IMP_003_cell_text() -> None:
     assert cell_text(1001.0) == "1001"
     assert cell_text("  Synthetica   Venkata ") == "Synthetica Venkata"
     assert cell_text("") is None
-    assert cell_text(dt.datetime(2012, 3, 14)) == "2012-03-14"
+    assert cell_text(dt.datetime(2012, 3, 14)) == "2012-03-14"  # noqa: DTZ001 - a cell
 
 
-# --- classes ------------------------------------------------------------------------------------------
+# --- classes --------------------------------------------------------------------------------------
 
 CLASSES = [
     ClassInfo("c9", "IX", "Class IX", "9వ తరగతి"),

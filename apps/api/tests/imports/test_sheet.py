@@ -61,7 +61,8 @@ def test_SEC_017_formula_cells_are_never_evaluated_but_kept_as_inert_text() -> N
     assert cells[0][1] == Cell(HYPERLINK, True)
     assert cells[1][1] == Cell(DDE, True)
     assert cells[1][2] == Cell("=1+1", True)  # never 2
-    assert cells[2][2].value == "=SUM(1,2)" and cells[2][2].formula
+    assert cells[2][2].value == "=SUM(1,2)"
+    assert cells[2][2].formula
     assert cells[2][1] == Cell("Synthetica Plain", False)
     assert sheet.formula_cells == 4
 
@@ -209,8 +210,8 @@ def test_FR_IMP_001_csv_must_be_utf8() -> None:
 def test_FR_IMP_001_google_sheets_csv_export() -> None:
     """Google Sheets exports: comma, CRLF, quoted cells with commas and newlines."""
     data = (
-        'Adm No,Name of the Student,Address\r\n"A-1","Synthetica, Venkata","Line 1\r\nLine 2"\r\n'
-    ).encode()
+        b'Adm No,Name of the Student,Address\r\n"A-1","Synthetica, Venkata","Line 1\r\nLine 2"\r\n'
+    )
     sheet = read_sheet(data, "csv", LIMITS)
     assert _values(sheet) == [["A-1", "Synthetica, Venkata", "Line 1\r\nLine 2"]]
 
@@ -218,8 +219,9 @@ def test_FR_IMP_001_google_sheets_csv_export() -> None:
 def test_FR_IMP_001_xlsx_dates_and_numbers_keep_their_type() -> None:
     import datetime as dt
 
-    data = S.xlsx_bytes([["Adm No", "Name", "DOB"], [1001, "Synthetica", dt.datetime(2012, 3, 14)]])
+    born = dt.datetime(2012, 3, 14)  # noqa: DTZ001 - spreadsheet date cells are naive
+    data = S.xlsx_bytes([["Adm No", "Name", "DOB"], [1001, "Synthetica", born]])
     sheet = read_sheet(data, "xlsx", LIMITS)
     adm_no, _, dob = sheet.rows[0].cells
     assert adm_no.value == 1001
-    assert dob.value == dt.datetime(2012, 3, 14)
+    assert dob.value == born

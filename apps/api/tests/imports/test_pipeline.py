@@ -18,9 +18,9 @@ from app.core.db import tenant_session
 from app.core.errors import NotFound
 from app.imports import service
 from app.imports.config import import_config
+from app.imports.schemas import ColumnMap, MappingIn, TemplateCreate
 from app.imports.sheet import read_sheet
 from app.imports.validation import validate_sheet
-from app.imports.schemas import ColumnMap, MappingIn, TemplateCreate
 from app.students import service as students
 
 pytestmark = pytest.mark.db
@@ -38,7 +38,8 @@ def test_US_401_AC1_upload_parse_suggest_and_validate(world: Any, admin_engine: 
     batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
     batch = S.batch(admin_engine, batch_id)
     assert batch["status"] == "validated"
-    assert batch["file_kind"] == "xlsx" and batch["header_row"] == 1
+    assert batch["file_kind"] == "xlsx"
+    assert batch["header_row"] == 1
     assert batch["mapping"] == {
         "0": "admission_no",
         "1": "full_name",
@@ -49,7 +50,8 @@ def test_US_401_AC1_upload_parse_suggest_and_validate(world: Any, admin_engine: 
         "6": "section",
     }
     assert [c["suggested"] for c in batch["columns"]][:2] == ["admission_no", "full_name"]
-    assert batch["row_count"] == 3 and batch["error_count"] == 0
+    assert batch["row_count"] == 3
+    assert batch["error_count"] == 0
     stored = S.rows(admin_engine, batch_id)
     assert [r["status"] for r in stored] == ["valid"] * 3
     assert stored[0]["parsed"]["values"]["admission_no"] == numbers[0]
@@ -98,7 +100,8 @@ def test_US_401_AC3_commit_creates_students_attributed_to_the_source(
     # Audit, outbox (IDs/counts only) and the importer's notification (same transaction).
     events = W.audit_events(admin_engine, world.a.tenant_id, "import.committed")
     mine = [e for e in events if str(e["resource_id"]) == str(batch_id)]
-    assert mine and mine[0]["summary"]["students_created"] == 3
+    assert mine
+    assert mine[0]["summary"]["students_created"] == 3
     payloads = S.D.outbox_events(admin_engine, world.a.tenant_id, "import.committed")
     assert {"batch_id": str(batch_id), "student_ids_count": 3} in payloads
     assert (
@@ -139,7 +142,7 @@ def test_FR_IMP_004_other_sources_add_observations_to_existing_students(
 def test_FR_IMP_003_register_identity_is_not_overwritten_by_a_reimport(
     world: Any, admin_engine: Engine
 ) -> None:
-    rows, numbers = S.class_list(1)
+    rows, _numbers = S.class_list(1)
     S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
     changed = [list(rows[0]), list(rows[1])]
     changed[1][1] = "Synthetica Someone Else"
@@ -163,7 +166,7 @@ def test_FR_IMP_003_duplicates_against_existing_and_within_file(
 ) -> None:
     existing_rows, existing = S.class_list(1)
     S.imported(admin_engine, world.a, S.xlsx_bytes(existing_rows))
-    rows, numbers = S.class_list(2)
+    rows, _numbers = S.class_list(2)
     rows.append(list(rows[1]))  # the first data row again: duplicate admission number
     rows.append(list(existing_rows[1]))  # already a student: matched, never created twice
     batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
@@ -182,7 +185,7 @@ def test_FR_IMP_003_duplicates_against_existing_and_within_file(
 
 def test_FR_IMP_002_mapping_change_template_and_reuse(world: Any, admin_engine: Engine) -> None:
     rows = [
-        ["Ref", "Pupil", "Born", "Std", "Div"],
+        ["Ref", "Pupil", "Born", "Std", "Div", f"Layout {uuid.uuid4().hex[:8]}"],
         [S.adm(), "Synthetica Template One", "14/03/2012", "9", "A"],
     ]
     batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
@@ -287,14 +290,16 @@ def test_SEC_013_full_aadhaar_rows_fail_and_nothing_is_stored(
     ]
     everything = repr(S.batch(admin_engine, batch_id)) + repr(stored)
     everything += repr(W.audit_events(admin_engine, world.a.tenant_id))
-    assert number not in everything and number[-4:] not in everything
+    assert number not in everything
+    assert number[-4:] not in everything
     # Commit only the valid row: the Aadhaar row is skipped and nothing of it is kept.
     assert S.commit(world.a, batch_id, skip_error_rows=True) == "committed"
     assert [r["status"] for r in S.rows(admin_engine, batch_id)] == ["skipped", "committed"]
     assert (
         S.count(
             admin_engine,
-            "SELECT count(*) FROM sis.attribute_values v JOIN sis.import_rows r ON r.student_id = v.student_id "
+            "SELECT count(*) FROM sis.attribute_values v "
+            "JOIN sis.import_rows r ON r.student_id = v.student_id "
             "WHERE r.batch_id = :b AND v.attribute_key LIKE 'aadhaar%'",
             b=batch_id,
         )
@@ -323,7 +328,8 @@ def test_FR_IMP_004_c3_values_are_encrypted_at_commit_and_never_in_import_rows(
             ),
             {"s": sid},
         ).one()
-    assert row.value_text is None and row.value_ciphertext is not None
+    assert row.value_text is None
+    assert row.value_ciphertext is not None
 
 
 def test_SEC_015_scoped_importer_cannot_write_other_sections(
@@ -345,8 +351,8 @@ def test_SEC_015_scoped_importer_cannot_write_other_sections(
     batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
     sheet = read_sheet(S.xlsx_bytes(rows), "xlsx", import_config().limits)
     with tenant_session(world.a.tenant_id, importer.user_id) as s:
-        batch = service._visible(s, scoped, batch_id, "import.run")  # noqa: SLF001
-        vctx = service._validation_context(s, scoped, batch, sheet, "import.commit")  # noqa: SLF001
+        batch = service._visible(s, scoped, batch_id, "import.run")
+        vctx = service._validation_context(s, scoped, batch, sheet, "import.commit")
         result = validate_sheet(sheet, batch.mapping, vctx)
     assert [r.status for r in result.rows] == ["valid", "error"]
     assert result.rows[1].errors[0]["code"] == "section_out_of_scope"

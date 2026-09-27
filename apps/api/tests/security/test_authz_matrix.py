@@ -73,8 +73,23 @@ def _load_documents_support() -> ModuleType:
     return sys.modules[name]
 
 
+def _load_imports_support() -> ModuleType:
+    """tests/imports/support.py (synthetic spreadsheets and import batches)."""
+    name = "sos_test_imports_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "imports" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 SW = _load_students()
 D = _load_documents_support()
+IM = _load_imports_support()
 
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
@@ -187,6 +202,45 @@ def _doc_acl_put(w: Any, r: str, a: Engine) -> Request:
 def _doc_delete(w: Any, r: str, a: Engine) -> Request:
     doc = D.make_document(a, w.a.tenant_id, w.a.people["owner"].user_id)
     return f"/api/v1/documents/{doc}", None, {}
+
+
+# --- imports (US-401, FR-IMP-*): office roles and the exam coordinator ----------------------
+
+
+def _shared_import(w: Any, admin: Engine) -> uuid.UUID:
+    """A validated school A batch (started by the office admin) readable by import.run holders."""
+    if "matrix_import" not in w.a.ids:
+        w.a.ids["matrix_import"] = IM.start(admin, w.a, IM.xlsx_bytes(IM.class_list(1)[0]))
+    value: uuid.UUID = w.a.ids["matrix_import"]
+    return value
+
+
+def _fresh_import(w: Any, admin: Engine) -> uuid.UUID:
+    batch_id: uuid.UUID = IM.start(admin, w.a, IM.xlsx_bytes(IM.class_list(1)[0]))
+    return batch_id
+
+
+def _import_create(w: Any, r: str, a: Engine) -> Request:
+    doc = IM.import_document(
+        a, w.a.tenant_id, w.person(r).user_id, IM.xlsx_bytes(IM.class_list(1)[0])
+    )
+    return "/api/v1/imports", {"document_id": str(doc), "source": "admission_register"}, {}
+
+
+def _import_mapping(w: Any, r: str, a: Engine) -> Request:
+    batch_id = _fresh_import(w, a)
+    batch = IM.batch(a, batch_id)
+    columns = [{"index": int(k), "target": v} for k, v in batch["mapping"].items()]
+    return (
+        f"/api/v1/imports/{batch_id}/mapping",
+        {"columns": columns},
+        _if_match(batch["version"]),
+    )
+
+
+def _import_committed(w: Any, r: str, a: Engine) -> Request:
+    batch_id = IM.imported(a, w.a, IM.xlsx_bytes(IM.class_list(1)[0]))
+    return f"/api/v1/imports/{batch_id}/revert", None, {}
 
 
 SPECS: dict[tuple[str, str], Builder] = {
@@ -398,6 +452,37 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"body": "Synthetic follow-up"},
         {},
     ),
+    # Imports (app/imports/api.py; US-401, FR-IMP-001..007).
+    ("POST", "/api/v1/imports"): _import_create,
+    ("GET", "/api/v1/imports"): lambda w, r, a: ("/api/v1/imports", None, {}),
+    ("GET", "/api/v1/imports/{import_id}"): lambda w, r, a: (
+        f"/api/v1/imports/{_shared_import(w, a)}",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/imports/{import_id}/rows"): lambda w, r, a: (
+        f"/api/v1/imports/{_shared_import(w, a)}/rows",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/imports/{import_id}/mapping"): _import_mapping,
+    ("POST", "/api/v1/imports/{import_id}/validate"): lambda w, r, a: (
+        f"/api/v1/imports/{_fresh_import(w, a)}/validate",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/imports/{import_id}/commit"): lambda w, r, a: (
+        f"/api/v1/imports/{_fresh_import(w, a)}/commit",
+        {},
+        {},
+    ),
+    ("POST", "/api/v1/imports/{import_id}/revert"): _import_committed,
+    ("GET", "/api/v1/import-templates"): lambda w, r, a: ("/api/v1/import-templates", None, {}),
+    ("POST", "/api/v1/import-templates"): lambda w, r, a: (
+        "/api/v1/import-templates",
+        {"name": f"Matrix layout {uuid.uuid4().hex[:8]}", "import_id": str(_shared_import(w, a))},
+        {},
+    ),
     # Notifications (FR-NOT-001): every member, own notifications only.
     ("GET", "/api/v1/notifications"): lambda w, r, a: ("/api/v1/notifications", None, {}),
     ("GET", "/api/v1/notifications/unread-count"): lambda w, r, a: (
@@ -528,8 +613,15 @@ def _success(method: str, path: str) -> int:
         "/api/v1/students/{student_id}/guardians",
         "/api/v1/students/{student_id}/enrollments",
         "/api/v1/documents/uploads",
+        "/api/v1/import-templates",
     }
-    accepted = {"/api/v1/documents", "/api/v1/documents/{document_id}/versions"}
+    accepted = {
+        "/api/v1/documents",
+        "/api/v1/documents/{document_id}/versions",
+        "/api/v1/imports",
+        "/api/v1/imports/{import_id}/validate",
+        "/api/v1/imports/{import_id}/commit",
+    }
     if method == "POST" and path in accepted:
         return 202
     if method == "DELETE" and path == "/api/v1/documents/{document_id}":

@@ -103,7 +103,8 @@ def test_FR_IMP_003_valid_rows_convert_types() -> None:
     )
     result = validate_sheet(sheet, MAPPING, _ctx())
     row = result.rows[0]
-    assert row.status == "valid" and row.action == "create"
+    assert row.status == "valid"
+    assert row.action == "create"
     assert row.values == {
         "admission_no": "A-1",
         "full_name": "Synthetica Venkata",
@@ -113,7 +114,8 @@ def test_FR_IMP_003_valid_rows_convert_types() -> None:
     }
     assert row.section_id == "s9a"
     assert row.class_label == "IX-A"
-    assert result.stats["valid"] == 1 and result.stats["create"] == 1
+    assert result.stats["valid"] == 1
+    assert result.stats["create"] == 1
 
 
 def test_FR_IMP_003_row_level_errors_with_field_code_and_message_key() -> None:
@@ -183,7 +185,8 @@ def test_FR_IMP_003_existing_students_are_updates_and_register_identity_is_prote
     ]
     # Other sources are observations: a different name is recorded (a conflict for DQ).
     other = validate_sheet(sheet, MAPPING, _ctx(existing=existing, source="udise_plus")).rows[1]
-    assert other.status == "valid" and "admission_no" not in other.values
+    assert other.status == "valid"
+    assert "admission_no" not in other.values
 
 
 def test_FR_IMP_003_sources_that_cannot_create_only_match() -> None:
@@ -231,7 +234,8 @@ def test_SEC_013_full_aadhaar_anywhere_is_a_row_error_and_never_kept() -> None:
     assert "full_name" not in two.values
     assert three.status == "valid"  # an explicit +91 mobile number is not an Aadhaar number
     stored = repr([r.parsed(SPECS) for r in result.rows]) + repr([r.errors for r in result.rows])
-    assert number not in stored and number[-4:] not in stored
+    assert number not in stored
+    assert number[-4:] not in stored
 
 
 def test_SEC_013_aadhaar_column_keeps_last_four_digits_only() -> None:
