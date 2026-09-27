@@ -19,6 +19,7 @@ from app.exports.api import router as exports_router
 from app.extraction.api import router as extraction_router
 from app.identity.api import router as identity_router
 from app.imports.api import router as imports_router
+from app.knowledge.api import router as knowledge_router
 from app.notifications.api import router as notifications_router
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
@@ -57,6 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(changes_router)
     app.include_router(extraction_router)
     app.include_router(exports_router)
+    app.include_router(knowledge_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)
