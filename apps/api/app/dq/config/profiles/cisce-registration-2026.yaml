@@ -1,0 +1,28 @@
+# Export pre-check profile: CISCE registration 2026 (US-501, DQ-005, DQ-006, DQ-009).
+# Loaded and validated by app.dq.profiles.load_profiles(); the file name is the profile key.
+#
+# TODO(board formats): minimal field list for M1. Replace with the council's exact registration
+# template (field order, lengths, allowed characters, date format) before the pilot; the exports
+# module (FR-EXP-002) will share this profile key.
+key: cisce-registration-2026
+version: 1
+label_en: CISCE registration 2026
+label_te: CISCE నమోదు 2026
+
+# DQ-005: the canonical value must exist (blocker).
+required_fields: [full_name, dob, gender, father_name, mother_name, admission_no]
+
+# DQ-005 for required identity fields whose canonical value is provisional (no verified
+# admission-register value yet, docs/05 §10). Severity of that finding; null turns it off.
+unverified_identity_severity: low
+
+# DQ-006: what the board accepts in name fields (checked on the canonical value).
+name_format:
+  fields: [full_name, father_name, mother_name]
+  min_length: 2
+  max_length: 50
+  latin_only: true
+  allowed_punctuation: " .'"
+
+# DQ-009: Aadhaar details are needed for APAAR.
+needs_apaar: false

@@ -1,0 +1,65 @@
+# Data-quality engine settings (M1 wave 2; FR-DQ-002, FR-DQ-005, NFR-PERF-005; CLAUDE.md §6.13).
+# Loaded and validated by app.dq.profiles.load_engine_config(). Rule metadata lives in rules.yaml,
+# name-matching thresholds in match_classes.yaml, export profiles in profiles/*.yaml.
+version: 1
+
+# POST /dq/runs checks at most this many students inside the request; bigger scopes are queued
+# for the worker (queue "dq") and the requester is notified when the run finishes.
+sync_max_students: 300
+
+# Rules name the logical attribute (full_name, dob, gender). Some sources store it under their own
+# attribute key: Aadhaar-as-printed values are separate C3 attributes (docs/05 §5.1).
+source_attributes:
+  aadhaar_as_printed:
+    full_name: aadhaar_name_as_printed
+    dob: aadhaar_dob_as_printed
+    gender: aadhaar_gender_as_printed
+
+# DQ-009: the Aadhaar details APAAR generation needs (all from source aadhaar_as_printed).
+apaar_attributes: [aadhaar_last4, aadhaar_name_as_printed, aadhaar_dob_as_printed,
+                   aadhaar_gender_as_printed]
+
+# DQ-008 possible duplicate: same canonical date of birth, a name in one of `name_classes` and a
+# father's or mother's name in one of `parent_classes` (match classes of app.dq.matching).
+# TYPO is left out of the name classes on purpose: twins share date of birth and parents and
+# often have names one letter apart.
+duplicate:
+  name_classes: [EXACT, ORDER, SPACING, INITIALS, VARIANT]
+  parent_classes: [EXACT, ORDER, SPACING, INITIALS, VARIANT]
+
+# DQ-007 age plausibility: completed years on the first day of the student's academic year must
+# lie in [min, max] for the class code (core.classes.code). Classes not listed are not checked.
+age_bands:
+  NUR: [2, 4]
+  LKG: [3, 5]
+  UKG: [4, 6]
+  I: [5, 7]
+  II: [6, 8]
+  III: [7, 9]
+  IV: [8, 10]
+  V: [9, 11]
+  VI: [10, 12]
+  VII: [11, 13]
+  VIII: [12, 14]
+  IX: [13, 15]
+  X: [14, 16]
+  XI: [15, 17]
+  XII: [16, 18]
+
+# DQ-006 name-format issue codes and the words that fill {issue} in the explanation.
+format_issues:
+  too_long:
+    en: "names that are too long"
+    te: "చాలా పొడవైన పేర్లు"
+  too_short:
+    en: "names that are too short"
+    te: "చాలా చిన్న పేర్లు"
+  not_latin:
+    en: "names not written in English letters"
+    te: "ఇంగ్లీష్ అక్షరాలలో లేని పేర్లు"
+  digits:
+    en: "digits in names"
+    te: "పేర్లలో అంకెలు"
+  symbols:
+    en: "special characters in names"
+    te: "పేర్లలో ప్రత్యేక గుర్తులు"

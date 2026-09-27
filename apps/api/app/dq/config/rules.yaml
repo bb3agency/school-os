@@ -105,6 +105,7 @@ rules:
     scope: student
     attribute_keys: [aadhaar_last4, full_name, dob, gender]
     sources: [aadhaar_as_printed]
+    requires_profile: true      # only for export profiles that need APAAR (needs_apaar)
     severity: {mode: fixed, level: medium}
     explanation_key: DQ-009
     routes: [ROUTE-SCHOOL-CR]

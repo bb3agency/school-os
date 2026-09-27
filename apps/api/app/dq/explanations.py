@@ -6,7 +6,8 @@ sentence for office staff:
 - ``match_classes``: ``NM-EXACT`` ... ``NM-MISSING`` (one per name-match class),
 - ``routes``: the four suggested correction routes (``ROUTE-SCHOOL-CR``, ``ROUTE-UIDAI``,
   ``ROUTE-UDISE``, ``ROUTE-BOARD``),
-- ``rules``: the explanation template of each DQ rule (``DQ-001`` ...).
+- ``rules``: the explanation template of each DQ rule (``DQ-001`` ...) and of rule variants
+  for a second situation of the same rule (``DQ-005-UNVERIFIED``).
 
 Templates may contain ``{placeholders}``; English and Telugu of one code must use the same set.
 Callers fill them with labels or codes (a profile name, a field label, a class name), never with
@@ -44,7 +45,8 @@ ROUTE_CODES: Final[tuple[str, ...]] = (
 _IDENTIFIER: Final = re.compile(r"^[a-z][a-z0-9_]*$")
 _MATCH_CODE: Final = re.compile(r"^NM-[A-Z]+$")
 _ROUTE_CODE: Final = re.compile(r"^ROUTE-[A-Z]+(?:-[A-Z]+)*$")
-_RULE_CODE: Final = re.compile(r"^DQ-\d{3}$")
+# A rule's own code (DQ-005) or a variant of it for a second situation (DQ-005-UNVERIFIED).
+_RULE_CODE: Final = re.compile(r"^DQ-\d{3}(?:-[A-Z]+)?$")
 
 
 class UnknownExplanation(LookupError):
