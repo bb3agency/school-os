@@ -1,4 +1,4 @@
-"""Knowledge tables in schema ``kb`` (migration 0021_kb_tables; docs/05 §6, §6.2).
+"""Knowledge tables in schema ``kb`` (migrations 0021_kb_tables, 0024_kb_metering; docs/05 §6).
 
 Typed mappings for queries only; DDL (RLS, CHECKs, composite FKs, indexes) lives in the
 migration. Only ``app.knowledge.repository`` and ``app.knowledge.retrieval`` use these mappings
@@ -15,6 +15,7 @@ import datetime as dt
 import math
 import uuid
 from collections.abc import Callable, Sequence
+from decimal import Decimal
 from typing import Any, Final
 
 from sqlalchemy import (
@@ -25,6 +26,7 @@ from sqlalchemy import (
     Date,
     Integer,
     LargeBinary,
+    Numeric,
     Text,
     Uuid,
     cast,
@@ -202,3 +204,27 @@ class VerifiedAnswer(Base):
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class LlmCall(Base):
+    """One metered model call (0024_kb_metering; FR-KB-009, FR-KB-011). Ids and counts only."""
+
+    __tablename__ = "llm_calls"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    occurred_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    feature: Mapped[str] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(Text)
+    query_id: Mapped[uuid.UUID | None]
+    provider: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    outcome: Mapped[str] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(Integer)
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    input_tokens: Mapped[int] = mapped_column(Integer)
+    output_tokens: Mapped[int] = mapped_column(Integer)
+    cache_write_tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(14, 6))

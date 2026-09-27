@@ -126,6 +126,7 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "fields": {"full_name": "Synthetica BOLA"}
     },
     ("POST", "/api/v1/extraction-items/{item_id}/reject"): {"reason": "other"},
+    ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): {"feedback": "helpful"},
 }
 
 
@@ -356,6 +357,23 @@ def _b_export(w: Any) -> uuid.UUID:
     return value
 
 
+def _b_query(w: Any) -> uuid.UUID:
+    """A logged question of school B's owner (tests/knowledge/ask_support.py)."""
+    name = "sos_test_ask_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "knowledge" / "ask_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    if "bola_query" not in w.b.ids:
+        w.b.ids["bola_query"] = sys.modules[name].query_row(_ADMIN[0], w.b, w.b.people["owner"])
+    value: uuid.UUID = w.b.ids["bola_query"]
+    return value
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -383,6 +401,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "item_id": lambda w: _b_extraction(w)[1],
     # Exports (US-501 AC4, US-901): a ready export of school B.
     "export_id": _b_export,
+    # Knowledge (FR-KB-012): a logged question of school B.
+    "query_id": _b_query,
 }
 
 
@@ -742,3 +762,38 @@ def test_SEC_001_extraction_bodies_cannot_reference_other_school(
     )
     assert section.status_code == 422
     assert x.row_of(admin_engine, "sis.extraction_items", item)["status"] == "pending_review"
+
+
+def test_SEC_001_knowledge_never_shows_or_cites_another_school(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """FR-KB-010: search results and verified answers stay inside the school; a verified answer
+    cannot cite another school's document (422 citation_not_found, same as a random id)."""
+    kb = sys.modules.get("sos_test_ask_support")
+    if kb is None:
+        _b_query(world)
+        kb = sys.modules["sos_test_ask_support"]
+    SW.configure_keyring()
+    b_doc = kb.shared_document(admin_engine, world.b)
+    owner = world.person("owner")
+    found = api.call(
+        owner, "POST", "/api/v1/knowledge/search", json={"query": "parent-teacher meeting"}
+    )
+    assert found.status_code == 200
+    assert str(b_doc) not in {r["document_id"] for r in found.json()["data"]}
+    codes = []
+    for doc in (b_doc, uuid.uuid4()):
+        res = api.call(
+            world.person("principal"),
+            "POST",
+            "/api/v1/knowledge/verified-answers",
+            json={
+                "question": "When is the meeting?",
+                "language": "en",
+                "answer_text": "On 18/10/2026.",
+                "citations": [{"source": f"sos://doc/{doc}/v1#p1", "cited_text": "18/10/2026"}],
+            },
+        )
+        assert res.status_code == 422, res.text
+        codes.append(res.json()["errors"][0]["code"])
+    assert codes == ["citation_not_found", "citation_not_found"]

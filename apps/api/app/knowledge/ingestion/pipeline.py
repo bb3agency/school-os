@@ -204,7 +204,8 @@ class DocumentIngestionPipeline:
                 return MISSING, 0
             if not self._eligible(fresh):
                 return EXCLUDED, self._store.delete_document(s, document_id)
-            is_latest = fresh.current_version_id == version_id
+            archived = fresh.status == "archived"
+            is_latest = fresh.current_version_id == version_id and not archived
             written = self._store.replace_version(
                 s,
                 VersionIndex(
@@ -223,6 +224,8 @@ class DocumentIngestionPipeline:
             )
             if is_latest:
                 self._store.set_latest(s, document_id, version_id)
+            elif archived:
+                self._store.hide_document(s, document_id)
             retired = [v.id for v in fresh.versions if v.status in RETIRED_STATUSES]
             if retired:
                 self._store.delete_versions(s, document_id, retired)

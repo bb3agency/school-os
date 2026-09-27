@@ -10,4 +10,11 @@ scopes and C3 rules apply exactly as in the UI. Results are ``search_result`` bl
 
 Boundary: no writes, no network, no model calls (invariant 9): must not import gateway,
 ingestion, service, httpx, boto3 or celery (import-linter ``knowledge-tools-read-only``).
+
+As built (M2 wave 4): ``access`` (the caller's ``AclKeys``, same rule as the documents
+service), ``documents`` (:class:`DocumentSearch` and ``search_documents``), ``students``
+(``find_students``, ``get_student_facts`` over ``students.service``) and ``registry`` (the tools
+described in ``tools.yaml``, offered per caller permission). ``get_value_history``,
+``count_students``, ``list_findings`` and ``list_documents`` are whitelisted but not built yet
+(no description in ``tools.yaml``, so never offered).
 """

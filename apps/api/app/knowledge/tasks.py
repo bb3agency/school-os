@@ -11,7 +11,9 @@
 
 Every task is idempotent and retries with exponential backoff (max 5, docs/04 §6); after the
 last attempt it logs ``error_code`` and gives up (the next event for the document repairs it).
-Register this module in ``sos_worker.celery_app.TASK_MODULES``.
+Register this module in ``sos_worker.celery_app.TASK_MODULES``. Importing it wires the pipeline
+from the composition root (:func:`app.knowledge.composition.configure_ingestion`; the pipeline
+itself is built on the first task).
 """
 
 from __future__ import annotations
@@ -23,11 +25,14 @@ from typing import Any, Final
 from celery import Task, shared_task
 
 from app.core.logging import get_logger
+from app.knowledge import composition
 from app.knowledge.ingestion import hooks, runtime
 
 log = get_logger(__name__)
 
 MAX_RETRIES: Final = 5
+
+composition.configure_ingestion()
 
 
 def _uuid(value: object) -> uuid.UUID:

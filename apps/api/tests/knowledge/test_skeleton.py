@@ -1,8 +1,7 @@
 """Knowledge module skeleton: boundaries that hold before any feature code lands (docs/06).
 
 - Every subpackage docs/06 and CLAUDE.md §4 name exists and states its responsibility.
-- No routes yet: a route would need ``require("kb.ask")`` (invariant 2); ``api.py`` arrives with
-  the ask endpoint.
+- The routes are exactly docs/09 Knowledge, each with its permission (invariant 2).
 - Provider SDKs are imported only under ``knowledge/gateway`` (CLAUDE.md §11, ADR-0005). The
   semgrep rule ``sos-llm-sdk-outside-gateway`` covers the whole repo; this AST scan is the fast
   in-suite copy for the knowledge tree.
@@ -43,14 +42,35 @@ def test_FR_KB_001_subpackage_exists_with_a_responsibility_docstring(name: str) 
     assert "Boundary" in doc, f"app.knowledge.{name}: state the import boundary"
 
 
-def test_SEC_020_knowledge_has_no_routes_yet() -> None:
-    assert not (KNOWLEDGE / "api.py").exists(), (
-        "routes land with the ask endpoint; each needs Depends(require('kb.ask'))"
-    )
+KNOWLEDGE_ROUTES = {
+    ("POST", "/api/v1/knowledge/ask"): "kb.ask",
+    ("POST", "/api/v1/knowledge/search"): "document.read",
+    ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): "kb.ask",
+    ("GET", "/api/v1/knowledge/verified-answers"): "kb.ask",
+    ("POST", "/api/v1/knowledge/verified-answers"): "kb.verified_answer.manage",
+}
+
+
+def test_SEC_020_knowledge_routes_are_exactly_docs_09_with_their_permissions() -> None:
+    """docs/09 Knowledge: every route guarded by its permission (invariant 2); no other route."""
+    from fastapi.routing import APIRoute, iter_route_contexts
+
     from app.main import create_app
 
-    paths = {getattr(r, "path", "") for r in create_app().routes}
-    assert not [p for p in paths if p.startswith("/api/v1/knowledge")]
+    found: dict[tuple[str, str], str] = {}
+    for rc in iter_route_contexts(create_app().routes):
+        route = rc.original_route
+        if not isinstance(route, APIRoute) or not str(rc.path).startswith("/api/v1/knowledge"):
+            continue
+        guards = [
+            str(getattr(d.call, "sos_permission", ""))
+            for d in route.dependant.dependencies
+            if hasattr(d.call, "sos_permission")
+        ]
+        assert len(guards) == 1, rc.path
+        for method in rc.methods or ():
+            found[(method, str(rc.path))] = guards[0]
+    assert found == KNOWLEDGE_ROUTES
 
 
 def _imported_roots(path: Path) -> set[str]:
@@ -73,6 +93,18 @@ def test_SEC_020_provider_sdks_only_inside_the_gateway() -> None:
         if found:
             offenders.append(f"{path.relative_to(KNOWLEDGE)}: {sorted(found)}")
     assert not offenders, offenders
+
+
+def test_docs_06_s13_production_code_never_imports_the_eval_harness() -> None:
+    """The eval bridge lives in tests/ (tests/knowledge/eval_bridge.py); app code stays free of
+    sos_evals so the harness scores the product through its adapter protocols only."""
+    app_root = KNOWLEDGE.parent
+    offenders = [
+        str(path.relative_to(app_root))
+        for path in app_root.rglob("*.py")
+        if "sos_evals" in _imported_roots(path)
+    ]
+    assert offenders == []
 
 
 def test_knowledge_never_reads_the_environment() -> None:

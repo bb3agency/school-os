@@ -124,6 +124,49 @@ def _load_extraction_support() -> ModuleType:
 X = _load_extraction_support()
 
 
+def _load_ask_support() -> ModuleType:
+    """tests/knowledge/ask_support.py (indexed documents and logged questions)."""
+    name = "sos_test_ask_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "knowledge" / "ask_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+KB = _load_ask_support()
+
+
+def _kb_ask(w: Any, r: str, a: Engine) -> Request:
+    SW.configure_keyring()
+    KB.shared_document(a, w.a)
+    return (
+        "/api/v1/knowledge/ask",
+        {"question": "When is the parent-teacher meeting?", "session_id": str(uuid.uuid4())},
+        {},
+    )
+
+
+def _kb_feedback(w: Any, r: str, a: Engine) -> Request:
+    query_id = KB.query_row(a, w.a, w.person(r))
+    return f"/api/v1/knowledge/queries/{query_id}/feedback", {"feedback": "helpful"}, {}
+
+
+def _kb_verified(w: Any, r: str, a: Engine) -> Request:
+    doc = KB.shared_document(a, w.a)
+    body = {
+        "question": f"When is the parent-teacher meeting? {uuid.uuid4().hex[:6]}",
+        "language": "en",
+        "answer_text": "On 18/10/2026 at 10:00.",
+        "citations": [{"source": f"sos://doc/{doc}/v1#p1", "cited_text": "18/10/2026 at 10:00"}],
+    }
+    return "/api/v1/knowledge/verified-answers", body, {}
+
+
 def _load_promotion_support() -> ModuleType:
     """tests/students/promotion_support.py (fresh year pairs and promotions, real services)."""
     name = "sos_test_promotion_support"
@@ -1010,6 +1053,20 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # Knowledge ("Ask the school"; docs/09 Knowledge, FR-KB-*, FR-KB-030).
+    ("POST", "/api/v1/knowledge/ask"): _kb_ask,
+    ("POST", "/api/v1/knowledge/search"): lambda w, r, a: (
+        "/api/v1/knowledge/search",
+        {"query": "parent-teacher meeting"},
+        {},
+    ),
+    ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): _kb_feedback,
+    ("GET", "/api/v1/knowledge/verified-answers"): lambda w, r, a: (
+        "/api/v1/knowledge/verified-answers",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/knowledge/verified-answers"): _kb_verified,
 }
 
 
@@ -1100,6 +1157,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/import-templates",
         "/api/v1/change-requests",
         "/api/v1/academic-years/{year_id}/promotions:commit",
+        "/api/v1/knowledge/verified-answers",
     }
     accepted = {
         "/api/v1/documents",

@@ -138,15 +138,18 @@ tf-validate: ## terraform fmt/init/validate/test on every root, pinned image as 
 	  -c 'cp -R /src /work && exec /bin/sh /work/scripts/validate.sh'
 
 
-# EVAL_SUITE: fast (pull requests) or full (nightly, release). EVAL_ADAPTER: stub-perfect until the
-# knowledge module provides a real adapter; stub-leaky and stub-injectable must fail (exit 1).
+# EVAL_SUITE: fast (pull requests) or full (nightly, release). EVAL_ADAPTER: stub-perfect (harness
+# self-check), app-fake (the real knowledge service on a throwaway database with offline fake
+# providers; needs Docker or SOS_TEST_ADMIN_DATABASE_URL; apps/api/tests/knowledge/eval_bridge.py);
+# stub-leaky and stub-injectable must fail (exit 1).
 # EVAL_ARGS: extra flags, e.g. --fail-on-soft (release) or --out <dir>. Report: evals/reports/.
 EVAL_SUITE   ?= fast
 EVAL_ADAPTER ?= stub-perfect
 EVAL_ARGS    ?=
+EVAL_RUNNER  := $(if $(filter app-fake,$(EVAL_ADAPTER)),apps/api/tests/knowledge/eval_bridge.py,-m sos_evals)
 
 eval: ## RAG evaluation harness with hard gates (docs/06 §13); non-zero exit when a gate fails
 	$(UV) run python -m sos_evals generate --check
-	$(UV) run python -m sos_evals run --adapter $(EVAL_ADAPTER) --suite $(EVAL_SUITE) $(EVAL_ARGS)
+	$(UV) run python $(EVAL_RUNNER) run --adapter $(EVAL_ADAPTER) --suite $(EVAL_SUITE) $(EVAL_ARGS)
 
 check: lint typecheck test security ## Everything CI runs

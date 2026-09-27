@@ -103,6 +103,7 @@ client:
 # Per tenant and feature, provider calls per minute (docs/07 T15, LLM10; each tool round is a call).
 rate_limit:
   requests_per_minute_per_tenant: 30
+  questions_per_minute_per_user: 10   # §5 step 1: per-user limit, checked by the ask route
 
 budget:
   alert_fraction: 0.8                 # §12: 80% alert
@@ -115,3 +116,8 @@ budget:
 
 answer_checks:
   max_uncited_factual_fraction: 0.30  # §9 rule 3
+  # Shown instead of an answer that no valid citation supports (FR-KB-007, invariant 8): Telugu when
+  # the question uses Telugu script (alone or code-mixed), otherwise English (FR-KB-006).
+  not_found:
+    en: "Not found in school records you can access. If it should be there, upload or verify the document."
+    te: "మీరు చూడగలిగే పాఠశాల రికార్డుల్లో ఇది కనబడలేదు. ఉండాల్సి ఉంటే, పత్రాన్ని అప్‌లోడ్ చేయండి లేదా ధృవీకరించండి."

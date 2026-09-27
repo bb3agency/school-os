@@ -119,6 +119,11 @@ class ChunkStore(Protocol):
         the number of chunks that changed."""
         ...
 
+    def hide_document(self, session: Session, document_id: uuid.UUID) -> int:
+        """``is_latest = false`` on every chunk of the document (archived: kept, not searched).
+        Returns the number of chunks that changed."""
+        ...
+
     def update_acl(self, session: Session, document_id: uuid.UUID, acl: ChunkAcl) -> int:
         """Rewrite the ACL copies on every chunk of the document (docs/05 §6)."""
         ...
@@ -160,6 +165,8 @@ class DocumentFacts:
     current_version_id: uuid.UUID | None
     acl: tuple[tuple[str, str], ...]
     versions: tuple[VersionFacts, ...]
+    status: str = "active"
+    """``archived`` documents keep their chunks but none is searchable (FR-DOC-005)."""
 
     def version(self, version_id: uuid.UUID) -> VersionFacts | None:
         return next((v for v in self.versions if v.id == version_id), None)

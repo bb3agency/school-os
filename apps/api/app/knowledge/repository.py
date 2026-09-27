@@ -43,6 +43,8 @@ from app.knowledge.models import (
     EMBEDDING_DIMENSIONS,
     DocumentChunk,
     EmbeddingCacheEntry,
+    LlmCall,
+    Query,
     VerifiedAnswer,
 )
 
@@ -307,6 +309,107 @@ def purge_embedding_cache(
         )
     )
     return _rowcount(result)
+
+
+def latest_version_of(session: Session, document_id: uuid.UUID) -> uuid.UUID | None:
+    """The version whose chunks are searchable now (None when the document has none)."""
+    value: uuid.UUID | None = session.execute(
+        select(DocumentChunk.version_id)
+        .where(DocumentChunk.document_id == document_id, DocumentChunk.is_latest)
+        .limit(1)
+    ).scalar_one_or_none()
+    return value
+
+
+def has_version_chunks(session: Session, version_id: uuid.UUID) -> bool:
+    return (
+        session.execute(
+            select(DocumentChunk.id).where(DocumentChunk.version_id == version_id).limit(1)
+        ).first()
+        is not None
+    )
+
+
+def latest_page_texts(session: Session, version_id: uuid.UUID, page: int) -> list[str]:
+    """Content of the searchable chunks of ``version_id`` covering ``page`` (page 1 also
+    matches chunks without page numbers). Callers check the document's visibility first."""
+    covers = (DocumentChunk.page_from <= page) & (
+        func.coalesce(DocumentChunk.page_to, DocumentChunk.page_from) >= page
+    )
+    if page == 1:
+        covers = covers | DocumentChunk.page_from.is_(None)
+    rows = session.execute(
+        select(DocumentChunk.content)
+        .where(DocumentChunk.version_id == version_id, DocumentChunk.is_latest, covers)
+        .order_by(DocumentChunk.chunk_no)
+    ).scalars()
+    return list(rows)
+
+
+# --- query log (kb.queries; FR-KB-009) ----------------------------------------------------------
+
+
+def insert_query(session: Session, values: Mapping[str, Any]) -> None:
+    """One asked question: ciphertext + HMAC, ids, codes and counts only (invariant 5)."""
+    session.execute(insert(Query).values(tenant_id=current_tenant_id(session), **values))
+
+
+def get_query_of_user(
+    session: Session, query_id: uuid.UUID, user_id: uuid.UUID, *, for_update: bool = False
+) -> Query | None:
+    """A query row of the current school asked by ``user_id`` (None otherwise: 404)."""
+    stmt = select(Query).where(Query.id == query_id, Query.user_id == user_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def set_feedback(
+    session: Session,
+    query_id: uuid.UUID,
+    *,
+    feedback: str,
+    reason: str | None,
+    at: dt.datetime,
+) -> None:
+    session.execute(
+        update(Query)
+        .where(Query.id == query_id)
+        .values(feedback=feedback, feedback_reason=reason, feedback_at=at)
+    )
+
+
+# --- metering ledger (kb.llm_calls; 0024_kb_metering) ----------------------------------------
+
+
+def insert_llm_call(session: Session, values: Mapping[str, Any]) -> None:
+    session.execute(
+        insert(LlmCall).values(id=new_id(), tenant_id=current_tenant_id(session), **values)
+    )
+
+
+# --- verified answers (kb.verified_answers; FR-KB-030) ---------------------------------------
+
+
+def list_verified_answers(
+    session: Session, *, status: str | None, limit: int, before_id: uuid.UUID | None
+) -> list[VerifiedAnswer]:
+    stmt = select(VerifiedAnswer)
+    if status is not None:
+        stmt = stmt.where(VerifiedAnswer.status == status)
+    if before_id is not None:
+        stmt = stmt.where(VerifiedAnswer.id < before_id)
+    stmt = stmt.order_by(VerifiedAnswer.id.desc()).limit(limit)
+    return list(session.execute(stmt).scalars())
+
+
+def insert_verified_answer(session: Session, values: Mapping[str, Any]) -> VerifiedAnswer:
+    row = session.execute(
+        insert(VerifiedAnswer)
+        .values(tenant_id=current_tenant_id(session), **values)
+        .returning(VerifiedAnswer)
+    ).scalar_one()
+    return row
 
 
 def _rowcount(result: object) -> int:
