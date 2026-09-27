@@ -91,7 +91,7 @@ def test_FR_IMP_004_failure_midway_leaves_nothing(
     stored = S.rows(admin_engine, batch_id)
     assert stored[2]["errors"] == [
         {
-            "field": "values.0.value",
+            "field": "full_name",  # values.0 of the internal call -> the attribute
             "code": "synthetic_failure",
             "message_key": "errors.synthetic_failure",
         }

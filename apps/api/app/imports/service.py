@@ -1048,39 +1048,71 @@ class _CommitAborted(Exception):
         self.result = result
 
 
-def _row_failure(exc: DomainError) -> dict[str, str]:
+_VALUE_FIELD = re.compile(r"^values\.(\d+)(?:\.|$)")
+
+
+def _row_failure(exc: DomainError, keys: Sequence[str], key: str | None = None) -> dict[str, str]:
+    """The student service's refusal as a row error naming the attribute (not the request
+    field ``values.<i>.value`` of the internal call)."""
+    field_name = key or "row"
+    code = exc.code
     if isinstance(exc, ValidationFailed) and exc.errors:
         first = exc.errors[0]
-        return issue(str(first.get("field", "row")), str(first.get("code", exc.code)))
-    return issue("row", exc.code)
+        code = str(first.get("code", exc.code))
+        raw = str(first.get("field", ""))
+        match = _VALUE_FIELD.match(raw)
+        if key is None and match is not None and int(match.group(1)) < len(keys):
+            field_name = keys[int(match.group(1))]
+        elif key is None and raw in ("section_id", "roll_no", "values"):
+            field_name = raw
+    return issue(field_name, code)
 
 
 def _apply_row(
     session: Session, ctx: UserContext, batch: ImportBatch, row: RowResult
 ) -> tuple[uuid.UUID, bool, int]:
     """Write one valid row through students.service; (student id, created, student version)."""
+    keys = list(row.values)
     if row.action == "create":
-        created = students.create_student(
-            session,
-            ctx,
-            StudentCreate(
-                values=[
-                    ValueIn(attribute_key=k, source=batch.source, value=v)
-                    for k, v in row.values.items()
-                ],
-                section_id=_uuid(row.section_id),
-                roll_no=row.roll_no,
-            ),
-        )
+        try:
+            created = students.create_student(
+                session,
+                ctx,
+                StudentCreate(
+                    values=[
+                        ValueIn(attribute_key=k, source=batch.source, value=row.values[k])
+                        for k in keys
+                    ],
+                    section_id=_uuid(row.section_id),
+                    roll_no=row.roll_no,
+                ),
+            )
+        except DomainError as exc:
+            raise _RowRefused(_row_failure(exc, keys)) from exc
         return created.id, True, created.version
     student_id = uuid.UUID(str(row.student_id))
     version = 0
-    for key, value in row.values.items():
-        recorded = students.record_value(
-            session, ctx, student_id, key, batch.source, value, import_batch_id=batch.id
-        )
+    for key in keys:
+        try:
+            recorded = students.record_value(
+                session,
+                ctx,
+                student_id,
+                key,
+                batch.source,
+                row.values[key],
+                import_batch_id=batch.id,
+            )
+        except DomainError as exc:
+            raise _RowRefused(_row_failure(exc, keys, key)) from exc
         version = recorded.student_version
     return student_id, False, version
+
+
+class _RowRefused(Exception):
+    def __init__(self, error: dict[str, str]) -> None:
+        super().__init__(error["code"])
+        self.error = error
 
 
 def _commit(
@@ -1107,8 +1139,8 @@ def _commit(
     for row in valid_rows:
         try:
             applied[row.row_no] = _apply_row(session, ctx, batch, row)
-        except DomainError as exc:
-            row.errors.append(_row_failure(exc))
+        except _RowRefused as exc:
+            row.errors.append(exc.error)
             row.status = "error"
             raise _CommitAborted("commit_row_failed", result) from exc
     rows: list[dict[str, Any]] = []

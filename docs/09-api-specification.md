@@ -143,12 +143,21 @@ Students notes (M1, as built):
 ### Imports and extraction
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/imports` (multipart: file, `source`, `kind`) → 202 | `import.run` |
-| GET | `/imports/{id}` · `/imports/{id}/rows?status=error` | `import.run` |
-| PUT | `/imports/{id}/mapping` | `import.run` |
-| POST | `/imports/{id}/commit` · `/imports/{id}/revert` | `import.commit` |
+| POST | `/imports` (JSON: `document_id` of an uploaded, scanned `import_file`, `source`, `kind` = `spreadsheet`) → 202 (**M1**) | `import.run` |
+| GET | `/imports` · `/imports/{id}` (`ETag`) · `/imports/{id}/rows?status=error\|valid\|warning\|committed\|skipped` (cursor) (**M1**) | `import.run` |
+| PUT | `/imports/{id}/mapping` (`If-Match`) (**M1**) | `import.run` |
+| POST | `/imports/{id}/validate` → 202 (**M1**) | `import.run` |
+| POST | `/imports/{id}/commit` (`{"skip_error_rows": bool}`) → 202 · `/imports/{id}/revert` → 200 (**M1**) | `import.commit` |
+| GET · POST | `/import-templates` (POST 201: `name`, `import_id`) (**M1**) | `import.run` |
 | GET | `/extraction-items?batch_id=&status=pending_review` | `import.run` |
 | POST | `/extraction-items/{id}/confirm` · `/reject` | `import.commit` |
+
+Imports notes (M1, as built; US-401, FR-IMP-001..007):
+- **Upload first** with `POST /documents/uploads` (purpose `import_file`: XLSX or CSV/Google Sheets CSV export, ≤ 10 MB) and `POST /documents`; `POST /imports` accepts the document once it passed the virus scan (`409 document_not_ready` before; `413`/`415` for size/type; `409 import_exists` when the file already has a live batch). Parsing, validation and commit run in workers (queue `ingest`); the body carries `job_id`, `Location` points at the batch, whose `status` moves `uploaded → parsing → parsed → validating → validated → committing → committed` (`failed` with `error_code`, e.g. `header_not_found`, `too_many_rows`, `file_too_complex`).
+- **Formulas are never evaluated**: a formula cell (or text starting with `=`/`@`) is kept as inert text; mapped, it is a row error `formula_not_evaluated`.
+- **Mapping**: columns are suggested from English/Telugu headers; a saved template with the same headers is applied automatically (`mapping_template_id`). `PUT …/mapping` replaces the mapping (`{"columns": [{"index", "target"}]}`) and clears earlier results; validate again with `POST …/validate`.
+- **Rows**: `errors`/`warnings` are `{field, code, message_key, ref?}` (e.g. `missing`, `invalid_date`, `ambiguous_date` (warning), `duplicate_in_file` with `ref` = other row, `identity_change_required`, `no_matching_student`, `section_out_of_scope`, `aadhaar_full_number_rejected`). Rows never show C3 values, only `sensitive` keys. The admission number matches existing students (`action: update`); only `admission_register`, `tc_incoming` and `manual_entry` rows may create students (and need `student.create`).
+- **Commit** is all-or-nothing (`409 import_has_errors` unless `skip_error_rows`); the worker re-reads and re-validates the file inside the commit transaction (failure → back to `validated` with `error_code`). Audit `import.committed`, outbox `import.committed {batch_id, student_ids_count}`, notification `import.committed` to the requester. **Revert** within 24 h (`409 revert_window_closed`), refused with `409 import_has_dependents` when records from the batch were changed or are referenced since; outbox `import.reverted {batch_id}`.
 
 ### Data quality
 | Method | Path | Permission |
