@@ -10,11 +10,15 @@ final_k: 12          # fused results returned by default
 branches:
   vector:
     limit: 40        # HNSW, embedding <=> query vector
+    iterative_scan: relaxed_order   # pgvector >= 0.8: filtered HNSW still fills the list
+    max_scan_tuples: 20000
   full_text:
     limit: 40
     ts_config: simple
+    match: any_term  # OR of the question's lexemes, ranked by ts_rank_cd
   trigram:
-    limit: 20        # content % query text
+    limit: 20        # :q <% context_header (title, issuer, reference no., subject, section)
+    word_similarity_threshold: 0.6  # pg_trgm default
 
 hnsw_ef_search: 64   # SET LOCAL hnsw.ef_search (tune)
 
@@ -24,7 +28,10 @@ diversity:
 
 boosts:
   recency_when_latest_intent: true  # decay on issued_on when the question implies latest/current
+  recency_max_factor: 1.0           # neutral until `make eval` tunes it
+  recency_half_life_days: 180
   verified_answers: true            # doc_type = 'verified_answer'
+  verified_answer_factor: 1.0       # neutral until `make eval` tunes it
 
 rerank:
   enabled: false                    # adopt only if evals show a gain worth the latency

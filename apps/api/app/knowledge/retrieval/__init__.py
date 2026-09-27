@@ -12,3 +12,8 @@ Boundary: read-only; no model calls. Must not import gateway, tools, ingestion o
 (import-linter ``knowledge-layers``). Query translation and query embedding are done by the
 caller, which passes texts and vectors in :class:`app.knowledge.domain.RetrievalQuery`.
 """
+
+from app.knowledge.retrieval.acl import acl_predicate
+from app.knowledge.retrieval.hybrid import HybridRetriever
+
+__all__ = ["HybridRetriever", "acl_predicate"]
