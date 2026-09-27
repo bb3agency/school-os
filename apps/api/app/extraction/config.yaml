@@ -1,0 +1,37 @@
+# Register-photo extraction (US-402; FR-IMP-020..024). Versioned configuration shipped inside the
+# package (the API image does not copy /config). The provider kind and the low-confidence
+# threshold are settings (SOS_EXTRACTION_PROVIDER, SOS_EXTRACTION_LOW_CONFIDENCE_THRESHOLD).
+version: 1
+
+# Register columns a provider may return, as student attribute keys (app/students/attributes.yaml).
+# Only C2 attributes: C3 values (caste, religion, address, health) would be stored unencrypted in
+# the review queue, so they are never kept from a page; anything else a provider returns is
+# dropped (counted per page) after it has been scanned for Aadhaar numbers.
+fields:
+  - admission_no
+  - admission_date
+  - full_name
+  - gender
+  - dob
+  - father_name
+  - mother_name
+  - mother_tongue
+  - nationality
+
+# Language hints passed to the provider (registers are written in English and Telugu).
+language_hints: [en, te]
+
+limits:
+  documents_per_batch: 50      # one page image per document in M1
+  rows_per_page: 200           # provider rows beyond this are dropped (counted)
+  value_max_length: 200        # longer values are cut (a register cell is never this long)
+
+# Only images in M1. PDFs need a rasteriser (no approved dependency yet): refused with a message.
+accepted_mime_types: [image/jpeg, image/png]
+
+# Deterministic synthetic output of the fake provider (local/ci only).
+fake:
+  rows_min: 3
+  rows_max: 5
+  confidence_min: 0.55
+  confidence_max: 0.99

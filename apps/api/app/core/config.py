@@ -37,6 +37,15 @@ class AvScannerKind(StrEnum):
     DEV_NOOP = "dev-noop"
 
 
+class ExtractionProviderKind(StrEnum):
+    """Register-photo extraction provider (FR-IMP-024). ``fake`` is synthetic and refuses to run
+    in staging/prod; ``not-configured`` fails every batch with an operator-facing error until a
+    real provider (OCR / Claude vision via ``knowledge/gateway``, M2) is chosen by evaluation."""
+
+    FAKE = "fake"
+    NOT_CONFIGURED = "not-configured"
+
+
 MIB = 1024 * 1024
 
 
@@ -96,6 +105,12 @@ class Settings(BaseSettings):
     clamav_host: str = "localhost"
     clamav_port: int = Field(default=3310, ge=1, le=65535)
     clamav_timeout_s: float = Field(default=30.0, gt=0, le=300)
+
+    # Register-photo extraction (US-402, FR-IMP-020..024). Unset: ``fake`` in local/ci,
+    # ``not-configured`` in staging/prod. Fields read with a confidence below the threshold are
+    # highlighted for the reviewer (US-402 AC4).
+    extraction_provider: ExtractionProviderKind | None = None
+    extraction_low_confidence_threshold: float = Field(default=0.8, gt=0, le=1)
 
     oidc_issuer: str = "http://localhost:8080/schoolos"
     oidc_audience: str = "schoolos-web"
