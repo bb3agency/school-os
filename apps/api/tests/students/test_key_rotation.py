@@ -69,7 +69,7 @@ def _cancelled_request(admin: Engine, school: Any, student_id: uuid.UUID) -> uui
         sensitivity="C3",
     )
     with admin.connect() as c:
-        old_id = c.execute(
+        old_id: Any = c.execute(
             text(
                 "SELECT id FROM sis.attribute_values WHERE student_id = :s "
                 "AND attribute_key = 'health_notes' AND superseded_by IS NOT NULL"
@@ -246,7 +246,7 @@ def test_SEC_012_rotation_adds_a_current_version_and_old_data_still_decrypts(
     assert rotated[0]["summary"]["previous_key_version"] == 1
     assert rotated[0]["summary"]["hmac_key"] == "carried"
     with admin_engine.connect() as c:
-        queued = c.execute(
+        queued: Any = c.execute(
             text("SELECT payload FROM ops.outbox WHERE tenant_id = :t AND event_type = :e"),
             {"t": school.tenant_id, "e": rotation.ROTATED_EVENT},
         ).scalar_one()
@@ -311,7 +311,7 @@ def test_SEC_012_reencryption_moves_every_value_and_is_idempotent(
     assert bytes(guardian_after.phone_blind_index) == bytes(guardian_before.phone_blind_index)
     # History (superseded) rows and the decided change request were re-encrypted too.
     with admin_engine.connect() as c:
-        superseded = c.execute(
+        superseded: Any = c.execute(
             text(
                 "SELECT key_version FROM sis.attribute_values WHERE student_id = :s "
                 "AND superseded_by IS NOT NULL AND value_ciphertext IS NOT NULL"
@@ -498,7 +498,7 @@ def test_SEC_012_history_and_decided_requests_change_only_by_reencryption(
     rotate(school)
     rotation.run_reencryption(school.tenant_id)
     with tenant_session(school.tenant_id) as db:
-        superseded = db.execute(
+        superseded: Any = db.execute(
             text(
                 "SELECT id FROM sis.attribute_values WHERE superseded_by IS NOT NULL "
                 "AND value_ciphertext IS NOT NULL"
@@ -587,7 +587,7 @@ def test_SEC_012_worker_task_reencrypts_in_bounded_runs_and_queues_its_continuat
     assert result["done"] is False
     assert result["total"] == 2
     with admin_engine.connect() as c:
-        continuation = c.execute(
+        continuation: Any = c.execute(
             text("SELECT count(*) FROM ops.outbox WHERE tenant_id = :t AND event_type = :e"),
             {"t": school.tenant_id, "e": rotation.CONTINUE_EVENT},
         ).scalar_one()
@@ -621,7 +621,7 @@ def test_SEC_008_rotation_logs_no_plaintext_or_key_material(
     for value in PLAINTEXTS:
         assert value not in logs
     with admin_engine.connect() as c:
-        wrapped = c.execute(
+        wrapped: Any = c.execute(
             text("SELECT wrapped_dek FROM core.tenant_keys WHERE tenant_id = :t"),
             {"t": school.tenant_id},
         ).scalars()
