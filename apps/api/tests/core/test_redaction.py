@@ -341,3 +341,31 @@ def test_PRV_015_real_aadhaar_next_to_a_uuid_is_still_found() -> None:
     masked = mask_aadhaar(text)
     assert masked.startswith(KNOWN_COLLISION)
     assert number not in masked.replace(" ", "")
+
+
+# Request and trace ids are UUIDs written as 32 hex characters without hyphens; their digit
+# runs look like mobile numbers (6-9 + 9 digits) or Aadhaar numbers now and then (SEC-008).
+KNOWN_HEX_COLLISION = "req_01a0e0b9d6597733935fa0f8f875a46f"  # "6597733935" reads as a mobile
+
+
+def test_SEC_008_known_hex_id_collision_is_not_a_phone() -> None:
+    assert redact(f"request {KNOWN_HEX_COLLISION} done") == f"request {KNOWN_HEX_COLLISION} done"
+    assert not contains_full_aadhaar(KNOWN_HEX_COLLISION)
+
+
+@given(st.uuids())
+def test_SEC_008_hex_ids_are_never_masked(value: uuid.UUID) -> None:
+    for text in (value.hex, f"req_{value.hex}", f"trace_id={value.hex}"):
+        assert redact(text) == text
+        assert not contains_full_aadhaar(text)
+
+
+def test_SEC_008_numbers_next_to_hex_ids_are_still_masked() -> None:
+    body = "23456789012"
+    number = body + verhoeff_check_digit(body)
+    text = f"{KNOWN_HEX_COLLISION} 9876543210 {number}"
+    masked = redact(text)
+    assert masked.startswith(KNOWN_HEX_COLLISION)
+    assert "9876543210" not in masked
+    assert number not in masked
+    assert contains_full_aadhaar(text)

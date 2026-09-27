@@ -122,8 +122,17 @@ _UUID_RE = re.compile(
 )
 
 
+# The same UUIDs written as 32 hex characters (request ids ``req_<hex>``, trace ids): digit runs
+# inside them read as mobile numbers now and then. Only runs of exactly 32 hex characters with at
+# least one letter count, so a plain long number is still scanned.
+_HEX32_RE = re.compile(r"(?<![0-9A-Za-z])(?=[0-9]*[A-Fa-f])[0-9A-Fa-f]{32}(?![0-9A-Za-z])")
+
+
 def _scan_view(text: str) -> str:
-    return _UUID_RE.sub(lambda m: "u" * len(m.group(0)), text)
+    def blank(m: re.Match[str]) -> str:
+        return "u" * len(m.group(0))
+
+    return _HEX32_RE.sub(blank, _UUID_RE.sub(blank, text))
 
 
 _EMAIL_RE = re.compile(r"[\w.%+\-]+@[\w\-]+(?:\.[\w\-]+)+")
