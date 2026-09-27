@@ -710,6 +710,17 @@ The DDL above is the model; migration `0008_sis_students` implements `students`,
 - **`guardians`** add `updated_at` and `version` (ETag); phone (C3) is stored as 10 digits, encrypted, with a blind index (`guardians_phone_bidx`); `student_guardians_one_primary` allows one primary guardian per student.
 - **Encryption**: AAD `tenant_id|sis.attribute_values|value_ciphertext|<row id>` and `tenant_id|sis.guardians|phone_ciphertext|<guardian id>` (likewise `address_ciphertext`); blind index = HMAC-SHA256(tenant HMAC key, `schoolos/blind-index/v1|<purpose>|<value>`).
 
+### 5.2 Change requests as built in M1 (migration `0014_change_requests`; US-601, FR-CR-*, ADR-0010)
+
+`sis.change_requests` follows the DDL above with these refinements:
+
+- **Snapshot and value columns.** `old_value_id` is the value being corrected (current value of `attribute_key` from `target_source` at submission); `old_value_text`/`old_value_date`/`old_value_ciphertext` snapshot it for the memo. The requested value is exactly one of `new_value_text`/`new_value_date`/`new_value_ciphertext` (CHECK). C3 attributes are stored only as ciphertext (AAD `tenant_id|sis.change_requests|new_value_ciphertext|<id>`, likewise `old_value_ciphertext`; `key_version` present iff a ciphertext is).
+- **Maker-checker.** `requested_by`/`decided_by` are **memberships** (composite FKs to `core.memberships`); `change_requests_no_self_approval CHECK (decided_by IS NULL OR decided_by <> requested_by)` (SEC-014). `decided_by` is set exactly for `approved`/`rejected`; `decided_at` for every closed status (`cancelled` by the requester and `expired` by the daily task carry no `decided_by`). `applied_value_id` (composite FK to `attribute_values`) is set exactly when `approved`.
+- **Text rules.** `reason` 10..1000 characters; `decision_note` optional on approval, required on rejection (`change_requests_reject_needs_note`), same length. Bounds live in `app/changes/config.yaml` too (`expiry_days: 30`).
+- **One open request** per `(tenant_id, student_id, attribute_key, target_source)` (`change_requests_one_pending`, partial unique index); evidence is a composite FK to `kb.documents` (NOT NULL).
+- **Records.** Trigger `change_requests_frozen` forbids any change to a decided row and to the requested content of a pending one (only workflow columns and re-encryption to a newer key); `sos_app` has column-level UPDATE on those columns and no DELETE. Extra columns: `applied_value_id`, `updated_at`, `version` (ETag).
+- **`attribute_values.change_request_id`** now has its composite FK (`attribute_values_change_request_fk`). The downgrade drops the requests (lossy; values keep the ids), so the upgrade adds the FK `NOT VALID` and validates it only when no stale ids exist.
+
 ## 6. Knowledge schema (`kb`)
 
 ```sql

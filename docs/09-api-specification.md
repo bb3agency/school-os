@@ -134,11 +134,20 @@ Students notes (M1, as built):
 ### Change requests (maker-checker)
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/change-requests` | `student.identity_change.request` |
-| GET | `/change-requests?status=pending` | request or approve permission |
-| POST | `/change-requests/{id}/approve` | `student.identity_change.approve` (step-up; approver ≠ requester) |
-| POST | `/change-requests/{id}/reject` | `student.identity_change.approve` |
-| GET | `/change-requests/{id}/memo.pdf` | request or approve permission |
+| POST | `/change-requests` | `student.identity_change.request` (`Idempotency-Key`) — **built** |
+| GET | `/change-requests?status=&student_id=` | request or approve permission (`require_any`) — **built** |
+| GET | `/change-requests/{id}` | request or approve permission; `ETag` — **built** |
+| POST | `/change-requests/{id}/approve` | `student.identity_change.approve` (step-up; approver ≠ requester; `If-Match`) — **built** |
+| POST | `/change-requests/{id}/reject` | `student.identity_change.approve` (step-up; reason required; `If-Match`) — **built** |
+| POST | `/change-requests/{id}/cancel` | `student.identity_change.request` (requester only; `If-Match`) — **built** |
+| GET | `/change-requests/{id}/memo` | request or approve permission; `text/html` A4 memo (PDF with exports) — **built** |
+
+Change-request notes (M1, as built; US-601, FR-CR-001..005):
+- **Submit** body: `student_id`, `attribute_key` (an `is_identity` attribute, else `422 not_identity_attribute`), `target_source` (default `admission_register`), exactly one of `new_value` (string; dates `YYYY-MM-DD`) or `new_value_date`, `reason` (10–1000 characters), `evidence_document_id` (a document you can open, uploaded with purpose `evidence`, not quarantined; else `422 evidence_required` with `errors[0].code` `evidence_not_found` / `evidence_wrong_purpose` / `evidence_not_usable`). The value follows the attribute's rules (same codes as `POST /students/{id}/values`); full Aadhaar numbers in the value or reason are refused (`aadhaar_full_number_rejected`). A second pending request for the same student, attribute and source → `409 duplicate_pending_request`. Pending requests expire after 30 days (`expires_at`).
+- **Response** `ChangeRequest`: ids, `attribute_label_en/te`, `old_value_id`, `old_value`, `new_value`, `masked` (C3 attributes always `"••••"`), `reason`, `status` (`pending|approved|rejected|expired|cancelled`), `requested_by`/`decided_by` (membership ids), `decision_note`, `applied_value_id` (the new verified value), `expires_at`, `version`, and `can_decide`/`can_cancel` for the caller.
+- **Approve** (optional body `{"note": …}`): errors `403 self_approval_forbidden`, `428 step_up_required`, `412` stale `If-Match`, `409 request_not_pending | request_expired | request_outdated` (the value changed after submission). On success the new value is recorded as **verified** for `target_source` (old value kept in history), audit `change_request.approved` + `student.value.recorded`, outbox `change_request.approved` (DQ re-evaluates), requester notified. **Reject** body `{"reason": …}` (10–1000). **Cancel** by anyone else → `403 not_requester`.
+- **Memo**: bilingual (EN/TE) print-ready page: school, student name, admission number, class, field, source, old/new value (C3 masked unless the viewer holds `student.read_sensitive`), reason, evidence reference, requester/approver names, times in IST and register-correction instructions (only when approved). `Content-Disposition: inline`, `Cache-Control: no-store`, no scripts; every value HTML-escaped. Audited (`change_request.memo_viewed`).
+- Scope: requests are reached through their student (scoped holders only see their sections' students; otherwise `404`).
 
 ### Imports and extraction
 | Method | Path | Permission |
@@ -267,13 +276,20 @@ POST /api/v1/change-requests
 Idempotency-Key: 5b0a…
 { "student_id": "0192f3a0-…", "attribute_key": "dob", "new_value_date": "2012-03-15",
   "reason": "Birth certificate shows 15/03/2012", "evidence_document_id": "0192…" }
-→ 201 { "id": "0192…", "status": "pending", "expires_at": "2026-10-26T…" }
+→ 201 ETag: W/"1"  { "id": "0192…", "status": "pending", "old_value": "2012-03-14",
+                     "new_value": "2012-03-15", "expires_at": "2026-10-26T…", "version": 1, … }
 
-POST /api/v1/change-requests/0192…/approve        (same user as requester)
+POST /api/v1/change-requests/0192…/approve        (same user as requester, fresh MFA)
+If-Match: W/"1"
 → 403 { "code": "self_approval_forbidden", … }
 
 POST /api/v1/change-requests/0192…/approve        (principal, no recent MFA)
+If-Match: W/"1"
 → 428 { "code": "step_up_required", … }
+
+POST /api/v1/change-requests/0192…/approve        (principal, MFA within 5 minutes)
+If-Match: W/"1"
+→ 200 ETag: W/"2"  { "status": "approved", "applied_value_id": "0192…", … }
 ```
 
 ### 5.4 Ask the school (SSE)
