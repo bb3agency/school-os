@@ -3,11 +3,12 @@
 import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
+import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { Select, SelectField } from "@/components/ui/Select";
@@ -15,10 +16,12 @@ import { DataTable, type Column } from "@/components/ui/Table";
 import { Label } from "@/components/ui/Label";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
+import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatList } from "@/lib/format";
 import type { FieldErrors } from "@/lib/forms";
+import type { Loadable } from "@/lib/loadable";
 import {
   ALL_STRUCTURE_KEYS,
   STRUCTURE_MANAGE,
@@ -26,45 +29,75 @@ import {
   classEditSchema,
   classLabel,
   ifMatch,
+  isArchived,
   nextSortOrder,
   pickYear,
   sectionCreateSchema,
   sectionEditSchema,
+  setArchived,
+  useStaffDirectory,
   useStructureLists,
   useYearSections,
   withFreshOnConflict,
   yearCreateSchema,
   yearEditSchema,
+  type StaffMember,
+  type StructureKind,
 } from "./data";
 
 /**
- * School structure (US-202, FR-TEN-010): academic years, classes and sections, with add and
- * edit for holders of `tenant.structure.manage` (AC3: others see the lists only). Every edit
- * sends If-Match with the version it was read at; a 412 reloads the lists and says so.
- * The API has no archive or delete for years, classes or sections, so none is offered.
+ * School structure (US-202, FR-TEN-010): academic years, classes and sections, with add, edit,
+ * archive and unarchive for holders of `tenant.structure.manage` (AC3: others see the lists
+ * only). Every change sends If-Match with the version it was read at; a 412 reloads the lists
+ * and says so. Archived rows are hidden unless "Show archived" is on, and are marked when
+ * shown. A section's class teacher is chosen from the staff directory (GET /staff). Each
+ * year links to its year-end promotion (FR-TEN-011, US-202 AC2).
  */
 export function AcademicStructureScreen() {
   const ts = useTranslations("school.structure");
   const t = useTranslations("academicStructure");
+  const locale = useLocale();
   const can = useStaffCan();
   const manage = can(STRUCTURE_MANAGE);
-  const { years, classes } = useStructureLists();
+  const [showArchived, setShowArchived] = useState(false);
+  const { years, classes } = useStructureLists(showArchived);
   const [chosenYear, setChosenYear] = useState<string | null>(null);
   const yearId = years.status === "ready" ? pickYear(years.data, chosenYear) : null;
-  const sections = useYearSections(yearId);
+  const sections = useYearSections(yearId, showArchived);
+  const staff = useStaffDirectory(manage, locale);
   // The read-only note waits for /me so it never flashes for managers.
   const meLoaded = useStaffMe() !== undefined;
+  const toggleId = useId();
 
   return (
     <div className="space-y-6">
       <PageHeader title={ts("title")} description={ts("description")} />
       {!manage && meLoaded ? <Alert tone="info">{t("readOnlyNote")}</Alert> : null}
+      <div className="flex items-start gap-2 text-sm">
+        <input
+          id={toggleId}
+          type="checkbox"
+          checked={showArchived}
+          onChange={(event) => setShowArchived(event.target.checked)}
+          className="mt-1 size-4 accent-primary"
+          aria-describedby={`${toggleId}-hint`}
+        />
+        <span>
+          <label htmlFor={toggleId} className="font-semibold">
+            {t("showArchived")}
+          </label>
+          <span id={`${toggleId}-hint`} className="block text-ink-muted">
+            {t("showArchivedHint")}
+          </span>
+        </span>
+      </div>
       <YearsCard years={years} manage={manage} />
       <ClassesCard classes={classes} sections={sections} manage={manage} />
       <SectionsCard
         years={years}
         classes={classes}
         sections={sections}
+        staff={staff}
         yearId={yearId}
         onYear={setChosenYear}
         manage={manage}
@@ -75,6 +108,21 @@ export function AcademicStructureScreen() {
 
 type Lists = ReturnType<typeof useStructureLists>;
 
+/** Name plus an "Archived" badge, so archived rows never look like rows in use. */
+function NameCell({ name, archived }: { name: ReactNode; archived: boolean }) {
+  const t = useTranslations("academicStructure");
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span>{name}</span>
+      {archived ? <Badge tone="warning">{t("archivedBadge")}</Badge> : null}
+    </span>
+  );
+}
+
+function Actions({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap gap-2">{children}</div>;
+}
+
 /* ------------------------------------------------------------------------ academic years */
 
 function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }) {
@@ -82,7 +130,11 @@ function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }
   const t = useTranslations("academicStructure");
   const tc = useTranslations("common");
   const columns: Column<AcademicYear>[] = [
-    { key: "label", header: ts("years.colYear"), cell: (row) => row.label },
+    {
+      key: "label",
+      header: ts("years.colYear"),
+      cell: (row) => <NameCell name={row.label} archived={isArchived(row)} />,
+    },
     {
       key: "starts",
       header: ts("years.colStarts"),
@@ -99,7 +151,7 @@ function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }
       cell: (row) =>
         row.is_current ? (
           <Badge tone="success">{ts("currentBadge")}</Badge>
-        ) : manage ? (
+        ) : manage && !isArchived(row) ? (
           <MakeCurrentDialog year={row} />
         ) : (
           <span className="text-ink-muted">{tc("no")}</span>
@@ -110,7 +162,25 @@ function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }
           {
             key: "actions",
             header: t("colActions"),
-            cell: (row: AcademicYear) => <EditYearDialog year={row} />,
+            cell: (row: AcademicYear) =>
+              isArchived(row) ? (
+                <ArchiveDialog kind="year" row={row} name={row.label} archive={false} />
+              ) : (
+                <Actions>
+                  <EditYearDialog year={row} />
+                  <ButtonLink
+                    href={`/settings/structure/years/${row.id}/promotions`}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    {t("years.promote")}{" "}
+                    <span className="sr-only">{t("years.promoteFor", { label: row.label })}</span>
+                  </ButtonLink>
+                  {row.is_current ? null : (
+                    <ArchiveDialog kind="year" row={row} name={row.label} archive />
+                  )}
+                </Actions>
+              ),
           },
         ]
       : []),
@@ -270,6 +340,47 @@ function MakeCurrentDialog({ year }: { year: AcademicYear }) {
   );
 }
 
+/* ------------------------------------------------------------------- archive / unarchive */
+
+/**
+ * Archive (hide from lists, keep for old records) or bring back one year, class or section.
+ * The API refuses the current year (`academic_year_current`) and anything with students
+ * enrolled (`structure_in_use`); both are explained in plain language.
+ */
+function ArchiveDialog({
+  kind,
+  row,
+  name,
+  archive,
+}: {
+  kind: StructureKind;
+  row: { id: string; version: number };
+  name: string;
+  archive: boolean;
+}) {
+  const t = useTranslations("academicStructure.archive");
+  const api = useBffClient("staff");
+  const queryClient = useQueryClient();
+  const values = { name };
+  return (
+    <ActionDialog
+      triggerLabel={archive ? t("archive") : t("unarchive")}
+      triggerSize="sm"
+      triggerDescription={
+        archive ? t(`${kind}.describe`, values) : t(`${kind}.unarchiveDescribe`, values)
+      }
+      title={archive ? t(`${kind}.title`, values) : t(`${kind}.unarchiveTitle`, values)}
+      description={archive ? t(`${kind}.body`) : t("unarchiveBody")}
+      confirmLabel={archive ? t("archive") : t("unarchive")}
+      confirmVariant={archive ? "danger" : "primary"}
+      schema={z.object({})}
+      invalidate={ALL_STRUCTURE_KEYS}
+      errorNamespace="academicStructure"
+      submit={() => withFreshOnConflict(queryClient, () => setArchived(api, kind, row, archive))}
+    />
+  );
+}
+
 /* ------------------------------------------------------------------------------- classes */
 
 function ClassesCard({
@@ -289,7 +400,11 @@ function ClassesCard({
       ? String(sections.data.filter((row) => row.class_id === classId).length)
       : null;
   const columns: Column<SchoolClass>[] = [
-    { key: "name", header: ts("classes.colName"), cell: (row) => classLabel(row, locale) },
+    {
+      key: "name",
+      header: ts("classes.colName"),
+      cell: (row) => <NameCell name={classLabel(row, locale)} archived={isArchived(row)} />,
+    },
     { key: "code", header: t("classes.colCode"), cell: (row) => row.code },
     { key: "order", header: ts("classes.colOrder"), cell: (row) => row.sort_order },
     {
@@ -302,11 +417,25 @@ function ClassesCard({
           {
             key: "actions",
             header: t("colActions"),
-            cell: (row: SchoolClass) => <EditClassDialog schoolClass={row} />,
+            cell: (row: SchoolClass) =>
+              isArchived(row) ? (
+                <ArchiveDialog
+                  kind="class"
+                  row={row}
+                  name={classLabel(row, locale)}
+                  archive={false}
+                />
+              ) : (
+                <Actions>
+                  <EditClassDialog schoolClass={row} />
+                  <ArchiveDialog kind="class" row={row} name={classLabel(row, locale)} archive />
+                </Actions>
+              ),
           },
         ]
       : []),
   ];
+  const inUse = classes.status === "ready" ? classes.data.filter((row) => !isArchived(row)) : [];
   return (
     <Card
       title={ts("classes.title")}
@@ -314,9 +443,7 @@ function ClassesCard({
         manage ? (
           <>
             <DefaultClassesDialog />
-            <AddClassDialog
-              nextOrder={classes.status === "ready" ? nextSortOrder(classes.data) : 0}
-            />
+            <AddClassDialog nextOrder={classes.status === "ready" ? nextSortOrder(inUse) : 0} />
           </>
         ) : undefined
       }
@@ -485,10 +612,76 @@ function DefaultClassesDialog() {
 
 /* ------------------------------------------------------------------------------ sections */
 
+type StaffList = Loadable<readonly StaffMember[]>;
+
+/** "Name (Teacher, Class teacher)": built-in role names from the messages, else the key. */
+function useStaffLabel(): (member: StaffMember) => string {
+  const tr = useTranslations("school.users.roles");
+  const locale = useLocale() as Locale;
+  const loose = tr as unknown as ((key: string) => string) & { has: (key: string) => boolean };
+  return (member) => {
+    if (member.roles.length === 0) return member.display_name;
+    const roles = member.roles.map((key) => (loose.has(key) ? loose(key) : key));
+    return `${member.display_name} (${formatList(roles, locale)})`;
+  };
+}
+
+/** The class teacher's name for the sections table (managers only; they can read /staff). */
+function TeacherCell({ membershipId, staff }: { membershipId: string | null; staff: StaffList }) {
+  const t = useTranslations("academicStructure.sections");
+  if (!membershipId) return <Value>{null}</Value>;
+  if (staff.status !== "ready") return <>{t("teacherAssigned")}</>;
+  const member = staff.data.find((row) => row.membership_id === membershipId);
+  return <>{member ? member.display_name : t("teacherNotListed")}</>;
+}
+
+/**
+ * Class teacher picker (GET /staff, sorted by name). While the list loads, or when it cannot
+ * be read (e.g. no permission), the field is left out and the section keeps its teacher.
+ */
+function ClassTeacherField({
+  errors,
+  staff,
+  current,
+}: {
+  errors: FieldErrors;
+  staff: StaffList;
+  current: string | null;
+}) {
+  const t = useTranslations("academicStructure.sections");
+  const tc = useTranslations("common");
+  const label = useStaffLabel();
+  if (staff.status === "loading") {
+    return <p className="text-sm text-ink-muted">{t("teacherLoading")}</p>;
+  }
+  if (staff.status !== "ready") {
+    return <p className="text-sm text-ink-muted">{t("teacherUnavailable")}</p>;
+  }
+  const options = staff.data.map((member) => ({
+    value: member.membership_id,
+    label: label(member),
+  }));
+  if (current && !staff.data.some((member) => member.membership_id === current)) {
+    options.unshift({ value: current, label: t("teacherNotListed") });
+  }
+  return (
+    <SelectField
+      name="class_teacher_membership_id"
+      label={t("teacherField")}
+      hint={t("teacherHint")}
+      error={errors.class_teacher_membership_id}
+      placeholder={staff.data.length > 0 ? t("noTeacher") : tc("notAvailable")}
+      defaultValue={current ?? ""}
+      options={options}
+    />
+  );
+}
+
 function SectionsCard({
   years,
   classes,
   sections,
+  staff,
   yearId,
   onYear,
   manage,
@@ -496,6 +689,7 @@ function SectionsCard({
   years: Lists["years"];
   classes: Lists["classes"];
   sections: ReturnType<typeof useYearSections>;
+  staff: StaffList;
   yearId: string | null;
   onYear: (yearId: string) => void;
   manage: boolean;
@@ -510,6 +704,7 @@ function SectionsCard({
   const yearList = years.status === "ready" ? years.data : [];
   const year = yearList.find((row) => row.id === yearId);
   const classList = classes.status === "ready" ? classes.data : [];
+  const activeClasses = classList.filter((row) => !isArchived(row));
   // Sort like the class list (display order), then by section name.
   const order = new Map(classList.map((row, index) => [row.id, index] as const));
   const rows =
@@ -533,15 +728,41 @@ function SectionsCard({
       header: ts("sections.colClass"),
       cell: (row) => <Value>{parentName(row)}</Value>,
     },
-    { key: "name", header: ts("sections.colName"), cell: (row) => row.name },
+    {
+      key: "name",
+      header: ts("sections.colName"),
+      cell: (row) => <NameCell name={row.name} archived={isArchived(row)} />,
+    },
     ...(manage
       ? [
           {
+            key: "teacher",
+            header: t("sections.colTeacher"),
+            cell: (row: Section) => (
+              <TeacherCell membershipId={row.class_teacher_membership_id} staff={staff} />
+            ),
+          },
+          {
             key: "actions",
             header: t("colActions"),
-            cell: (row: Section) => (
-              <EditSectionDialog section={row} className={parentName(row) ?? ""} />
-            ),
+            cell: (row: Section) => {
+              const name = t("sections.fullName", {
+                className: parentName(row) ?? "",
+                name: row.name,
+              });
+              return isArchived(row) ? (
+                <ArchiveDialog kind="section" row={row} name={name} archive={false} />
+              ) : (
+                <Actions>
+                  <EditSectionDialog
+                    section={row}
+                    className={parentName(row) ?? ""}
+                    staff={staff}
+                  />
+                  <ArchiveDialog kind="section" row={row} name={name} archive />
+                </Actions>
+              );
+            },
           },
         ]
       : []),
@@ -552,8 +773,8 @@ function SectionsCard({
       title={ts("sections.title")}
       description={t("sections.description")}
       actions={
-        manage && year && classList.length > 0 ? (
-          <AddSectionDialog year={year} classes={classList} />
+        manage && year && !isArchived(year) && activeClasses.length > 0 ? (
+          <AddSectionDialog year={year} classes={activeClasses} staff={staff} />
         ) : undefined
       }
     >
@@ -568,10 +789,15 @@ function SectionsCard({
               value: row.id,
               label: row.is_current
                 ? t("sections.currentYearOption", { label: row.label })
-                : row.label,
+                : isArchived(row)
+                  ? t("sections.archivedYearOption", { label: row.label })
+                  : row.label,
             }))}
           />
         </div>
+      ) : null}
+      {year && isArchived(year) ? (
+        <p className="mb-3 text-sm text-ink-muted">{t("sections.archivedYearNote")}</p>
       ) : null}
       {years.status === "ready" && yearList.length === 0 ? (
         <Alert tone="info">{t("sections.needYear")}</Alert>
@@ -586,7 +812,7 @@ function SectionsCard({
           emptyBody={ts("sections.emptyBody")}
         />
       )}
-      {manage && classes.status === "ready" && classList.length === 0 && yearList.length > 0 ? (
+      {manage && classes.status === "ready" && activeClasses.length === 0 && yearList.length > 0 ? (
         <p className="mt-3 text-sm text-ink-muted">{t("sections.needClass")}</p>
       ) : null}
     </Card>
@@ -596,9 +822,11 @@ function SectionsCard({
 function AddSectionDialog({
   year,
   classes,
+  staff,
 }: {
   year: AcademicYear;
   classes: readonly SchoolClass[];
+  staff: StaffList;
 }) {
   const t = useTranslations("academicStructure.sections");
   const tc = useTranslations("common");
@@ -622,6 +850,9 @@ function AddSectionDialog({
               academic_year_id: data.academic_year_id,
               class_id: data.class_id,
               name: data.name,
+              ...(data.class_teacher_membership_id
+                ? { class_teacher_membership_id: data.class_teacher_membership_id }
+                : {}),
             },
           }),
         )
@@ -649,13 +880,22 @@ function AddSectionDialog({
             className="max-w-48"
             required
           />
+          <ClassTeacherField errors={errors} staff={staff} current={null} />
         </>
       )}
     </ActionDialog>
   );
 }
 
-function EditSectionDialog({ section, className }: { section: Section; className: string }) {
+function EditSectionDialog({
+  section,
+  className,
+  staff,
+}: {
+  section: Section;
+  className: string;
+  staff: StaffList;
+}) {
   const t = useTranslations("academicStructure");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
@@ -670,30 +910,44 @@ function EditSectionDialog({ section, className }: { section: Section; className
       schema={sectionEditSchema}
       invalidate={ALL_STRUCTURE_KEYS}
       errorNamespace="academicStructure"
-      submit={(data) =>
-        withFreshOnConflict(queryClient, () =>
+      submit={(data) => {
+        const teacher = data.class_teacher_membership_id;
+        // Send the teacher only when it changed (each change is audited on its own).
+        const teacherChanged =
+          teacher !== undefined && teacher !== section.class_teacher_membership_id;
+        return withFreshOnConflict(queryClient, () =>
           unwrap(
             api.PATCH("/api/v1/sections/{section_id}", {
               params: { path: { section_id: section.id } },
               headers: { "If-Match": ifMatch(section.version) },
-              body: { name: data.name },
+              body: {
+                name: data.name,
+                ...(teacherChanged ? { class_teacher_membership_id: teacher } : {}),
+              },
             }),
           ),
-        )
-      }
+        );
+      }}
     >
       {(errors) => (
-        <TextField
-          name="name"
-          label={t("sections.nameField")}
-          hint={t("sections.nameHint")}
-          error={errors.name}
-          defaultValue={section.name}
-          autoComplete="off"
-          maxLength={16}
-          className="max-w-48"
-          required
-        />
+        <>
+          <TextField
+            name="name"
+            label={t("sections.nameField")}
+            hint={t("sections.nameHint")}
+            error={errors.name}
+            defaultValue={section.name}
+            autoComplete="off"
+            maxLength={16}
+            className="max-w-48"
+            required
+          />
+          <ClassTeacherField
+            errors={errors}
+            staff={staff}
+            current={section.class_teacher_membership_id}
+          />
+        </>
       )}
     </ActionDialog>
   );

@@ -1362,6 +1362,14 @@
       "step_up_cancelled": {
         "title": "Not done: we still need to confirm it's you",
         "body": "This action needs a fresh sign-in with your second step (MFA). Try again and choose \"Sign in again\"."
+      },
+      "structure_archived": {
+        "title": "This is archived",
+        "body": "The academic year, class or section is archived. Ask the office to unarchive it on the school structure page, then try again."
+      },
+      "structure_in_use": {
+        "title": "Students are still enrolled here",
+        "body": "This can't be archived while students are enrolled in it. Move the students first, then try again."
       }
     },
     "stepUp": {
@@ -3180,7 +3188,9 @@
       "makeCurrent": "Make current",
       "makeCurrentDescribe": "Make {label} the current year",
       "makeCurrentTitle": "Make {label} the current year?",
-      "makeCurrentBody": "Only one year can be current. The year that is current now will stop being current, and {label} will be shown as the current year everywhere."
+      "makeCurrentBody": "Only one year can be current. The year that is current now will stop being current, and {label} will be shown as the current year everywhere.",
+      "promote": "Promote students",
+      "promoteFor": "(academic year {label})"
     },
     "classes": {
       "add": "Add class",
@@ -3214,7 +3224,18 @@
       "editTitle": "Rename section {name} of {className}",
       "editDescribe": "Rename section {name} of {className}",
       "needYear": "Add an academic year first. Sections are set up for each academic year.",
-      "needClass": "Add classes first, then add sections to them."
+      "needClass": "Add classes first, then add sections to them.",
+      "colTeacher": "Class teacher",
+      "fullName": "{className} {name}",
+      "teacherField": "Class teacher",
+      "teacherHint": "Optional. The class teacher can see this section's students.",
+      "noTeacher": "No class teacher",
+      "teacherLoading": "Loading the staff list…",
+      "teacherUnavailable": "The staff list can't be shown, so the class teacher can't be chosen here. You can still save the other details; the class teacher stays as it is.",
+      "teacherNotListed": "Someone not in the staff list",
+      "teacherAssigned": "Assigned",
+      "archivedYearOption": "{label} (archived)",
+      "archivedYearNote": "This academic year is archived. Unarchive it to add sections to it."
     },
     "errors": {
       "academic_year_overlap": {
@@ -3228,7 +3249,192 @@
       "duplicate": {
         "title": "This already exists",
         "body": "There is already a class with this code, or a section with this name in the same class and year. Check the list before adding it again."
+      },
+      "academic_year_current": {
+        "title": "The current year can't be archived",
+        "body": "Make another academic year current first, then archive this one."
+      },
+      "structure_in_use": {
+        "title": "Students are still enrolled here",
+        "body": "This can't be archived while students are enrolled in it. Move or promote the students first, then try again."
+      },
+      "structure_archived": {
+        "title": "This is archived",
+        "body": "The academic year or class is archived. Turn on \"Show archived\", unarchive it, then try again."
+      },
+      "promotion_already_committed": {
+        "title": "This year was already promoted",
+        "body": "Students of this year were already moved to the next year. To change that, undo the promotion first (within 24 hours)."
+      },
+      "promotion_plan_changed": {
+        "title": "Enrolments changed since the preview",
+        "body": "Someone changed students' sections after you previewed. Close this window, select \"Preview promotion\" again and check the new plan."
+      },
+      "nothing_to_promote": {
+        "title": "No student can be promoted",
+        "body": "Every student of this year has left, graduated or is already enrolled in the new year. Nothing was changed."
+      },
+      "no_target_section": {
+        "title": "Some students have no section in the new year",
+        "body": "Add the missing sections to the new year on the school structure page, or choose a section for them under \"Sections in the new year\", then preview again."
+      },
+      "promotion_undo_expired": {
+        "title": "It's too late to undo",
+        "body": "A promotion can be undone only within 24 hours. Correct the students one by one from their records instead."
+      },
+      "promotion_has_dependents": {
+        "title": "This promotion can't be undone",
+        "body": "Some of these students' enrolments or records were changed after the promotion. Correct those students one by one from their records instead."
+      },
+      "no_promotion": {
+        "title": "There is nothing to undo",
+        "body": "This year has no promotion that can be undone. Reload the page to see its current state."
+      },
+      "promotion_held_back_not_in_year": {
+        "title": "A chosen student is not in this year",
+        "body": "One of the students you chose is not enrolled in this academic year. Remove them from \"Students who stay in the same class\" and preview again."
+      },
+      "promotion_target_not_later": {
+        "title": "Choose a later year",
+        "body": "Students can only be promoted into an academic year that starts after this one. Choose another year."
+      },
+      "promotion_target_not_found": {
+        "title": "That academic year no longer exists",
+        "body": "Reload the page and choose the year to promote into again."
+      },
+      "promotion_section_map_invalid": {
+        "title": "Check the section choices",
+        "body": "One of the chosen sections no longer exists or was chosen twice. Reload the page and choose the sections again."
       }
+    },
+    "showArchived": "Show archived years, classes and sections",
+    "showArchivedHint": "Archived items are hidden from lists but kept for old records.",
+    "archivedBadge": "Archived",
+    "archive": {
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "unarchiveBody": "It shows in lists again and can be used for new records.",
+      "year": {
+        "title": "Archive academic year {name}?",
+        "body": "The year is hidden from lists but kept for old records. The current year, or a year that still has students enrolled, can't be archived.",
+        "describe": "Archive academic year {name}",
+        "unarchiveTitle": "Unarchive academic year {name}?",
+        "unarchiveDescribe": "Unarchive academic year {name}"
+      },
+      "class": {
+        "title": "Archive {name}?",
+        "body": "The class is hidden from lists but kept for old records. A class with students enrolled in any of its sections can't be archived.",
+        "describe": "Archive class {name}",
+        "unarchiveTitle": "Unarchive {name}?",
+        "unarchiveDescribe": "Unarchive class {name}"
+      },
+      "section": {
+        "title": "Archive section {name}?",
+        "body": "The section is hidden from lists but kept for old records. A section with students enrolled can't be archived: move them to another section first.",
+        "describe": "Archive section {name}",
+        "unarchiveTitle": "Unarchive section {name}?",
+        "unarchiveDescribe": "Unarchive section {name}"
+      }
+    },
+    "promotions": {
+      "titlePlain": "Promote students",
+      "title": "Promote students of {label}",
+      "description": "Move students to the next class for the new academic year. Nothing changes until you select \"Promote students\" after the preview.",
+      "back": "Back to school structure",
+      "loading": "Loading the promotion…",
+      "noAccessTitle": "You can't promote students",
+      "noAccessBody": "Only people who can manage the school structure (for example the principal or office admin) can promote students to the next year.",
+      "archivedYear": "This academic year is archived.",
+      "statusTitle": "Promotion status",
+      "notYet": "Students of this year have not been promoted yet.",
+      "doneTitle": "Students of this year were promoted",
+      "doneBody": "They were moved to {to} on {when}.",
+      "countsSummary": "{promoted} promoted, {held_back} held back, {graduated} graduated, {skipped} skipped",
+      "undoUntil": "You can undo it until {when}.",
+      "undoExpired": "More than 24 hours have passed, so this promotion can't be undone. Correct students one by one from their records.",
+      "undo": "Undo promotion",
+      "undoTitle": "Undo this promotion?",
+      "undoBody": "Students go back to their classes and sections in {from}. Their new enrolments are removed and graduates get their earlier status back. This is recorded in the audit log.",
+      "undoConfirm": "Undo promotion",
+      "historyTitle": "Promotions of this year",
+      "colStatus": "Status",
+      "colTo": "Promoted into",
+      "colCommitted": "Promoted on",
+      "colUndone": "Undone on",
+      "colCounts": "Students",
+      "runStatus": {
+        "committed": "Done",
+        "undone": "Undone"
+      },
+      "planTitle": "Plan the promotion",
+      "planDescription": "Each class goes to the next class by class order and the last class graduates. Students who left are skipped.",
+      "noTargetTitle": "Add the next academic year first",
+      "noTargetBody": "There is no academic year that starts after {label}. Add it and its sections on the school structure page, then come back.",
+      "openStructure": "Open school structure",
+      "targetField": "Promote into",
+      "targetHint": "The academic year the students move to.",
+      "heldBackTitle": "Students who stay in the same class",
+      "heldBackHint": "Find each student who is not promoted this year. They stay in the same class in the new year.",
+      "searchField": "Find a student",
+      "searchHint": "Type part of a name or an admission number.",
+      "searchHintNotCurrent": "Search finds students of the current academic year only, so it may not find students of this year.",
+      "searchResults": "{count, plural, =0 {No students of this year match.} one {# student of this year matches.} other {# students of this year match.}}",
+      "noStudentRead": "You can't see student records, so you can't choose students here. Ask someone who can, or promote everyone.",
+      "heldBackCount": "{count, plural, one {# student stays in the same class} other {# students stay in the same class}}",
+      "remove": "Remove",
+      "aboutStudent": "(student {name})",
+      "holdBack": "Keep in class",
+      "nameHidden": "Name hidden",
+      "nameLoading": "Loading…",
+      "nameNotAvailable": "Name not available",
+      "mapTitle": "Sections in the new year",
+      "mapHint": "{year} has no section with the same name for these students. Choose where they go.",
+      "mapField": "Students of {from} going to {className}",
+      "mapPlaceholder": "Choose a section",
+      "mapNone": "{year} has no section of {className} yet. Add one on the school structure page.",
+      "unknownClass": "the next class",
+      "unknownSection": "Section",
+      "preview": "Preview promotion",
+      "previewing": "Preparing the preview…",
+      "previewHint": "The preview changes nothing.",
+      "previewTitle": "Preview: {from} to {to}",
+      "stale": "You changed the plan after this preview. Select \"Preview promotion\" again before promoting.",
+      "outcome": {
+        "promoted": "Promoted",
+        "held_back": "Held back",
+        "graduated": "Graduated",
+        "skipped": "Skipped"
+      },
+      "problemsTitle": "{count, plural, one {# student has no section in the new year} other {# students have no section in the new year}}",
+      "problemLine": "{from}: {count, plural, one {# student} other {# students}}",
+      "problemsFix": "Choose a section for them under \"Sections in the new year\" and preview again, or add the sections on the school structure page.",
+      "groupsTitle": "Where each section goes",
+      "groupsEmpty": "No students in this plan.",
+      "colFrom": "From section",
+      "colOutcome": "Result",
+      "colToSection": "New section",
+      "colStudents": "Students",
+      "colStudent": "Student",
+      "colNote": "Note",
+      "colAction": "Change",
+      "studentsTitle": "Students",
+      "namesHiddenNote": "You can't see student records, so names are hidden. Only the results are shown.",
+      "sectionField": "Section",
+      "studentsCaption": "Students of {section}",
+      "reason": {
+        "left": "Left the school",
+        "graduated": "Already graduated",
+        "already_enrolled": "Already enrolled in the new year",
+        "no_target_section": "No section in the new year",
+        "other": "Not moved"
+      },
+      "commit": "Promote students",
+      "commitTitle": "{count, plural, one {Promote # student now?} other {Promote # students now?}}",
+      "commitBody": "{from} to {to}: {promoted} promoted, {held} held back, {graduated} graduated. You can undo this within 24 hours.",
+      "commitConfirm": "Promote students",
+      "commitHint": "You can undo a promotion within 24 hours.",
+      "commitNeedsPreview": "Preview again to promote with the plan as it is now.",
+      "cannotCommit": "Fix the problems above and preview again before promoting."
     }
   },
   "schoolSettings": {

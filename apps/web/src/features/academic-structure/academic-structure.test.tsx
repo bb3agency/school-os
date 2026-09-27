@@ -11,6 +11,7 @@ import {
   classCreateSchema,
   fetchAllPages,
   pickYear,
+  sortStaff,
   suggestYearLabel,
   yearCreateSchema,
   yearLabelFits,
@@ -405,5 +406,350 @@ describe("academic structure screen (US-202, FR-TEN-010)", () => {
     expect(
       screen.getByRole("button", { name: messages.te.academicStructure.years.add }),
     ).toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------- archive, "Show archived", class teacher picker */
+
+const ARCHIVED_AT = "2026-07-01T04:30:00Z";
+const YEAR_GONE = {
+  ...YEAR_OLD,
+  id: "0192f3a4-0000-7000-8000-0000000000a9",
+  label: "2024-25",
+  starts_on: "2024-06-01",
+  ends_on: "2025-04-30",
+  archived_at: ARCHIVED_AT,
+  version: 7,
+};
+const CLASS_GONE = {
+  ...CLASS_6,
+  id: "0192f3a4-0000-7000-8000-0000000000c9",
+  code: "PREP",
+  display_en: "Prep",
+  display_te: "ప్రిప్",
+  sort_order: 0,
+  archived_at: ARCHIVED_AT,
+};
+const SECTION_GONE = {
+  ...SECTION_A,
+  id: "0192f3a4-0000-7000-8000-0000000005a9",
+  name: "Z",
+  archived_at: ARCHIVED_AT,
+  version: 5,
+};
+const TEACHER_B = {
+  membership_id: "0192f3a4-0000-7000-8000-0000000000b2",
+  display_name: "Bhavani Teacher",
+  roles: ["class_teacher"],
+};
+const TEACHER_A = {
+  membership_id: "0192f3a4-0000-7000-8000-0000000000b3",
+  display_name: "anil Teacher",
+  roles: ["teacher", "class_teacher"],
+};
+const TEACHER_C = {
+  membership_id: "0192f3a4-0000-7000-8000-0000000000b4",
+  display_name: "Chandra Office",
+  roles: ["office_staff"],
+};
+
+/** The structure with archived rows that the API returns only for include_archived=true. */
+function structureWithArchived(permissions: string[]) {
+  structure(permissions);
+  const withArchived = <T,>(url: URL, rows: T[], archived: T[]) =>
+    page(url.searchParams.get("include_archived") === "true" ? [...rows, ...archived] : rows);
+  stub.routes["GET /bff/api/v1/academic-years"] = (_r, url) =>
+    withArchived(url, [YEAR_NOW, YEAR_OLD], [YEAR_GONE]);
+  stub.routes["GET /bff/api/v1/classes"] = (_r, url) => withArchived(url, [CLASS_6], [CLASS_GONE]);
+  stub.routes["GET /bff/api/v1/sections"] = (_r, url) =>
+    withArchived(
+      url,
+      [SECTION_A, SECTION_OLD].filter(
+        (row) => row.academic_year_id === url.searchParams.get("academic_year_id"),
+      ),
+      [SECTION_GONE].filter(
+        (row) => row.academic_year_id === url.searchParams.get("academic_year_id"),
+      ),
+    );
+}
+
+/** GET /staff in two pages (cursor), unsorted, as the API may return it. */
+function staffDirectory() {
+  stub.routes["GET /bff/api/v1/staff"] = (_r, url) =>
+    url.searchParams.get("cursor") === "p2"
+      ? Response.json({ data: [TEACHER_C], next_cursor: null })
+      : Response.json({ data: [TEACHER_B, TEACHER_A], next_cursor: "p2" });
+}
+
+describe("archive and unarchive (US-202, FR-TEN-010)", () => {
+  it("hides archived rows until 'Show archived' is on, then marks them (include_archived=true)", async () => {
+    structureWithArchived([READ]);
+    renderWithIntl(<AcademicStructureScreen />);
+    const years = await region("Academic years");
+    await within(years).findByText("2025-26");
+    expect(within(years).queryByText("2024-25")).toBeNull();
+    expect(screen.queryByText(messages.en.academicStructure.archivedBadge)).toBeNull();
+    for (const key of ["GET /bff/api/v1/academic-years", "GET /bff/api/v1/classes"]) {
+      expect(stub.callsTo(key)[0]?.url.searchParams.has("include_archived")).toBe(false);
+    }
+
+    await userEvent.click(screen.getByLabelText(messages.en.academicStructure.showArchived));
+    const row = (await within(await region("Academic years")).findByText("2024-25")).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(row).getByText("Archived")).toBeInTheDocument();
+    const classRow = (await within(await region("Classes")).findByText("Prep")).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(classRow).getByText("Archived")).toBeInTheDocument();
+    const sectionRow = (await within(await region("Sections")).findByText("Z")).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(sectionRow).getByText("Archived")).toBeInTheDocument();
+    for (const key of [
+      "GET /bff/api/v1/academic-years",
+      "GET /bff/api/v1/classes",
+      "GET /bff/api/v1/sections",
+    ]) {
+      expect(stub.callsTo(key).at(-1)?.url.searchParams.get("include_archived")).toBe("true");
+    }
+    // Read-only users see the archived rows but get no archive controls.
+    expect(screen.queryByRole("button", { name: /Archive|Unarchive/ })).toBeNull();
+  });
+
+  it("archives a year with If-Match; the current year offers no Archive", async () => {
+    structureWithArchived([READ, MANAGE]);
+    stub.routes[`POST /bff/api/v1/academic-years/${YEAR_OLD.id}/archive`] = () =>
+      Response.json({ ...YEAR_OLD, archived_at: ARCHIVED_AT, version: 5 });
+    renderWithIntl(<AcademicStructureScreen />);
+    const years = await region("Academic years");
+    const current = (await within(years).findByText("2026-27")).closest("tr") as HTMLElement;
+    expect(within(current).queryByRole("button", { name: "Archive" })).toBeNull();
+    const row = within(years).getByText("2025-26").closest("tr") as HTMLElement;
+    await userEvent.click(within(row).getByRole("button", { name: "Archive" }));
+    const dialog = screen.getByRole("dialog", { name: "Archive academic year 2025-26?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Archive" }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/academic-years/${YEAR_OLD.id}/archive`)).toHaveLength(
+        1,
+      ),
+    );
+    expect(
+      stub
+        .callsTo(`POST /bff/api/v1/academic-years/${YEAR_OLD.id}/archive`)[0]
+        ?.headers.get("If-Match"),
+    ).toBe('W/"4"');
+  });
+
+  it("explains academic_year_current and structure_in_use in plain language", async () => {
+    structureWithArchived([READ, MANAGE]);
+    stub.routes[`POST /bff/api/v1/academic-years/${YEAR_OLD.id}/archive`] = () =>
+      problem(409, "academic_year_current");
+    stub.routes[`POST /bff/api/v1/sections/${SECTION_A.id}/archive`] = () =>
+      problem(409, "structure_in_use");
+    renderWithIntl(<AcademicStructureScreen />);
+    const yearRow = (await within(await region("Academic years")).findByText("2025-26")).closest(
+      "tr",
+    ) as HTMLElement;
+    await userEvent.click(within(yearRow).getByRole("button", { name: "Archive" }));
+    const yearDialog = screen.getByRole("dialog", { name: "Archive academic year 2025-26?" });
+    await userEvent.click(within(yearDialog).getByRole("button", { name: "Archive" }));
+    expect(
+      await within(yearDialog).findByText(
+        messages.en.academicStructure.errors.academic_year_current.title,
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(within(yearDialog).getByRole("button", { name: "Cancel" }));
+
+    const sectionRow = (await within(await region("Sections")).findByText("A")).closest(
+      "tr",
+    ) as HTMLElement;
+    await userEvent.click(within(sectionRow).getByRole("button", { name: "Archive" }));
+    const sectionDialog = screen.getByRole("dialog", { name: "Archive section Class 6 A?" });
+    await userEvent.click(within(sectionDialog).getByRole("button", { name: "Archive" }));
+    expect(
+      await within(sectionDialog).findByText(
+        messages.en.academicStructure.errors.structure_in_use.title,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("unarchives an archived class and section with If-Match", async () => {
+    structureWithArchived([READ, MANAGE]);
+    stub.routes[`POST /bff/api/v1/classes/${CLASS_GONE.id}/unarchive`] = () =>
+      Response.json({ ...CLASS_GONE, archived_at: null, version: 3 });
+    stub.routes[`POST /bff/api/v1/sections/${SECTION_GONE.id}/unarchive`] = () =>
+      Response.json({ ...SECTION_GONE, archived_at: null, version: 6 });
+    renderWithIntl(<AcademicStructureScreen />);
+    await within(await region("Classes")).findByText("Class 6");
+    await userEvent.click(screen.getByLabelText(messages.en.academicStructure.showArchived));
+
+    const classRow = (await within(await region("Classes")).findByText("Prep")).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(classRow).queryByRole("button", { name: "Edit" })).toBeNull();
+    await userEvent.click(within(classRow).getByRole("button", { name: "Unarchive" }));
+    const classDialog = screen.getByRole("dialog", { name: "Unarchive Prep?" });
+    await userEvent.click(within(classDialog).getByRole("button", { name: "Unarchive" }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/classes/${CLASS_GONE.id}/unarchive`)).toHaveLength(1),
+    );
+    expect(
+      stub
+        .callsTo(`POST /bff/api/v1/classes/${CLASS_GONE.id}/unarchive`)[0]
+        ?.headers.get("If-Match"),
+    ).toBe('W/"2"');
+
+    const sectionRow = (await within(await region("Sections")).findByText("Z")).closest(
+      "tr",
+    ) as HTMLElement;
+    await userEvent.click(within(sectionRow).getByRole("button", { name: "Unarchive" }));
+    const sectionDialog = screen.getByRole("dialog", { name: "Unarchive section Class 6 Z?" });
+    await userEvent.click(within(sectionDialog).getByRole("button", { name: "Unarchive" }));
+    await waitFor(() =>
+      expect(
+        stub
+          .callsTo(`POST /bff/api/v1/sections/${SECTION_GONE.id}/unarchive`)[0]
+          ?.headers.get("If-Match"),
+      ).toBe('W/"5"'),
+    );
+  });
+
+  it("explains structure_archived when adding a section to an archived class", async () => {
+    structure([READ, MANAGE]);
+    stub.routes["POST /bff/api/v1/sections"] = () => problem(409, "structure_archived");
+    renderWithIntl(<AcademicStructureScreen />);
+    await within(await region("Sections")).findByText("A");
+    await userEvent.click(screen.getByRole("button", { name: "Add section" }));
+    const add = screen.getByRole("dialog", { name: "Add a section to 2026-27" });
+    await userEvent.selectOptions(within(add).getByLabelText("Class"), CLASS_6.id);
+    await userEvent.type(within(add).getByLabelText("Section name"), "C");
+    await userEvent.click(within(add).getByRole("button", { name: "Add section" }));
+    expect(
+      await within(add).findByText(messages.en.academicStructure.errors.structure_archived.title),
+    ).toBeInTheDocument();
+  });
+
+  it("links each year in use to its promotion screen (FR-TEN-011); ids only in the URL", async () => {
+    structure([READ, MANAGE]);
+    renderWithIntl(<AcademicStructureScreen />);
+    const years = await region("Academic years");
+    const row = (await within(years).findByText("2025-26")).closest("tr") as HTMLElement;
+    const link = within(row).getByRole("link", { name: /Promote students/ });
+    expect(link).toHaveAttribute("href", `/en/settings/structure/years/${YEAR_OLD.id}/promotions`);
+    expect(link).toHaveAccessibleName("Promote students (academic year 2025-26)");
+  });
+});
+
+describe("class teacher picker (US-202, FR-TEN-010: section class teacher)", () => {
+  it("lists staff from every page of GET /staff sorted by name and sends the choice", async () => {
+    structure([READ, MANAGE]);
+    staffDirectory();
+    stub.routes["POST /bff/api/v1/sections"] = () =>
+      Response.json({ ...SECTION_A, name: "B" }, { status: 201 });
+    renderWithIntl(<AcademicStructureScreen />);
+    await within(await region("Sections")).findByText("A");
+    await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/staff")).toHaveLength(2));
+    expect(stub.callsTo("GET /bff/api/v1/staff")[1]?.url.searchParams.get("cursor")).toBe("p2");
+
+    await userEvent.click(screen.getByRole("button", { name: "Add section" }));
+    const add = screen.getByRole("dialog", { name: "Add a section to 2026-27" });
+    const picker = within(add).getByLabelText("Class teacher");
+    expect(
+      within(picker)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "No class teacher",
+      "anil Teacher (Teacher and Class teacher)",
+      "Bhavani Teacher (Class teacher)",
+      "Chandra Office (Office staff)",
+    ]);
+    await userEvent.selectOptions(within(add).getByLabelText("Class"), CLASS_6.id);
+    await userEvent.type(within(add).getByLabelText("Section name"), "B");
+    await userEvent.selectOptions(picker, TEACHER_B.membership_id);
+    await userEvent.click(within(add).getByRole("button", { name: "Add section" }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/sections")).toHaveLength(1));
+    expect(bodyOf("POST /bff/api/v1/sections")).toEqual({
+      academic_year_id: YEAR_NOW.id,
+      class_id: CLASS_6.id,
+      name: "B",
+      class_teacher_membership_id: TEACHER_B.membership_id,
+    });
+  });
+
+  it("shows the class teacher and sends it on edit only when it changed (null clears it)", async () => {
+    structure([READ, MANAGE]);
+    staffDirectory();
+    const withTeacher = { ...SECTION_A, class_teacher_membership_id: TEACHER_B.membership_id };
+    stub.routes["GET /bff/api/v1/sections"] = (_r, url) =>
+      page(url.searchParams.get("academic_year_id") === YEAR_NOW.id ? [withTeacher] : []);
+    stub.routes[`PATCH /bff/api/v1/sections/${SECTION_A.id}`] = () =>
+      Response.json({ ...withTeacher, version: 4 });
+    renderWithIntl(<AcademicStructureScreen />);
+    const sections = await region("Sections");
+    const row = (await within(sections).findByText("A")).closest("tr") as HTMLElement;
+    expect(await within(row).findByText("Bhavani Teacher")).toBeInTheDocument();
+
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    let edit = screen.getByRole("dialog", { name: "Rename section A of Class 6" });
+    expect(within(edit).getByLabelText("Class teacher")).toHaveValue(TEACHER_B.membership_id);
+    await userEvent.click(within(edit).getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(stub.callsTo(`PATCH /bff/api/v1/sections/${SECTION_A.id}`)).toHaveLength(1),
+    );
+    expect(
+      JSON.parse(stub.callsTo(`PATCH /bff/api/v1/sections/${SECTION_A.id}`)[0]?.body ?? "{}"),
+    ).toEqual({ name: "A" });
+
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    edit = screen.getByRole("dialog", { name: "Rename section A of Class 6" });
+    await userEvent.selectOptions(within(edit).getByLabelText("Class teacher"), "");
+    await userEvent.click(within(edit).getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(stub.callsTo(`PATCH /bff/api/v1/sections/${SECTION_A.id}`)).toHaveLength(2),
+    );
+    expect(
+      JSON.parse(stub.callsTo(`PATCH /bff/api/v1/sections/${SECTION_A.id}`)[1]?.body ?? "{}"),
+    ).toEqual({ name: "A", class_teacher_membership_id: null });
+  });
+
+  it("without access to the staff list the picker is left out and nothing about it is sent", async () => {
+    structure([READ, MANAGE]);
+    stub.routes["GET /bff/api/v1/staff"] = () => problem(403, "forbidden");
+    stub.routes[`PATCH /bff/api/v1/sections/${SECTION_A.id}`] = () =>
+      Response.json({ ...SECTION_A, version: 4 });
+    renderWithIntl(<AcademicStructureScreen />);
+    const row = (await within(await region("Sections")).findByText("A")).closest(
+      "tr",
+    ) as HTMLElement;
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const edit = screen.getByRole("dialog", { name: "Rename section A of Class 6" });
+    expect(
+      await within(edit).findByText(messages.en.academicStructure.sections.teacherUnavailable),
+    ).toBeInTheDocument();
+    expect(within(edit).queryByLabelText("Class teacher")).toBeNull();
+    await userEvent.click(within(edit).getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(stub.callsTo(`PATCH /bff/api/v1/sections/${SECTION_A.id}`)).toHaveLength(1),
+    );
+    expect(bodyOf(`PATCH /bff/api/v1/sections/${SECTION_A.id}`)).toEqual({ name: "A" });
+  });
+
+  it("does not ask for the staff list without tenant.structure.manage", async () => {
+    structure([READ]);
+    staffDirectory();
+    renderWithIntl(<AcademicStructureScreen />);
+    await within(await region("Sections")).findByText("A");
+    expect(stub.callsTo("GET /bff/api/v1/staff")).toHaveLength(0);
+    expect(screen.queryByRole("columnheader", { name: "Class teacher" })).toBeNull();
+  });
+
+  it("sorts staff by name, then id (stable)", () => {
+    expect(sortStaff([TEACHER_C, TEACHER_B, TEACHER_A]).map((row) => row.display_name)).toEqual([
+      "anil Teacher",
+      "Bhavani Teacher",
+      "Chandra Office",
+    ]);
   });
 });
