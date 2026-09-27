@@ -1,4 +1,4 @@
-# ADR-0023: Chromium sandbox for PDF rendering on Fargate and dedicated hosts
+# ADR-0025: Chromium sandbox for PDF rendering on Fargate and dedicated hosts
 
 | Field | Value |
 |---|---|

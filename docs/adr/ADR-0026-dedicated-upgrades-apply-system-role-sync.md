@@ -1,4 +1,4 @@
-# ADR-0024: Dedicated upgrades apply the system-role sync
+# ADR-0026: Dedicated upgrades apply the system-role sync
 
 | Field | Value |
 |---|---|

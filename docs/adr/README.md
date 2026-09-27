@@ -97,6 +97,6 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0019](ADR-0019-invitation-acceptance-on-first-sign-in.md) | Invitation acceptance on first sign-in | Accepted |
 | [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) | Control-plane boundaries and guaranteed audit copies | Accepted |
 | [ADR-0021](ADR-0021-export-access-and-step-up.md) | Export access and step-up | Accepted |
-| [ADR-0022](ADR-0022-system-role-sync-for-existing-schools.md) | System-role sync for existing schools | Accepted · Amended by ADR-0024 |
-| [ADR-0023](ADR-0023-chromium-sandbox-for-pdf-rendering.md) | Chromium sandbox for PDF rendering on Fargate and dedicated hosts | Proposed |
-| [ADR-0024](ADR-0024-dedicated-upgrades-apply-system-role-sync.md) | Dedicated upgrades apply the system-role sync | Accepted |
+| [ADR-0022](ADR-0022-system-role-sync-for-existing-schools.md) | System-role sync for existing schools | Accepted · Amended by ADR-0026 |
+| [ADR-0025](ADR-0025-chromium-sandbox-for-pdf-rendering.md) | Chromium sandbox for PDF rendering on Fargate and dedicated hosts | Proposed |
+| [ADR-0026](ADR-0026-dedicated-upgrades-apply-system-role-sync.md) | Dedicated upgrades apply the system-role sync | Accepted |

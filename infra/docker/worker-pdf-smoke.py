@@ -11,7 +11,7 @@ dropped and no network:
       --entrypoint python schoolos-worker:<tag> /smoke/worker-pdf-smoke.py [--sandbox]
 
 Without ``--sandbox`` Chromium runs unsandboxed: Docker's default seccomp profile (like ECS
-Fargate's) blocks the user namespace the sandbox needs (ADR-0023). Staging and prod keep
+Fargate's) blocks the user namespace the sandbox needs (ADR-0025). Staging and prod keep
 ``pdf.chromium_sandbox`` required, so a render there fails instead of running unsandboxed.
 Synthetic text only.
 """

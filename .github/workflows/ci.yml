@@ -272,7 +272,7 @@ jobs:
         if: matrix.image == 'worker'
         # Renders a synthetic Telugu page with the baked Chromium as UID 10001 on a read-only root,
         # all capabilities dropped, no network. Unsandboxed only here: Docker's default seccomp
-        # profile blocks the sandbox (ADR-0023); staging/prod keep it required.
+        # profile blocks the sandbox (ADR-0025); staging/prod keep it required.
         run: |
           docker run --rm --read-only --tmpfs /tmp:size=256m,uid=10001,gid=10001 --cap-drop ALL \
             --security-opt no-new-privileges:true --network none \
