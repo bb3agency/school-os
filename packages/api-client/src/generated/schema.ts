@@ -72,6 +72,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/academic-years/{year_id}/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Promotions
+         * @description Promotions out of this academic year, newest first, with ``can_undo`` and
+         *     ``undo_until`` (permission ``tenant.structure.manage``).
+         */
+        get: operations["list_promotions_api_v1_academic_years__year_id__promotions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic-years/{year_id}/promotions:commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit Promotion
+         * @description Apply the promotion in one transaction (permission ``tenant.structure.manage``; accepts
+         *     ``Idempotency-Key``): old enrolments are closed, new ones opened, graduates marked
+         *     ``graduated``. 409 ``promotion_already_committed``, ``promotion_plan_changed`` or
+         *     ``nothing_to_promote``; 422 ``no_target_section``. Can be undone within 24 hours.
+         */
+        post: operations["commit_promotion_api_v1_academic_years__year_id__promotions_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic-years/{year_id}/promotions:preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Promotion
+         * @description Plan the year-end promotion of this academic year into ``to_academic_year_id`` without
+         *     changing anything (permission ``tenant.structure.manage``). Class N goes to N+1 by class
+         *     order; ``held_back_student_ids`` stay in their class; the last class graduates; students who
+         *     left are skipped. Sections keep their name unless ``section_map`` says otherwise.
+         *     ``problems`` lists students who cannot be placed; ``plan_fingerprint`` can be sent with the
+         *     commit to make sure nothing changed in between.
+         */
+        post: operations["preview_promotion_api_v1_academic_years__year_id__promotions_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic-years/{year_id}/promotions:undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Promotion
+         * @description Undo this year's committed promotion within 24 hours (permission
+         *     ``tenant.structure.manage``). 409 ``no_promotion``, ``promotion_undo_expired``, or
+         *     ``promotion_has_dependents`` when an enrolment it touched changed afterwards.
+         */
+        post: operations["undo_promotion_api_v1_academic_years__year_id__promotions_undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/announcements": {
         parameters: {
             query?: never;
@@ -2639,7 +2730,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Enrollments
+         * @description Every enrolment of the student (any year, active or closed), newest first; each carries
+         *     its ``version`` for ``If-Match`` (permission ``student.read_basic``).
+         */
+        get: operations["list_enrollments_api_v1_students__student_id__enrollments_get"];
         put?: never;
         /**
          * Enrol Student
@@ -2647,6 +2743,52 @@ export interface paths {
          *     (permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``.
          */
         post: operations["enrol_student_api_v1_students__student_id__enrollments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/enrollments/{enrollment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Enrollment
+         * @description Correct the roll number, or move an active enrolment to another section of the same
+         *     class and year (permission ``student.update_nonidentity``; ``If-Match`` with the
+         *     enrolment's version, 412 ``precondition_failed`` when stale). Moving to another class is a
+         *     new enrolment (``POST …/enrollments``).
+         */
+        patch: operations["update_enrollment_api_v1_students__student_id__enrollments__enrollment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/enrollments/{enrollment_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End Enrollment
+         * @description Close an active enrolment as ``completed`` (default) or ``transferred`` on ``ended_on``
+         *     (default today); the record status is unchanged (permission
+         *     ``student.update_nonidentity``; ``If-Match`` with the enrolment's version). 409
+         *     ``enrollment_not_active`` when it is already closed.
+         */
+        post: operations["end_enrollment_api_v1_students__student_id__enrollments__enrollment_id__end_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2688,7 +2830,13 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove Guardian
+         * @description Unlink a guardian from the student (permission ``student.update_nonidentity``;
+         *     ``If-Match`` with the guardian's ETag). A guardian no other student is linked to is deleted
+         *     with their phone and address.
+         */
+        delete: operations["remove_guardian_api_v1_students__student_id__guardians__guardian_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -4200,6 +4348,21 @@ export interface components {
             version_no: number;
         };
         /**
+         * EnrollmentEnd
+         * @description Close an active enrolment: ``completed`` (year finished, left the school) or
+         *     ``transferred`` (moved elsewhere). ``ended_on`` defaults to today (India time).
+         */
+        EnrollmentEnd: {
+            /** Ended On */
+            ended_on?: string | null;
+            /**
+             * Status
+             * @default completed
+             * @enum {string}
+             */
+            status: "completed" | "transferred";
+        };
+        /**
          * EnrollmentIn
          * @description Enrol in a section; an active enrolment in the same academic year becomes ``transferred``.
          */
@@ -4246,6 +4409,18 @@ export interface components {
             student_id: string;
             /** Version */
             version: number;
+        };
+        /**
+         * EnrollmentPatch
+         * @description Correct an enrolment: roll number (``null`` clears it) and/or the section, which must be
+         *     another section of the same class in the same academic year (an active enrolment only).
+         *     Omit a field to keep it. Moving to another class is a new enrolment, not a correction.
+         */
+        EnrollmentPatch: {
+            /** Roll No */
+            roll_no?: string | null;
+            /** Section Id */
+            section_id?: string | null;
         };
         /** ExportDownloadOut */
         ExportDownloadOut: {
@@ -5917,6 +6092,203 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * PromotionCommitIn
+         * @description The preview request plus, optionally, the preview's ``plan_fingerprint``: when sent, the
+         *     commit is refused (409 ``promotion_plan_changed``) if enrolments changed since the preview.
+         */
+        PromotionCommitIn: {
+            /** Held Back Student Ids */
+            held_back_student_ids?: string[];
+            /** Plan Fingerprint */
+            plan_fingerprint?: string | null;
+            /** Section Map */
+            section_map?: components["schemas"]["SectionMapEntry"][];
+            /**
+             * To Academic Year Id
+             * Format: uuid
+             */
+            to_academic_year_id: string;
+        };
+        /** PromotionCounts */
+        PromotionCounts: {
+            /** Graduated */
+            graduated: number;
+            /** Held Back */
+            held_back: number;
+            /** Promoted */
+            promoted: number;
+            /** Skipped */
+            skipped: number;
+        };
+        /**
+         * PromotionGroupOut
+         * @description Students moving from one section to one target section with one outcome.
+         */
+        PromotionGroupOut: {
+            /** Count */
+            count: number;
+            /** From Label */
+            from_label: string;
+            /**
+             * From Section Id
+             * Format: uuid
+             */
+            from_section_id: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "promoted" | "held_back" | "graduated" | "skipped";
+            /** To Label */
+            to_label: string | null;
+            /** To Section Id */
+            to_section_id: string | null;
+        };
+        /**
+         * PromotionIn
+         * @description Move this year's active enrolments into ``to_academic_year_id``: class N -> N+1 by class
+         *     order, ``held_back_student_ids`` into the same class again, the final class graduates.
+         */
+        PromotionIn: {
+            /** Held Back Student Ids */
+            held_back_student_ids?: string[];
+            /** Section Map */
+            section_map?: components["schemas"]["SectionMapEntry"][];
+            /**
+             * To Academic Year Id
+             * Format: uuid
+             */
+            to_academic_year_id: string;
+        };
+        /** PromotionPreviewOut */
+        PromotionPreviewOut: {
+            /** Can Commit */
+            can_commit: boolean;
+            counts: components["schemas"]["PromotionCounts"];
+            /**
+             * From Academic Year Id
+             * Format: uuid
+             */
+            from_academic_year_id: string;
+            /** Groups */
+            groups: components["schemas"]["PromotionGroupOut"][];
+            /** Plan Fingerprint */
+            plan_fingerprint: string;
+            /** Problems */
+            problems: components["schemas"]["PromotionProblemOut"][];
+            /** Students */
+            students: components["schemas"]["PromotionStudentOut"][];
+            /**
+             * To Academic Year Id
+             * Format: uuid
+             */
+            to_academic_year_id: string;
+        };
+        /**
+         * PromotionProblemOut
+         * @description Students who cannot be placed: add the section in the new year or map it.
+         */
+        PromotionProblemOut: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "no_target_section";
+            /** Count */
+            count: number;
+            /** From Label */
+            from_label: string;
+            /**
+             * From Section Id
+             * Format: uuid
+             */
+            from_section_id: string;
+            /**
+             * Target Class Id
+             * Format: uuid
+             */
+            target_class_id: string;
+        };
+        /** PromotionRunOut */
+        PromotionRunOut: {
+            /**
+             * Can Undo
+             * @description Committed and still within 24 hours of the commit.
+             */
+            can_undo: boolean;
+            /**
+             * Committed At
+             * Format: date-time
+             */
+            committed_at: string;
+            /** Committed By */
+            committed_by: string | null;
+            counts: components["schemas"]["PromotionCounts"];
+            /**
+             * From Academic Year Id
+             * Format: uuid
+             */
+            from_academic_year_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Plan Fingerprint */
+            plan_fingerprint: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "committed" | "undone";
+            /**
+             * To Academic Year Id
+             * Format: uuid
+             */
+            to_academic_year_id: string;
+            /**
+             * Undo Until
+             * Format: date-time
+             */
+            undo_until: string;
+            /** Undone At */
+            undone_at: string | null;
+            /** Undone By */
+            undone_by: string | null;
+            /** Version */
+            version: number;
+        };
+        /** PromotionStudentOut */
+        PromotionStudentOut: {
+            /**
+             * Enrollment Id
+             * Format: uuid
+             */
+            enrollment_id: string;
+            /**
+             * From Section Id
+             * Format: uuid
+             */
+            from_section_id: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "promoted" | "held_back" | "graduated" | "skipped";
+            /**
+             * Reason
+             * @description Why a student is skipped (left, graduated, already_enrolled) or cannot be placed (no_target_section).
+             */
+            reason?: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** To Section Id */
+            to_section_id: string | null;
+        };
         /** ProvisionIn */
         ProvisionIn: {
             billing_account: components["schemas"]["BillingAccountIn"];
@@ -6267,6 +6639,23 @@ export interface components {
             class_teacher_membership_id?: string | null;
             /** Name */
             name: string;
+        };
+        /**
+         * SectionMapEntry
+         * @description Send the students of ``from_section_id`` whose target class is the class of
+         *     ``to_section_id`` to that section (default: the section with the same name).
+         */
+        SectionMapEntry: {
+            /**
+             * From Section Id
+             * Format: uuid
+             */
+            from_section_id: string;
+            /**
+             * To Section Id
+             * Format: uuid
+             */
+            to_section_id: string;
         };
         /** SectionOut */
         SectionOut: {
@@ -7458,6 +7847,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AcademicYearOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_promotions_api_v1_academic_years__year_id__promotions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionRunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_promotion_api_v1_academic_years__year_id__promotions_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionCommitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_promotion_api_v1_academic_years__year_id__promotions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_promotion_api_v1_academic_years__year_id__promotions_undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionRunOut"];
                 };
             };
             /** @description Validation Error */
@@ -12285,6 +12806,37 @@ export interface operations {
             };
         };
     };
+    list_enrollments_api_v1_students__student_id__enrollments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     enrol_student_api_v1_students__student_id__enrollments_post: {
         parameters: {
             query?: never;
@@ -12302,6 +12854,78 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_enrollment_api_v1_students__student_id__enrollments__enrollment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                enrollment_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_enrollment_api_v1_students__student_id__enrollments__enrollment_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                enrollment_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentEnd"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12374,6 +12998,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GuardianOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_guardian_api_v1_students__student_id__guardians__guardian_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guardian_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
