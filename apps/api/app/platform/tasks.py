@@ -82,7 +82,11 @@ def deliver_tenant_audit() -> dict[str, int]:
 
 # Both deployment modes: the dedicated host's own provisioning queues school-chain copies too.
 _BOTH_MODES: dict[str, dict[str, Any]] = {
-    "platform-deliver-tenant-audit": {"task": "platform.deliver_tenant_audit", "schedule": 60.0},
+    "platform-deliver-tenant-audit": {
+        "task": "platform.deliver_tenant_audit",
+        "schedule": 60.0,
+        "options": {"queue": "maintenance"},
+    },
 }
 
 
