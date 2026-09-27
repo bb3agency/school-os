@@ -989,7 +989,15 @@
       },
       "dq": {
         "unknown_profile": "This format no longer exists. Reload the page and choose again."
-      }
+      },
+      "upload_failed": "The file could not be uploaded. Check your internet connection and upload it again.",
+      "acl_required_for_scoped_upload": "Choose your own classes or sections under \"Only some staff\".",
+      "acl_outside_scope": "Choose only your own classes or sections.",
+      "doc_type_not_allowed_for_purpose": "This type can't be used here. Choose another type.",
+      "sensitivity_below_minimum": "This kind of document needs a higher level. Choose the next one down the list.",
+      "purpose_mismatch": "This file is for another kind of document. Reload the page and try again.",
+      "upload_is_for_a_new_version": "Reload the page and upload the file again.",
+      "upload_is_for_another_document": "Reload the page and upload the file again."
     },
     "api": {
       "generic": {
@@ -1221,7 +1229,14 @@
     "chooseColumns": "Choose at least one column.",
     "tooManyColumns": "Choose at most 60 columns.",
     "tooManyClasses": "Choose at most 50 classes, or choose \"All students I can see\".",
-    "tooManySections": "Choose at most 100 sections, or choose some classes instead."
+    "tooManySections": "Choose at most 100 sections, or choose some classes instead.",
+    "fileRequired": "Choose a file to upload.",
+    "fileEmpty": "This file is empty. Choose another file.",
+    "fileType": "Choose a PDF, JPG, PNG, Word (DOCX) or Excel (XLSX) file.",
+    "fileTooLarge": "This file is larger than 25 MB. Scan at a lower resolution or split it.",
+    "chooseWhoCanSee": "Choose at least one role, class, section or staff member, or choose \"Whole school\".",
+    "tooManyAclEntries": "Choose at most 50, or choose \"Whole school\".",
+    "invalidIssueDate": "Choose a date, or leave it empty."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -2777,6 +2792,293 @@
       "sensitive_not_allowed": {
         "title": "Restricted details are not allowed for you",
         "body": "Only staff allowed to see restricted details (such as category) can include or download them. Leave them out, or ask your school's office admin."
+      }
+    }
+  },
+  "documents": {
+    "nav": "Documents",
+    "title": "Documents",
+    "description": "Circulars, policies, meeting minutes and other school documents. Every file is checked for viruses before anyone can open it.",
+    "upload": "Upload a document",
+    "noAccessTitle": "You can't see documents",
+    "noAccessBody": "Documents are for staff with document access. Ask your school's office admin if you need this.",
+    "docType": {
+      "circular": "Circular",
+      "policy": "Policy",
+      "minutes": "Meeting minutes",
+      "register_scan": "Register photo",
+      "certificate": "Certificate",
+      "letter": "Letter",
+      "form": "Form",
+      "report": "Report",
+      "verified_answer": "Verified answer",
+      "other": "Other",
+      "evidence": "Evidence for a correction",
+      "import_file": "Spreadsheet import"
+    },
+    "purpose": {
+      "circular": "Circulars",
+      "policy": "Policies",
+      "other": "Other documents",
+      "evidence": "Evidence for corrections",
+      "register_scan": "Register photos",
+      "import_file": "Spreadsheet imports"
+    },
+    "docStatus": {
+      "active": "In use",
+      "archived": "Archived"
+    },
+    "sensitivity": {
+      "C1": {
+        "short": "Internal",
+        "hint": "For school staff only, with no personal details (for example a holiday circular)."
+      },
+      "C2": {
+        "short": "Personal details",
+        "hint": "Names or other details of students, parents or staff (for example a class list)."
+      },
+      "C3": {
+        "short": "Restricted",
+        "hint": "Sensitive details such as health, category, income or identity papers. Only staff allowed to see sensitive data, and the person who uploaded it, can open the file."
+      }
+    },
+    "language": {
+      "en": "English",
+      "te": "Telugu",
+      "mixed": "English and Telugu"
+    },
+    "version": {
+      "status": {
+        "queued": "Waiting for the virus check",
+        "scanning": "Being checked for viruses",
+        "extracting": "Being prepared for search",
+        "chunking": "Being prepared for search",
+        "embedding": "Being prepared for search",
+        "ready": "Ready",
+        "failed": "Could not be checked",
+        "quarantined": "Blocked",
+        "withheld": "Withheld",
+        "replaced": "Replaced"
+      },
+      "reason": {
+        "busy": "SchoolOS is checking this file. It can be opened once the check has passed, usually within a few minutes. This page updates by itself.",
+        "malware_detected": "The virus check found a threat in this file, so it was blocked and cannot be opened. Check the file on your computer with your antivirus, then upload a clean copy as a new version.",
+        "aadhaar_detected": "This file showed a full Aadhaar number, so SchoolOS keeps it from being opened. SchoolOS never shows or stores full Aadhaar numbers. Upload a copy with the number covered, showing only the last 4 digits.",
+        "aadhaar_redacted": "This file showed a full Aadhaar number. SchoolOS saved a copy with the number hidden as the next version and removed this one. Use the newer version.",
+        "aadhaar_unredactable": "This file showed a full Aadhaar number that SchoolOS could not hide, so the file was removed. Upload a copy with the number covered, showing only the last 4 digits.",
+        "scan_unavailable": "The virus check could not be done, so the file cannot be opened. Upload it again as a new version. If it happens again, contact SchoolOS support.",
+        "storage_unavailable": "The file could not be read for the virus check. Upload it again as a new version. If it happens again, contact SchoolOS support.",
+        "quarantined_other": "This file was blocked and cannot be opened. Upload a new version, or contact SchoolOS support if you are not sure why.",
+        "failed_other": "This file could not be checked, so it cannot be opened. Upload it again as a new version. If it happens again, contact SchoolOS support."
+      }
+    },
+    "list": {
+      "colTitle": "Title",
+      "colType": "Type",
+      "colStatus": "Status",
+      "colVersion": "Version",
+      "colSensitivity": "Kind of content",
+      "colVisibility": "Who can see it",
+      "colUpdated": "Last changed",
+      "noVersion": "No file yet",
+      "wholeSchool": "Whole school",
+      "limited": "Only some staff",
+      "filtersTitle": "Filters",
+      "filterType": "Type",
+      "filterPurpose": "Group",
+      "filterStatus": "In use or archived",
+      "clearFilters": "Clear filters",
+      "updating": "Some files are still being checked. This list updates by itself.",
+      "emptyTitle": "No documents yet",
+      "emptyBody": "Documents you are allowed to see will be listed here.",
+      "emptyBodyUploader": "Upload circulars, policies and other documents with the button above.",
+      "emptyFilteredTitle": "No documents match these filters",
+      "emptyFilteredBody": "Choose other filters, or clear them to see every document you can see.",
+      "pagesLabel": "Pages of documents",
+      "deletedTitle": "Document deleted",
+      "deletedBody": "The document and all its versions were deleted. Its files are removed from storage shortly."
+    },
+    "detail": {
+      "title": "Document",
+      "back": "Back to documents",
+      "notFoundTitle": "We couldn't find this document",
+      "notFoundBody": "It may have been deleted, or you may not be allowed to see it. Go back to the list and choose it again.",
+      "loadErrorTitle": "We couldn't load this document",
+      "loadErrorBody": "Check your internet connection and reload the page. If it keeps happening, contact support.",
+      "stillChecking": "A file is still being checked. This page updates by itself.",
+      "fileTitle": "File",
+      "checkingTitle": "Version {version} is being checked",
+      "blockedTitle": "Version {version} cannot be opened",
+      "restrictedTitle": "Restricted file",
+      "restrictedBody": "This file has sensitive details. Only staff allowed to see sensitive data, and the person who uploaded it, can open it. Ask your school's office admin if you need it.",
+      "download": "Download version {version}",
+      "olderReady": "The newest version cannot be opened yet, so this downloads version {version}, the newest one that passed the virus check.",
+      "linkNote": "The download link works for 5 minutes and saves the file to your computer. Downloads are recorded in the audit log.",
+      "nothingReady": "No version of this document can be opened yet.",
+      "versionsTitle": "Versions",
+      "versionsHint": "Every upload is kept as a version. The newest version is used by default.",
+      "colVersion": "Version",
+      "latest": "(newest)",
+      "colStatus": "Status",
+      "colKind": "File type",
+      "otherKind": "Other",
+      "colSize": "Size",
+      "colUploaded": "Uploaded on",
+      "colOpen": "Open",
+      "downloadShort": "Download",
+      "downloadVersion": "Download version {version}",
+      "cannotOpen": "Cannot be opened",
+      "noVersions": "No versions yet",
+      "aboutTitle": "About this document",
+      "type": "Type",
+      "purpose": "Group",
+      "sensitivity": "Kind of content",
+      "language": "Language",
+      "issuer": "Issued by",
+      "issuedOn": "Date on the document",
+      "status": "In use or archived",
+      "uploadedBy": "Uploaded by",
+      "you": "You",
+      "someoneElse": "Another staff member",
+      "created": "Uploaded on",
+      "updated": "Last changed",
+      "aclTitle": "Who can see it",
+      "aclHint": "Staff also need document access for their role. Class teachers see only documents for their own classes or sections.",
+      "deleteTitle": "Delete this document",
+      "deleteHint": "Deleting removes every version and its files. It cannot be undone."
+    },
+    "acl": {
+      "legend": "Who can see it",
+      "hint": "Choose the whole school, or only some roles, classes, sections or staff members. Class teachers must choose their own classes or sections.",
+      "mode": {
+        "school": "Whole school (everyone with document access)",
+        "limited": "Only some staff"
+      },
+      "group": {
+        "role": "Roles",
+        "class": "Classes",
+        "section": "Sections",
+        "membership": "Staff members"
+      },
+      "kind": {
+        "role": "Role",
+        "class": "Class",
+        "section": "Section",
+        "membership": "Staff member"
+      },
+      "unknown": {
+        "role": "A role",
+        "class": "A class you can't see",
+        "section": "A section you can't see",
+        "membership": "A staff member"
+      },
+      "wholeSchool": "Everyone in the school with document access.",
+      "limitedTo": "Only these staff (if they also have document access):",
+      "unnamedMember": "Staff member without a name"
+    },
+    "aclEdit": {
+      "trigger": "Change who can see it",
+      "title": "Change who can see this document",
+      "description": "The change applies right away and is recorded in the audit log.",
+      "confirm": "Save"
+    },
+    "newVersion": {
+      "trigger": "Upload a new version",
+      "title": "Upload a new version",
+      "description": "The earlier versions are kept. The new one can be opened once it passes the virus check.",
+      "confirm": "Upload",
+      "file": "File",
+      "fileHint": "Use the same kind of file as before. At most 25 MB."
+    },
+    "delete": {
+      "trigger": "Delete document",
+      "title": "Delete this document?",
+      "description": "Every version and its files will be deleted. This cannot be undone.",
+      "confirm": "Delete",
+      "body": "You are deleting \"{title}\". Documents still used as evidence for a student's record cannot be deleted."
+    },
+    "new": {
+      "title": "Upload a document",
+      "description": "Add a circular, policy, meeting minutes or another school document. The file is checked for viruses before anyone can open it.",
+      "back": "Back to documents",
+      "noPermissionTitle": "You can't upload documents",
+      "noPermissionBody": "Uploading documents is for staff with upload permission. Ask your school's office admin if you need this.",
+      "fileTitle": "File",
+      "file": "File to upload",
+      "fileHint": "PDF, JPG, PNG, Word (DOCX) or Excel (XLSX), at most 25 MB.",
+      "detailsTitle": "Details",
+      "titleField": "Title",
+      "titleHint": "A short name staff will recognise, for example \"Dasara holidays circular 2026\". No student's personal details.",
+      "docType": "Type",
+      "language": "Language",
+      "languageHint": "The language the document is written in.",
+      "languageUnknown": "Not sure",
+      "issuer": "Issued by (optional)",
+      "issuerHint": "For example the school, the board or the district office.",
+      "issuedOn": "Date on the document (optional)",
+      "issuedOnHint": "The date printed on the document, if it has one.",
+      "sensitivity": "Kind of content",
+      "sensitivityHint": "Choose the highest that applies. It decides who may open the file.",
+      "aclTitle": "Who can see it",
+      "scanNote": "After you upload, SchoolOS checks the file for viruses. You can open it once the check has passed, usually within a few minutes.",
+      "uploading": "Uploading…"
+    },
+    "errors": {
+      "document_in_use": {
+        "title": "This document must be kept",
+        "body": "It is used as evidence for a student's record, or the school's retention rules keep it. It cannot be deleted."
+      },
+      "document_not_ready": {
+        "title": "The file cannot be opened yet",
+        "body": "It has not passed the virus check. Wait a few minutes and try again; this page updates by itself."
+      },
+      "sensitive_document": {
+        "title": "This file is restricted",
+        "body": "Only staff allowed to see sensitive data, and the person who uploaded it, can open it. Ask your school's office admin if you need it."
+      },
+      "duplicate_document": {
+        "title": "This file is already uploaded",
+        "body": "The same file is already in the documents list. Open that document instead, or upload a new version of it."
+      },
+      "unsupported_file_type": {
+        "title": "This type of file is not accepted",
+        "body": "Upload a PDF, JPG, PNG, Word (DOCX) or Excel (XLSX) file. Check that the name ends with the right extension, for example .pdf."
+      },
+      "file_too_large": {
+        "title": "The file is too large",
+        "body": "Files can be at most 25 MB. Scan at a lower resolution or split the document, then try again."
+      },
+      "upload_expired": {
+        "title": "The upload took too long",
+        "body": "Choose the file again and press upload. On a slow connection, try a smaller file."
+      },
+      "upload_already_used": {
+        "title": "This upload was already saved",
+        "body": "Go back to the documents list to find it. To add the file again, choose it and upload once more."
+      },
+      "upload_missing": {
+        "title": "The file did not arrive",
+        "body": "Check your internet connection, choose the file again and press upload."
+      },
+      "upload_changed": {
+        "title": "The file changed during the upload",
+        "body": "Choose the file again and press upload."
+      },
+      "storage_unavailable": {
+        "title": "The file could not be saved",
+        "body": "Try again in a few minutes. If it keeps happening, contact SchoolOS support."
+      },
+      "version_conflict": {
+        "title": "Someone added a version just now",
+        "body": "Reload the page to see it, then upload your file again if it is still needed."
+      },
+      "version_unchanged": {
+        "title": "This is the same file",
+        "body": "The file is the same as the newest version, so nothing was added."
+      },
+      "not_versionable": {
+        "title": "No new versions for this document",
+        "body": "Spreadsheet imports cannot get new versions. Start a new import instead."
       }
     }
   },
