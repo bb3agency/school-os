@@ -183,7 +183,9 @@ def start(
     doc = import_document(admin, school.tenant_id, person.user_id, data, kind=kind)
     with tenant_session(school.tenant_id, person.user_id) as s:
         out = service.create_import(
-            s, ctx(school, role), ImportCreate(document_id=doc, source=source)  # type: ignore[arg-type]
+            s,
+            ctx(school, role),
+            ImportCreate(document_id=doc, source=source),  # type: ignore[arg-type]
         )
     if parse:
         run_parse(school, out.id, role=role)
@@ -316,4 +318,6 @@ def age_batch(admin: Engine, batch_id: uuid.UUID, **shift: dt.timedelta) -> None
     """Move a batch's timestamps into the past (revert window / retention tests)."""
     sets = ", ".join(f"{col} = {col} - :{col}" for col in shift)
     with admin.begin() as c:
-        c.execute(text(f"UPDATE sis.import_batches SET {sets} WHERE id = :i"), {"i": batch_id, **shift})
+        c.execute(
+            text(f"UPDATE sis.import_batches SET {sets} WHERE id = :i"), {"i": batch_id, **shift}
+        )

@@ -130,7 +130,12 @@ def admission_key(value: str) -> str:
 
 
 def allowed_targets(specs: Mapping[str, AttributeSpec], source: str) -> set[str]:
-    return {k for k, s in specs.items() if s.allows(source)} | set(SPECIAL_TARGETS)
+    """Attributes the source may record, the structure columns, and always the admission
+    number (the match key, even when this source cannot record it)."""
+    targets = {k for k, s in specs.items() if s.allows(source)} | set(SPECIAL_TARGETS)
+    if "admission_no" in specs:
+        targets.add("admission_no")
+    return targets
 
 
 def mapping_problems(

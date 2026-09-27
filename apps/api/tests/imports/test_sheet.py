@@ -174,7 +174,9 @@ def test_FR_IMP_001_row_and_column_limits() -> None:
     with pytest.raises(SheetError) as err:
         read_sheet(S.csv_bytes(too_wide), "csv", LIMITS)
     assert err.value.code == "too_many_columns"
-    rows = [["Adm No", "Name", "Class"]] + [[f"A{i}", "N", "IX"] for i in range(LIMITS.max_rows + 1)]
+    rows = [["Adm No", "Name", "Class"]] + [
+        [f"A{i}", "N", "IX"] for i in range(LIMITS.max_rows + 1)
+    ]
     with pytest.raises(SheetError) as err:
         read_sheet(S.csv_bytes(rows), "csv", LIMITS)
     assert err.value.code == "too_many_rows"
@@ -207,8 +209,7 @@ def test_FR_IMP_001_csv_must_be_utf8() -> None:
 def test_FR_IMP_001_google_sheets_csv_export() -> None:
     """Google Sheets exports: comma, CRLF, quoted cells with commas and newlines."""
     data = (
-        'Adm No,Name of the Student,Address\r\n'
-        '"A-1","Synthetica, Venkata","Line 1\r\nLine 2"\r\n'
+        'Adm No,Name of the Student,Address\r\n"A-1","Synthetica, Venkata","Line 1\r\nLine 2"\r\n'
     ).encode()
     sheet = read_sheet(data, "csv", LIMITS)
     assert _values(sheet) == [["A-1", "Synthetica, Venkata", "Line 1\r\nLine 2"]]
@@ -217,9 +218,7 @@ def test_FR_IMP_001_google_sheets_csv_export() -> None:
 def test_FR_IMP_001_xlsx_dates_and_numbers_keep_their_type() -> None:
     import datetime as dt
 
-    data = S.xlsx_bytes(
-        [["Adm No", "Name", "DOB"], [1001, "Synthetica", dt.datetime(2012, 3, 14)]]
-    )
+    data = S.xlsx_bytes([["Adm No", "Name", "DOB"], [1001, "Synthetica", dt.datetime(2012, 3, 14)]])
     sheet = read_sheet(data, "xlsx", LIMITS)
     adm_no, _, dob = sheet.rows[0].cells
     assert adm_no.value == 1001

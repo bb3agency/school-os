@@ -109,10 +109,16 @@ def test_FR_IMP_002_unrelated_headers_are_not_forced() -> None:
 
 def test_FR_IMP_002_templates_by_header_signature() -> None:
     headers = ["Adm No", "Name of the Student", "Class", "Section"]
-    assert header_signature(headers) == header_signature(["ADM. NO", "name of the student ", "CLASS", "Section"])
+    assert header_signature(headers) == header_signature(
+        ["ADM. NO", "name of the student ", "CLASS", "Section"]
+    )
     assert header_signature(headers) != header_signature(["Adm No", "Name", "Class", "Section"])
     payload = template_payload(headers, {"0": "admission_no", "1": "full_name", "3": "section"})
-    assert payload == {"adm no": "admission_no", "name of the student": "full_name", "section": "section"}
+    assert payload == {
+        "adm no": "admission_no",
+        "name of the student": "full_name",
+        "section": "section",
+    }
     shuffled = ["Section", "Adm No", "Name of the Student", "Class"]
     applied = mapping_from_template(shuffled, payload, ALL_TARGETS)
     assert applied == {"0": "section", "1": "admission_no", "2": "full_name"}

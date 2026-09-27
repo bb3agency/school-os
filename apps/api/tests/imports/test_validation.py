@@ -39,7 +39,12 @@ SPECS = {
         "gender", "enum", "C2", True, NAME_SOURCES, ("female", "male", "transgender")
     ),
     "admission_no": AttributeSpec(
-        "admission_no", "text", "C2", True, ("admission_register", "tc_incoming", "manual_entry"), None
+        "admission_no",
+        "text",
+        "C2",
+        True,
+        ("admission_register", "tc_incoming", "manual_entry"),
+        None,
     ),
     "mother_tongue": AttributeSpec("mother_tongue", "text", "C2", False, None, None),
     "caste": AttributeSpec("caste", "text", "C3", False, None, None),
@@ -93,7 +98,9 @@ def _codes(result: Any) -> list[set[str]]:
 
 
 def test_FR_IMP_003_valid_rows_convert_types() -> None:
-    sheet = _rows(["A-1", "  Synthetica   Venkata ", "Synthetica Ramana", "14/03/2012", "M", "9", "a"])
+    sheet = _rows(
+        ["A-1", "  Synthetica   Venkata ", "Synthetica Ramana", "14/03/2012", "M", "9", "a"]
+    )
     result = validate_sheet(sheet, MAPPING, _ctx())
     row = result.rows[0]
     assert row.status == "valid" and row.action == "create"
@@ -148,7 +155,9 @@ def test_FR_IMP_003_duplicates_within_the_file_are_errors_on_every_copy() -> Non
 
 def test_FR_IMP_003_existing_students_are_updates_and_register_identity_is_protected() -> None:
     existing = {
-        "a-1": ExistingStudent("sid-1", "s9a", {"full_name": "Synthetica One", "dob": "2012-03-14"}),
+        "a-1": ExistingStudent(
+            "sid-1", "s9a", {"full_name": "Synthetica One", "dob": "2012-03-14"}
+        ),
         "a-2": ExistingStudent("sid-2", "s9b", {"full_name": "Synthetica Two"}),
     }
     sheet = _rows(
@@ -166,12 +175,14 @@ def test_FR_IMP_003_existing_students_are_updates_and_register_identity_is_prote
         }
     ]
     assert two.warnings == [
-        {"field": "section", "code": "enrolment_unchanged", "message_key": "errors.enrolment_unchanged"}
+        {
+            "field": "section",
+            "code": "enrolment_unchanged",
+            "message_key": "errors.enrolment_unchanged",
+        }
     ]
     # Other sources are observations: a different name is recorded (a conflict for DQ).
-    other = validate_sheet(
-        sheet, MAPPING, _ctx(existing=existing, source="udise_plus")
-    ).rows[1]
+    other = validate_sheet(sheet, MAPPING, _ctx(existing=existing, source="udise_plus")).rows[1]
     assert other.status == "valid" and "admission_no" not in other.values
 
 
@@ -190,7 +201,17 @@ def test_SEC_013_full_aadhaar_anywhere_is_a_row_error_and_never_kept() -> None:
                 header,
                 ["A-1", "Synthetica One", "", "14/03/2012", "M", "IX", "A", "", f"UID {number}"],
                 ["A-2", number, "", "14/03/2012", "M", "IX", "A", "", ""],
-                ["A-3", "Synthetica Three", "", "14/03/2012", "M", "IX", "A", "", "+91 98765 43210"],
+                [
+                    "A-3",
+                    "Synthetica Three",
+                    "",
+                    "14/03/2012",
+                    "M",
+                    "IX",
+                    "A",
+                    "",
+                    "+91 98765 43210",
+                ],
             ]
         ),
         "csv",
@@ -256,7 +277,7 @@ def test_SEC_017_mapped_formula_cells_are_errors_unmapped_ones_warnings() -> Non
     header = [*S.HEADER, "Notes"]
     sheet = read_sheet(
         S.csv_bytes(
-            [header, ["A-1", "=HYPERLINK(\"https://x\")", "", "14/03/2012", "M", "IX", "A", "=1+1"]]
+            [header, ["A-1", '=HYPERLINK("https://x")', "", "14/03/2012", "M", "IX", "A", "=1+1"]]
         ),
         "csv",
         CFG.limits,
@@ -264,7 +285,11 @@ def test_SEC_017_mapped_formula_cells_are_errors_unmapped_ones_warnings() -> Non
     row = validate_sheet(sheet, MAPPING, _ctx()).rows[0]
     assert {(e["field"], e["code"]) for e in row.errors} == {("full_name", "formula_not_evaluated")}
     assert row.warnings == [
-        {"field": "column_8", "code": "formula_not_evaluated", "message_key": "errors.formula_not_evaluated"}
+        {
+            "field": "column_8",
+            "code": "formula_not_evaluated",
+            "message_key": "errors.formula_not_evaluated",
+        }
     ]
     assert "full_name" not in row.values
 
