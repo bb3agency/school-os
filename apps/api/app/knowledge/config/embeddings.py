@@ -50,12 +50,57 @@ class Candidate(ConfigModel):
     dimensions: Dimensions
 
 
+class Batching(ConfigModel):
+    """How ``TenantEmbedder`` splits texts into provider requests (K2)."""
+
+    max_texts: int = Field(ge=1, le=1000)
+    """Texts per request (Voyage accepts up to 1000)."""
+    max_chars: int = Field(ge=1000, le=2_000_000)
+    """Characters per request: a conservative proxy for the provider's token limit per request
+    (Telugu uses more tokens per character than English). A single longer text is sent alone."""
+
+
+class Retry(ConfigModel):
+    """Transient failures (timeouts, 429, 5xx): exponential backoff, capped, with jitter."""
+
+    max_attempts: int = Field(ge=1, le=10)
+    base_delay_s: float = Field(gt=0, le=10)
+    max_delay_s: float = Field(gt=0, le=120)
+
+    @model_validator(mode="after")
+    def _order(self) -> Retry:
+        if self.max_delay_s < self.base_delay_s:
+            raise ValueError("retry.max_delay_s must be >= retry.base_delay_s")
+        return self
+
+
+class VoyageHttp(ConfigModel):
+    """The Voyage embeddings endpoint (network provider in ``knowledge/gateway``)."""
+
+    endpoint: str = Field(pattern=r"^https://[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9/._\-]*$")
+    connect_timeout_s: float = Field(gt=0, le=30)
+    read_timeout_s: float = Field(gt=0, le=300)
+
+
+class Fake(ConfigModel):
+    """The deterministic offline provider (local/CI, eval stubs); never selected by evaluation."""
+
+    model: str = Field(pattern=MODEL_ID_PATTERN)
+    """Stored as ``embedding_model``, so fake vectors are never mistaken for a real model's."""
+
+
 class EmbeddingsConfig(ConfigModel):
     version: int = Field(ge=1)
     selected: str | None = Field(default=None, pattern=KEY_PATTERN)
     storage: Storage
     query_cache_ttl_s: int = Field(ge=0, le=3600)
     """docs/06 §12: query embeddings are cached for 10 minutes."""
+    query_cache_max_entries: int = Field(ge=0, le=100_000)
+    """Per process; bounds memory (about 8 KiB per 1024-dim entry)."""
+    batching: Batching
+    retry: Retry
+    voyage: VoyageHttp
+    fake: Fake
     selection_rule: SelectionRule
     candidates: dict[str, Candidate]
 
