@@ -17,7 +17,8 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 | `src/components/session/` | "Lock now" button and the idle-timeout `<dialog>`                                                                                           |
 | `src/instrumentation.ts`  | Validates the BFF config once at server start                                                                                               |
 | `src/features/platform/`  | Platform admin panel screens (C14): TanStack Query + `ActionDialog` forms against `/api/v1/platform/*`                                      |
-| `src/features/school/`    | School console screens (structure, users, audit, plan & billing, support, announcements banner)                                             |
+| `src/features/school/`    | School console screens (structure, audit, plan & billing, support, announcements banner)                                                    |
+| `src/features/users/`     | Users and roles (US-102): staff list, invite, status, roles and class/section scopes (`/settings/users/*`; step-up per call)                |
 | `src/features/auth/`      | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                 |
 | `src/lib/forms.ts`        | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                       |
 | `src/lib/api-errors.ts`   | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                    |
