@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from functools import lru_cache
 from importlib import resources
@@ -715,6 +715,33 @@ def get_section(session: Session, section_id: uuid.UUID) -> SectionOut:
     if section is None:
         raise NotFound("Section not found")
     return SectionOut.model_validate(section)
+
+
+def lock_enrolment_targets(
+    session: Session, section_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, SectionOut]:
+    """Lock sections for an enrolment write (enrol, move, promotion commit or undo).
+
+    Each section, its class and its academic year are locked ``FOR SHARE`` until the caller's
+    transaction ends, so a concurrent archive of any of them waits and then fails on its
+    active-enrolment guard (409 ``structure_in_use``), or, when the archive committed first,
+    this call sees it. Raises 404 when a section is unknown (or another school's) and 409
+    ``structure_archived`` when a section, its class or its year is archived.
+    """
+    wanted = sorted(set(section_ids))
+    rows = repo.share_lock_sections(session, wanted)
+    if len(rows) != len(wanted):
+        raise NotFound("Section not found")
+    out: dict[uuid.UUID, SectionOut] = {}
+    for section, klass, year in rows:
+        if year.archived_at is not None:
+            raise _archived("academic year")
+        if klass.archived_at is not None:
+            raise _archived("class")
+        if section.archived_at is not None:
+            raise _archived("section")
+        out[section.id] = SectionOut.model_validate(section)
+    return out
 
 
 def create_section(session: Session, data: SectionCreate) -> SectionOut:

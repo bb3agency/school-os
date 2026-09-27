@@ -636,6 +636,47 @@ def test_FR_DOC_006_concurrent_version_uploads_first_wins(world: Any, api: Any) 
     assert res.json()["code"] == "version_conflict"
 
 
+def test_FR_DOC_006_archived_document_gets_no_new_version(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """An archived document is read-only: no version upload or registration (409
+    ``document_archived``), until it is unarchived."""
+    who = world.person("office_admin")
+    doc = new_document(api, who)
+    path = f"/api/v1/documents/{doc['id']}"
+    pending = upload(api, who, S.pdf(), document_id=doc["id"])  # issued before the archive
+    etag = api.call(who, "GET", path).headers["ETag"]
+    archived = api.call(who, "POST", f"{path}/archive", headers={"If-Match": etag})
+    assert archived.status_code == 200, archived.text
+    res = api.call(who, "POST", f"{path}/versions", json={"upload_id": pending["upload_id"]})
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "document_archived"
+    body = {
+        "filename": "circular.pdf",
+        "content_type": PDF_CT,
+        "size_bytes": 100,
+        "purpose": "circular",
+        "document_id": doc["id"],
+    }
+    refused = api.call(who, "POST", "/api/v1/documents/uploads", json=body)
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "document_archived"
+    detail = api.call(who, "GET", path).json()
+    assert [v["version_no"] for v in detail["versions"]] == [1]
+    assert not [
+        e
+        for e in W.audit_events(admin_engine, world.a.tenant_id, "document.version_added")
+        if e["resource_id"] == uuid.UUID(doc["id"])
+    ]
+    back = api.call(
+        who, "POST", f"{path}/unarchive", headers={"If-Match": archived.headers["ETag"]}
+    )
+    assert back.status_code == 200, back.text
+    res = api.call(who, "POST", f"{path}/versions", json={"upload_id": pending["upload_id"]})
+    assert res.status_code == 202, res.text
+    assert res.json()["current_version"]["version_no"] == 2
+
+
 def test_SEC_016_reposting_after_registration_cannot_replace_the_checked_file(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:

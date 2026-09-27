@@ -706,6 +706,17 @@ def _section_or_422(session: Session, section_id: uuid.UUID) -> Any:
         raise ValidationFailed([error("section_id", "not_found")]) from None
 
 
+def _enrolment_target(session: Session, section_id: uuid.UUID) -> Any:
+    """The section a student is being placed in, locked with its class and year ``FOR SHARE``
+    until the transaction ends (a concurrent archive waits, then fails on its active-enrolment
+    guard). 422 ``section_id``/``not_found`` for an unknown section; 409 ``structure_archived``
+    when the section, its class or its academic year is archived (FR-TEN-010)."""
+    try:
+        return tenancy.lock_enrolment_targets(session, [section_id])[section_id]
+    except NotFound:
+        raise ValidationFailed([error("section_id", "not_found")]) from None
+
+
 def create_student(
     session: Session,
     ctx: UserContext,
@@ -734,7 +745,7 @@ def create_student(
         cleaned.append((definition, item.source, clean, item.evidence_document_id))
     if not any(d.key == "full_name" for d, *_ in cleaned):
         raise ValidationFailed([error("values", "full_name_required")])
-    section = _section_or_422(session, data.section_id) if data.section_id else None
+    section = _enrolment_target(session, data.section_id) if data.section_id else None
     tenant_id = repo.current_tenant_id(session)
     with _db_errors():
         student = repo.insert_student(
@@ -1135,13 +1146,15 @@ def enrol(
     session: Session, ctx: UserContext, student_id: uuid.UUID, data: EnrollmentIn
 ) -> EnrollmentOut:
     """Enrol in a section (its academic year); an active enrolment in that year is ended as
-    ``transferred``. Permission ``student.update_nonidentity``. Audit: ``enrollment.created``
+    ``transferred``. Permission ``student.update_nonidentity``. 409 ``structure_archived`` when
+    the section, its class or its year is archived (the rows stay share-locked until commit,
+    so a concurrent archive fails instead). Audit: ``enrollment.created``
     (+ ``enrollment.transferred``)."""
     structure = _structure(session)
     student = _visible_student(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
-    section = _section_or_422(session, data.section_id)
+    section = _enrolment_target(session, data.section_id)
     out = _enrol(session, ctx, student, section, roll_no=data.roll_no, started_on=data.started_on)
     _touch(session, student, _definitions(session))
     _values_changed(session, student_id, [ENROLLMENT_KEY])
@@ -1184,7 +1197,8 @@ def update_enrollment(
     """Correct an enrolment's roll number and/or move an active enrolment to another section of
     the same class and academic year (``If-Match``: enrolment version; 412 when stale).
     Permission ``student.update_nonidentity``; a scoped holder may only move a student into a
-    section they reach. Audit: ``enrollment.updated`` (field names and section ids)."""
+    section they reach; an archived target answers 409 ``structure_archived``.
+    Audit: ``enrollment.updated`` (field names and section ids)."""
     fields = data.model_fields_set
     student, enrollment = _owned_enrollment(session, ctx, student_id, enrollment_id)
     values: dict[str, Any] = {}
@@ -1200,7 +1214,7 @@ def update_enrollment(
                     code="enrollment_not_active",
                 )
             current = _section_or_422(session, enrollment.section_id)
-            target = _section_or_422(session, data.section_id)
+            target = _enrolment_target(session, data.section_id)
             if (target.academic_year_id, target.class_id) != (
                 current.academic_year_id,
                 current.class_id,
@@ -2320,7 +2334,8 @@ def commit_promotion(
     ``promotion_already_committed`` while an earlier promotion of this year is not undone,
     409 ``promotion_plan_changed`` when ``plan_fingerprint`` no longer matches, 409
     ``nothing_to_promote`` when no student moves, and 422 ``no_target_section`` (field
-    ``section_map``) while a student cannot be placed. Old enrolments are closed as
+    ``section_map``) while a student cannot be placed; 409 ``structure_archived`` when a target
+    section (or its class or year) is archived. Old enrolments are closed as
     ``completed`` on the source year's last day; new ones start on the target year's first day
     (roll numbers are not carried over); graduates get record status ``graduated``.
 
@@ -2347,6 +2362,11 @@ def commit_promotion(
     movers = [s for s in plan.students if s.outcome != "skipped"]
     if not movers:
         raise Conflict("No student in this year can be promoted.", code="nothing_to_promote")
+    # Lock the target sections (and their class and year) against a concurrent archive; an
+    # archived target answers 409 structure_archived (FR-TEN-010).
+    tenancy.lock_enrolment_targets(
+        session, {s.to_section_id for s in movers if s.to_section_id is not None}
+    )
     tenant_id = repo.current_tenant_id(session)
     ended_on = plan.from_year.ends_on
     closed = repo.close_enrollments(session, [s.enrollment_id for s in movers], ended_on=ended_on)
@@ -2450,7 +2470,8 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
     Refused with 409 ``no_promotion`` when there is none, 409 ``promotion_undo_expired`` after
     24 hours, and 409 ``promotion_has_dependents`` when anything was recorded on top of it: an
     enrolment it closed or opened changed since (version or status), or a graduate's record
-    status changed. Otherwise, in the caller's transaction: the enrolments it opened are
+    status changed, and 409 ``structure_archived`` when an enrolment it would reopen is in
+    archived structure. Otherwise, in the caller's transaction: the enrolments it opened are
     removed, the ones it closed are active again, graduates get their previous status back.
 
     Audit: ``promotion.undone`` (run id and counts). Outbox: ``student.values.changed`` for
@@ -2482,6 +2503,9 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
             raise _promotion_has_dependents()
     if repo.students_active_in_year(session, [i.student_id for i in items], year.id):
         raise _promotion_has_dependents()  # re-enrolled in the old year since the commit
+    # The reopened enrolments must not land in archived structure (409 structure_archived);
+    # their sections stay locked against a concurrent archive (FR-TEN-010).
+    tenancy.lock_enrolment_targets(session, repo.enrollment_section_ids(session, old_ids))
     removed = repo.delete_enrollments(session, new_ids)
     reopened = repo.reopen_enrollments(session, old_ids)
     by_status: dict[str, list[uuid.UUID]] = {}

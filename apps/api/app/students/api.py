@@ -335,7 +335,8 @@ def enrol_student(
     idem: IdempotencyDep,
 ) -> Response:
     """Enrol in a section; an active enrolment in the same year becomes ``transferred``
-    (permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``."""
+    (permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``. 409
+    ``structure_archived`` when the section, its class or its academic year is archived."""
     return idem.run(
         db,
         body,
@@ -366,7 +367,8 @@ def update_enrollment(
     """Correct the roll number, or move an active enrolment to another section of the same
     class and year (permission ``student.update_nonidentity``; ``If-Match`` with the
     enrolment's version, 412 ``precondition_failed`` when stale). Moving to another class is a
-    new enrolment (``POST …/enrollments``)."""
+    new enrolment (``POST …/enrollments``). 409 ``structure_archived`` when the target section
+    (or its class or year) is archived."""
     out = students.update_enrollment(
         db, ctx, student_id, enrollment_id, body, expected_version=version
     )
@@ -460,7 +462,8 @@ def commit_promotion(
     """Apply the promotion in one transaction (permission ``tenant.structure.manage``; accepts
     ``Idempotency-Key``): old enrolments are closed, new ones opened, graduates marked
     ``graduated``. 409 ``promotion_already_committed``, ``promotion_plan_changed`` or
-    ``nothing_to_promote``; 422 ``no_target_section``. Can be undone within 24 hours."""
+    ``nothing_to_promote``; 409 ``structure_archived`` when a target section, class or the
+    target year is archived; 422 ``no_target_section``. Can be undone within 24 hours."""
     return idem.run(
         db,
         body,
@@ -477,7 +480,8 @@ def commit_promotion(
 def undo_promotion(ctx: Promoter, db: TenantDB, year_id: uuid.UUID) -> PromotionRunOut:
     """Undo this year's committed promotion within 24 hours (permission
     ``tenant.structure.manage``). 409 ``no_promotion``, ``promotion_undo_expired``, or
-    ``promotion_has_dependents`` when an enrolment it touched changed afterwards."""
+    ``promotion_has_dependents`` when an enrolment it touched changed afterwards, or
+    ``structure_archived`` when the source year (or a section or class of it) was archived."""
     return students.undo_promotion(db, ctx, year_id)
 
 

@@ -413,6 +413,38 @@ def get_section(session: Session, section_id: uuid.UUID) -> Section | None:
     return session.get(Section, section_id, populate_existing=True)
 
 
+def share_lock_sections(
+    session: Session, section_ids: Sequence[uuid.UUID]
+) -> list[tuple[Section, SchoolClass, AcademicYear]]:
+    """The sections with their class and academic year, all three rows locked ``FOR SHARE``
+    (in section-id order) and read after the lock (latest committed state).
+
+    ``FOR SHARE`` conflicts with the ``UPDATE`` that archives a row, so an enrolment write
+    holding it and an archive are serialised: the archive's guard trigger then sees the
+    committed enrolment, or the enrolment sees the committed ``archived_at``."""
+    if not section_ids:
+        return []
+    stmt = (
+        select(Section, SchoolClass, AcademicYear)
+        .join(
+            SchoolClass,
+            and_(SchoolClass.tenant_id == Section.tenant_id, SchoolClass.id == Section.class_id),
+        )
+        .join(
+            AcademicYear,
+            and_(
+                AcademicYear.tenant_id == Section.tenant_id,
+                AcademicYear.id == Section.academic_year_id,
+            ),
+        )
+        .where(Section.id.in_(list(section_ids)))
+        .order_by(Section.id)
+        .with_for_update(read=True, of=[Section, SchoolClass, AcademicYear])
+        .execution_options(populate_existing=True)
+    )
+    return [(r[0], r[1], r[2]) for r in session.execute(stmt).all()]
+
+
 def insert_section(
     session: Session,
     *,

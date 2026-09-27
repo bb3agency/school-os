@@ -455,6 +455,16 @@ def enrollment_states(
     return {r.id: (r.status, r.version) for r in session.execute(stmt)}
 
 
+def enrollment_section_ids(
+    session: Session, enrollment_ids: Collection[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The distinct sections of these enrolments."""
+    if not enrollment_ids:
+        return set()
+    stmt = select(Enrollment.section_id).where(Enrollment.id.in_(list(enrollment_ids))).distinct()
+    return set(session.scalars(stmt))
+
+
 def delete_enrollments(session: Session, enrollment_ids: Collection[uuid.UUID]) -> int:
     if not enrollment_ids:
         return 0

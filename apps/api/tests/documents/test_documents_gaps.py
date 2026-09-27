@@ -175,6 +175,67 @@ def test_SEC_015_patch_follows_document_acl_and_upload_permission(
     assert _patch(api, world.person("owner"), b_doc, {"title": TITLE}, 'W/"1"').status_code == 404
 
 
+@pytest.fixture
+def metadata_calls() -> Iterator[list[tuple[uuid.UUID, frozenset[str]]]]:
+    calls: list[tuple[uuid.UUID, frozenset[str]]] = []
+
+    def hook(session: Any, document_id: uuid.UUID, fields: frozenset[str]) -> None:
+        calls.append((document_id, fields))
+
+    service.METADATA_CHANGED_HOOKS.append(hook)
+    try:
+        yield calls
+    finally:
+        service.METADATA_CHANGED_HOOKS.remove(hook)
+
+
+def test_FR_DOC_005_metadata_changed_hooks_see_changed_field_names(
+    world: Any,
+    api: Any,
+    admin_engine: Engine,
+    metadata_calls: list[tuple[uuid.UUID, frozenset[str]]],
+) -> None:
+    """``METADATA_CHANGED_HOOKS`` (for knowledge: chunk titles/facets) run in the PATCH
+    transaction after the change and its audit event, with the changed field names only; not
+    for a no-op PATCH or a refused one."""
+    admin = world.person("office_admin")
+    doc = _doc(world, admin_engine)
+    res = _patch(api, admin, doc, {"title": TITLE, "language": "te"}, _etag(api, admin, doc))
+    assert res.status_code == 200, res.text
+    assert metadata_calls == [(doc, frozenset({"title", "language"}))]
+    same = _patch(api, admin, doc, {"title": TITLE}, res.headers["ETag"])
+    assert same.status_code == 200
+    stale = _patch(api, admin, doc, {"title": "Other synthetic title"}, 'W/"1"')
+    assert stale.status_code == 412
+    assert len(metadata_calls) == 1
+
+
+def test_FR_DOC_005_metadata_hook_failure_rolls_back_the_patch(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """The hook shares the PATCH transaction: if it fails, the change and its audit event are
+    rolled back together (never a title the chunks do not know about)."""
+
+    def failing(session: Any, document_id: uuid.UUID, fields: frozenset[str]) -> None:
+        raise RuntimeError("synthetic hook failure")
+
+    admin = world.person("office_admin")
+    doc = _doc(world, admin_engine)
+    etag = _etag(api, admin, doc)
+    service.METADATA_CHANGED_HOOKS.append(failing)
+    try:
+        try:
+            res = _patch(api, admin, doc, {"title": TITLE}, etag)
+        except RuntimeError:  # the test client re-raises server errors
+            pass
+        else:
+            assert res.status_code == 500
+    finally:
+        service.METADATA_CHANGED_HOOKS.remove(failing)
+    assert _etag(api, admin, doc) == etag
+    assert not _events(admin_engine, world, doc, "document.metadata_updated")
+
+
 # --- archive / unarchive --------------------------------------------------------------------------
 
 

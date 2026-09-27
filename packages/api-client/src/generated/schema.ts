@@ -130,7 +130,8 @@ export interface paths {
          * @description Apply the promotion in one transaction (permission ``tenant.structure.manage``; accepts
          *     ``Idempotency-Key``): old enrolments are closed, new ones opened, graduates marked
          *     ``graduated``. 409 ``promotion_already_committed``, ``promotion_plan_changed`` or
-         *     ``nothing_to_promote``; 422 ``no_target_section``. Can be undone within 24 hours.
+         *     ``nothing_to_promote``; 409 ``structure_archived`` when a target section, class or the
+         *     target year is archived; 422 ``no_target_section``. Can be undone within 24 hours.
          */
         post: operations["commit_promotion_api_v1_academic_years__year_id__promotions_commit_post"];
         delete?: never;
@@ -177,7 +178,8 @@ export interface paths {
          * Undo Promotion
          * @description Undo this year's committed promotion within 24 hours (permission
          *     ``tenant.structure.manage``). 409 ``no_promotion``, ``promotion_undo_expired``, or
-         *     ``promotion_has_dependents`` when an enrolment it touched changed afterwards.
+         *     ``promotion_has_dependents`` when an enrolment it touched changed afterwards, or
+         *     ``structure_archived`` when the source year (or a section or class of it) was archived.
          */
         post: operations["undo_promotion_api_v1_academic_years__year_id__promotions_undo_post"];
         delete?: never;
@@ -806,7 +808,7 @@ export interface paths {
          * Add Version
          * @description Register an uploaded file as the next version; history is kept (permission
          *     ``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.
-         *     Accepts ``Idempotency-Key``.
+         *     Accepts ``Idempotency-Key``. An archived document answers 409 ``document_archived``.
          */
         post: operations["add_version_api_v1_documents__document_id__versions_post"];
         delete?: never;
@@ -831,7 +833,8 @@ export interface paths {
          *     Accepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,
          *     PNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10
          *     minutes with the returned fields; the key, Content-Type and size are fixed by the policy.
-         *     Send ``document_id`` to upload a new version. Accepts ``Idempotency-Key``.
+         *     Send ``document_id`` to upload a new version (409 ``document_archived`` for an archived
+         *     document). Accepts ``Idempotency-Key``.
          */
         post: operations["create_upload_api_v1_documents_uploads_post"];
         delete?: never;
@@ -2946,7 +2949,8 @@ export interface paths {
         /**
          * Enrol Student
          * @description Enrol in a section; an active enrolment in the same year becomes ``transferred``
-         *     (permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``.
+         *     (permission ``student.update_nonidentity``). Accepts ``Idempotency-Key``. 409
+         *     ``structure_archived`` when the section, its class or its academic year is archived.
          */
         post: operations["enrol_student_api_v1_students__student_id__enrollments_post"];
         delete?: never;
@@ -2973,7 +2977,8 @@ export interface paths {
          * @description Correct the roll number, or move an active enrolment to another section of the same
          *     class and year (permission ``student.update_nonidentity``; ``If-Match`` with the
          *     enrolment's version, 412 ``precondition_failed`` when stale). Moving to another class is a
-         *     new enrolment (``POST …/enrollments``).
+         *     new enrolment (``POST …/enrollments``). 409 ``structure_archived`` when the target section
+         *     (or its class or year) is archived.
          */
         patch: operations["update_enrollment_api_v1_students__student_id__enrollments__enrollment_id__patch"];
         trace?: never;
