@@ -35,15 +35,15 @@ variable "cognito_domain_prefix" {
 }
 
 variable "bff_callback_path" {
-  description = "BFF OIDC callback path for school staff."
+  description = "BFF OIDC callback path for school staff (apps/web: /bff/auth/callback)."
   type        = string
-  default     = "/api/auth/callback"
+  default     = "/bff/auth/callback"
 }
 
 variable "platform_callback_path" {
-  description = "BFF OIDC callback path for platform operators."
+  description = "BFF OIDC callback path for platform operators, on app_domain like every BFF route (apps/web: /bff/auth/platform/callback)."
   type        = string
-  default     = "/api/auth/platform/callback"
+  default     = "/bff/auth/platform/callback"
 }
 
 variable "ses_email_identity_arn" {

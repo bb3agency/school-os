@@ -302,3 +302,25 @@ run "supplier_name_dev_placeholder_refused" {
 
   expect_failures = [var.billing_supplier_legal_name]
 }
+
+# FR-IAM-001, SEC-004: Cognito redirects exactly where the BFF sends people. apps/web/src/server/config.ts
+# builds every redirect and post-logout URI from APP_BASE_URL (https://app_domain), operators included.
+run "oidc_redirects_match_the_bff" {
+  command = plan
+
+  assert {
+    condition = (
+      module.cognito.posture["tenant"].callback_urls == toset(["https://app.staging.example.test/bff/auth/callback"])
+      && module.cognito.posture["tenant"].logout_urls == toset(["https://app.staging.example.test/signed-out"])
+    )
+    error_message = "Staff client: <APP_BASE_URL>/bff/auth/callback and /signed-out."
+  }
+
+  assert {
+    condition = (
+      module.cognito.posture["platform"].callback_urls == toset(["https://app.staging.example.test/bff/auth/platform/callback"])
+      && module.cognito.posture["platform"].logout_urls == toset(["https://app.staging.example.test/signed-out?kind=operator"])
+    )
+    error_message = "Operator admin client: <APP_BASE_URL>/bff/auth/platform/callback and /signed-out?kind=operator."
+  }
+}

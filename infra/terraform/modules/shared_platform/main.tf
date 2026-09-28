@@ -215,17 +215,19 @@ module "secrets" {
 
 # --- Identity ---------------------------------------------------------------------------
 
+# Redirect and sign-out URLs match what the BFF sends: it builds every one of them from APP_BASE_URL
+# (https://app_domain), operators included (apps/web/src/server/config.ts).
 module "cognito" {
   source = "../cognito"
 
   name_prefix            = local.name
   tenant_domain_prefix   = "${var.cognito_domain_prefix}-schools"
   tenant_callback_urls   = ["https://${var.app_domain}${var.bff_callback_path}"]
-  tenant_logout_urls     = ["https://${var.app_domain}/"]
+  tenant_logout_urls     = ["https://${var.app_domain}/signed-out"]
   create_platform_pool   = true
   platform_domain_prefix = "${var.cognito_domain_prefix}-ops"
-  platform_callback_urls = ["https://${var.admin_domain}${var.platform_callback_path}"]
-  platform_logout_urls   = ["https://${var.admin_domain}/"]
+  platform_callback_urls = ["https://${var.app_domain}${var.platform_callback_path}"]
+  platform_logout_urls   = ["https://${var.app_domain}/signed-out?kind=operator"]
   deletion_protection    = var.rds_deletion_protection ? "ACTIVE" : "INACTIVE"
   ses_email_identity_arn = var.ses_email_identity_arn
   from_email_address     = var.from_email_address

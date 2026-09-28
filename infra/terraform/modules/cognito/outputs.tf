@@ -60,6 +60,8 @@ output "posture" {
       refresh_rotation   = one(aws_cognito_user_pool_client.this[k].refresh_token_rotation).feature
       access_token_min   = aws_cognito_user_pool_client.this[k].access_token_validity
       oauth_flows        = aws_cognito_user_pool_client.this[k].allowed_oauth_flows
+      callback_urls      = aws_cognito_user_pool_client.this[k].callback_urls
+      logout_urls        = aws_cognito_user_pool_client.this[k].logout_urls
       totp_mfa_available = one(p.software_token_mfa_configuration).enabled
       device_remembering = length(p.device_configuration) > 0
       pre_token_version  = one(one(p.lambda_config).pre_token_generation_config).lambda_version

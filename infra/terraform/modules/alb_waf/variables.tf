@@ -89,7 +89,7 @@ variable "waf_rate_limit_per_5min" {
 }
 
 variable "waf_auth_rate_limit_per_5min" {
-  description = "Stricter per-IP limit for authentication paths (/api/auth/)."
+  description = "Stricter per-IP limit for authentication paths (/bff/auth/)."
   type        = number
   default     = 300
 }
@@ -97,7 +97,7 @@ variable "waf_auth_rate_limit_per_5min" {
 variable "waf_auth_path_prefix" {
   description = "URI prefix of the BFF authentication routes that get the stricter rate limit."
   type        = string
-  default     = "/api/auth/"
+  default     = "/bff/auth/"
 }
 
 variable "waf_log_retention_days" {

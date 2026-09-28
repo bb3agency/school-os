@@ -76,8 +76,8 @@ module "cognito" {
 
   name_prefix          = local.name
   tenant_domain_prefix = local.name
-  tenant_callback_urls = [for h in local.callback_hosts : "https://${h}/api/auth/callback"]
-  tenant_logout_urls   = [for h in local.callback_hosts : "https://${h}/"]
+  tenant_callback_urls = [for h in local.callback_hosts : "https://${h}/bff/auth/callback"]
+  tenant_logout_urls   = [for h in local.callback_hosts : "https://${h}/signed-out"]
   create_platform_pool = false
   secrets_kms_key_arn  = module.kms.key_arns["data"]
   secret_name_prefix   = "sos/dedicated/${var.school_code}"

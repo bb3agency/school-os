@@ -58,6 +58,15 @@ run "waf_rules" {
   }
 
   assert {
+    condition = one([
+      for r in aws_wafv2_web_acl.this.rule :
+      one(one(one(one(r.statement).rate_based_statement).scope_down_statement).byte_match_statement).search_string
+      if r.name == "rate-limit-auth"
+    ]) == "/bff/auth/"
+    error_message = "The stricter auth rate limit covers the BFF sign-in routes (/bff/auth/*, apps/web)."
+  }
+
+  assert {
     condition     = length(aws_wafv2_web_acl_logging_configuration.this.redacted_fields) == 4
     error_message = "WAF logs redact authorization, cookie and service-token headers and the query string (SEC-008)."
   }

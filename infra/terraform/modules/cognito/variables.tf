@@ -9,12 +9,12 @@ variable "tenant_domain_prefix" {
 }
 
 variable "tenant_callback_urls" {
-  description = "BFF OIDC callback URLs, e.g. https://app.schoolos.in/api/auth/callback."
+  description = "BFF OIDC callback URLs: <APP_BASE_URL>/bff/auth/callback (apps/web/README.md)."
   type        = list(string)
 }
 
 variable "tenant_logout_urls" {
-  description = "Allowed post-logout redirect URLs."
+  description = "Allowed post-logout redirect URLs: <APP_BASE_URL>/signed-out."
   type        = list(string)
 }
 
@@ -31,13 +31,13 @@ variable "platform_domain_prefix" {
 }
 
 variable "platform_callback_urls" {
-  description = "Platform admin callback URLs, e.g. https://admin.schoolos.in/api/auth/platform/callback."
+  description = "Platform admin callback URLs: <APP_BASE_URL>/bff/auth/platform/callback."
   type        = list(string)
   default     = []
 }
 
 variable "platform_logout_urls" {
-  description = "Platform admin logout URLs."
+  description = "Platform admin logout URLs: <APP_BASE_URL>/signed-out?kind=operator."
   type        = list(string)
   default     = []
 }

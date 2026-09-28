@@ -28,11 +28,11 @@ mock_provider "aws" {
 variables {
   name_prefix            = "sos-test"
   tenant_domain_prefix   = "sos-test-schools"
-  tenant_callback_urls   = ["https://app.example.test/api/auth/callback"]
-  tenant_logout_urls     = ["https://app.example.test/"]
+  tenant_callback_urls   = ["https://app.example.test/bff/auth/callback"]
+  tenant_logout_urls     = ["https://app.example.test/signed-out"]
   platform_domain_prefix = "sos-test-ops"
-  platform_callback_urls = ["https://admin.example.test/api/auth/platform/callback"]
-  platform_logout_urls   = ["https://admin.example.test/"]
+  platform_callback_urls = ["https://app.example.test/bff/auth/platform/callback"]
+  platform_logout_urls   = ["https://app.example.test/signed-out?kind=operator"]
   secrets_kms_key_arn    = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
   secret_name_prefix     = "sos/test"
   logs_kms_key_arn       = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000002"
