@@ -104,5 +104,6 @@ module "security" {
 
   alert_emails                       = coalesce(var.security_alert_emails, var.alarm_emails)
   securityhub_alert_labels           = var.securityhub_alert_labels
+  securityhub_control_exceptions     = var.securityhub_control_exceptions
   guardduty_runtime_agent_management = var.guardduty_runtime_agent_management
 }

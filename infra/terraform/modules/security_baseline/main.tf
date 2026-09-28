@@ -493,14 +493,15 @@ module "detection_primary" {
     prefix      = local.findings_prefix
     kms_key_arn = aws_kms_key.security.arn
   }
-  config_role_arn            = local.config_role_arn
-  config_bucket_name         = module.evidence_bucket.id
-  config_s3_key_prefix       = local.config_prefix
-  config_kms_key_arn         = aws_kms_key.security.arn
-  config_recording_frequency = var.config_recording_frequency
-  config_rules               = var.config_rules
-  securityhub_standards      = var.securityhub_standards
-  tags                       = local.tags
+  config_role_arn                = local.config_role_arn
+  config_bucket_name             = module.evidence_bucket.id
+  config_s3_key_prefix           = local.config_prefix
+  config_kms_key_arn             = aws_kms_key.security.arn
+  config_recording_frequency     = var.config_recording_frequency
+  config_rules                   = var.config_rules
+  securityhub_standards          = var.securityhub_standards
+  securityhub_control_exceptions = var.securityhub_control_exceptions
+  tags                           = local.tags
 }
 
 module "detection_dr" {
@@ -515,16 +516,17 @@ module "detection_dr" {
     prefix      = local.findings_prefix
     kms_key_arn = aws_kms_key.security.arn
   }
-  config_role_arn            = local.config_role_arn
-  config_bucket_name         = module.evidence_bucket.id
-  config_s3_key_prefix       = local.config_prefix
-  config_kms_key_arn         = aws_kms_key.security.arn
-  config_recording_frequency = var.config_recording_frequency
-  securityhub_standards      = var.securityhub_standards
-  forward_to_event_bus_arn   = local.primary_bus_arn
-  tamper_event_sources       = local.tamper_event_sources
-  tamper_event_names         = local.tamper_event_names
-  tags                       = local.tags
+  config_role_arn                = local.config_role_arn
+  config_bucket_name             = module.evidence_bucket.id
+  config_s3_key_prefix           = local.config_prefix
+  config_kms_key_arn             = aws_kms_key.security.arn
+  config_recording_frequency     = var.config_recording_frequency
+  securityhub_standards          = var.securityhub_standards
+  securityhub_control_exceptions = var.securityhub_control_exceptions
+  forward_to_event_bus_arn       = local.primary_bus_arn
+  tamper_event_sources           = local.tamper_event_sources
+  tamper_event_names             = local.tamper_event_names
+  tags                           = local.tags
 }
 
 # Security Hub in ap-south-1 shows ap-south-2 findings too (one console, one alert rule).

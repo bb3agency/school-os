@@ -107,6 +107,7 @@ module "security" {
   delete_exempt_principal_arns = var.security_log_delete_exempt_principal_arns
   kms_deletion_window_in_days  = 7
 
-  alert_emails             = coalesce(var.security_alert_emails, var.alarm_emails)
-  securityhub_alert_labels = var.securityhub_alert_labels
+  alert_emails                   = coalesce(var.security_alert_emails, var.alarm_emails)
+  securityhub_alert_labels       = var.securityhub_alert_labels
+  securityhub_control_exceptions = var.securityhub_control_exceptions
 }

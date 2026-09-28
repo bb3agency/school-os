@@ -247,6 +247,16 @@ variable "email_from" {
   default     = null
 }
 
+variable "securityhub_control_exceptions" {
+  description = "Security Hub controls disabled with a recorded reason after the first-run triage (docs/10 §5.1); list of { standard, control_id, reason }."
+  type = list(object({
+    standard   = string
+    control_id = string
+    reason     = string
+  }))
+  default = []
+}
+
 variable "security_alert_emails" {
   description = "Security alert recipients (GuardDuty/Security Hub/tampering, SEC-023). Null = alarm_emails. The on-call path is docs/11 §6-7."
   type        = list(string)

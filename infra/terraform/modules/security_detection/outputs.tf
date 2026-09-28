@@ -33,3 +33,8 @@ output "posture" {
     forward_event_pattern_obj = try(jsondecode(aws_cloudwatch_event_rule.forward[0].event_pattern), null)
   }
 }
+
+output "securityhub_disabled_controls" {
+  description = "Controls disabled per standard with their recorded reason (asserted by tests)."
+  value       = { for k, a in aws_securityhub_standards_control_association.disabled : k => { status = a.association_status, reason = a.updated_reason } }
+}
