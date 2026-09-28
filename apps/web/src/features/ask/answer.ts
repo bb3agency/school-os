@@ -205,7 +205,9 @@ export function splitMarkers(text: string, known: ReadonlySet<number>): AnswerPa
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const DOC = new RegExp(`^sos://doc/(${UUID})/v(\\d{1,6})(?:#p(\\d{1,6}))?$`);
-const STUDENT = new RegExp(`^sos://student/(${UUID})(?:/field/([a-z0-9_]{1,64}))?(?:\\?[a-z0-9_=&-]*)?$`);
+const STUDENT = new RegExp(
+  `^sos://student/(${UUID})(?:/field/([a-z0-9_]{1,64}))?(?:\\?[a-z0-9_=&-]*)?$`,
+);
 const OTHER = new RegExp(`^sos://(finding|change|verified)/(${UUID})$`);
 
 export type SourceRef =

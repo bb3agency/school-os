@@ -1211,7 +1211,12 @@
       "upload_is_for_another_document": "Reload the page and upload the file again.",
       "different_class_or_year": "Choose a section of the same class and year. To change the class, use “Change class or section”.",
       "before_start": "The end date is before the start date. Choose a later date.",
-      "roles_required": "Choose at least one role. To stop their access, use Suspend or Remove instead."
+      "roles_required": "Choose at least one role. To stop their access, use Suspend or Remove instead.",
+      "citation_source_invalid": "This is not a source SchoolOS understands. Copy it from an answer's source.",
+      "citation_source_unsupported": "Only a document page can be a source here, like sos://doc/…/v2#p1.",
+      "citation_not_found": "No document you can read matches this source. Check it, or copy it again.",
+      "citation_not_current": "This is not the current version of the document. Use the newest version's page.",
+      "citation_text_not_found": "This text is not on that page. Copy the exact words from the document."
     },
     "api": {
       "generic": {
@@ -3811,6 +3816,163 @@
       "unTitle": "Unarchive this document?",
       "unDescription": "It is listed with the documents in use again, and its details can be changed.",
       "unConfirm": "Unarchive"
+    }
+  },
+  "ask": {
+    "nav": "Ask the school",
+    "title": "Ask the school",
+    "description": "Ask about the school's records and documents. Every answer shows where it comes from.",
+    "noAccessTitle": "You can't ask questions here yet",
+    "noAccessBody": "Ask the principal or the office to give you access to Ask the school.",
+    "tabs": {
+      "label": "Ask the school sections",
+      "ask": "Ask",
+      "search": "Search documents",
+      "verified": "Verified answers"
+    },
+    "form": {
+      "question": "Your question",
+      "hint": "Write in English, Telugu or a mix, up to 1000 characters. Do not type Aadhaar numbers.",
+      "shortcut": "Press Ctrl+Enter to ask.",
+      "submit": "Ask",
+      "asking": "Answering…",
+      "stop": "Stop"
+    },
+    "status": {
+      "waiting": "Looking in the school records…",
+      "streaming": "Writing the answer…",
+      "done": "The answer is ready.",
+      "stopped": "You stopped the answer.",
+      "interrupted": "The answer was cut off."
+    },
+    "answer": {
+      "heading": "Answer",
+      "yourQuestion": "Your question",
+      "sources": "Sources",
+      "sourceLink": "Source {index}: {title}",
+      "untitled": "Untitled source",
+      "openDocument": "open the document",
+      "openRecord": "open the student record",
+      "openFinding": "open the finding",
+      "openChange": "open the correction request",
+      "openVerified": "open verified answers",
+      "page": "page {page}",
+      "noLink": "This source cannot be opened here.",
+      "download": "Download version {version}",
+      "downloadOf": "Download the cited version of {title}",
+      "stoppedNote": "You stopped the answer, so it may be incomplete. Ask again to see all of it.",
+      "interruptedTitle": "The answer was cut off",
+      "interruptedBody": "Check your internet connection and ask again."
+    },
+    "notFound": {
+      "title": "Not found in the school records you can access",
+      "body": "Nothing you can see answers this question. If the document exists, upload it, or ask the office to check who can see it."
+    },
+    "searchOnly": {
+      "title": "AI answers are not available right now",
+      "body": "Below are the passages that best match your question. Read them to find the answer.",
+      "passages": "Matching passages",
+      "none": "No passages matched your question. Try other words."
+    },
+    "kbErrors": {
+      "budget": "The school's AI budget for this month is used up. Until it is raised or the month ends, you see matching passages instead of answers.",
+      "disabled": "AI answers are switched off for this school. The principal can switch them on in school settings.",
+      "rate_limited": "Many questions are being asked right now. Wait a minute, then ask again for a full answer.",
+      "unavailable": "AI answers are temporarily unavailable. Try again in a few minutes."
+    },
+    "errors": {
+      "ai_rate_limited": {
+        "title": "Too many questions",
+        "body": "You asked many questions in the last minute. Wait a minute, then ask again."
+      },
+      "ai_budget_exhausted": {
+        "title": "AI budget used up",
+        "body": "The school's AI budget for this month is used up. Use Search documents, or ask the principal to raise the budget."
+      },
+      "ai_disabled": {
+        "title": "AI answers are switched off",
+        "body": "The principal can switch them on in school settings. Meanwhile, use Search documents."
+      },
+      "ai_unavailable": {
+        "title": "AI answers are unavailable",
+        "body": "Try again in a few minutes. Meanwhile, use Search documents."
+      },
+      "not_found": {
+        "title": "Question not found",
+        "body": "You can only give feedback on your own answers. Ask the question again."
+      }
+    },
+    "feedback": {
+      "question": "Was this answer helpful?",
+      "helpful": "Yes, helpful",
+      "notHelpful": "No, not helpful",
+      "reasonLegend": "What was wrong? (optional)",
+      "reasons": {
+        "wrong_source": "It used the wrong document or record",
+        "outdated": "It is out of date",
+        "incomplete": "It is incomplete",
+        "not_found_but_exists": "It said not found, but the record exists",
+        "wrong_language": "It answered in the wrong language"
+      },
+      "send": "Send feedback",
+      "sending": "Sending…",
+      "thanks": "Thank you. Your feedback helps the office improve answers."
+    },
+    "verified": {
+      "title": "Verified answers",
+      "description": "Answers the school has checked, so everyone gets the same reliable response.",
+      "save": "Save as verified answer",
+      "new": "Add a verified answer",
+      "dialogTitle": "Save a verified answer",
+      "dialogDescription": "Check the question, the answer and each source. Each source must quote the current version of a document you can read.",
+      "question": "Question",
+      "language": "Language of the answer",
+      "languages": {
+        "en": "English",
+        "te": "Telugu",
+        "mixed": "English and Telugu mixed"
+      },
+      "answer": "Answer",
+      "answerHint": "Write the answer as people should read it, without source numbers.",
+      "citations": "Sources",
+      "citationsHint": "Only document pages can be sources. Copy the source from an answer and quote the exact text on that page.",
+      "citationSource": "Source {number}",
+      "citationSourceHint": "Looks like sos://doc/…/v2#p1.",
+      "citationText": "Quoted text for source {number}",
+      "addCitation": "Add another source",
+      "removeCitation": "Remove source {number}",
+      "confirm": "Save verified answer",
+      "reviewDue": "Check again by (optional)",
+      "statusFilter": "Show",
+      "status": {
+        "active": "In use",
+        "needs_review": "Needs checking",
+        "retired": "Retired"
+      },
+      "needsReviewNote": "A source document changed or was deleted. Check this answer again.",
+      "verifiedByYou": "Verified by you",
+      "verifiedByOther": "Verified by a staff member",
+      "verifiedOn": "on {date}",
+      "reviewDueOn": "check again by {date}",
+      "sourceTitle": "Source {number}",
+      "emptyTitle": "No verified answers yet",
+      "emptyBody": "When the principal saves a checked answer, it appears here for everyone."
+    },
+    "search": {
+      "title": "Search documents",
+      "description": "Find passages in the documents you can read. No AI is used.",
+      "query": "Search for",
+      "queryHint": "Words from the document, up to 300 characters.",
+      "docType": "Document type",
+      "from": "Issued on or after",
+      "submit": "Search",
+      "results": "Search results",
+      "resultsCount": "{count, plural, =0 {No passages found.} one {# passage found.} other {# passages found.}}",
+      "emptyTitle": "Nothing found",
+      "emptyBody": "Try other words, or remove the filters. You only see documents you are allowed to read.",
+      "issued": "issued {date}",
+      "noAccessTitle": "You can't search documents",
+      "noAccessBody": "Ask the office to give you access to documents."
     }
   }
 }

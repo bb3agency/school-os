@@ -4,7 +4,9 @@ import { createSseParser } from "./sse";
 describe("createSseParser edge cases (FR-KB-008)", () => {
   it("defaults the event name to message and strips one leading space only", () => {
     const parser = createSseParser();
-    expect(parser.push("data:  two spaces\n\n")).toEqual([{ event: "message", data: " two spaces" }]);
+    expect(parser.push("data:  two spaces\n\n")).toEqual([
+      { event: "message", data: " two spaces" },
+    ]);
   });
 
   it("ignores id and retry fields and events without data", () => {

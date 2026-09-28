@@ -19,7 +19,8 @@ export type ErrorNamespace =
   | "school.users"
   | "academicStructure"
   | "schoolSettings"
-  | "documents";
+  | "documents"
+  | "ask";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

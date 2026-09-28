@@ -58,7 +58,12 @@ describe("answer state from SSE events (FR-KB-005, FR-KB-007, FR-KB-011)", () =>
       ev("meta", { query_id: "q1", language: "te", mode: "full" }),
       ev("token", { text: "Exams begin on 22/09/2026. [1]" }),
       ev("token", { text: "Timings are 9 to 12. [1]" }),
-      ev("citation", { index: 1, source: `sos://doc/${DOC}/v2#p1`, title: "Circular", snippet: "s" }),
+      ev("citation", {
+        index: 1,
+        source: `sos://doc/${DOC}/v2#p1`,
+        title: "Circular",
+        snippet: "s",
+      }),
       ev("done", { latency_ms: 4120, cited_sources: 1 }),
     ]);
     expect(state).toMatchObject({
