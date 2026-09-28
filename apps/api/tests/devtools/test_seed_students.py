@@ -54,6 +54,11 @@ DIGITS_12 = re.compile(r"(?<!\d)(?:\d[\s-]?){11}\d(?!\d)")
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
+def _aadhaar_like(text: str) -> list[str]:
+    """12-digit runs (spaces or hyphens allowed) outside UUIDs: random IDs are not Aadhaar."""
+    return DIGITS_12.findall(UUID_RE.sub(" ", text))
+
+
 def _load(name: str, path: Path) -> ModuleType:
     if name not in sys.modules:
         spec = importlib.util.spec_from_file_location(name, path)
@@ -209,7 +214,7 @@ def test_docs12_s3_manifest_file_matches_the_plan(seeded: Seeded) -> None:
     assert data["tenant_id"] == str(seeded.tenant_id)
     assert len(data["register_pages"]) == 2
     assert sum(p["has_aadhaar_like_number"] for p in data["register_pages"]) == 1
-    assert not DIGITS_12.search(path.read_text(encoding="utf-8"))
+    assert not _aadhaar_like(path.read_text(encoding="utf-8"))
 
 
 def test_docs12_s3_register_pages_and_circulars_are_stored(seeded: Seeded) -> None:
@@ -292,7 +297,7 @@ def test_invariant_4_no_full_aadhaar_stored_anywhere(seeded: Seeded, admin_engin
         for name, sql in queries.items():
             for (value,) in c.execute(text(sql), {"t": seeded.tenant_id}):
                 assert not contains_full_aadhaar(value or ""), name
-                for match in DIGITS_12.findall(UUID_RE.sub(" ", value or "")):
+                for match in _aadhaar_like(value or ""):
                     digits = re.sub(r"\D", "", match)
                     assert not verhoeff_valid(digits), name
     user_id, ctx = _office_admin(seeded.tenant_id)
@@ -342,3 +347,14 @@ def test_cli_rejects_a_student_count_out_of_range() -> None:
     code = cli.main(["--students", "99999"], settings=CI_SETTINGS, stdout=out, stderr=err)
     assert code == cli.EXIT_REFUSED
     assert "--students" in err.getvalue()
+
+
+def test_docs12_s3_aadhaar_check_ignores_digit_heavy_ids_only() -> None:
+    # Random UUIDs can hold 12+ digits within or across groups (about 1 in 100 tenant IDs).
+    digit_heavy = "0192f3a4-0000-7000-8123-123456789012"
+    assert _aadhaar_like(f'{{"tenant_id": "{digit_heavy}"}}') == []
+    assert _aadhaar_like("id 0192f3a4-1111-2222-3333-44445555a666 ok") == []
+    # Real 12-digit runs are still found, with or without separators, next to an ID too.
+    assert _aadhaar_like("2345 6789 0123") != []
+    assert _aadhaar_like("234567890123") != []
+    assert _aadhaar_like(f"{digit_heavy} 2345-6789-0123") != []
