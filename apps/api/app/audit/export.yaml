@@ -1,0 +1,12 @@
+# School audit log CSV export (FR-AUD-005, US-1001). Versioned configuration shipped inside the
+# package next to the module that reads it (app/audit/export.py; CLAUDE.md §4, invariant 13).
+version: 1
+
+# Most events one export may hold. A bigger selection is refused with 422 too_many_events and
+# the reader narrows the date range (a busy school writes a few thousand events a day, so this
+# is months of history in one file, about 30-60 MB).
+max_rows: 200000
+
+# Events read per database transaction while the file streams (one short tenant_session each,
+# keyset pagination on seq, so a large export never holds a long transaction).
+page_size: 1000

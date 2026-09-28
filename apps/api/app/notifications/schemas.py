@@ -36,3 +36,14 @@ class MarkedReadOut(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     updated: int
+
+
+class InvitationEmailOut(BaseModel):
+    """An invitation email was queued (``POST /users/{user_id}/invitation-email``)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    user_id: uuid.UUID
+    membership_id: uuid.UUID
+    status: Literal["queued"]
+    expires_at: dt.datetime

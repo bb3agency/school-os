@@ -17,7 +17,12 @@ from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, Limit, Page
 from app.notifications import service, templates
-from app.notifications.schemas import MarkedReadOut, NotificationOut, UnreadCountOut
+from app.notifications.schemas import (
+    InvitationEmailOut,
+    MarkedReadOut,
+    NotificationOut,
+    UnreadCountOut,
+)
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
@@ -78,3 +83,26 @@ def mark_read(
     return service.mark_read(
         db, ctx, notification_id, language=_language(response, accept_language)
     )
+
+
+# --- invitation emails (US-102; docs/03 §5 Email via SES) -----------------------------------
+
+invitations_router = APIRouter(prefix="/api/v1", tags=["users"])
+
+UserManager = Annotated[UserContext, Depends(require("user.manage", scope="school", step_up=True))]
+
+
+@invitations_router.post(
+    "/users/{user_id}/invitation-email", response_model=InvitationEmailOut, status_code=202
+)
+def resend_invitation_email(
+    ctx: UserManager, db: TenantDB, user_id: uuid.UUID
+) -> InvitationEmailOut:
+    """Send the invitation email again to a person who has not accepted yet (permission
+    ``user.manage``, school-wide, recent sign-in with MFA). The email goes to the address on
+    their profile, in their language, shortly after this call (202). Errors: 404 for someone
+    who is not a member of this school; 409 ``email_disabled`` (email is not switched on),
+    ``not_invited`` (already accepted or removed), ``invitation_expired`` (invite them again),
+    ``email_missing`` (add an email address first); 429 when one was sent in the last 10
+    minutes. Recorded in the audit log (``notification.email_requested``)."""
+    return service.resend_invitation_email(db, ctx, user_id)

@@ -220,7 +220,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-IAM-010..014 | Built | Role keys pinned to 07 §6.2; permission catalog in `core.permissions`; scopes; school picker and invitation acceptance; changes effective within 60 s and audited |
 | FR-TEN-001..003, FR-TEN-010, FR-TEN-012 | Built | Provisioning via the control plane (16 §5.4); academic structure; settings (retention settings are M1) |
 | FR-AUD-001..004 | Built | Tenant and platform chains; daily signed archive and verification. School-chain copies of platform actions are queued in the platform transaction and delivered exactly once (`platform.tenant_audit_outbox`, ADR-0020) |
-| FR-AUD-005 | Partial | Viewer with filters and chain verification built; CSV export not built |
+| FR-AUD-005 | Built | Viewer with filters and chain verification; CSV export (`GET /audit/export`, step-up, streamed, audited `audit.exported`); the web export button is pending |
 | FR-OPS-004 | Partial | `ops.break_glass_grants` and `platform.breakglass_requests` with the 8-hour and two-person rules in the database; workflow M1 |
 | FR-PLT-001, FR-PLT-003, FR-PLT-005, FR-PLT-010..018, FR-PLT-020, FR-PLT-022..030 | Built | 16 §8 route catalog. FR-PLT-005: two-person request/approval built; data deletion, key destruction and certificate are M1. FR-PLT-020: students, storage, documents and AI meters are 0 until `sis`/`kb` exist |
 | FR-PLT-002 | Built | Resumable provisioning (ADR-0024, migration `0020_provisioning_runs`): each step atomic and idempotent, state visible to operators, resume route, go-live blocked until complete |
@@ -322,7 +322,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | Anthropic Messages API | Out | HTTPS JSON, streaming | Commercial org API keys; ZDR requested; model IDs in config |
 | Fleet heartbeat (dedicated host → control plane) | In (to shared) | HTTPS JSON, HMAC-SHA256 signed | `POST /api/v1/fleet/heartbeat`; outbound from host only; no personal data (FR-PLT-024) |
 | Payment provider (Razorpay candidate) | Out | HTTPS | **Proposed only** (ADR-0016); not built; M0 uses manual payments |
-| Email (AWS SES) | Out | AWS SDK | Invites, billing reminders, usage alerts; templates EN/TE |
+| Email (AWS SES) | Out | AWS SDK | Invites, billing reminders, usage alerts; templates EN/TE. Built: provider interface with a local fake and SES v2, staff invitation emails (queued at invite and on resend, sent by a worker); off by default (`SOS_EMAIL_PROVIDER`) |
 | Embeddings provider (e.g., Voyage) | Out | HTTPS JSON | Behind interface; chosen by eval |
 | OCR/extraction provider(s) | Out | HTTPS | Behind interface; Telugu support required |
 | AWS S3, KMS, Secrets Manager, SSM Parameter Store | Out | AWS SDK | VPC endpoints where cost-justified |

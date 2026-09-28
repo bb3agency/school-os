@@ -5377,6 +5377,39 @@
         "title": "ImportSummary",
         "type": "object"
       },
+      "InvitationEmailOut": {
+        "description": "An invitation email was queued (``POST /users/{user_id}/invitation-email``).",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "queued",
+            "title": "Status",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "membership_id",
+          "status",
+          "expires_at"
+        ],
+        "title": "InvitationEmailOut",
+        "type": "object"
+      },
       "InviteIn": {
         "additionalProperties": false,
         "description": "Invite a staff member. ``idp_subject`` is the identity provider's ``sub`` of the account\ncreated for them (admin-created username; docs/07 \u00a75.1).",
@@ -14796,6 +14829,146 @@
           }
         },
         "summary": "List Audit Events",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/v1/audit/export": {
+      "get": {
+        "description": "Download the school audit log as a CSV file (permission ``audit.read`` and a recent\nsign-in with MFA, 428 ``step_up_required``).\n\nSame filters as ``GET /audit/events``: acting user, resource type/id, action and a time\nrange ``[from, to)``. Oldest event first; IDs, codes and summaries only, never names or\ncontact details. At most 200,000 events per file (422 ``too_many_events``: choose a shorter\ndate range). Every export is recorded in the audit log (``audit.exported``) before the file\nis sent.",
+        "operationId": "export_audit_events_api_v1_audit_export_get",
+        "parameters": [
+          {
+            "description": "Acting user id",
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Acting user id",
+              "title": "Actor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "pattern": "^[a-z_]+(\\.[a-z_]+)+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "example": "seq,occurred_at_utc,occurred_at_ist,actor_type,actor_id,action,resource_type,resource_id,request_id,summary\r\n41,2026-09-01T04:30:00Z,2026-09-01 10:00:00,user,\u2026,section.created,section,\u2026,req_\u2026,\"{\"\"fields\"\":[\"\"name_en\"\"]}\"\r\n",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV file (UTF-8 with BOM), oldest event first"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Audit Events",
         "tags": [
           "audit"
         ]
@@ -24911,6 +25084,50 @@
         "summary": "Update User",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/invitation-email": {
+      "post": {
+        "description": "Send the invitation email again to a person who has not accepted yet (permission\n``user.manage``, school-wide, recent sign-in with MFA). The email goes to the address on\ntheir profile, in their language, shortly after this call (202). Errors: 404 for someone\nwho is not a member of this school; 409 ``email_disabled`` (email is not switched on),\n``not_invited`` (already accepted or removed), ``invitation_expired`` (invite them again),\n``email_missing`` (add an email address first); 429 when one was sent in the last 10\nminutes. Recorded in the audit log (``notification.email_requested``).",
+        "operationId": "resend_invitation_email_api_v1_users__user_id__invitation_email_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationEmailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Invitation Email",
+        "tags": [
+          "users"
         ]
       }
     },

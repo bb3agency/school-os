@@ -58,6 +58,18 @@ class KnowledgeProviderMode(StrEnum):
     LIVE = "live"
 
 
+class EmailProviderKind(StrEnum):
+    """Email delivery for invitations and other notices (docs/03 §5 integrations: Amazon SES).
+
+    ``off`` (default) sends nothing and queues nothing. ``fake`` keeps messages in memory and
+    logs that one was "sent" (local/CI; refused in staging/prod). ``ses`` uses Amazon SES v2 in
+    ``AWS_REGION`` with the task role's credentials."""
+
+    OFF = "off"
+    FAKE = "fake"
+    SES = "ses"
+
+
 MIB = 1024 * 1024
 _LOCAL_HOSTS = frozenset(
     {"localhost", "127.0.0.1", "::1", "0.0.0.0", "oidc", "mock-oauth2-server"}  # noqa: S104
@@ -178,6 +190,14 @@ class Settings(BaseSettings):
 
     otel_exporter_otlp_endpoint: str | None = None
 
+    # Email (invitations; app/notifications/email.py). Off by default. ``email_from`` is the
+    # verified SES sender ("SchoolOS <no-reply@example.org>"); ``email_app_url`` is the web app
+    # address put in links (each dedicated host has its own). Never logged with recipients.
+    email_provider: EmailProviderKind = EmailProviderKind.OFF
+    email_from: str | None = None
+    email_app_url: str | None = None
+    email_ses_configuration_set: str | None = None
+
     # Control plane / fleet (docs/16 §10, §12; ADR-0015). Supplier identity for GST invoices.
     billing_supplier_legal_name: str = DEV_SUPPLIER_NAME
     billing_supplier_gstin: str = DEV_SUPPLIER_GSTIN
@@ -259,10 +279,29 @@ class Settings(BaseSettings):
             if key is None or not key.get_secret_value().strip():
                 raise ValueError(f"SOS_KB_ENABLED needs SOS_ANTHROPIC_API_KEY in {self.env}")
 
+    @property
+    def email_enabled(self) -> bool:
+        return self.email_provider is not EmailProviderKind.OFF
+
+    def _guard_email(self) -> None:
+        """Email that is on needs a sender and a link target; staging/prod: never the fake
+        provider, and links only to a public https address."""
+        if not self.email_enabled:
+            return
+        if self.email_provider is EmailProviderKind.FAKE and self.is_production_like:
+            raise ValueError(f"SOS_EMAIL_PROVIDER=fake is not allowed in {self.env}")
+        if not (self.email_from or "").strip() or "@" not in (self.email_from or ""):
+            raise ValueError("SOS_EMAIL_FROM must be set to a sender address when email is on")
+        if not (self.email_app_url or "").strip():
+            raise ValueError("SOS_EMAIL_APP_URL must be set when email is on")
+        if self.is_production_like and not _is_public_https(self.email_app_url or ""):
+            raise ValueError(f"SOS_EMAIL_APP_URL must be a public https URL in {self.env}")
+
     @model_validator(mode="after")
     def _guard_production(self) -> Settings:
         """Fail closed: dev-only conveniences can never run in staging or production."""
         self._guard_support_client()
+        self._guard_email()
         if self.is_production_like:
             if self.key_wrapper is KeyWrapperKind.LOCAL_DEV:
                 raise ValueError("SOS_KEY_WRAPPER=local-dev is not allowed in staging/prod")

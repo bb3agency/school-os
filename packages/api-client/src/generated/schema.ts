@@ -273,6 +273,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Audit Events
+         * @description Download the school audit log as a CSV file (permission ``audit.read`` and a recent
+         *     sign-in with MFA, 428 ``step_up_required``).
+         *
+         *     Same filters as ``GET /audit/events``: acting user, resource type/id, action and a time
+         *     range ``[from, to)``. Oldest event first; IDs, codes and summaries only, never names or
+         *     contact details. At most 200,000 events per file (422 ``too_many_events``: choose a shorter
+         *     date range). Every export is recorded in the audit log (``audit.exported``) before the file
+         *     is sent.
+         */
+        get: operations["export_audit_events_api_v1_audit_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit/verify": {
         parameters: {
             query?: never;
@@ -3480,6 +3507,32 @@ export interface paths {
         patch: operations["update_user_api_v1_users__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/users/{user_id}/invitation-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Invitation Email
+         * @description Send the invitation email again to a person who has not accepted yet (permission
+         *     ``user.manage``, school-wide, recent sign-in with MFA). The email goes to the address on
+         *     their profile, in their language, shortly after this call (202). Errors: 404 for someone
+         *     who is not a member of this school; 409 ``email_disabled`` (email is not switched on),
+         *     ``not_invited`` (already accepted or removed), ``invitation_expired`` (invite them again),
+         *     ``email_missing`` (add an email address first); 429 when one was sent in the last 10
+         *     minutes. Recorded in the audit log (``notification.email_requested``).
+         */
+        post: operations["resend_invitation_email_api_v1_users__user_id__invitation_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{user_id}/roles": {
         parameters: {
             query?: never;
@@ -5513,6 +5566,32 @@ export interface components {
              * @enum {string}
              */
             status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
+        };
+        /**
+         * InvitationEmailOut
+         * @description An invitation email was queued (``POST /users/{user_id}/invitation-email``).
+         */
+        InvitationEmailOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "queued";
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
         };
         /**
          * InviteIn
@@ -8920,6 +8999,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AuditEventOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_audit_events_api_v1_audit_export_get: {
+        parameters: {
+            query?: {
+                action?: string | null;
+                /** @description Acting user id */
+                actor?: string | null;
+                from?: string | null;
+                resource_id?: string | null;
+                resource_type?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file (UTF-8 with BOM), oldest event first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example seq,occurred_at_utc,occurred_at_ist,actor_type,actor_id,action,resource_type,resource_id,request_id,summary
+                     *     41,2026-09-01T04:30:00Z,2026-09-01 10:00:00,user,…,section.created,section,…,req_…,"{""fields"":[""name_en""]}"
+                     */
+                    "text/csv": string;
                 };
             };
             /** @description Validation Error */
@@ -14961,6 +15081,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_invitation_email_api_v1_users__user_id__invitation_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationEmailOut"];
                 };
             };
             /** @description Validation Error */

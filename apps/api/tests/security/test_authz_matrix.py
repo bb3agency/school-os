@@ -795,6 +795,19 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/documents/{document_id}/archive"): _doc_archive("archive"),
     ("POST", "/api/v1/documents/{document_id}/unarchive"): _doc_archive("unarchive"),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
+    # Invitation email (US-102): the target member is active and email is off in tests, so a
+    # permitted caller reaches the service and gets 409 (see _success); others get 403.
+    ("POST", "/api/v1/users/{user_id}/invitation-email"): lambda w, r, a: (
+        f"/api/v1/users/{w.a.people['target'].user_id}/invitation-email",
+        None,
+        {},
+    ),
+    # CSV export (FR-AUD-005): a narrow filter keeps each matrix call small.
+    ("GET", "/api/v1/audit/export"): lambda w, r, a: (
+        "/api/v1/audit/export?action=section.created",
+        None,
+        {},
+    ),
     # School-side routes backed by the control plane (app/platform/tenant_api.py).
     ("GET", "/api/v1/tenant/billing"): lambda w, r, a: ("/api/v1/tenant/billing", None, {}),
     ("GET", "/api/v1/tenant/billing/invoices"): lambda w, r, a: (
@@ -1182,6 +1195,8 @@ def _success(method: str, path: str) -> int:
     }
     if method == "POST" and path in accepted:
         return 202
+    if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
+        return 409  # guard passed; the service refuses (email off in tests)
     if method == "DELETE" and path in (
         "/api/v1/documents/{document_id}",
         "/api/v1/students/{student_id}/guardians/{guardian_id}",

@@ -9,10 +9,8 @@
 - Deletion (FR-DOC-007, docs/06 §4.8): deleting ``kb.documents`` / ``kb.document_versions``
   rows cascades to their chunks in the same statement (0021_kb_tables ``ON DELETE CASCADE``), so
   no job is needed. Verified answers citing the document must be flagged ``needs_review`` in
-  that transaction too; ``documents`` has no "deleted" hook, so :func:`flag_citing_answers` is
-  registered in ``DELETE_GUARDS`` (called with the session right before the delete, in the same
-  transaction): it flags and never refuses (returns ``None``). If a later guard refuses the
-  delete, the whole transaction, flags included, rolls back.
+  that transaction too: :func:`flag_citing_answers` is a ``DELETED_HOOKS`` entry, called after
+  the delete (and only for a delete that happened) in the same transaction.
 
 These run whether or not ``SOS_KB_ENABLED`` is on: hiding and flagging only ever narrow what
 can be retrieved (fail closed). Importing this module installs them (idempotent); the API and
@@ -58,8 +56,8 @@ def on_status_changed(session: Session, document_id: uuid.UUID, status: str) -> 
     )
 
 
-def flag_citing_answers(session: Session, document_id: uuid.UUID) -> str | None:
-    """A ``DELETE_GUARDS`` entry that never refuses: flags citing verified answers."""
+def flag_citing_answers(session: Session, document_id: uuid.UUID) -> None:
+    """A ``DELETED_HOOKS`` entry: flags the verified answers citing the deleted document."""
     flagged = repo.flag_verified_answers_citing(session, document_id)
     if flagged:
         log.info(
@@ -68,14 +66,13 @@ def flag_citing_answers(session: Session, document_id: uuid.UUID) -> str | None:
             resource_id=document_id,
             count=flagged,
         )
-    return None
 
 
 def install() -> None:
     if on_status_changed not in documents.STATUS_CHANGED_HOOKS:
         documents.STATUS_CHANGED_HOOKS.append(on_status_changed)
-    if flag_citing_answers not in documents.DELETE_GUARDS:
-        documents.DELETE_GUARDS.append(flag_citing_answers)
+    if flag_citing_answers not in documents.DELETED_HOOKS:
+        documents.DELETED_HOOKS.append(flag_citing_answers)
 
 
 install()

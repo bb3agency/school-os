@@ -68,8 +68,8 @@ The M0 code is merged on the session branch (not yet on `main`). What exists, pe
 - **Deploy configuration vs settings names (blocker for staging):** the Terraform `shared_platform` module and `deploy/dedicated/compose.yaml` set `SOS_KMS_KEY_ARN`, `SOS_FLEET_URL` and `SOS_FLEET_HMAC_KEY`, but the settings read `SOS_KMS_DATA_KEY_ARN`, `SOS_CONTROL_PLANE_URL`, `SOS_HEARTBEAT_KEY`/`SOS_HEARTBEAT_KEY_ID` and `SOS_DEDICATED_TENANT_ID`; `SOS_AUDIT_SIGNING_KEY_ARN` and `SOS_BILLING_SUPPLIER_*` are set nowhere; the ECS migrate task sets only `SOS_ENV`, so the staging/prod settings guard refuses it (`key_wrapper` defaults to `local-dev`).
 - **Dedicated tier:** a host-side tenant provisioning command (the runbook names `python -m app.tenancy.provision_dedicated`, which does not exist); pin WAL-G in `deploy/dedicated/walg/walg.lock` (go-live precondition, 10 §15.3).
 - **Identity:** Cognito Essentials has no threat protection, so breached-password screening (and adaptive login protection) must be built in the BFF/identity module or the pool moved to Plus (ADR-0018); FR-IAM-005 lockout auditing is not built.
-- **Email delivery:** owner and staff invite emails, billing reminders (FR-PLT-019), usage-threshold notifications (FR-PLT-021). M0 records the events only.
-- **Audit:** CSV export of the school audit log (FR-AUD-005).
+- **Email delivery:** staff invite emails built (provider interface, SES, `POST /users/{id}/invitation-email`; off until `SOS_EMAIL_PROVIDER=ses` and an SES identity exist). Still open: owner invite emails from the control plane, billing reminders (FR-PLT-019), usage-threshold notifications (FR-PLT-021), SES identity, DKIM and `ses:SendEmail` permission in Terraform.
+- **Audit:** CSV export of the school audit log (FR-AUD-005): API built (`GET /audit/export`); the web button is still open.
 - **Usage meters:** students, storage, documents and AI counts are 0 until `sis`/`kb` exist (M1+; `core.tenant_usage_summary` and the `definer_access` allowlist grow then).
 - **Security testing:** ZAP baseline (nightly job skips until staging exists); axe accessibility checks in Playwright; Schemathesis contract tests; e2e beyond the signed-out smoke test.
 - **School support form** in the web app (API routes exist).
@@ -132,7 +132,7 @@ Checked against the code and tests on the session branch (migrations `0008_sis_s
 - **Synthetic student data**: `make seed-synthetic` creates schools, structure and staff only; 12 §3 also requires 2,000 students, guardians, per-source values with deliberate mismatches, rendered register pages and circulars. Needed for demos, the pilot rehearsal, the "DQ precision on seeded mismatches" exit check at school scale, and the M2 eval corpus.
 - **Usage meters**: students, storage and documents are still 0 (`core.tenant_usage_summary()` counts memberships, sections and years only); counting `sis`/`kb` rows means `definer_access` on those tables, which needs an ADR (CLAUDE.md §11).
 - **Test gates**: coverage ≥ 80 % on critical modules (12 §9) is not enforced (no `fail_under`); e2e journeys for the M1 screens (import → DQ → change request → pre-check) are not written; e2e runs nightly only.
-- **Carried from M0 and still open**: email delivery (invites, approvals), audit log CSV export (FR-AUD-005), everything that needs AWS or GitHub (M0 status above).
+- **Carried from M0 and still open**: email delivery beyond staff invitations (owner invites, approvals), the audit log CSV export button in the web app (API built, FR-AUD-005), everything that needs AWS or GitHub (M0 status above).
 - **Human evidence for the exit criteria**: design-partner batches imported and verified, a real CISCE pre-check used, post-submission corrections counted. None can be ticked from code.
 
 **Decisions needed** (owner):
