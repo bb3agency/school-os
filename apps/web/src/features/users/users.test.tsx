@@ -55,6 +55,7 @@ function role(
     permissions,
     grantable: true,
     scoped: false,
+    needs_mfa: false,
     ...overrides,
   };
 }
@@ -63,10 +64,12 @@ const ROLES: Schemas["RoleOut"][] = [
   role("owner", [MANAGE, ASSIGN, READ_BASIC, "audit.read"], {
     name_en: "Owner",
     name_te: "యజమాని",
+    needs_mfa: true,
   }),
   role("office_admin", [MANAGE, ASSIGN, READ_BASIC], {
     name_en: "Office admin",
     name_te: "ఆఫీసు అడ్మిన్",
+    needs_mfa: true,
   }),
   role("office_staff", [READ_BASIC], { name_en: "Office staff", name_te: "ఆఫీసు సిబ్బంది" }),
   role("class_teacher", [READ_BASIC], {
@@ -95,6 +98,7 @@ function user(overrides: Partial<Schemas["UserOut"]> = {}): Schemas["UserOut"] {
     last_login_at: "2026-09-20T04:30:00Z",
     created_at: "2026-06-01T04:30:00Z",
     version: 3,
+    profile_shared: false,
     ...overrides,
   };
 }
@@ -167,6 +171,26 @@ describe("users list (US-102, FR-IAM-010..014)", () => {
     for (const call of stub.calls) {
       expect(call.url.search).not.toMatch(/Lakshmi|school\.example/);
     }
+  });
+
+  it("marks your own row and people whose profile is shared with another school", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    stub.routes["GET /bff/api/v1/users"] = () =>
+      page([
+        user({ id: ME_USER, display_name: "Test Clerk" }),
+        user({ id: CREATED, display_name: "Ravi Sample", profile_shared: true }),
+        user(),
+      ]);
+    renderWithIntl(<UsersScreen />);
+    const rowOf = async (name: string) =>
+      (await screen.findByRole("link", { name })).closest("tr") as HTMLElement;
+    const mine = await rowOf("Test Clerk");
+    expect(within(mine).getByText(messages.en.school.users.youBadge)).toBeInTheDocument();
+    const shared = await rowOf("Ravi Sample");
+    expect(within(shared).getByText(messages.en.school.users.sharedBadge)).toBeInTheDocument();
+    const plain = await rowOf("Lakshmi Sample");
+    expect(within(plain).queryByText(messages.en.school.users.youBadge)).toBeNull();
+    expect(within(plain).queryByText(messages.en.school.users.sharedBadge)).toBeNull();
   });
 
   it("without user.manage it says so and asks the API nothing", async () => {
@@ -452,6 +476,33 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
     // Your own name, email and language can still be corrected.
     expect(screen.getByRole("button", { name: detailCopy.edit.trigger })).toBeInTheDocument();
+  });
+
+  it("a profile shared with another school offers no edit and says why (ADR-0028)", async () => {
+    setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
+    serveUser(user({ profile_shared: true }));
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    expect(await screen.findByText(detailCopy.profileShared)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: detailCopy.edit.trigger })).toBeNull();
+    // Status and roles are the school's own and can still change.
+    expect(screen.getByRole("button", { name: "Suspend" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Save roles" })).toBeInTheDocument();
+    expect(stub.calls.filter((call) => call.method === "PATCH")).toHaveLength(0);
+  });
+
+  it("notes the roles that need two-step sign-in from the API (RoleOut.needs_mfa)", async () => {
+    setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
+    stub.routes["GET /bff/api/v1/roles"] = () =>
+      page(ROLES.map((item) => (item.key === "librarian" ? { ...item, needs_mfa: true } : item)));
+    serveUser(user());
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    const needsMfa = messages.en.school.users.rolesForm.needsMfa;
+    const owner = await screen.findByLabelText("Owner");
+    expect(owner).toHaveAccessibleDescription(expect.stringContaining(needsMfa));
+    expect(screen.getByLabelText("Librarian")).toHaveAccessibleDescription(
+      expect.stringContaining(needsMfa),
+    );
+    expect(screen.getByLabelText("Office staff")).not.toHaveAccessibleDescription();
   });
 
   it("404: says the person was not found", async () => {

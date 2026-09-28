@@ -13,7 +13,6 @@ import { uuid } from "@/lib/validation";
 import { roleName } from "./data";
 import {
   MAX_SCOPES,
-  MFA_ROLES,
   type MemberStatus,
   type ScopeInput,
   type StaffRole,
@@ -104,7 +103,7 @@ export function RoleCheckboxes({
           const hintId = `${baseId}-${role.key}-hint`;
           const invalid = role.key === firstEnabled && Boolean(error);
           const notes = [
-            ...(MFA_ROLES.includes(role.key) ? [t("needsMfa")] : []),
+            ...(role.needs_mfa ? [t("needsMfa")] : []),
             ...(!role.is_system ? [t("schoolRole")] : []),
             ...(role.scoped ? [t("scopedRole")] : []),
             ...(!allowed ? [t("notGrantable")] : []),

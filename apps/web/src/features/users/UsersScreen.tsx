@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -56,9 +57,15 @@ export function UsersScreen() {
       key: "name",
       header: t("colName"),
       cell: (row) => (
-        <Link href={`/settings/users/${row.id}`} className="font-semibold text-primary underline">
-          {row.display_name}
-        </Link>
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <Link href={`/settings/users/${row.id}`} className="font-semibold text-primary underline">
+            {row.display_name}
+          </Link>
+          {/* Hints before any request: own account (no status change, 409 own_account) and
+              a profile shared with another school (no profile edit, 409 profile_shared). */}
+          {me.data?.user_id === row.id ? <Badge tone="info">{t("youBadge")}</Badge> : null}
+          {row.profile_shared ? <Badge tone="neutral">{t("sharedBadge")}</Badge> : null}
+        </span>
       ),
     },
     { key: "email", header: t("colEmail"), cell: (row) => <Value>{row.email}</Value> },
