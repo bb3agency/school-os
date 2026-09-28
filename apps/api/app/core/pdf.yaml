@@ -1,0 +1,9 @@
+# HTML -> PDF renderer (app/core/pdf.py): headless Chromium through Playwright in the worker,
+# queue "pdf" (docs/04 §6). Used by school exports and control-plane invoices alike.
+# Versioned configuration shipped inside the package (the API image does not copy /config).
+version: 1
+timeout_ms: 60000
+# docs/07 §10, ADR-0025: Chromium runs sandboxed in staging and prod. Local and CI containers
+# run as root, where Chromium cannot sandbox itself; there the renderer runs without it
+# (JavaScript stays off and every network request is still refused).
+chromium_sandbox: true

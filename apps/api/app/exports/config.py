@@ -88,11 +88,6 @@ def _check_date_format(value: str) -> str:
     return value
 
 
-class PdfConfig(_Model):
-    timeout_ms: int = Field(ge=1000, le=300_000)
-    chromium_sandbox: bool
-
-
 class ProfileLayout(_Model):
     kind: LayoutKind
     layout_version: int = Field(ge=1)
@@ -132,7 +127,6 @@ class ExportsConfig(_Model):
     max_findings: int = Field(ge=1, le=100_000)
     download_url_ttl_s: int = Field(ge=30, le=300)
     watermark: Bilingual
-    pdf: PdfConfig
     never_exported: frozenset[str]
     aadhaar_last4_display: str
     profiles: dict[str, ProfileLayout] = Field(min_length=1)
@@ -192,7 +186,6 @@ __all__ = [
     "ExportsConfig",
     "Language",
     "LayoutKind",
-    "PdfConfig",
     "ProfileLayout",
     "StudentListLayout",
     "load_config",

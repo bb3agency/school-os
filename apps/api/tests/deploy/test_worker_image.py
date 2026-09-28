@@ -1,7 +1,7 @@
 """Worker image contract (FR-EXP-002..004, docs/04 §6 queue ``pdf``, docs/10 §6).
 
 The ``worker`` target of apps/api/Dockerfile bakes headless Chromium for the PDF renderer
-(app/exports/pdf.py never downloads a browser). These checks read the Dockerfile and the installed
+(app/core/pdf.py never downloads a browser). These checks read the Dockerfile and the installed
 playwright package, so a playwright bump without a matching browser, a root worker or a worker that
 misses a queue fails CI before an image is built. The built image itself renders a PDF in the CI
 ``images (worker)`` job (smoke step).

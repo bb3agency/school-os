@@ -1,0 +1,72 @@
+"""The shared HTML -> PDF renderer in ``core`` (CLAUDE.md §3, docs/07 §10, ADR-0025; FR-EXP-002,
+FR-PLT-017).
+
+Real Chromium renders are covered in ``tests/exports/test_pdf.py`` and
+``tests/platform/test_invoice_pdf.py`` (skipped without Chromium). These checks always run.
+"""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+import app.core.pdf as core_pdf
+from app.core.config import Environment, Settings
+from app.exports import pdf as exports_pdf
+
+
+def test_ADR_0025_renderer_config_ships_with_core_and_keeps_the_sandbox_on() -> None:
+    cfg = core_pdf.load_config()
+    assert cfg.chromium_sandbox is True
+    assert 1000 <= cfg.timeout_ms <= 300_000
+    with pytest.raises(ValidationError):
+        core_pdf.PdfConfig.model_validate({"version": 1, "timeout_ms": 1, "chromium_sandbox": True})
+    with pytest.raises(ValidationError):
+        core_pdf.PdfConfig.model_validate(
+            {"version": 1, "timeout_ms": 60000, "chromium_sandbox": True, "extra": 1}
+        )
+
+
+def test_ADR_0025_sandbox_is_required_in_staging_and_prod(monkeypatch: pytest.MonkeyPatch) -> None:
+    for env, expected in ((Environment.CI, False), (Environment.PROD, True)):
+        settings = Settings.model_construct(env=env)
+        monkeypatch.setattr(core_pdf, "get_settings", lambda s=settings: s)
+        renderer = core_pdf.default_renderer()
+        assert isinstance(renderer, core_pdf.ChromiumRenderer)
+        assert renderer.sandbox is expected
+
+
+def test_renderer_moved_to_core_exports_reuses_the_same_objects() -> None:
+    """``app.exports.pdf`` is a re-export: one renderer override for every caller."""
+    assert exports_pdf.set_renderer is core_pdf.set_renderer
+    assert exports_pdf.get_renderer is core_pdf.get_renderer
+    assert exports_pdf.ChromiumRenderer is core_pdf.ChromiumRenderer
+
+    class Fake:
+        def render(self, html: str) -> bytes:
+            return b"%PDF-fake"
+
+    fake = Fake()
+    exports_pdf.set_renderer(fake)
+    try:
+        assert core_pdf.get_renderer() is fake
+    finally:
+        core_pdf.set_renderer(None)
+
+
+def test_core_pdf_imports_no_feature_module() -> None:
+    tree = ast.parse(Path(core_pdf.__file__).read_text("utf-8"))
+    modules = {
+        n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module is not None
+    }
+    app_modules = {m for m in modules if m.startswith("app.")}
+    assert app_modules <= {"app.core.config", "app.core.logging"}, app_modules
+
+
+def test_bundled_font_lives_next_to_the_core_renderer() -> None:
+    assert core_pdf.FONT_PATH.parent == Path(core_pdf.__file__).with_name("fonts")
+    assert (core_pdf.FONT_PATH.parent / "OFL.txt").is_file()
+    assert core_pdf.font_bytes()[:4] == b"\x00\x01\x00\x00"
