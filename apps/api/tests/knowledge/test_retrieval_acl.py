@@ -180,6 +180,48 @@ def test_SEC_018_c3_documents_are_never_retrieved(schools: tuple[School, School]
         assert not set(_search(a.tenant_id, acl)) & a.ids("restricted_c3")
 
 
+def test_SEC_018_c3_documents_only_for_read_sensitive_holders_their_acl_reaches(
+    schools: tuple[School, School],
+) -> None:
+    """``AclKeys.read_sensitive`` (``student.read_sensitive``) adds C3 documents, and only those
+    the caller's ACL keys reach; without the flag the SQL filter returns zero C3 chunks."""
+    a, b = schools
+    holder = R.keys(roles={"accountant"}, read_sensitive=True)
+    assert set(_search(a.tenant_id, holder)) == a.ids("accountant_only", "restricted_c3")
+    # The flag never widens the ACL: another role, or a scoped reader, still gets no C3 file.
+    for acl in (
+        R.keys(roles={"teacher"}, read_sensitive=True),
+        R.keys(sections={a.section_9a}, classes={a.class_9}, read_sensitive=True),
+    ):
+        assert not set(_search(a.tenant_id, acl)) & a.ids("restricted_c3")
+    everything = set(_search(a.tenant_id, R.keys(sees_all=True, read_sensitive=True)))
+    assert a.ids("restricted_c3") <= everything
+    # Non-holders: zero C3 chunks for every combination of keys (fail closed).
+    for acl in (
+        R.keys(roles={"principal", "accountant"}),
+        R.keys(roles={"principal"}, school_wide=True),
+        R.keys(sees_all=True),
+        R.keys(sees_all=True, school_wide=True, roles={"principal", "accountant"}),
+    ):
+        assert not set(_search(a.tenant_id, acl)) & a.ids("restricted_c3")
+    # And never another school's C3 file, even with every key.
+    assert not set(_search(b.tenant_id, R.keys(sees_all=True, read_sensitive=True))) & a.ids(
+        "restricted_c3"
+    )
+
+
+def test_SEC_018_the_c3_clause_is_in_the_predicate_unless_read_sensitive() -> None:
+    from sqlalchemy.dialects import postgresql
+
+    def sql(acl: AclKeys) -> str:
+        compiled = acl_predicate(acl, SearchFilters()).compile(dialect=postgresql.dialect())  # type: ignore[no-untyped-call]
+        return str(compiled)
+
+    assert "sensitivity !=" in sql(R.keys(sees_all=True))
+    assert "sensitivity !=" in sql(R.keys(roles={"principal"}, school_wide=True))
+    assert "sensitivity" not in sql(R.keys(sees_all=True, read_sensitive=True))
+
+
 def test_FR_KB_002_superseded_versions_are_excluded(schools: tuple[School, School]) -> None:
     a, _ = schools
     retriever = HybridRetriever()

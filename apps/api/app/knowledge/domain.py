@@ -35,7 +35,7 @@ StopReason = Literal["end_turn", "tool_use", "max_tokens", "refusal"]
 
 BlockKind = Literal["heading", "paragraph", "list_item", "table", "page_break"]
 
-SourceKind = Literal["doc", "student", "finding", "change", "verified"]
+SourceKind = Literal["doc", "student", "finding", "change", "verified", "count"]
 
 
 # --- ingestion and chunking (docs/06 §4) -----------------------------------------------------
@@ -117,6 +117,10 @@ class AclKeys:
     (docs/05 §6.1): ``sees_all`` for holders of ``document.manage_acl``; otherwise a chunk is
     visible when an ACL entry matches a role, section, class or the membership, and an EMPTY ACL
     only when ``school_wide`` is true. Tenant isolation is RLS, never these keys.
+
+    ``read_sensitive`` (M2 wave 5, additive; default False = fail closed): the caller holds
+    ``student.read_sensitive``, so restricted (C3) documents their ACL reaches may be retrieved
+    too. Without it retrieval never returns a C3 chunk, whatever the ACL says.
     """
 
     roles: frozenset[str]
@@ -125,6 +129,7 @@ class AclKeys:
     membership_id: uuid.UUID
     school_wide: bool
     sees_all: bool = False
+    read_sensitive: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,8 +227,27 @@ class ModelTurn:
 
 
 @dataclass(frozen=True, slots=True)
+class TextDelta:
+    """A piece of answer text as the model generates it (streaming, docs/06 §5.1).
+
+    Already Aadhaar-masked by the gateway; NOT validated: citations are checked only on the
+    complete :class:`ModelTurn` that ends every stream (FR-KB-005)."""
+
+    text: str
+
+
+TurnEvent = TextDelta | ModelTurn
+"""What :meth:`~app.knowledge.interfaces.StreamingLlmGateway.stream_turn` yields: text deltas,
+then exactly one complete :class:`ModelTurn`."""
+
+
+@dataclass(frozen=True, slots=True)
 class UserMessage:
     text: str
+    earlier_questions: tuple[str, ...] = ()
+    """Earlier questions of the SAME user's session, oldest first (FR-KB-012; docs/06 §5
+    conversation rules). Context only: never earlier answers or tool results, so every turn
+    re-retrieves under the caller's current permissions (invariant 8)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +294,9 @@ class MetaEvent:
 class TokenEvent:
     event: ClassVar[str] = "token"
     text: str
+    """One whole validated answer segment (with its ``[n]`` markers), without surrounding
+    whitespace: join token texts with ONE space to get ``final.text`` (docs/06 §5.1). Only
+    ``delta`` texts carry their own whitespace and are appended verbatim."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,6 +313,11 @@ class DoneEvent:
     event: ClassVar[str] = "done"
     latency_ms: int
     cited_sources: int
+    status: str = "answered"
+    """How the question ended (M2 wave 5, additive): ``answered``, ``not_found``, ``refused``,
+    ``search_only`` or ``error`` (the stored query status; ``error`` = the stream failed)."""
+    mode: AskMode = "full"
+    """The final mode (``meta.mode`` is sent before the answer and may still say ``full``)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,4 +329,28 @@ class ErrorEvent:
     """An i18n key (``kb.errors.budget``); the UI renders it in en/te."""
 
 
-AskEvent = MetaEvent | TokenEvent | CitationEvent | DoneEvent | ErrorEvent
+@dataclass(frozen=True, slots=True)
+class DeltaEvent:
+    """Streaming preview (docs/06 §5.1, M2 wave 5): append ``text`` verbatim to the answer
+    being shown. NOT yet validated; the ``final`` event replaces it."""
+
+    event: ClassVar[str] = "delta"
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class FinalEvent:
+    """The validated answer (docs/06 §5.1): show ``text`` INSTEAD of every ``delta`` received
+    so far, and ignore the ``token`` events that follow (they repeat it for older clients).
+    ``replaced`` is true when validation changed what was streamed (citations dropped, "not
+    found", search-only fallback), beyond adding the ``[n]`` citation markers."""
+
+    event: ClassVar[str] = "final"
+    text: str
+    replaced: bool
+    status: str
+    """``answered``, ``not_found``, ``refused`` or ``search_only`` (the stored query status)."""
+    mode: AskMode
+
+
+AskEvent = MetaEvent | TokenEvent | CitationEvent | DoneEvent | ErrorEvent | DeltaEvent | FinalEvent

@@ -14,9 +14,11 @@ The rule mirrors the documents service's visibility rule (docs/05 §6.1, ``AclKe
 - school-wide readers also see every section- or class-restricted document and documents with an
   EMPTY ACL; for anyone else an empty ACL matches nothing (fail closed, never public).
 
-Always, for everyone: only ``is_latest`` chunks, optional filters, and never ``C3`` documents.
-C3 files need ``student.read_sensitive`` (unless the caller uploaded them), which ``AclKeys``
-does not carry, so retrieval leaves them out rather than guess (fail closed; docs/06 §6 as built).
+Always, for everyone: only ``is_latest`` chunks and the optional filters. Restricted (``C3``)
+documents only for callers whose keys carry ``read_sensitive`` (``student.read_sensitive``,
+docs/05 §6.1); for everyone else the predicate excludes them in SQL, whatever their ACL says
+(fail closed). The documents service also lets an uploader open their own C3 file; retrieval does
+not (chunks carry no uploader), which is narrower, never wider.
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ from app.knowledge.domain import AclKeys, SearchFilters
 from app.knowledge.models import DocumentChunk
 
 RESTRICTED_SENSITIVITY: Final = "C3"
-"""Never retrieved (see the module docstring)."""
+"""Retrieved only with ``AclKeys.read_sensitive`` (see the module docstring)."""
 
 _C = DocumentChunk
 
@@ -91,10 +93,11 @@ def _acl_match(acl: AclKeys) -> ColumnElement[bool]:
 
 def acl_predicate(acl: AclKeys, filters: SearchFilters | None = None) -> ColumnElement[bool]:
     """``<ALLOWED>`` over ``kb.document_chunks`` for this caller (bound parameters only)."""
-    clauses: list[ColumnElement[bool]] = [
-        _C.is_latest == true(),
-        _C.sensitivity != bindparam("restricted_sensitivity", RESTRICTED_SENSITIVITY),
-    ]
+    clauses: list[ColumnElement[bool]] = [_C.is_latest == true()]
+    if not acl.read_sensitive:
+        clauses.append(
+            _C.sensitivity != bindparam("restricted_sensitivity", RESTRICTED_SENSITIVITY)
+        )
     if not acl.sees_all:
         clauses.append(_acl_match(acl))
     if filters is not None:

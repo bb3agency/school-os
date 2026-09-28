@@ -64,6 +64,7 @@ def keys(
     membership: uuid.UUID | None = None,
     school_wide: bool = False,
     sees_all: bool = False,
+    read_sensitive: bool = False,
 ) -> AclKeys:
     return AclKeys(
         roles=frozenset(roles),
@@ -72,6 +73,7 @@ def keys(
         membership_id=membership or uuid.uuid4(),
         school_wide=school_wide,
         sees_all=sees_all,
+        read_sensitive=read_sensitive,
     )
 
 

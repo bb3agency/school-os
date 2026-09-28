@@ -9,7 +9,7 @@ way to callers. A transport never logs the request or the response (invariant 5)
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, runtime_checkable
 
@@ -57,4 +57,25 @@ class Transport(Protocol):
         ...
 
 
-__all__ = ["RETRYABLE", "FailureKind", "MessagesRequest", "Transport", "TransportError"]
+@runtime_checkable
+class StreamingTransport(Transport, Protocol):
+    """A transport that can also stream one Messages API call (docs/06 §5.1; FR-KB-008)."""
+
+    def stream(self, request: MessagesRequest) -> Iterator[Mapping[str, Any]]:
+        """One streamed attempt: the Messages API stream events as plain dicts
+        (``message_start``, ``content_block_start``, ``content_block_delta``,
+        ``content_block_stop``, ``message_delta``, ``message_stop``; ``ping`` may be skipped).
+        Raises :class:`TransportError` when the call fails, before or after the first event
+        (an ``error`` event mid-stream is raised as ``overloaded``/``server``). Closing the
+        iterator early closes the connection (the provider stops generating)."""
+        ...
+
+
+__all__ = [
+    "RETRYABLE",
+    "FailureKind",
+    "MessagesRequest",
+    "StreamingTransport",
+    "Transport",
+    "TransportError",
+]

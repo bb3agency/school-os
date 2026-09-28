@@ -19,6 +19,7 @@ blocks are dropped. Model output is masked too (defence in depth for invariant 4
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -101,11 +102,26 @@ def _tool_results(item: ToolResultsMessage) -> dict[str, Any]:
     return {"role": "user", "content": blocks}
 
 
-def messages(conversation: Sequence[ConversationItem]) -> list[dict[str, Any]]:
+def _user(item: UserMessage, earlier_header: str | None) -> dict[str, Any]:
+    """The question is the LAST text block; earlier questions of the session (FR-KB-012) go
+    before it in one block introduced by the configured header (prompt text, invariant 13)."""
+    content: list[dict[str, Any]] = []
+    if item.earlier_questions:
+        if earlier_header is None:
+            raise GatewayMisuse("earlier questions need the configured conversation header")
+        listed = "\n".join(f"- {q}" for q in item.earlier_questions)
+        content.append({"type": "text", "text": f"{earlier_header}\n{listed}"})
+    content.append({"type": "text", "text": item.text})
+    return {"role": "user", "content": content}
+
+
+def messages(
+    conversation: Sequence[ConversationItem], earlier_header: str | None = None
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for item in conversation:
         if isinstance(item, UserMessage):
-            out.append({"role": "user", "content": [{"type": "text", "text": item.text}]})
+            out.append(_user(item, earlier_header))
         elif isinstance(item, AssistantMessage):
             message = _assistant(item)
             if message is not None:
@@ -156,7 +172,7 @@ def turn_request(
     """A redacted tool-use turn. Tool choice is ``auto`` (never forced: some models reject it);
     once ``max_tool_rounds`` rounds are used it becomes ``none`` so the model must answer."""
     body = _common(role, system)
-    body["messages"] = messages(conversation)
+    body["messages"] = messages(conversation, config.conversation.earlier_questions_header)
     if tools:
         definitions: list[dict[str, Any]] = [
             {"name": t.name, "description": t.description, "input_schema": dict(t.input_schema)}
@@ -257,6 +273,103 @@ def parse_turn(
     return turn, raw
 
 
+class StreamAssembler:
+    """Rebuilds a Messages API response dict from its stream events (docs/06 §5.1).
+
+    :meth:`feed` returns the raw text of a ``text_delta`` (else None); :meth:`response` is the
+    response as ``send`` would have returned it (text blocks with their citations, ``tool_use``
+    blocks with their parsed input, stop reason, usage so far), so the same :func:`parse_turn`
+    and metering apply to streamed and unstreamed calls. Unknown events and block types are
+    ignored (thinking blocks are dropped by ``parse_turn`` anyway).
+    """
+
+    def __init__(self) -> None:
+        self._model: str | None = None
+        self._blocks: dict[int, dict[str, Any]] = {}
+        self._json: dict[int, list[str]] = {}
+        self._usage: dict[str, Any] = {}
+        self._stop: str | None = None
+        self.complete = False
+
+    def feed(self, event: Mapping[str, Any]) -> str | None:
+        kind = event.get("type")
+        if kind == "message_start":
+            message = event.get("message")
+            if isinstance(message, Mapping):
+                model = message.get("model")
+                self._model = model if isinstance(model, str) else None
+                self._add_usage(message.get("usage"))
+        elif kind == "content_block_start":
+            self._start_block(event)
+        elif kind == "content_block_delta":
+            return self._delta(event)
+        elif kind == "content_block_stop":
+            self._stop_block(event)
+        elif kind == "message_delta":
+            delta = event.get("delta")
+            if isinstance(delta, Mapping) and isinstance(delta.get("stop_reason"), str):
+                self._stop = delta["stop_reason"]
+            self._add_usage(event.get("usage"))
+        elif kind == "message_stop":
+            self.complete = True
+        return None
+
+    def _add_usage(self, usage: object) -> None:
+        if isinstance(usage, Mapping):
+            self._usage.update({k: v for k, v in usage.items() if v is not None})
+
+    @staticmethod
+    def _index(event: Mapping[str, Any]) -> int | None:
+        index = event.get("index")
+        return index if isinstance(index, int) else None
+
+    def _start_block(self, event: Mapping[str, Any]) -> None:
+        index, raw = self._index(event), event.get("content_block")
+        if index is None or not isinstance(raw, Mapping):
+            return
+        block = dict(raw)
+        if block.get("type") == "text":
+            block["text"] = str(block.get("text") or "")
+            block["citations"] = list(block.get("citations") or ())
+        elif block.get("type") == "tool_use":
+            self._json[index] = []
+        self._blocks[index] = block
+
+    def _delta(self, event: Mapping[str, Any]) -> str | None:
+        index, delta = self._index(event), event.get("delta")
+        block = self._blocks.get(index) if index is not None else None
+        if block is None or not isinstance(delta, Mapping):
+            return None
+        kind = delta.get("type")
+        if kind == "text_delta" and block.get("type") == "text":
+            text = str(delta.get("text") or "")
+            block["text"] += text
+            return text or None
+        if kind == "citations_delta" and block.get("type") == "text":
+            block["citations"].append(delta.get("citation"))
+        elif kind == "input_json_delta" and index in self._json:
+            self._json[index].append(str(delta.get("partial_json") or ""))
+        return None
+
+    def _stop_block(self, event: Mapping[str, Any]) -> None:
+        index = self._index(event)
+        if index is None or index not in self._json:
+            return
+        raw = "".join(self._json.pop(index)).strip()
+        try:
+            self._blocks[index]["input"] = json.loads(raw) if raw else {}
+        except ValueError:
+            raise InvalidModelOutput("tool arguments are not valid JSON") from None
+
+    def response(self) -> dict[str, Any]:
+        return {
+            "model": self._model,
+            "content": [self._blocks[i] for i in sorted(self._blocks)],
+            "stop_reason": self._stop,
+            "usage": dict(self._usage),
+        }
+
+
 def response_text(response: Mapping[str, Any]) -> str:
     """Concatenated text blocks (structured output arrives as one JSON text block)."""
     return "".join(
@@ -268,6 +381,7 @@ def response_text(response: Mapping[str, Any]) -> str:
 
 __all__ = [
     "RawUsage",
+    "StreamAssembler",
     "json_request",
     "messages",
     "parse_turn",

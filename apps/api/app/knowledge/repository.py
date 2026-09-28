@@ -354,6 +354,42 @@ def insert_query(session: Session, values: Mapping[str, Any]) -> None:
     session.execute(insert(Query).values(tenant_id=current_tenant_id(session), **values))
 
 
+def update_query(session: Session, query_id: uuid.UUID, values: Mapping[str, Any]) -> None:
+    """Complete (or cancel) a streamed question's row: ciphertext, codes and counts only."""
+    session.execute(update(Query).where(Query.id == query_id).values(**values))
+
+
+EARLIER_STATUSES = ("answered", "not_found", "refused", "search_only")
+"""Questions that count as conversation context (a cancelled or failed one does not)."""
+
+
+def earlier_questions(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    since: dt.datetime,
+    limit: int,
+) -> list[tuple[uuid.UUID, bytes]]:
+    """The newest ``limit`` completed questions of ONE user's session since ``since``, newest
+    first, as ``(id, question_ciphertext)``. Another user's rows with the same session id are
+    never read (FR-KB-012: no cross-user memory; the school is RLS)."""
+    if limit < 1:
+        return []
+    rows = session.execute(
+        select(Query.id, Query.question_ciphertext)
+        .where(
+            Query.user_id == user_id,
+            Query.session_id == session_id,
+            Query.created_at >= since,
+            Query.status.in_(EARLIER_STATUSES),
+        )
+        .order_by(Query.created_at.desc(), Query.id.desc())
+        .limit(limit)
+    ).all()
+    return [(r.id, bytes(r.question_ciphertext)) for r in rows]
+
+
 def get_query_of_user(
     session: Session, query_id: uuid.UUID, user_id: uuid.UUID, *, for_update: bool = False
 ) -> Query | None:
@@ -401,6 +437,32 @@ def list_verified_answers(
         stmt = stmt.where(VerifiedAnswer.id < before_id)
     stmt = stmt.order_by(VerifiedAnswer.id.desc()).limit(limit)
     return list(session.execute(stmt).scalars())
+
+
+def get_verified_answer(
+    session: Session, answer_id: uuid.UUID, *, for_update: bool = False
+) -> VerifiedAnswer | None:
+    stmt = select(VerifiedAnswer).where(VerifiedAnswer.id == answer_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def update_verified_answer(
+    session: Session,
+    answer_id: uuid.UUID,
+    *,
+    expected_version: int,
+    values: Mapping[str, Any],
+) -> VerifiedAnswer | None:
+    """Apply ``values`` and bump ``version`` when it is still ``expected_version`` (None if
+    not: the caller answers 412)."""
+    return session.execute(
+        update(VerifiedAnswer)
+        .where(VerifiedAnswer.id == answer_id, VerifiedAnswer.version == expected_version)
+        .values(**values, version=VerifiedAnswer.version + 1)
+        .returning(VerifiedAnswer)
+    ).scalar_one_or_none()
 
 
 def insert_verified_answer(session: Session, values: Mapping[str, Any]) -> VerifiedAnswer:

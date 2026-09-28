@@ -69,19 +69,24 @@ class SearchOut(_Out):
     data: list[SearchResultOut]
 
 
+FeedbackReason = Literal[
+    "wrong_source", "outdated", "incomplete", "not_found_but_exists", "wrong_language"
+]
+"""Why an answer did not help (docs/09 Knowledge): a fixed code the UI translates, never text."""
+
+
 class FeedbackIn(_In):
     feedback: Literal["helpful", "not_helpful"]
-    reason: Code | None = Field(
+    reason: FeedbackReason | None = Field(
         default=None,
-        description="A reason code (e.g. wrong_source, outdated, not_found_but_exists); "
-        "never free text.",
+        description="Why the answer did not help, as a code; never free text.",
     )
 
 
 class FeedbackOut(_Out):
     query_id: uuid.UUID
     feedback: Literal["helpful", "not_helpful"]
-    reason: str | None
+    reason: FeedbackReason | None
     recorded_at: dt.datetime
 
 
@@ -101,6 +106,15 @@ class VerifiedAnswerIn(_In):
     review_due: dt.date | None = None
 
 
+class VerifiedAnswerReviewIn(_In):
+    """Confirm a verified answer (typically ``needs_review``) as it is, or with a corrected
+    text, new citations or a new review date. Omitted fields keep their stored value."""
+
+    answer_text: str | None = Field(default=None, min_length=1, max_length=5000)
+    citations: list[VerifiedCitationIn] | None = Field(default=None, min_length=1, max_length=20)
+    review_due: dt.date | None = None
+
+
 class VerifiedCitationOut(_Out):
     source: str
     cited_text: str
@@ -114,6 +128,10 @@ class VerifiedAnswerOut(_Out):
     citations: list[VerifiedCitationOut]
     status: Literal["active", "needs_review", "retired"]
     verified_by: uuid.UUID = Field(description="Membership id of the person who verified it.")
+    verified_by_name: str | None = Field(
+        default=None,
+        description="Display name of that person in this school (null if no longer a member).",
+    )
     verified_at: dt.datetime
     review_due: dt.date | None
     version: int
@@ -127,12 +145,14 @@ __all__ = [
     "Code",
     "FeedbackIn",
     "FeedbackOut",
+    "FeedbackReason",
     "Locale",
     "SearchIn",
     "SearchOut",
     "SearchResultOut",
     "VerifiedAnswerIn",
     "VerifiedAnswerOut",
+    "VerifiedAnswerReviewIn",
     "VerifiedCitationIn",
     "VerifiedCitationOut",
     "VerifiedStatus",

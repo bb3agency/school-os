@@ -48,6 +48,8 @@ KNOWLEDGE_ROUTES = {
     ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): "kb.ask",
     ("GET", "/api/v1/knowledge/verified-answers"): "kb.ask",
     ("POST", "/api/v1/knowledge/verified-answers"): "kb.verified_answer.manage",
+    ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): "kb.verified_answer.manage",
+    ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): "kb.verified_answer.manage",
 }
 
 

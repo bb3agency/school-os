@@ -5,8 +5,10 @@ Built from the :class:`UserContext` exactly like the documents service's visibil
 school scope; ``school_wide`` for school-wide ``document.read`` holders; otherwise the sections
 and classes a scoped ``document.read`` grant reaches through the academic structure (a class
 scope covers its sections, a section scope makes its class match class-level ACL entries).
-Roles and the membership always count. ``tests/knowledge/test_ask_service.py`` checks that the
-index filter built from these keys agrees with ``documents.service.is_visible``.
+Roles and the membership always count. ``read_sensitive`` (C3 documents) follows
+``student.read_sensitive``, as the documents service does for opening C3 files.
+``tests/knowledge/test_ask_service.py`` checks that the index filter built from these keys
+agrees with ``documents.service.is_visible``.
 
 Tenant isolation stays RLS (invariant 1): these keys only narrow within the school.
 """
@@ -26,6 +28,8 @@ if TYPE_CHECKING:
 
 READ: Final = "document.read"
 MANAGE: Final = "document.manage_acl"
+SENSITIVE: Final = "student.read_sensitive"
+"""Restricted (C3) documents also need this (docs/05 §6.1, like the documents service)."""
 
 
 def acl_keys(session: Session, ctx: UserContext) -> AclKeys | None:
@@ -53,7 +57,8 @@ def acl_keys(session: Session, ctx: UserContext) -> AclKeys | None:
         membership_id=ctx.membership_id,
         school_wide=school_wide,
         sees_all=sees_all,
+        read_sensitive=ctx.has(SENSITIVE),
     )
 
 
-__all__ = ["MANAGE", "READ", "acl_keys"]
+__all__ = ["MANAGE", "READ", "SENSITIVE", "acl_keys"]
