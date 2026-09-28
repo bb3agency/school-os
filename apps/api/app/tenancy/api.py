@@ -13,12 +13,14 @@ from collections.abc import Callable
 from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy.orm import Session
 
 from app.authz import scope
 from app.authz.catalog import AUTHENTICATED
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag, paginate
+from app.students import service as students
 from app.tenancy import service as tenancy
 from app.tenancy.schemas import (
     AcademicYearCreate,
@@ -49,6 +51,21 @@ IncludeArchived = Annotated[
 
 def _with_etag(response: Response, version: int) -> None:
     response.headers["ETag"] = etag(version)
+
+
+def _years_in_use(db: Session, years: list[AcademicYearOut]) -> list[AcademicYearOut]:
+    used = students.structure_in_use(db).year_ids
+    return [y.model_copy(update={"in_use": y.id in used}) for y in years]
+
+
+def _classes_in_use(db: Session, classes: list[ClassOut]) -> list[ClassOut]:
+    used = students.structure_in_use(db).class_ids
+    return [c.model_copy(update={"in_use": c.id in used}) for c in classes]
+
+
+def _sections_in_use(db: Session, sections: list[SectionOut]) -> list[SectionOut]:
+    used = students.structure_in_use(db).section_ids
+    return [s.model_copy(update={"in_use": s.id in used}) for s in sections]
 
 
 class _Created(Protocol):
@@ -111,7 +128,7 @@ def list_academic_years(
     """Academic years, newest first; archived years only with ``include_archived=true``
     (permission ``student.read_basic``)."""
     years = tenancy.list_academic_years(db, include_archived=include_archived)
-    return paginate(years, key=_year_key, cursor=cursor, limit=limit)
+    return paginate(_years_in_use(db, years), key=_year_key, cursor=cursor, limit=limit)
 
 
 @router.get("/academic-years/{year_id}", response_model=AcademicYearOut)
@@ -121,7 +138,7 @@ def get_academic_year(
     """One academic year (permission ``student.read_basic``)."""
     year = tenancy.get_academic_year(db, year_id)
     _with_etag(response, year.version)
-    return year
+    return _years_in_use(db, [year])[0]
 
 
 @router.post("/academic-years", response_model=AcademicYearOut, status_code=201)
@@ -207,7 +224,7 @@ def list_classes(
     (permission ``student.read_basic``; scoped holders see only their classes)."""
     classes = tenancy.list_classes(db, include_archived=include_archived)
     visible = scope.visible_classes(ctx, READ, classes, tenancy.list_sections(db))
-    return paginate(visible, key=_class_key, cursor=cursor, limit=limit)
+    return paginate(_classes_in_use(db, visible), key=_class_key, cursor=cursor, limit=limit)
 
 
 @router.post("/classes/defaults", response_model=Page[ClassOut])
@@ -225,7 +242,7 @@ def get_class(ctx: Reader, db: TenantDB, class_id: uuid.UUID, response: Response
         ctx, READ, tenancy.get_class(db, class_id), tenancy.list_sections(db)
     )
     _with_etag(response, klass.version)
-    return klass
+    return _classes_in_use(db, [klass])[0]
 
 
 @router.post("/classes", response_model=ClassOut, status_code=201)
@@ -253,7 +270,7 @@ def update_class(
     ``tenant.structure.manage``; ``If-Match``)."""
     klass = tenancy.update_class(db, class_id, body, expected_version=version)
     _with_etag(response, klass.version)
-    return klass
+    return _classes_in_use(db, [klass])[0]
 
 
 @router.post("/classes/{class_id}/archive", response_model=ClassOut)
@@ -265,7 +282,7 @@ def archive_class(
     sections answers 409 ``structure_in_use``."""
     klass = tenancy.archive_class(db, class_id, archived=True, expected_version=version)
     _with_etag(response, klass.version)
-    return klass
+    return _classes_in_use(db, [klass])[0]
 
 
 @router.post("/classes/{class_id}/unarchive", response_model=ClassOut)
@@ -276,7 +293,7 @@ def unarchive_class(
     ``If-Match``)."""
     klass = tenancy.archive_class(db, class_id, archived=False, expected_version=version)
     _with_etag(response, klass.version)
-    return klass
+    return _classes_in_use(db, [klass])[0]
 
 
 # --- sections ---------------------------------------------------------------------------------
@@ -303,7 +320,7 @@ def list_sections(
         include_archived=include_archived,
     )
     order = {s.id: i for i, s in enumerate(sections)}
-    visible = scope.visible_sections(ctx, READ, sections)
+    visible = _sections_in_use(db, scope.visible_sections(ctx, READ, sections))
     return paginate(visible, key=lambda s: f"{order[s.id]:06d}", cursor=cursor, limit=limit)
 
 
@@ -312,7 +329,7 @@ def get_section(ctx: Reader, db: TenantDB, section_id: uuid.UUID, response: Resp
     """One section (permission ``student.read_basic``; 404 outside the caller's scope)."""
     section = scope.ensure_section_visible(ctx, READ, tenancy.get_section(db, section_id))
     _with_etag(response, section.version)
-    return section
+    return _sections_in_use(db, [section])[0]
 
 
 @router.post("/sections", response_model=SectionOut, status_code=201)
