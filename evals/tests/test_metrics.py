@@ -13,6 +13,7 @@ DOC = "sos://doc/00000000-0000-5000-8000-000000000001/v2#p1"
 OLD = "sos://doc/00000000-0000-5000-8000-000000000001/v1#p1"
 SECRET = "sos://doc/00000000-0000-5000-8000-000000000002/v1#p1"
 OTHER_TENANT = "sos://doc/00000000-0000-5000-8000-000000000003/v1#p1"
+SECTION_9B = "sos://doc/00000000-0000-5000-8000-000000000004/v1#p1"
 
 CLERK = Asker(tenant="t1", role="office_staff")
 TEACHER_9A = Asker(tenant="t1", role="class_teacher", sections=("9A",))
@@ -37,8 +38,9 @@ def _item(source: str, marker: str, **kw: object) -> CorpusItem:
 CORPUS = {
     DOC: _item(DOC, "MK-000001"),
     OLD: _item(OLD, "MK-000002", is_latest=False),
-    SECRET: _item(SECRET, "MK-000003", acl=Acl(roles=("principal",), sections=("9B",))),
+    SECRET: _item(SECRET, "MK-000003", acl=Acl(roles=("principal",))),
     OTHER_TENANT: _item(OTHER_TENANT, "MK-000004", tenant="t2"),
+    SECTION_9B: _item(SECTION_9B, "MK-000005", acl=Acl(sections=("9B",))),
 }
 
 
@@ -119,9 +121,11 @@ def test_FR_KB_010_leaked_sources_are_those_the_asker_cannot_see() -> None:
         OTHER_TENANT,
         "sos://doc/unknown",
     ]
-    assert metrics.leaked_sources([SECRET], asker=TEACHER_9A, corpus=CORPUS) == [SECRET]
+    assert metrics.leaked_sources([SECTION_9B], asker=TEACHER_9A, corpus=CORPUS) == [SECTION_9B]
     teacher_9b = Asker(tenant="t1", role="class_teacher", sections=("9B",))
-    assert metrics.leaked_sources([SECRET], asker=teacher_9b, corpus=CORPUS) == []
+    assert metrics.leaked_sources([SECTION_9B], asker=teacher_9b, corpus=CORPUS) == []
+    # A school-wide reader (office staff) sees section-restricted documents (docs/05 §6.1).
+    assert metrics.leaked_sources([SECTION_9B], asker=CLERK, corpus=CORPUS) == []
 
 
 def test_FR_KB_010_leaked_markers_catch_content_without_a_citation() -> None:

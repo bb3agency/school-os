@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from sos_evals.acl import retrievable, visible
+from sos_evals.acl import CLASSES, SECTIONS, can_ask, retrievable, visible
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
 EVALS_DIR = Path(__file__).resolve().parents[1]
@@ -83,18 +83,34 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
     return Dataset(corpus=corpus, items=tuple(items), sha256=digest.hexdigest())
 
 
-def validate(corpus: dict[str, CorpusItem], items: Sequence[EvalItem]) -> None:
-    """Cross-checks that keep the gates meaningful (a wrong key would hide a leak)."""
+def _check_structure(where: str, sections: Sequence[str], classes: Sequence[str]) -> None:
+    unknown = sorted((set(sections) - SECTIONS) | (set(classes) - CLASSES))
+    if unknown:
+        raise DatasetError(f"{where}: sections/classes outside the academic structure: {unknown}")
+
+
+def _validate_corpus(corpus: dict[str, CorpusItem]) -> None:
     markers: set[str] = set()
     for known in corpus.values():
         if known.marker in markers:
             raise DatasetError(f"marker {known.marker} is used twice")
         markers.add(known.marker)
+        _check_structure(known.source, known.acl.sections, known.acl.classes)
+        if known.student_section is not None:
+            _check_structure(known.source, (known.student_section,), ())
+
+
+def validate(corpus: dict[str, CorpusItem], items: Sequence[EvalItem]) -> None:
+    """Cross-checks that keep the gates meaningful (a wrong key would hide a leak)."""
+    _validate_corpus(corpus)
     seen: set[str] = set()
     for item in items:
         if item.id in seen:
             raise DatasetError(f"duplicate item id {item.id}")
         seen.add(item.id)
+        _check_structure(item.id, item.asker.sections, item.asker.classes)
+        if not can_ask(item.asker):
+            raise DatasetError(f"{item.id}: the asker's role does not hold kb.ask")
         for source in item.expected_sources:
             entry = corpus.get(source)
             if entry is None:
