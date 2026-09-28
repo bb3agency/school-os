@@ -359,23 +359,50 @@ const DOCUMENT = {
   version: 3,
 };
 
-/** Ask the school (docs/06 §5.1): a synthetic cited answer about the holiday circular. */
+/**
+ * Ask the school (docs/06 §5.1): a synthetic cited answer about the holiday circular, streamed
+ * as the API does since M2 wave 5: `meta` (always mode "full"), preview `delta`s with their own
+ * whitespace, the validated `final` (which the page shows instead of the preview), the legacy
+ * `token` segments (ignored after `final`), `citation`s and `done` with the real status.
+ */
 const ASK_QUERY_ID = "0192f3a4-0000-7000-8000-00000000e001";
 const ASK_SOURCE = `sos://doc/${DOC_ID}/v1#p1`;
+const ASK_CITATION = {
+  index: 1,
+  source: ASK_SOURCE,
+  title: "Dasara holidays circular 2026",
+  snippet: "Holidays from 02/10/2026 to 12/10/2026; school reopens on 13/10/2026.",
+};
 const ASK_EVENTS: Array<[string, unknown]> = [
   ["meta", { query_id: ASK_QUERY_ID, language: "en", mode: "full" }],
-  ["token", { text: "Dasara holidays run from 02/10/2026 to 12/10/2026. [1]" }],
-  ["token", { text: "School reopens on 13/10/2026. [1]" }],
+  ["delta", { text: "Dasara holidays run " }],
+  ["delta", { text: "from 02/10/2026 to 12/10/2026. [1] " }],
+  ["delta", { text: "School reopens on 13/10/2026. [1]" }],
   [
-    "citation",
+    "final",
     {
-      index: 1,
-      source: ASK_SOURCE,
-      title: "Dasara holidays circular 2026",
-      snippet: "Holidays from 02/10/2026 to 12/10/2026; school reopens on 13/10/2026.",
+      text: "Dasara holidays run from 02/10/2026 to 12/10/2026. [1] School reopens on 13/10/2026. [1]",
+      replaced: false,
+      status: "answered",
+      mode: "full",
     },
   ],
-  ["done", { latency_ms: 420, cited_sources: 1 }],
+  ["token", { text: "Dasara holidays run from 02/10/2026 to 12/10/2026. [1]" }],
+  ["token", { text: "School reopens on 13/10/2026. [1]" }],
+  ["citation", ASK_CITATION],
+  ["done", { latency_ms: 420, cited_sources: 1, status: "answered", mode: "full" }],
+];
+/**
+ * A question containing "budget": the AI budget ran out mid-answer, so the preview is replaced
+ * by search-only passages. Only `final`/`done` say so (meta still says "full").
+ */
+const ASK_SEARCH_ONLY_EVENTS: Array<[string, unknown]> = [
+  ["meta", { query_id: ASK_QUERY_ID, language: "en", mode: "full" }],
+  ["delta", { text: "Dasara holidays run " }],
+  ["error", { type: "ai_budget_exhausted", message_key: "kb.errors.budget" }],
+  ["final", { text: "", replaced: true, status: "search_only", mode: "search_only" }],
+  ["citation", ASK_CITATION],
+  ["done", { latency_ms: 310, cited_sources: 1, status: "search_only", mode: "search_only" }],
 ];
 const VERIFIED_ANSWER = {
   id: "0192f3a4-0000-7000-8000-00000000e101",
@@ -385,6 +412,7 @@ const VERIFIED_ANSWER = {
   citations: [{ source: ASK_SOURCE, cited_text: "Holidays from 02/10/2026 to 12/10/2026" }],
   status: "active",
   verified_by: "0192f3a4-0000-7000-8000-0000000000e1",
+  verified_by_name: "Synthetic Principal",
   verified_at: "2026-09-27T05:30:00Z",
   review_due: null,
   version: 1,
@@ -392,10 +420,14 @@ const VERIFIED_ANSWER = {
 };
 
 /**
- * Stream the canned answer as Server-Sent Events, one event at a time (FR-KB-008). A question
+ * Stream a canned answer as Server-Sent Events, one event at a time (FR-KB-008). A question
  * containing "slowly" waits 1.5 s between events, so the e2e run can press Stop mid-answer.
  */
-function streamAnswer(response: ServerResponse, slow: boolean): void {
+function streamAnswer(
+  response: ServerResponse,
+  events: Array<[string, unknown]>,
+  slow: boolean,
+): void {
   response.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-store",
@@ -409,7 +441,7 @@ function streamAnswer(response: ServerResponse, slow: boolean): void {
   });
   const next = () => {
     if (closed) return;
-    const item = ASK_EVENTS[i];
+    const item = events[i];
     if (!item) return void response.end();
     const [event, data] = item;
     response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -669,7 +701,8 @@ async function startApi(): Promise<Server> {
     }
     if (url.pathname === "/api/v1/knowledge/ask" && method === "POST") {
       const question = typeof body.question === "string" ? body.question : "";
-      return streamAnswer(response, question.includes("slowly"));
+      const events = question.includes("budget") ? ASK_SEARCH_ONLY_EVENTS : ASK_EVENTS;
+      return streamAnswer(response, events, question.includes("slowly"));
     }
     const subject = subjectOf(request);
     const [status, answer] =

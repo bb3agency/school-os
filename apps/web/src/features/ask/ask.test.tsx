@@ -252,6 +252,172 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     expect(await screen.findByText(/Exams begin soon\./)).toBeInTheDocument();
   });
 
+  it("search-only via final/done even though meta says full (docs/06 §5.1, FR-KB-011)", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("delta", { text: "Exams begin on 22/09" }),
+        sse("error", { type: "ai_budget_exhausted", message_key: "kb.errors.budget" }),
+        sse("final", { text: "", replaced: true, status: "search_only", mode: "search_only" }),
+        sse("citation", { index: 1, source: DOC_SOURCE, title: "Circular", snippet: "Exams at 9" }),
+        sse("done", {
+          latency_ms: 300,
+          cited_sources: 1,
+          status: "search_only",
+          mode: "search_only",
+        }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("AI answers are not available right now")).toBeInTheDocument();
+    expect(screen.getByText(/AI budget for this month is used up/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Matching passages" })).toBeInTheDocument();
+    expect(screen.queryByText(/Exams begin on 22\/09/)).toBeNull();
+    expect(screen.queryByText("Not found in the school records you can access")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save as verified answer" })).toBeNull();
+  });
+
+  it("shows streamed delta text as a marked, unchecked preview without links", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse(
+        [
+          sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+          sse("delta", { text: "Exams begin " }),
+          sse("delta", { text: "on 22/09/2026. [1]" }),
+        ],
+        { close: false },
+      );
+    renderWithIntl(<AskPage />);
+    await ask();
+    const preview = await screen.findByRole("group", { name: "Draft answer, not checked yet" });
+    expect(preview).toHaveTextContent("Exams begin on 22/09/2026. [1]");
+    expect(within(preview).queryByRole("link")).toBeNull();
+    expect(screen.getByText("Writing the answer…")).toBeInTheDocument();
+    expect(screen.queryByText("Was this answer helpful?")).toBeNull();
+  });
+
+  it("final replaces the preview, later tokens are ignored, and a changed answer says so", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("delta", { text: "Exams begin on 21/09/2026 [2] and end soon." }),
+        sse("final", {
+          text: "Exams begin on 22/09/2026. [1]",
+          replaced: true,
+          status: "answered",
+          mode: "full",
+        }),
+        sse("token", { text: "Exams begin on 22/09/2026. [1]" }),
+        sse("citation", { index: 1, source: DOC_SOURCE, title: "Circular", snippet: "x" }),
+        sse("done", { latency_ms: 900, cited_sources: 1, status: "answered", mode: "full" }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("The answer is ready.")).toBeInTheDocument();
+    const answer = screen.getByRole("region", { name: "Answer" });
+    expect(within(answer).getAllByText(/Exams begin on 22\/09\/2026\./)).toHaveLength(1);
+    expect(within(answer).queryByText(/21\/09\/2026/)).toBeNull();
+    expect(screen.queryByRole("group", { name: "Draft answer, not checked yet" })).toBeNull();
+    expect(within(answer).getByRole("link", { name: "Source 1: Circular" })).toBeInTheDocument();
+    expect(
+      within(answer).getByText(
+        "The draft was checked against the sources and changed to what they support.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says when the question was refused (done.status refused)", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("final", { text: "Cannot help.", replaced: false, status: "refused", mode: "full" }),
+        sse("token", { text: "Cannot help." }),
+        sse("done", { latency_ms: 90, cited_sources: 0, status: "refused", mode: "full" }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(
+      await screen.findByText("This question can't be answered from the school records"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Cannot help.")).toBeNull();
+  });
+
+  it("an internal error (done.status error) says to ask again, with no feedback", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("delta", { text: "Exams begin" }),
+        sse("error", { type: "internal_error", message_key: "kb.errors.internal" }),
+        sse("done", { latency_ms: 50, cited_sources: 0, status: "error", mode: "full" }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(screen.getByText(/could not finish this answer\. Ask again/)).toBeInTheDocument();
+    expect(screen.getByText("The answer could not be finished.")).toBeInTheDocument();
+    expect(screen.queryByText("Exams begin")).toBeNull();
+    expect(screen.queryByText("Was this answer helpful?")).toBeNull();
+  });
+
+  it("shows a student count source as a chip without a link (sos://count)", async () => {
+    const COUNT = "0192f3a4-0000-7000-8000-00000000e201";
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("final", {
+          text: "Class 6 has 42 students. [1]",
+          replaced: false,
+          status: "answered",
+          mode: "full",
+        }),
+        sse("citation", {
+          index: 1,
+          source: `sos://count/${COUNT}`,
+          title: "Students enrolled by class",
+          snippet: "Class 6: 42",
+        }),
+        sse("done", { latency_ms: 90, cited_sources: 1, status: "answered", mode: "full" }),
+      ]);
+    const { container } = renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("Students enrolled by class")).toBeInTheDocument();
+    expect(screen.getByText("Student count (numbers only)")).toBeInTheDocument();
+    expect(screen.queryByText("This source cannot be opened here.")).toBeNull();
+    const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "");
+    expect(hrefs.filter((href) => href.includes(COUNT))).toEqual([]);
+    expect(
+      screen.getByRole("link", { name: "Source 1: Students enrolled by class" }),
+    ).toBeVisible();
+  });
+
+  it("new stream states and kb.errors.* work in Telugu without missing messages", async () => {
+    for (const events of [
+      [
+        sse("meta", { query_id: QUERY, language: "te", mode: "full" }),
+        sse("error", { type: "internal_error", message_key: "kb.errors.internal" }),
+        sse("done", { latency_ms: 5, cited_sources: 0, status: "error", mode: "full" }),
+      ],
+      [
+        sse("meta", { query_id: QUERY, language: "te", mode: "full" }),
+        sse("final", { text: "x", replaced: true, status: "refused", mode: "full" }),
+        sse("done", { latency_ms: 5, cited_sources: 0, status: "refused", mode: "full" }),
+      ],
+      [
+        sse("meta", { query_id: QUERY, language: "te", mode: "full" }),
+        sse("delta", { text: "పరీక్షలు" }),
+      ],
+    ]) {
+      stub.routes[ASK] = () => sseResponse(events);
+      const { unmount } = renderWithIntl(<AskPage />, "te");
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText(/^మీ ప్రశ్న/), "ప్రశ్న?");
+      await user.click(screen.getByRole("button", { name: "అడగండి" }));
+      await screen.findByRole("region", { name: "సమాధానం" });
+      await waitFor(() => expect(screen.getByRole("status")).not.toHaveTextContent(/^$/));
+      unmount();
+    }
+  });
+
   it("explains 429 ai_rate_limited in plain words", async () => {
     stub.routes[ASK] = () => problem(429, "ai_rate_limited");
     renderWithIntl(<AskPage />);
@@ -367,6 +533,20 @@ describe("feedback on an answer (US-801 AC4, FR-KB-009)", () => {
     expect(stub.callsTo(key)[0]?.headers.get("x-csrf-token")).toBe(CSRF);
   });
 
+  it("offers exactly the reason codes the API accepts (FeedbackIn.reason)", async () => {
+    stub.routes[ASK] = () => sseResponse(answered);
+    renderWithIntl(<AskPage />);
+    const user = await ask();
+    await user.click(await screen.findByRole("button", { name: "No, not helpful" }));
+    const values = screen
+      .getAllByRole("radio")
+      .map((radio) => (radio as HTMLInputElement).value)
+      .sort();
+    expect(values).toEqual(
+      ["wrong_source", "outdated", "incomplete", "not_found_but_exists", "wrong_language"].sort(),
+    );
+  });
+
   it("explains a 404 for someone else's question", async () => {
     stub.routes[ASK] = () => sseResponse(answered);
     stub.routes[`POST /bff/api/v1/knowledge/queries/${QUERY}/feedback`] = () =>
@@ -389,6 +569,7 @@ function verified(
     citations: [{ source: DOC_SOURCE, cited_text: "Exams begin on 22/09/2026 at 9 am" }],
     status: "active",
     verified_by: ID.user,
+    verified_by_name: null,
     verified_at: "2026-09-27T05:30:00Z",
     review_due: "2027-03-31",
     version: 1,
@@ -504,6 +685,89 @@ describe("verified answers (US-802, FR-KB-030)", () => {
       screen.getAllByRole("link", { name: /Source 1 \(open the document\)/ })[0],
     ).toHaveAttribute("href", `/en/documents/${DOC}`);
     expect(screen.queryByRole("button", { name: "Add a verified answer" })).toBeNull();
+  });
+
+  it("shows the verifier's name when the API gives it (VerifiedAnswerOut.verified_by_name)", async () => {
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([
+        verified({
+          verified_by: "0192f3a4-0000-7000-8000-00000000c599",
+          verified_by_name: "Lakshmi Devi",
+        }),
+      ]);
+    renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByText(/Verified by Lakshmi Devi · on 27\/09\/2026/)).toBeVisible();
+  });
+
+  it("review confirms an answer again with If-Match; retire withdraws it (FR-KB-030)", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    const REVIEW = `POST /bff/api/v1/knowledge/verified-answers/${VERIFIED}/review`;
+    const RETIRE = `POST /bff/api/v1/knowledge/verified-answers/${VERIFIED}/retire`;
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([verified({ status: "needs_review", version: 3 })]);
+    stub.routes[REVIEW] = () => Response.json(verified({ status: "active", version: 4 }));
+    stub.routes[RETIRE] = () => Response.json(verified({ status: "retired", version: 4 }));
+    renderWithIntl(<VerifiedAnswersPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Check and confirm" }));
+    let dialog = await screen.findByRole("dialog", { name: "Confirm this verified answer" });
+    await user.click(within(dialog).getByRole("button", { name: "Confirm answer" }));
+    await waitFor(() => expect(stub.callsTo(REVIEW)).toHaveLength(1));
+    expect(stub.callsTo(REVIEW)[0]?.headers.get("if-match")).toBe('W/"3"');
+    expect(stub.callsTo(REVIEW)[0]?.headers.get("x-csrf-token")).toBe(CSRF);
+    expect(body(REVIEW)).toEqual({});
+
+    await user.click(screen.getByRole("button", { name: "Retire" }));
+    dialog = await screen.findByRole("dialog", { name: "Retire this verified answer" });
+    await user.click(within(dialog).getByRole("button", { name: "Retire answer" }));
+    await waitFor(() => expect(stub.callsTo(RETIRE)).toHaveLength(1));
+    expect(stub.callsTo(RETIRE)[0]?.headers.get("if-match")).toBe('W/"3"');
+  });
+
+  it("explains 409 verified_answer_retired", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([verified()]);
+    stub.routes[`POST /bff/api/v1/knowledge/verified-answers/${VERIFIED}/retire`] = () =>
+      problem(409, "verified_answer_retired");
+    renderWithIntl(<VerifiedAnswersPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Retire" }));
+    const dialog = await screen.findByRole("dialog", { name: "Retire this verified answer" });
+    await user.click(within(dialog).getByRole("button", { name: "Retire answer" }));
+    expect(await within(dialog).findByText("Already retired")).toBeInTheDocument();
+  });
+
+  it("review and retire are offered only to kb.verified_answer.manage, never on retired answers", async () => {
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([verified()]);
+    const { unmount } = renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByRole("heading", { name: "When do exams begin?" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retire" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check and confirm" })).toBeNull();
+    unmount();
+
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([verified({ status: "retired" })]);
+    renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByRole("heading", { name: "When do exams begin?" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retire" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check and confirm" })).toBeNull();
+  });
+
+  it("the verified-answer actions work in Telugu without missing messages", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([
+        verified({
+          status: "needs_review",
+          verified_by: "0192f3a4-0000-7000-8000-00000000c599",
+          verified_by_name: "Lakshmi Devi",
+        }),
+      ]);
+    renderWithIntl(<VerifiedAnswersPage />, "te");
+    expect(await screen.findByText(/Lakshmi Devi/)).toBeVisible();
+    expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(3);
   });
 
   it("filters by status", async () => {

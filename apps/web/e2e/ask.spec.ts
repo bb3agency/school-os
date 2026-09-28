@@ -75,10 +75,36 @@ test.describe("Ask the school: streamed answer, keyboard and axe (stand-in IdP)"
     await page.keyboard.press("Control+Enter");
     const stop = page.getByRole("button", { name: "Stop" });
     await expect(page.getByText("Writing the answer…")).toBeVisible();
+    // The unchecked preview is marked as a draft while it streams.
+    await expect(page.getByRole("group", { name: "Draft answer, not checked yet" })).toBeVisible();
+    await expectNoAxeViolations(page, "ask preview");
     await pressOn(stop, "Enter", "stop");
     await expect(page.getByText("You stopped the answer.")).toBeVisible();
     await expect(box).toBeFocused();
     await expectNoAxeViolations(page, "ask stopped");
+  });
+
+  test("a search-only fallback (final/done status) shows passages, not an answer", async ({
+    page,
+  }) => {
+    await signIn(page, "/en/ask", "clerk");
+    const box = page.getByLabel(/^Your question/);
+    await box.focus();
+    await page.keyboard.type("Dasara dates? (budget)");
+    await page.keyboard.press("Control+Enter");
+    await expect(page.getByText("The answer is ready.")).toBeVisible();
+    const answer = page.getByRole("region", { name: "Answer" });
+    await expect(answer.getByText("AI answers are not available right now")).toBeVisible();
+    await expect(answer.getByText(/AI budget for this month is used up/)).toBeVisible();
+    await expect(answer.getByRole("heading", { name: "Matching passages" })).toBeVisible();
+    await expect(
+      answer.getByRole("link", { name: "Dasara holidays circular 2026 (open the document)" }),
+    ).toBeVisible();
+    await expect(answer.getByText("Dasara holidays run")).toHaveCount(0);
+    await expect(answer.getByText("Not found in the school records you can access")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Save as verified answer" })).toHaveCount(0);
+    await expectNoAxeViolations(page, "ask search-only");
+    await expectNoHorizontalOverflow(page, "ask search-only");
   });
 
   test("search, verified answers and Telugu pages pass axe", async ({ page }) => {

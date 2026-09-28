@@ -148,13 +148,12 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
     await expect(dialog).toBeHidden();
 
     await expect(page.getByRole("heading", { name: "Added to student records" })).toBeVisible();
-    // The list still shows "Rows with errors" (now none): choose "All rows" by keyboard.
+    // After adding, the list shows every row again (FR-IMP-004): the "Rows with errors" filter
+    // from checking would now show nothing. The filter stays reachable by keyboard.
     const show = page.getByLabel("Show");
-    await expect(show).toHaveValue("error");
+    await expect(show).toHaveValue("all");
     await show.focus();
     await expectFocusRing(show, "rows filter");
-    await page.keyboard.press("ArrowUp");
-    await expect(show).toHaveValue("all");
     await checkScreen(page, "import committed", [
       "Rows added",
       /you can undo this import until/,

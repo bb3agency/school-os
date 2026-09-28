@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { z } from "zod";
+import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -13,7 +15,14 @@ import { Pager, useCursorStack } from "@/features/students/paging";
 import { useStaffCan, useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatDate } from "@/lib/format";
 import { displayText } from "./answer";
-import { ASK_PERM, useVerifiedAnswers, type VerifiedAnswer, type VerifiedStatus } from "./data";
+import {
+  ASK_KEYS,
+  ASK_PERM,
+  useKnowledgeApi,
+  useVerifiedAnswers,
+  type VerifiedAnswer,
+  type VerifiedStatus,
+} from "./data";
 import { AskTabs, SourceChip } from "./parts";
 import { VerifiedAnswerDialog } from "./VerifiedAnswerDialog";
 
@@ -24,8 +33,60 @@ const TONE: Record<VerifiedStatus, BadgeTone> = {
   retired: "neutral",
 };
 
-function VerifiedCard({ answer, mine }: { answer: VerifiedAnswer; mine: boolean }) {
+const noInput = z.object({});
+
+/**
+ * Check and confirm / Retire (FR-KB-030; `kb.verified_answer.manage`, If-Match with the version
+ * listed). Review sends an empty body: the stored text and sources are checked again against
+ * the current document versions (422 as on create). Neither is offered on a retired answer.
+ */
+function VerifiedActions({ answer }: { answer: VerifiedAnswer }) {
   const t = useTranslations("ask.verified");
+  const api = useKnowledgeApi();
+  if (answer.status === "retired") return null;
+  return (
+    <div className="flex flex-wrap gap-2" data-print="hide">
+      <ActionDialog
+        triggerLabel={t("review")}
+        triggerSize="sm"
+        triggerDescription={t("actionsFor", { question: answer.question })}
+        title={t("reviewTitle")}
+        description={t("reviewBody")}
+        confirmLabel={t("reviewConfirm")}
+        schema={noInput}
+        invalidate={[ASK_KEYS.verifiedAll]}
+        errorNamespace="ask.verified"
+        submit={() => api.reviewVerified(answer, {})}
+      />
+      <ActionDialog
+        triggerLabel={t("retire")}
+        triggerSize="sm"
+        triggerVariant="danger"
+        triggerDescription={t("actionsFor", { question: answer.question })}
+        title={t("retireTitle")}
+        description={t("retireBody")}
+        confirmLabel={t("retireConfirm")}
+        confirmVariant="danger"
+        schema={noInput}
+        invalidate={[ASK_KEYS.verifiedAll]}
+        errorNamespace="ask.verified"
+        submit={() => api.retireVerified(answer)}
+      />
+    </div>
+  );
+}
+
+function VerifiedCard({
+  answer,
+  mine,
+  canManage,
+}: {
+  answer: VerifiedAnswer;
+  mine: boolean;
+  canManage: boolean;
+}) {
+  const t = useTranslations("ask.verified");
+  const name = answer.verified_by_name?.trim();
   const verifiedOn = formatDate(answer.verified_at);
   const reviewBy = formatDate(answer.review_due);
   return (
@@ -41,7 +102,11 @@ function VerifiedCard({ answer, mine }: { answer: VerifiedAnswer; mine: boolean 
           ) : null}
           <p className="whitespace-pre-line">{displayText(answer.answer_text)}</p>
           <p className="text-sm text-ink-muted">
-            {mine ? t("verifiedByYou") : t("verifiedByOther")}
+            {mine
+              ? t("verifiedByYou")
+              : name
+                ? t("verifiedByName", { name })
+                : t("verifiedByOther")}
             {verifiedOn ? ` · ${t("verifiedOn", { date: verifiedOn })}` : ""}
             {reviewBy ? ` · ${t("reviewDueOn", { date: reviewBy })}` : ""}
           </p>
@@ -59,6 +124,7 @@ function VerifiedCard({ answer, mine }: { answer: VerifiedAnswer; mine: boolean 
               ))}
             </ol>
           </div>
+          {canManage ? <VerifiedActions answer={answer} /> : null}
         </div>
       </Card>
     </li>
@@ -67,8 +133,8 @@ function VerifiedCard({ answer, mine }: { answer: VerifiedAnswer; mine: boolean 
 
 /**
  * Verified answers (US-802, FR-KB-030): answers the school checked, newest first, with who
- * verified them and when, and a "check again" flag when a cited document changed. Adding one
- * needs `kb.verified_answer.manage`.
+ * verified them (their name in this school) and when, and a "check again" flag when a cited
+ * document changed. Adding, confirming again and retiring need `kb.verified_answer.manage`.
  */
 export function VerifiedAnswersScreen() {
   const t = useTranslations("ask.verified");
@@ -138,6 +204,7 @@ export function VerifiedAnswersScreen() {
                 key={answer.id}
                 answer={answer}
                 mine={Boolean(me && answer.verified_by === me.membership_id)}
+                canManage={can(ASK_PERM.manageVerified)}
               />
             ))}
           </ul>

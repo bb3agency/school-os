@@ -75,7 +75,9 @@ export function AnswerText({
   );
 }
 
-function openLabel(ref: SourceRef, t: ReturnType<typeof useTranslations<"ask.answer">>): string {
+type LinkedRef = Exclude<SourceRef, { kind: "count" }>;
+
+function openLabel(ref: LinkedRef, t: ReturnType<typeof useTranslations<"ask.answer">>): string {
   switch (ref.kind) {
     case "doc":
       return t("openDocument");
@@ -94,7 +96,8 @@ function openLabel(ref: SourceRef, t: ReturnType<typeof useTranslations<"ask.ans
  * One source: its title (plain text from the API), where it is (page), a link to the existing
  * screen that opens it (document, student record, finding, correction request) and, for a
  * document page, a download of exactly that version (presigned, US-801 AC4). A source that
- * is not a well-formed `sos://` URI is shown without any link.
+ * is not a well-formed `sos://` URI is shown without any link; so is a student count
+ * (`sos://count/…`, numbers only), which has no screen to open.
  */
 export function SourceChip({
   index,
@@ -114,6 +117,7 @@ export function SourceChip({
 }) {
   const t = useTranslations("ask.answer");
   const ref = parseSource(source);
+  const href = ref ? sourceHref(ref) : null;
   const name = title?.trim() || t("untitled");
   return (
     <li
@@ -125,9 +129,9 @@ export function SourceChip({
         {index !== undefined ? (
           <span className="font-semibold text-ink-muted">[{index}]</span>
         ) : null}
-        {ref ? (
+        {ref && ref.kind !== "count" && href ? (
           <Link
-            href={sourceHref(ref)}
+            href={href}
             className="font-semibold text-primary underline"
             // The visible title starts the name (WCAG 2.5.3); the rest says what opens.
             aria-label={`${name} (${openLabel(ref, t)})`}
@@ -140,6 +144,7 @@ export function SourceChip({
         {ref?.kind === "doc" && ref.page !== null ? (
           <span className="text-ink-muted">{t("page", { page: ref.page })}</span>
         ) : null}
+        {ref?.kind === "count" ? <span className="text-ink-muted">{t("countNote")}</span> : null}
         {ref === null ? <span className="text-ink-muted">{t("noLink")}</span> : null}
       </p>
       {meta ? <p className="text-xs text-ink-muted">{meta}</p> : null}
