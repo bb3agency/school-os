@@ -1,8 +1,12 @@
 // Self-hosted fonts (no external font CDN). Each file declares unicode-range subsets,
 // so browsers download only the scripts a page actually uses.
-import "@fontsource/noto-sans/400.css";
-import "@fontsource/noto-sans/600.css";
-import "@fontsource/noto-sans/700.css";
+// UI sans: Inter (variable, one file per script covers 400-700).
+import "@fontsource-variable/inter/wght.css";
+// KPI numbers and display accents (Latin only; :lang(te) uses the sans).
+import "@fontsource/instrument-serif/400.css";
+// Mono eyebrow labels and codes.
+import "@fontsource/jetbrains-mono/500.css";
+// Telugu glyphs: the fallback of every stack.
 import "@fontsource/noto-sans-telugu/400.css";
 import "@fontsource/noto-sans-telugu/600.css";
 import "@fontsource/noto-sans-telugu/700.css";
