@@ -9,8 +9,10 @@ import {
   defaultNavigate,
   keepAlive,
   loadSessionInfo,
+  SESSION_INFO_EVENT,
   signOut,
   type Navigate,
+  type SessionInfo,
   type SessionKind,
 } from "@/lib/bff/session-client";
 
@@ -111,23 +113,31 @@ export function IdleWarning({ kind, navigate }: { kind: SessionKind; navigate: N
 
   useEffect(() => {
     let cancelled = false;
+    const apply = (info: SessionInfo) => {
+      if (cancelled || !info.authenticated) return;
+      idleTimeoutRef.current = info.idle_timeout_ms;
+      const absolute = Date.parse(info.absolute_expires_at);
+      if (Number.isFinite(absolute)) absoluteRef.current = absolute;
+      setDeadline(Date.now() + info.expires_in_ms);
+    };
     loadSessionInfo(kind)
-      .then((info) => {
-        if (cancelled || !info.authenticated) return;
-        idleTimeoutRef.current = info.idle_timeout_ms;
-        const absolute = Date.parse(info.absolute_expires_at);
-        if (Number.isFinite(absolute)) absoluteRef.current = absolute;
-        setDeadline(Date.now() + info.expires_in_ms);
-      })
+      .then(apply)
       .catch(() => undefined);
     const onActivity = (event: Event) => {
       if ((event as CustomEvent<{ kind?: string }>).detail?.kind !== kind) return;
       setDeadline(Math.min(Date.now() + idleTimeoutRef.current, absoluteRef.current));
     };
+    // Fresh facts (e.g. the school changed its idle timeout): time the new value (FR-TEN-012).
+    const onInfo = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind?: string; info?: SessionInfo }>).detail;
+      if (detail?.kind === kind && detail.info) apply(detail.info);
+    };
     window.addEventListener(ACTIVITY_EVENT, onActivity);
+    window.addEventListener(SESSION_INFO_EVENT, onInfo);
     return () => {
       cancelled = true;
       window.removeEventListener(ACTIVITY_EVENT, onActivity);
+      window.removeEventListener(SESSION_INFO_EVENT, onInfo);
     };
   }, [kind]);
 

@@ -5,6 +5,7 @@ import { RefreshBusyError, SessionEndedError } from "@/server/auth/refresh";
 import type { SessionKind } from "@/server/config";
 import { logEvent } from "@/server/log";
 import type { AuthRuntime } from "@/server/runtime";
+import { applySchoolSettingsFromMe } from "@/server/session/school-settings";
 import type { Session } from "@/server/session/store";
 import {
   csrfFailed,
@@ -29,6 +30,8 @@ import { callApi } from "./upstream";
  * - Upstream 401 token_expired: one refresh and one retry. Upstream 428: problem with
  *   `step_up_url` for the UI.
  * - Streams responses (Server-Sent Events are passed through unbuffered).
+ * - A staff GET /me answer about the active school sets the session's idle timeout from
+ *   `settings.idle_timeout_minutes` (FR-TEN-012), so a changed setting applies without a reload.
  * - A GET marked passive (`x-sos-passive: 1`, background polls such as the notification bell)
  *   reads the session without sliding its idle timeout.
  * - An API page that brings its own strict Content-Security-Policy (the change-request memo)
@@ -303,6 +306,17 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
         detail: "For your security, sign in again to continue.",
         step_up_url: `${stepUpPath}?next=${encodeURIComponent(next)}`,
       });
+    }
+
+    if (upstream.ok && method === "GET" && apiPath === "/api/v1/me" && session.kind === "staff") {
+      // The school's idle timeout follows its settings (FR-TEN-012, FR-IAM-003), as for the
+      // server-rendered pages: a changed setting applies on the next /me read, without a
+      // reload. A failure keeps the session's current timeout.
+      const me: unknown = await upstream
+        .clone()
+        .json()
+        .catch(() => null);
+      await applySchoolSettingsFromMe(runtime.store, session, me).catch(() => null);
     }
 
     return new Response(upstream.body, {

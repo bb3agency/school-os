@@ -339,6 +339,43 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
   });
 });
 
+describe("BFF proxy: the school's idle timeout follows GET /me (FR-TEN-012, FR-IAM-003)", () => {
+  async function idleMs(): Promise<number> {
+    const { handleSessionInfo } = await import("@/server/auth/handlers");
+    const response = await handleSessionInfo(h.request("/bff/auth/session?kind=staff"), h.runtime);
+    return ((await response.json()) as { idle_timeout_ms: number }).idle_timeout_ms;
+  }
+  const me = (tenant: string, minutes: number) => ({
+    user_id: "0192f3a4-0000-7000-8000-0000000000d1",
+    tenant_id: tenant,
+    settings: { idle_timeout_minutes: minutes, date_format: "DD/MM/YYYY", languages: ["en"] },
+  });
+
+  it("applies the idle timeout from a GET /me answer about the active school", async () => {
+    await h.signIn("staff", clerk);
+    const before = await idleMs();
+    h.setApi(() => json(me(TENANT, 7)));
+    const response = await call("/bff/api/v1/me");
+    expect(response.status).toBe(200);
+    // The browser still gets the whole answer.
+    await expect(response.json()).resolves.toMatchObject({ tenant_id: TENANT });
+    expect(await idleMs()).toBe(7 * 60_000);
+    expect(before).not.toBe(7 * 60_000);
+  });
+
+  it("ignores answers about another school, failures and other paths", async () => {
+    await h.signIn("staff", clerk);
+    const before = await idleMs();
+    h.setApi(() => json(me("0192f3a4-0000-7000-8000-0000000000ff", 7)));
+    await call("/bff/api/v1/me");
+    h.setApi(() => json({ code: "forbidden", ...me(TENANT, 7) }, 403));
+    await call("/bff/api/v1/me");
+    h.setApi(() => json(me(TENANT, 7)));
+    await call("/bff/api/v1/users");
+    expect(await idleMs()).toBe(before);
+  });
+});
+
 describe("BFF proxy: background polls and API pages (FR-NOT-001, FR-CR-005)", () => {
   it("a passive GET reads the session without sliding the idle timeout", async () => {
     await h.signIn("staff", clerk);

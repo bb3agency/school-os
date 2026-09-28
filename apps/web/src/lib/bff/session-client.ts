@@ -60,6 +60,22 @@ export function loadSessionInfo(kind: SessionKind, options: { fresh?: boolean } 
   return pending;
 }
 
+/** Fired with fresh session facts (e.g. a new idle timeout after a settings change). */
+export const SESSION_INFO_EVENT = "sos:session-info";
+
+/**
+ * Re-read the session facts and tell the idle warning (FR-TEN-012): after the school's idle
+ * timeout changed and GET /me applied it server-side, the warning times the new value
+ * without a reload. The server keeps enforcing the timeout on every request either way.
+ */
+export async function refreshSessionInfo(kind: SessionKind): Promise<SessionInfo> {
+  const info = await loadSessionInfo(kind, { fresh: true });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SESSION_INFO_EVENT, { detail: { kind, info } }));
+  }
+  return info;
+}
+
 export function forgetSessionInfo(kind?: SessionKind): void {
   if (kind) cache.delete(kind);
   else cache.clear();

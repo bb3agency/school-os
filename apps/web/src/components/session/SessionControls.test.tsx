@@ -1,6 +1,6 @@
 import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ACTIVITY_EVENT, forgetSessionInfo } from "@/lib/bff/session-client";
+import { ACTIVITY_EVENT, forgetSessionInfo, refreshSessionInfo } from "@/lib/bff/session-client";
 import { messages, renderWithIntl } from "@/test/render";
 import { IDLE_WARNING_MS, SessionControls } from "./SessionControls";
 
@@ -176,6 +176,32 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
     expect(screen.getByRole("dialog")).toHaveAttribute("open");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(IDLE_WARNING_MS);
+    });
+    expect(navigate).toHaveBeenCalledWith("/signed-out?reason=idle");
+  });
+
+  it("times a new idle timeout as soon as the session info is refreshed (FR-TEN-012)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const navigate = vi.fn();
+    renderWithIntl(<SessionControls kind="staff" navigate={navigate} />);
+    await flush();
+    // The school lowered its timeout to 5 minutes; the server applied it (GET /me).
+    idleTimeoutMs = 5 * MINUTE;
+    expiresInMs = 5 * MINUTE;
+    await act(async () => {
+      await refreshSessionInfo("staff");
+    });
+    expect(requests.filter((r) => new URL(r.url).pathname === "/bff/auth/session")).toHaveLength(2);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * MINUTE - IDLE_WARNING_MS + 1_000);
+    });
+    expect(screen.getByRole("dialog")).toHaveAttribute("open");
+    // Activity now slides by 5 minutes, not the 15 it started with.
+    act(() => {
+      window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * MINUTE);
     });
     expect(navigate).toHaveBeenCalledWith("/signed-out?reason=idle");
   });
