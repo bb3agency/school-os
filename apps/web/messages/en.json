@@ -1909,7 +1909,8 @@
         "registering": "Saving the file…",
         "scanning": "Checking the file for viruses…",
         "ready": "File ready."
-      }
+      },
+      "dropTitle": "Choose the spreadsheet, or drag it here"
     },
     "list": {
       "title": "Imports",
@@ -1973,7 +1974,10 @@
         "reverting": "The import is being undone.",
         "reverted": "This import was undone. The records it added were removed.",
         "failed": "The file could not be read. See the reason below."
-      }
+      },
+      "undoEyebrow": "24-hour undo",
+      "hoursLeft": "{hours, plural, one {About # hour left to undo} other {About # hours left to undo}}",
+      "underAnHour": "Less than an hour left to undo"
     },
     "failure": {
       "generic": "Something went wrong with this file. Upload it again, or contact support with the time of the import.",
@@ -2006,7 +2010,9 @@
       "committed": "Rows added",
       "created": "Students created",
       "updated": "Students updated",
-      "skipped": "Rows skipped"
+      "skipped": "Rows skipped",
+      "title": "Summary",
+      "description": "Counts from the last check of this file."
     },
     "targets": {
       "ignore": "Don't import this column",
@@ -2104,7 +2110,9 @@
       },
       "emptyTitle": "No rows to show",
       "emptyBody": "Choose another option under Show.",
-      "pagesLabel": "Pages of rows"
+      "pagesLabel": "Pages of rows",
+      "errorTag": "Error",
+      "warningTag": "Warning"
     },
     "commit": {
       "open": "Add to student records",
@@ -2209,6 +2217,16 @@
         "title": "Only an added import can be undone",
         "body": "Reload the page to see this import's status."
       }
+    },
+    "steps": {
+      "label": "Import steps",
+      "step": "Step {number}",
+      "upload": "Upload",
+      "map": "Map columns",
+      "check": "Check rows",
+      "add": "Add",
+      "done": "Done:",
+      "stopped": "Stopped:"
     }
   },
   "extraction": {

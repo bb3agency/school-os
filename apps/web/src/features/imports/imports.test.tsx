@@ -208,7 +208,9 @@ describe("US-401 AC1..AC3: one import", () => {
         permissions={perms}
       />,
     );
-    const table = screen.getByRole("table", { name: im.mapping.tableLabel });
+    // One card per spreadsheet column, in a list named like the old table.
+    const table = screen.getByRole("list", { name: im.mapping.tableLabel });
+    expect(within(table).getAllByRole("listitem")).toHaveLength(importBatch().columns.length);
     const telugu = within(table).getByLabelText(
       im.mapping.targetFor.replace("{header}", "విద్యార్థి పేరు"),
     );
@@ -430,5 +432,43 @@ describe("US-401 AC1..AC3: one import", () => {
     ).toBeInTheDocument();
     expect(IMPORT_BUSY.has("validating")).toBe(true);
     expect(IMPORT_BUSY.has("validated")).toBe(false);
+  });
+});
+
+describe("NFR-A11Y-001: import steps and the 24-hour undo (US-401, FR-IMP-005)", () => {
+  const detailPerms = permissionsFrom(ALL_RECORD_PERMISSIONS);
+
+  it("marks the step the import has reached, and finished steps in words", () => {
+    stub.routes[`GET /bff/api/v1/imports/${ID.import}/rows`] = () => page([]);
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch({ status: "validated" }))}
+        attributes={ready(ATTRIBUTES)}
+        permissions={detailPerms}
+      />,
+    );
+    const steps = screen.getByRole("list", { name: im.steps.label });
+    const items = within(steps).getAllByRole("listitem");
+    expect(items).toHaveLength(4);
+    expect(items[3]).toHaveAttribute("aria-current", "step");
+    expect(items[3]).toHaveTextContent(im.steps.add);
+    expect(items[0]).toHaveTextContent(`${im.steps.done} ${im.steps.upload}`);
+    expect(items.filter((item) => item.hasAttribute("aria-current"))).toHaveLength(1);
+  });
+
+  it("shows how long is left to undo when the deadline is ahead", async () => {
+    stub.routes[`GET /bff/api/v1/imports/${ID.import}/rows`] = () => page([]);
+    const deadline = new Date(Date.now() + 5.5 * 3_600_000).toISOString();
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(
+          importBatch({ status: "committed", revert_deadline: deadline, can_revert: true }),
+        )}
+        attributes={ready(ATTRIBUTES)}
+        permissions={detailPerms}
+      />,
+    );
+    expect(await screen.findByText("About 5 hours left to undo")).toBeInTheDocument();
+    expect(screen.getByText(im.detail.undoEyebrow)).toBeInTheDocument();
   });
 });

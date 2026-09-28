@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
+import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Input";
@@ -24,12 +24,12 @@ import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import {
   CREATING_SOURCES,
-  importTone,
   type ImportBatch,
   type ImportSource,
   type ImportSummary,
   type ImportTemplate,
 } from "./types";
+import { FileDropZone, fileInputClasses, Stepper } from "./parts";
 import { extensionOf, uploadDocument, type UploadProgress } from "./upload";
 
 export const IMPORTS_KEY = ["staff", "imports"] as const;
@@ -38,9 +38,57 @@ export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 const ACCEPT =
   ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
 
+/** Workflow pills: busy = in progress, waiting for you = review, added = done. */
+const importPill: Record<ImportBatch["status"], PillVariant> = {
+  uploaded: "progress",
+  parsing: "progress",
+  parsed: "review",
+  validating: "progress",
+  validated: "review",
+  committing: "progress",
+  committed: "done",
+  reverting: "progress",
+  reverted: "tag",
+  failed: "negative",
+};
+
 export function ImportStatusBadge({ status }: { status: ImportBatch["status"] }) {
   const t = useTranslations("imports.status");
-  return <Badge tone={importTone[status]}>{t(status)}</Badge>;
+  return <Pill variant={importPill[status]}>{t(status)}</Pill>;
+}
+
+/** Upload → Map columns → Check rows → Add: the step an import has reached (4 = all done). */
+export function importStep(status: ImportBatch["status"]): number {
+  switch (status) {
+    case "uploaded":
+    case "parsing":
+    case "failed":
+      return 0;
+    case "parsed":
+      return 1;
+    case "validating":
+      return 2;
+    case "validated":
+    case "committing":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+export function ImportSteps({ current, failed = false }: { current: number; failed?: boolean }) {
+  const t = useTranslations("imports.steps");
+  return (
+    <Stepper
+      label={t("label")}
+      steps={[t("upload"), t("map"), t("check"), t("add")]}
+      current={current}
+      stepNumber={(number) => t("step", { number })}
+      doneLabel={t("done")}
+      failed={failed}
+      failedLabel={t("stopped")}
+    />
+  );
 }
 
 export function SourceName({ source }: { source: string }) {
@@ -144,18 +192,20 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
         error={problem ? t(problem) : undefined}
       >
         {({ id, describedBy, invalid }) => (
-          <input
-            ref={fileRef}
-            id={id}
-            name="file"
-            type="file"
-            accept={ACCEPT}
-            aria-describedby={describedBy}
-            aria-invalid={invalid || undefined}
-            disabled={busy}
-            onChange={() => setProblem(null)}
-            className="block w-full rounded-md border border-border-strong bg-surface p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:font-semibold file:text-primary"
-          />
+          <FileDropZone title={t("dropTitle")} disabled={busy}>
+            <input
+              ref={fileRef}
+              id={id}
+              name="file"
+              type="file"
+              accept={ACCEPT}
+              aria-describedby={describedBy}
+              aria-invalid={invalid || undefined}
+              disabled={busy}
+              onChange={() => setProblem(null)}
+              className={fileInputClasses}
+            />
+          </FileDropZone>
         )}
       </Field>
       <SelectField
@@ -178,13 +228,13 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
       <div id={statusId} role="status" aria-live="polite" className="min-h-6 space-y-2">
         {progress ? (
           <>
-            <p className="text-sm font-semibold">{stageText(progress)}</p>
+            <p className="text-sm font-medium">{stageText(progress)}</p>
             {progress.stage === "uploading" ? (
               <progress
                 max={100}
                 value={progress.percent ?? 0}
                 aria-label={t("progressLabel")}
-                className="h-2 w-full"
+                className="h-2 w-full accent-primary"
               />
             ) : null}
           </>
@@ -221,6 +271,7 @@ export function ImportsView({
   onStarted,
 }: ImportsViewProps) {
   const t = useTranslations("imports.list");
+  const tn = useTranslations("school.nav");
   const locale = useLocale() as Locale;
   const count = (value: number) => formatCount(value, locale) ?? String(value);
 
@@ -229,20 +280,27 @@ export function ImportsView({
       key: "started",
       header: t("colStarted"),
       cell: (row) => (
-        <Link href={`/imports/${row.id}`} className="font-semibold text-primary underline">
+        <Link
+          href={`/imports/${row.id}`}
+          className="font-medium text-primary underline underline-offset-4"
+        >
           {formatDateTime(row.created_at) ?? t("open")}
           <span className="sr-only">{t("openHint")}</span>
         </Link>
       ),
     },
     { key: "source", header: t("colSource"), cell: (row) => <SourceName source={row.source} /> },
-    { key: "rows", header: t("colRows"), cell: (row) => count(row.row_count) },
+    {
+      key: "rows",
+      header: t("colRows"),
+      cell: (row) => <span className="tabular-nums">{count(row.row_count)}</span>,
+    },
     {
       key: "errors",
       header: t("colErrors"),
       cell: (row) =>
         row.error_count > 0 ? (
-          <Badge tone="danger">{count(row.error_count)}</Badge>
+          <Pill variant="negative">{count(row.error_count)}</Pill>
         ) : (
           count(row.error_count)
         ),
@@ -273,28 +331,33 @@ export function ImportsView({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
-      <div className="grid gap-6 xl:grid-cols-[2fr_3fr]">
-        {canUpload ? (
-          <Card title={t("uploadTitle")} description={t("uploadDescription")}>
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+      />
+      {canUpload ? (
+        <Card title={t("uploadTitle")} description={t("uploadDescription")}>
+          <div className="space-y-6">
+            <ImportSteps current={0} />
             <UploadSpreadsheet onStarted={onStarted} />
-          </Card>
-        ) : null}
-        <Card title={t("historyTitle")} {...(canUpload ? {} : { className: "xl:col-span-2" })}>
-          <div className="space-y-3">
-            <DataTable
-              caption={t("historyTitle")}
-              captionHidden
-              columns={columns}
-              state={imports}
-              rowKey={(row) => row.id}
-              emptyTitle={t("emptyTitle")}
-              emptyBody={t("emptyBody")}
-            />
-            <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
           </div>
         </Card>
-      </div>
+      ) : null}
+      <Card title={t("historyTitle")}>
+        <div className="space-y-3">
+          <DataTable
+            caption={t("historyTitle")}
+            captionHidden
+            columns={columns}
+            state={imports}
+            rowKey={(row) => row.id}
+            emptyTitle={t("emptyTitle")}
+            emptyBody={t("emptyBody")}
+          />
+          <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
+        </div>
+      </Card>
       <Card title={t("templatesTitle")} description={t("templatesDescription")}>
         <DataTable
           caption={t("templatesTitle")}

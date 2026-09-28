@@ -2,14 +2,17 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { Card, cardClasses } from "@/components/ui/Card";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
+import { StatCard } from "@/components/ui/StatCard";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { containsFullAadhaar } from "@/features/students/aadhaar";
@@ -29,7 +32,13 @@ import { formatCount, formatDateTime } from "@/lib/format";
 import { translateOr } from "@/lib/i18n-dynamic";
 import type { Loadable } from "@/lib/loadable";
 import { checkbox } from "@/lib/validation";
-import { IMPORTS_KEY, ImportStatusBadge, SourceName } from "./ImportsScreen";
+import {
+  IMPORTS_KEY,
+  ImportStatusBadge,
+  ImportSteps,
+  importStep,
+  SourceName,
+} from "./ImportsScreen";
 import { POLL_MS, usePolledQuery } from "./poll";
 import {
   IMPORT_BUSY,
@@ -207,53 +216,43 @@ function MappingForm({ batch, attributes, label, onChecked }: MappingFormProps) 
           </Alert>
         </div>
       ) : null}
-      <div
-        role="region"
-        aria-label={t("tableLabel")}
-        tabIndex={0}
-        className="overflow-x-auto rounded-md border border-border"
-      >
-        <table className="w-full border-collapse text-left text-sm">
-          <caption className="sr-only">{t("tableLabel")}</caption>
-          <thead className="bg-surface-muted">
-            <tr>
-              <th scope="col" className="px-3 py-2 font-semibold">
-                {t("colHeader")}
-              </th>
-              <th scope="col" className="px-3 py-2 font-semibold">
-                {t("colTarget")}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {batch.columns.map((column) => {
-              const header = column.header || t("noHeader", { number: column.index + 1 });
-              return (
-                <tr key={column.index} className="align-top">
-                  <th scope="row" className="px-3 py-3 text-left font-semibold">
-                    {header}
-                    {column.suggested && column.target === null ? (
-                      <span className="mt-1 block">
-                        <Badge tone="info">{t("suggested")}</Badge>
-                      </span>
-                    ) : null}
-                  </th>
-                  <td className="px-3 py-2">
-                    <SelectField
-                      name={`col-${column.index}`}
-                      label={t("targetFor", { header })}
-                      className="[&>label]:sr-only"
-                      options={options}
-                      defaultValue={initialTarget(column)}
-                      error={errors[column.index]}
-                      disabled={pending}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="space-y-2">
+        {/* Column titles for sighted users; each select is named "Field for the column …". */}
+        <div aria-hidden="true" className="hidden gap-4 px-4 sm:grid sm:grid-cols-2">
+          <Eyebrow as="span">{t("colHeader")}</Eyebrow>
+          <Eyebrow as="span">{t("colTarget")}</Eyebrow>
+        </div>
+        <ul aria-label={t("tableLabel")} className="space-y-2">
+          {batch.columns.map((column) => {
+            const header = column.header || t("noHeader", { number: column.index + 1 });
+            return (
+              <li
+                key={column.index}
+                className={`${cardClasses({ padding: "sm", tone: "outline" })} grid gap-3 sm:grid-cols-2 sm:items-center`}
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Icon name="file" className="size-4 text-ink-muted" />
+                  <span className="font-medium break-words text-ink">{header}</span>
+                  {column.suggested && column.target === null ? (
+                    <Badge tone="info">
+                      <Icon name="sparkles" className="size-3.5" />
+                      {t("suggested")}
+                    </Badge>
+                  ) : null}
+                </div>
+                <SelectField
+                  name={`col-${column.index}`}
+                  label={t("targetFor", { header })}
+                  className="[&>label]:sr-only"
+                  options={options}
+                  defaultValue={initialTarget(column)}
+                  error={errors[column.index]}
+                  disabled={pending}
+                />
+              </li>
+            );
+          })}
+        </ul>
       </div>
       <ProblemAlert error={failure} namespace="imports.errors" />
       <div className="flex flex-wrap items-center justify-end gap-3">
@@ -269,6 +268,14 @@ function MappingForm({ batch, attributes, label, onChecked }: MappingFormProps) 
 /* ------------------------------------------------------------------ rows */
 
 const ROW_FILTERS = ["all", "error", "warning", "valid", "committed", "skipped"] as const;
+
+const rowPill: Record<ImportRow["status"], PillVariant> = {
+  valid: "positive",
+  error: "negative",
+  committed: "done",
+  skipped: "tag",
+  reverted: "tag",
+};
 type RowFilterChoice = (typeof ROW_FILTERS)[number];
 
 function rowQuery(filter: RowFilterChoice): { status?: RowStatusFilter } {
@@ -305,13 +312,20 @@ function RowsCard({
   const next = rows.status === "ready" ? rows.data.next_cursor : null;
 
   const columns: Column<ImportRow>[] = [
-    { key: "row", header: t("colRow"), cell: (row) => String(row.row_no) },
+    {
+      key: "row",
+      header: t("colRow"),
+      cell: (row) => <span className="font-mono text-xs text-ink-muted">{row.row_no}</span>,
+    },
     {
       key: "admission",
       header: t("colAdmissionNo"),
       cell: (row) =>
         row.student_id && row.status === "committed" ? (
-          <Link href={`/students/${row.student_id}`} className="text-primary underline">
+          <Link
+            href={`/students/${row.student_id}`}
+            className="text-primary underline underline-offset-4"
+          >
             <Value>{row.admission_no}</Value>
           </Link>
         ) : (
@@ -332,21 +346,7 @@ function RowsCard({
     {
       key: "status",
       header: t("colStatus"),
-      cell: (row) => (
-        <Badge
-          tone={
-            row.status === "error"
-              ? "danger"
-              : row.status === "committed"
-                ? "success"
-                : row.status === "valid"
-                  ? "info"
-                  : "neutral"
-          }
-        >
-          {t(`status.${row.status}`)}
-        </Badge>
-      ),
+      cell: (row) => <Pill variant={rowPill[row.status]}>{t(`status.${row.status}`)}</Pill>,
     },
     {
       key: "issues",
@@ -356,17 +356,28 @@ function RowsCard({
         row.errors.length === 0 && row.warnings.length === 0 ? (
           <Value>{null}</Value>
         ) : (
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {row.errors.map((issue, index) => (
-              <li key={`e${index}`} className="text-danger">
-                <span className="sr-only">{t("errorPrefix")} </span>
-                <IssueText issue={issue} label={label} />
+              <li key={`e${index}`} className="flex flex-wrap items-baseline gap-2">
+                <Pill variant="negative">
+                  <Icon name="alert" className="size-3" />
+                  {t("errorTag")}
+                  <span className="sr-only">:</span>
+                </Pill>
+                <span className="min-w-0 flex-1">
+                  <IssueText issue={issue} label={label} />
+                </span>
               </li>
             ))}
             {row.warnings.map((issue, index) => (
-              <li key={`w${index}`} className="text-warning-ink">
-                <span className="sr-only">{t("warningPrefix")} </span>
-                <IssueText issue={issue} label={label} />
+              <li key={`w${index}`} className="flex flex-wrap items-baseline gap-2">
+                <Badge tone="warning">
+                  {t("warningTag")}
+                  <span className="sr-only">:</span>
+                </Badge>
+                <span className="min-w-0 flex-1">
+                  <IssueText issue={issue} label={label} />
+                </span>
               </li>
             ))}
             {row.sensitive.length > 0 ? (
@@ -379,9 +390,10 @@ function RowsCard({
 
   return (
     <Card title={t("title")} description={t("description")}>
-      <div className="space-y-3">
-        <div className="max-w-xs" data-print="hide">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end gap-3" data-print="hide">
           <SelectField
+            className="w-full max-w-xs"
             label={t("filter")}
             value={filter}
             onChange={(event) => {
@@ -584,18 +596,77 @@ const STAT_KEYS = [
 
 function Stats({ batch }: { batch: ImportBatch }) {
   const t = useTranslations("imports.stats");
+  const tc = useTranslations("common");
   const locale = useLocale() as Locale;
   const shown = STAT_KEYS.filter((key) => batch.stats[key] !== undefined);
   if (shown.length === 0) return null;
   return (
-    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      {shown.map((key) => (
-        <div key={key} className="rounded-md border border-border p-3">
-          <dt className="text-sm text-ink-muted">{t(key)}</dt>
-          <dd className="text-xl font-semibold">{formatCount(batch.stats[key], locale)}</dd>
+    <Card title={t("title")} description={t("description")}>
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {shown.map((key) => (
+          <StatCard
+            key={key}
+            label={t(key)}
+            value={formatCount(batch.stats[key], locale) ?? null}
+            unavailableLabel={tc("notAvailable")}
+          />
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
+/** Whole hours until the undo deadline, measured on this device after the page has loaded. */
+function useHoursLeft(deadline: string | null | undefined): number | null {
+  // Client-only: the import is fetched in the browser, so this never runs on the server.
+  const [now, setNow] = useState<number | null>(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const end = deadline ? Date.parse(deadline) : Number.NaN;
+  if (now === null || Number.isNaN(end) || end <= now) return null;
+  return Math.floor((end - now) / 3_600_000);
+}
+
+/** US-401 AC3 / FR-IMP-005: the 24-hour undo, with how long is left. */
+function UndoCard({
+  batch,
+  canRun,
+  canCommit,
+}: {
+  batch: ImportBatch;
+  canRun: boolean;
+  canCommit: boolean;
+}) {
+  const t = useTranslations("imports.detail");
+  const open = batch.can_revert && Boolean(batch.revert_deadline);
+  const hours = useHoursLeft(open ? batch.revert_deadline : null);
+  return (
+    <Card
+      eyebrow={t("undoEyebrow")}
+      title={t("addedTitle")}
+      actions={
+        hours !== null ? (
+          <Pill variant="date" size="md">
+            <Icon name="clock" className="size-4" />
+            {hours >= 1 ? t("hoursLeft", { hours }) : t("underAnHour")}
+          </Pill>
+        ) : null
+      }
+    >
+      <div className="space-y-4">
+        {open ? (
+          <p>{t("revertUntil", { deadline: formatDateTime(batch.revert_deadline) ?? "" })}</p>
+        ) : (
+          <p className="text-ink-muted">{t("revertClosed")}</p>
+        )}
+        <div className="flex flex-wrap items-center gap-3" data-print="hide">
+          {batch.can_revert && canCommit ? <RevertDialog batch={batch} /> : null}
+          {canRun ? <SaveTemplateDialog batch={batch} /> : null}
         </div>
-      ))}
-    </dl>
+      </div>
+    </Card>
   );
 }
 
@@ -608,13 +679,22 @@ export interface ImportDetailViewProps {
 /** US-401 / FR-IMP-002..005: one import from mapping to check, add and (within 24 h) undo. */
 export function ImportDetailView({ batch, attributes, permissions }: ImportDetailViewProps) {
   const t = useTranslations("imports.detail");
+  const tl = useTranslations("imports.list");
+  const tn = useTranslations("school.nav");
   const label = useTargetLabel(attributes);
   const [checked, setChecked] = useState(0);
 
+  const crumbs = [
+    { label: tn("home"), href: "/" },
+    { label: tl("title"), href: "/imports" },
+  ];
   if (batch.status !== "ready") {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("loadingTitle")} />
+        <PageHeader
+          title={t("loadingTitle")}
+          breadcrumb={[...crumbs, { label: t("loadingTitle") }]}
+        />
         <LoadGate state={batch} />
       </div>
     );
@@ -624,56 +704,48 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
   const canCommit = permissions.has(PERM.importCommit);
   const editable = MAPPING_EDITABLE.has(data.status) && canRun;
 
+  const title = t("title", { date: formatDateTime(data.created_at) ?? "" });
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={t("title", { date: formatDateTime(data.created_at) ?? "" })}
+        title={title}
+        breadcrumb={[...crumbs, { label: title }]}
         badge={<ImportStatusBadge status={data.status} />}
         description={t(`next.${data.status as "parsed"}`)}
       />
-      <nav aria-label={t("relatedLabel")} data-print="hide">
-        <Link href="/imports" className="text-sm text-primary underline">
-          {t("backToList")}
-        </Link>
-      </nav>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-ink-muted">{t("source")}</dt>
-        <dd className="font-semibold">
-          <SourceName source={data.source} />
-        </dd>
-        {data.committed_at ? (
-          <>
-            <dt className="text-ink-muted">{t("committedAt")}</dt>
-            <dd>{formatDateTime(data.committed_at)}</dd>
-          </>
-        ) : null}
-        {data.reverted_at ? (
-          <>
-            <dt className="text-ink-muted">{t("revertedAt")}</dt>
-            <dd>{formatDateTime(data.reverted_at)}</dd>
-          </>
-        ) : null}
-      </dl>
+      <div className={cardClasses()}>
+        <div className="space-y-5">
+          <ImportSteps current={importStep(data.status)} failed={data.status === "failed"} />
+          <dl className="flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-4 text-sm">
+            <div>
+              <dt className="text-ink-muted">{t("source")}</dt>
+              <dd className="font-medium text-ink">
+                <SourceName source={data.source} />
+              </dd>
+            </div>
+            {data.committed_at ? (
+              <div>
+                <dt className="text-ink-muted">{t("committedAt")}</dt>
+                <dd className="font-medium text-ink">{formatDateTime(data.committed_at)}</dd>
+              </div>
+            ) : null}
+            {data.reverted_at ? (
+              <div>
+                <dt className="text-ink-muted">{t("revertedAt")}</dt>
+                <dd className="font-medium text-ink">{formatDateTime(data.reverted_at)}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </div>
+      </div>
       <StatusPanel batch={data} />
-      <Stats batch={data} />
 
       {data.status === "committed" ? (
-        <Card title={t("addedTitle")}>
-          <div className="space-y-3">
-            {data.can_revert && data.revert_deadline ? (
-              <p className="text-sm">
-                {t("revertUntil", { deadline: formatDateTime(data.revert_deadline) ?? "" })}
-              </p>
-            ) : (
-              <p className="text-sm">{t("revertClosed")}</p>
-            )}
-            <div className="flex flex-wrap gap-3" data-print="hide">
-              {data.can_revert && canCommit ? <RevertDialog batch={data} /> : null}
-              {canRun ? <SaveTemplateDialog batch={data} /> : null}
-            </div>
-          </div>
-        </Card>
+        <UndoCard batch={data} canRun={canRun} canCommit={canCommit} />
       ) : null}
+
+      <Stats batch={data} />
 
       {data.status === "validated" ? (
         <Card title={t("readyTitle")} description={t("readyDescription")}>
