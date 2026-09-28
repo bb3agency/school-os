@@ -123,6 +123,22 @@ function Actions({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap gap-2">{children}</div>;
 }
 
+/**
+ * Archive, or say why it is not offered: a row with students enrolled (`in_use` from the API)
+ * cannot be archived (409 `structure_in_use`), so the button would only lead to an error.
+ */
+function ArchiveOrInUse(props: {
+  kind: StructureKind;
+  row: { id: string; version: number; in_use?: boolean | null };
+  name: string;
+}) {
+  const t = useTranslations("academicStructure.archive");
+  if (props.row.in_use) {
+    return <span className="self-center text-sm text-ink-muted">{t("inUse")}</span>;
+  }
+  return <ArchiveDialog kind={props.kind} row={props.row} name={props.name} archive />;
+}
+
 /* ------------------------------------------------------------------------ academic years */
 
 function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }) {
@@ -177,7 +193,7 @@ function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }
                     <span className="sr-only">{t("years.promoteFor", { label: row.label })}</span>
                   </ButtonLink>
                   {row.is_current ? null : (
-                    <ArchiveDialog kind="year" row={row} name={row.label} archive />
+                    <ArchiveOrInUse kind="year" row={row} name={row.label} />
                   )}
                 </Actions>
               ),
@@ -428,7 +444,7 @@ function ClassesCard({
               ) : (
                 <Actions>
                   <EditClassDialog schoolClass={row} />
-                  <ArchiveDialog kind="class" row={row} name={classLabel(row, locale)} archive />
+                  <ArchiveOrInUse kind="class" row={row} name={classLabel(row, locale)} />
                 </Actions>
               ),
           },
@@ -614,15 +630,22 @@ function DefaultClassesDialog() {
 
 type StaffList = Loadable<readonly StaffMember[]>;
 
-/** "Name (Teacher, Class teacher)": built-in role names from the messages, else the key. */
+/**
+ * "Name (Teacher, Class teacher)": built-in role names from the messages, else the key. A
+ * member who has not signed in yet (`status` invited) is marked so.
+ */
 function useStaffLabel(): (member: StaffMember) => string {
   const tr = useTranslations("school.users.roles");
+  const t = useTranslations("academicStructure.sections");
   const locale = useLocale() as Locale;
   const loose = tr as unknown as ((key: string) => string) & { has: (key: string) => boolean };
   return (member) => {
-    if (member.roles.length === 0) return member.display_name;
     const roles = member.roles.map((key) => (loose.has(key) ? loose(key) : key));
-    return `${member.display_name} (${formatList(roles, locale)})`;
+    const name =
+      roles.length === 0
+        ? member.display_name
+        : `${member.display_name} (${formatList(roles, locale)})`;
+    return member.status === "invited" ? t("teacherInvited", { name }) : name;
   };
 }
 
@@ -632,7 +655,14 @@ function TeacherCell({ membershipId, staff }: { membershipId: string | null; sta
   if (!membershipId) return <Value>{null}</Value>;
   if (staff.status !== "ready") return <>{t("teacherAssigned")}</>;
   const member = staff.data.find((row) => row.membership_id === membershipId);
-  return <>{member ? member.display_name : t("teacherNotListed")}</>;
+  if (!member) return <>{t("teacherNotListed")}</>;
+  return (
+    <>
+      {member.status === "invited"
+        ? t("teacherInvited", { name: member.display_name })
+        : member.display_name}
+    </>
+  );
 }
 
 /**
@@ -759,7 +789,7 @@ function SectionsCard({
                     className={parentName(row) ?? ""}
                     staff={staff}
                   />
-                  <ArchiveDialog kind="section" row={row} name={name} archive />
+                  <ArchiveOrInUse kind="section" row={row} name={name} />
                 </Actions>
               );
             },

@@ -47,7 +47,8 @@
       "copied": "Copied to the clipboard.",
       "copyFailed": "Could not copy. Select the key and copy it by hand.",
       "stored": "I have stored this key safely"
-    }
+    },
+    "dateHintFormat": "Use {format}, for example {example}."
   },
   "language": {
     "label": "Language",
@@ -137,7 +138,8 @@
       "users": "Users and roles",
       "billing": "Plan and billing",
       "audit": "Audit log",
-      "support": "Support"
+      "support": "Support",
+      "promotions": "Promotions"
     },
     "home": {
       "title": "Home",
@@ -303,7 +305,8 @@
           "language": "Language",
           "languageHint": "The language SchoolOS uses for this person.",
           "submit": "Save details"
-        }
+        },
+        "profileShared": "This person also works at another school on SchoolOS, so their name, email and language are shared and can't be changed here. Ask them to update their profile, or contact SchoolOS support."
       },
       "errors": {
         "role_not_grantable": {
@@ -361,7 +364,9 @@
         "rolesLegend": "Roles for this person",
         "scopeTitle": "Classes and sections",
         "submit": "Send invitation"
-      }
+      },
+      "youBadge": "You",
+      "sharedBadge": "Also at another school"
     },
     "billing": {
       "title": "Plan and billing",
@@ -1547,8 +1552,8 @@
     "aadhaarNotAllowed": "This looks like a full Aadhaar number. SchoolOS never stores it: enter only the last 4 digits, in the Aadhaar last 4 digits field.",
     "aadhaarWarningTitle": "No Aadhaar numbers",
     "aadhaarWarningBody": "Don't enter full Aadhaar numbers anywhere. Only the last 4 digits are kept, in their own field.",
-    "dateHint": "Use DD/MM/YYYY, for example 14/03/2012.",
-    "dateInvalid": "Enter a real date as DD/MM/YYYY, for example 14/03/2012.",
+    "dateHint": "Use {format}, for example {example}.",
+    "dateInvalid": "Enter a real date as {format}, for example {example}.",
     "status": {
       "provisional": "Provisional",
       "active": "Studying",
@@ -1625,7 +1630,9 @@
       "colClassSection": "Class and section",
       "colStatus": "Status",
       "unnamed": "Name not recorded",
-      "matchedOn": "Found by: {field}"
+      "matchedOn": "Found by: {field}",
+      "filterYear": "Academic year",
+      "currentYear": "Current year"
     },
     "create": {
       "title": "Add a student",
@@ -1786,7 +1793,7 @@
       "sectionHint": "Sections of the current academic year.",
       "rollNo": "Roll number",
       "startedOn": "Start date",
-      "startedOnHint": "Use DD/MM/YYYY. Leave it empty for today.",
+      "startedOnHint": "Use {format}. Leave it empty for today.",
       "enrolSubmit": "Save class and section",
       "reload": "Reload the latest details",
       "reloaded": "The latest details are loaded. Check them, then save again.",
@@ -1845,7 +1852,7 @@
         "transferred": "The student moved to another school or section."
       },
       "endedOn": "End date",
-      "endedOnHint": "Use DD/MM/YYYY. Leave it empty for today.",
+      "endedOnHint": "Use {format}. Leave it empty for today.",
       "endNote": "The record status does not change. If the student left the school, also use “Change status”.",
       "endSubmit": "End enrolment"
     }
@@ -2729,7 +2736,7 @@
       "chooseField": "Choose the field to correct.",
       "chooseSource": "Choose the record this correction is for.",
       "valueRequired": "Enter the correct value.",
-      "invalidDate": "Enter a real date as DD/MM/YYYY, for example 01/06/2012.",
+      "invalidDate": "Enter a real date as {format}, for example {example}.",
       "dateInFuture": "The date can't be in the future.",
       "noAadhaar": "This looks like a full Aadhaar number. Remove it; use only the last 4 digits if you must refer to it.",
       "reasonRequired": "Say why the record should change.",
@@ -2748,7 +2755,7 @@
       "too_long": "This is too long. Shorten it and try again.",
       "invalid_format": "This value is not in the right format. Check it against the document.",
       "not_allowed": "Choose one of the allowed values.",
-      "invalid_date": "Enter a real date as DD/MM/YYYY.",
+      "invalid_date": "Enter a real date as {format}.",
       "date_too_early": "This date is too early to be right. Check it against the document.",
       "date_in_future": "The date can't be in the future.",
       "source_not_allowed": "This field can't be recorded for that source. Choose another source.",
@@ -3258,7 +3265,8 @@
       "teacherNotListed": "Someone not in the staff list",
       "teacherAssigned": "Assigned",
       "archivedYearOption": "{label} (archived)",
-      "archivedYearNote": "This academic year is archived. Unarchive it to add sections to it."
+      "archivedYearNote": "This academic year is archived. Unarchive it to add sections to it.",
+      "teacherInvited": "{name} (invited, has not signed in yet)"
     },
     "errors": {
       "academic_year_overlap": {
@@ -3357,7 +3365,8 @@
         "describe": "Archive section {name}",
         "unarchiveTitle": "Unarchive section {name}?",
         "unarchiveDescribe": "Unarchive section {name}"
-      }
+      },
+      "inUse": "Students are enrolled, so it can't be archived"
     },
     "promotions": {
       "titlePlain": "Promote students",
@@ -3457,7 +3466,11 @@
       "commitConfirm": "Promote students",
       "commitHint": "You can undo a promotion within 24 hours.",
       "commitNeedsPreview": "Preview again to promote with the plan as it is now.",
-      "cannotCommit": "Fix the problems above and preview again before promoting."
+      "cannotCommit": "Fix the problems above and preview again before promoting.",
+      "byName": "by {name}",
+      "indexTitle": "Academic years",
+      "indexDescription": "At the end of a year, move its students to the next class. Choose the year whose students you are promoting; you see a preview before anything changes.",
+      "indexColAction": "Promotion"
     }
   },
   "schoolSettings": {

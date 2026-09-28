@@ -286,10 +286,18 @@ class PromotionRunOut(_Out):
     counts: PromotionCounts
     plan_fingerprint: str
     committed_by: uuid.UUID | None
+    committed_by_name: str | None = Field(
+        default=None,
+        description="Display name of who committed it (no contact details); null when they "
+        "are no longer a member of this school.",
+    )
     committed_at: dt.datetime
     undo_until: dt.datetime
     can_undo: bool = Field(description="Committed and still within 24 hours of the commit.")
     undone_by: uuid.UUID | None
+    undone_by_name: str | None = Field(
+        default=None, description="Display name of who undid it (no contact details)."
+    )
     undone_at: dt.datetime | None
     version: int
 
@@ -347,6 +355,7 @@ class SearchFilters(_In):
     class_id: uuid.UUID | None = None
     status: StudentStatus | None = None
     admission_no: str | None = None
+    academic_year_id: uuid.UUID | None = None
 
 
 class StudentSearchIn(_In):
@@ -364,6 +373,11 @@ class StudentSearchIn(_In):
     class_id: uuid.UUID | None = None
     status: StudentStatus | None = None
     admission_no: str | None = Field(default=None, max_length=32)
+    academic_year_id: uuid.UUID | None = Field(
+        default=None,
+        description="Academic year whose enrolments are listed (class, section and "
+        "scope); the current year when left out. Unknown years answer 422.",
+    )
     limit: int = Field(
         default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="Page size (max 200)."
     )
@@ -378,6 +392,7 @@ class StudentSearchIn(_In):
             class_id=self.class_id,
             status=self.status,
             admission_no=self.admission_no,
+            academic_year_id=self.academic_year_id,
         )
 
 

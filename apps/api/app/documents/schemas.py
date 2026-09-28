@@ -215,6 +215,11 @@ class DocumentOut(_Out):
 
 class DocumentDetail(DocumentOut):
     versions: list[VersionOut]
+    allowed_doc_types: list[DocType] = Field(
+        default_factory=list,
+        description="Document types that suit this document's purpose; PATCH answers 422 "
+        "``doc_type_not_allowed_for_purpose`` for any other (FR-DOC-005).",
+    )
 
 
 class DownloadUrlOut(_Out):

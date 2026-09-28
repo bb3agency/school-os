@@ -66,6 +66,7 @@ from app.core.errors import (
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.core.textnorm import comparison_key
+from app.identity import service as identity
 from app.ops import service as ops
 from app.students import crypto
 from app.students import repository as repo
@@ -239,8 +240,17 @@ class _Structure:
         return f"{code}-{section.name}"
 
 
-def _structure(session: Session) -> _Structure:
-    year = tenancy.get_current_academic_year(session)
+def _structure(session: Session, year_id: uuid.UUID | None = None) -> _Structure:
+    """The current academic year's structure, or ``year_id``'s (422 ``academic_year_id``
+    ``not_found`` when this school has no such year)."""
+    year: Any
+    if year_id is None:
+        year = tenancy.get_current_academic_year(session)
+    else:
+        try:
+            year = tenancy.get_academic_year(session, year_id)
+        except NotFound:
+            raise ValidationFailed([error("academic_year_id", "not_found")]) from None
     sections = tenancy.list_sections(session, academic_year_id=year.id) if year else []
     classes = tenancy.list_classes(session)
     return _Structure(
@@ -1328,12 +1338,14 @@ def search(
 ) -> Page[StudentSummary]:
     """Scoped, ranked search by partial name (EN/TE), admission number, class/section tokens
     (``9b``, ``IX-B``) and parent names (FR-STU-010, US-302). Scope: current-year enrolments in
-    the caller's sections for scoped holders (US-302 AC2)."""
+    the caller's sections for scoped holders (US-302 AC2). ``filters.academic_year_id`` picks
+    another year: its enrolments give the class and section, and scoped holders reach that
+    year's sections exactly as they reach the current year's."""
     if filters.query and is_full_aadhaar(filters.query):
         raise ValidationFailed([aadhaar_error("query")], detail=AADHAAR_DETAIL)
     cfg = search_config()
     offset = _offset(cursor, cfg.max_offset)
-    structure = _structure(session)
+    structure = _structure(session, filters.academic_year_id)
     allowed = _allowed_sections(ctx, READ, structure)
     parsed = parse_query(filters.query or "")
     sections: frozenset[uuid.UUID] | None = None
@@ -1536,6 +1548,26 @@ def active_enrolments(
             )
         )
     return out
+
+
+@dataclass(frozen=True, slots=True)
+class StructureInUse:
+    """Academic years, classes and sections with at least one active enrolment."""
+
+    year_ids: frozenset[uuid.UUID]
+    class_ids: frozenset[uuid.UUID]
+    section_ids: frozenset[uuid.UUID]
+
+
+def structure_in_use(session: Session) -> StructureInUse:
+    """Which structure rows have active enrolments (the archive guard's rule, FR-TEN-010), for
+    the structure screens. Yes/no only: no counts, names or student ids."""
+    placements = repo.active_placements(session)
+    sections = frozenset(s for _, s in placements)
+    classes = frozenset(s.class_id for s in tenancy.list_sections(session) if s.id in sections)
+    return StructureInUse(
+        year_ids=frozenset(y for y, _ in placements), class_ids=classes, section_ids=sections
+    )
 
 
 def student_ids_for_import_batch(session: Session, batch_id: uuid.UUID) -> list[uuid.UUID]:
@@ -2292,7 +2324,16 @@ def preview_promotion(
     return _preview_out(_promotion_plan(session, year_id, data, lock=False))
 
 
-def _run_out(run: Any, now: dt.datetime) -> PromotionRunOut:
+def _run_names(session: Session, runs: Sequence[Any]) -> dict[uuid.UUID, str]:
+    """Display names of who committed/undid ``runs`` (members of this school only)."""
+    users = {u for r in runs for u in (r.committed_by, r.undone_by) if u is not None}
+    return {u: ref[1] for u, ref in identity.members_for_users(session, users).items()}
+
+
+def _run_out(
+    run: Any, now: dt.datetime, names: Mapping[uuid.UUID, str] | None = None
+) -> PromotionRunOut:
+    names = names or {}
     undo_until = run.committed_at + UNDO_WINDOW
     return PromotionRunOut(
         id=run.id,
@@ -2307,10 +2348,12 @@ def _run_out(run: Any, now: dt.datetime) -> PromotionRunOut:
         ),
         plan_fingerprint=run.plan_fingerprint,
         committed_by=run.committed_by,
+        committed_by_name=names.get(run.committed_by) if run.committed_by else None,
         committed_at=run.committed_at,
         undo_until=undo_until,
         can_undo=run.status == "committed" and now < undo_until,
         undone_by=run.undone_by,
+        undone_by_name=names.get(run.undone_by) if run.undone_by else None,
         undone_at=run.undone_at,
         version=run.version,
     )
@@ -2322,7 +2365,9 @@ def list_promotions(
     """Promotions out of ``year_id``, newest first, with whether each can still be undone."""
     year = tenancy.get_academic_year(session, year_id)
     now = repo.now(session)
-    return [_run_out(r, now) for r in repo.promotions_from(session, year.id)]
+    runs = repo.promotions_from(session, year.id)
+    names = _run_names(session, runs)
+    return [_run_out(r, now, names) for r in runs]
 
 
 def commit_promotion(
@@ -2453,7 +2498,7 @@ def commit_promotion(
         },
     )
     log.info("promotion.committed", resource_type="promotion", resource_id=run.id)
-    return _run_out(run, repo.now(session))
+    return _run_out(run, repo.now(session), _run_names(session, [run]))
 
 
 def _promotion_has_dependents() -> Conflict:
@@ -2534,4 +2579,4 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
         },
     )
     log.info("promotion.undone", resource_type="promotion", resource_id=run.id)
-    return _run_out(run, repo.now(session))
+    return _run_out(run, repo.now(session), _run_names(session, [run]))

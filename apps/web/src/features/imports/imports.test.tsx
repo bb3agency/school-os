@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { permissionsFrom } from "@/features/students/me";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
@@ -308,6 +309,48 @@ describe("US-401 AC1..AC3: one import", () => {
     const call = stub.callsTo(`POST /bff/api/v1/imports/${ID.import}/commit`)[0];
     expect(JSON.parse(call?.body ?? "{}")).toEqual({ skip_error_rows: true });
     expect(call?.headers.get("idempotency-key")).toBeTruthy();
+  });
+
+  it("after adding, shows every row again (the error filter from before is reset)", async () => {
+    const validated = importBatch({
+      status: "validated",
+      error_count: 1,
+      stats: { rows: 3, valid: 2, errors: 1, warnings: 0, create: 2, update: 0 },
+      can_commit: true,
+    });
+    const committed = importBatch({
+      status: "committed",
+      error_count: 1,
+      committed_at: NOW,
+      revert_deadline: NOW,
+      can_revert: false,
+      version: validated.version + 1,
+    });
+    stub.routes[`GET /bff/api/v1/imports/${ID.import}/rows`] = () => page([]);
+    function Harness() {
+      const [batch, setBatch] = useState(validated);
+      return (
+        <>
+          <button type="button" onClick={() => setBatch(committed)}>
+            finish
+          </button>
+          <ImportDetailView
+            batch={ready(batch)}
+            attributes={ready(ATTRIBUTES)}
+            permissions={perms}
+          />
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    renderWithIntl(<Harness />);
+    const rowCalls = () => stub.callsTo(`GET /bff/api/v1/imports/${ID.import}/rows`);
+    await waitFor(() => expect(rowCalls()).toHaveLength(1));
+    expect(rowCalls()[0]?.url.searchParams.get("status")).toBe("error");
+
+    await user.click(screen.getByRole("button", { name: "finish" }));
+    await waitFor(() => expect(rowCalls().length).toBeGreaterThan(1));
+    expect(rowCalls().at(-1)?.url.searchParams.has("status")).toBe(false);
   });
 
   it("does not offer adding without import.commit", () => {

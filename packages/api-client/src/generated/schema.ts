@@ -3586,6 +3586,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * In Use
+             * @description Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.
+             */
+            in_use?: boolean | null;
             /** Is Current */
             is_current: boolean;
             /** Label */
@@ -4364,6 +4369,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * In Use
+             * @description Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.
+             */
+            in_use?: boolean | null;
             /** Sort Order */
             sort_order: number;
             /**
@@ -4579,6 +4589,11 @@ export interface components {
             academic_year_id: string | null;
             /** Acl */
             acl: components["schemas"]["AclEntryOut"][];
+            /**
+             * Allowed Doc Types
+             * @description Document types that suit this document's purpose; PATCH answers 422 ``doc_type_not_allowed_for_purpose`` for any other (FR-DOC-005).
+             */
+            allowed_doc_types?: ("circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other" | "evidence" | "import_file")[];
             /**
              * Created At
              * Format: date-time
@@ -6656,6 +6671,11 @@ export interface components {
             committed_at: string;
             /** Committed By */
             committed_by: string | null;
+            /**
+             * Committed By Name
+             * @description Display name of who committed it (no contact details); null when they are no longer a member of this school.
+             */
+            committed_by_name?: string | null;
             counts: components["schemas"]["PromotionCounts"];
             /**
              * From Academic Year Id
@@ -6688,6 +6708,11 @@ export interface components {
             undone_at: string | null;
             /** Undone By */
             undone_by: string | null;
+            /**
+             * Undone By Name
+             * @description Display name of who undid it (no contact details).
+             */
+            undone_by_name?: string | null;
             /** Version */
             version: number;
         };
@@ -6903,6 +6928,12 @@ export interface components {
             name_en: string;
             /** Name Te */
             name_te: string;
+            /**
+             * Needs Mfa
+             * @description Members holding this role must sign in with two-step verification (roles.yaml ``mfa_required``; FR-IAM-002, ADR-0018).
+             * @default false
+             */
+            needs_mfa: boolean;
             /** Permissions */
             permissions: string[];
             /**
@@ -7182,6 +7213,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * In Use
+             * @description Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.
+             */
+            in_use?: boolean | null;
             /** Name */
             name: string;
             /**
@@ -7251,6 +7287,12 @@ export interface components {
             membership_id: string;
             /** Roles */
             roles: string[];
+            /**
+             * Status
+             * @description ``invited`` until the person first signs in (ADR-0019).
+             * @enum {string}
+             */
+            status: "active" | "invited";
         };
         /**
          * StudentCreate
@@ -7366,6 +7408,11 @@ export interface components {
          *     size and cursor as ``GET /students``.
          */
         StudentSearchIn: {
+            /**
+             * Academic Year Id
+             * @description Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422.
+             */
+            academic_year_id?: string | null;
             /** Admission No */
             admission_no?: string | null;
             /** Class Id */
@@ -8122,6 +8169,12 @@ export interface components {
              * @enum {string}
              */
             preferred_language: "en" | "te";
+            /**
+             * Profile Shared
+             * @description The person also belongs to another school on SchoolOS, so their name, email and language are shared and cannot be edited here (PATCH answers 409 ``profile_shared``, ADR-0028). The other schools are never named.
+             * @default false
+             */
+            profile_shared: boolean;
             /** Roles */
             roles: string[];
             /** Scopes */
@@ -13895,6 +13948,8 @@ export interface operations {
     search_students_api_v1_students_get: {
         parameters: {
             query?: {
+                /** @description Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422. */
+                academic_year_id?: string | null;
                 /**
                  * @deprecated
                  * @description Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008). Stops working after the Sunset date, Thu, 31 Dec 2026 23:59:59 GMT.

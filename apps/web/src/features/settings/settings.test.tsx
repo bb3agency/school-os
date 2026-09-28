@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SchoolSettingsPage from "@/app/[locale]/(school)/settings/school/page";
+import { SESSION_INFO_EVENT } from "@/lib/bff/session-client";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me } from "@/test/school-fixtures";
@@ -100,6 +101,38 @@ describe("school settings (FR-TEN-012)", () => {
       date_format: "YYYY-MM-DD",
     });
     expect(await screen.findByText(en.form.saved)).toBeInTheDocument();
+  });
+
+  it("after saving, re-reads /me and the session info so a new idle timeout applies at once", async () => {
+    school([MANAGE]);
+    stub.routes["PATCH /bff/api/v1/tenant"] = () =>
+      Response.json({ ...TENANT, settings: { ...SETTINGS, idle_timeout_minutes: 5 }, version: 8 });
+    const seen: string[] = [];
+    const onInfo = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind: string }>).detail;
+      seen.push(detail.kind);
+    };
+    window.addEventListener(SESSION_INFO_EVENT, onInfo);
+    try {
+      renderWithIntl(<SchoolSettingsScreen />);
+      const idle = await screen.findByLabelText(en.form.idleField);
+      await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/me")).toHaveLength(1));
+      const sessionReads = stub.callsTo("GET /bff/auth/session").length;
+      await userEvent.clear(idle);
+      await userEvent.type(idle, "5");
+      await userEvent.click(screen.getByRole("button", { name: en.form.save }));
+      expect(await screen.findByText(en.form.saved)).toBeInTheDocument();
+      // /me goes through the BFF, which applies the school's timeout to the session...
+      await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/me")).toHaveLength(2));
+      // ...then the session facts are read again (not from the page's cache) for the warning.
+      await waitFor(() => expect(seen).toEqual(["staff"]));
+      const me = stub.callsTo("GET /bff/api/v1/me").at(-1);
+      const info = stub.callsTo("GET /bff/auth/session").at(-1);
+      expect(stub.callsTo("GET /bff/auth/session").length).toBeGreaterThan(sessionReads);
+      expect(stub.calls.indexOf(info!)).toBeGreaterThan(stub.calls.indexOf(me!));
+    } finally {
+      window.removeEventListener(SESSION_INFO_EVENT, onInfo);
+    }
   });
 
   it("sends nothing when nothing changed, and checks values before sending", async () => {

@@ -705,6 +705,9 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
 
       {HAS_ROWS.has(data.status) ? (
         <RowsCard
+          // A new status (e.g. committed) starts again from its own filter, so rows that were
+          // hidden by "errors only" before adding show up.
+          key={data.status}
           batch={data}
           label={label}
           initialFilter={data.status === "validated" && data.error_count > 0 ? "error" : "all"}

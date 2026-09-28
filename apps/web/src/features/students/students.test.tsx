@@ -22,6 +22,7 @@ import {
   student,
   summary,
 } from "@/test/records-fixtures";
+import { setSchoolDateFormat } from "@/lib/date-format";
 import { messages, renderWithIntl } from "@/test/render";
 import { aadhaarDisplay, containsFullAadhaar, verhoeffValid } from "./aadhaar";
 import { CreateStudentForm, createBody, createStudentSchema } from "./CreateStudent";
@@ -179,6 +180,62 @@ describe("US-302 / FR-STU-010: find students", () => {
   });
 });
 
+describe("FR-STU-010 / FR-TEN-010: another year's class lists; archived sections are not offered", () => {
+  const OLD_YEAR = {
+    ...YEAR,
+    id: "0192f3a4-0000-7000-8000-00000000c4a1",
+    label: "2025-26",
+    is_current: false,
+  };
+  const OLD_SECTION = {
+    ...SECTION,
+    id: "0192f3a4-0000-7000-8000-00000000c4a3",
+    academic_year_id: OLD_YEAR.id,
+    name: "C",
+  };
+  const ARCHIVED_SECTION = {
+    ...SECTION,
+    id: "0192f3a4-0000-7000-8000-00000000c4a4",
+    name: "Z",
+    archived_at: "2026-09-01T05:00:00Z",
+  };
+  const GONE_CLASS_SECTION = {
+    ...SECTION,
+    id: "0192f3a4-0000-7000-8000-00000000c4a5",
+    class_id: "0192f3a4-0000-7000-8000-00000000c4a6",
+    name: "Q",
+  };
+
+  function sectionNames(): string[] {
+    const select = screen.getByLabelText(sm.list.filterSection);
+    return within(select)
+      .getAllByRole("option")
+      .map((option) => option.textContent ?? "")
+      .filter((label) => label !== messages.en.common.all);
+  }
+
+  it("lists another academic year with academic_year_id and offers that year's sections", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["student.read_basic"]));
+    stub.routes["GET /bff/api/v1/academic-years"] = () => page([YEAR, OLD_YEAR]);
+    stub.routes["GET /bff/api/v1/sections"] = () =>
+      page([SECTION, OLD_SECTION, ARCHIVED_SECTION, GONE_CLASS_SECTION]);
+    stub.routes["POST /bff/api/v1/students/search"] = () => page([]);
+    const user = userEvent.setup();
+    renderWithIntl(<StudentsScreen />);
+    await screen.findByText(sm.list.emptyTitle);
+    await waitFor(() => expect(sectionNames()).toEqual(["Class 9 · A"]));
+
+    await user.selectOptions(screen.getByLabelText(sm.list.filterYear), "2025-26");
+    expect(sectionNames()).toEqual(["Class 9 · C"]);
+    await user.click(screen.getByRole("button", { name: messages.en.common.search }));
+    await waitFor(() =>
+      expect(
+        JSON.parse(stub.callsTo("POST /bff/api/v1/students/search").at(-1)?.body ?? "{}"),
+      ).toEqual({ academic_year_id: OLD_YEAR.id, limit: PAGE_SIZE }),
+    );
+  });
+});
+
 describe("US-301 / US-303: add a student", () => {
   it("builds one value per filled field, all from the chosen source", () => {
     const parsed = createStudentSchema.parse({
@@ -217,6 +274,30 @@ describe("US-301 / US-303: add a student", () => {
     expect(stub.callsTo("POST /bff/api/v1/students")).toHaveLength(0);
   });
 
+  it("the date of birth follows the school's date format (FR-TEN-012)", async () => {
+    setSchoolDateFormat("DD-MM-YYYY");
+    try {
+      stub.routes["POST /bff/api/v1/students"] = () => Response.json(student(), { status: 201 });
+      const user = userEvent.setup();
+      renderWithIntl(<CreateStudentForm permissions={permissionsFrom(ALL_RECORD_PERMISSIONS)} />);
+      const dob = screen.getByLabelText(sm.create.dob);
+      expect(dob).toHaveAttribute("placeholder", "DD-MM-YYYY");
+      expect(dob).toHaveAccessibleDescription(
+        expect.stringContaining("Use DD-MM-YYYY, for example 14-03-2012."),
+      );
+      await user.type(screen.getByLabelText(sm.create.fullName), "Venkata Sai K.");
+      await user.type(dob, "14-03-2012");
+      await user.click(screen.getByRole("button", { name: sm.create.submit }));
+      await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/students")).toHaveLength(1));
+      const sent = JSON.parse(stub.callsTo("POST /bff/api/v1/students")[0]?.body ?? "{}") as {
+        values: { attribute_key: string; value: string }[];
+      };
+      expect(sent.values.find((value) => value.attribute_key === "dob")?.value).toBe("2012-03-14");
+    } finally {
+      setSchoolDateFormat(null);
+    }
+  });
+
   it("posts the student with an Idempotency-Key and opens it", async () => {
     stub.routes["POST /bff/api/v1/students"] = () => Response.json(student(), { status: 201 });
     const created = vi.fn();
@@ -235,7 +316,11 @@ describe("US-301 / US-303: add a student", () => {
     await user.type(screen.getByLabelText(sm.create.fullName), "Venkata Sai K.");
     await user.type(screen.getByLabelText(sm.create.dob), "31/02/2012");
     await user.click(screen.getByRole("button", { name: sm.create.submit }));
-    expect(await screen.findByText(sm.dateInvalid)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        sm.dateInvalid.replace("{format}", "DD/MM/YYYY").replace("{example}", "14/03/2012"),
+      ),
+    ).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText(sm.create.dob));
     await user.type(screen.getByLabelText(sm.create.dob), "14/03/2012");

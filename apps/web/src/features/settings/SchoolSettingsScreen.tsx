@@ -15,7 +15,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
 import { known, schoolTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
-import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
+import { refreshSessionInfo } from "@/lib/bff/session-client";
+import { STAFF_ME_KEY, useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatInr } from "@/lib/format";
 import { formList, useApiForm } from "@/lib/forms";
 import type { Locale } from "@/i18n/routing";
@@ -216,6 +217,22 @@ function SettingsForm({
   const aiId = useId();
   const [reloading, setReloading] = useState(false);
   const settings = tenant.settings;
+  const queryClient = useQueryClient();
+
+  /**
+   * A saved setting applies without a reload (FR-TEN-012): GET /me through the BFF sets the
+   * session's idle timeout from the school's settings (and the date format for the screens),
+   * then the idle warning re-reads the session facts. The server enforces the timeout on
+   * every request whether or not this runs.
+   */
+  const applyToSession = async () => {
+    try {
+      await queryClient.invalidateQueries({ queryKey: STAFF_ME_KEY });
+      await refreshSessionInfo("staff");
+    } catch {
+      // The next page load applies it anyway.
+    }
+  };
 
   const form = useApiForm({
     schema: settingsSchema,
@@ -232,7 +249,10 @@ function SettingsForm({
         }),
       );
     },
-    onSuccess: (result) => setOutcome(result === null ? "unchanged" : "saved"),
+    onSuccess: (result) => {
+      setOutcome(result === null ? "unchanged" : "saved");
+      if (result !== null) void applyToSession();
+    },
   });
 
   const stale = form.error instanceof ApiError && form.error.status === 412;

@@ -441,16 +441,19 @@ const TEACHER_B = {
   membership_id: "0192f3a4-0000-7000-8000-0000000000b2",
   display_name: "Bhavani Teacher",
   roles: ["class_teacher"],
+  status: "active" as const,
 };
 const TEACHER_A = {
   membership_id: "0192f3a4-0000-7000-8000-0000000000b3",
   display_name: "anil Teacher",
   roles: ["teacher", "class_teacher"],
+  status: "active" as const,
 };
 const TEACHER_C = {
   membership_id: "0192f3a4-0000-7000-8000-0000000000b4",
   display_name: "Chandra Office",
   roles: ["office_staff"],
+  status: "active" as const,
 };
 
 /** The structure with archived rows that the API returns only for include_archived=true. */
@@ -751,5 +754,64 @@ describe("class teacher picker (US-202, FR-TEN-010: section class teacher)", () 
       "Bhavani Teacher",
       "Chandra Office",
     ]);
+  });
+});
+
+describe("rows in use and invited staff (US-202, FR-TEN-010)", () => {
+  it("offers no Archive for a year, class or section with students enrolled (in_use)", async () => {
+    structure([READ, MANAGE]);
+    stub.routes["GET /bff/api/v1/academic-years"] = () =>
+      page([
+        { ...YEAR_NOW, in_use: true },
+        { ...YEAR_OLD, in_use: true },
+      ]);
+    stub.routes["GET /bff/api/v1/classes"] = () => page([{ ...CLASS_6, in_use: true }]);
+    stub.routes["GET /bff/api/v1/sections"] = (_request, url) =>
+      page(
+        url.searchParams.get("academic_year_id") === YEAR_NOW.id
+          ? [{ ...SECTION_A, in_use: true }]
+          : [],
+      );
+    renderWithIntl(<AcademicStructureScreen />);
+    const inUse = messages.en.academicStructure.archive.inUse;
+    const oldYear = (await within(await region("Academic years")).findByText("2025-26")).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(oldYear).getByText(inUse)).toBeInTheDocument();
+    const classRow = within(await region("Classes"))
+      .getByText("Class 6")
+      .closest("tr") as HTMLElement;
+    expect(within(classRow).getByText(inUse)).toBeInTheDocument();
+    const sectionRow = (await within(await region("Sections")).findByText("A")).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(sectionRow).getByText(inUse)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
+    // Editing is still offered.
+    expect(within(sectionRow).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  it("marks staff who have not signed in yet (StaffMemberOut.status invited)", async () => {
+    structure([READ, MANAGE]);
+    const invited = { ...TEACHER_C, status: "invited" as const };
+    stub.routes["GET /bff/api/v1/staff"] = () =>
+      page([{ ...TEACHER_B, status: "active" }, { ...TEACHER_A, status: "active" }, invited]);
+    const withTeacher = { ...SECTION_A, class_teacher_membership_id: invited.membership_id };
+    stub.routes["GET /bff/api/v1/sections"] = (_r, url) =>
+      page(url.searchParams.get("academic_year_id") === YEAR_NOW.id ? [withTeacher] : []);
+    renderWithIntl(<AcademicStructureScreen />);
+    const row = (await within(await region("Sections")).findByText("A")).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(
+      await within(row).findByText("Chandra Office (invited, has not signed in yet)"),
+    ).toBeInTheDocument();
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const edit = screen.getByRole("dialog", { name: "Rename section A of Class 6" });
+    expect(
+      within(within(edit).getByLabelText("Class teacher"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toContain("Chandra Office (Office staff) (invited, has not signed in yet)");
   });
 });

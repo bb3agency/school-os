@@ -36,6 +36,8 @@ export interface StudentFilters {
   classId?: string | undefined;
   sectionId?: string | undefined;
   status?: string | undefined;
+  /** Another academic year's class lists (the current year when unset). */
+  yearId?: string | undefined;
 }
 
 interface CleanFilters {
@@ -43,6 +45,7 @@ interface CleanFilters {
   class_id?: string;
   section_id?: string;
   status?: StudentStatus;
+  academic_year_id?: string;
 }
 
 const filtersSchema = z.object({
@@ -50,6 +53,7 @@ const filtersSchema = z.object({
   class_id: z.string().optional(),
   section_id: z.string().optional(),
   status: z.string().optional(),
+  academic_year_id: z.string().optional(),
 });
 
 /** Search form values → filters (the zod schema only shapes them; cleanFilters checks them). */
@@ -60,6 +64,7 @@ export function filtersFromForm(form: HTMLFormElement): StudentFilters {
     classId: parsed.class_id || undefined,
     sectionId: parsed.section_id || undefined,
     status: parsed.status || undefined,
+    yearId: parsed.academic_year_id || undefined,
   };
 }
 
@@ -73,6 +78,9 @@ export function cleanFilters(filters: StudentFilters): CleanFilters {
       ? { section_id: filters.sectionId }
       : {}),
     ...(filters.status && isStudentStatus(filters.status) ? { status: filters.status } : {}),
+    ...(filters.yearId && UUID_PATTERN.test(filters.yearId)
+      ? { academic_year_id: filters.yearId }
+      : {}),
   };
 }
 
@@ -101,21 +109,31 @@ export function useSchoolStructure(): StructureData {
   return { years, classes, sections };
 }
 
-/** "Class 9 · A" options for the current academic year, optionally for one class. */
+/**
+ * "Class 9 · A" options for the current academic year (or `yearId`), optionally for one class.
+ * Archived sections, and sections of archived classes, are never offered (FR-TEN-010: the API
+ * refuses them with 409 `structure_archived`).
+ */
 export function useSectionOptions(
   structure: StructureData,
   classId?: string,
+  yearId?: string,
 ): readonly SelectOption[] {
   const locale = useLocale();
   if (structure.sections.status !== "ready" || structure.classes.status !== "ready") return [];
-  const current =
-    structure.years.status === "ready"
-      ? structure.years.data.find((year) => year.is_current)?.id
-      : undefined;
+  const year =
+    yearId ??
+    (structure.years.status === "ready"
+      ? structure.years.data.find((row) => row.is_current)?.id
+      : undefined);
   const classes = new Map(structure.classes.data.map((row) => [row.id, row] as const));
   return structure.sections.data
-    .filter((section) => !current || section.academic_year_id === current)
+    .filter((section) => !year || section.academic_year_id === year)
     .filter((section) => !classId || section.class_id === classId)
+    .filter((section) => {
+      const parent = classes.get(section.class_id);
+      return !section.archived_at && parent !== undefined && !parent.archived_at;
+    })
     .map((section) => {
       const parent = classes.get(section.class_id);
       return {
@@ -166,6 +184,7 @@ export function StudentListView({
   const tc = useTranslations("common");
   const locale = useLocale();
   const [classId, setClassId] = useState(filters.classId ?? "");
+  const [yearId, setYearId] = useState(filters.yearId ?? "");
   const attributes = useAttributes(results !== null);
   const index = useAttributeIndex(attributes);
 
@@ -175,7 +194,13 @@ export function StudentListView({
           .sort((a, b) => a.sort_order - b.sort_order)
           .map((row) => ({ value: row.id, label: classDisplay(row, locale) }))
       : [];
-  const sectionOptions = useSectionOptions(structure, classId || undefined);
+  const sectionOptions = useSectionOptions(structure, classId || undefined, yearId || undefined);
+  const yearOptions: SelectOption[] =
+    structure.years.status === "ready"
+      ? structure.years.data
+          .filter((row) => !row.is_current)
+          .map((row) => ({ value: row.id, label: row.label }))
+      : [];
 
   const columns: Column<StudentSummary>[] = [
     {
@@ -220,7 +245,9 @@ export function StudentListView({
       : results.status === "ready"
         ? { status: "ready", data: results.data.data }
         : results;
-  const hasFilters = Boolean(filters.q || filters.classId || filters.sectionId || filters.status);
+  const hasFilters = Boolean(
+    filters.q || filters.classId || filters.sectionId || filters.status || filters.yearId,
+  );
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -261,7 +288,7 @@ export function StudentListView({
             noValidate
             onSubmit={submit}
           >
-            <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+            <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
               <GuardedTextField
                 id={SEARCH_FIELD_ID}
                 name="q"
@@ -274,6 +301,16 @@ export function StudentListView({
                 spellCheck={false}
                 error={aadhaarBlocked ? ts("aadhaarNotAllowed") : undefined}
               />
+              {yearOptions.length > 0 ? (
+                <SelectField
+                  name="academic_year_id"
+                  label={t("filterYear")}
+                  placeholder={t("currentYear")}
+                  options={yearOptions}
+                  value={yearId}
+                  onChange={(event) => setYearId(event.currentTarget.value)}
+                />
+              ) : null}
               <SelectField
                 name="class_id"
                 label={t("filterClass")}
@@ -288,7 +325,7 @@ export function StudentListView({
                 placeholder={tc("all")}
                 options={sectionOptions}
                 defaultValue={filters.sectionId ?? ""}
-                key={`section-${classId}`}
+                key={`section-${yearId}-${classId}`}
               />
               <SelectField
                 name="status"

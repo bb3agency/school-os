@@ -169,6 +169,12 @@ class UserOut(_Out):
     last_login_at: dt.datetime | None
     created_at: dt.datetime
     version: int
+    profile_shared: bool = Field(
+        default=False,
+        description="The person also belongs to another school on SchoolOS, so their name, "
+        "email and language are shared and cannot be edited here (PATCH answers 409 "
+        "``profile_shared``, ADR-0028). The other schools are never named.",
+    )
 
 
 # --- roles and permissions ------------------------------------------------------------------
@@ -191,6 +197,11 @@ class RoleOut(_Out):
         description="Whether some of its permissions reach only the member's classes/sections "
         "(set scopes for them); false when every permission is school-wide."
     )
+    needs_mfa: bool = Field(
+        default=False,
+        description="Members holding this role must sign in with two-step verification "
+        "(roles.yaml ``mfa_required``; FR-IAM-002, ADR-0018).",
+    )
 
 
 class StaffMemberOut(_Out):
@@ -199,6 +210,9 @@ class StaffMemberOut(_Out):
     membership_id: uuid.UUID
     display_name: str
     roles: list[str]
+    status: Literal["active", "invited"] = Field(
+        description="``invited`` until the person first signs in (ADR-0019)."
+    )
 
 
 class PermissionOut(_Out):

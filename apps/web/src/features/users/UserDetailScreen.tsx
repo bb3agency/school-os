@@ -369,6 +369,8 @@ export function UserDetailScreen({ userId }: { userId: string }) {
   const removed = user.status === "removed";
   const canManage = can(USER_PERM.manage) && !breakGlass;
   const canAssign = can(USER_PERM.assign) && !breakGlass && !removed;
+  // ADR-0028: a profile shared with another school is not edited here (409 profile_shared).
+  const profileShared = user.profile_shared;
 
   return (
     <div className="space-y-6">
@@ -413,7 +415,11 @@ export function UserDetailScreen({ userId }: { userId: string }) {
 
       <Card
         title={td("aboutTitle")}
-        actions={canManage && !removed ? <EditProfile user={user} isSelf={isSelf} /> : null}
+        actions={
+          canManage && !removed && !profileShared ? (
+            <EditProfile user={user} isSelf={isSelf} />
+          ) : null
+        }
       >
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Item label={t("colEmail")}>
@@ -435,6 +441,9 @@ export function UserDetailScreen({ userId }: { userId: string }) {
         </dl>
         {isSelf && canManage && !removed ? (
           <p className="mt-4 text-sm text-ink-muted">{td("selfNoStatus")}</p>
+        ) : null}
+        {profileShared && canManage && !removed ? (
+          <p className="mt-4 text-sm text-ink-muted">{td("profileShared")}</p>
         ) : null}
         {!canManage && !breakGlass ? (
           <p className="mt-4 text-sm text-ink-muted">{td("detailsNote")}</p>

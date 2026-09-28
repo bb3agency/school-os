@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Select";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
+import { useDateInput } from "@/lib/date-format";
 import { UUID_PATTERN } from "@/lib/validation";
 import { containsFullAadhaar } from "./aadhaar";
 import { toIsoDate } from "./dates";
@@ -152,6 +153,7 @@ export const enrolmentSchema = z.object({
 export function EnrolmentDialog({ student }: { student: Student }) {
   const t = useTranslations("students.edit");
   const ts = useTranslations("students");
+  const dates = useDateInput();
   const tc = useTranslations("common");
   const api = useBffClient("staff");
   const structure = useSchoolStructure();
@@ -199,10 +201,10 @@ export function EnrolmentDialog({ student }: { student: Student }) {
           <GuardedTextField
             name="started_on"
             label={t("startedOn")}
-            hint={t("startedOnHint")}
-            error={errors.started_on ? ts("dateInvalid") : undefined}
+            hint={t("startedOnHint", dates.hint("2012-03-14"))}
+            error={errors.started_on ? ts("dateInvalid", dates.hint("2012-03-14")) : undefined}
             inputMode="numeric"
-            placeholder="DD/MM/YYYY"
+            placeholder={dates.placeholder}
             autoComplete="off"
           />
         </>

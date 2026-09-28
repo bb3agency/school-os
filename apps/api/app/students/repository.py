@@ -203,6 +203,16 @@ def active_enrollments_of(session: Session, student_ids: Collection[uuid.UUID]) 
     return list(session.scalars(stmt.order_by(Enrollment.student_id, Enrollment.created_at)))
 
 
+def active_placements(session: Session) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Distinct (academic year, section) pairs that have an active enrolment (RLS: this school)."""
+    stmt = (
+        select(Enrollment.academic_year_id, Enrollment.section_id)
+        .where(Enrollment.status == "active")
+        .distinct()
+    )
+    return [(row.academic_year_id, row.section_id) for row in session.execute(stmt)]
+
+
 def student_ids_with_batch(session: Session, batch_id: uuid.UUID) -> list[uuid.UUID]:
     """Students with at least one value recorded by import batch ``batch_id``."""
     stmt = (

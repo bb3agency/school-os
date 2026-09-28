@@ -40,13 +40,6 @@ export const STATUS_ACTIONS: Record<MemberStatus, readonly StatusChange[]> = {
   removed: [],
 };
 
-/**
- * Roles that need two-step sign-in (roles.yaml `mfa_required`; FR-IAM-002). Only for the
- * "Needs two-step sign-in" hint next to a role: which roles may be given comes from the API
- * (`RoleOut.grantable`), never from rules copied here.
- */
-export const MFA_ROLES: readonly string[] = ["owner", "principal", "office_admin"];
-
 /** The temporary SchoolOS support role: changed only on the Support access page (07 §6.4). */
 export const BREAKGLASS_ROLE = "platform_support";
 

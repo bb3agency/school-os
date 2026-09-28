@@ -160,6 +160,11 @@ class AcademicYearOut(_Out):
     archived_at: dt.datetime | None = Field(
         default=None, description="When it was archived (hidden from lists); null while in use."
     )
+    in_use: bool | None = Field(
+        default=None,
+        description="Whether it has active enrolments, so archiving it answers 409 "
+        "``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
+    )
     version: int
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -192,6 +197,11 @@ class ClassOut(_Out):
     archived_at: dt.datetime | None = Field(
         default=None, description="When it was archived (hidden from lists); null while in use."
     )
+    in_use: bool | None = Field(
+        default=None,
+        description="Whether it has active enrolments, so archiving it answers 409 "
+        "``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
+    )
     version: int
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -222,6 +232,11 @@ class SectionOut(_Out):
     class_teacher_membership_id: uuid.UUID | None
     archived_at: dt.datetime | None = Field(
         default=None, description="When it was archived (hidden from lists); null while in use."
+    )
+    in_use: bool | None = Field(
+        default=None,
+        description="Whether it has active enrolments, so archiving it answers 409 "
+        "``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
     )
     version: int
     created_at: dt.datetime

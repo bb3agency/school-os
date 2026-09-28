@@ -388,6 +388,7 @@ def _document_out(
         "version": doc.version,
     }
     if detail:
+        data["allowed_doc_types"] = list(purpose_rule(doc.purpose).doc_types)
         return DocumentDetail(**data, versions=[_version_out(v, viewer) for v in versions])
     return DocumentOut(**data)
 
