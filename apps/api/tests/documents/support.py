@@ -286,10 +286,12 @@ def make_document(
     purpose: str = "circular",
     doc_type: str = "circular",
     data: bytes | None = None,
+    document_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
-    """Insert a document with one version (default ``ready``) and its object."""
+    """Insert a document with one version (default ``ready``) and its object. ``document_id``
+    pins the ID (e.g. a digit-heavy UUID, whose object key must still pass the outbox checks)."""
     store = memory_store()
-    doc_id, version_id = uuid.uuid4(), uuid.uuid4()
+    doc_id, version_id = document_id or uuid.uuid4(), uuid.uuid4()
     content = data or pdf()
     key = f"t/{tenant_id}/docs/{doc_id}/v1/original.pdf"
     with admin.begin() as c:

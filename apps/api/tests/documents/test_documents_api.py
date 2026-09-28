@@ -1222,6 +1222,37 @@ def test_PRV_016_discarded_version_without_a_copy_is_gone_for_good(
     assert [e["summary"] for e in mine] == [{"version_no": 1, "reason": "aadhaar_unredactable"}]
 
 
+@pytest.mark.parametrize(
+    "document_id",
+    [
+        # UUIDs whose last group is (almost) all digits: ~2-3% of random IDs look like this, and
+        # their object keys once failed the outbox "long digit run" check at random (PRV-016).
+        uuid.UUID("0a1b2c3d-4e5f-4a6b-8c7d-123456789012"),
+        uuid.UUID("0a1b2c3d-4e5f-4a6b-8c7d-a12345678901"),
+    ],
+)
+def test_PRV_016_discard_works_for_digit_heavy_document_ids(
+    world: Any, admin_engine: Engine, store: Any, document_id: uuid.UUID
+) -> None:
+    tenant = world.a.tenant_id
+    owner = world.person("owner").user_id
+    S.make_document(
+        admin_engine,
+        tenant,
+        owner,
+        purpose="register_scan",
+        doc_type="register_scan",
+        document_id=document_id,
+    )
+    key = f"t/{tenant}/docs/{document_id}/v1/original.pdf"
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, document_id, 1, "aadhaar_unredactable") is True
+    payload = _discard_payload(admin_engine, tenant, document_id)
+    assert payload["object_key"] == key
+    assert _run_discard(tenant, payload) is True
+    assert key not in store.objects
+
+
 def test_PRV_016_daily_sweep_discards_what_the_task_missed(
     world: Any, api: Any, admin_engine: Engine, store: Any
 ) -> None:

@@ -84,6 +84,32 @@ def test_FR_AUD_001_summary_accepts_ids_fields_counts_codes() -> None:
     assert out["nested"] == {"source": "admission_register"}
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        "t/01a0e3ac-bedf-7672-ac40-6fc7a11dd4c4/docs/ccd60c2e-1c94-464d-9f5a-e3249464808f/v1/a.png",
+        "t/12345678-1234-1234-1234-123456789012/docs/0a1b2c3d-4e5f-4a6b-8c7d-123456789012/v1/a.png",
+    ],
+)
+def test_FR_AUD_001_uuids_inside_object_keys_are_not_digit_runs(key: str) -> None:
+    """Object keys carry tenant and document UUIDs; a UUID group of 10+ decimal digits (about
+    2-3% of random UUIDs) is an identifier, not a phone or Aadhaar number (PRV-016 flake)."""
+    assert sanitize_summary({"object_key": key}) == {"object_key": key}
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "t/0a1b2c3d-4e5f-4a6b-8c7d-123456789012/docs/123412341234/v1/a.png",
+        "t/0a1b2c3d-4e5f-4a6b-8c7d-1234567890121/v1/a.png",  # 13 hex: not a UUID
+        "t/1234567890-0a1b2c3d-4e5f-4a6b-8c7d-a23456789012/v1/a.png",
+    ],
+)
+def test_FR_AUD_001_digit_runs_next_to_uuids_are_still_rejected(key: str) -> None:
+    with pytest.raises(SummaryError, match="digit"):
+        sanitize_summary({"object_key": key})
+
+
 def test_FR_AUD_001_summary_strings_are_nfc_normalised() -> None:
     decomposed = "café"
     assert sanitize_summary({"code": decomposed})["code"] == "café"

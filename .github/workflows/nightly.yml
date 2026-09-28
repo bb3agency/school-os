@@ -44,6 +44,21 @@ jobs:
       - name: make migration-check
         run: make migration-check
 
+  test-order:
+    # Order dependence (docs/12 §9): the Python suites with modules and the tests inside each
+    # module shuffled (pytest-random-order, new seed each night). The seed is printed in the
+    # report header; reproduce with `make test-order ORDER_SEED=<seed>`.
+    name: test order (shuffled)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+      - name: make test-order
+        run: make test-order
+
   e2e:
     name: e2e (playwright)
     runs-on: ubuntu-24.04

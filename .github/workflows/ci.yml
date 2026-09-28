@@ -59,7 +59,8 @@ jobs:
 
   test:
     # test-api needs Docker (testcontainers: pgvector Postgres, Valkey, SeaweedFS); GitHub's
-    # ubuntu runners provide it. test-web runs vitest.
+    # ubuntu runners provide it. test-api also enforces the coverage gate ([tool.coverage.report]
+    # fail_under in pyproject.toml; docs/12 §9). test-web runs vitest.
     name: test (${{ matrix.target }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30

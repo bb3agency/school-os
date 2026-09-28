@@ -33,6 +33,10 @@ dev = [
   "boto3-stubs[s3,kms]==1.43.103",
   "celery-types==0.26.0",
   "pre-commit==4.6.2",
+  # Test-order check (docs/12 §9): shuffles only when asked (`--random-order-bucket=...`), so the
+  # default run is unchanged; unlike pytest-randomly it does not reseed `random` per test.
+  # Licence MIT; only dependency pytest; no known vulnerabilities (PyPI/OSV, 2026-09-27).
+  "pytest-random-order==1.2.0",
 ]
 
 [tool.ruff]
@@ -85,3 +89,10 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["apps/api/app", "apps/worker/sos_worker"]
+
+[tool.coverage.report]
+# Merge gate (docs/12 §9): combined line + branch coverage of the full `make test-api` run.
+# Measured 2026-09-27: 92.97 % (lines 94.92 %, branches 84.58 %; PDF render tests skipped).
+# Set a little below the measurement for machine differences; raise it as coverage grows
+# (plan in docs/12 §9). Only the full run is gated: `pytest --cov` on a subset will fail it.
+fail_under = 92

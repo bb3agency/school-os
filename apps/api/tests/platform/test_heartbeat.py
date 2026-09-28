@@ -135,10 +135,15 @@ def test_SEC_028_valid_heartbeat_is_accepted_and_recorded(api: Api, dep: dict[st
     ["wrong_key", "unknown_key_id", "altered_body", "stale", "future", "unknown_deployment"],
 )
 def test_SEC_028_bad_signatures_are_401_and_store_nothing(
-    api: Api, dep: dict[str, Any], tamper: str
+    api: Api, dep: dict[str, Any], tamper: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     body = _payload(dep)
     now = int(time.time())
+    # The server clock is pinned to the same whole second: with the real clock, "future"
+    # (now + 301) fell inside the 300 s window whenever the request reached the server a
+    # fraction of a second later (it passed or failed with load and test order).
+    pinned = dt.datetime.fromtimestamp(now, dt.UTC)
+    monkeypatch.setattr(fleet, "now", lambda: pinned)
     if tamper == "wrong_key":
         raw, headers = _signed(dep, body, key="A" * 43)
     elif tamper == "unknown_key_id":

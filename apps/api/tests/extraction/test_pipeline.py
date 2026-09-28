@@ -33,6 +33,15 @@ pytestmark = pytest.mark.db
 X = sys.modules["sos_test_extraction_support"]
 
 
+def _document_actions(admin: Engine, tenant_id: uuid.UUID, document_id: Any) -> list[str]:
+    """Audit actions about one document (the shared schools carry other tests' events)."""
+    return [
+        e["action"]
+        for e in X.W.audit_events(admin, tenant_id)
+        if e["resource_type"] == "document" and str(e["resource_id"]) == str(document_id)
+    ]
+
+
 def _count(admin: Engine, sql: str, **params: Any) -> int:
     with admin.connect() as c:
         return int(c.execute(text(sql), params).scalar_one())
@@ -213,8 +222,10 @@ def test_FR_IMP_022_PRV_016_valid_aadhaar_never_reaches_db_logs_or_api(  # noqa:
     assert [(v.version_no, v.status, v.error) for v in versions] == [
         (1, "quarantined", "aadhaar_unredactable")
     ], "no redacted copy was made"
-    assert "document.version_discarded" in actions
-    assert "document.version_redacted" not in actions
+    # This page's document only: other tests redact pages of the same shared school.
+    doc_actions = _document_actions(admin_engine, a.tenant_id, page_row["document_id"])
+    assert "document.version_discarded" in doc_actions
+    assert "document.version_redacted" not in doc_actions
     key = versions[0].object_key
     assert key in X.D.memory_store().objects
     _run_discard_tasks(admin_engine, a.tenant_id)
@@ -318,12 +329,10 @@ def test_PRV_016_page_image_is_redacted_and_its_rows_become_confirmable(  # noqa
     assert v2.object_key in store.objects
 
     actions = [e["action"] for e in X.W.audit_events(admin_engine, a.tenant_id)]
-    for action in (
-        "document.version_redacted",
-        "document.version_discarded",
-        "extraction.page.image_redacted",
-    ):
-        assert action in actions
+    assert "extraction.page.image_redacted" in actions
+    doc_actions = _document_actions(admin_engine, a.tenant_id, doc_id)
+    assert "document.version_redacted" in doc_actions
+    assert "document.version_discarded" in doc_actions
 
     # Reviewers see the redacted copy once it has been scanned, never the original.
     who = a.people["office_admin"]

@@ -38,8 +38,10 @@ def test_ADR_0019_invitee_accepts_on_first_sign_in(
     assert _status(admin_engine, invitee.membership_id) == "active"
     assert api.call(invitee, "GET", "/api/v1/me").status_code == 200
     events = W.audit_events(admin_engine, world.a.tenant_id, "membership.invitation_accepted")
-    assert [e["resource_id"] for e in events] == [invitee.membership_id]
-    assert events[0]["actor_id"] == invitee.user_id
+    # Exactly one event for this membership (school A is shared: other tests accept too).
+    mine = [e for e in events if e["resource_id"] == invitee.membership_id]
+    assert len(mine) == 1
+    assert mine[0]["actor_id"] == invitee.user_id
 
 
 def test_ADR_0019_accepting_twice_changes_nothing(

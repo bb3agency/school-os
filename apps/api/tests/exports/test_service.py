@@ -562,7 +562,7 @@ def test_read_and_download_only_own_exports(
     school: Any, section: str, admin_engine: Engine
 ) -> None:
     EX.student(school, section_key=section)
-    mine = EX.ready_export(school, "exam_coordinator")
+    mine = EX.ready_export(school, "exam_coordinator", section_keys=(section,))
     me = school.people["exam_coordinator"]
     other = school.people["coordinator_2"]
     c_me = EX.ctx(school, me, "exam_coordinator")
@@ -595,7 +595,8 @@ def test_read_and_download_only_own_exports(
 def test_ADR_0021_read_all_and_download_any_rules(
     school: Any, section: str, admin_engine: Engine
 ) -> None:
-    EX.student(school, section_key=section)
+    # The export covers section 9A; the scoped reader below holds only ``section``.
+    EX.student(school)
     theirs = EX.ready_export(school, "exam_coordinator")
     who = school.people["coordinator_2"]
     base = EX.ctx(school, who, "exam_coordinator")
@@ -678,7 +679,7 @@ def test_ADR_0021_download_any_of_restricted_values_needs_school_wide_sensitive(
 
 def test_FR_EXP_004_student_list_download_needs_step_up(school: Any, section: str) -> None:
     EX.student(school, section_key=section)
-    export_id = EX.ready_export(school, "owner")
+    export_id = EX.ready_export(school, "owner", section_keys=(section,))
     owner = school.people["owner"]
     stale = dataclasses.replace(
         EX.ctx(school, owner, "owner"), auth_time=dt.datetime.now(dt.UTC) - dt.timedelta(minutes=6)
@@ -693,11 +694,11 @@ def test_download_states(school: Any, section: str, admin_engine: Engine) -> Non
     EX.student(school, section_key=section)
     person = school.people["principal"]
     c = EX.ctx(school, person, "principal")
-    queued = EX.queued_export(school, "principal")
+    queued = EX.queued_export(school, "principal", section_keys=(section,))
     with tenant_session(school.tenant_id, person.user_id) as db, pytest.raises(Conflict) as exc:
         exports.download_url(db, c, queued)
     assert exc.value.code == "export_not_ready"
-    ready = EX.ready_export(school, "principal")
+    ready = EX.ready_export(school, "principal", section_keys=(section,))
     with tenant_session(school.tenant_id, person.user_id) as db, pytest.raises(NotFound):
         exports.download_url(db, c, ready, "csv")
 
@@ -706,7 +707,7 @@ def test_docs_05_13_files_purged_after_seven_days(
     school: Any, section: str, admin_engine: Engine
 ) -> None:
     EX.student(school, section_key=section)
-    export_id = EX.ready_export(school, "principal")
+    export_id = EX.ready_export(school, "principal", section_keys=(section,))
     store = EX.D.memory_store()
     prefix = f"t/{school.tenant_id}/exports/{export_id}/"
     assert any(k.startswith(prefix) for k in store.objects)

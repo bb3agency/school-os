@@ -1,12 +1,14 @@
 /**
  * Stand-ins for the e2e run with sign-in (E2E_STAND_IN=1): a scripted OIDC provider (the
  * in-process fake from src/test/fake-idp.ts served over HTTP, with a tiny login form) and a
- * canned API that answers with the generated OpenAPI shapes. Synthetic data only; never
+ * canned API that answers with the generated OpenAPI shapes (the M1 journeys' stateful part
+ * lives in journey-api.ts; POST /__e2e/reset starts it again). Synthetic data only; never
  * used outside tests. The real API and the dev OIDC stub are exercised manually
  * (apps/web/README.md).
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
+import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
 export const API_PORT = Number(process.env.E2E_API_PORT ?? 8099);
@@ -447,6 +449,7 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
         ],
         scopes: [{ type: "school", ref: null }],
         mfa: true,
+        settings: { idle_timeout_minutes: 15, date_format: "DD/MM/YYYY", languages: ["en", "te"] },
       },
     ];
   if (path === "/api/v1/announcements")
@@ -548,9 +551,32 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
 async function startApi(): Promise<Server> {
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", `http://localhost:${API_PORT}`);
-    if (request.method !== "GET") await readBody(request);
-    const [status, body] = apiAnswer(request.method ?? "GET", url.pathname, subjectOf(request));
-    send(response, status, body, status >= 400 ? "application/problem+json" : "application/json");
+    const method = request.method ?? "GET";
+    const raw = method !== "GET" ? await readBody(request) : "";
+    // Test control and the files behind canned download links (not API paths).
+    if (url.pathname === "/__e2e/reset" && method === "POST") {
+      resetJourney();
+      return send(response, 204, "");
+    }
+    if (url.pathname.startsWith(FILES_PREFIX)) {
+      const name = url.pathname.slice(FILES_PREFIX.length).replace(/[^a-z0-9.-]/g, "");
+      response.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "content-disposition": `attachment; filename="${name}"`,
+        "cache-control": "no-store",
+      });
+      return response.end("Synthetic pre-check file (e2e stand-in)");
+    }
+    let body: Record<string, unknown> = {};
+    try {
+      body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    } catch {
+      body = {};
+    }
+    const subject = subjectOf(request);
+    const [status, answer] =
+      journeyAnswer(method, url, subject, body) ?? apiAnswer(method, url.pathname, subject);
+    send(response, status, answer, status >= 400 ? "application/problem+json" : "application/json");
   });
   await new Promise<void>((resolve) => server.listen(API_PORT, resolve));
   return server;
