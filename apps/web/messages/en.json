@@ -1427,7 +1427,8 @@
       "signIn": "Sign in to the school office",
       "platformSignIn": "Sign in to the platform admin panel",
       "supportBody": "Your SchoolOS support session has ended. To look again, open the approved request from the admin panel.",
-      "supportBack": "Back to break-glass requests"
+      "supportBack": "Back to break-glass requests",
+      "homeLink": "SchoolOS home"
     },
     "support": {
       "bannerTitle": "SchoolOS support access (read only)",
@@ -4018,6 +4019,180 @@
     },
     "failedAnswer": {
       "title": "Something went wrong"
+    }
+  },
+  "welcome": {
+    "title": "School office records, checked",
+    "nav": {
+      "label": "On this page",
+      "features": "Features",
+      "how": "How it works",
+      "security": "Security",
+      "plans": "Plans",
+      "faq": "FAQ"
+    },
+    "signIn": "Sign in",
+    "hero": {
+      "eyebrow": "For school offices in Andhra Pradesh",
+      "headline": "Enter student details once. Catch mismatches before the portal does.",
+      "body": "SchoolOS keeps one checked record for every student, compares it with the admission register, Aadhaar as printed, UDISE+ and board registration, and answers questions from your school's own records, with sources.",
+      "primary": "Sign in",
+      "secondary": "See how it works",
+      "note": "For staff of schools that use SchoolOS. English and Telugu."
+    },
+    "visual": {
+      "description": "Example screens with made-up data: a date of birth that differs between the admission register and Aadhaar as printed, and an answer from school records that shows its sources.",
+      "sample": "Sample data",
+      "findingBadge": "Mismatch",
+      "findingTitle": "Date of birth differs",
+      "findingStudent": "Sample student A · Class 7-B",
+      "register": "Admission register",
+      "aadhaar": "Aadhaar as printed",
+      "udise": "UDISE+",
+      "matches": "Matches",
+      "differs": "Differs",
+      "findingRoute": "Register is the legal record. Fix through a change request with evidence.",
+      "askLabel": "Ask the school",
+      "askQuestion": "When did Sample student B join the school?",
+      "askAnswer": "Sample student B joined Class 1 on 12 June 2019.",
+      "sources": "Sources",
+      "sourceRegister": "Admission register, page 18",
+      "sourceRecord": "Student record"
+    },
+    "features": {
+      "title": "What SchoolOS does for your office",
+      "intro": "Built around the work the office already does, so staff type less and correct less.",
+      "planned": "Planned",
+      "import": {
+        "title": "Enter once, import the rest",
+        "body": "Bring in the Excel or Google Sheets lists you already keep, or photograph register pages and confirm each row. You can undo an import within 24 hours."
+      },
+      "checks": {
+        "title": "Catch mismatches early",
+        "body": "Each student's details are compared with the admission register, Aadhaar as printed, UDISE+ and board registration. Differences become findings before you submit to a portal."
+      },
+      "changes": {
+        "title": "Corrections with a second check",
+        "body": "SchoolOS never corrects official records on its own. Changes to a name, date of birth or parents' names need an evidence document and approval by another person."
+      },
+      "certificates": {
+        "title": "Certificates and registers",
+        "body": "Printable certificates and registers in English and Telugu, in your school's familiar formats. This is the next module we are building."
+      },
+      "ask": {
+        "title": "Ask the school",
+        "body": "Ask in English or Telugu. Answers come from your school's own records and documents and show their sources, or say that nothing was found in the school records."
+      },
+      "audit": {
+        "title": "A record of every change",
+        "body": "Changes to student details, role changes, exports, sign-ins and questions asked are written to an audit log that cannot be edited, and you can check it for tampering."
+      }
+    },
+    "how": {
+      "title": "How it works",
+      "intro": "Three steps, using the records you already have.",
+      "step": "Step {number}",
+      "import": {
+        "title": "Import",
+        "body": "Upload the lists you already keep, or photograph admission register pages. Staff confirm what was read before anything becomes a student record."
+      },
+      "check": {
+        "title": "Check",
+        "body": "SchoolOS compares each student's details across sources and lists every mismatch and missing field, with the record that likely needs correcting."
+      },
+      "submit": {
+        "title": "Submit with confidence",
+        "body": "Fix mismatches through approved changes, then download pre-check sheets for UDISE+ and board registration. Your staff still submit on the portal, as today."
+      }
+    },
+    "security": {
+      "title": "Security and privacy",
+      "intro": "Student records are children's data. SchoolOS is built to keep them safe and private from the start.",
+      "india": {
+        "title": "Data stays in India",
+        "body": "Your school's data is stored in AWS Mumbai, with encrypted backups in Hyderabad."
+      },
+      "isolation": {
+        "title": "Each school is kept apart",
+        "body": "Every school's records are separated in the database itself, so one school can never see another school's data."
+      },
+      "aadhaar": {
+        "title": "No Aadhaar numbers",
+        "body": "SchoolOS never stores Aadhaar numbers: only the last 4 digits and the details as printed on the card."
+      },
+      "audit": {
+        "title": "Every change and question is recorded",
+        "body": "Changes to student details and every question asked of the AI are written to the school's audit log."
+      },
+      "ai": {
+        "title": "AI sees only what you can see",
+        "body": "Answers use only the records and documents the person asking is allowed to see. Everything else is filtered out before the AI reads anything."
+      },
+      "support": {
+        "title": "No standing access for our staff",
+        "body": "SchoolOS staff cannot open your school's records unless your owner or principal approves it, for a limited time, and every screen they open is recorded."
+      }
+    },
+    "plans": {
+      "title": "Two ways to run SchoolOS",
+      "intro": "Both have the same features, the same security and keep data in India. Pricing is agreed with each school before it starts.",
+      "shared": {
+        "name": "Shared",
+        "summary": "Your school is a separate, isolated school on the SchoolOS platform in AWS Mumbai. The simplest choice for most schools.",
+        "point1": "Managed, updated and backed up by SchoolOS",
+        "point2": "No IT work for your school",
+        "point3": "Works in a browser on your office PCs"
+      },
+      "dedicated": {
+        "name": "Dedicated",
+        "summary": "Your own isolated server in AWS Mumbai running the same software, with its own storage and encryption key.",
+        "point1": "Nightly encrypted backups to Hyderabad",
+        "point2": "Optional web address on your school's own domain",
+        "point3": "For larger schools, school groups or schools that want their own server"
+      }
+    },
+    "faq": {
+      "title": "Frequently asked questions",
+      "portal": {
+        "q": "Does SchoolOS submit to UDISE+ or board portals for us?",
+        "a": "No. The portals do not offer a way to do that. SchoolOS checks your data and prepares sheets in the portal's field order; your staff submit as they do today."
+      },
+      "register": {
+        "q": "Will SchoolOS change our admission register?",
+        "a": "No. The admission register stays the legal record. SchoolOS points out differences, and any correction goes through a change request with evidence, approved by a second person."
+      },
+      "tools": {
+        "q": "Do we have to stop using Excel, Tally or paper registers?",
+        "a": "No. SchoolOS works alongside them. It imports and reads what you already keep."
+      },
+      "ai": {
+        "q": "Where do the answers in Ask the school come from?",
+        "a": "Only from your school's own records and documents that the person asking may see. Every answer shows its sources, or says it was not found in the school records."
+      },
+      "training": {
+        "q": "Is our student data used to train AI?",
+        "a": "No. Your school's data is never used to train AI models."
+      },
+      "exit": {
+        "q": "Can we take our data with us?",
+        "a": "Yes. Your school owns its data and can export everything in open formats at any time. If you leave, your data is deleted and its encryption keys are destroyed."
+      },
+      "language": {
+        "q": "Which languages does SchoolOS use?",
+        "a": "English and Telugu. Switch the language at any time from the top of the page."
+      }
+    },
+    "cta": {
+      "title": "Your school's records, checked and ready",
+      "body": "If your school already uses SchoolOS, sign in with your school account.",
+      "button": "Sign in to the school office"
+    },
+    "footer": {
+      "tagline": "School office records, checked.",
+      "sampleNote": "Names and dates shown on this page are made-up samples.",
+      "location": "Data stored in India (AWS Mumbai).",
+      "top": "Back to top",
+      "signIn": "Sign in"
     }
   }
 }

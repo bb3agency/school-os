@@ -39,7 +39,12 @@ export function SignedOutView({
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-6 py-3">
         <p className="text-lg font-bold text-primary">{tc("appName")}</p>
-        <LanguageSwitcher />
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          <a href={`/${locale}/welcome`} className="text-sm text-primary underline">
+            {t("signedOut.homeLink")}
+          </a>
+          <LanguageSwitcher />
+        </div>
       </header>
       <main id="main" className="mx-auto w-full max-w-xl space-y-4 p-6 md:p-10">
         <h1 className="text-2xl font-bold">{t("signedOut.title")}</h1>
