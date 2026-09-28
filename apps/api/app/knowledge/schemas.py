@@ -106,6 +106,15 @@ class VerifiedAnswerIn(_In):
     review_due: dt.date | None = None
 
 
+class VerifiedAnswerReviewIn(_In):
+    """Confirm a verified answer (typically ``needs_review``) as it is, or with a corrected
+    text, new citations or a new review date. Omitted fields keep their stored value."""
+
+    answer_text: str | None = Field(default=None, min_length=1, max_length=5000)
+    citations: list[VerifiedCitationIn] | None = Field(default=None, min_length=1, max_length=20)
+    review_due: dt.date | None = None
+
+
 class VerifiedCitationOut(_Out):
     source: str
     cited_text: str
@@ -119,6 +128,10 @@ class VerifiedAnswerOut(_Out):
     citations: list[VerifiedCitationOut]
     status: Literal["active", "needs_review", "retired"]
     verified_by: uuid.UUID = Field(description="Membership id of the person who verified it.")
+    verified_by_name: str | None = Field(
+        default=None,
+        description="Display name of that person in this school (null if no longer a member).",
+    )
     verified_at: dt.datetime
     review_due: dt.date | None
     version: int
@@ -139,6 +152,7 @@ __all__ = [
     "SearchResultOut",
     "VerifiedAnswerIn",
     "VerifiedAnswerOut",
+    "VerifiedAnswerReviewIn",
     "VerifiedCitationIn",
     "VerifiedCitationOut",
     "VerifiedStatus",

@@ -12,7 +12,8 @@
   (SEC-008). Filtered by the document ACL and your scopes in SQL.
 - ``POST /knowledge/queries/{query_id}/feedback`` (``kb.ask``, own questions only; 404 else).
 - ``GET /knowledge/verified-answers`` (``kb.ask``) and ``POST`` (``kb.verified_answer.manage``,
-  ``Idempotency-Key``).
+  ``Idempotency-Key``); ``POST .../{id}/review`` and ``.../{id}/retire``
+  (``kb.verified_answer.manage``, ``If-Match``).
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from dataclasses import asdict
 from typing import Annotated, Any
 
 import anyio
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -33,10 +34,12 @@ from app.authz.dependencies import TenantDB, require
 from app.authz.http import (
     Cursor,
     IdempotencyDep,
+    IfMatch,
     Limit,
     Page,
     decode_cursor,
     encode_cursor,
+    etag,
 )
 from app.core.errors import ValidationFailed
 from app.knowledge import service
@@ -48,6 +51,7 @@ from app.knowledge.schemas import (
     SearchOut,
     VerifiedAnswerIn,
     VerifiedAnswerOut,
+    VerifiedAnswerReviewIn,
     VerifiedStatus,
 )
 
@@ -190,3 +194,38 @@ def create_verified_answer(
     ``citation_text_not_found``, ``citation_source_unsupported``). It is flagged for review when
     a cited document changes or is deleted. Accepts ``Idempotency-Key``."""
     return idem.run(db, body, lambda: service.get_service().create_verified_answer(db, ctx, body))
+
+
+@router.post("/knowledge/verified-answers/{answer_id}/review", response_model=VerifiedAnswerOut)
+def review_verified_answer(
+    *,
+    ctx: Verifier,
+    db: TenantDB,
+    answer_id: uuid.UUID,
+    body: VerifiedAnswerReviewIn,
+    version: IfMatch,
+    response: Response,
+) -> VerifiedAnswerOut:
+    """Confirm a verified answer again, as it is or corrected (permission
+    ``kb.verified_answer.manage``; ``If-Match``; FR-KB-030). Use it for answers flagged
+    ``needs_review`` after a cited document changed. Its citations (new ones if you send them)
+    must quote the current version of documents you can read (422 as on create); it becomes
+    ``active`` and you become its verifier. 404 when you cannot read a document it cites; 409
+    ``verified_answer_retired``; 412 when it changed since you read it."""
+    out = service.get_service().review_verified_answer(
+        db, ctx, answer_id, body, expected_version=version
+    )
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.post("/knowledge/verified-answers/{answer_id}/retire", response_model=VerifiedAnswerOut)
+def retire_verified_answer(
+    ctx: Verifier, db: TenantDB, answer_id: uuid.UUID, version: IfMatch, response: Response
+) -> VerifiedAnswerOut:
+    """Withdraw a verified answer (permission ``kb.verified_answer.manage``; ``If-Match``): it
+    is no longer used by Ask; kept for the record. 409 ``verified_answer_retired`` when it
+    already is; 404 / 412 as for review."""
+    out = service.get_service().retire_verified_answer(db, ctx, answer_id, expected_version=version)
+    response.headers["ETag"] = etag(out.version)
+    return out

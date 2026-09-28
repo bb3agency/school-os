@@ -403,7 +403,15 @@ def test_FR_KB_004_record_question_reads_named_fields_through_scoped_tools(
     assert sources == [f"sos://student/{ids['s9a']}/field/dob?src=admission_register"]
     assert "14/03/2012" in _text(events)
     tools_sent = [t["name"] for t in transport.sent[0]["tools"]]
-    assert sorted(tools_sent) == ["find_students", "get_student_facts", "search_documents"]
+    assert sorted(tools_sent) == [
+        "count_students",
+        "find_students",
+        "get_student_facts",
+        "get_value_history",
+        "list_documents",
+        "list_findings",
+        "search_documents",
+    ]
     # Only the named fields reach the model: never the guardian phone or C3 values.
     for body in transport.sent:
         assert "9876501234" not in str(body)
@@ -797,3 +805,136 @@ def test_FR_KB_012_history_is_limited_and_skips_cancelled_questions(
     assert earlier is not None
     listed = [line for line in earlier.splitlines() if line.startswith("- ")]
     assert listed == [f"- Synthetic question number {n}?" for n in range(1, limit + 1)]
+
+
+# --- verified answers: review, retire, search (FR-KB-030; docs/06 §2, §4.8, §6) -------------
+
+
+def _vid(res: Any) -> str:
+    assert res.status_code == 201, res.text
+    value: str = res.json()["id"]
+    return value
+
+
+def _set_status(admin: Engine, answer_id: str, status: str) -> None:
+    with admin.begin() as c:
+        c.execute(
+            text("UPDATE kb.verified_answers SET status = :s, version = version + 1 WHERE id = :i"),
+            {"s": status, "i": answer_id},
+        )
+
+
+def _manage(api: Any, who: Any, answer_id: str, action: str, version: int, **body: Any) -> Any:
+    return api.call(
+        who,
+        "POST",
+        f"/api/v1/knowledge/verified-answers/{answer_id}/{action}",
+        json=body if action == "review" else None,
+        headers={"If-Match": f'W/"{version}"'},
+    )
+
+
+def test_FR_KB_030_review_confirms_a_flagged_answer_and_names_the_verifier(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    principal = world.person("principal")
+    vid = _vid(_verified(api, principal, docs["sports"], "held on 28/11/2026"))
+    _set_status(admin_engine, vid, "needs_review")  # a cited document changed (§4.8)
+    stale = _manage(api, principal, vid, "review", 1)
+    assert stale.status_code == 412
+    office = _manage(api, world.person("office_staff"), vid, "review", 2)
+    assert office.status_code == 403
+    b_principal = W.add_member(admin_engine, world.b.tenant_id, ["principal"])
+    other_school = _manage(api, b_principal, vid, "review", 2)
+    assert other_school.status_code == 404
+    ok = _manage(api, principal, vid, "review", 2, answer_text="Sports day: 28/11/2026.")
+    assert ok.status_code == 200, ok.text
+    body = ok.json()
+    assert (body["status"], body["version"], body["answer_text"]) == (
+        "active",
+        3,
+        "Sports day: 28/11/2026.",
+    )
+    assert body["verified_by"] == str(principal.membership_id)
+    assert body["verified_by_name"] == principal.display_name
+    assert ok.headers["ETag"] == 'W/"3"'
+    audits = [
+        e
+        for e in W.audit_events(admin_engine, world.a.tenant_id, "kb.verified_answer.reviewed")
+        if str(e["resource_id"]) == vid
+    ]
+    assert len(audits) == 1
+    assert audits[0]["summary"]["changed"] == ["answer_text"]
+    assert "28/11/2026" not in str(audits[0]["summary"])
+
+
+def test_FR_KB_030_review_rechecks_citations_against_the_current_version(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    principal = world.person("principal")
+    vid = _vid(_verified(api, principal, docs["sports"], "held on 28/11/2026"))
+    bad = _manage(
+        api,
+        principal,
+        vid,
+        "review",
+        1,
+        citations=[{"source": f"sos://doc/{docs['sports']}/v1#p1", "cited_text": "not in it"}],
+    )
+    assert bad.status_code == 422
+    assert bad.json()["errors"][0]["code"] == "citation_text_not_found"
+
+
+def test_FR_KB_030_retire_withdraws_an_answer_once(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    principal = world.person("principal")
+    vid = _vid(_verified(api, principal, docs["sports"], "held on 28/11/2026"))
+    retired = _manage(api, principal, vid, "retire", 1)
+    assert retired.status_code == 200, retired.text
+    assert (retired.json()["status"], retired.json()["version"]) == ("retired", 2)
+    again = _manage(api, principal, vid, "retire", 2)
+    assert again.status_code == 409
+    assert again.json()["code"] == "verified_answer_retired"
+    review = _manage(api, principal, vid, "review", 2)
+    assert review.status_code == 409
+    assert [
+        e["resource_id"]
+        for e in W.audit_events(admin_engine, world.a.tenant_id, "kb.verified_answer.retired")
+        if str(e["resource_id"]) == vid
+    ]
+
+
+def test_FR_KB_030_active_verified_answers_are_searched_first_and_only_where_visible(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    principal = world.person("principal")
+    remedial = _vid(
+        _verified(
+            api,
+            principal,
+            docs["remedial"],
+            "Saturdays at 10:00",
+            question="When do zebramaths remedial classes run?",
+            answer_text="Zebramaths remedial classes run on Saturdays at 10:00.",
+        )
+    )
+    source = f"sos://verified/{remedial}"
+    question = "When do zebramaths remedial classes run?"
+    _, events = K.ask(api, principal, question)
+    assert _sources(events)[0] == source  # boosted: before the passages
+    assert "Saturdays at 10:00" in _text(events)
+    # The class teacher (9A) cannot read the 9C circular it cites: never offered or cited.
+    fake.sent.clear()
+    _, events = K.ask(api, world.person("class_teacher"), question)
+    assert source not in _sources(events)
+    assert source not in str(fake.sent)
+    # Flagged for review or retired: no longer used.
+    _set_status(admin_engine, remedial, "needs_review")
+    fake.sent.clear()
+    _, events = K.ask(api, principal, question)
+    assert source not in str(fake.sent)
+    # Another school never sees it (RLS).
+    fake.sent.clear()
+    K.ask(api, world.b.people["owner"], question)
+    assert source not in str(fake.sent)

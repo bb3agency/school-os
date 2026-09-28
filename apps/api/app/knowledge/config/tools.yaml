@@ -76,5 +76,6 @@ tools:
       return the most relevant passages. Use for rules, dates, timings and announcements.
     permission: document.read
     max_results: 6                     # passages per call (docs/06 §12: prefer fewer, better)
+    max_verified_answers: 2            # active verified answers first (docs/06 §2, §6 boost)
     # A question with one of these words prefers the newest documents (recency boost, §6).
     latest_terms: [latest, current, recent, newest, new, updated, revised, తాజా, ప్రస్తుత, కొత్త]

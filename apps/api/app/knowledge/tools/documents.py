@@ -36,6 +36,7 @@ from app.knowledge.domain import (
     ToolSpec,
 )
 from app.knowledge.interfaces import Retriever, TenantEmbedder
+from app.knowledge.retrieval.verified import VerifiedHit, search_verified_answers
 from app.knowledge.tools.access import SENSITIVE, acl_keys
 
 if TYPE_CHECKING:
@@ -114,6 +115,16 @@ def to_block(chunk: RankedChunk) -> SearchResultBlock:
     return SearchResultBlock(source=chunk.source, title=block_title(chunk), text=chunk.content)
 
 
+def verified_block(hit: VerifiedHit) -> SearchResultBlock:
+    """A verified answer as a citable source (``sos://verified/{id}``, docs/06 §8)."""
+    verified_on = hit.verified_at.strftime("%d/%m/%Y")
+    return SearchResultBlock(
+        source=sources.verified_answer(hit.id),
+        title=f"Verified answer · {hit.question} · verified {verified_on}",
+        text=f"Question: {hit.question}\nVerified answer: {hit.answer_text}",
+    )
+
+
 class DocumentSearch:
     """Query embedding + ACL-filtered hybrid retrieval for one caller."""
 
@@ -127,6 +138,17 @@ class DocumentSearch:
     def prefers_latest(self, query: str) -> bool:
         words = {w.casefold() for w in _WORD.findall(query)}
         return bool(words & self._latest_terms)
+
+    def verified(
+        self, session: Session, ctx: UserContext, query: str, *, limit: int
+    ) -> list[SearchResultBlock]:
+        """Active verified answers the caller may see (every cited document visible under the
+        same SQL filter as passages), best first; [] without document access."""
+        acl = acl_keys(session, ctx)
+        text = nfc(query).strip()
+        if acl is None or not text or limit < 1:
+            return []
+        return [verified_block(h) for h in search_verified_answers(session, acl, text, limit=limit)]
 
     def search(
         self,
@@ -164,6 +186,7 @@ class SearchDocumentsTool:
             raise ValueError("search_documents needs a description in tools.yaml")
         self._search = search
         self._max_results = config.max_results or 6
+        self._max_verified = config.max_verified_answers or 0
         self._spec = ToolSpec(
             name=NAME,
             description=config.description,
@@ -191,7 +214,10 @@ class SearchDocumentsTool:
             doc_types=frozenset(args.doc_types) if args.doc_types is not None else None
         )
         found = self._search.search(session, ctx, args.query, filters=filters, k=self._max_results)
-        return ToolOutcome(call_id=call_id, blocks=tuple(to_block(c) for c in found))
+        verified: list[SearchResultBlock] = []
+        if args.doc_types is None or "verified_answer" in args.doc_types:
+            verified = self._search.verified(session, ctx, args.query, limit=self._max_verified)
+        return ToolOutcome(call_id=call_id, blocks=(*verified, *(to_block(c) for c in found)))
 
 
 LIST_NAME: Final = "list_documents"
@@ -290,4 +316,5 @@ __all__ = [
     "block_title",
     "input_schema",
     "to_block",
+    "verified_block",
 ]

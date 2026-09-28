@@ -439,6 +439,32 @@ def list_verified_answers(
     return list(session.execute(stmt).scalars())
 
 
+def get_verified_answer(
+    session: Session, answer_id: uuid.UUID, *, for_update: bool = False
+) -> VerifiedAnswer | None:
+    stmt = select(VerifiedAnswer).where(VerifiedAnswer.id == answer_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def update_verified_answer(
+    session: Session,
+    answer_id: uuid.UUID,
+    *,
+    expected_version: int,
+    values: Mapping[str, Any],
+) -> VerifiedAnswer | None:
+    """Apply ``values`` and bump ``version`` when it is still ``expected_version`` (None if
+    not: the caller answers 412)."""
+    return session.execute(
+        update(VerifiedAnswer)
+        .where(VerifiedAnswer.id == answer_id, VerifiedAnswer.version == expected_version)
+        .values(**values, version=VerifiedAnswer.version + 1)
+        .returning(VerifiedAnswer)
+    ).scalar_one_or_none()
+
+
 def insert_verified_answer(session: Session, values: Mapping[str, Any]) -> VerifiedAnswer:
     row = session.execute(
         insert(VerifiedAnswer)

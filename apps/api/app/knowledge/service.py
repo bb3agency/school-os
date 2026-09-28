@@ -39,12 +39,13 @@ from typing import TYPE_CHECKING, Final
 from app.audit import service as audit
 from app.authz.kv import KVUnavailable, kv_store
 from app.core.db import tenant_session
-from app.core.errors import Forbidden, NotFound, ValidationFailed
+from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_logger
 from app.core.redaction import mask_aadhaar
 from app.core.textnorm import nfc
 from app.documents import service as documents
+from app.identity import service as identity
 from app.knowledge import composition, sources
 from app.knowledge import repository as repo
 from app.knowledge.answer import Answer, Progress, detect_language, elapsed_ms, normalise
@@ -83,6 +84,7 @@ from app.knowledge.schemas import (
     SearchResultOut,
     VerifiedAnswerIn,
     VerifiedAnswerOut,
+    VerifiedAnswerReviewIn,
     VerifiedCitationOut,
 )
 from app.students import crypto
@@ -99,6 +101,7 @@ log = get_logger(__name__)
 ASK: Final = "kb.ask"
 SEARCH: Final = "document.read"
 MANAGE_VERIFIED: Final = "kb.verified_answer.manage"
+READ_SENSITIVE: Final = "student.read_sensitive"
 QUERIES_TABLE: Final = "kb.queries"
 MAX_QUESTION_CHARS: Final = 1000
 INTERNAL_ERROR: Final = "internal_error"
@@ -124,7 +127,7 @@ def _result_out(chunk: RankedChunk) -> SearchResultOut:
     )
 
 
-def _verified_out(row: VerifiedAnswer) -> VerifiedAnswerOut:
+def _verified_out(row: VerifiedAnswer, verified_by_name: str | None) -> VerifiedAnswerOut:
     return VerifiedAnswerOut(
         id=row.id,
         question=row.question_canonical,
@@ -133,6 +136,7 @@ def _verified_out(row: VerifiedAnswer) -> VerifiedAnswerOut:
         citations=[VerifiedCitationOut.model_validate(c) for c in row.citations],
         status=row.status,
         verified_by=row.verified_by,
+        verified_by_name=verified_by_name,
         verified_at=row.verified_at,
         review_due=row.review_due,
         version=row.version,
@@ -572,15 +576,29 @@ class SchoolKnowledgeService:
     # --- verified answers (FR-KB-030) -------------------------------------------------------
 
     @staticmethod
-    def _cites_visible(session: Session, ctx: UserContext, row: VerifiedAnswer) -> bool:
+    def _document_visible(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
+        """The caller's ACL/scope reaches it, and a restricted (C3) one only with
+        ``student.read_sensitive`` (the rule retrieval applies, docs/06 §6)."""
+        try:
+            doc = documents.get_document(session, ctx, document_id)
+        except NotFound:
+            return False
+        return doc.sensitivity != "C3" or ctx.has(READ_SENSITIVE)
+
+    def _cites_visible(self, session: Session, ctx: UserContext, row: VerifiedAnswer) -> bool:
         for citation in row.citations:
             try:
                 ref = sources.parse(str(citation.get("source", "")))
             except ValueError:
                 return False
-            if ref.kind != "doc" or not documents.is_visible(session, ctx, ref.object_id):
+            if ref.kind != "doc" or not self._document_visible(session, ctx, ref.object_id):
                 return False
         return True
+
+    @staticmethod
+    def _verified_page(session: Session, rows: list[VerifiedAnswer]) -> list[VerifiedAnswerOut]:
+        names = identity.member_display_names(session, {r.verified_by for r in rows})
+        return [_verified_out(r, names.get(r.verified_by)) for r in rows]
 
     def list_verified_answers(
         self,
@@ -599,8 +617,8 @@ class SchoolKnowledgeService:
         )
         more = len(rows) > limit
         rows = rows[:limit]
-        page = [_verified_out(r) for r in rows if self._cites_visible(session, ctx, r)]
-        return page, (rows[-1].id if more and rows else None)
+        visible = [r for r in rows if self._cites_visible(session, ctx, r)]
+        return self._verified_page(session, visible), (rows[-1].id if more and rows else None)
 
     def _check_citation(
         self, session: Session, ctx: UserContext, index: int, source: str, cited_text: str
@@ -612,10 +630,9 @@ class SchoolKnowledgeService:
             return _error(field, "citation_source_invalid")
         if ref.kind != "doc" or ref.version_no is None or ref.page is None:
             return _error(field, "citation_source_unsupported")
-        try:
-            doc = documents.get_document(session, ctx, ref.object_id)
-        except NotFound:
-            return _error(field, "citation_not_found")
+        if not self._document_visible(session, ctx, ref.object_id):
+            return _error(field, "citation_not_found")  # also a C3 one without read_sensitive
+        doc = documents.get_document(session, ctx, ref.object_id)
         current = doc.current_version
         if doc.status != "active" or current is None or current.version_no != ref.version_no:
             return _error(field, "citation_not_current")
@@ -625,6 +642,19 @@ class SchoolKnowledgeService:
             return _error(f"citations[{index}].cited_text", "citation_text_not_found")
         return None
 
+    def _checked_citations(
+        self, session: Session, ctx: UserContext, citations: list[dict[str, str]]
+    ) -> list[dict[str, str]]:
+        errors = [
+            e
+            for i, c in enumerate(citations)
+            if (e := self._check_citation(session, ctx, i, c["source"], c["cited_text"]))
+            is not None
+        ]
+        if errors:
+            raise ValidationFailed(errors)
+        return [{"source": c["source"], "cited_text": nfc(c["cited_text"])} for c in citations]
+
     def create_verified_answer(
         self, session: Session, ctx: UserContext, data: VerifiedAnswerIn
     ) -> VerifiedAnswerOut:
@@ -632,13 +662,7 @@ class SchoolKnowledgeService:
         the current version of a document the caller can read (docs/06 §8-9)."""
         if not ctx.has(MANAGE_VERIFIED):
             raise Forbidden()
-        errors = [
-            e
-            for i, c in enumerate(data.citations)
-            if (e := self._check_citation(session, ctx, i, c.source, c.cited_text)) is not None
-        ]
-        if errors:
-            raise ValidationFailed(errors)
+        citations = self._checked_citations(session, ctx, [c.model_dump() for c in data.citations])
         now = dt.datetime.now(dt.UTC)
         row = repo.insert_verified_answer(
             session,
@@ -647,9 +671,7 @@ class SchoolKnowledgeService:
                 "question_canonical": mask_aadhaar(nfc(data.question)),
                 "language": data.language,
                 "answer_text": mask_aadhaar(nfc(data.answer_text)),
-                "citations": [
-                    {"source": c.source, "cited_text": nfc(c.cited_text)} for c in data.citations
-                ],
+                "citations": citations,
                 "verified_by": ctx.membership_id,
                 "verified_at": now,
                 "review_due": data.review_due,
@@ -663,7 +685,103 @@ class SchoolKnowledgeService:
             summary={"language": data.language, "citations": len(data.citations)},
             request_id=ctx.request_id,
         )
-        return _verified_out(row)
+        return self._verified_page(session, [row])[0]
+
+    def _managed_answer(
+        self, session: Session, ctx: UserContext, answer_id: uuid.UUID, expected_version: int
+    ) -> VerifiedAnswer:
+        """The answer, locked, for a manager who can read every document it cites (404
+        otherwise, like another school's); 412 on a stale ``If-Match``; 409 once retired."""
+        if not ctx.has(MANAGE_VERIFIED):
+            raise Forbidden()
+        row = repo.get_verified_answer(session, answer_id, for_update=True)
+        if row is None or not self._cites_visible(session, ctx, row):
+            raise NotFound("Verified answer not found")
+        if row.version != expected_version:
+            raise PreconditionFailed()
+        if row.status == "retired":
+            raise Conflict("This verified answer is retired.", code="verified_answer_retired")
+        return row
+
+    def review_verified_answer(
+        self,
+        session: Session,
+        ctx: UserContext,
+        answer_id: uuid.UUID,
+        data: VerifiedAnswerReviewIn,
+        *,
+        expected_version: int,
+    ) -> VerifiedAnswerOut:
+        """Confirm (or correct) a verified answer, typically one flagged ``needs_review`` after a
+        cited document changed (FR-KB-030, docs/06 §4.8). Its citations (the new ones, else the
+        stored ones) must again quote the CURRENT version of documents the caller can read;
+        it becomes ``active``, verified by the caller now. Audited
+        ``kb.verified_answer.reviewed`` with the changed field names only."""
+        row = self._managed_answer(session, ctx, answer_id, expected_version)
+        citations = self._checked_citations(
+            session,
+            ctx,
+            [c.model_dump() for c in data.citations]
+            if data.citations is not None
+            else [
+                {"source": str(c.get("source", "")), "cited_text": str(c.get("cited_text", ""))}
+                for c in row.citations
+            ],
+        )
+        values: dict[str, object] = {
+            "status": "active",
+            "citations": citations,
+            "verified_by": ctx.membership_id,
+            "verified_at": dt.datetime.now(dt.UTC),
+        }
+        changed = []
+        if data.answer_text is not None:
+            values["answer_text"] = mask_aadhaar(nfc(data.answer_text))
+            changed.append("answer_text")
+        if data.citations is not None:
+            changed.append("citations")
+        if "review_due" in data.model_fields_set:
+            values["review_due"] = data.review_due
+            changed.append("review_due")
+        updated = repo.update_verified_answer(
+            session, answer_id, expected_version=expected_version, values=values
+        )
+        if updated is None:  # pragma: no cover - the row is locked above
+            raise PreconditionFailed()
+        audit.record(
+            session,
+            action="kb.verified_answer.reviewed",
+            resource_type="kb_verified_answer",
+            resource_id=answer_id,
+            summary={
+                "previous_status": row.status,
+                "changed": changed,
+                "citations": len(citations),
+            },
+            request_id=ctx.request_id,
+        )
+        return self._verified_page(session, [updated])[0]
+
+    def retire_verified_answer(
+        self, session: Session, ctx: UserContext, answer_id: uuid.UUID, *, expected_version: int
+    ) -> VerifiedAnswerOut:
+        """Withdraw a verified answer (``retired``): it is never searched or shown as current
+        again; kept for the record. Audited ``kb.verified_answer.retired``."""
+        row = self._managed_answer(session, ctx, answer_id, expected_version)
+        updated = repo.update_verified_answer(
+            session, answer_id, expected_version=expected_version, values={"status": "retired"}
+        )
+        if updated is None:  # pragma: no cover - the row is locked above
+            raise PreconditionFailed()
+        audit.record(
+            session,
+            action="kb.verified_answer.retired",
+            resource_type="kb_verified_answer",
+            resource_id=answer_id,
+            summary={"previous_status": row.status},
+            request_id=ctx.request_id,
+        )
+        return self._verified_page(session, [updated])[0]
 
 
 _MARKER = re.compile(r"\s*\[\d+\]")
