@@ -196,9 +196,7 @@ describe("school home without a session: public welcome page (FR-IAM-001)", () =
 
   it("the operator panel never sends visitors to the school welcome page", async () => {
     requestPath = "/en";
-    expect(await redirectOf(() => requireOperator())).toBe(
-      "/bff/auth/platform/login?next=%2Fen",
-    );
+    expect(await redirectOf(() => requireOperator())).toBe("/bff/auth/platform/login?next=%2Fen");
   });
 
   it("recognises only the bare locale home as the school home", () => {
