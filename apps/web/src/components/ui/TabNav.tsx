@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { tabStyles, type TabsVariant } from "./tab-styles";
 
 export interface TabNavItem {
   id: string;
@@ -16,14 +17,18 @@ export function TabNav({
   label,
   items,
   activeId,
+  variant = "segmented",
 }: {
   label: string;
   items: readonly TabNavItem[];
   activeId: string;
+  /** `segmented` (default) or the older `underline` look. */
+  variant?: TabsVariant;
 }) {
+  const styles = tabStyles(variant);
   return (
     <nav aria-label={label} data-print="hide">
-      <ul className="flex flex-wrap gap-1 border-b border-border">
+      <ul className={styles.list}>
         {items.map((item) => {
           const active = item.id === activeId;
           return (
@@ -31,12 +36,7 @@ export function TabNav({
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={cn(
-                  "-mb-px inline-block border-b-2 px-4 py-2 text-sm font-semibold",
-                  active
-                    ? "border-primary text-primary"
-                    : "border-transparent text-ink-muted hover:text-ink",
-                )}
+                className={cn(styles.tab, active ? styles.active : styles.inactive)}
               >
                 {item.label}
               </Link>

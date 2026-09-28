@@ -1,15 +1,47 @@
-/** Placeholder rows while data loads. Announced once via role="status". */
-export function LoadingState({ label, rows = 3 }: { label: string; rows?: number }) {
+import { cn } from "@/lib/cn";
+
+/**
+ * Placeholder rows while data loads. Announced once via role="status". The shimmer is a
+ * flat block when the user prefers reduced motion (globals.css `.skeleton`).
+ */
+export function LoadingState({
+  label,
+  rows = 3,
+  variant = "rows",
+  className,
+}: {
+  label: string;
+  rows?: number;
+  /** `rows`: list lines. `cards`: a grid of card-sized blocks (dashboards). */
+  variant?: "rows" | "cards";
+  className?: string;
+}) {
   return (
-    <div role="status" aria-live="polite" className="space-y-2">
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        variant === "cards" ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3" : "space-y-2",
+        className,
+      )}
+    >
       <span className="sr-only">{label}</span>
       {Array.from({ length: rows }, (_, index) => (
-        <div
+        <Skeleton
           key={index}
-          aria-hidden="true"
-          className="h-6 rounded-sm bg-surface-muted motion-safe:animate-pulse"
+          className={variant === "cards" ? "h-32 rounded-xl" : "h-6 rounded-sm"}
         />
       ))}
     </div>
+  );
+}
+
+/** One decorative placeholder block (size and round it with `className`). */
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("skeleton motion-safe:animate-shimmer", className ?? "h-6 rounded-sm")}
+    />
   );
 }

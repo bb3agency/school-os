@@ -144,7 +144,7 @@ describe("dev sign-in is reachable from nowhere else", () => {
       return statSync(path).isDirectory() ? files(path) : [path];
     });
 
-  it("only the dev page and the signed-out page import it", () => {
+  it("only the dev pages and the signed-out page import it", () => {
     const importers = files(src)
       .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
       .filter(
@@ -155,6 +155,8 @@ describe("dev sign-in is reachable from nowhere else", () => {
       .sort();
     expect(importers).toEqual([
       "app/[locale]/dev/sign-in/page.tsx",
+      // The UI reference reuses the same guard (isDevSignInEnabled) and nothing else.
+      "app/[locale]/dev/ui/page.tsx",
       "app/[locale]/signed-out/page.tsx",
     ]);
   });

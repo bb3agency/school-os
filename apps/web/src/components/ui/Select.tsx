@@ -14,10 +14,13 @@ export interface SelectProps extends Omit<ComponentProps<"select">, "children"> 
   placeholder?: string;
 }
 
-/** Native <select>: keyboard, screen-reader and mobile friendly without extra code. */
+/**
+ * Native <select> (keyboard, screen-reader and mobile friendly without extra code), styled
+ * as a filled control with a chevron drawn by CSS (`.select-chevron`, no extra markup).
+ */
 export function Select({ options, placeholder, className, ...props }: SelectProps) {
   return (
-    <select className={cn(controlClasses, "min-h-10 pr-8", className)} {...props}>
+    <select className={cn(controlClasses, "select-chevron min-h-10 pr-10", className)} {...props}>
       {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
       {options.map((option) => (
         <option key={option.value} value={option.value} disabled={option.disabled}>

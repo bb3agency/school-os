@@ -48,7 +48,11 @@
       "copyFailed": "Could not copy. Select the key and copy it by hand.",
       "stored": "I have stored this key safely"
     },
-    "dateHintFormat": "Use {format}, for example {example}."
+    "dateHintFormat": "Use {format}, for example {example}.",
+    "breadcrumb": "You are here",
+    "sectionsNav": "Sections",
+    "menu": "Menu",
+    "closeMenu": "Close menu"
   },
   "language": {
     "label": "Language",
@@ -139,7 +143,14 @@
       "billing": "Plan and billing",
       "audit": "Audit log",
       "support": "Support",
-      "promotions": "Promotions"
+      "promotions": "Promotions",
+      "sections": {
+        "overview": "Overview",
+        "records": "Records",
+        "checks": "Checks and submissions",
+        "ask": "Ask",
+        "admin": "School admin"
+      }
     },
     "home": {
       "title": "Home",
@@ -511,7 +522,13 @@
       "support": "Support tickets",
       "breakGlass": "Break-glass requests",
       "operators": "Operators and roles",
-      "audit": "Platform audit log"
+      "audit": "Platform audit log",
+      "sections": {
+        "overview": "Overview",
+        "schools": "Schools and billing",
+        "operations": "Operations",
+        "access": "Access and audit"
+      }
     },
     "noStudentData": "Student records are never shown in the platform admin panel.",
     "dashboard": {
@@ -4193,6 +4210,28 @@
       "location": "Data stored in India (AWS Mumbai).",
       "top": "Back to top",
       "signIn": "Sign in"
+    }
+  },
+  "devUi": {
+    "title": "UI reference",
+    "intro": "Every SchoolOS primitive and variant with synthetic content. Screens use these components; docs/17-ui-design-system.md explains when to use which.",
+    "localOnly": "Local development only. This page does not exist in staging or production.",
+    "sampleNote": "All names, numbers and dates on this page are made-up samples.",
+    "sections": {
+      "colours": "Colours",
+      "type": "Type",
+      "buttons": "Buttons",
+      "pills": "Badges and pills",
+      "cards": "Cards and KPIs",
+      "forms": "Form controls",
+      "navigation": "Tabs and segmented controls",
+      "table": "Table",
+      "feedback": "Alerts, empty and loading states",
+      "people": "Avatars, progress and timeline",
+      "ai": "AI panel",
+      "dialog": "Dialog",
+      "icons": "Icons",
+      "telugu": "Telugu"
     }
   }
 }

@@ -192,7 +192,7 @@ export function IdleWarning({ kind, navigate }: { kind: SessionKind; navigate: N
         event.preventDefault();
         void stay();
       }}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-ink shadow-xl"
+      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
     >
       <div className="space-y-2 p-5">
         <h2 id={titleId} className="text-lg font-semibold">
@@ -202,7 +202,7 @@ export function IdleWarning({ kind, navigate }: { kind: SessionKind; navigate: N
           {t("body")}
         </p>
       </div>
-      <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
+      <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-5 py-4">
         <Button variant="secondary" onClick={() => void expire()}>
           {t("signOut")}
         </Button>

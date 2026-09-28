@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
 /*
- * SchoolOS design tokens (Tailwind v4, CSS-first).
+ * SchoolOS design tokens (Tailwind v4, CSS-first). docs/17-ui-design-system.md describes them.
  * Only the semantic colours below exist, so every screen draws from the same palette.
- * Text/background pairs meet WCAG 2.2 AA (4.5:1 text, 3:1 UI boundaries).
+ * Every text/background pair used by the primitives meets WCAG 2.2 AA (4.5:1 text,
+ * 3:1 large text and UI boundaries); the ratio is written next to each token and
+ * src/components/ui/tokens.test.ts re-computes them from this file (NFR-A11Y-001).
+ * Older token names (primary, border-strong, …) still work: they are kept or aliased.
  */
 @theme {
   --color-*: initial;
@@ -12,47 +15,126 @@
   --color-transparent: transparent;
   --color-current: currentColor;
 
-  --color-canvas: #f6f7f9;
+  /* Canvas: soft sky-blue → pale aqua gradient behind the white cards (decorative). */
+  --color-canvas: #eef5fc; /* solid fallback and flat areas */
+  --color-canvas-from: #dbe9fa; /* ink-muted 6.1:1, ink-subtle 4.8:1, primary 5.4:1 */
+  --color-canvas-via: #ecf5fc; /* ink-subtle 5.3:1 */
+  --color-canvas-to: #dcf2f0; /* ink-muted 6.5:1, ink-subtle 5.1:1, primary 5.7:1 */
+
+  /* Surfaces */
   --color-surface: #ffffff;
-  --color-surface-muted: #eef1f5;
-  --color-border: #d5dae1; /* decorative dividers only */
-  --color-border-strong: #6b7280; /* input and control boundaries, 4.8:1 on white */
-  --color-ink: #1b2330; /* 15:1 on white */
-  --color-ink-muted: #4a5565; /* 7.3:1 on white */
+  --color-surface-muted: #f3f5f8; /* filled inputs, table header; ink 16.2:1, ink-muted 6.9:1 */
+  --color-surface-sunken: #eef1f5; /* segmented-control track; ink-muted 6.7:1 */
+  --color-surface-hover: #f7f9fb; /* row hover */
 
-  --color-primary: #1d4ed8; /* 6.7:1 on white */
+  /* Borders */
+  --color-border: #e6ebf1; /* hairline, decorative dividers and card edges only */
+  --color-border-soft: #d3dae3; /* secondary buttons (text label identifies them, 1.4.11) */
+  --color-border-control: #7b8494; /* input / switch boundaries: 3.8:1 on white, 3.5:1 on surface-muted */
+  --color-border-strong: #6b7280; /* legacy control boundary, 4.8:1 on white, 4.4:1 on surface-muted */
+
+  /* Ink scale */
+  --color-ink: #111827; /* 17.7:1 on white, 14.4:1 on canvas-from */
+  --color-ink-muted: #4b5563; /* 7.6:1 on white, 6.1:1 on canvas-from */
+  --color-ink-subtle: #5b6576; /* secondary lines ("1,157 last month"): 5.9:1 on white, 4.8:1 on canvas-from */
+
+  /* Action (near-black primary button) */
+  --color-action: #111827; /* white text 17.7:1 */
+  --color-action-hover: #1f2937; /* white text 14.7:1 */
+  --color-on-action: #ffffff;
+
+  /* Brand blue: links, focus, brand buttons. `primary` keeps its old name and meaning (links). */
+  --color-primary: #1d4ed8; /* 6.7:1 on white, 5.4:1 on canvas-from, 6.1:1 on info-soft */
   --color-primary-hover: #1e3a8a;
-  --color-primary-soft: #e8efff;
+  --color-primary-soft: #e8efff; /* primary text on it 5.8:1 */
   --color-on-primary: #ffffff;
+  --color-brand: #2563eb; /* white text 5.2:1 */
+  --color-brand-strong: #1e40af; /* white text 8.7:1 */
 
-  --color-danger: #b42318; /* 6.5:1 on white */
+  /* Status */
+  --color-danger: #b42318; /* 6.6:1 on white, 6.0:1 on danger-soft, white on it 6.6:1 */
   --color-danger-hover: #912018;
   --color-danger-soft: #fef3f2;
-  --color-warning-ink: #7a2e0e; /* 8.9:1 on warning-soft */
+  --color-warning-ink: #7a2e0e; /* 9.0:1 on warning-soft */
   --color-warning-soft: #fffaeb;
   --color-warning-border: #b54708;
-  --color-success-ink: #05603a; /* 7.4:1 on success-soft */
+  --color-success-ink: #05603a; /* 7.3:1 on success-soft */
   --color-success-soft: #ecfdf3;
-  --color-info-ink: #1e40af;
+  --color-success: #15803d; /* switch "on" track, check circles: 5.0:1 on white */
+  --color-positive-ink: #166534; /* 6.8:1 on positive-soft */
+  --color-positive-soft: #f0fdf4;
+  --color-positive-border: #86efac; /* decorative */
+  --color-info-ink: #1e40af; /* 7.9:1 on info-soft */
   --color-info-soft: #eff4ff;
+  --color-info-border: #bfd3fb; /* decorative */
+  --color-violet-ink: #5b21b6; /* 8.0:1 on violet-soft, 9.0:1 on white */
+  --color-violet-soft: #f3efff;
+  --color-teal-ink: #115e59; /* 6.9:1 on teal-soft */
+  --color-teal-soft: #e6f7f5;
+  --color-teal: #0f766e; /* 5.5:1 on white */
 
-  --color-focus: #1d4ed8;
+  /* Status pills (white text): gradients from the darker to the lighter stop.
+     The ratio is for white text on the LIGHTER stop, i.e. the worst case. */
+  --color-pill-blue-from: #1d4ed8;
+  --color-pill-blue-to: #2563eb; /* white 5.2:1 */
+  --color-pill-violet-from: #4f46e5;
+  --color-pill-violet-to: #7c3aed; /* white 5.7:1 (and 6.3:1 on the first stop) */
+  --color-pill-teal-from: #0f766e;
+  --color-pill-teal-to: #0e7a6f; /* white 5.2:1 */
+
+  /* AI panel: white text; lightest stop brand #2563eb (5.2:1). */
+  --color-ai-from: #1e3a8a; /* white 10.4:1 */
+  --color-ai-to: #2563eb;
+
+  /* Chart series (graphics: 3:1 against white cards, WCAG 1.4.11) */
+  --color-chart-1: #2563eb; /* 5.2:1 */
+  --color-chart-2: #d97706; /* amber, 3.2:1 */
+  --color-chart-3: #0d9488; /* teal, 3.7:1 */
+  --color-chart-4: #7c3aed; /* violet, 5.7:1 */
+  --color-chart-track: #e6ebf1; /* ring/bar track, decorative (the value carries the meaning) */
+
+  --color-focus: #1d4ed8; /* 6.7:1 on white, 5.4:1 on canvas */
 
   /* Platform admin chrome: deliberately different from the school app. */
-  --color-platform: #3b0764; /* white text 14:1 */
-  --color-platform-hover: #581c87;
+  --color-platform: #3b0764; /* white text 15:1 */
+  --color-platform-hover: #581c87; /* white text 10.9:1 */
   --color-platform-ink: #ffffff;
-  --color-platform-accent: #fcd34d; /* badge + focus ring on dark chrome */
+  --color-platform-muted: #e9d5ff; /* 11.0:1 on platform */
+  --color-platform-accent: #fcd34d; /* badge + focus ring on dark chrome, 10.4:1 on platform */
   --color-platform-accent-ink: #3b0764;
+  --color-platform-soft: #f5f0ff; /* platform ink on it 13.4:1 */
 
   --radius-*: initial;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.625rem;
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem; /* 8px */
+  --radius-md: 0.625rem; /* 10px: buttons, inputs */
+  --radius-lg: 0.875rem; /* 14px */
+  --radius-xl: 1.25rem; /* 20px: cards */
+  --radius-2xl: 1.5rem;
   --radius-full: 9999px;
 
-  --font-sans: "Noto Sans", "Noto Sans Telugu", system-ui, "Segoe UI", Arial, sans-serif;
-  --font-mono: ui-monospace, Consolas, "Liberation Mono", monospace;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 12px 32px -12px rgb(30 64 175 / 0.12);
+  --shadow-raised: 0 1px 2px rgb(16 24 40 / 0.06), 0 2px 6px -1px rgb(16 24 40 / 0.08);
+  --shadow-popover: 0 4px 8px -2px rgb(16 24 40 / 0.08), 0 20px 40px -12px rgb(30 64 175 / 0.22);
+
+  /* Latin UI font first; Telugu glyphs fall through to Noto Sans Telugu. */
+  --font-sans: "Inter Variable", "Noto Sans Telugu", system-ui, "Segoe UI", Arial, sans-serif;
+  /* Big KPI numbers and display headings, Latin only (:lang(te) switches back to sans). */
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-serif: var(--font-display);
+  --font-mono:
+    "JetBrains Mono", ui-monospace, Consolas, "Liberation Mono", "Noto Sans Telugu", monospace;
+
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
 }
 
 @layer base {
@@ -63,10 +145,19 @@
 
   body {
     background-color: var(--color-canvas);
+    /* Decorative only; text contrast is checked against both end colours. */
+    background-image: linear-gradient(
+      160deg,
+      var(--color-canvas-from) 0%,
+      var(--color-canvas-via) 45%,
+      var(--color-canvas-to) 100%
+    );
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
     line-height: 1.5;
     min-height: 100vh;
+    accent-color: var(--color-primary);
   }
 
   /* Telugu has tall vowel signs and conjuncts: give lines room so glyphs never clip. */
@@ -86,6 +177,11 @@
     --color-focus: var(--color-platform-accent);
   }
 
+  /* Blue AI panel: a white ring (5.2:1 on the lightest stop) instead of the blue one. */
+  .ai-chrome {
+    --color-focus: #ffffff;
+  }
+
   dialog::backdrop {
     background-color: rgb(15 23 42 / 0.55);
   }
@@ -93,6 +189,100 @@
   meter {
     inline-size: 100%;
     block-size: 0.75rem;
+  }
+}
+
+@layer components {
+  /* Mono uppercase label ("SENTIMENT DYNAMICS"). Telugu has no case and letter-spacing
+     breaks its shaping, so it gets the sans font and normal spacing. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .eyebrow:lang(te) {
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    letter-spacing: normal;
+    line-height: 1.75;
+    text-transform: none;
+  }
+
+  /* Serif display (KPI numbers, hero headline accents): Latin only. */
+  .font-display:lang(te),
+  .font-serif:lang(te) {
+    font-family: var(--font-sans);
+    letter-spacing: normal;
+    line-height: 1.75;
+  }
+
+  /* Native <select> chevron (data: image is allowed by img-src; no inline styles). */
+  .select-chevron {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%234b5563'%3E%3Cpath d='M5.3 7.3a1 1 0 0 1 1.4 0L10 10.58l3.3-3.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.42Z'/%3E%3C/svg%3E");
+    background-position: right 0.625rem center;
+    background-repeat: no-repeat;
+    background-size: 1.125rem;
+  }
+
+  /* Skeleton shimmer; a flat block when motion is reduced (see the media query below). */
+  .skeleton {
+    background-color: var(--color-surface-sunken);
+    background-image: linear-gradient(
+      90deg,
+      var(--color-surface-sunken) 0%,
+      var(--color-surface-muted) 40%,
+      var(--color-surface-sunken) 80%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* Status pills: gradient fill, white text; a transparent border becomes visible in
+     forced-colors mode, where backgrounds are removed. */
+  .pill-gradient-blue {
+    background-color: var(--color-pill-blue-from);
+    background-image: linear-gradient(
+      135deg,
+      var(--color-pill-blue-from),
+      var(--color-pill-blue-to)
+    );
+  }
+
+  .pill-gradient-violet {
+    background-color: var(--color-pill-violet-from);
+    background-image: linear-gradient(
+      135deg,
+      var(--color-pill-violet-from),
+      var(--color-pill-violet-to)
+    );
+  }
+
+  .pill-gradient-teal {
+    background-color: var(--color-pill-teal-from);
+    background-image: linear-gradient(
+      135deg,
+      var(--color-pill-teal-from),
+      var(--color-pill-teal-to)
+    );
+  }
+
+  /* AI panel: dark stop at the top left with a soft light over it; the lightest point is
+     the brand stop (white text 5.2:1). */
+  .ai-gradient {
+    background-color: var(--color-ai-from);
+    background-image:
+      radial-gradient(circle at 0% 0%, rgb(96 165 250 / 0.25), transparent 45%),
+      linear-gradient(135deg, var(--color-ai-from) 0%, var(--color-ai-to) 100%);
+  }
+
+  /* Pale green quote block (copilot suggestions). */
+  .quote-gradient {
+    background-color: var(--color-positive-soft);
+    background-image: linear-gradient(135deg, #ecfdf5, #f0fdf4 60%, #f7fee7);
   }
 }
 
@@ -104,6 +294,21 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .skeleton {
+    animation: none !important;
+    background-image: none;
+  }
+}
+
+/* Windows high contrast: gradients and shadows disappear, so borders carry the shapes. */
+@media (forced-colors: active) {
+  .pill-gradient-blue,
+  .pill-gradient-violet,
+  .pill-gradient-teal,
+  .ai-gradient {
+    border-color: CanvasText;
   }
 }
 
@@ -121,8 +326,33 @@
     font-size: 11pt;
   }
 
+  /* Cards print as plain bordered boxes: no gradients, shadows or tints. */
+  *,
+  ::before,
+  ::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .ai-gradient,
+  .pill-gradient-blue,
+  .pill-gradient-violet,
+  .pill-gradient-teal,
+  .quote-gradient {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #000000 !important;
+  }
+
   [data-print="hide"] {
     display: none !important;
+  }
+
+  [data-print="card"] {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+    border-radius: 0 !important;
+    break-inside: avoid;
   }
 
   a {

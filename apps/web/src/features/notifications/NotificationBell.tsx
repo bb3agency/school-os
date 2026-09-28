@@ -182,7 +182,7 @@ export function NotificationBell() {
           if (!open) void queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.latest });
           setOpen((value) => !value);
         }}
-        className="relative inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-border-strong bg-surface text-ink hover:bg-surface-muted"
+        className="relative inline-flex size-10 items-center justify-center rounded-full border border-border-soft bg-surface text-ink hover:bg-surface-muted"
       >
         <svg
           aria-hidden="true"
@@ -213,7 +213,7 @@ export function NotificationBell() {
         <section
           id={panelId}
           aria-label={t("panelLabel")}
-          className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-3 text-ink shadow-xl"
+          className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-4 text-ink shadow-popover"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold">{t("title")}</h2>

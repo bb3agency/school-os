@@ -317,6 +317,7 @@ Each class produces a bilingual explanation code (`NM-ORDER`, `NM-SPACING`, …)
 - Print views for every report; A4 by default; Telugu renders without clipping.
 - Language toggle persists per user; numbers and dates follow Indian conventions (DD/MM/YYYY, lakh/crore where relevant).
 - Accessibility target: WCAG 2.2 AA (contrast, focus visible, labels, reduced motion).
+- Visual language, components and the contrast table: 17-UI Design System.
 
 ## 9. Non-goals for core
 

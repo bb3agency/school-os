@@ -1,8 +1,11 @@
 import { useTranslations } from "next-intl";
+import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
 import { buttonClasses } from "@/components/ui/Button";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { cardClasses } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
+import { cn } from "@/lib/cn";
 import { translateOr } from "@/lib/i18n-dynamic";
 import { CopyButton } from "./CopyButton";
 import type { DevSchool } from "./staff";
@@ -17,32 +20,29 @@ export function DevSignInView({ schools }: { schools: DevSchool[] }) {
   // Role keys come from the seed plan; fall back to the column heading if one is missing.
   const tr = (role: string) =>
     translateOr(tAll, `school.users.roles.${role}`, "devSignIn.columns.role");
-  const tc = useTranslations("common");
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-6 py-3">
-        <p className="text-lg font-bold text-primary">{tc("appName")}</p>
-        <LanguageSwitcher />
-      </header>
-      <main id="main" className="mx-auto w-full max-w-4xl space-y-6 p-6 md:p-10">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+    <MinimalShell wide>
+      <div className="space-y-6">
+        <PageHeader title={t("title")} plain />
         <Alert tone="warning">{t("localOnly")}</Alert>
-        <ol className="list-decimal space-y-1 pl-6 text-ink">
-          <li>{t("steps.copy")}</li>
-          <li>{t("steps.signIn")}</li>
-          <li>{t("steps.paste")}</li>
-        </ol>
-        <p className="text-ink-muted">{t("mfaNote")}</p>
+        <div className={cn(cardClasses(), "space-y-3")}>
+          <ol className="list-decimal space-y-1 pl-6 text-ink">
+            <li>{t("steps.copy")}</li>
+            <li>{t("steps.signIn")}</li>
+            <li>{t("steps.paste")}</li>
+          </ol>
+          <p className="text-ink-muted">{t("mfaNote")}</p>
+        </div>
         {schools.map((school) => (
           <section
             key={school.code}
             aria-labelledby={`school-${school.code}`}
-            className="space-y-2"
+            className={cn(cardClasses(), "space-y-3")}
           >
-            <h2 id={`school-${school.code}`} className="text-xl font-semibold">
+            <h2 id={`school-${school.code}`} className="text-lg font-medium">
               {t("school", { code: school.code })}
             </h2>
-            <div className="overflow-x-auto rounded-md border border-border">
+            <div className="overflow-x-auto rounded-lg border border-border">
               <Table>
                 <caption className="sr-only">{t("tableCaption", { code: school.code })}</caption>
                 <THead>
@@ -89,20 +89,20 @@ export function DevSignInView({ schools }: { schools: DevSchool[] }) {
             </div>
           </section>
         ))}
-        <section aria-labelledby="dev-step-up" className="space-y-2">
-          <h2 id="dev-step-up" className="text-xl font-semibold">
+        <section aria-labelledby="dev-step-up" className={cn(cardClasses(), "space-y-2")}>
+          <h2 id="dev-step-up" className="text-lg font-medium">
             {t("stepUp.title")}
           </h2>
           <p className="text-ink">{t("stepUp.body")}</p>
           <CopyButton stepUpClaims label={t("stepUp.copy")} />
         </section>
-        <section aria-labelledby="dev-operators" className="space-y-2">
-          <h2 id="dev-operators" className="text-xl font-semibold">
+        <section aria-labelledby="dev-operators" className={cn(cardClasses(), "space-y-2")}>
+          <h2 id="dev-operators" className="text-lg font-medium">
             {t("operators.title")}
           </h2>
           <p className="text-ink">{t("operators.body")}</p>
         </section>
-      </main>
-    </div>
+      </div>
+    </MinimalShell>
   );
 }

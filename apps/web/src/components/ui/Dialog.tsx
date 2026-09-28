@@ -56,13 +56,13 @@ export function Dialog({
         aria-describedby={description ? descriptionId : undefined}
         onClose={() => triggerRef.current?.focus()}
         className={cn(
-          "m-auto w-[min(32rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-ink shadow-xl",
+          "m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover",
           className,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+        <div className="flex items-start justify-between gap-4 p-6 pb-2">
           <div className="space-y-1">
-            <h2 id={titleId} className="text-lg font-semibold">
+            <h2 id={titleId} className="text-lg font-medium">
               {title}
             </h2>
             {description ? (
@@ -75,7 +75,7 @@ export function Dialog({
             type="button"
             onClick={close}
             aria-label={closeLabel}
-            className="rounded-md p-1 text-ink-muted hover:bg-surface-muted hover:text-ink"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink"
           >
             <svg
               aria-hidden="true"
@@ -89,9 +89,9 @@ export function Dialog({
             </svg>
           </button>
         </div>
-        {children ? <div className="space-y-4 p-5">{children}</div> : null}
+        {children ? <div className="space-y-4 px-6 py-4">{children}</div> : null}
         {footer ? (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
+          <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-6 py-4">
             {footer}
           </div>
         ) : null}

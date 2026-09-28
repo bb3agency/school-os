@@ -39,7 +39,12 @@ export function LanguageSwitcher({
   if (offered.length === 1 && offered[0] === locale) return null;
   return (
     <nav aria-label={t("label")} data-print="hide">
-      <ul className="flex items-center gap-1">
+      <ul
+        className={cn(
+          "flex items-center gap-0.5 rounded-full p-0.5",
+          tone === "dark" ? "bg-platform-hover" : "bg-surface-sunken",
+        )}
+      >
         {offered.map((target) => {
           const active = target === locale;
           return (
@@ -51,14 +56,14 @@ export function LanguageSwitcher({
                 hrefLang={target}
                 aria-current={active ? "true" : undefined}
                 className={cn(
-                  "inline-block rounded-md px-2.5 py-1 text-sm",
+                  "inline-flex min-h-8 items-center rounded-full px-3 text-sm font-medium",
                   tone === "dark"
                     ? active
-                      ? "bg-platform-ink font-semibold text-platform"
-                      : "text-platform-ink hover:bg-platform-hover"
+                      ? "bg-platform-ink text-platform"
+                      : "text-platform-ink hover:bg-platform"
                     : active
-                      ? "bg-primary font-semibold text-on-primary"
-                      : "text-primary hover:bg-primary-soft",
+                      ? "bg-surface text-ink shadow-raised"
+                      : "text-ink-muted hover:text-ink",
                 )}
               >
                 {t(target)}

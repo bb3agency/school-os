@@ -1,18 +1,26 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
-import { SidebarNav, type NavItem } from "@/components/ui/SidebarNav";
+import type { NavItem, NavSection } from "@/components/ui/SidebarNav";
 import { Link } from "@/i18n/navigation";
-import { SkipLink } from "./SkipLink";
+import { AppShell } from "./AppShell";
 
 interface SchoolNavItem extends NavItem {
   /** Effective permission (or any of several) needed to see the item (UX only: the API checks every call). */
   permission?: string | readonly string[];
 }
 
+interface SchoolNavSection {
+  id: string;
+  icon: IconName;
+  items: SchoolNavItem[];
+}
+
 /**
- * School office console chrome: light header, sidebar navigation, main landmark.
- * `headerActions` holds the session controls (who is signed in, "Lock now").
+ * School office console chrome: icon rail, grouped menu panel, top bar and main landmark
+ * on the gradient canvas (AppShell).
+ * `headerActions` holds the session controls (who is signed in, "Lock now") and the bell.
  * `permissions` (from GET /me) hides menu items the user cannot use; null shows all.
  * Hiding is never a security control: every API route checks its permission.
  */
@@ -34,93 +42,159 @@ export function SchoolShell({
   banner?: ReactNode;
 }) {
   const t = useTranslations();
-  const all: SchoolNavItem[] = [
-    { href: "/", label: t("school.nav.home"), exact: true },
-    { href: "/students", label: t("students.nav"), permission: "student.read_basic" },
-    { href: "/imports", label: t("imports.nav"), permission: "import.run" },
-    { href: "/register-photos", label: t("extraction.nav"), permission: "import.run" },
-    { href: "/settings/school", label: t("schoolSettings.nav") },
-    { href: "/documents", label: t("documents.nav"), permission: "document.read" },
-    { href: "/ask", label: t("ask.nav"), permission: "kb.ask" },
-    { href: "/settings/structure", label: t("school.nav.structure") },
+  const groups: SchoolNavSection[] = [
     {
-      // FR-TEN-011, US-202 AC2: year-end promotion, under the structure it changes.
-      href: "/settings/structure/promotions",
-      label: t("school.nav.promotions"),
-      permission: "tenant.structure.manage",
-      nested: true,
-      activePattern: "^/settings/structure/years/[^/]+/promotions/?$",
-    },
-    { href: "/settings/users", label: t("school.nav.users"), permission: "user.manage" },
-    {
-      href: "/settings/billing",
-      label: t("school.nav.billing"),
-      permission: "tenant.billing.read",
-    },
-    { href: "/findings", label: t("findings.nav"), permission: "dq.findings.read" },
-    {
-      href: "/change-requests",
-      label: t("changeRequests.nav"),
-      permission: ["student.identity_change.request", "student.identity_change.approve"],
+      id: "overview",
+      icon: "home",
+      items: [{ href: "/", label: t("school.nav.home"), exact: true, icon: "home" }],
     },
     {
-      href: "/exports",
-      label: t("exports.nav"),
-      permission: ["export.board", "export.portal", "student.export", "export.read_all"],
+      id: "records",
+      icon: "users",
+      items: [
+        {
+          href: "/students",
+          label: t("students.nav"),
+          permission: "student.read_basic",
+          icon: "users",
+        },
+        { href: "/imports", label: t("imports.nav"), permission: "import.run", icon: "upload" },
+        {
+          href: "/register-photos",
+          label: t("extraction.nav"),
+          permission: "import.run",
+          icon: "camera",
+        },
+        {
+          href: "/documents",
+          label: t("documents.nav"),
+          permission: "document.read",
+          icon: "folder",
+        },
+      ],
     },
-    { href: "/break-glass", label: t("breakGlass.nav"), permission: "breakglass.approve" },
-    { href: "/support", label: t("school.nav.support"), permission: "support.ticket.create" },
-    { href: "/audit", label: t("school.nav.audit"), permission: "audit.read" },
+    {
+      id: "checks",
+      icon: "shieldCheck",
+      items: [
+        {
+          href: "/findings",
+          label: t("findings.nav"),
+          permission: "dq.findings.read",
+          icon: "shieldCheck",
+        },
+        {
+          href: "/change-requests",
+          label: t("changeRequests.nav"),
+          permission: ["student.identity_change.request", "student.identity_change.approve"],
+          icon: "clipboard",
+        },
+        {
+          href: "/exports",
+          label: t("exports.nav"),
+          permission: ["export.board", "export.portal", "student.export", "export.read_all"],
+          icon: "file",
+        },
+      ],
+    },
+    {
+      id: "ask",
+      icon: "sparkles",
+      items: [{ href: "/ask", label: t("ask.nav"), permission: "kb.ask", icon: "sparkles" }],
+    },
+    {
+      id: "admin",
+      icon: "settings",
+      items: [
+        { href: "/settings/school", label: t("schoolSettings.nav"), icon: "building" },
+        { href: "/settings/structure", label: t("school.nav.structure"), icon: "layers" },
+        {
+          // FR-TEN-011, US-202 AC2: year-end promotion, under the structure it changes.
+          href: "/settings/structure/promotions",
+          label: t("school.nav.promotions"),
+          permission: "tenant.structure.manage",
+          nested: true,
+          activePattern: "^/settings/structure/years/[^/]+/promotions/?$",
+        },
+        {
+          href: "/settings/users",
+          label: t("school.nav.users"),
+          permission: "user.manage",
+          icon: "users",
+        },
+        {
+          href: "/settings/billing",
+          label: t("school.nav.billing"),
+          permission: "tenant.billing.read",
+          icon: "creditCard",
+        },
+        {
+          href: "/break-glass",
+          label: t("breakGlass.nav"),
+          permission: "breakglass.approve",
+          icon: "key",
+        },
+        {
+          href: "/support",
+          label: t("school.nav.support"),
+          permission: "support.ticket.create",
+          icon: "lifeBuoy",
+        },
+        {
+          href: "/audit",
+          label: t("school.nav.audit"),
+          permission: "audit.read",
+          icon: "activity",
+        },
+      ],
+    },
   ];
-  const items: NavItem[] = all
-    .filter(
-      (item) =>
-        !item.permission ||
-        permissions === null ||
-        (typeof item.permission === "string" ? [item.permission] : item.permission).some((key) =>
-          permissions.includes(key),
-        ),
-    )
-    .map(({ href, label, exact, nested, activePattern }) => ({
-      href,
-      label,
-      ...(exact ? { exact } : {}),
-      ...(nested ? { nested } : {}),
-      ...(activePattern ? { activePattern } : {}),
-    }));
+  const allowed = (item: SchoolNavItem) =>
+    !item.permission ||
+    permissions === null ||
+    (typeof item.permission === "string" ? [item.permission] : item.permission).some((key) =>
+      permissions.includes(key),
+    );
+  const sections: NavSection[] = groups.map((group) => ({
+    id: group.id,
+    icon: group.icon,
+    label: t(`school.nav.sections.${group.id}` as "school.nav.sections.overview"),
+    items: group.items
+      .filter(allowed)
+      .map(({ href, label, exact, nested, activePattern, icon }) => ({
+        href,
+        label,
+        ...(exact ? { exact } : {}),
+        ...(nested ? { nested } : {}),
+        ...(activePattern ? { activePattern } : {}),
+        ...(icon ? { icon } : {}),
+      })),
+  }));
   return (
-    <div className="flex min-h-screen flex-col">
-      <SkipLink label={t("common.skipToContent")} />
-      <header
-        className="flex items-center justify-between gap-4 border-b border-border bg-surface px-6 py-3"
-        data-print="hide"
-      >
-        <p className="text-lg font-bold text-primary">{t("common.appName")}</p>
-        <div className="flex flex-wrap items-center justify-end gap-4">
+    <AppShell
+      theme="school"
+      homeHref="/"
+      navLabel={t("school.nav.label")}
+      sections={sections}
+      brand={<p className="truncate text-lg font-semibold text-ink">{t("common.appName")}</p>}
+      headerActions={
+        <>
           {canSwitchSchool ? (
             <Link
               href="/choose-school"
-              className="rounded-md px-2 py-1 text-sm font-semibold text-primary underline"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-border-soft px-3 text-sm font-medium text-primary hover:bg-primary-soft"
             >
+              <Icon name="swap" className="size-4" />
               {t("school.switchSchool")}
             </Link>
           ) : null}
           {headerActions}
           <LanguageSwitcher languages={languages} />
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col md:flex-row">
-        <aside
-          className="border-b border-border bg-surface p-4 md:w-60 md:shrink-0 md:border-r md:border-b-0"
-          data-print="hide"
-        >
-          <SidebarNav label={t("school.nav.label")} items={items} />
-        </aside>
-        <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-6 focus:outline-none print:p-0">
-          {banner}
-          {children}
-        </main>
-      </div>
-    </div>
+        </>
+      }
+      banner={banner}
+    >
+      {children}
+    </AppShell>
   );
 }

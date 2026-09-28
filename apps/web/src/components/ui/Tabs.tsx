@@ -2,6 +2,9 @@
 
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { tabStyles, type TabsVariant } from "./tab-styles";
+
+export type { TabsVariant } from "./tab-styles";
 
 export interface TabItem {
   id: string;
@@ -15,6 +18,8 @@ export interface TabsProps {
   items: readonly TabItem[];
   defaultTabId?: string;
   className?: string;
+  /** `segmented` (default): light track with a white raised tab. `underline`: the older look. */
+  variant?: TabsVariant;
 }
 
 /**
@@ -23,7 +28,8 @@ export interface TabsProps {
  * DOM (hidden) so form fields inside them keep their values and still submit.
  * For tabs that change the URL, use `TabNav` instead.
  */
-export function Tabs({ label, items, defaultTabId, className }: TabsProps) {
+export function Tabs({ label, items, defaultTabId, className, variant = "segmented" }: TabsProps) {
+  const styles = tabStyles(variant);
   const baseId = useId();
   const [activeId, setActiveId] = useState(defaultTabId ?? items[0]?.id ?? "");
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -62,11 +68,7 @@ export function Tabs({ label, items, defaultTabId, className }: TabsProps) {
 
   return (
     <div className={className}>
-      <div
-        role="tablist"
-        aria-label={label}
-        className="flex flex-wrap gap-1 border-b border-border"
-      >
+      <div role="tablist" aria-label={label} className={styles.list}>
         {items.map((item, index) => {
           const selected = item.id === activeId;
           return (
@@ -83,12 +85,7 @@ export function Tabs({ label, items, defaultTabId, className }: TabsProps) {
               tabIndex={selected ? 0 : -1}
               onClick={() => setActiveId(item.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={cn(
-                "-mb-px border-b-2 px-4 py-2 text-sm font-semibold",
-                selected
-                  ? "border-primary text-primary"
-                  : "border-transparent text-ink-muted hover:text-ink",
-              )}
+              className={cn(styles.tab, selected ? styles.active : styles.inactive)}
             >
               {item.label}
             </button>
