@@ -27,15 +27,24 @@ export const ASK_KEYS = {
   verifiedAll: ["staff", "knowledge", "verified"],
 } as const;
 
-/** Reason codes for "not helpful" (FeedbackIn.reason: a code, never free text). */
+/** The API's pinned reason codes (FeedbackIn.reason; anything else is 422). */
+type ApiFeedbackReason = NonNullable<FeedbackBody["reason"]>;
+
+/**
+ * Reason codes for "not helpful" (a code, never free text), exactly the API's list: the
+ * `satisfies` and the check below fail typecheck if either side gains or loses a code.
+ */
 export const FEEDBACK_REASONS = [
   "wrong_source",
   "outdated",
   "incomplete",
   "not_found_but_exists",
   "wrong_language",
-] as const;
+] as const satisfies readonly ApiFeedbackReason[];
 export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
+// Every API code is offered (compile-time: `true` only when the two sets are equal).
+const ALL_REASONS_OFFERED: ApiFeedbackReason extends FeedbackReason ? true : never = true;
+void ALL_REASONS_OFFERED;
 
 export interface VerifiedPage {
   data: VerifiedAnswer[];

@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { useApiMutation } from "@/lib/bff/query";
-import { FEEDBACK_REASONS, useKnowledgeApi, type FeedbackReason } from "./data";
+import { FEEDBACK_REASONS, useKnowledgeApi, type FeedbackBody, type FeedbackReason } from "./data";
 
 /**
  * "Was this answer helpful?" (US-801 AC4, FR-KB-009): helpful is sent at once; not helpful
@@ -19,9 +19,7 @@ export function AnswerFeedback({ queryId }: { queryId: string }) {
   const legendId = useId();
   const [choice, setChoice] = useState<"helpful" | "not_helpful" | null>(null);
   const [reason, setReason] = useState<FeedbackReason | "">("");
-  const send = useApiMutation((body: { feedback: "helpful" | "not_helpful"; reason?: string }) =>
-    api.feedback(queryId, body),
-  );
+  const send = useApiMutation((body: FeedbackBody) => api.feedback(queryId, body));
 
   if (send.isSuccess) {
     return (

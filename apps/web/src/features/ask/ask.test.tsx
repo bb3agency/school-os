@@ -367,6 +367,20 @@ describe("feedback on an answer (US-801 AC4, FR-KB-009)", () => {
     expect(stub.callsTo(key)[0]?.headers.get("x-csrf-token")).toBe(CSRF);
   });
 
+  it("offers exactly the reason codes the API accepts (FeedbackIn.reason)", async () => {
+    stub.routes[ASK] = () => sseResponse(answered);
+    renderWithIntl(<AskPage />);
+    const user = await ask();
+    await user.click(await screen.findByRole("button", { name: "No, not helpful" }));
+    const values = screen
+      .getAllByRole("radio")
+      .map((radio) => (radio as HTMLInputElement).value)
+      .sort();
+    expect(values).toEqual(
+      ["wrong_source", "outdated", "incomplete", "not_found_but_exists", "wrong_language"].sort(),
+    );
+  });
+
   it("explains a 404 for someone else's question", async () => {
     stub.routes[ASK] = () => sseResponse(answered);
     stub.routes[`POST /bff/api/v1/knowledge/queries/${QUERY}/feedback`] = () =>
