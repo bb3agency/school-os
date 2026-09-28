@@ -46,11 +46,15 @@ locals {
     SOS_S3_BUCKET_FILES = module.s3.files_bucket
     SOS_S3_BUCKET_AUDIT = module.s3.audit_bucket
     # SSE-KMS with the files bucket's CMK on every write and presigned POST (FR-DOC-003, SEC-011).
-    SOS_S3_KMS_KEY_ID               = local.kms_data
-    SOS_OIDC_ISSUER                 = module.cognito.tenant_issuer
-    SOS_OIDC_AUDIENCE               = module.cognito.tenant_client_id
-    SOS_PLATFORM_OIDC_ISSUER        = module.cognito.platform_issuer
-    SOS_PLATFORM_OIDC_AUDIENCE      = module.cognito.platform_client_id
+    SOS_S3_KMS_KEY_ID          = local.kms_data
+    SOS_OIDC_ISSUER            = module.cognito.tenant_issuer
+    SOS_OIDC_AUDIENCE          = module.cognito.tenant_client_id
+    SOS_PLATFORM_OIDC_ISSUER   = module.cognito.platform_issuer
+    SOS_PLATFORM_OIDC_AUDIENCE = module.cognito.platform_client_id
+    # Break-glass support sign-in (ADR-0023): the support app client of the operator pool. Issuer
+    # and JWKS are left to their defaults (SOS_PLATFORM_OIDC_*, the same pool), which the shared-tier
+    # config guard requires anyway.
+    SOS_SUPPORT_OIDC_AUDIENCE       = module.cognito.support_client_id
     SOS_KEY_WRAPPER                 = "kms"
     SOS_KMS_DATA_KEY_ARN            = local.kms_data
     SOS_AUDIT_SIGNING_KEY_ARN       = local.kms_signing
@@ -228,6 +232,9 @@ module "cognito" {
   platform_domain_prefix = "${var.cognito_domain_prefix}-ops"
   platform_callback_urls = ["https://${var.app_domain}${var.platform_callback_path}"]
   platform_logout_urls   = ["https://${var.app_domain}/signed-out?kind=operator"]
+  create_support_client  = true
+  support_callback_urls  = ["https://${var.app_domain}/bff/auth/support/callback"]
+  support_logout_urls    = ["https://${var.app_domain}/signed-out?kind=support"]
   deletion_protection    = var.rds_deletion_protection ? "ACTIVE" : "INACTIVE"
   ses_email_identity_arn = var.ses_email_identity_arn
   from_email_address     = var.from_email_address
@@ -394,6 +401,8 @@ module "web" {
     OIDC_CLIENT_ID          = module.cognito.tenant_client_id
     PLATFORM_OIDC_ISSUER    = module.cognito.platform_issuer
     PLATFORM_OIDC_CLIENT_ID = module.cognito.platform_client_id
+    # Break-glass support sign-in (ADR-0023); the issuer defaults to PLATFORM_OIDC_ISSUER (same pool).
+    SUPPORT_OIDC_CLIENT_ID = module.cognito.support_client_id
     # Origin of presigned upload/preview URLs (CSP connect-src + img-src, SEC-010/SEC-016).
     FILES_ORIGIN = module.s3.files_browser_origin
   }
@@ -402,11 +411,13 @@ module "web" {
     SOS_SERVICE_TOKEN_KEY       = local.rnd_secret["service_token_key"]
     OIDC_CLIENT_SECRET          = module.cognito.tenant_client_secret_arn
     PLATFORM_OIDC_CLIENT_SECRET = module.cognito.platform_client_secret_arn
+    SUPPORT_OIDC_CLIENT_SECRET  = module.cognito.support_client_secret_arn
     REDIS_URL                   = "${module.redis.secret_arn}:url::"
   }
   secret_arns = [
     local.rnd_secret["session_secret"], local.rnd_secret["service_token_key"],
-    module.cognito.tenant_client_secret_arn, module.cognito.platform_client_secret_arn, module.redis.secret_arn,
+    module.cognito.tenant_client_secret_arn, module.cognito.platform_client_secret_arn,
+    module.cognito.support_client_secret_arn, module.redis.secret_arn,
   ]
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs

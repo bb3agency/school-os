@@ -324,3 +324,45 @@ run "oidc_redirects_match_the_bff" {
     error_message = "Operator admin client: <APP_BASE_URL>/bff/auth/platform/callback and /signed-out?kind=operator."
   }
 }
+
+# ADR-0023 option C (US-103, FR-OPS-004, SEC-021): the support app client of the operator pool exists per
+# environment; the API and workers know its audience, the web BFF its client ID and secret.
+run "support_client_is_wired" {
+  command = plan
+
+  assert {
+    condition = (
+      module.cognito.support_posture.callback_urls == toset(["https://app.staging.example.test/bff/auth/support/callback"])
+      && module.cognito.support_posture.logout_urls == toset(["https://app.staging.example.test/signed-out?kind=support"])
+      && module.cognito.support_posture.access_token_min == 10
+      && module.cognito.support_posture.refresh_rotation == "ENABLED"
+    )
+    error_message = "Support client: BFF support callback and sign-out on app_domain, 10-minute tokens, rotation."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      contains([for e in c.environment : e.name], "SOS_SUPPORT_OIDC_AUDIENCE")
+      && !contains([for e in c.environment : e.name], "SOS_SUPPORT_OIDC_ISSUER")
+    ])
+    error_message = "Every app container gets the support audience; the issuer defaults to the operator pool's (SOS_PLATFORM_OIDC_ISSUER)."
+  }
+
+  assert {
+    condition = (
+      contains([for e in module.web.container_definition.environment : e.name], "SUPPORT_OIDC_CLIENT_ID")
+      && contains([for s in module.web.container_definition.secrets : s.name], "SUPPORT_OIDC_CLIENT_SECRET")
+      && !contains([for e in module.web.container_definition.environment : e.name], "SUPPORT_OIDC_CLIENT_SECRET")
+    )
+    error_message = "The web BFF gets the support client ID, and its secret from Secrets Manager only."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      !contains([for s in c.secrets : s.name], "SUPPORT_OIDC_CLIENT_SECRET")
+    ])
+    error_message = "Only the BFF holds the support client secret."
+  }
+}

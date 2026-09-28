@@ -246,7 +246,7 @@ data "aws_iam_policy_document" "host" {
   statement {
     sid       = "OwnSecrets"
     actions   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
-    resources = [aws_secretsmanager_secret.generated.arn, aws_secretsmanager_secret.operator.arn, var.oidc_client_secret_arn]
+    resources = compact([aws_secretsmanager_secret.generated.arn, aws_secretsmanager_secret.operator.arn, var.oidc_client_secret_arn, var.support_oidc_client_secret_arn])
   }
 
   statement {
@@ -407,14 +407,18 @@ resource "aws_instance" "host" {
     oidc_client_secret_arn = var.oidc_client_secret_arn
     oidc_issuer            = var.oidc_issuer
     oidc_client_id         = var.oidc_client_id
-    control_plane_url      = var.control_plane_url
-    bundle_s3_prefix       = var.bundle_s3_prefix
-    bundle_sha256          = var.bundle_sha256
-    install_dir            = var.install_dir
-    deployment_id          = var.deployment_id
-    tenant_id              = var.tenant_id
-    log_group              = local.log_group
-    walg_enabled           = var.walg_enabled ? "true" : "false"
+    # Break-glass support sign-in (ADR-0023); empty strings = off.
+    support_oidc_issuer            = var.support_oidc_issuer
+    support_oidc_client_id         = var.support_oidc_client_id
+    support_oidc_client_secret_arn = var.support_oidc_client_secret_arn
+    control_plane_url              = var.control_plane_url
+    bundle_s3_prefix               = var.bundle_s3_prefix
+    bundle_sha256                  = var.bundle_sha256
+    install_dir                    = var.install_dir
+    deployment_id                  = var.deployment_id
+    tenant_id                      = var.tenant_id
+    log_group                      = local.log_group
+    walg_enabled                   = var.walg_enabled ? "true" : "false"
   })
   user_data_replace_on_change = false
 

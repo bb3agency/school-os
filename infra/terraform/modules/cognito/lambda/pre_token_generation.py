@@ -6,6 +6,10 @@ authentication never skips MFA, so a user with MFA enabled always completed an M
 for this session. The API refuses privileged memberships (owner, principal, office_admin)
 without ``sos:mfa == "true"`` and uses ``auth_time`` for step-up freshness.
 
+The trigger is per pool, not per app client: every client of the operator pool gets the claim,
+including the break-glass support client (ADR-0023), whose tokens the API accepts only with
+``sos:mfa == "true"``. The operator pool has MFA ON, so the value is always ``"true"`` there.
+
 No personal data is logged: only the outcome and the trigger source.
 """
 

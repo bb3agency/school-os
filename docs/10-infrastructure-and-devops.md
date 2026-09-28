@@ -54,7 +54,7 @@ Endpoints: S3 (gateway), ECR, Secrets Manager, KMS, CloudWatch Logs (interface; 
 | Cache/queue | ElastiCache for Valkey (small) | Replication group with failover | Cluster mode |
 | Files | S3 + versioning + lifecycle | + cross-region replication for documents to ap-south-2 | Same |
 | Edge | ALB + ACM + WAF | + CloudFront for static assets | Same |
-| Identity | Two Cognito user pools in ap-south-1 on the Essentials plan: staff (MFA optional, `sos:mfa` claim) and operators (MFA on); pre-token-generation Lambda; access tokens 10 min (ADR-0018) | Same | Same |
+| Identity | Two Cognito user pools in ap-south-1 on the Essentials plan: staff (MFA optional, `sos:mfa` claim) and operators (MFA on); pre-token-generation Lambda; access tokens 10 min (ADR-0018); app clients: staff BFF, operator admin and the break-glass **support** client in the operator pool (ADR-0023; one per environment, one per dedicated host) | Same | Same |
 | Observability | CloudWatch Logs/Metrics, X-Ray via OTel collector sidecar | + dashboards, synthetic checks | + tracing sampling policies |
 | Backups | RDS automated (14 days) + daily snapshot copy to ap-south-2 | AWS Backup cross-account vault, 35-day PITR | Warm standby option |
 
@@ -80,6 +80,7 @@ infra/terraform/
 │   ├── ecs_ec2_capacity/     EC2 capacity provider for the pdf queue: ECS AL2023 ASG, daemon seccomp profile for the Chromium sandbox (ADR-0025)
 │   ├── alb_waf/              ALB (TLS 1.2+), WAFv2 managed + rate rules; optional fleet heartbeat route
 │   ├── cognito/              staff and operator user pools (Essentials), app clients, pre-token Lambda (ADR-0018)
+│   ├── cognito_support_client/ break-glass support app client in the operator pool (ADR-0023; shared + dedicated)
 │   ├── observability/        alarms, SNS topic, log groups (400 days), budget
 │   ├── security_baseline/    SEC-023 per account: CloudTrail + Object Lock log bucket, evidence bucket, Config role, alerts (§5.1)
 │   ├── security_detection/   SEC-023 per region: GuardDuty, AWS Config, Security Hub (FSBP + CIS), forwarding to ap-south-1
@@ -306,6 +307,8 @@ Deployments use exactly these names: Terraform `shared_platform` (§5) and `depl
 
 Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test), `SOS_WEB_TEST_LOGS` (print the web app's JSON logs during vitest). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
 
+Shared tier wiring (`modules/shared_platform`): the support app client is created per environment (`modules/cognito`, `create_support_client`; callback `https://<app_domain>/bff/auth/support/callback`, sign-out `/signed-out?kind=support`); every app container gets `SOS_SUPPORT_OIDC_AUDIENCE` (issuer and JWKS stay at their operator-pool defaults) and the web task gets `SUPPORT_OIDC_CLIENT_ID` and, from Secrets Manager `sos/<env>/oidc/support-client-secret`, `SUPPORT_OIDC_CLIENT_SECRET`. All Cognito redirect URLs are on `app_domain` because the BFF builds them from `APP_BASE_URL` (`/bff/auth/callback`, `/bff/auth/platform/callback`, `/signed-out[?kind=operator|support]`).
+
 **Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`, and optional `SUPPORT_OIDC_CLIENT_ID`, `SUPPORT_OIDC_CLIENT_SECRET`, `SUPPORT_OIDC_ISSUER` (break-glass support app client of the operator pool, ADR-0023; unset client ID = off; callback `/bff/auth/support/callback`).
 
 `FILES_ORIGIN` is the origin of presigned upload and preview URLs, added to the CSP `connect-src` and `img-src` (docs/07 §10, §11; https only, except a loopback http origin under `next dev`). It must equal the origin the API presigns with, which the files bucket's CORS rule allows the app to `POST` to:
@@ -398,4 +401,6 @@ Targets: RPO ≤ 15 min, RTO ≤ 8 h (NFR-AVL-005). The RPO needs continuous WAL
 
 ### 15.6 Custom domains and TLS
 
-The school points `office.<school>.edu.in` (example) at its host with a CNAME. Caddy obtains and renews certificates automatically (ACME). Certificate expiry is reported in the heartbeat and alerted at 14 days. The OIDC app client for that deployment lists the domain's callback URL (ADR-0018; 16 §19, Q4).
+The school points `office.<school>.edu.in` (example) at its host with a CNAME. Caddy obtains and renews certificates automatically (ACME). Certificate expiry is reported in the heartbeat and alerted at 14 days. The OIDC app client for that deployment lists the domain's callback URL (ADR-0018; 16 §19, Q4), and so does the host's support client when it has one.
+
+**Break-glass support sign-in on a dedicated host (ADR-0023).** Off by default: without a support client, approved break-glass access cannot be used on the host (fail closed). To enable it, set `operator_user_pool_id` in the school's tfvars to the prod operator pool (prod output `oidc.platform_user_pool_id`; the host must be in the prod account, which is the default). `envs/dedicated-template` then creates the host's own app client in that pool (`modules/cognito_support_client`: callbacks `https://<host>/bff/auth/support/callback` for the platform hostname and the custom domain, sign-out `/signed-out?kind=support`, 10-minute tokens, refresh rotation) with its secret in `sos/dedicated/<code>/oidc/support-client-secret` (the school's CMK), and cloud-init writes `SOS_SUPPORT_OIDC_ISSUER`, `SOS_SUPPORT_OIDC_AUDIENCE`, `SUPPORT_OIDC_CLIENT_ID` and a `SUPPORT_OIDC_CLIENT_SECRET` entry in `SOS_SECRET_PLAIN`. An existing host keeps its user data (lifecycle), so after enabling it edit `/etc/schoolos/host.env` the same way (values from `terraform output oidc` and the secret ARN), run `scripts/fetch-secrets.sh` and restart. Destroying the school's root removes its support client.

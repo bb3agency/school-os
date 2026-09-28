@@ -79,11 +79,14 @@ output "kms_key_arns" {
 output "oidc" {
   description = "Non-secret OIDC settings for the app."
   value = {
-    tenant_issuer        = module.cognito.tenant_issuer
-    tenant_client_id     = module.cognito.tenant_client_id
-    tenant_hosted_domain = module.cognito.tenant_hosted_domain
-    platform_issuer      = module.cognito.platform_issuer
-    platform_client_id   = module.cognito.platform_client_id
+    tenant_issuer         = module.cognito.tenant_issuer
+    tenant_client_id      = module.cognito.tenant_client_id
+    tenant_hosted_domain  = module.cognito.tenant_hosted_domain
+    platform_issuer       = module.cognito.platform_issuer
+    platform_client_id    = module.cognito.platform_client_id
+    platform_user_pool_id = module.cognito.platform_user_pool_id
+    support_issuer        = module.cognito.support_issuer
+    support_client_id     = module.cognito.support_client_id
   }
 }
 
@@ -97,6 +100,7 @@ output "secret_arns" {
     rds_master             = module.rds.master_user_secret_arn
     oidc_tenant_client     = module.cognito.tenant_client_secret_arn
     oidc_platform_client   = module.cognito.platform_client_secret_arn
+    oidc_support_client    = module.cognito.support_client_secret_arn
     note_operator_supplied = "Values start as __SET_ME__; set them before the first deploy."
   }
 }
@@ -128,6 +132,7 @@ output "security_posture" {
     redis                 = module.redis.posture
     ecr                   = module.ecr.posture
     cognito               = module.cognito.posture
+    cognito_support       = module.cognito.support_posture
     web_container         = module.web.container_definition
     api_container         = module.api.container_definition
     worker_container      = module.worker.container_definition

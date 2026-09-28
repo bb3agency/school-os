@@ -126,6 +126,17 @@ variable "control_plane_url" {
   type        = string
 }
 
+variable "operator_user_pool_id" {
+  description = "Break-glass support sign-in (ADR-0023): the prod OPERATOR pool ID (prod output oidc.platform_user_pool_id). Creates this host's own support app client there. Null = off (approved break-glass access cannot be used on this host)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.operator_user_pool_id == null || can(regex("^ap-south-1_[A-Za-z0-9]+$", var.operator_user_pool_id))
+    error_message = "operator_user_pool_id is a Cognito pool ID in ap-south-1 (ap-south-1_XXXX), or null."
+  }
+}
+
 variable "route53_zone_id" {
   description = "Hosted zone of the platform domain (null = create the A record manually)."
   type        = string

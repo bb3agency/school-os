@@ -19,5 +19,8 @@ artifacts_bucket      = "sos-prod-artifacts-<PROD_ACCOUNT_ID>"
 artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<DATA_KEY_ID>"
 control_plane_url     = "https://app.<your-domain>"
 
+# Break-glass support sign-in (ADR-0023): prod output oidc.platform_user_pool_id; null = off.
+operator_user_pool_id = null
+
 route53_zone_id = null
 walg_enabled    = false

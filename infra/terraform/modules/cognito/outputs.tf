@@ -43,9 +43,34 @@ output "platform_client_secret_arn" {
   value       = var.create_platform_pool ? aws_secretsmanager_secret.client["platform"].arn : null
 }
 
+output "platform_user_pool_id" {
+  description = "Platform-operator user pool ID (dedicated roots put their own support client in it: envs/dedicated-template operator_user_pool_id)."
+  value       = var.create_platform_pool ? aws_cognito_user_pool.this["platform"].id : null
+}
+
 output "platform_user_pool_arn" {
   description = "Platform-operator user pool ARN."
   value       = var.create_platform_pool ? aws_cognito_user_pool.this["platform"].arn : null
+}
+
+output "support_issuer" {
+  description = "Issuer of break-glass support tokens = the operator pool (SOS_SUPPORT_OIDC_ISSUER / SUPPORT_OIDC_ISSUER); null when off."
+  value       = var.create_support_client ? module.support[0].issuer : null
+}
+
+output "support_client_id" {
+  description = "Support app client ID (SOS_SUPPORT_OIDC_AUDIENCE, SUPPORT_OIDC_CLIENT_ID); null when off."
+  value       = var.create_support_client ? module.support[0].client_id : null
+}
+
+output "support_client_secret_arn" {
+  description = "Secrets Manager ARN of the support client secret (SUPPORT_OIDC_CLIENT_SECRET); null when off."
+  value       = var.create_support_client ? module.support[0].client_secret_arn : null
+}
+
+output "support_posture" {
+  description = "Support client posture (asserted by tests); null when off."
+  value       = var.create_support_client ? module.support[0].posture : null
 }
 
 output "posture" {
