@@ -50,6 +50,7 @@ vi.mock("next/navigation", async (importOriginal) => {
 import ChooseSchoolPage from "./[locale]/choose-school/page";
 import PlatformLayout from "./[locale]/platform/layout";
 import SchoolLayout from "./[locale]/(school)/layout";
+import { isSchoolHomePath, requireOperator, requireStaff } from "@/server/session/rsc";
 
 let h: Harness;
 const en = Promise.resolve({ locale: "en" });
@@ -151,6 +152,67 @@ describe("school layout", () => {
       expect(html).not.toContain(secret);
     }
     expect(html).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
+  });
+});
+
+describe("school home without a session: public welcome page (FR-IAM-001)", () => {
+  it.each([
+    ["/en", "/en/welcome"],
+    ["/en/", "/en/welcome"],
+    ["/te", "/te/welcome"],
+    ["/te/", "/te/welcome"],
+    ["/", "/en/welcome"],
+    ["/te?from=bookmark", "/te/welcome"],
+  ])("a signed-out visitor to %s sees %s instead of the sign-in page", async (path, welcome) => {
+    requestPath = path;
+    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toBe(welcome);
+    expect(await redirectOf(() => requireStaff())).toBe(welcome);
+  });
+
+  it.each([
+    ["/en/students", "/bff/auth/login?next=%2Fen%2Fstudents"],
+    ["/te/ask?q=1", "/bff/auth/login?next=%2Fte%2Fask%3Fq%3D1"],
+    ["/en/welcome-back", "/bff/auth/login?next=%2Fen%2Fwelcome-back"],
+    ["/english", "/bff/auth/login?next=%2Fenglish"],
+    ["/en//", "/bff/auth/login?next=%2Fen%2F%2F"],
+  ])("a deep link %s still goes straight to sign-in, returning there", async (path, login) => {
+    requestPath = path;
+    expect(await redirectOf(() => requireStaff())).toBe(login);
+  });
+
+  it("a signed-in staff member on the school home gets the console, not the welcome page", async () => {
+    requestPath = "/en";
+    await signInDirect("staff", { sub: "staff-1", name: "Office Clerk" });
+    const session = await requireStaff();
+    expect(session.kind).toBe("staff");
+  });
+
+  it("a SchoolOS support session on the school home still opens the console (ADR-0023)", async () => {
+    requestPath = "/te";
+    await signInDirect("support", { sub: "op-1" });
+    const session = await requireStaff();
+    expect(session.kind).toBe("support");
+  });
+
+  it("the operator panel never sends visitors to the school welcome page", async () => {
+    requestPath = "/en";
+    expect(await redirectOf(() => requireOperator())).toBe(
+      "/bff/auth/platform/login?next=%2Fen",
+    );
+  });
+
+  it("recognises only the bare locale home as the school home", () => {
+    expect(["/", "/en", "/te", "/en/", "/te/", "/en?x=1"].map(isSchoolHomePath)).toEqual([
+      "en",
+      "en",
+      "te",
+      "en",
+      "te",
+      "en",
+    ]);
+    for (const path of ["/fr", "/en/students", "/en//", "//en", "/te/welcome", "", "en"]) {
+      expect(isSchoolHomePath(path), path).toBeNull();
+    }
   });
 });
 
