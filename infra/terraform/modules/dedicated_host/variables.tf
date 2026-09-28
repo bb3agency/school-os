@@ -39,9 +39,9 @@ variable "subnet_id" {
 }
 
 variable "instance_type" {
-  description = "Instance type. Graviton (t4g/m7g/...) uses the arm64 Ubuntu image, others amd64."
+  description = "Instance type. Graviton (t4g/m7g/...) uses the arm64 Ubuntu image, others amd64. Default t3.medium: release images are linux/amd64 only (a Graviton host could not run them)."
   type        = string
-  default     = "t4g.medium"
+  default     = "t3.medium"
 }
 
 variable "root_volume_gb" {

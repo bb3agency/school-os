@@ -436,6 +436,7 @@ data "aws_iam_policy_document" "worker" {
 module "web" {
   source = "../ecs_service"
 
+  cpu_architecture       = var.cpu_architecture
   name                   = "${local.name}-web"
   cluster_arn            = module.cluster.arn
   cluster_name           = module.cluster.name
@@ -496,6 +497,7 @@ module "web" {
 module "api" {
   source = "../ecs_service"
 
+  cpu_architecture       = var.cpu_architecture
   name                   = "${local.name}-api"
   cluster_arn            = module.cluster.arn
   cluster_name           = module.cluster.name
@@ -540,6 +542,7 @@ module "api" {
 module "worker" {
   source = "../ecs_service"
 
+  cpu_architecture       = var.cpu_architecture
   name                   = "${local.name}-worker"
   cluster_arn            = module.cluster.arn
   cluster_name           = module.cluster.name
@@ -608,6 +611,7 @@ module "worker_pdf" {
 module "beat" {
   source = "../ecs_service"
 
+  cpu_architecture = var.cpu_architecture
   name             = "${local.name}-beat"
   cluster_arn      = module.cluster.arn
   cluster_name     = module.cluster.name
@@ -638,6 +642,7 @@ module "beat" {
 module "migrate" {
   source = "../ecs_service"
 
+  cpu_architecture = var.cpu_architecture
   name             = "${local.name}-migrate"
   create_service   = false
   cluster_arn      = module.cluster.arn
@@ -668,6 +673,7 @@ module "migrate" {
 module "db_bootstrap" {
   source = "../ecs_service"
 
+  cpu_architecture = var.cpu_architecture
   name             = "${local.name}-db-bootstrap"
   create_service   = false
   cluster_arn      = module.cluster.arn

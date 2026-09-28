@@ -42,3 +42,8 @@ output "container_definition" {
   description = "Rendered main container definition (asserted by tests; contains no secret values, only ARNs)."
   value       = local.container
 }
+
+output "cpu_architecture" {
+  description = "Task CPU architecture (must match the image; asserted by tests)."
+  value       = one(aws_ecs_task_definition.this.runtime_platform).cpu_architecture
+}

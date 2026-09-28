@@ -189,10 +189,21 @@ variable "worker_queues" {
   }
 }
 
+variable "cpu_architecture" {
+  description = "CPU architecture of every Fargate task (web, api, worker, beat, migrate, db-bootstrap). X86_64 because CI builds linux/amd64 images only (docker build on x86 runners, no multi-arch manifest); switch to ARM64 only together with arm64 images and a Graviton pdf_worker.instance_type."
+  type        = string
+  default     = "X86_64"
+
+  validation {
+    condition     = contains(["X86_64", "ARM64"], var.cpu_architecture)
+    error_message = "cpu_architecture must be X86_64 or ARM64."
+  }
+}
+
 variable "pdf_worker" {
-  description = "The worker-pdf service (queue pdf) and its EC2 capacity whose Docker daemon allows Chromium's sandbox (ADR-0025 option A). A Graviton instance type means ARM64 tasks (the worker image must be built for it). concurrency = Celery processes (one Chromium each)."
+  description = "The worker-pdf service (queue pdf) and its EC2 capacity whose Docker daemon allows Chromium's sandbox (ADR-0025 option A). Default t3.medium (x86_64): the worker image is linux/amd64 only. A Graviton type (t4g, c7g...) means ARM64 tasks and needs cpu_architecture = ARM64 and arm64 images. concurrency = Celery processes (one Chromium each)."
   type = object({
-    instance_type = optional(string, "t4g.medium")
+    instance_type = optional(string, "t3.medium")
     min_instances = optional(number, 1)
     max_instances = optional(number, 2)
     cpu           = optional(number, 1024)
@@ -205,6 +216,11 @@ variable "pdf_worker" {
   validation {
     condition     = var.pdf_worker.max_instances >= 1 && var.pdf_worker.min_instances <= var.pdf_worker.max_instances && var.pdf_worker.concurrency >= 1
     error_message = "pdf_worker: 1 <= max_instances, min_instances <= max_instances, concurrency >= 1."
+  }
+
+  validation {
+    condition     = (can(regex("^[a-z]+[0-9]+[a-z]*g[a-z]*\\.", var.pdf_worker.instance_type)) ? "ARM64" : "X86_64") == var.cpu_architecture
+    error_message = "pdf_worker.instance_type must match cpu_architecture (one worker image for both): x86 types (t3, m6i...) with X86_64, Graviton types (t4g, m7g...) with ARM64."
   }
 }
 

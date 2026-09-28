@@ -66,8 +66,8 @@ run "imdsv2_required" {
   }
 
   assert {
-    condition     = aws_instance.host.instance_type == "t4g.medium" && strcontains(data.aws_ssm_parameter.ubuntu.name, "/arm64/")
-    error_message = "Graviton default with the arm64 Ubuntu image."
+    condition     = aws_instance.host.instance_type == "t3.medium" && strcontains(data.aws_ssm_parameter.ubuntu.name, "/amd64/")
+    error_message = "x86_64 default (release images are linux/amd64 only) with the amd64 Ubuntu image."
   }
 }
 

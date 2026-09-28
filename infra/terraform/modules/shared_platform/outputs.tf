@@ -19,8 +19,8 @@ output "cluster_name" {
 }
 
 output "ecs_services" {
-  description = "Long-running ECS services the deploy pipeline rolls (e.g. the STAGING_ECS_SERVICES variable)."
-  value       = [module.web.service_name, module.api.service_name, module.worker.service_name, module.worker_pdf.service_name, module.beat.service_name]
+  description = "Long-running ECS services the deploy pipeline rolls, in STAGING_ECS_SERVICES order: api first (the migrate task reuses its network configuration), worker-pdf never first."
+  value       = [module.api.service_name, module.web.service_name, module.worker.service_name, module.worker_pdf.service_name, module.beat.service_name]
 }
 
 output "pdf_capacity" {

@@ -135,8 +135,8 @@ run "pdf_worker_runs_on_the_sandbox_capacity" {
   }
 
   assert {
-    condition     = contains(output.ecs_services, "sos-staging-worker-pdf") && length(output.ecs_services) == 5
-    error_message = "The deploy pipeline rolls web, api, worker, worker-pdf and beat."
+    condition     = contains(output.ecs_services, "sos-staging-worker-pdf") && length(output.ecs_services) == 5 && output.ecs_services[0] == "sos-staging-api"
+    error_message = "The deploy pipeline rolls api (first: the migrate task reuses its network configuration), web, worker, worker-pdf and beat."
   }
 }
 
@@ -494,4 +494,33 @@ run "email_fake_refused" {
   }
 
   expect_failures = [var.email_provider]
+}
+
+# ADR-0025 follow-up: CI publishes linux/amd64 images only, so every task and the pdf capacity run
+# x86_64 by default; a Graviton pdf capacity is refused unless the whole platform is ARM64.
+run "one_architecture_for_every_task" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for m in [module.web, module.api, module.worker, module.worker_pdf, module.beat, module.migrate, module.db_bootstrap] :
+      m.cpu_architecture == "X86_64"
+    ])
+    error_message = "Every task definition is X86_64, matching the amd64 images CI builds."
+  }
+
+  assert {
+    condition     = output.pdf_capacity.posture.ami_parameter == "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended/image_id"
+    error_message = "The pdf capacity uses the x86_64 ECS-optimized AMI (t3.medium)."
+  }
+}
+
+run "graviton_pdf_capacity_needs_arm64_everywhere" {
+  command = plan
+
+  variables {
+    pdf_worker = { instance_type = "t4g.medium" }
+  }
+
+  expect_failures = [var.pdf_worker]
 }

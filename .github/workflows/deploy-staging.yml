@@ -11,9 +11,14 @@
 #                               sub = repo:<owner>/<repo>:environment:staging
 #   STAGING_ECR_REGISTRY        <account>.dkr.ecr.ap-south-1.amazonaws.com
 #   STAGING_ECS_CLUSTER         ECS cluster name
-#   STAGING_ECS_SERVICES        space-separated ECS service names (terraform output ecs_services, incl.
-#                               sos-staging-worker-pdf); list the API service first
-#                               (its network configuration is reused for the migrate task)
+#   STAGING_ECS_SERVICES        space-separated ECS service names = terraform output ecs_services:
+#                               sos-staging-api sos-staging-web sos-staging-worker
+#                               sos-staging-worker-pdf sos-staging-beat
+#                               The API service goes FIRST: the migrate task (Fargate) reuses the first
+#                               service's network configuration. worker-pdf is never first (it runs on
+#                               the EC2 sandbox capacity without a public IP, ADR-0025) but must be
+#                               listed, or the pdf queue keeps running the previous image. The
+#                               preflight job fails when either rule is broken.
 #   STAGING_MIGRATE_TASK_FAMILY task definition family of the one-off migrate task
 #   STAGING_BASE_URL            e.g. https://staging.example.in (used for smoke tests)
 # Optional:
@@ -76,6 +81,21 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::notice::Staging deploy skipped; missing repository variables: ${missing[*]}"
           else
+            # ADR-0025: worker-pdf is rolled with the rest but never first (the migrate task reuses
+            # the first service's Fargate network configuration).
+            read -r -a svcs <<< "$STAGING_ECS_SERVICES"
+            if [[ "${svcs[0]}" == *-worker-pdf ]]; then
+              echo "::error::STAGING_ECS_SERVICES must not start with worker-pdf; list the API service first."
+              exit 1
+            fi
+            has_pdf=false
+            for svc in "${svcs[@]}"; do
+              [[ "$svc" == *-worker-pdf ]] && has_pdf=true
+            done
+            if [[ "$has_pdf" != true ]]; then
+              echo "::error::STAGING_ECS_SERVICES has no *-worker-pdf service; the pdf queue would keep the old image (terraform output ecs_services)."
+              exit 1
+            fi
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 

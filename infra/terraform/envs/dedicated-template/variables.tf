@@ -77,9 +77,9 @@ variable "acme_email" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type (Graviton default)."
+  description = "EC2 instance type. x86_64 (t3.medium) because release images are linux/amd64 only; Graviton only once CI publishes arm64 images."
   type        = string
-  default     = "t4g.medium"
+  default     = "t3.medium"
 }
 
 variable "data_volume_gb" {
