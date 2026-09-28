@@ -3,8 +3,8 @@
 # (app/authz/permissions.yaml); each tool also calls the owning module's service with the
 # caller's UserContext, so RLS and scopes apply exactly as in the UI.
 # `description` is what the answer model is told (prompt text, invariant 13; change it only with
-# a passing `make eval`). A tool without a description is not offered to the model yet (M2 wave 4
-# implements find_students, get_student_facts and search_documents; docs/06 §7 as built).
+# a passing `make eval`). A tool without a description is not offered to the model (every
+# whitelisted tool is built since M2 wave 5; docs/06 §7 as built).
 version: 1
 tools:
   find_students:
@@ -34,15 +34,42 @@ tools:
       - status
       - leaving_date
   get_value_history:
+    description: >-
+      History of ONE field of ONE student the user can access: every recorded value, newest
+      first, with its source, verification status, when it was recorded and whether it is still
+      current. Use for "who changed", "when was it corrected" or "what was it before".
     permission: student.read_basic
-    actor_names_permission: audit.read
+    actor_names_permission: audit.read  # without it, actors read "a staff member"
+    max_results: 10
+    fields:                            # never a restricted (C3) attribute
+      - full_name
+      - dob
+      - gender
+      - father_name
+      - mother_name
+      - admission_date
+      - leaving_date
   count_students:
+    description: >-
+      Count the students enrolled in the current academic year that the user can access, in
+      total or by class, section or gender. Returns numbers only, never names. Small groups in a
+      gender breakdown are not shown.
     permission: student.read_basic
     small_cell_min: 5                  # suppress cells < 5 in sensitive breakdowns
   list_findings:
+    description: >-
+      List data-quality findings (mismatches between the admission register, Aadhaar as printed,
+      UDISE+ and board records) for students the user can access, most severe first. Optional
+      filters: severity and status (unresolved by default).
     permission: dq.findings.read
+    max_results: 20
   list_documents:
+    description: >-
+      List the school's documents the user can read (title, type, issuer, date, current
+      version), newest first, optionally of one type. No content: use search_documents to read
+      what a document says.
     permission: document.read          # metadata only; content via search_documents
+    max_results: 20
   search_documents:
     description: >-
       Search the school's documents the user can read (circulars, policies, minutes, letters) and

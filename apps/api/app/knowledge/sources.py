@@ -24,7 +24,7 @@ _FIELD: Final = re.compile(
     rf"^sos://student/(?P<id>{_UUID})/field/(?P<attr>[a-z][a-z0-9_]{{0,63}})"
     r"\?src=(?P<src>[a-z][a-z0-9_]{0,63})$"
 )
-_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified)/(?P<id>{_UUID})$")
+_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified|count)/(?P<id>{_UUID})$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +74,12 @@ def verified_answer(verified_answer_id: uuid.UUID) -> str:
     return f"sos://verified/{verified_answer_id}"
 
 
+def student_count(count_id: uuid.UUID) -> str:
+    """A student count the ``count_students`` tool computed (numbers only; docs/06 §8). The id
+    is derived from the school, breakdown and day, so it names no student."""
+    return f"sos://count/{count_id}"
+
+
 def parse(uri: str) -> SourceRef:
     """Parse a URI built by this module; anything else raises ``ValueError``."""
     if m := _DOC.fullmatch(uri):
@@ -101,6 +107,7 @@ __all__ = [
     "document_page",
     "finding",
     "parse",
+    "student_count",
     "student_field",
     "verified_answer",
 ]

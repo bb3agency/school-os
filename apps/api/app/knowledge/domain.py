@@ -35,7 +35,7 @@ StopReason = Literal["end_turn", "tool_use", "max_tokens", "refusal"]
 
 BlockKind = Literal["heading", "paragraph", "list_item", "table", "page_break"]
 
-SourceKind = Literal["doc", "student", "finding", "change", "verified"]
+SourceKind = Literal["doc", "student", "finding", "change", "verified", "count"]
 
 
 # --- ingestion and chunking (docs/06 §4) -----------------------------------------------------

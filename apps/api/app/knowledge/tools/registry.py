@@ -12,8 +12,15 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from app.knowledge.config.tools import ToolsConfig
 from app.knowledge.interfaces import RecordTool
+from app.knowledge.tools.counts import NAME as COUNT
+from app.knowledge.tools.counts import CountStudentsTool
+from app.knowledge.tools.documents import LIST_NAME as LIST_DOCUMENTS
 from app.knowledge.tools.documents import NAME as SEARCH
-from app.knowledge.tools.documents import DocumentSearch, SearchDocumentsTool
+from app.knowledge.tools.documents import DocumentSearch, ListDocumentsTool, SearchDocumentsTool
+from app.knowledge.tools.findings import NAME as FINDINGS
+from app.knowledge.tools.findings import ListFindingsTool
+from app.knowledge.tools.history import NAME as HISTORY
+from app.knowledge.tools.history import GetValueHistoryTool
 from app.knowledge.tools.students import FACTS, FIND, FindStudentsTool, GetStudentFactsTool
 
 if TYPE_CHECKING:
@@ -36,6 +43,14 @@ def build_tools(config: ToolsConfig, search: DocumentSearch) -> dict[str, Offere
         tools[FIND] = FindStudentsTool(specs[FIND])
     if specs[FACTS].description:
         tools[FACTS] = GetStudentFactsTool(specs[FACTS])
+    if specs[HISTORY].description:
+        tools[HISTORY] = GetValueHistoryTool(specs[HISTORY])
+    if specs[COUNT].description:
+        tools[COUNT] = CountStudentsTool(specs[COUNT])
+    if specs[FINDINGS].description:
+        tools[FINDINGS] = ListFindingsTool(specs[FINDINGS])
+    if specs[LIST_DOCUMENTS].description:
+        tools[LIST_DOCUMENTS] = ListDocumentsTool(specs[LIST_DOCUMENTS])
     return tools
 
 
