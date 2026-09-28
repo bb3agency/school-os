@@ -54,6 +54,12 @@ TENANT_CLIENT = "synthwebclient"
 SERVICE_KEY = "synthetic-service-token-key-0123456789abcdef"
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers", "chromium: renders with the real headless Chromium (skipped when absent)"
+    )
+
+
 def letters(n: int) -> str:
     """Random lowercase letters (audit summaries reject long digit runs in codes)."""
     return "".join(secrets.choice("abcdefghijkmnopqrstuvwxyz") for _ in range(n))

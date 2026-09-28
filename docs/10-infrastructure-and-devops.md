@@ -298,6 +298,8 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_AUDIT_ARCHIVE_RETENTION_DAYS` | 1096 | Object Lock retention for audit archives |
 | `SOS_OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP endpoint; no trace export when unset |
 | `SOS_BILLING_SUPPLIER_LEGAL_NAME`, `SOS_BILLING_SUPPLIER_GSTIN`, `SOS_BILLING_SUPPLIER_STATE_CODE` | dev placeholders, `37` | Supplier block on GST invoices (placeholders refused in staging/prod) |
+| `SOS_BILLING_SUPPLIER_ADDRESS` | dev placeholder | Supplier's registered address on invoice PDFs (CGST Rule 46); with the placeholder, invoice PDFs refuse to render in staging/prod (docs/16 §5.8) |
+| `SOS_PLATFORM_INVOICE_BUCKET` | unset (files bucket) | Control-plane bucket for invoice PDFs; unset = the files bucket under `platform/invoices/`, never a school prefix (ADR-0017 Amendment 2026-09-28) |
 | `SOS_CONTROL_PLANE_URL` | none | Dedicated hosts: where the heartbeat is sent |
 | `SOS_DEPLOYMENT_ID`, `SOS_DEDICATED_TENANT_ID` | none | Dedicated hosts: identity in the heartbeat |
 | `SOS_HEARTBEAT_KEY_ID`, `SOS_HEARTBEAT_KEY` | none | Dedicated hosts: heartbeat HMAC key (base64url, shown once by the panel) |
