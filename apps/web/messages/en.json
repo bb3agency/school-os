@@ -4211,5 +4211,27 @@
       "top": "Back to top",
       "signIn": "Sign in"
     }
+  },
+  "devUi": {
+    "title": "UI reference",
+    "intro": "Every SchoolOS primitive and variant with synthetic content. Screens use these components; docs/17-ui-design-system.md explains when to use which.",
+    "localOnly": "Local development only. This page does not exist in staging or production.",
+    "sampleNote": "All names, numbers and dates on this page are made-up samples.",
+    "sections": {
+      "colours": "Colours",
+      "type": "Type",
+      "buttons": "Buttons",
+      "pills": "Badges and pills",
+      "cards": "Cards and KPIs",
+      "forms": "Form controls",
+      "navigation": "Tabs and segmented controls",
+      "table": "Table",
+      "feedback": "Alerts, empty and loading states",
+      "people": "Avatars, progress and timeline",
+      "ai": "AI panel",
+      "dialog": "Dialog",
+      "icons": "Icons",
+      "telugu": "Telugu"
+    }
   }
 }

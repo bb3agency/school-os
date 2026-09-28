@@ -4,6 +4,19 @@ Next.js 16 (App Router) app. The browser never holds a token: it talks only to t
 same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valkey
 (docs/07 §5, docs/09 §1, ADR-0012, ADR-0018).
 
+## Design system
+
+Tokens live in `src/app/globals.css` (Tailwind v4 `@theme`: gradient canvas, white cards,
+ink scale, near-black primary, brand blue, status and chart colours, radii, shadows, fonts),
+primitives in `src/components/ui/` (exported from `index.ts`) and the console layout in
+`src/components/shell/` (`AppShell`: icon rail, grouped menu panel, top bar). Fonts are
+self-hosted `@fontsource` packages (Inter, Instrument Serif for big numbers, JetBrains Mono
+for eyebrow labels, Noto Sans Telugu for Telugu). `docs/17-ui-design-system.md` has the
+component API, do/don't and the contrast table; `src/components/ui/tokens.test.ts` recomputes
+every documented contrast pair. Under `next dev` with the local stub issuer,
+`/en/dev/ui` shows every primitive and variant with synthetic content (a 404 anywhere else,
+same guard as `/dev/sign-in`).
+
 ## Layout
 
 | Path                               | What                                                                                                                                                                                                                                                                                                       |
@@ -24,6 +37,7 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 | `src/features/documents/`          | Documents (US-701, FR-DOC-001..008): list/filters in the URL, presigned upload, versions, who can see it, edit details, archive, uploader (`/documents/*`)                                                                                                                                                 |
 | `src/features/ask/`                | Ask the school (US-801..803): `/ask` streams SSE via the BFF (Stop aborts), text answers with source chips, feedback; `/ask/search`, `/ask/verified`                                                                                                                                                       |
 | `src/features/auth/`               | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                                                                                                                                                                                |
+| `src/features/dev-ui/`             | Dev-only design-system reference (`/[locale]/dev/ui`, guarded by `isDevSignInEnabled`)                                                                                                                                                                                                                     |
 | `src/features/welcome/`            | Public product page (`/welcome`): header, hero with a CSS/SVG mock on sample data, features, how it works, security, plans, FAQ; no session                                                                                                                                                                |
 | `src/lib/forms.ts`                 | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                                                                                                                                                                                      |
 | `src/lib/api-errors.ts`            | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                                                                                                                                                                                   |

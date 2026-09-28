@@ -25,6 +25,7 @@ SchoolOS is a **managed SaaS** that we run, sold as a recurring subscription in 
 | Standards and workflow | `docs/13-engineering-standards.md` |
 | What to build next | `docs/14-roadmap.md` |
 | Platform admin panel, billing, fleet | `docs/16-platform-admin-panel.md` |
+| Web UI tokens, components, contrast | `docs/17-ui-design-system.md` |
 | Decisions and why | `docs/adr/` (index in `docs/adr/README.md`) |
 
 Reference requirement IDs (e.g. `FR-STU-004`, `SEC-012`) in commit messages, PR descriptions and test names.
