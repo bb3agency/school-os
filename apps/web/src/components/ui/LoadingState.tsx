@@ -27,18 +27,21 @@ export function LoadingState({
     >
       <span className="sr-only">{label}</span>
       {Array.from({ length: rows }, (_, index) => (
-        <Skeleton key={index} className={variant === "cards" ? "h-32 rounded-xl" : "h-6"} />
+        <Skeleton
+          key={index}
+          className={variant === "cards" ? "h-32 rounded-xl" : "h-6 rounded-sm"}
+        />
       ))}
     </div>
   );
 }
 
-/** One decorative placeholder block (size it with `className`). */
+/** One decorative placeholder block (size and round it with `className`). */
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={cn("skeleton rounded-sm motion-safe:animate-shimmer", className)}
+      className={cn("skeleton motion-safe:animate-shimmer", className ?? "h-6 rounded-sm")}
     />
   );
 }

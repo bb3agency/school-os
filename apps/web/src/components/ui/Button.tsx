@@ -7,8 +7,13 @@ import { cn } from "@/lib/cn";
  * - `brand`: blue fill for the one brand-coloured call to action on a page.
  * - `secondary`: white with a hairline border. `ghost`: text only (blue).
  * - `danger`: red fill for destructive actions ("End", "Revoke").
+ * - `inverse`: white fill with dark text, for dark or blue surfaces (AI panel, dark cards).
+ *
+ * `cn` joins classes without merging them, so `className` can add spacing or width but
+ * cannot reliably override colours or padding: pick a variant or size instead.
  */
-export type ButtonVariant = "primary" | "primary-dark" | "brand" | "secondary" | "danger" | "ghost";
+export type ButtonVariant =
+  "primary" | "primary-dark" | "brand" | "secondary" | "danger" | "ghost" | "inverse";
 export type ButtonSize = "lg" | "md" | "sm";
 
 const base =
@@ -26,6 +31,7 @@ const variants: Record<ButtonVariant, string> = {
   secondary: "border-border-soft bg-surface text-ink hover:bg-surface-muted",
   danger: "border-danger bg-danger text-white hover:bg-danger-hover hover:border-danger-hover",
   ghost: "border-transparent bg-transparent text-primary hover:bg-primary-soft",
+  inverse: "border-white bg-white text-ink shadow-raised hover:bg-primary-soft",
 };
 
 const sizes: Record<ButtonSize, string> = {

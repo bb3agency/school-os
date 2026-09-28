@@ -70,22 +70,28 @@ const pills: Record<PillVariant, string> = {
   sample: "border-border-soft bg-surface text-ink-muted",
   positive: "border-positive-border bg-positive-soft text-positive-ink",
   negative: "border-danger/30 bg-danger-soft text-danger",
-  command: "border-border bg-surface-muted font-mono text-ink",
+  command: "border-border bg-surface-muted text-ink",
 };
 
 export function Pill({
   variant = "tag",
+  size = "sm",
   children,
   className,
 }: {
   variant?: PillVariant;
+  /** `sm` (default) 12px text; `md` 14px text for hero or header chips. */
+  size?: "sm" | "md";
   children: ReactNode;
   className?: string;
 }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-full border font-medium",
+        // md chips carry sentences (hero, headers): they may wrap on phones.
+        size === "md" ? "px-3 py-1 text-sm" : "px-2.5 py-0.5 text-xs whitespace-nowrap",
+        variant === "command" ? "font-mono" : "font-sans",
         pills[variant],
         className,
       )}

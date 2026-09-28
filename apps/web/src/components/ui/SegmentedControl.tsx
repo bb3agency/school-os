@@ -63,8 +63,8 @@ export function SegmentedControl({
       </legend>
       <div
         className={cn(
-          "inline-flex max-w-full flex-wrap gap-1 rounded-lg bg-surface-sunken p-1",
-          block && "flex w-full",
+          "max-w-full flex-wrap gap-1 rounded-lg bg-surface-sunken p-1",
+          block ? "flex w-full" : "inline-flex",
         )}
       >
         {options.map((option) => (

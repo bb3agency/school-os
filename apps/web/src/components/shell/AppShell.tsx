@@ -159,12 +159,12 @@ export function AppShell({
         <aside
           id={panelId}
           className={cn(
-            "w-64 shrink-0 self-start rounded-xl border border-border bg-surface p-3 shadow-card",
+            "hidden w-64 shrink-0 self-start rounded-xl border border-border bg-surface p-3 shadow-card",
             "lg:sticky lg:top-4 lg:block lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto",
-            open
-              ? "fixed inset-x-3 top-3 bottom-3 z-40 block w-auto overflow-y-auto md:static md:inset-auto md:w-64"
-              : "hidden",
-            "lg:bottom-auto",
+            // Below lg the menu button shows it: an overlay on phones, a column on tablets.
+            // max-* variants only, so nothing competes with the lg layout (cn does not merge).
+            open &&
+              "max-lg:block max-md:fixed max-md:inset-x-3 max-md:top-3 max-md:bottom-3 max-md:z-40 max-md:w-auto max-md:overflow-y-auto",
           )}
           data-print="hide"
         >

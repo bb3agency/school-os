@@ -88,6 +88,10 @@ export type IconName = keyof typeof paths;
 /** Every icon name, for the dev reference page. */
 export const ICON_NAMES = Object.keys(paths) as IconName[];
 
+/** A caller's size class replaces the default (cn joins classes, it does not merge them). */
+const SIZED = /(^|\s)(size|h|w)-/;
+
+/** Decorative icon, 20px unless `className` sets a size (`size-4`, `h-3 w-3`). */
 export function Icon({ name, className }: { name: IconName; className?: string }) {
   return (
     <svg
@@ -99,7 +103,7 @@ export function Icon({ name, className }: { name: IconName; className?: string }
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={cn("size-5 shrink-0", className)}
+      className={cn(SIZED.test(className ?? "") ? undefined : "size-5", "shrink-0", className)}
     >
       {paths[name]}
     </svg>
