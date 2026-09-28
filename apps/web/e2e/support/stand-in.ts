@@ -359,6 +359,66 @@ const DOCUMENT = {
   version: 3,
 };
 
+/** Ask the school (docs/06 §5.1): a synthetic cited answer about the holiday circular. */
+const ASK_QUERY_ID = "0192f3a4-0000-7000-8000-00000000e001";
+const ASK_SOURCE = `sos://doc/${DOC_ID}/v1#p1`;
+const ASK_EVENTS: Array<[string, unknown]> = [
+  ["meta", { query_id: ASK_QUERY_ID, language: "en", mode: "full" }],
+  ["token", { text: "Dasara holidays run from 02/10/2026 to 12/10/2026. [1]" }],
+  ["token", { text: "School reopens on 13/10/2026. [1]" }],
+  [
+    "citation",
+    {
+      index: 1,
+      source: ASK_SOURCE,
+      title: "Dasara holidays circular 2026",
+      snippet: "Holidays from 02/10/2026 to 12/10/2026; school reopens on 13/10/2026.",
+    },
+  ],
+  ["done", { latency_ms: 420, cited_sources: 1 }],
+];
+const VERIFIED_ANSWER = {
+  id: "0192f3a4-0000-7000-8000-00000000e101",
+  question: "When are the Dasara holidays?",
+  language: "en",
+  answer_text: "From 02/10/2026 to 12/10/2026. School reopens on 13/10/2026.",
+  citations: [{ source: ASK_SOURCE, cited_text: "Holidays from 02/10/2026 to 12/10/2026" }],
+  status: "active",
+  verified_by: "0192f3a4-0000-7000-8000-0000000000e1",
+  verified_at: "2026-09-27T05:30:00Z",
+  review_due: null,
+  version: 1,
+  created_at: "2026-09-27T05:30:00Z",
+};
+
+/**
+ * Stream the canned answer as Server-Sent Events, one event at a time (FR-KB-008). A question
+ * containing "slowly" waits 1.5 s between events, so the e2e run can press Stop mid-answer.
+ */
+function streamAnswer(response: ServerResponse, slow: boolean): void {
+  response.writeHead(200, {
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-store",
+    "x-accel-buffering": "no",
+  });
+  let i = 0;
+  let closed = false;
+  // The browser pressed Stop (the BFF aborts this request): write nothing more.
+  response.on("close", () => {
+    closed = true;
+  });
+  const next = () => {
+    if (closed) return;
+    const item = ASK_EVENTS[i];
+    if (!item) return void response.end();
+    const [event, data] = item;
+    response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    i += 1;
+    setTimeout(next, slow ? 1500 : 60);
+  };
+  next();
+}
+
 /** Platform school detail while provisioning is stopped (docs/16 §5.4). */
 const PROVISIONING_DETAIL = {
   ...provisioningSummary(),
@@ -446,6 +506,8 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
           "document.read",
           "document.upload",
           "document.manage_acl",
+          "kb.ask",
+          "kb.verified_answer.manage",
         ],
         scopes: [{ type: "school", ref: null }],
         mfa: true,
@@ -507,6 +569,38 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
   if (path === "/api/v1/documents") return [200, page([DOCUMENT])];
   if (path === `/api/v1/documents/${DOC_ID}`)
     return [200, { ...DOCUMENT, versions: [DOC_VERSION] }];
+  if (path === "/api/v1/knowledge/verified-answers" && method === "GET")
+    return [200, page([VERIFIED_ANSWER])];
+  if (path === `/api/v1/knowledge/queries/${ASK_QUERY_ID}/feedback` && method === "POST")
+    return [
+      200,
+      {
+        query_id: ASK_QUERY_ID,
+        feedback: "helpful",
+        reason: null,
+        recorded_at: "2026-09-28T05:00:00Z",
+      },
+    ];
+  if (path === "/api/v1/knowledge/search" && method === "POST")
+    return [
+      200,
+      {
+        data: [
+          {
+            source: ASK_SOURCE,
+            document_id: DOC_ID,
+            version_no: 1,
+            page_from: 1,
+            page_to: 1,
+            doc_type: "circular",
+            title: "Dasara holidays circular 2026",
+            issued_on: "2026-09-15",
+            snippet: "Holidays from 02/10/2026 to 12/10/2026; school reopens on 13/10/2026.",
+            score: 0.82,
+          },
+        ],
+      },
+    ];
   if (path === "/api/v1/audit/verify")
     return [200, { ok: true, checked: 1234, first_bad_seq: null, reason: null }];
   if (path === `/api/v1/platform/tenants/${T3}`) return [200, PROVISIONING_DETAIL];
@@ -572,6 +666,10 @@ async function startApi(): Promise<Server> {
       body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     } catch {
       body = {};
+    }
+    if (url.pathname === "/api/v1/knowledge/ask" && method === "POST") {
+      const question = typeof body.question === "string" ? body.question : "";
+      return streamAnswer(response, question.includes("slowly"));
     }
     const subject = subjectOf(request);
     const [status, answer] =
