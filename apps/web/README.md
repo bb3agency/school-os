@@ -22,6 +22,7 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 | `src/features/settings/`           | School profile and settings (FR-TEN-012): languages, date format, idle timeout, AI switch and budget for `tenant.settings.manage`; step-up per call (`/settings/school`)     |
 | `src/features/users/`              | Users and roles (US-102): staff list, invite, profile edits, status (not on own account), roles by API `grantable`, scopes (`/settings/users/*`; step-up)                    |
 | `src/features/documents/`          | Documents (US-701, FR-DOC-001..008): list/filters in the URL, presigned upload, versions, who can see it, edit details, archive, uploader (`/documents/*`)                   |
+| `src/features/ask/`                | Ask the school (US-801..803): `/ask` streams SSE via the BFF (Stop aborts), text answers with source chips, feedback; `/ask/search`, `/ask/verified`                         |
 | `src/features/auth/`               | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                                                  |
 | `src/lib/forms.ts`                 | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                                                        |
 | `src/lib/api-errors.ts`            | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                                                     |
@@ -138,7 +139,7 @@ the signed-out page, without an IdP.
 With `E2E_STAND_IN=1` (and Valkey at `REDIS_URL`) it also signs in through a scripted
 stand-in IdP and canned API (`e2e/support/stand-in.ts`; synthetic data only) and runs axe
 plus keyboard-only paths on school pages (billing, support, home, the picker, settings,
-structure and promotions, users, documents, the audit check) and platform pages (dashboard, schools, a school
+structure and promotions, users, documents, the audit check, Ask the school with a streamed synthetic answer and Stop) and platform pages (dashboard, schools, a school
 whose provisioning stopped, invoices, plans, the provision wizard, dialogs). It also fails on
 horizontal overflow at 1366×768 and on any Tab stop without a visible focus indicator:
 
