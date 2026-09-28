@@ -3,7 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
-export type ButtonSize = "md" | "sm";
+export type ButtonSize = "lg" | "md" | "sm";
 
 const base =
   "inline-flex items-center justify-center gap-2 rounded-md border font-semibold whitespace-nowrap " +
@@ -18,6 +18,7 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
+  lg: "min-h-12 px-6 py-2.5 text-base",
   md: "min-h-10 px-4 py-2 text-sm",
   sm: "min-h-8 px-3 py-1 text-sm",
 };

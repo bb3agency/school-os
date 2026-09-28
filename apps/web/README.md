@@ -24,6 +24,7 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 | `src/features/documents/`          | Documents (US-701, FR-DOC-001..008): list/filters in the URL, presigned upload, versions, who can see it, edit details, archive, uploader (`/documents/*`)                                                                                                                                                 |
 | `src/features/ask/`                | Ask the school (US-801..803): `/ask` streams SSE via the BFF (Stop aborts), text answers with source chips, feedback; `/ask/search`, `/ask/verified`                                                                                                                                                       |
 | `src/features/auth/`               | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                                                                                                                                                                                |
+| `src/features/welcome/`            | Public product page (`/welcome`): header, hero with a CSS/SVG mock on sample data, features, how it works, security, plans, FAQ; no session                                                                                                                                                                |
 | `src/lib/forms.ts`                 | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                                                                                                                                                                                      |
 | `src/lib/api-errors.ts`            | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                                                                                                                                                                                   |
 | `src/lib/date-format.ts`           | Display dates in the school's `date_format` from GET /me (FR-TEN-012); `formatDate`/`formatDateTime` in `lib/format.ts` use it (browser only; the server renders DD/MM/YYYY). Typed dates too: `useDateInput` (placeholder, hint values, starting value) and `typedDateToIso` (reads D/M/YYYY or YYYY-M-D) |
@@ -87,6 +88,16 @@ answers `active_tenant_required`), hides menu items the user lacks (from `/me` e
 permissions; UX only, the API checks every call) and shows "Switch school" when `/me`
 lists more than one school. Platform menus are filtered the same way from `/platform/me`.
 
+**Public welcome page (`/[locale]/welcome`, `src/features/welcome/`).** A signed-out visitor
+to the bare school home (`/`, `/en`, `/te`) is sent to the public product page instead of
+the IdP (`requireStaff` → `isSchoolHomePath` in `src/server/session/rsc.ts`); every deep link
+still goes straight to `/bff/auth/login?next=…`, a SchoolOS support session still opens the
+console, and the operator panel is unchanged. The page needs no session, is a Server
+Component with no client JS of its own (only the language switch), stays `noindex` like the
+rest of the app, and links to sign-in; the signed-out page links back to it. Its claims come
+from docs/01, docs/07 and docs/08 (no prices, counts or customer names; certificates are
+marked planned until M3).
+
 ## BFF routes
 
 | Route                                                                  | Notes                                                        |
@@ -135,8 +146,9 @@ SOS_WEB_TEST_REDIS_URL=redis://127.0.0.1:6390/15 npm test -w @schoolos/web
 ```
 
 `npm run e2e -w @schoolos/web` (Playwright, after `npm run build`) checks the redirect to
-sign-in, the signed-out page (CSP, Telugu), the health check, and axe-core (WCAG 2.2 AA) on
-the signed-out page, without an IdP.
+sign-in, the signed-out page (CSP, Telugu), the health check, axe-core (WCAG 2.2 AA) on
+the signed-out page, and the public welcome page (`e2e/welcome.spec.ts`: home redirect,
+CSP, axe at 1366×768 and 375 px in both languages, keyboard tab-through), without an IdP.
 
 With `E2E_STAND_IN=1` (and Valkey at `REDIS_URL`) it also signs in through a scripted
 stand-in IdP and canned API (`e2e/support/stand-in.ts`; synthetic data only) and runs axe
