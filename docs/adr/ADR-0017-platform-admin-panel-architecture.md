@@ -44,3 +44,13 @@ The platform team must provision schools (shared and dedicated), manage plans, s
 ## Related requirements
 
 FR-PLT-001..030, FR-OPS-004, SEC-003, SEC-026..029, BR-09; 02 §3 (C14); 04 §4, §16; 07 §6.5–6.6; 09 §4; 16.
+
+## Amendments
+
+### 2026-09-28: where invoice PDFs are stored (proposed location, implementation fact)
+
+The decision said billing lives in `platform` but not where its generated files go. Invoice PDFs (docs/16 §5.8, roadmap M1 "before the first paid invoice") are control-plane business records, not school data, so they are **not** stored under a school prefix `t/<tenant_id>/` (offboarding deletes that prefix, while invoices must be kept as business records; docs/16 §5.5, 08 §14). Implemented, behind configuration:
+
+- **Location:** bucket `SOS_PLATFORM_INVOICE_BUCKET`, or the shared files bucket when unset (the default today, so no new bucket is needed), under the prefix `platform/invoices/<financial_year>/<invoice_id>/<render_id>.pdf` (`billing.yaml` → `invoice_pdf.object_prefix`). The client (`app/platform/invoice_storage.py`) refuses any key under `t/`; the table `platform.invoice_pdfs` (migration `0029_invoice_pdfs`, append-only, CHECK `object_key NOT LIKE 't/%'`) records the one document per invoice. Same private bucket rules: SSE-KMS with the data key, presigned GETs of at most 5 minutes with `Content-Disposition: attachment`.
+- **Access:** the shared tier's api/worker task role gets `s3:GetObject`/`s3:PutObject`/`s3:DeleteObject` on `platform/invoices/*` of the files bucket (`infra/terraform/modules/shared_platform`); dedicated hosts never invoice and get nothing. A separate control-plane bucket (own KMS key, own lifecycle, retention for GST records) remains an option: set `SOS_PLATFORM_INVOICE_BUCKET` once Terraform creates it.
+- **Rendering** uses the shared renderer `app/core/pdf.py` on the `pdf` queue (ADR-0025) through the beat task `billing.render_invoice_pdfs`; the platform module never imports `app.exports` (import-linter contract `platform-pdf-via-core`).

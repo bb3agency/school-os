@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.5 · 2026-09-27 |
-| Changes | 0.5: provisioning is a persisted, resumable state machine (`platform.provisioning_runs`, migration `0020_provisioning_runs`): request fingerprint, lease, failed state, `provisioning:resume`, go-live refused until provisioning completed (§5.3, §5.4, §7, §8.1, §16, §18; FR-PLT-002). 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
+| Version | 0.6 · 2026-09-28 |
+| Changes | 0.6: invoice PDFs (M1): template v0 **pending CA review**, render on the `pdf` queue, control-plane storage, download route, `platform.invoice_pdfs` (migration `0029_invoice_pdfs`), audit events, open questions Q11-Q13 (§1, §5.8, §5.8.1, §7, §8.1, §16, §18, §19; FR-PLT-016, FR-PLT-017). 0.5: provisioning is a persisted, resumable state machine (`platform.provisioning_runs`, migration `0020_provisioning_runs`): request fingerprint, lease, failed state, `provisioning:resume`, go-live refused until provisioning completed (§5.3, §5.4, §7, §8.1, §16, §18; FR-PLT-002). 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
 | Capability | C14 · Milestone M0 (roadmap Task 11) |
 | Requirements | FR-PLT-001..030 (03-TRD §3.12) · stories US-1301..US-1310, US-1204 (02-PRD §4) |
 | Decisions | ADR-0013 (privilege separation), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies), ADR-0023 (operator sign-in for break-glass, Proposed), ADR-0024 (resumable provisioning, Proposed) |
@@ -26,7 +26,7 @@ It **never shows student data**. Everything it shows about a school is the schoo
 
 The control plane runs **only in the shared deployment** (ADR-0015). On a dedicated host (`SOS_DEPLOYMENT_MODE=dedicated`) its routes and screens are not mounted.
 
-Out of scope for M0: online payment collection (ADR-0016, Proposed), invoice PDFs (planned before the first paid invoice, 14 §2 M1), credit notes, self-serve sign-up, the break-glass *workflow* (M1; the panel only lists requests in M0).
+Out of scope for M0: online payment collection (ADR-0016, Proposed), invoice PDFs (built in M1, template v0 pending CA review; §5.8.1), credit notes, self-serve sign-up, the break-glass *workflow* (M1; the panel only lists requests in M0).
 
 ## 2. Personas (platform operator team)
 
@@ -162,8 +162,18 @@ List with filters by status. Actions: activate (trial → active), extend trial,
 *Permission:* read `platform.invoices.read`; actions `platform.invoices.manage`.
 - **Invoice list:** number, school, period, issue date, due date, total, paid, status; filters by status, financial year, school.
 - **Invoice detail:** supplier and recipient blocks (legal names, GSTINs, addresses, place of supply), lines (description, SAC, quantity, unit price, amount), taxable value, CGST/SGST or IGST, total, payments, balance due.
-- **Actions:** edit draft lines; discard draft; **issue** (assigns the next number, freezes the invoice); **void** (issued, unpaid; reason required; number is kept); record payment (§5.9). PDF download arrives later (§1).
+- **Actions:** edit draft lines; discard draft; **issue** (assigns the next number, freezes the invoice); **void** (issued, unpaid; reason required; number is kept); record payment (§5.9); **download PDF** of any numbered invoice (§5.8.1).
 - **Billing account** (edit with `platform.subscriptions.manage`, ᴿ): legal name, GSTIN (validated format; its first two digits must match the state code), PAN (optional), billing email, billing contact name and phone, address, district, PIN code, state code, PO reference. Changes apply to future invoices only; issued invoices keep their snapshot.
+
+### 5.8.1 Invoice PDFs (M1)
+
+> **Template v0: pending CA review** (§19 Q2, Q3, Q11-Q13). The layout, wording, SAC code and number format must be confirmed by the supplier's chartered accountant before the first paid invoice. The marker lives here and in `billing.yaml`, never on the PDF. Synthetic samples for the CA, rendered from the same template and renderer settings: [`samples/invoice-template-v0-sample.pdf`](samples/invoice-template-v0-sample.pdf) and its HTML [`samples/invoice-template-v0-sample.html`](samples/invoice-template-v0-sample.html) (synthetic supplier and school; intra-state CGST + SGST, a per-student line and a discount).
+
+- **What is printed** (CGST Rule 46): title "Tax Invoice"; supplier legal name, registered address (`SOS_BILLING_SUPPLIER_ADDRESS`, `;` separates lines) and GSTIN; invoice number (at most 16 characters) and date, due date, service period; recipient (the school's billing entity) legal name, address and GSTIN ("Unregistered" when empty); state codes with names and the place of supply; per line: description, SAC, quantity, rate, GST rate, taxable value; taxable value, CGST + SGST (intra-state) or IGST (inter-state) with the rate, total; amount in words (Indian system); "tax payable on reverse charge: No"; invoice notes; a zero-rate note when every line has GST 0 (§19 Q3); a signatory block; "computer-generated invoice". A4 portrait, bundled font, JavaScript off, no network (ADR-0025). **English only** (a tax document for the school's accounts office; the panel itself stays bilingual, §3 principle 7; Telugu labels are Q12). No student data: only the invoice snapshot taken at issue (supplier, billing entity, lines, totals).
+- **When:** every numbered invoice (issued, paid or void) gets exactly one PDF. The beat task `billing.render_invoice_pdfs` (every minute, queue `pdf`, the Chromium workers) renders those without one, oldest first, 20 per run; a failure is logged (IDs and error type) and retried on the next run. The worker refuses to render in staging/prod while the supplier address is the dev placeholder. Drafts never have a PDF.
+- **Idempotent per invoice:** `platform.invoice_pdfs` (primary key `invoice_id`) records template version, object key, SHA-256 and size in the same transaction as `invoice.pdf_rendered`. Each render writes its own object; a render that loses the insert deletes its object. The table is append-only (`sos_platform` has SELECT and INSERT only; a trigger refuses UPDATE, DELETE and TRUNCATE). A voided invoice keeps its original PDF (the list shows the void).
+- **Where:** the control-plane bucket/prefix `platform/invoices/<financial_year>/<invoice_id>/<render_id>.pdf` (`SOS_PLATFORM_INVOICE_BUCKET`, default the files bucket), never under a school prefix, so offboarding keeps invoices as business records (ADR-0017 Amendment 2026-09-28).
+- **Download:** `GET /platform/invoices/{id}/download-url` (`platform.invoices.read`): a presigned GET of at most 5 minutes with `Content-Disposition: attachment` and the file name `invoice-SOS-26-27-000123.pdf`; `409 invoice_draft` for a draft, `409 invoice_pdf_pending` until rendered, 404 for an unknown ID; audited as `invoice.pdf_downloaded`. Emailing PDFs to schools and the school-side download are not built yet (no email delivery; §5.18).
 
 ### 5.9 Payments
 *Permission:* `platform.invoices.manage`.
@@ -735,6 +745,7 @@ Notes on columns that are easy to miss:
 - `provisioning_runs` (migration `0020_provisioning_runs`): one row per school (`tenant_id` → `deployments.tenant_id`, `tenant_code` unique), `tier`, `request_sha256` (NULL for runs backfilled from before `0020`), `state` (`registered`, `initialised`, `completed`, `failed`), `failed_step` + `last_error` (a code; set exactly when `failed`), `attempts`, `lease_id` + `lease_expires_at`, `owner_subject`/`owner_display_name`/`owner_email`/`owner_language` (the owner invite parameters, held only until the invite exists: a CHECK requires them empty once `completed`, and dedicated runs never hold them), `created_by`, `completed_at`. `sos_platform` may `SELECT`, `INSERT`, `UPDATE` (no `DELETE`); `sos_app` and `sos_readonly` nothing. API responses show only state, step, error code and attempts (§5.4).
 - `job_runs.created_by`: the operator who started a job (`GET /platform/jobs/{id}` shows a job to its creator or to holders of `platform.audit.read`).
 - `invoices.invoice_number` is at most 16 characters (CGST Rule 46), e.g. `SOS/26-27/000123`.
+- `invoice_pdfs` (migration `0029_invoice_pdfs`): `invoice_id` (primary key, one PDF per invoice), `template_version` (`v0`…), `object_key` (control-plane prefix, CHECK: never `t/…`), `sha256`, `size_bytes`, `rendered_at`. Append-only: `sos_platform` has SELECT and INSERT only and a trigger refuses UPDATE, DELETE and TRUNCATE; `sos_app` and `sos_readonly` nothing (§5.8.1).
 
 ## 8. API endpoint catalog
 
@@ -771,6 +782,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/subscriptions/{sub_id}/suspend` | `platform.subscriptions.manage` ᴿ | 200 | Only `past_due` after grace; exam-window rule (§9.3) |
 | POST | `/platform/subscriptions/{sub_id}/reactivate` | `platform.subscriptions.manage` ᴿ | 200 | |
 | GET | `/platform/invoices` · `/platform/invoices/{invoice_id}` | `platform.invoices.read` | 200 | Filters: `status`, `financial_year`, `tenant_id` |
+| GET | `/platform/invoices/{invoice_id}/download-url` | `platform.invoices.read` | 200 | Presigned PDF download ≤ 5 min (§5.8.1); `409 invoice_draft`, `409 invoice_pdf_pending` |
 | POST | `/platform/invoices` | `platform.invoices.manage` | 201 | Manual draft for a subscription and period |
 | PATCH | `/platform/invoices/{invoice_id}` | `platform.invoices.manage` | 200 | Draft lines and notes only |
 | DELETE | `/platform/invoices/{invoice_id}` | `platform.invoices.manage` | 204 | Drafts only |
@@ -1048,7 +1060,7 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.deleted` (M1, with the deletion job) |
 | Plans | `plan.created`, `plan.updated`, `plan.published`, `plan.retired` |
 | Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
-| Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system) |
+| Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system), `invoice.pdf_rendered` (system; number, template version, size), `invoice.pdf_downloaded` |
 | Usage | `usage.limit_threshold_crossed` (system) |
 | Flags | `flag.updated`, `flag.override_set`, `flag.override_removed` |
 | Fleet | `deployment.created`, `deployment.updated`, `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.decommissioned` (rejected heartbeats are logged, not audited) |
@@ -1103,6 +1115,7 @@ In addition to the general suites (12 §4):
 | Invoice numbering | Concurrent issues in one financial year produce consecutive, unique numbers with no gaps; FY boundary on 1 April IST | FR-PLT-016 |
 | GST | Intra-state → CGST = SGST; inter-state → IGST; totals equal sum; rounding half-up to paise (table-driven) | FR-PLT-017 |
 | Immutability | Issued invoice fields other than status/payments/void cannot change; published plan prices cannot change | FR-PLT-010, FR-PLT-016 |
+| Invoice PDFs | Template content (Rule 46 fields, CGST/SGST vs IGST, escaping, no URL but the bundled font, no student fields) always runs; the real Chromium render is checked by text extraction (number, totals, GSTINs) and skipped only without Chromium; render once per invoice (concurrent render keeps one document), drafts never, append-only table, placeholder supplier refused in prod; download route: roles with `platform.invoices.read` only, 404/409 cases, audit (`tests/platform/test_invoice_pdf_template.py`, `test_invoice_pdf.py`) | FR-PLT-016, FR-PLT-017, FR-PLT-028 |
 | Lifecycle | Past-due after due date; never auto-suspended; suspension before grace end → 409; inside exam window without owner approval → 409 | FR-PLT-014 |
 | Provisioning | The first provisioning transaction is atomic (failure leaves no tenant, subscription or deployment); a failure or crash at each later step is recorded (or leaves a lease that expires), and a retry or resume converges on exactly one tenant, key, owner membership and school-chain `tenant.provisioned`; concurrent double submission yields one school; a runner that lost its lease cannot change the run; go-live is refused until provisioning completed (`tests/platform/test_provisioning_resume.py`, `test_provisioning_migration.py`) | FR-PLT-002 |
 | Platform audit chain | Every mutating platform route writes exactly one event in the same transaction; tamper and gap detection | FR-PLT-029 |
@@ -1123,6 +1136,9 @@ In addition to the general suites (12 §4):
 | Q8 | Default trial length and pilot terms. | **Implemented** per plan: `platform.plans.trial_days` (default 30), extendable by billing admin; design partner per signed pilot terms | Founder |
 | Q9 | Should `admin.<domain>` be restricted by IP allowlist in addition to MFA? | Not at Stage 0 (operators travel); WAF rate rules and geo-restriction to India; revisit at Stage 1 | Engineering |
 | Q10 | E-invoicing (IRN) applies above a turnover threshold. | Not needed at Stage 0; add to the compliance calendar | Founder + CA |
+| Q11 | Invoice PDF template v0 (§5.8.1): layout and wording, "Tax Invoice" vs "Bill of Supply" while unregistered (Q3), the zero-rate note, a digital signature or "authorised signatory" block (Rule 46(q)), whether bank/UPI payment details, supplier PAN, contact or CIN should be printed, rounding line. | **Implemented as v0, pending CA review**; a CA-approved layout becomes `v1` (`billing.yaml`) and applies to invoices rendered after the change (stored PDFs never change) | Founder + CA |
+| Q12 | Language of invoice PDFs. | English only in v0; add Telugu labels only if schools ask (needs reviewed tax terms) | Product owner |
+| Q13 | Sending invoice PDFs to schools (email at issue, FR-PLT-019) and a download on the school-side billing page (§5.18). | Not built (no email delivery in M0/M1); operators download and send manually | Product owner |
 
 ## 20. Requirement map
 
