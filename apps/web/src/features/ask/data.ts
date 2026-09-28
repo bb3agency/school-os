@@ -11,6 +11,7 @@ export type FeedbackBody = Schemas["FeedbackIn"];
 export type Feedback = Schemas["FeedbackOut"];
 export type VerifiedAnswer = Schemas["VerifiedAnswerOut"];
 export type VerifiedAnswerBody = Schemas["VerifiedAnswerIn"];
+export type VerifiedReviewBody = Schemas["VerifiedAnswerReviewIn"];
 export type VerifiedStatus = VerifiedAnswer["status"];
 
 /** Permissions (docs/09 Knowledge). Hiding is UX only: the API checks every call. */
@@ -45,6 +46,11 @@ export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
 // Every API code is offered (compile-time: `true` only when the two sets are equal).
 const ALL_REASONS_OFFERED: ApiFeedbackReason extends FeedbackReason ? true : never = true;
 void ALL_REASONS_OFFERED;
+
+/** `W/"3"` for If-Match from a resource's `version` (the API's ETag format). */
+export function ifMatch(version: number): string {
+  return `W/"${version}"`;
+}
 
 export interface VerifiedPage {
   data: VerifiedAnswer[];
@@ -89,6 +95,23 @@ export function useKnowledgeApi() {
         api.POST("/api/v1/knowledge/verified-answers", {
           body,
           headers: { "Idempotency-Key": idempotencyKey },
+        }),
+      ),
+    /** Confirm again (`kb.verified_answer.manage`, If-Match; an empty body keeps what is stored). */
+    reviewVerified: (answer: VerifiedAnswer, body: VerifiedReviewBody) =>
+      unwrap(
+        api.POST("/api/v1/knowledge/verified-answers/{answer_id}/review", {
+          params: { path: { answer_id: answer.id } },
+          headers: { "If-Match": ifMatch(answer.version) },
+          body,
+        }),
+      ),
+    /** Withdraw from Ask, kept for the record (409 verified_answer_retired when it already is). */
+    retireVerified: (answer: VerifiedAnswer) =>
+      unwrap(
+        api.POST("/api/v1/knowledge/verified-answers/{answer_id}/retire", {
+          params: { path: { answer_id: answer.id } },
+          headers: { "If-Match": ifMatch(answer.version) },
         }),
       ),
   };

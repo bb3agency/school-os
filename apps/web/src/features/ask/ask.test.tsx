@@ -569,6 +569,7 @@ function verified(
     citations: [{ source: DOC_SOURCE, cited_text: "Exams begin on 22/09/2026 at 9 am" }],
     status: "active",
     verified_by: ID.user,
+    verified_by_name: null,
     verified_at: "2026-09-27T05:30:00Z",
     review_due: "2027-03-31",
     version: 1,
@@ -684,6 +685,89 @@ describe("verified answers (US-802, FR-KB-030)", () => {
       screen.getAllByRole("link", { name: /Source 1 \(open the document\)/ })[0],
     ).toHaveAttribute("href", `/en/documents/${DOC}`);
     expect(screen.queryByRole("button", { name: "Add a verified answer" })).toBeNull();
+  });
+
+  it("shows the verifier's name when the API gives it (VerifiedAnswerOut.verified_by_name)", async () => {
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([
+        verified({
+          verified_by: "0192f3a4-0000-7000-8000-00000000c599",
+          verified_by_name: "Lakshmi Devi",
+        }),
+      ]);
+    renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByText(/Verified by Lakshmi Devi · on 27\/09\/2026/)).toBeVisible();
+  });
+
+  it("review confirms an answer again with If-Match; retire withdraws it (FR-KB-030)", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    const REVIEW = `POST /bff/api/v1/knowledge/verified-answers/${VERIFIED}/review`;
+    const RETIRE = `POST /bff/api/v1/knowledge/verified-answers/${VERIFIED}/retire`;
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([verified({ status: "needs_review", version: 3 })]);
+    stub.routes[REVIEW] = () => Response.json(verified({ status: "active", version: 4 }));
+    stub.routes[RETIRE] = () => Response.json(verified({ status: "retired", version: 4 }));
+    renderWithIntl(<VerifiedAnswersPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Check and confirm" }));
+    let dialog = await screen.findByRole("dialog", { name: "Confirm this verified answer" });
+    await user.click(within(dialog).getByRole("button", { name: "Confirm answer" }));
+    await waitFor(() => expect(stub.callsTo(REVIEW)).toHaveLength(1));
+    expect(stub.callsTo(REVIEW)[0]?.headers.get("if-match")).toBe('W/"3"');
+    expect(stub.callsTo(REVIEW)[0]?.headers.get("x-csrf-token")).toBe(CSRF);
+    expect(body(REVIEW)).toEqual({});
+
+    await user.click(screen.getByRole("button", { name: "Retire" }));
+    dialog = await screen.findByRole("dialog", { name: "Retire this verified answer" });
+    await user.click(within(dialog).getByRole("button", { name: "Retire answer" }));
+    await waitFor(() => expect(stub.callsTo(RETIRE)).toHaveLength(1));
+    expect(stub.callsTo(RETIRE)[0]?.headers.get("if-match")).toBe('W/"3"');
+  });
+
+  it("explains 409 verified_answer_retired", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([verified()]);
+    stub.routes[`POST /bff/api/v1/knowledge/verified-answers/${VERIFIED}/retire`] = () =>
+      problem(409, "verified_answer_retired");
+    renderWithIntl(<VerifiedAnswersPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Retire" }));
+    const dialog = await screen.findByRole("dialog", { name: "Retire this verified answer" });
+    await user.click(within(dialog).getByRole("button", { name: "Retire answer" }));
+    expect(await within(dialog).findByText("Already retired")).toBeInTheDocument();
+  });
+
+  it("review and retire are offered only to kb.verified_answer.manage, never on retired answers", async () => {
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([verified()]);
+    const { unmount } = renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByRole("heading", { name: "When do exams begin?" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retire" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check and confirm" })).toBeNull();
+    unmount();
+
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([verified({ status: "retired" })]);
+    renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByRole("heading", { name: "When do exams begin?" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retire" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check and confirm" })).toBeNull();
+  });
+
+  it("the verified-answer actions work in Telugu without missing messages", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([
+        verified({
+          status: "needs_review",
+          verified_by: "0192f3a4-0000-7000-8000-00000000c599",
+          verified_by_name: "Lakshmi Devi",
+        }),
+      ]);
+    renderWithIntl(<VerifiedAnswersPage />, "te");
+    expect(await screen.findByText(/Lakshmi Devi/)).toBeVisible();
+    expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(3);
   });
 
   it("filters by status", async () => {

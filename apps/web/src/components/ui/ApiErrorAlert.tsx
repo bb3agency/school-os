@@ -20,7 +20,8 @@ export type ErrorNamespace =
   | "academicStructure"
   | "schoolSettings"
   | "documents"
-  | "ask";
+  | "ask"
+  | "ask.verified";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

@@ -3974,7 +3974,27 @@
       "reviewDueOn": "check again by {date}",
       "sourceTitle": "Source {number}",
       "emptyTitle": "No verified answers yet",
-      "emptyBody": "When the principal saves a checked answer, it appears here for everyone."
+      "emptyBody": "When the principal saves a checked answer, it appears here for everyone.",
+      "verifiedByName": "Verified by {name}",
+      "actionsFor": "For the question: {question}",
+      "review": "Check and confirm",
+      "reviewTitle": "Confirm this verified answer",
+      "reviewBody": "SchoolOS checks each quoted source against the current version of its document. If they still match, the answer is used again and you become its verifier. To change the text or the sources, retire it and add a new one.",
+      "reviewConfirm": "Confirm answer",
+      "retire": "Retire",
+      "retireTitle": "Retire this verified answer",
+      "retireBody": "Ask the school will no longer use this answer. It stays in this list as retired, for the record.",
+      "retireConfirm": "Retire answer",
+      "errors": {
+        "verified_answer_retired": {
+          "title": "Already retired",
+          "body": "This answer was retired already. Close this and reload the page to see its current state."
+        },
+        "not_found": {
+          "title": "Answer or source not found",
+          "body": "You can't read a document this answer cites, or the answer is gone. Ask the office to check who can see the documents."
+        }
+      }
     },
     "search": {
       "title": "Search documents",
