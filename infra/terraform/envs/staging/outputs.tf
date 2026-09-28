@@ -28,6 +28,11 @@ output "files_browser_origin" {
   value       = module.platform.files_browser_origin
 }
 
+output "ses" {
+  description = "SES identity and the DKIM CNAMEs to publish (null when email_domain is unset)."
+  value       = module.platform.ses
+}
+
 output "oidc" {
   description = "OIDC settings (non-secret)."
   value       = module.platform.oidc

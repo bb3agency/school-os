@@ -223,6 +223,30 @@ variable "platform_invoice_bucket" {
   default     = null
 }
 
+variable "email_provider" {
+  description = "Staff invitation email: off (default) or ses (validated by modules/shared_platform)."
+  type        = string
+  default     = "off"
+}
+
+variable "email_domain" {
+  description = "SES sending domain (Easy DKIM); null = no SES identity."
+  type        = string
+  default     = null
+}
+
+variable "email_route53_zone_id" {
+  description = "Hosted zone for the DKIM CNAMEs (null = publish them by hand from output ses)."
+  type        = string
+  default     = null
+}
+
+variable "email_from" {
+  description = "Sender, e.g. \"SchoolOS <no-reply@mail.example.in>\" (address in email_domain)."
+  type        = string
+  default     = null
+}
+
 variable "security_alert_emails" {
   description = "Security alert recipients (GuardDuty/Security Hub/tampering, SEC-023). Null = alarm_emails. The on-call path is docs/11 §6-7."
   type        = list(string)

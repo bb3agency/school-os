@@ -74,6 +74,7 @@ infra/terraform/
 │   ├── s3_bucket/            hardened private bucket used by every stack
 │   ├── kms/                  CMKs (data, audit, backup, logs; annual rotation) + asymmetric audit-signing keys, key policies
 │   ├── secrets/              Secrets Manager secrets (ephemeral generation, write-only values)
+│   ├── ses_email/            SES v2 domain identity (Easy DKIM), configuration set, reputation alarms (§5.2)
 │   ├── ecr/                  repositories (immutable tags, scan on push, KMS)
 │   ├── ecs_cluster/          Fargate cluster (+ optional EC2 capacity providers), Container Insights, ECS Exec audit, Service Connect
 │   ├── ecs_service/          hardened Fargate service or one-off task (migrate, db-bootstrap); EC2 mode for worker-pdf
@@ -128,6 +129,20 @@ Each module and root has `terraform test` files (`tests/*.tftest.hcl`). CI runs 
 **Known gaps (owner decisions).** Root console sign-in and IAM API events are delivered to EventBridge only in us-east-1, which the region guardrail excludes, so they are recorded and checked by Config/Security Hub but not paged in real time. The trail does not send to CloudWatch Logs, so CIS controls CloudWatch.1-14 (metric filters and alarms) will fail until either CloudWatch Logs delivery is added (billed per GB ingested) or those controls are disabled with a recorded reason. GuardDuty Malware Protection for S3 (scanning new uploads to the files bucket) is not enabled: it overlaps the upload antivirus hook (SEC-016) and is billed per GB scanned.
 
 **Cost (Stage 0, estimate; check current ap-south-1 pricing).** Per account: one KMS key (about USD 1/month) plus requests; CloudTrail's first copy of management events is free and S3 data events cost about USD 0.10 per 100,000 events (every presigned upload or download of a school file is one); GuardDuty is billed by the volume of CloudTrail, VPC flow, DNS and S3 events analysed (small at pilot scale; 30-day free trial per region); Config about USD 0.003 per configuration item recorded plus rule evaluations; Security Hub per control check and per finding ingested beyond the free tier; S3 storage of compressed logs is small. Expect tens of US dollars per month per account at pilot volume; the monthly budget alert (§12) covers surprises. `config_recording_frequency = "DAILY"` lowers Config cost if needed.
+
+### 5.2 Email: staff invitations through Amazon SES (US-102, FR-IAM-013)
+
+`modules/ses_email`, instantiated by `shared_platform` when `email_domain` is set: an SES v2 **domain identity** in ap-south-1 with Easy DKIM (RSA 2048) and a default **configuration set** `sos-<env>-email` (TLS required to the receiving server, reputation metrics, account suppression list for bounces and complaints). Bounces and complaints are watched through the account reputation metrics (`AWS/SES` `Reputation.BounceRate` at 5 % and `Reputation.ComplaintRate` at 0.1 %, the levels at which SES starts a review) alarming to the ops topic; there is deliberately no SES event destination to SNS or email, because those notifications carry recipient addresses (CLAUDE.md §6.5). Only the **worker** task role may send (`ses:SendEmail`, `ses:SendRawEmail` on the identity and the configuration set, condition `ses:FromAddress` in the sending domain), and only when `email_provider = "ses"`. The api and worker get `SOS_EMAIL_PROVIDER` (`email_provider`, default `off`; the fake provider is refused), and once `email_from` is set `SOS_EMAIL_FROM`, `SOS_EMAIL_APP_URL` (`https://<app_domain>`) and `SOS_EMAIL_SES_CONFIGURATION_SET`. Terraform refuses `ses` without a domain and sender, and a sender outside the domain.
+
+Enabling it (per environment, manual steps in order):
+
+1. Set `email_domain` (e.g. `mail.<your-domain>`) and apply. The identity is created **pending**.
+2. **DNS:** publish the three DKIM CNAMEs from `terraform output ses` (`<token>._domainkey.<domain>` → `<token>.dkim.amazonses.com`), or set `email_route53_zone_id` so Terraform creates them. Also publish SPF/DMARC for the domain as your mail policy requires (DMARC `p=quarantine` or stricter once reports are clean). Wait until the identity shows DKIM **verified**.
+3. **SES production access:** a new account is in the SES **sandbox** (only verified recipients, 200 messages a day). In the SES console (ap-south-1) request production access (use case: transactional staff invitations, low volume, no marketing; bounce/complaint handling as above). Staging may stay in the sandbox with verified test inboxes only (synthetic data).
+4. Set `email_from` (`"SchoolOS <no-reply@<email_domain>>"`) and `email_provider = "ses"`, apply, and send one invitation to a test inbox.
+5. Confirm the alarm topic subscription receives the SES reputation alarms (they start `INSUFFICIENT_DATA` until mail is sent).
+
+Dedicated hosts send no email yet (their compose file does not set the email settings; off by default).
 
 ## 6. Containers
 

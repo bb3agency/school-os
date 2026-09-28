@@ -105,6 +105,15 @@ output "secret_arns" {
   }
 }
 
+output "ses" {
+  description = "SES email identity (null when email_domain is unset): publish dkim_records in DNS unless email_route53_zone_id manages them."
+  value = var.email_domain == null ? null : {
+    identity_arn           = one(module.ses[*].identity_arn)
+    configuration_set_name = one(module.ses[*].configuration_set_name)
+    dkim_records           = one(module.ses[*].dkim_records)
+  }
+}
+
 output "github_actions" {
   description = "Role ARNs for GitHub Actions (configure-aws-credentials role-to-assume)."
   value = {

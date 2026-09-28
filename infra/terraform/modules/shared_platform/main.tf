@@ -65,6 +65,17 @@ locals {
     SOS_LOG_LEVEL                   = var.log_level
   }, local.invoice_env)
 
+  # Staff invitation email (notifications.send_email runs in the worker; the api queues it). Only the
+  # api and worker get these; off by default. Links in emails point at the school app.
+  email_env = merge(
+    { SOS_EMAIL_PROVIDER = var.email_provider },
+    var.email_from == null ? {} : {
+      SOS_EMAIL_FROM                  = var.email_from
+      SOS_EMAIL_APP_URL               = "https://${var.app_domain}"
+      SOS_EMAIL_SES_CONFIGURATION_SET = one(module.ses[*].configuration_set_name)
+    },
+  )
+
   # Invoice PDFs (docs/16 §5.8): a separate control-plane bucket only when configured; otherwise the
   # app uses the files bucket under platform/invoices/.
   invoice_env = var.platform_invoice_bucket == null ? {} : {
@@ -251,6 +262,22 @@ module "cognito" {
   tags                   = var.tags
 }
 
+# --- Email (staff invitations, US-102) ------------------------------------------------------------
+# SES v2 domain identity with Easy DKIM + default configuration set; reputation alarms to the ops topic.
+# The account starts in the SES sandbox: request production access by hand (docs/10 §5.2).
+
+module "ses" {
+  source = "../ses_email"
+  count  = var.email_domain == null ? 0 : 1
+
+  name_prefix       = local.name
+  domain            = var.email_domain
+  route53_zone_id   = var.email_route53_zone_id
+  reputation_alarms = true
+  alarm_topic_arn   = module.observability.alarm_topic_arn
+  tags              = var.tags
+}
+
 # --- Edge ---------------------------------------------------------------------------------
 
 module "alb" {
@@ -386,6 +413,22 @@ data "aws_iam_policy_document" "worker" {
     actions   = ["kms:Sign", "kms:GetPublicKey"]
     resources = [local.kms_signing]
   }
+
+  # Staff invitation email: notifications.send_email (worker) sends through the SES identity and its
+  # configuration set only, from the sending domain only.
+  dynamic "statement" {
+    for_each = var.email_provider == "ses" ? [1] : []
+    content {
+      sid       = "SesSendInvitations"
+      actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+      resources = [one(module.ses[*].identity_arn), one(module.ses[*].configuration_set_arn)]
+      condition {
+        test     = "StringLike"
+        variable = "ses:FromAddress"
+        values   = ["*@${coalesce(var.email_domain, "invalid.invalid")}"]
+      }
+    }
+  }
 }
 
 # --- Services -------------------------------------------------------------------------------
@@ -483,7 +526,7 @@ module "api" {
     client_alias_port = 8000
   }
 
-  environment             = merge(local.app_env, { SOS_SERVICE_NAME = "api" })
+  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "api" })
   secrets                 = merge(local.app_base_secrets, local.provider_secrets)
   secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
   secrets_kms_key_arns    = [local.kms_data]
@@ -516,7 +559,7 @@ module "worker" {
   enable_execute_command = var.enable_execute_command
   service_connect        = { namespace_arn = module.cluster.service_connect_namespace_arn }
 
-  environment             = merge(local.app_env, { SOS_SERVICE_NAME = "worker" })
+  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "worker" })
   secrets                 = merge(local.app_base_secrets, local.provider_secrets)
   secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
   secrets_kms_key_arns    = [local.kms_data]

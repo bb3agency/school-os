@@ -49,12 +49,17 @@ NOT_SETTINGS: dict[str, str] = {
 }
 
 # Settings added by branches that are merged on the integration branch, not on this one (invoice
-# PDFs: docs/16 §5.8). Deploy files may already pass them. Remove each entry when this branch's
-# app/core/config.py has the field: test_SEC_009_pending_settings_are_really_pending then fails.
+# PDFs: docs/16 §5.8; staff invitation email: US-102). Deploy files may already pass them. Remove
+# each entry when this branch's app/core/config.py has the field:
+# test_SEC_009_pending_settings_are_really_pending then fails.
 PENDING_SETTINGS: frozenset[str] = frozenset(
     {
         "SOS_BILLING_SUPPLIER_ADDRESS",
         "SOS_PLATFORM_INVOICE_BUCKET",
+        "SOS_EMAIL_PROVIDER",
+        "SOS_EMAIL_FROM",
+        "SOS_EMAIL_APP_URL",
+        "SOS_EMAIL_SES_CONFIGURATION_SET",
     }
 )
 
@@ -475,6 +480,25 @@ def test_US_103_dedicated_support_client_is_created_in_the_operator_pool() -> No
         "SUPPORT_OIDC_CLIENT_SECRET=${support_oidc_client_secret_arn}",
     ):
         assert line in text, line
+
+
+# --- staff invitation email (US-102, FR-IAM-013) --------------------------------------------------
+
+
+def test_US_102_email_settings_reach_only_api_and_worker() -> None:
+    """The api queues invitation emails and the worker sends them (notifications.send_email);
+    staging/prod refuse the fake provider and non-https links, so the link is the https app URL."""
+    hcl = shared_hcl()
+    email = hcl.map_entries(hcl.locals["email_env"])
+    assert email["SOS_EMAIL_PROVIDER"] == "var.email_provider"
+    assert email["SOS_EMAIL_APP_URL"] == '"https://${var.app_domain}"'
+    assert "module.ses" in email["SOS_EMAIL_SES_CONFIGURATION_SET"]
+    assert "off" in hcl.var_defaults["email_provider"]
+    for module in ("api", "worker"):
+        assert "local.email_env" in hcl.block("module", module)["environment"], module
+        assert "SOS_EMAIL_PROVIDER" in hcl.container_env(module)
+    for module in ("worker_pdf", "beat", "migrate"):
+        assert "SOS_EMAIL_PROVIDER" not in hcl.container_env(module), module
 
 
 def test_SEC_009_guard_really_refuses_a_bare_task(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -344,6 +344,49 @@ variable "platform_invoice_bucket" {
   }
 }
 
+variable "email_provider" {
+  description = "Staff invitation email (SOS_EMAIL_PROVIDER): off (default) or ses. The fake provider is local/CI only (staging/prod refuse it)."
+  type        = string
+  default     = "off"
+
+  validation {
+    condition     = contains(["off", "ses"], var.email_provider)
+    error_message = "email_provider must be off or ses (fake is refused in staging/prod)."
+  }
+}
+
+variable "email_domain" {
+  description = "SES sending domain (Easy DKIM identity, modules/ses_email), e.g. mail.schoolos.in. Null = no SES identity. Needed before email_provider = ses."
+  type        = string
+  default     = null
+}
+
+variable "email_route53_zone_id" {
+  description = "Hosted zone of email_domain for the three DKIM CNAMEs (null = publish them by hand from the ses output)."
+  type        = string
+  default     = null
+}
+
+variable "email_from" {
+  description = "Sender (SOS_EMAIL_FROM), e.g. \"SchoolOS <no-reply@mail.schoolos.in>\"; its address must be in email_domain."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.email_provider == "off" || (var.email_from != null && var.email_domain != null)
+    error_message = "email_provider = ses needs email_domain (the SES identity) and email_from."
+  }
+
+  validation {
+    condition = var.email_from == null || (
+      var.email_domain != null
+      && can(regex("^([^<>]*<)?[A-Za-z0-9._%+-]+@([a-z0-9.-]+)>?$", var.email_from))
+      && try(endswith(lower(regex("@([^>]+)>?$", var.email_from)[0]), var.email_domain), false)
+    )
+    error_message = "email_from must be an address (optionally 'Name <address>') in email_domain."
+  }
+}
+
 variable "enable_execute_command" {
   description = "ECS Exec on services (staging only)."
   type        = bool

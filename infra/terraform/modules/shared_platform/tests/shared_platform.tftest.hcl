@@ -409,3 +409,89 @@ run "invoice_address_dev_placeholder_refused" {
 
   expect_failures = [var.billing_supplier_address]
 }
+
+# US-102, FR-IAM-013 (staff invitation email through SES): off by default; when on, api and worker get
+# the provider, sender, https app URL and configuration set, and only the worker may send.
+run "email_off_by_default" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_EMAIL_PROVIDER"] == ["off"]
+      && !contains([for e in c.environment : e.name], "SOS_EMAIL_FROM")
+    ])
+    error_message = "Email is off unless configured."
+  }
+
+  assert {
+    condition     = length(module.ses) == 0 && output.ses == null
+    error_message = "No SES identity without email_domain."
+  }
+}
+
+run "email_through_ses" {
+  command = plan
+
+  variables {
+    email_provider = "ses"
+    email_domain   = "mail.staging.example.test"
+    email_from     = "SchoolOS <no-reply@mail.staging.example.test>"
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_EMAIL_PROVIDER"] == ["ses"]
+      && [for e in c.environment : e.value if e.name == "SOS_EMAIL_FROM"] == ["SchoolOS <no-reply@mail.staging.example.test>"]
+      && [for e in c.environment : e.value if e.name == "SOS_EMAIL_APP_URL"] == ["https://app.staging.example.test"]
+      && [for e in c.environment : e.value if e.name == "SOS_EMAIL_SES_CONFIGURATION_SET"] == ["sos-staging-email"]
+    ])
+    error_message = "api and worker get the SES provider, sender, https app URL and configuration set."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.beat.container_definition, module.worker_pdf.container_definition, module.migrate.container_definition] :
+      !contains([for e in c.environment : e.name], "SOS_EMAIL_PROVIDER")
+    ])
+    error_message = "Only api (queues) and worker (sends) know about email."
+  }
+
+  assert {
+    condition     = module.ses[0].posture.tls_policy == "REQUIRE" && module.ses[0].posture.default_config_set == "sos-staging-email" && toset(module.ses[0].posture.reputation_alarms) == toset(["bounce", "complaint"])
+    error_message = "The SES identity uses the configuration set with TLS required."
+  }
+}
+
+run "email_ses_needs_a_sender" {
+  command = plan
+
+  variables {
+    email_provider = "ses"
+    email_domain   = "mail.staging.example.test"
+  }
+
+  expect_failures = [var.email_from]
+}
+
+run "email_sender_in_the_domain" {
+  command = plan
+
+  variables {
+    email_domain = "mail.staging.example.test"
+    email_from   = "no-reply@elsewhere.example.test"
+  }
+
+  expect_failures = [var.email_from]
+}
+
+run "email_fake_refused" {
+  command = plan
+
+  variables {
+    email_provider = "fake"
+  }
+
+  expect_failures = [var.email_provider]
+}

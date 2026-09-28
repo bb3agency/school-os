@@ -18,6 +18,14 @@ billing_supplier_state_code = "37"
 billing_supplier_address    = "Synthetic staging supplier (not a tax invoice); Vijayawada 520001, Andhra Pradesh"
 # platform_invoice_bucket   = null # optional separate invoice-PDF bucket (docs/16 §5.8)
 
+# Staff invitation email via SES (US-102; docs/10 §5.2). 1) set email_domain and apply, 2) publish the
+# DKIM CNAMEs (terraform output ses) unless email_route53_zone_id manages them, 3) request SES
+# production access, 4) set email_from and email_provider = "ses" and apply.
+email_provider = "off"
+# email_domain          = "mail.<your-domain>"
+# email_route53_zone_id = null
+# email_from            = "SchoolOS <no-reply@mail.<your-domain>>"
+
 alarm_emails       = ["<dev-alerts@your-domain>"]
 # SEC-023 baseline in the staging account (on by default; 180-day GOVERNANCE-locked CloudTrail).
 # enable_security_baseline = true
