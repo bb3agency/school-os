@@ -84,11 +84,13 @@ def discard_object(
 ) -> bool:
     document_id = _uuid(payload["document_id"])
     try:
+        # ``object_key`` only in events queued before the IDs-only payload (read either).
+        legacy_key = payload.get("object_key")
         return service.discard_object(
             _uuid(tenant_id),
             document_id,
             _uuid(payload["version_id"]),
-            str(payload["object_key"]),
+            str(legacy_key) if legacy_key is not None else None,
         )
     except ObjectStoreError as exc:
         if self.request.retries >= DISCARD_MAX_RETRIES:

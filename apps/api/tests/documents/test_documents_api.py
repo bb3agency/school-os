@@ -1248,7 +1248,7 @@ def test_PRV_016_redacted_copy_replaces_the_version_and_the_original_is_discarde
 
     # The original's bytes are deleted after commit by the outbox task (idempotent).
     payload = _discard_payload(admin_engine, tenant, doc_id)
-    assert set(payload) == {"document_id", "version_id", "object_key"}
+    assert set(payload) == {"document_id", "version_id"}, "IDs only; the worker finds the key"
     assert original_key in store.objects, "never before the transaction committed"
     assert _run_discard(tenant, payload) is True
     assert original_key not in store.objects
@@ -1303,6 +1303,9 @@ def test_PRV_016_discarded_version_without_a_copy_is_gone_for_good(
         # their object keys once failed the outbox "long digit run" check at random (PRV-016).
         uuid.UUID("0a1b2c3d-4e5f-4a6b-8c7d-123456789012"),
         uuid.UUID("0a1b2c3d-4e5f-4a6b-8c7d-a12345678901"),
+        # Pinned: the last group is 12 digits that pass the Verhoeff check (an Aadhaar-shaped
+        # number), so an object key carrying it could be refused by the payload sanitiser.
+        uuid.UUID("0a1b2c3d-4e5f-4a6b-8c7d-234567890124"),
     ],
 )
 def test_PRV_016_discard_works_for_digit_heavy_document_ids(
@@ -1322,9 +1325,55 @@ def test_PRV_016_discard_works_for_digit_heavy_document_ids(
     with tenant_session(tenant) as s:
         assert service.discard_version(s, document_id, 1, "aadhaar_unredactable") is True
     payload = _discard_payload(admin_engine, tenant, document_id)
-    assert payload["object_key"] == key
+    assert payload == {"document_id": str(document_id), "version_id": payload["version_id"]}
     assert _run_discard(tenant, payload) is True
     assert key not in store.objects
+    assert key in store.discarded
+
+
+def test_PRV_016_the_pinned_digit_group_is_aadhaar_shaped() -> None:
+    """Guards the pinned ID above: it must stay a Verhoeff-valid 12-digit group."""
+    from app.core.redaction import contains_full_aadhaar
+
+    assert contains_full_aadhaar("234567890124")
+
+
+def test_PRV_016_in_flight_discard_events_with_an_object_key_still_work(
+    world: Any, admin_engine: Engine, store: Any
+) -> None:
+    """Events queued before the IDs-only payload carry ``object_key``; the worker still
+    accepts them, with the same checks (backward compatible)."""
+    tenant = world.a.tenant_id
+    owner = world.person("owner").user_id
+    document_id = S.make_document(
+        admin_engine, tenant, owner, purpose="register_scan", doc_type="register_scan"
+    )
+    key = f"t/{tenant}/docs/{document_id}/v1/original.pdf"
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, document_id, 1, "aadhaar_unredactable") is True
+    payload = _discard_payload(admin_engine, tenant, document_id)
+    assert _run_discard(tenant, {**payload, "object_key": key}) is True
+    assert key not in store.objects
+    wrong = f"t/{tenant}/docs/{document_id}/v2/original.pdf"
+    assert _run_discard(tenant, {**payload, "object_key": wrong}) is False
+
+
+def test_PRV_016_discard_after_the_document_was_deleted_leaves_it_to_the_purge(
+    world: Any, admin_engine: Engine, store: Any
+) -> None:
+    """No version row any more: the document's purge (``document.deleted``) removes every
+    object under its prefix, so the IDs-only event has nothing to do."""
+    tenant = world.a.tenant_id
+    owner = world.person("owner").user_id
+    document_id = S.make_document(
+        admin_engine, tenant, owner, purpose="register_scan", doc_type="register_scan"
+    )
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, document_id, 1, "aadhaar_unredactable") is True
+    payload = _discard_payload(admin_engine, tenant, document_id)
+    with tenant_session(tenant) as s:
+        assert service.delete_for_retention(s, document_id, reason="import_raw_file") is True
+    assert _run_discard(tenant, payload) is False
 
 
 def test_PRV_016_daily_sweep_discards_what_the_task_missed(
@@ -1353,6 +1402,8 @@ def test_PRV_016_discard_task_never_deletes_a_usable_version(
     assert _run_discard(tenant, {**forged, "object_key": key}) is False
     other = f"t/{world.b.tenant_id}/docs/{doc_id}/v1/original.png"
     assert _run_discard(tenant, {**forged, "object_key": other}) is False
+    assert _run_discard(tenant, forged) is False
+    assert _run_discard(world.b.tenant_id, forged) is False
     assert key in store.objects
 
 

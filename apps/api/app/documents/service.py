@@ -1137,13 +1137,26 @@ def delete_for_retention(session: Session, document_id: uuid.UUID, *, reason: st
     return True
 
 
+def _import_batch_ids(keys: Sequence[str]) -> list[uuid.UUID]:
+    """Import batches whose raw files (``t/<tenant>/imports/<batch>/...``) the purge must also
+    remove. The outbox event carries these IDs, never the keys themselves (invariant 5)."""
+    out: set[uuid.UUID] = set()
+    for key in keys:
+        parts = key.split("/")
+        if len(parts) > 3 and parts[2] == "imports":
+            batch_id = _parse_uuid(parts[3])
+            if batch_id is not None:
+                out.add(batch_id)
+    return sorted(out)
+
+
 def _delete(session: Session, doc: Document, *, reason: str | None) -> None:
     for guard in DELETE_GUARDS:
         code = guard(session, doc.id)
         if code is not None:
             raise Conflict("This document must be kept (retention rules).", code=code)
     keys = repo.object_keys_of(session, doc.id)
-    batch_ids = sorted({k.split("/")[3] for k in keys if k.split("/")[2] == "imports"})
+    batch_ids = _import_batch_ids(keys)
     summary: dict[str, Any] = {"purpose": doc.purpose, "versions": len(keys)}
     if reason is not None:
         summary["reason"] = reason
@@ -1386,14 +1399,10 @@ def _discard_version(session: Session, version: DocumentVersion, reason_code: st
         {"version_no": version.version_no, "reason": reason_code},
         system=True,
     )
+    # IDs only: the worker reads the object key from the version row (an object key is not an
+    # ID and must never need to pass the payload sanitiser; invariant 5).
     ops.enqueue_event(
-        session,
-        DISCARDED_EVENT,
-        {
-            "document_id": version.document_id,
-            "version_id": version.id,
-            "object_key": version.object_key,
-        },
+        session, DISCARDED_EVENT, {"document_id": version.document_id, "version_id": version.id}
     )
     return True
 
@@ -1497,29 +1506,40 @@ def discard_object(
     tenant_id: uuid.UUID,
     document_id: uuid.UUID,
     version_id: uuid.UUID,
-    object_key: str,
+    object_key: str | None = None,
     *,
     store: ObjectStore | None = None,
 ) -> bool:
     """Worker (outbox ``document.version.discarded``): delete a discarded version's object.
 
-    Idempotent. Refuses (returns False) unless the key lies under this school's document and is
-    the key of that version, and the version is discarded. If the document was deleted
-    meanwhile (no version row), the key is discarded anyway: its objects are being purged.
+    The event carries IDs only; the key comes from the version row, which must belong to this
+    school's document and be discarded (``quarantined`` with a discard reason). No version row
+    (the document was deleted meanwhile): nothing to do, the document's purge removes every
+    object under its prefix. Events queued before the IDs-only payload also carry
+    ``object_key`` (backward compatible): it must lie under this school's document and, while
+    the version row exists, be that version's key; with no row it is discarded anyway.
+    Idempotent. Returns True when an object was discarded.
     """
-    if not key_in_tenant(object_key, tenant_id) or not object_key.startswith(
-        document_prefix(tenant_id, document_id)
+    prefix = document_prefix(tenant_id, document_id)
+    if object_key is not None and (
+        not key_in_tenant(object_key, tenant_id) or not object_key.startswith(prefix)
     ):
         return False
     with tenant_session(tenant_id) as s:
         version = repo.get_version(s, document_id, version_id=version_id)
-        if version is not None and (
-            version.object_key != object_key
-            or version.status != "quarantined"
-            or version.error not in DISCARD_REASONS
+        if version is None:
+            key = object_key
+        elif (
+            version.status == "quarantined"
+            and version.error in DISCARD_REASONS
+            and object_key in (None, version.object_key)
         ):
-            return False
-    (store or get_object_store()).discard(object_key)
+            key = version.object_key
+        else:
+            key = None
+    if key is None or not key_in_tenant(key, tenant_id) or not key.startswith(prefix):
+        return False
+    (store or get_object_store()).discard(key)
     log.info("documents.version.discarded", resource_type="document", resource_id=document_id)
     return True
 
