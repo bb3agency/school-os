@@ -122,6 +122,25 @@ describe("academic structure screen (US-202, FR-TEN-010)", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows each academic year as a card with its dates and a 'Current' pill on the current one", async () => {
+    structure([READ]);
+    renderWithIntl(<AcademicStructureScreen />);
+    const years = await region("Academic years");
+    const current = (await within(years).findByText("2026-27")).closest("li") as HTMLElement;
+    expect(
+      within(current).getByText(messages.en.school.structure.currentBadge),
+    ).toBeInTheDocument();
+    expect(
+      within(current).getByText(messages.en.school.structure.years.colStarts),
+    ).toBeInTheDocument();
+    const old = within(years).getByText("2025-26").closest("li") as HTMLElement;
+    expect(within(old).queryByText(messages.en.school.structure.currentBadge)).toBeNull();
+    // "Show archived" is a switch that applies at once.
+    expect(
+      screen.getByRole("switch", { name: messages.en.academicStructure.showArchived }),
+    ).toHaveAttribute("aria-checked", "false");
+  });
+
   it("the page renders the screen under the school structure title", async () => {
     structure([READ]);
     renderWithIntl(<SchoolStructurePage />);
@@ -228,7 +247,7 @@ describe("academic structure screen (US-202, FR-TEN-010)", () => {
       Response.json({ ...YEAR_OLD, is_current: true, version: 5 });
     renderWithIntl(<AcademicStructureScreen />);
     const years = await region("Academic years");
-    const row = (await within(years).findByText("2025-26")).closest("tr") as HTMLElement;
+    const row = (await within(years).findByText("2025-26")).closest("li") as HTMLElement;
     expect(within(years).getAllByRole("button", { name: /Make current/ })).toHaveLength(1);
     await userEvent.click(within(row).getByRole("button", { name: /Make current/ }));
     const dialog = screen.getByRole("dialog", { name: "Make 2025-26 the current year?" });
@@ -251,7 +270,7 @@ describe("academic structure screen (US-202, FR-TEN-010)", () => {
       problem(412, "precondition_failed");
     renderWithIntl(<AcademicStructureScreen />);
     const years = await region("Academic years");
-    const row = (await within(years).findByText("2025-26")).closest("tr") as HTMLElement;
+    const row = (await within(years).findByText("2025-26")).closest("li") as HTMLElement;
     await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Change academic year 2025-26" });
     expect(within(dialog).getByLabelText("Starts on")).toHaveValue("2025-06-01");
@@ -498,7 +517,7 @@ describe("archive and unarchive (US-202, FR-TEN-010)", () => {
 
     await userEvent.click(screen.getByLabelText(messages.en.academicStructure.showArchived));
     const row = (await within(await region("Academic years")).findByText("2024-25")).closest(
-      "tr",
+      "li",
     ) as HTMLElement;
     expect(within(row).getByText("Archived")).toBeInTheDocument();
     const classRow = (await within(await region("Classes")).findByText("Prep")).closest(
@@ -526,9 +545,9 @@ describe("archive and unarchive (US-202, FR-TEN-010)", () => {
       Response.json({ ...YEAR_OLD, archived_at: ARCHIVED_AT, version: 5 });
     renderWithIntl(<AcademicStructureScreen />);
     const years = await region("Academic years");
-    const current = (await within(years).findByText("2026-27")).closest("tr") as HTMLElement;
+    const current = (await within(years).findByText("2026-27")).closest("li") as HTMLElement;
     expect(within(current).queryByRole("button", { name: "Archive" })).toBeNull();
-    const row = within(years).getByText("2025-26").closest("tr") as HTMLElement;
+    const row = within(years).getByText("2025-26").closest("li") as HTMLElement;
     await userEvent.click(within(row).getByRole("button", { name: "Archive" }));
     const dialog = screen.getByRole("dialog", { name: "Archive academic year 2025-26?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Archive" }));
@@ -552,7 +571,7 @@ describe("archive and unarchive (US-202, FR-TEN-010)", () => {
       problem(409, "structure_in_use");
     renderWithIntl(<AcademicStructureScreen />);
     const yearRow = (await within(await region("Academic years")).findByText("2025-26")).closest(
-      "tr",
+      "li",
     ) as HTMLElement;
     await userEvent.click(within(yearRow).getByRole("button", { name: "Archive" }));
     const yearDialog = screen.getByRole("dialog", { name: "Archive academic year 2025-26?" });
@@ -637,7 +656,7 @@ describe("archive and unarchive (US-202, FR-TEN-010)", () => {
     structure([READ, MANAGE]);
     renderWithIntl(<AcademicStructureScreen />);
     const years = await region("Academic years");
-    const row = (await within(years).findByText("2025-26")).closest("tr") as HTMLElement;
+    const row = (await within(years).findByText("2025-26")).closest("li") as HTMLElement;
     const link = within(row).getByRole("link", { name: /Promote students/ });
     expect(link).toHaveAttribute("href", `/en/settings/structure/years/${YEAR_OLD.id}/promotions`);
     expect(link).toHaveAccessibleName("Promote students (academic year 2025-26)");
@@ -775,7 +794,7 @@ describe("rows in use and invited staff (US-202, FR-TEN-010)", () => {
     renderWithIntl(<AcademicStructureScreen />);
     const inUse = messages.en.academicStructure.archive.inUse;
     const oldYear = (await within(await region("Academic years")).findByText("2025-26")).closest(
-      "tr",
+      "li",
     ) as HTMLElement;
     expect(within(oldYear).getByText(inUse)).toBeInTheDocument();
     const classRow = within(await region("Classes"))
