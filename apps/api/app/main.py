@@ -20,6 +20,7 @@ from app.extraction.api import router as extraction_router
 from app.identity.api import router as identity_router
 from app.imports.api import router as imports_router
 from app.knowledge.api import router as knowledge_router
+from app.notifications.api import invitations_router
 from app.notifications.api import router as notifications_router
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
@@ -54,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dq_router)
     app.include_router(platform_tenant_router)
     app.include_router(notifications_router)
+    app.include_router(invitations_router)
     app.include_router(breakglass_router)
     app.include_router(changes_router)
     app.include_router(extraction_router)

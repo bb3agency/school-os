@@ -92,7 +92,7 @@ flowchart TB
 | `documents` | files, versions, ACLs, scanning | `upload()`, `get_download_url()` | core, authz, audit |
 | `knowledge` | ingestion, chunks, embeddings, retrieval, tools, gateway, evals | `ask()`, `ingest()` | documents, students (via service), dq (via service) |
 | `exports` | export profiles, report generation | `generate()` | students, dq |
-| `notifications` | in-app notifications, templates | `notify()` | core |
+| `notifications` | in-app notifications, templates; email (provider interface: fake, Amazon SES) | `notify()`, `request_email()` | core, identity, tenancy, ops (via service) |
 | `admin` | tenant admin, retention, full export | `export_tenant()` | all services (read) |
 | `ops` | job runs, outbox, idempotency keys, break-glass grants (tenant-side) | `grant_break_glass()`, `claim_outbox()` | tenancy, audit |
 | `platform` | control plane: operators, school registry and provisioning, plans, subscriptions, billing accounts, invoices, payments (billing), usage, fleet/deployments and heartbeat, feature flags, announcements, support tickets, platform audit viewer (ADR-0017; 16) | `current_subscription()`, `invite_school_owner()`, `open_ticket_from_tenant()`, `is_flag_enabled()` | core, audit, authz, `tenancy.service` (provisioning/lifecycle only); tenant rows only through allowlisted definer functions (ADR-0013, Amendment A10) |

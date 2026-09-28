@@ -256,7 +256,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `make eval` | Placeholder until the knowledge module exists (M2) |
 | `make check` | `lint typecheck test security` |
 
-**API and worker settings** (`apps/api/app/core/config.py`, the only code that reads the environment; prefix `SOS_`, unknown variables ignored). In `staging`/`prod` the process refuses to start with `SOS_KEY_WRAPPER=local-dev`, with a `dev-only` value in `SOS_DATABASE_URL`, `SOS_PLATFORM_DATABASE_URL`, `SOS_SERVICE_TOKEN_KEY`, `SOS_ANTHROPIC_API_KEY` or `SOS_EMBEDDINGS_API_KEY`, with the placeholder invoice supplier name or GSTIN, with `SOS_KB_PROVIDER_MODE=fake`, or with `SOS_KB_ENABLED=true` and no `SOS_ANTHROPIC_API_KEY`.
+**API and worker settings** (`apps/api/app/core/config.py`, the only code that reads the environment; prefix `SOS_`, unknown variables ignored). In `staging`/`prod` the process refuses to start with `SOS_KEY_WRAPPER=local-dev`, with a `dev-only` value in `SOS_DATABASE_URL`, `SOS_PLATFORM_DATABASE_URL`, `SOS_SERVICE_TOKEN_KEY`, `SOS_ANTHROPIC_API_KEY` or `SOS_EMBEDDINGS_API_KEY`, with the placeholder invoice supplier name or GSTIN, with `SOS_KB_PROVIDER_MODE=fake`, with `SOS_KB_ENABLED=true` and no `SOS_ANTHROPIC_API_KEY`, or with `SOS_EMAIL_PROVIDER=fake` or email on without `SOS_EMAIL_FROM` and a public https `SOS_EMAIL_APP_URL`.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -297,6 +297,9 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_AUDIT_SIGNING_KEY_ARN` | none | Asymmetric KMS key (ECC_NIST_P256) signing daily audit archives |
 | `SOS_AUDIT_ARCHIVE_RETENTION_DAYS` | 1096 | Object Lock retention for audit archives |
 | `SOS_OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP endpoint; no trace export when unset |
+| `SOS_EMAIL_PROVIDER` | `off` | Email delivery (staff invitation emails; `app/notifications/email.py`): `off` sends and queues nothing; `fake` keeps messages in memory (local/CI; refused in staging/prod); `ses` sends through Amazon SES v2 in `AWS_REGION` with the task role (needs `ses:SendEmail` on the sender identity) |
+| `SOS_EMAIL_FROM`, `SOS_EMAIL_APP_URL` | none | Required when email is on: the verified SES sender (`SchoolOS <no-reply@…>`) and the web app address used in links (public https in staging/prod; each dedicated host its own) |
+| `SOS_EMAIL_SES_CONFIGURATION_SET` | none | Optional SES configuration set (bounce and complaint events) |
 | `SOS_BILLING_SUPPLIER_LEGAL_NAME`, `SOS_BILLING_SUPPLIER_GSTIN`, `SOS_BILLING_SUPPLIER_STATE_CODE` | dev placeholders, `37` | Supplier block on GST invoices (placeholders refused in staging/prod) |
 | `SOS_CONTROL_PLANE_URL` | none | Dedicated hosts: where the heartbeat is sent |
 | `SOS_DEPLOYMENT_ID`, `SOS_DEDICATED_TENANT_ID` | none | Dedicated hosts: identity in the heartbeat |

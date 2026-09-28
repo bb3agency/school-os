@@ -1,0 +1,52 @@
+# Email templates (docs/03 §5: Email via Amazon SES, templates EN/TE). Versioned configuration
+# shipped inside the package (app/notifications/email.py reads it; invariant 13).
+#
+# Per template
+#   params   every placeholder, and nothing else. The worker fills them from the school's and
+#            the recipient's records when it sends; they never travel in an outbox payload.
+#   en / te  subject (one line) + plain-text body, same ICU subset as templates.yaml.
+#
+# Writing rules (CLAUDE.md §10): plain language, sentence case, say what to do next. Telugu is
+# written for office staff, not translated word for word. Emails never contain student data.
+version: 1
+
+invitation:
+  # Invitations are accepted on first sign-in within this many days of the invite
+  # (migration 0007_accept_invitations: interval '30 days'; a test keeps the two equal).
+  valid_days: 30
+  # One invitation email per person per this many seconds (POST /users/{id}/invitation-email).
+  resend_cooldown_s: 600
+
+templates:
+  invitation.staff:
+    params: [school, sign_in_url, expires_on]
+    en:
+      subject: "You have been invited to {school} on SchoolOS"
+      body: |
+        Hello,
+
+        You have been given access to {school} on SchoolOS, the school office system.
+
+        To accept, sign in at {sign_in_url} with the SchoolOS account details you received
+        separately. Please sign in before {expires_on}; after that, ask the school office to
+        invite you again.
+
+        If you did not expect this email, you can ignore it. Nobody can use your access
+        without your sign-in details.
+
+        SchoolOS
+    te:
+      subject: "SchoolOSలో {school}కు మీకు ఆహ్వానం వచ్చింది"
+      body: |
+        నమస్కారం,
+
+        SchoolOS (పాఠశాల కార్యాలయ వ్యవస్థ)లో {school}కు మీకు ప్రవేశం ఇవ్వబడింది.
+
+        అంగీకరించడానికి, మీకు విడిగా అందిన SchoolOS ఖాతా వివరాలతో {sign_in_url} లో సైన్ ఇన్
+        చేయండి. {expires_on} లోపు సైన్ ఇన్ చేయండి; ఆ తర్వాత అయితే మళ్లీ ఆహ్వానించమని పాఠశాల
+        కార్యాలయాన్ని అడగండి.
+
+        ఈ ఈమెయిల్ మీరు ఊహించకపోతే, దీన్ని పట్టించుకోనవసరం లేదు. మీ సైన్ ఇన్ వివరాలు లేకుండా
+        మీ ప్రవేశాన్ని ఎవరూ ఉపయోగించలేరు.
+
+        SchoolOS

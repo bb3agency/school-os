@@ -322,7 +322,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | Anthropic Messages API | Out | HTTPS JSON, streaming | Commercial org API keys; ZDR requested; model IDs in config |
 | Fleet heartbeat (dedicated host → control plane) | In (to shared) | HTTPS JSON, HMAC-SHA256 signed | `POST /api/v1/fleet/heartbeat`; outbound from host only; no personal data (FR-PLT-024) |
 | Payment provider (Razorpay candidate) | Out | HTTPS | **Proposed only** (ADR-0016); not built; M0 uses manual payments |
-| Email (AWS SES) | Out | AWS SDK | Invites, billing reminders, usage alerts; templates EN/TE |
+| Email (AWS SES) | Out | AWS SDK | Invites, billing reminders, usage alerts; templates EN/TE. Built: provider interface with a local fake and SES v2, staff invitation emails (queued at invite and on resend, sent by a worker); off by default (`SOS_EMAIL_PROVIDER`) |
 | Embeddings provider (e.g., Voyage) | Out | HTTPS JSON | Behind interface; chosen by eval |
 | OCR/extraction provider(s) | Out | HTTPS | Behind interface; Telugu support required |
 | AWS S3, KMS, Secrets Manager, SSM Parameter Store | Out | AWS SDK | VPC endpoints where cost-justified |

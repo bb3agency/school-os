@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from functools import lru_cache
@@ -69,6 +69,11 @@ OWNER_ROLE = "owner"
 PROFILE_FIELDS = ("display_name", "email", "preferred_language")
 # Permissions that open the staff directory (GET /staff); either must reach the whole school.
 DIRECTORY_PERMISSIONS = ("tenant.structure.manage", "user.manage")
+
+InvitedHook = Callable[[Session, uuid.UUID, uuid.UUID], None]
+INVITED_HOOKS: list[InvitedHook] = []
+"""``hook(session, tenant_id, user_id)`` after :func:`invite_user` created the membership and
+its audit events, in the same transaction (notifications: queue the invitation email)."""
 # Allowed membership status transitions (PATCH /users/{id}).
 _TRANSITIONS: Mapping[str, frozenset[str]] = {
     "invited": frozenset({"active", "removed"}),
@@ -550,6 +555,8 @@ def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
         )
     _add_scopes(session, ctx, membership.id, data.scopes)
     cache.invalidate_on_commit(session, ctx.tenant_id, membership.id)
+    for hook in INVITED_HOOKS:
+        hook(session, ctx.tenant_id, user_id)
     return _user_out(session, membership)
 
 

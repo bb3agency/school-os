@@ -64,6 +64,7 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/users/{user_id}"): {"status": "active"},
     ("PUT", "/api/v1/users/{user_id}/roles"): {"roles": ["teacher"]},
     ("PUT", "/api/v1/users/{user_id}/scopes"): {"scopes": []},
+    ("POST", "/api/v1/users/{user_id}/invitation-email"): None,
     ("PATCH", "/api/v1/academic-years/{year_id}"): {},
     ("PATCH", "/api/v1/classes/{class_id}"): {},
     ("PATCH", "/api/v1/sections/{section_id}"): {},
