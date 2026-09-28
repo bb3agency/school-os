@@ -63,8 +63,8 @@ migrate: .env ## Apply database migrations and create audit partitions (as sos_m
 db-shell: ## psql into the local database as the admin
 	$(COMPOSE) exec db psql -U postgres -d schoolos
 
-seed-synthetic: ## Synthetic schools, staff, students, documents (NEVER real data; PROFILE=none|small|full)
-	$(UV) run python -m app.devtools.seed_synthetic --profile $(PROFILE) $(SEED_ARGS)
+seed-synthetic: .env ## Synthetic schools, staff, students, documents (NEVER real data; PROFILE=none|small|full)
+	$(UV) run python scripts/dev.py --seed-only -- --profile $(PROFILE) $(SEED_ARGS)
 
 sync-system-roles: ## Sync every school's system roles with roles.yaml (dry run; ARGS="--apply [--prune] [--tenant <id>]")
 	$(UV) run python -m app.identity.sync_system_roles $(ARGS)

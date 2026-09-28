@@ -388,7 +388,7 @@ def pump(service: Service, stream: IO[str], raw: bool, tail: list[str]) -> None:
         emit(f"{label} | {line if raw else compact(line)}")
 
 
-def preflight() -> dict[str, str] | None:
+def preflight(*, check_ports: bool = True) -> dict[str, str] | None:
     """``.env`` (created if missing), SOS_ENV=local, free app ports; the children's env."""
     if not (ROOT / ".env").exists():
         shutil.copyfile(ROOT / ".env.example", ROOT / ".env")
@@ -397,7 +397,7 @@ def preflight() -> dict[str, str] | None:
     if env.get("SOS_ENV") not in ("local", "ci"):
         print(paint("  SOS_ENV in .env must be local: refusing to start.", "1;31"))
         return None
-    busy = [f"{n} :{p}" for n, p in APP_PORTS.items() if listening(p)]
+    busy = [f"{n} :{p}" for n, p in APP_PORTS.items() if check_ports and listening(p)]
     if busy:
         print(paint(f"  already in use: {', '.join(busy)}.", "1;31"))
         print("  If `make dev` is running, stop its app containers first:")
@@ -469,7 +469,34 @@ def stop(procs: Running) -> None:
             proc.kill()
 
 
+def seed_args(argv: list[str]) -> list[str]:
+    """Arguments after ``--`` go to the seeder (``make seed-synthetic`` PROFILE, SEED_ARGS)."""
+    return argv[argv.index("--") + 1 :] if "--" in argv else []
+
+
+def seed_only(argv: list[str]) -> int:
+    """``make seed-synthetic``: the seeder with the same environment as ``make dev-host``.
+
+    Settings read only ``SOS_*`` environment variables, never ``.env`` itself, so the seeder
+    needs the host environment built here (database URLs, local-dev master key, S3). Backing
+    services are started if needed and migrations applied first; the app may already be running.
+    """
+    env = preflight(check_ports=False)
+    if env is None:
+        return 2
+    if not start_backing(env) or not prepare(env, seed=False):
+        print(paint("  Setup failed: fix the above, then retry.", "1;31"))
+        return 2
+    command = [PY, "-m", "app.devtools.seed_synthetic", *seed_args(argv)]
+    if not step("synthetic schools", command, env, API_DIR):
+        return 1
+    print_sign_in(env)
+    return 0
+
+
 def main() -> int:
+    if "--seed-only" in sys.argv:
+        return seed_only(sys.argv)
     raw = "--raw" in sys.argv
     seed = "--no-seed" not in sys.argv
     if isinstance(sys.stdout, io.TextIOWrapper):
