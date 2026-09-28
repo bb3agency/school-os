@@ -14,7 +14,7 @@ import { SelectField, type SelectOption } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
 import { POLL_MS, usePolledQuery } from "@/features/imports/poll";
 import { containsFullAadhaar } from "@/features/students/aadhaar";
-import { isoToDmy, toIsoDate } from "@/features/students/dates";
+import { isoToTypedDate, toIsoDate } from "@/features/students/dates";
 import { GuardedTextField } from "@/features/students/fields";
 import { FormDialog } from "@/features/students/FormDialog";
 import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
@@ -30,6 +30,7 @@ import { STUDENT_STATUSES, type Attribute } from "@/features/students/types";
 import { Link, useRouter } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
+import { useDateInput } from "@/lib/date-format";
 import { useApiForm } from "@/lib/forms";
 import type { Loadable } from "@/lib/loadable";
 import type { AfterAction } from "./after";
@@ -180,10 +181,10 @@ function PageImage({
 
 const GENDERS = ["female", "male", "transgender"] as const;
 
-/** Register value → form value: ISO dates as DD/MM/YYYY; everything else unchanged. */
+/** Register value → form value: ISO dates in the school's date format; everything else unchanged. */
 export function formValueOf(key: string, field: ExtractedField | undefined): string {
   if (!field || field.masked) return "";
-  return DATE_FIELDS.has(key) ? isoToDmy(field.value) : field.value;
+  return DATE_FIELDS.has(key) ? isoToTypedDate(field.value) : field.value;
 }
 
 /** The gender option the extracted text names, if any ("M", "Boy", "F", "Girl"...). */
@@ -262,6 +263,7 @@ function ConfirmForm({
 }) {
   const t = useTranslations("extraction.review");
   const ts = useTranslations("students");
+  const dates = useDateInput();
   const tc = useTranslations("common");
   const locale = useLocale();
   const api = useBffClient("staff");
@@ -298,7 +300,9 @@ function ConfirmForm({
   };
 
   const fieldError = (key: string) =>
-    form.errors[key] && DATE_FIELDS.has(key) ? ts("dateInvalid") : form.errors[key];
+    form.errors[key] && DATE_FIELDS.has(key)
+      ? ts("dateInvalid", dates.hint("2012-03-14"))
+      : form.errors[key];
 
   return (
     <form noValidate onSubmit={form.onSubmit} className="space-y-5">
@@ -319,7 +323,7 @@ function ConfirmForm({
               ? t("confidence", { percent: Math.round(field.confidence * 100) })
               : undefined;
           const hint = [
-            DATE_FIELDS.has(key) ? ts("dateHint") : null,
+            DATE_FIELDS.has(key) ? ts("dateHint", dates.hint("2012-03-14")) : null,
             low ? t("lowHint") : null,
             low ? confidence : null,
           ]
@@ -370,7 +374,7 @@ function ConfirmForm({
                 autoComplete="off"
                 spellCheck={false}
                 inputMode={DATE_FIELDS.has(key) ? "numeric" : undefined}
-                placeholder={DATE_FIELDS.has(key) ? "DD/MM/YYYY" : undefined}
+                placeholder={DATE_FIELDS.has(key) ? dates.placeholder : undefined}
                 onFocus={() => onFocusField(key)}
                 onBlur={() => onFocusField(null)}
               />

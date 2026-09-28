@@ -1,16 +1,8 @@
 /**
- * Dates as the office types them (PRD §8: DD/MM/YYYY) ↔ the API's YYYY-MM-DD. Plain module.
+ * Dates as the office types them, in the school's `date_format` (FR-TEN-012; PRD §8 default
+ * DD/MM/YYYY) ↔ the API's YYYY-MM-DD. Plain module; the rules live in `@/lib/date-format`.
  */
-
-/** `01/06/2012` (or `1-6-2012`) → `2012-06-01`; null when it is not a real calendar date. */
-export function displayDateToIso(value: string): string | null {
-  const match = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(value.trim());
-  if (!match) return null;
-  const [, day = "", month = "", year = ""] = match;
-  const iso = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-  const date = new Date(`${iso}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(iso) ? iso : null;
-}
+export { typedDateToIso as displayDateToIso } from "@/lib/date-format";
 
 /** Today in India (IST), as YYYY-MM-DD, whatever the PC's time zone is. */
 export function todayInIndia(now: Date = new Date()): string {

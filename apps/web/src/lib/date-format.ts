@@ -103,3 +103,51 @@ function subscribe(listener: () => void): () => void {
 export function useSchoolDateFormat(): DateFormat {
   return useSyncExternalStore(subscribe, schoolDateFormat, () => DEFAULT_DATE_FORMAT);
 }
+
+/*
+ * Typed dates (text inputs). Every school format is day-month-year or year-month-day with a
+ * four-digit year, so both orders can be read without guessing: the office may type the
+ * school's format (`14/03/2012`, `14-03-2012`, `2012-03-14`) or the other one, with `/`, `-`
+ * or `.`. Impossible dates (31/02) and two-digit years (which century?) are refused.
+ */
+const TYPED_DMY = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
+const TYPED_YMD = /^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$/;
+
+function calendarDate(year: string, month: string, day: string): string | null {
+  const iso = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(iso) ? iso : null;
+}
+
+/** What the office typed → `YYYY-MM-DD` for the API; null when it is not a real date. */
+export function typedDateToIso(value: string): string | null {
+  const text = value.trim();
+  const dmy = TYPED_DMY.exec(text);
+  if (dmy) return calendarDate(dmy[3] ?? "", dmy[2] ?? "", dmy[1] ?? "");
+  const ymd = TYPED_YMD.exec(text);
+  if (ymd) return calendarDate(ymd[1] ?? "", ymd[2] ?? "", ymd[3] ?? "");
+  return null;
+}
+
+/** An ISO date as a text input's starting value in `format`; anything else is unchanged. */
+export function isoToTypedDate(value: string, format: DateFormat = schoolDateFormat()): string {
+  const dateOnly = DATE_ONLY.exec(value.trim());
+  if (!dateOnly) return value;
+  const [, year = "", month = "", day = ""] = dateOnly;
+  return arrange(day, month, year, format);
+}
+
+/**
+ * Everything a typed date field needs in the school's format: the placeholder, the values for
+ * hint and error messages (`{format}`, `{example}`), and the conversions both ways.
+ */
+export function useDateInput() {
+  const format = useSchoolDateFormat();
+  return {
+    format,
+    placeholder: format,
+    hint: (exampleIso: string) => ({ format, example: isoToTypedDate(exampleIso, format) }),
+    fromIso: (value: string) => isoToTypedDate(value, format),
+    toIso: typedDateToIso,
+  };
+}

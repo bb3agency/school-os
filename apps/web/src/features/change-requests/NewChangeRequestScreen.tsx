@@ -19,6 +19,7 @@ import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { apiFieldErrors } from "@/lib/api-errors";
 import { ApiError, newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffMeQuery } from "@/lib/bff/staff-me";
+import { useDateInput } from "@/lib/date-format";
 import { formatDate } from "@/lib/format";
 import { formValues } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
@@ -125,6 +126,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
   const tsrc = useTranslations("findings.sources");
   const tcr = useTranslations("changeRequests");
   const tc = useTranslations("common");
+  const dates = useDateInput();
   const locale = useLocale();
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
@@ -225,11 +227,11 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
     locale === "te" && item.label_te ? item.label_te : item.label_en;
 
   function clientMessage(key: string): string {
-    return translateOr(tv, key, "invalid");
+    return translateOr(tv, key, "invalid", dates.hint("2012-06-01"));
   }
 
   function serverMessage(key: string): string {
-    return translateOr(tfe, key, "invalid");
+    return translateOr(tfe, key, "invalid", dates.hint("2012-06-01"));
   }
 
   function resetKeys(which: "all" | "document" | "submit") {
@@ -511,7 +513,11 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
               <Field
                 key={`value-${attributeKey}`}
                 label={t("newValue")}
-                hint={attribute?.data_type === "date" ? tc("dateHint") : t("newTextHint")}
+                hint={
+                  attribute?.data_type === "date"
+                    ? tc("dateHintFormat", dates.hint("2026-06-01"))
+                    : t("newTextHint")
+                }
                 error={errors.new_value}
               >
                 {({ id, describedBy, invalid }) => (
@@ -519,6 +525,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
                     id={id}
                     name="new_value"
                     inputMode={attribute?.data_type === "date" ? "numeric" : undefined}
+                    placeholder={attribute?.data_type === "date" ? dates.placeholder : undefined}
                     maxLength={VALUE_MAX}
                     autoComplete="off"
                     aria-describedby={describedBy}

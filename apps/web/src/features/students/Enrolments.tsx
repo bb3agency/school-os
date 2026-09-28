@@ -10,6 +10,7 @@ import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { useDateInput } from "@/lib/date-format";
 import { formatDate } from "@/lib/format";
 import { classLabel } from "@/lib/school-class";
 import { containsFullAadhaar } from "./aadhaar";
@@ -204,6 +205,7 @@ function EndEnrolmentDialog({
 }) {
   const t = useTranslations("students.enrolments");
   const ts = useTranslations("students");
+  const dates = useDateInput();
   const api = useBffClient("staff");
   const legendId = useId();
   return (
@@ -267,10 +269,10 @@ function EndEnrolmentDialog({
           <GuardedTextField
             name="ended_on"
             label={t("endedOn")}
-            hint={t("endedOnHint")}
-            error={errors.ended_on ? ts("dateInvalid") : undefined}
+            hint={t("endedOnHint", dates.hint("2012-03-14"))}
+            error={errors.ended_on ? ts("dateInvalid", dates.hint("2012-03-14")) : undefined}
             inputMode="numeric"
-            placeholder="DD/MM/YYYY"
+            placeholder={dates.placeholder}
             autoComplete="off"
           />
           <p className="text-sm text-ink-muted">{t("endNote")}</p>

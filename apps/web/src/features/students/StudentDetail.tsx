@@ -14,6 +14,7 @@ import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { useDateInput } from "@/lib/date-format";
 import { formatDate, formatList } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import type { Locale } from "@/i18n/routing";
@@ -278,6 +279,7 @@ function RecordValueDialog({
 }) {
   const t = useTranslations("students.record");
   const ts = useTranslations("students");
+  const dates = useDateInput();
   const tc = useTranslations("common");
   const locale = useLocale();
   const api = useBffClient("staff");
@@ -292,7 +294,7 @@ function RecordValueDialog({
   const valueError = (error: string | undefined) => {
     if (!error) return undefined;
     if (containsFullAadhaar(raw)) return ts("aadhaarNotAllowed");
-    if (attribute?.data_type === "date") return ts("dateInvalid");
+    if (attribute?.data_type === "date") return ts("dateInvalid", dates.hint("2012-03-14"));
     if (attribute?.data_type === "digits4") return t("digits4Invalid");
     return error;
   };
@@ -379,7 +381,7 @@ function RecordValueDialog({
               label={t("value")}
               hint={
                 attribute?.data_type === "date"
-                  ? ts("dateHint")
+                  ? ts("dateHint", dates.hint("2012-03-14"))
                   : attribute?.data_type === "digits4"
                     ? t("digits4Hint")
                     : undefined

@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Link, useRouter } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
+import { useDateInput } from "@/lib/date-format";
 import { useApiForm } from "@/lib/forms";
 import { containsFullAadhaar } from "./aadhaar";
 import { toIsoDate } from "./dates";
@@ -92,6 +93,7 @@ export interface CreateStudentFormProps {
 export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormProps) {
   const t = useTranslations("students.create");
   const ts = useTranslations("students");
+  const dates = useDateInput();
   const tc = useTranslations("common");
   const api = useBffClient("staff");
   const structure = useSchoolStructure();
@@ -126,9 +128,11 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
     );
   }
 
-  const dateHint = ts("dateHint");
+  const dateHint = ts("dateHint", dates.hint("2012-03-14"));
   const err = (field: CreateField) =>
-    form.errors[field] && field === "dob" ? ts("dateInvalid") : form.errors[field];
+    form.errors[field] && field === "dob"
+      ? ts("dateInvalid", dates.hint("2012-03-14"))
+      : form.errors[field];
 
   return (
     <div className="space-y-6">
@@ -173,7 +177,7 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
               hint={dateHint}
               error={err("dob")}
               inputMode="numeric"
-              placeholder="DD/MM/YYYY"
+              placeholder={dates.placeholder}
               autoComplete="off"
             />
             <SelectField
