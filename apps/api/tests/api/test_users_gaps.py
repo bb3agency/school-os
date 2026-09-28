@@ -294,13 +294,14 @@ def test_FR_TEN_010_staff_directory_for_structure_managers(
         res = api.call(world.person(role), "GET", "/api/v1/staff", auth_age_s=3600)
         assert res.status_code == 200, (role, res.text)
         data = res.json()["data"]
-        assert all(set(m) == {"membership_id", "display_name", "roles"} for m in data)
+        assert all(set(m) == {"membership_id", "display_name", "roles", "status"} for m in data)
         by_id = {m["membership_id"]: m for m in data}
         teacher = world.person("teacher")
         assert by_id[str(teacher.membership_id)] == {
             "membership_id": str(teacher.membership_id),
             "display_name": teacher.display_name,
             "roles": ["teacher"],
+            "status": "active",
         }
         assert str(invited.membership_id) in by_id
         assert str(suspended.membership_id) not in by_id

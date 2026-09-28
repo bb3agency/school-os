@@ -158,6 +158,7 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
         last_login_at=user.last_login_at,
         created_at=membership.created_at,
         version=membership.version,
+        profile_shared=(repo.user_membership_count(session, user.id) or 0) > 1,
     )
 
 
@@ -793,6 +794,7 @@ def list_roles(session: Session, ctx: UserContext | None = None) -> list[RoleOut
     """
     roles = [r for r in repo.list_roles(session) if r.key != BREAKGLASS_ROLE]
     perms = repo.role_permission_keys(session, [r.id for r in roles])
+    privileged = mfa_roles()
     return [
         RoleOut(
             id=r.id,
@@ -803,6 +805,7 @@ def list_roles(session: Session, ctx: UserContext | None = None) -> list[RoleOut
             permissions=sorted(perms[r.id]),
             grantable=ctx is not None and _role_grantable(ctx, r, perms[r.id]),
             scoped=_role_scoped(r, perms[r.id]),
+            needs_mfa=r.is_system and r.key in privileged,
         )
         for r in roles
     ]
@@ -830,7 +833,10 @@ def staff_directory(session: Session, ctx: UserContext) -> list[StaffMemberOut]:
     roles = repo.role_keys_by_membership(session, ids)
     return [
         StaffMemberOut(
-            membership_id=m.id, display_name=names[m.id], roles=sorted(roles.get(m.id, ()))
+            membership_id=m.id,
+            display_name=names[m.id],
+            roles=sorted(roles.get(m.id, ())),
+            status="invited" if m.status == "invited" else "active",
         )
         for m in members
         if m.id in names and BREAKGLASS_ROLE not in roles.get(m.id, ())
