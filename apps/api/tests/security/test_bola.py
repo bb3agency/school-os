@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.main import create_app
 
@@ -127,6 +127,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     },
     ("POST", "/api/v1/extraction-items/{item_id}/reject"): {"reason": "other"},
     ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): {"feedback": "helpful"},
+    ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): {},
+    ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): None,
 }
 
 
@@ -182,6 +184,9 @@ ACTOR.update(
             ("GET", "/api/v1/extraction-items/{item_id}"),
             ("POST", "/api/v1/extraction-items/{item_id}/confirm"),
             ("POST", "/api/v1/extraction-items/{item_id}/reject"),
+            # FR-KB-030: the owner cannot manage verified answers; the principal can.
+            ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"),
+            ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"),
         ),
         "office_admin",
     )
@@ -374,6 +379,31 @@ def _b_query(w: Any) -> uuid.UUID:
     return value
 
 
+def _b_verified_answer(w: Any) -> uuid.UUID:
+    """An active verified answer of school B (synthetic row; FR-KB-030)."""
+    if "bola_verified" not in w.b.ids:
+        answer_id = uuid.uuid4()
+        with _ADMIN[0].begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO kb.verified_answers (id, tenant_id, question_canonical, language, "
+                    "answer_text, citations, verified_by, verified_at) VALUES (:i, :t, "
+                    "'Synthetic question?', 'en', 'Synthetic answer.', "
+                    "CAST(:c AS jsonb), :m, now())"
+                ),
+                {
+                    "i": answer_id,
+                    "t": w.b.tenant_id,
+                    "c": '[{"source": "sos://doc/' + str(uuid.uuid4()) + '/v1#p1", '
+                    '"cited_text": "synthetic"}]',
+                    "m": w.b.people["owner"].membership_id,
+                },
+            )
+        w.b.ids["bola_verified"] = answer_id
+    value: uuid.UUID = w.b.ids["bola_verified"]
+    return value
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -403,6 +433,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "export_id": _b_export,
     # Knowledge (FR-KB-012): a logged question of school B.
     "query_id": _b_query,
+    # Knowledge (FR-KB-030): a verified answer of school B.
+    "answer_id": _b_verified_answer,
 }
 
 

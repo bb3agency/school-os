@@ -167,6 +167,39 @@ def _kb_verified(w: Any, r: str, a: Engine) -> Request:
     return "/api/v1/knowledge/verified-answers", body, {}
 
 
+def _kb_verified_row(w: Any, a: Engine) -> uuid.UUID:
+    """A fresh active verified answer of school A citing the shared circular (FR-KB-030)."""
+    doc = KB.shared_document(a, w.a)
+    answer_id = uuid.uuid4()
+    with a.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO kb.verified_answers (id, tenant_id, question_canonical, language, "
+                "answer_text, citations, verified_by, verified_at) VALUES (:i, :t, "
+                "'When is the parent-teacher meeting?', 'en', 'On 18/10/2026 at 10:00.', "
+                "CAST(:c AS jsonb), :m, now())"
+            ),
+            {
+                "i": answer_id,
+                "t": w.a.tenant_id,
+                "c": '[{"source": "sos://doc/' + str(doc) + '/v1#p1", '
+                '"cited_text": "18/10/2026 at 10:00"}]',
+                "m": w.a.people["owner"].membership_id,
+            },
+        )
+    return answer_id
+
+
+def _kb_manage(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        answer_id = _kb_verified_row(w, a)
+        body: dict[str, Any] | None = {} if action == "review" else None
+        path = f"/api/v1/knowledge/verified-answers/{answer_id}/{action}"
+        return path, body, _if_match(1)
+
+    return build
+
+
 def _load_promotion_support() -> ModuleType:
     """tests/students/promotion_support.py (fresh year pairs and promotions, real services)."""
     name = "sos_test_promotion_support"
@@ -1074,6 +1107,8 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("POST", "/api/v1/knowledge/verified-answers"): _kb_verified,
+    ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): _kb_manage("review"),
+    ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): _kb_manage("retire"),
 }
 
 
