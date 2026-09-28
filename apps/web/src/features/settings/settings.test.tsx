@@ -135,6 +135,29 @@ describe("school settings (FR-TEN-012)", () => {
     }
   });
 
+  it("groups the settings in cards and the AI switch sends ai_features_enabled when turned off", async () => {
+    school([MANAGE]);
+    stub.routes["PATCH /bff/api/v1/tenant"] = () =>
+      Response.json({
+        ...TENANT,
+        settings: { ...SETTINGS, ai_features_enabled: false },
+        version: 8,
+      });
+    renderWithIntl(<SchoolSettingsScreen />);
+    const ai = await screen.findByRole("region", { name: en.groups.ai.title });
+    expect(screen.getByRole("region", { name: en.groups.languages.title })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: en.groups.session.title })).toBeInTheDocument();
+    const toggle = within(ai).getByRole("switch", { name: en.form.aiToggle });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await userEvent.click(screen.getByRole("button", { name: en.form.save }));
+    await waitFor(() => expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(1));
+    expect(JSON.parse(stub.callsTo("PATCH /bff/api/v1/tenant")[0]?.body ?? "{}")).toEqual({
+      ai_features_enabled: false,
+    });
+  });
+
   it("sends nothing when nothing changed, and checks values before sending", async () => {
     school([MANAGE]);
     renderWithIntl(<SchoolSettingsScreen />);

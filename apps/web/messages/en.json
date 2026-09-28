@@ -3526,13 +3526,32 @@
       "save": "Save settings",
       "saved": "Settings saved.",
       "nothingChanged": "Nothing changed, so there was nothing to save.",
-      "reload": "Load the latest settings"
+      "reload": "Load the latest settings",
+      "aiToggle": "Allow AI features"
     },
     "errors": {
       "precondition_failed": {
         "title": "Someone else changed these settings first",
         "body": "Select “Load the latest settings” to see their change, then make yours again."
       }
+    },
+    "groups": {
+      "languages": {
+        "title": "Languages and dates",
+        "description": "The languages your school uses and how dates are written."
+      },
+      "session": {
+        "title": "Signing out",
+        "description": "Staff are signed out after this many idle minutes, so records stay safe on shared office computers."
+      },
+      "ai": {
+        "title": "AI features",
+        "description": "Turn AI help on or off for everyone and set a monthly limit on its cost."
+      }
+    },
+    "saveBar": {
+      "title": "Save your changes",
+      "body": "Changes apply to everyone in the school once you save."
     }
   },
   "documents": {
