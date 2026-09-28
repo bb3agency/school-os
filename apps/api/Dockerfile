@@ -50,7 +50,7 @@ USER 10001:10001
 # Only chrome-headless-shell (what Playwright launches headless) at the revision pinned by the locked
 # playwright package (1.56.0 -> Chromium 141.0.7390.37, revision 1194), plus its Debian runtime
 # libraries (`--with-deps`). Browsers live read-only under /opt/ms-playwright; the renderer never
-# downloads one (app/exports/pdf.py). The sandbox policy is ADR-0023 (docs/07 §10).
+# downloads one (app/core/pdf.py). The sandbox policy is ADR-0023 (docs/07 §10).
 FROM base AS worker
 USER root
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright

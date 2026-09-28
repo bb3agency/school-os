@@ -137,6 +137,17 @@ forbidden_modules =
     app.exports
     app.knowledge
 
+# The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
+# a neutral building block. The control plane prints its invoices through it and never through
+# the exports module (school data; ADR-0020, CLAUDE.md §4).
+[importlinter:contract:platform-pdf-via-core]
+name = platform prints PDFs only through app.core.pdf (never app.exports)
+type = forbidden
+source_modules =
+    app.platform
+forbidden_modules =
+    app.exports
+
 # --- 3. tenant side never depends on the control plane ------------------------------------
 
 [importlinter:contract:tenant-side-without-control-plane]

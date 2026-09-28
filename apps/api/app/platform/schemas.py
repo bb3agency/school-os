@@ -355,6 +355,18 @@ class InvoiceOut(Out):
     lines: list[InvoiceLineOut] = Field(default_factory=list)
 
 
+class InvoicePdfDownloadOut(Out):
+    """A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF."""
+
+    url: str
+    expires_at: dt.datetime
+    filename: str
+    content_type: Literal["application/pdf"] = "application/pdf"
+    template_version: str
+    size_bytes: int
+    sha256: str
+
+
 class PaymentIn(In):
     method: Literal["bank_transfer", "upi", "cheque", "other"]
     amount_inr: Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)]

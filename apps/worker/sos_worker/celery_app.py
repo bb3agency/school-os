@@ -90,6 +90,8 @@ def create_celery() -> Celery:
             # (Chromium workers); the daily file purge on "maintenance".
             "exports.generate": {"queue": "exports"},
             "exports.render": {"queue": "pdf"},
+            # docs/16 §5.8: invoice PDFs render on the same Chromium workers (ADR-0025).
+            "billing.render_invoice_pdfs": {"queue": "pdf"},
             "exports.purge_expired": {"queue": "maintenance"},
             # docs/06 §4: document ingestion (extract, redact, chunk, embed, index), ACL
             # refresh and chunk removal (outbox consumers of the kb.* events).

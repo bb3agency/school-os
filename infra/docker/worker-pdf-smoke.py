@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import sys
 
-from app.exports.pdf import FONT_FAMILY, FONT_URL, ChromiumRenderer, RenderError
+from app.core.pdf import FONT_FAMILY, FONT_URL, ChromiumRenderer, RenderError
 
 HTML = f"""<!doctype html>
 <html lang="te"><head><meta charset="utf-8"><style>

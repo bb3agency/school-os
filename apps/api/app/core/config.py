@@ -80,6 +80,8 @@ def _is_public_https(url: str) -> bool:
 # Placeholder supplier identity for local/CI invoices; refused in staging/prod (FR-PLT-016).
 DEV_SUPPLIER_NAME = "SchoolOS Synthetic Supplier (dev)"
 DEV_SUPPLIER_GSTIN = "37AAAAA0000A1Z5"
+# Invoice PDFs refuse to render with this in staging/prod (app/platform/invoice_files.py).
+DEV_SUPPLIER_ADDRESS = "Synthetic supplier address (dev); Vijayawada 520001, Andhra Pradesh"
 
 
 class Settings(BaseSettings):
@@ -180,6 +182,13 @@ class Settings(BaseSettings):
     billing_supplier_legal_name: str = DEV_SUPPLIER_NAME
     billing_supplier_gstin: str = DEV_SUPPLIER_GSTIN
     billing_supplier_state_code: str = Field(default="37", pattern=r"^[0-9]{2}$")
+    # Registered address printed on invoice PDFs (CGST Rule 46(a)); ";" separates printed lines.
+    billing_supplier_address: str = Field(
+        default=DEV_SUPPLIER_ADDRESS, min_length=1, max_length=300
+    )
+    # Control-plane bucket for invoice PDFs (ADR-0017 Amendment 2026-09-28). Unset: the files
+    # bucket, under the control-plane prefix of app/platform/billing.yaml (never a school prefix).
+    platform_invoice_bucket: str | None = None
     # Dedicated hosts: where and as whom the heartbeat client reports (outbound only).
     control_plane_url: str | None = None
     deployment_id: str | None = None

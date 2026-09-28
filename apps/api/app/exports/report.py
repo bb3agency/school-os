@@ -19,8 +19,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from app.core.pdf import FONT_FAMILY, FONT_URL
 from app.exports.config import ExportsConfig, Language
-from app.exports.pdf import FONT_FAMILY, FONT_URL
 from app.exports.tables import Table, clean_text
 
 SEVERITY_RANK: Final = {"blocker": 5, "high": 4, "medium": 3, "low": 2, "info": 1}

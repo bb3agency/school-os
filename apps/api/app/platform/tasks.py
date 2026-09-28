@@ -20,6 +20,7 @@ from app.platform import (
     billing,
     fleet,
     heartbeat_client,
+    invoice_files,
     support,
     tenant_audit,
     usage,
@@ -39,6 +40,14 @@ def generate_invoices(month: str | None = None) -> dict[str, Any]:
 def billing_daily() -> dict[str, int]:
     """06:00 IST: roll ended periods, then mark past-due subscriptions (never suspends)."""
     return {"rolled": billing.roll_periods(), "past_due": billing.mark_past_due()}
+
+
+@shared_task(name="billing.render_invoice_pdfs", queue="pdf", acks_late=True, ignore_result=True)
+def render_invoice_pdfs() -> dict[str, int]:
+    """Every minute on the ``pdf`` queue (Chromium workers, ADR-0025): render and store the PDFs
+    of issued invoices that have none yet (idempotent per invoice; docs/16 §5.8)."""
+    result = invoice_files.render_pending()
+    return {"rendered": result.rendered, "existing": result.existing, "failed": result.failed}
 
 
 @shared_task(name="usage.collect_daily", acks_late=True)
@@ -104,6 +113,11 @@ def beat_schedule(settings: Settings | None = None) -> dict[str, dict[str, Any]]
             "schedule": crontab(minute=30, hour=20),  # 02:00 IST
         },
         "billing-daily": {"task": "billing.daily", "schedule": crontab(minute=30, hour=0)},
+        "billing-render-invoice-pdfs": {
+            "task": "billing.render_invoice_pdfs",
+            "schedule": 60.0,
+            "options": {"queue": "pdf"},
+        },
         "usage-collect-daily": {
             "task": "usage.collect_daily",
             "schedule": crontab(minute=0, hour=20),  # 01:30 IST

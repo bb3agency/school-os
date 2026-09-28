@@ -452,3 +452,16 @@ provisioning_runs = Table(
     Column("updated_at", DateTime(timezone=True)),
     Column("completed_at", DateTime(timezone=True)),
 )
+
+
+# 0029_invoice_pdfs: rendered invoice PDFs, one per issued invoice, append-only (docs/16 §5.8).
+invoice_pdfs = Table(
+    "invoice_pdfs",
+    metadata,
+    Column("invoice_id", Uuid, primary_key=True),
+    Column("template_version", Text, nullable=False),
+    Column("object_key", Text, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("size_bytes", Integer, nullable=False),
+    Column("rendered_at", DateTime(timezone=True)),
+)

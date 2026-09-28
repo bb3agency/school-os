@@ -65,12 +65,12 @@ from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.pdf import PdfRenderer, get_renderer
 from app.documents import service as documents
 from app.dq import service as dq
 from app.exports import repository as repo
 from app.exports.config import ExportsConfig, Language, ProfileLayout, load_config
 from app.exports.models import Export
-from app.exports.pdf import PdfRenderer, get_renderer
 from app.exports.report import (
     FindingLine,
     PrecheckInput,
