@@ -184,15 +184,28 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     "OIDC_CLIENT_SECRET",
     "/bff/auth/callback",
   );
-  const operator = client(
-    "operator",
-    "PLATFORM_OIDC_ISSUER",
-    "PLATFORM_OIDC_CLIENT_ID",
-    "PLATFORM_OIDC_CLIENT_SECRET",
-    "/bff/auth/platform/callback",
-  );
+  const platformEnabled = (env.SOS_DEPLOYMENT_MODE ?? "shared").trim() !== "dedicated";
+  // Dedicated hosts have no control plane (every operator route answers 404 first), so they
+  // carry no operator client: a placeholder that is never used stands in for it.
+  const operator: OidcClientConfig = platformEnabled
+    ? client(
+        "operator",
+        "PLATFORM_OIDC_ISSUER",
+        "PLATFORM_OIDC_CLIENT_ID",
+        "PLATFORM_OIDC_CLIENT_SECRET",
+        "/bff/auth/platform/callback",
+      )
+    : {
+        ...staff,
+        kind: "operator",
+        clientId: "",
+        clientSecret: "",
+        redirectUri: `${base}/bff/auth/platform/callback`,
+        postLogoutRedirectUri: `${base}${signedOutPath("operator")}`,
+      };
 
-  // Break-glass support sign-in (ADR-0023): a third app client, in the OPERATOR pool.
+  // Break-glass support sign-in (ADR-0023): a third app client, in the OPERATOR pool. On a
+  // dedicated host without PLATFORM_OIDC_ISSUER its issuer must be given explicitly.
   const supportEnabled = Boolean(env.SUPPORT_OIDC_CLIENT_ID?.trim());
   const supportIssuer = env.SUPPORT_OIDC_ISSUER?.trim() || env.PLATFORM_OIDC_ISSUER;
   let support: OidcClientConfig;
@@ -205,7 +218,10 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
       "/bff/auth/support/callback",
       supportIssuer,
     );
-    if (support.clientId && [staff.clientId, operator.clientId].includes(support.clientId)) {
+    if (
+      support.clientId &&
+      [staff.clientId, operator.clientId].filter(Boolean).includes(support.clientId)
+    ) {
       problems.push("SUPPORT_OIDC_CLIENT_ID must be its own app client");
     }
     if (support.issuer.href === staff.issuer.href) {
@@ -228,7 +244,7 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     staff,
     operator,
     support,
-    platformEnabled: (env.SOS_DEPLOYMENT_MODE ?? "shared").trim() !== "dedicated",
+    platformEnabled,
     supportEnabled,
   };
 }

@@ -106,4 +106,49 @@ describe("loadAuthConfig (SEC-004, SEC-006)", () => {
       false,
     );
   });
+
+  it("starts a dedicated host without the operator client (the control plane is off there)", () => {
+    const env = testEnv({
+      SOS_DEPLOYMENT_MODE: "dedicated",
+      PLATFORM_OIDC_ISSUER: undefined,
+      PLATFORM_OIDC_CLIENT_ID: undefined,
+      PLATFORM_OIDC_CLIENT_SECRET: undefined,
+      SUPPORT_OIDC_CLIENT_ID: undefined,
+      SUPPORT_OIDC_CLIENT_SECRET: undefined,
+    });
+    const config = loadAuthConfig(env);
+    expect(config.platformEnabled).toBe(false);
+    expect(config.operator.clientId).toBe("");
+    expect(config.supportEnabled).toBe(false);
+  });
+
+  it("still requires the operator client on the shared tier", () => {
+    expect(problemsOf(testEnv({ PLATFORM_OIDC_CLIENT_ID: undefined }))).toContain(
+      "PLATFORM_OIDC_CLIENT_ID is required",
+    );
+  });
+
+  it("needs an explicit support issuer for break-glass on a dedicated host (ADR-0023)", () => {
+    const dedicated = {
+      SOS_DEPLOYMENT_MODE: "dedicated",
+      PLATFORM_OIDC_ISSUER: undefined,
+      PLATFORM_OIDC_CLIENT_ID: undefined,
+      PLATFORM_OIDC_CLIENT_SECRET: undefined,
+      SUPPORT_OIDC_CLIENT_ID: "support-client",
+      SUPPORT_OIDC_CLIENT_SECRET: "support-secret",
+    };
+    expect(problemsOf(testEnv({ ...dedicated, SUPPORT_OIDC_ISSUER: undefined }))).toContain(
+      "SUPPORT_OIDC_ISSUER must be an absolute URL",
+    );
+    const config = loadAuthConfig(
+      testEnv({
+        ...dedicated,
+        SUPPORT_OIDC_ISSUER: "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_Operators",
+      }),
+    );
+    expect(config.supportEnabled).toBe(true);
+    expect(config.support.redirectUri).toBe(
+      "https://office.school.example/bff/auth/support/callback",
+    );
+  });
 });
