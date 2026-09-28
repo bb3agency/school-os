@@ -143,3 +143,46 @@ run "backup_region_guard" {
 
   expect_failures = [var.backup_region]
 }
+
+# ADR-0023 option C (US-103, SEC-021): each host gets its own support app client in the prod operator
+# pool, redirecting only to its own hosts; without the pool ID there is none (fail closed).
+run "support_client_off_without_the_operator_pool" {
+  command = plan
+
+  assert {
+    condition     = length(module.support) == 0 && output.oidc.support_client_id == null
+    error_message = "No operator pool ID, no support client."
+  }
+}
+
+run "support_client_for_this_host" {
+  command = plan
+
+  variables {
+    operator_user_pool_id = "ap-south-1_OperatorPool"
+  }
+
+  assert {
+    condition = (
+      module.support[0].posture.callback_urls == toset(["https://demo-school.example.test/bff/auth/support/callback", "https://office.demo-school.example.test/bff/auth/support/callback"])
+      && module.support[0].posture.logout_urls == toset(["https://demo-school.example.test/signed-out?kind=support", "https://office.demo-school.example.test/signed-out?kind=support"])
+      && module.support[0].posture.access_token_min == 10
+    )
+    error_message = "The support client redirects only to this school's hosts, 10-minute tokens."
+  }
+
+  assert {
+    condition     = module.support[0].issuer == "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_OperatorPool"
+    error_message = "Support tokens come from the operator pool."
+  }
+}
+
+run "operator_pool_id_is_validated" {
+  command = plan
+
+  variables {
+    operator_user_pool_id = "us-east-1_Elsewhere"
+  }
+
+  expect_failures = [var.operator_user_pool_id]
+}

@@ -37,9 +37,9 @@ variable "memory" {
 }
 
 variable "cpu_architecture" {
-  description = "ARM64 (Graviton, preferred) or X86_64."
+  description = "X86_64 (default: CI publishes linux/amd64 images only) or ARM64 (Graviton; only with arm64 images)."
   type        = string
-  default     = "ARM64"
+  default     = "X86_64"
 
   validation {
     condition     = contains(["ARM64", "X86_64"], var.cpu_architecture)

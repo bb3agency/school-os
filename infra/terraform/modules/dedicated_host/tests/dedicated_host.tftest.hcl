@@ -66,8 +66,8 @@ run "imdsv2_required" {
   }
 
   assert {
-    condition     = aws_instance.host.instance_type == "t4g.medium" && strcontains(data.aws_ssm_parameter.ubuntu.name, "/arm64/")
-    error_message = "Graviton default with the arm64 Ubuntu image."
+    condition     = aws_instance.host.instance_type == "t3.medium" && strcontains(data.aws_ssm_parameter.ubuntu.name, "/amd64/")
+    error_message = "x86_64 default (release images are linux/amd64 only) with the amd64 Ubuntu image."
   }
 }
 
@@ -264,4 +264,65 @@ run "backups_only_in_hyderabad" {
   }
 
   expect_failures = [var.backup_region]
+}
+
+# ADR-0023 option C (US-103, SEC-021): support sign-in is off unless the host gets its own support
+# client; then host.env carries it under the Settings/BFF names and the secret stays in Secrets Manager.
+run "support_sign_in_off_by_default" {
+  command = apply
+
+  assert {
+    condition = (
+      strcontains(aws_instance.host.user_data, "SOS_SUPPORT_OIDC_AUDIENCE=\n")
+      && strcontains(aws_instance.host.user_data, "SUPPORT_OIDC_CLIENT_ID=\n")
+      && !strcontains(aws_instance.host.user_data, "SUPPORT_OIDC_CLIENT_SECRET=")
+    )
+    error_message = "Without a support client, host.env leaves it empty (fail closed) and fetches no support secret."
+  }
+}
+
+run "support_sign_in_configured" {
+  command = apply
+  # Own state: the host ignores user_data changes after creation (lifecycle), so it must be a new host.
+  state_key = "support"
+
+  variables {
+    support_oidc_issuer            = "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_OperatorPool"
+    support_oidc_client_id         = "supportclientid"
+    support_oidc_client_secret_arn = "arn:aws:secretsmanager:ap-south-1:111122223333:secret:sos/dedicated/demo-school/oidc/support-client-secret-AbCdEf"
+  }
+
+  assert {
+    condition = alltrue([
+      for line in [
+        "SOS_SUPPORT_OIDC_ISSUER=https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_OperatorPool",
+        "SOS_SUPPORT_OIDC_AUDIENCE=supportclientid",
+        "SUPPORT_OIDC_CLIENT_ID=supportclientid",
+        " SUPPORT_OIDC_CLIENT_SECRET=arn:aws:secretsmanager:ap-south-1:111122223333:secret:sos/dedicated/demo-school/oidc/support-client-secret-AbCdEf\"",
+      ] : strcontains(aws_instance.host.user_data, line)
+    ])
+    error_message = "host.env carries the support issuer and client ID; the secret is fetched from Secrets Manager by ARN."
+  }
+}
+
+run "support_settings_all_or_none" {
+  command = plan
+
+  variables {
+    support_oidc_client_id = "supportclientid"
+  }
+
+  expect_failures = [var.support_oidc_client_id]
+}
+
+run "support_issuer_is_never_the_staff_pool" {
+  command = plan
+
+  variables {
+    support_oidc_issuer            = "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_example"
+    support_oidc_client_id         = "supportclientid"
+    support_oidc_client_secret_arn = "arn:aws:secretsmanager:ap-south-1:111122223333:secret:x-AbCdEf"
+  }
+
+  expect_failures = [var.support_oidc_issuer]
 }

@@ -74,6 +74,9 @@ start-up checks. `apps/api/tests/deploy/test_env_contract.py` fails CI if a name
    terraform init -reconfigure -backend-config=schools/<code>.backend.hcl
    terraform apply -var-file=schools/<code>.tfvars
    ```
+   Break-glass support sign-in (ADR-0023) is off unless the tfvars set `operator_user_pool_id` (prod
+   output `oidc.platform_user_pool_id`); then the host gets its own support app client in the operator pool
+   (docs/10 §15.6).
 3. **Operator secrets** (the host waits up to 2 h for them):
    ```bash
    aws secretsmanager put-secret-value --secret-id "$(terraform output -raw operator_secret_arn)" \
@@ -201,7 +204,7 @@ NFR-AVL-002 (RPO ≤ 15 min) is met only with WAL-G. docs/10 §15.3 lists WAL-G 
 |---|---|
 | Generated credentials (DB roles, Valkey, service token key, session secret) | Bump `generated_secret_version` in Terraform and apply (a new value is written to Secrets Manager, never to state). On the host: `systemctl stop schoolos`, `scripts/fetch-secrets.sh`, `scripts/compose.sh up -d --wait db valkey`, `scripts/compose.sh run --rm db-bootstrap` (sets the role passwords), then `systemctl start schoolos`. Changing `POSTGRES_PASSWORD` also needs `ALTER ROLE postgres PASSWORD …` inside the db container first. Users must sign in again after a `SESSION_SECRET` change. |
 | Anthropic API key / heartbeat key | `put-secret-value` on the operator secret (for the heartbeat, both `SOS_HEARTBEAT_KEY_ID` and `SOS_HEARTBEAT_KEY`), then `systemctl restart schoolos`. For the heartbeat key, follow the panel's 7-day overlap. |
-| OIDC client secret | Recreate the Cognito app client (taint it), apply, restart. |
+| OIDC client secret | Recreate the Cognito app client (taint it), apply, restart. The support client (ADR-0023) likewise (`module.support[0].aws_cognito_user_pool_client.this`), then `scripts/fetch-secrets.sh`. Secrets Manager gets a new client secret only when the module's `client_secret_version` changes (write-only value). |
 | TLS certificates | Automatic (Caddy/ACME). Expiry is reported in the heartbeat. |
 | KMS | Data and backup keys: annual automatic rotation. The audit signing key is asymmetric (ECC_NIST_P256), which AWS KMS cannot rotate: to replace it, create a new key, point `SOS_AUDIT_SIGNING_KEY_ARN` at it, and keep the old key (or its exported public key) to verify older archives. |
 

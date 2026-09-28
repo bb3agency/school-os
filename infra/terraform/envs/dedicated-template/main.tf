@@ -76,12 +76,32 @@ module "cognito" {
 
   name_prefix          = local.name
   tenant_domain_prefix = local.name
-  tenant_callback_urls = [for h in local.callback_hosts : "https://${h}/api/auth/callback"]
-  tenant_logout_urls   = [for h in local.callback_hosts : "https://${h}/"]
+  tenant_callback_urls = [for h in local.callback_hosts : "https://${h}/bff/auth/callback"]
+  tenant_logout_urls   = [for h in local.callback_hosts : "https://${h}/signed-out"]
   create_platform_pool = false
   secrets_kms_key_arn  = module.kms.key_arns["data"]
   secret_name_prefix   = "sos/dedicated/${var.school_code}"
   logs_kms_key_arn     = module.kms.key_arns["data"]
+}
+
+# --- Break-glass support sign-in (ADR-0023 option C) ------------------------------------------------
+# The host's own support app client in the prod OPERATOR pool (same account and region as this root;
+# pool ID = prod output oidc.platform_user_pool_id). Operators sign in to this school's app with it
+# only during an approved break-glass grant; MFA comes from the operator pool. Null pool ID = no
+# client: break-glass access cannot be used on this host (fail closed). Destroying this root removes
+# the client.
+
+module "support" {
+  source = "../../modules/cognito_support_client"
+  count  = var.operator_user_pool_id == null ? 0 : 1
+
+  name                = "${local.name}-support"
+  user_pool_id        = var.operator_user_pool_id
+  callback_urls       = [for h in local.callback_hosts : "https://${h}/bff/auth/support/callback"]
+  logout_urls         = [for h in local.callback_hosts : "https://${h}/signed-out?kind=support"]
+  secret_name         = "sos/dedicated/${var.school_code}/oidc/support-client-secret"
+  secrets_kms_key_arn = module.kms.key_arns["data"]
+  tags                = { school_code = var.school_code }
 }
 
 # --- Host ----------------------------------------------------------------------------------------
@@ -114,8 +134,12 @@ module "host" {
   oidc_issuer            = module.cognito.tenant_issuer
   oidc_client_id         = module.cognito.tenant_client_id
   oidc_client_secret_arn = module.cognito.tenant_client_secret_arn
-  control_plane_url      = var.control_plane_url
-  walg_enabled           = var.walg_enabled
-  termination_protection = var.termination_protection
-  route53_zone_id        = var.route53_zone_id
+  # Empty strings = support sign-in off (dedicated_host validates all-or-none).
+  support_oidc_issuer            = try(module.support[0].issuer, "")
+  support_oidc_client_id         = try(module.support[0].client_id, "")
+  support_oidc_client_secret_arn = try(module.support[0].client_secret_arn, "")
+  control_plane_url              = var.control_plane_url
+  walg_enabled                   = var.walg_enabled
+  termination_protection         = var.termination_protection
+  route53_zone_id                = var.route53_zone_id
 }

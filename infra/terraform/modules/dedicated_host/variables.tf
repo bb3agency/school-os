@@ -39,9 +39,9 @@ variable "subnet_id" {
 }
 
 variable "instance_type" {
-  description = "Instance type. Graviton (t4g/m7g/...) uses the arm64 Ubuntu image, others amd64."
+  description = "Instance type. Graviton (t4g/m7g/...) uses the arm64 Ubuntu image, others amd64. Default t3.medium: release images are linux/amd64 only (a Graviton host could not run them)."
   type        = string
-  default     = "t4g.medium"
+  default     = "t3.medium"
 }
 
 variable "root_volume_gb" {
@@ -181,6 +181,44 @@ variable "oidc_client_id" {
 variable "oidc_client_secret_arn" {
   description = "Secrets Manager ARN of the BFF client secret."
   type        = string
+}
+
+variable "support_oidc_issuer" {
+  description = "Break-glass support sign-in (ADR-0023): issuer of the prod OPERATOR pool (SOS_SUPPORT_OIDC_ISSUER). Empty = support sign-in off (fail closed)."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.support_oidc_issuer == "" || can(regex("^https://cognito-idp\\.[a-z0-9-]+\\.amazonaws\\.com/[A-Za-z0-9-]+_[A-Za-z0-9]+$", var.support_oidc_issuer))
+    error_message = "support_oidc_issuer is a Cognito issuer URL (https://cognito-idp.<region>.amazonaws.com/<pool id>) or empty."
+  }
+
+  validation {
+    condition     = var.support_oidc_issuer == "" || var.support_oidc_issuer != var.oidc_issuer
+    error_message = "Support tokens come from the operator pool, never this school's staff pool (ADR-0023)."
+  }
+}
+
+variable "support_oidc_client_id" {
+  description = "This host's support app client ID in the operator pool (SOS_SUPPORT_OIDC_AUDIENCE, SUPPORT_OIDC_CLIENT_ID). Empty = off."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = (var.support_oidc_client_id == "") == (var.support_oidc_issuer == "") && (var.support_oidc_client_id == "") == (var.support_oidc_client_secret_arn == "")
+    error_message = "Set support_oidc_issuer, support_oidc_client_id and support_oidc_client_secret_arn together, or none of them."
+  }
+
+  validation {
+    condition     = var.support_oidc_client_id == "" || var.support_oidc_client_id != var.oidc_client_id
+    error_message = "The support client is its own app client, never the staff client (ADR-0023)."
+  }
+}
+
+variable "support_oidc_client_secret_arn" {
+  description = "Secrets Manager ARN of the support client secret (SUPPORT_OIDC_CLIENT_SECRET on web). Empty = off."
+  type        = string
+  default     = ""
 }
 
 variable "control_plane_url" {

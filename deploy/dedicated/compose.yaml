@@ -52,6 +52,10 @@ x-app-env: &app-env
   SOS_S3_KMS_KEY_ID: ${SOS_KMS_DATA_KEY_ARN:?}
   SOS_OIDC_ISSUER: ${SOS_OIDC_ISSUER:?}
   SOS_OIDC_AUDIENCE: ${SOS_OIDC_AUDIENCE:?}
+  # Break-glass support sign-in (ADR-0023): this host's support app client in the prod operator pool.
+  # Empty audience (the default) = off: approved break-glass access cannot be used here (fail closed).
+  SOS_SUPPORT_OIDC_ISSUER: ${SOS_SUPPORT_OIDC_ISSUER:-}
+  SOS_SUPPORT_OIDC_AUDIENCE: ${SOS_SUPPORT_OIDC_AUDIENCE:-}
   SOS_SERVICE_TOKEN_KEY: ${SOS_SERVICE_TOKEN_KEY:?}
   SOS_KEY_WRAPPER: kms
   SOS_KMS_DATA_KEY_ARN: ${SOS_KMS_DATA_KEY_ARN:?}
@@ -115,6 +119,10 @@ services:
       OIDC_ISSUER: ${SOS_OIDC_ISSUER:?}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?}
+      # Break-glass support sign-in (ADR-0023); empty client ID = off.
+      SUPPORT_OIDC_ISSUER: ${SOS_SUPPORT_OIDC_ISSUER:-}
+      SUPPORT_OIDC_CLIENT_ID: ${SUPPORT_OIDC_CLIENT_ID:-}
+      SUPPORT_OIDC_CLIENT_SECRET: ${SUPPORT_OIDC_CLIENT_SECRET:-}
       REDIS_URL: redis://:${VALKEY_PASSWORD:?}@valkey:6379/1
       # Origin of presigned upload/preview URLs (CSP connect-src + img-src; docs/07 §10, §11). The API
       # presigns virtual-hosted, regional URLs, so this is derived from the same bucket and region

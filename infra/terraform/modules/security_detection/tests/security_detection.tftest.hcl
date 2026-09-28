@@ -163,3 +163,72 @@ run "fsbp_and_cis_required" {
 
   expect_failures = [var.securityhub_standards]
 }
+
+# Owner decision 2026-09-27 (SEC-023): the CIS CloudWatch.1-14 metric-filter controls are disabled with
+# a recorded reason wherever a subscribed CIS version contains them (v1.4.0); v3.0.0 has none.
+run "cis_v3_needs_no_cloudwatch_exceptions" {
+  command = plan
+
+  assert {
+    condition     = length(output.securityhub_disabled_controls) == 0
+    error_message = "CIS v3.0.0 does not contain CloudWatch.1-14; nothing to disable."
+  }
+}
+
+run "cis_v14_cloudwatch_controls_disabled_with_reason" {
+  command = plan
+
+  variables {
+    securityhub_standards = ["aws-foundational-security-best-practices/v/1.0.0", "cis-aws-foundations-benchmark/v/1.4.0"]
+  }
+
+  assert {
+    condition = (
+      length(output.securityhub_disabled_controls) == 12
+      && alltrue([for c in values(output.securityhub_disabled_controls) : c.status == "DISABLED" && strcontains(c.reason, "CloudWatch Logs")])
+      && contains(keys(output.securityhub_disabled_controls), "cis-aws-foundations-benchmark/v/1.4.0|CloudWatch.14")
+    )
+    error_message = "CloudWatch.1 and 4-14 are disabled in CIS v1.4.0 with the recorded reason."
+  }
+}
+
+run "triage_exceptions_are_recorded" {
+  command = plan
+
+  variables {
+    securityhub_control_exceptions = [{
+      standard   = "aws-foundational-security-best-practices/v/1.0.0"
+      control_id = "EC2.10"
+      reason     = "Stage 0 no-NAT option uses public subnets without interface endpoints (docs/10 §3)."
+    }]
+  }
+
+  assert {
+    condition     = output.securityhub_disabled_controls["aws-foundational-security-best-practices/v/1.0.0|EC2.10"].status == "DISABLED"
+    error_message = "Accepted triage exceptions are Terraform, with their reason."
+  }
+}
+
+run "exception_needs_a_reason" {
+  command = plan
+
+  variables {
+    securityhub_control_exceptions = [{
+      standard   = "aws-foundational-security-best-practices/v/1.0.0"
+      control_id = "EC2.10"
+      reason     = "n/a"
+    }]
+  }
+
+  expect_failures = [var.securityhub_control_exceptions]
+}
+
+run "cis_v12_refused" {
+  command = plan
+
+  variables {
+    securityhub_standards = ["aws-foundational-security-best-practices/v/1.0.0", "cis-aws-foundations-benchmark/v/1.2.0"]
+  }
+
+  expect_failures = [var.securityhub_standards]
+}

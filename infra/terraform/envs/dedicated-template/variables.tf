@@ -77,9 +77,9 @@ variable "acme_email" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type (Graviton default)."
+  description = "EC2 instance type. x86_64 (t3.medium) because release images are linux/amd64 only; Graviton only once CI publishes arm64 images."
   type        = string
-  default     = "t4g.medium"
+  default     = "t3.medium"
 }
 
 variable "data_volume_gb" {
@@ -124,6 +124,17 @@ variable "ecr_account_id" {
 variable "control_plane_url" {
   description = "Control-plane URL for heartbeats, e.g. https://app.schoolos.in."
   type        = string
+}
+
+variable "operator_user_pool_id" {
+  description = "Break-glass support sign-in (ADR-0023): the prod OPERATOR pool ID (prod output oidc.platform_user_pool_id). Creates this host's own support app client there. Null = off (approved break-glass access cannot be used on this host)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.operator_user_pool_id == null || can(regex("^ap-south-1_[A-Za-z0-9]+$", var.operator_user_pool_id))
+    error_message = "operator_user_pool_id is a Cognito pool ID in ap-south-1 (ap-south-1_XXXX), or null."
+  }
 }
 
 variable "route53_zone_id" {

@@ -35,9 +35,9 @@ variable "associate_public_ip_address" {
 }
 
 variable "instance_type" {
-  description = "Instance type. Graviton (t4g/c7g/m7g...) selects the arm64 ECS-optimized AMI, anything else x86_64. Must match the task cpu_architecture."
+  description = "Instance type. Graviton (t4g/c7g/m7g...) selects the arm64 ECS-optimized AMI, anything else x86_64. Must match the task cpu_architecture and the image: CI publishes linux/amd64 images only, hence t3.medium (ADR-0025 amendment)."
   type        = string
-  default     = "t4g.medium"
+  default     = "t3.medium"
 }
 
 variable "min_size" {

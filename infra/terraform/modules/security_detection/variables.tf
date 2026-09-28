@@ -135,6 +135,27 @@ variable "securityhub_standards" {
     condition     = contains(var.securityhub_standards, "aws-foundational-security-best-practices/v/1.0.0") && length([for s in var.securityhub_standards : s if startswith(s, "cis-aws-foundations-benchmark/")]) > 0
     error_message = "SEC-023 needs AWS Foundational Security Best Practices and a CIS AWS Foundations Benchmark version."
   }
+
+  validation {
+    # v1.2.0 has a global "ruleset" ARN, not arn:...:securityhub:<region>::standards/..., and is superseded.
+    condition     = !contains(var.securityhub_standards, "cis-aws-foundations-benchmark/v/1.2.0")
+    error_message = "CIS v1.2.0 is not supported here (different ARN format, superseded): use v3.0.0 (or v1.4.0)."
+  }
+}
+
+variable "securityhub_control_exceptions" {
+  description = "Controls disabled in one subscribed standard, with the recorded reason (Security Hub keeps it as the disable reason). Add accepted exceptions from the first-run triage here (docs/10 §5.1). The CloudWatch.1-14 exceptions for CIS v1.4.0 are added automatically."
+  type = list(object({
+    standard   = string
+    control_id = string
+    reason     = string
+  }))
+  default = []
+
+  validation {
+    condition     = alltrue([for e in var.securityhub_control_exceptions : contains(var.securityhub_standards, e.standard) && length(trimspace(e.reason)) >= 20])
+    error_message = "Each exception names a subscribed standard and a reason of at least 20 characters."
+  }
 }
 
 # --- Event forwarding ---------------------------------------------------------------------

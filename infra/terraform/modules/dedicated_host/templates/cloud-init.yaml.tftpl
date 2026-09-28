@@ -46,10 +46,13 @@ write_files:
       SOS_KEY_WRAPPER=kms
       SOS_DATA_VOLUME_ID=${data_volume_id}
       SOS_SECRET_JSON_IDS="${secret_json_ids}"
-      SOS_SECRET_PLAIN="OIDC_CLIENT_SECRET=${oidc_client_secret_arn}"
+      SOS_SECRET_PLAIN="OIDC_CLIENT_SECRET=${oidc_client_secret_arn}%{ if support_oidc_client_secret_arn != "" } SUPPORT_OIDC_CLIENT_SECRET=${support_oidc_client_secret_arn}%{ endif }"
       SOS_OIDC_ISSUER=${oidc_issuer}
       SOS_OIDC_AUDIENCE=${oidc_client_id}
       OIDC_CLIENT_ID=${oidc_client_id}
+      SOS_SUPPORT_OIDC_ISSUER=${support_oidc_issuer}
+      SOS_SUPPORT_OIDC_AUDIENCE=${support_oidc_client_id}
+      SUPPORT_OIDC_CLIENT_ID=${support_oidc_client_id}
       SOS_CONTROL_PLANE_URL=${control_plane_url}
       SOS_DEPLOYMENT_ID=${deployment_id}
       SOS_DEDICATED_TENANT_ID=${tenant_id}

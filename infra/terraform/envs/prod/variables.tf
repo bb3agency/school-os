@@ -206,6 +206,51 @@ variable "billing_supplier_state_code" {
   default     = "37"
 }
 
+variable "billing_supplier_address" {
+  description = "Supplier registered address on invoice PDFs (validated by modules/shared_platform)."
+  type        = string
+}
+
+variable "platform_invoice_bucket" {
+  description = "Optional separate bucket for invoice PDFs; null = the files bucket under platform/invoices/."
+  type        = string
+  default     = null
+}
+
+variable "email_provider" {
+  description = "Staff invitation email: off (default) or ses (validated by modules/shared_platform)."
+  type        = string
+  default     = "off"
+}
+
+variable "email_domain" {
+  description = "SES sending domain (Easy DKIM); null = no SES identity."
+  type        = string
+  default     = null
+}
+
+variable "email_route53_zone_id" {
+  description = "Hosted zone for the DKIM CNAMEs (null = publish them by hand from output ses)."
+  type        = string
+  default     = null
+}
+
+variable "email_from" {
+  description = "Sender, e.g. \"SchoolOS <no-reply@mail.example.in>\" (address in email_domain)."
+  type        = string
+  default     = null
+}
+
+variable "securityhub_control_exceptions" {
+  description = "Security Hub controls disabled with a recorded reason after the first-run triage (docs/10 §5.1); list of { standard, control_id, reason }."
+  type = list(object({
+    standard   = string
+    control_id = string
+    reason     = string
+  }))
+  default = []
+}
+
 variable "security_alert_emails" {
   description = "Security alert recipients (GuardDuty/Security Hub/tampering, SEC-023). Null = alarm_emails. The on-call path is docs/11 §6-7."
   type        = list(string)

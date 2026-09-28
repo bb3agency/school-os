@@ -9,12 +9,12 @@ variable "tenant_domain_prefix" {
 }
 
 variable "tenant_callback_urls" {
-  description = "BFF OIDC callback URLs, e.g. https://app.schoolos.in/api/auth/callback."
+  description = "BFF OIDC callback URLs: <APP_BASE_URL>/bff/auth/callback (apps/web/README.md)."
   type        = list(string)
 }
 
 variable "tenant_logout_urls" {
-  description = "Allowed post-logout redirect URLs."
+  description = "Allowed post-logout redirect URLs: <APP_BASE_URL>/signed-out."
   type        = list(string)
 }
 
@@ -31,13 +31,36 @@ variable "platform_domain_prefix" {
 }
 
 variable "platform_callback_urls" {
-  description = "Platform admin callback URLs, e.g. https://admin.schoolos.in/api/auth/platform/callback."
+  description = "Platform admin callback URLs: <APP_BASE_URL>/bff/auth/platform/callback."
   type        = list(string)
   default     = []
 }
 
 variable "platform_logout_urls" {
-  description = "Platform admin logout URLs."
+  description = "Platform admin logout URLs: <APP_BASE_URL>/signed-out?kind=operator."
+  type        = list(string)
+  default     = []
+}
+
+variable "create_support_client" {
+  description = "Create the break-glass support app client in the operator pool (ADR-0023 option C; shared tier). Dedicated roots create their own per host (envs/dedicated-template)."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.create_support_client || var.create_platform_pool
+    error_message = "The support client lives in the operator pool: create_platform_pool must be true."
+  }
+}
+
+variable "support_callback_urls" {
+  description = "Support client callbacks: <APP_BASE_URL>/bff/auth/support/callback."
+  type        = list(string)
+  default     = []
+}
+
+variable "support_logout_urls" {
+  description = "Support client sign-out URLs: <APP_BASE_URL>/signed-out?kind=support."
   type        = list(string)
   default     = []
 }

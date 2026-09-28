@@ -164,6 +164,16 @@ variable "securityhub_standards" {
   ]
 }
 
+variable "securityhub_control_exceptions" {
+  description = "Security Hub controls disabled with a recorded reason, in both regions (modules/security_detection). Record accepted exceptions from the first-run triage here."
+  type = list(object({
+    standard   = string
+    control_id = string
+    reason     = string
+  }))
+  default = []
+}
+
 variable "account_public_access_block" {
   description = "Turn on S3 Block Public Access for the whole account (docs/07 §13: deny public S3)."
   type        = bool

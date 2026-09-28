@@ -19,8 +19,8 @@ output "cluster_name" {
 }
 
 output "ecs_services" {
-  description = "Long-running ECS services the deploy pipeline rolls (e.g. the STAGING_ECS_SERVICES variable)."
-  value       = [module.web.service_name, module.api.service_name, module.worker.service_name, module.worker_pdf.service_name, module.beat.service_name]
+  description = "Long-running ECS services the deploy pipeline rolls, in STAGING_ECS_SERVICES order: api first (the migrate task reuses its network configuration), worker-pdf never first."
+  value       = [module.api.service_name, module.web.service_name, module.worker.service_name, module.worker_pdf.service_name, module.beat.service_name]
 }
 
 output "pdf_capacity" {
@@ -79,11 +79,14 @@ output "kms_key_arns" {
 output "oidc" {
   description = "Non-secret OIDC settings for the app."
   value = {
-    tenant_issuer        = module.cognito.tenant_issuer
-    tenant_client_id     = module.cognito.tenant_client_id
-    tenant_hosted_domain = module.cognito.tenant_hosted_domain
-    platform_issuer      = module.cognito.platform_issuer
-    platform_client_id   = module.cognito.platform_client_id
+    tenant_issuer         = module.cognito.tenant_issuer
+    tenant_client_id      = module.cognito.tenant_client_id
+    tenant_hosted_domain  = module.cognito.tenant_hosted_domain
+    platform_issuer       = module.cognito.platform_issuer
+    platform_client_id    = module.cognito.platform_client_id
+    platform_user_pool_id = module.cognito.platform_user_pool_id
+    support_issuer        = module.cognito.support_issuer
+    support_client_id     = module.cognito.support_client_id
   }
 }
 
@@ -97,7 +100,17 @@ output "secret_arns" {
     rds_master             = module.rds.master_user_secret_arn
     oidc_tenant_client     = module.cognito.tenant_client_secret_arn
     oidc_platform_client   = module.cognito.platform_client_secret_arn
+    oidc_support_client    = module.cognito.support_client_secret_arn
     note_operator_supplied = "Values start as __SET_ME__; set them before the first deploy."
+  }
+}
+
+output "ses" {
+  description = "SES email identity (null when email_domain is unset): publish dkim_records in DNS unless email_route53_zone_id manages them."
+  value = var.email_domain == null ? null : {
+    identity_arn           = one(module.ses[*].identity_arn)
+    configuration_set_name = one(module.ses[*].configuration_set_name)
+    dkim_records           = one(module.ses[*].dkim_records)
   }
 }
 
@@ -128,6 +141,7 @@ output "security_posture" {
     redis                 = module.redis.posture
     ecr                   = module.ecr.posture
     cognito               = module.cognito.posture
+    cognito_support       = module.cognito.support_posture
     web_container         = module.web.container_definition
     api_container         = module.api.container_definition
     worker_container      = module.worker.container_definition

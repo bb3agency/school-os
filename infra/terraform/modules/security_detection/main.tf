@@ -124,6 +124,39 @@ resource "aws_securityhub_account" "this" {
   depends_on = [aws_config_configuration_recorder_status.this]
 }
 
+# Disabled controls with a recorded reason (owner decision 2026-09-27, SEC-023). The CIS metric-filter
+# controls CloudWatch.1-14 need the trail in CloudWatch Logs, which Stage 0 does not do (billed per GB);
+# the same events are covered by the EventBridge alerts of modules/security_baseline. Only CIS v1.2.0
+# and v1.4.0 contain them; v3.0.0 (the default) does not, so nothing is disabled there.
+locals {
+  cis_cloudwatch_controls = {
+    "cis-aws-foundations-benchmark/v/1.4.0" = ["CloudWatch.1", "CloudWatch.4", "CloudWatch.5", "CloudWatch.6", "CloudWatch.7", "CloudWatch.8", "CloudWatch.9", "CloudWatch.10", "CloudWatch.11", "CloudWatch.12", "CloudWatch.13", "CloudWatch.14"]
+  }
+  cloudwatch_reason = "SchoolOS Stage 0: CloudTrail is not delivered to CloudWatch Logs (cost); tampering, root and security-service changes alert through EventBridge rules instead (docs/10 §5.1, owner decision 2026-09-27)."
+
+  control_exceptions = merge(
+    {
+      for pair in flatten([
+        for std, ids in local.cis_cloudwatch_controls : [for id in ids : { standard = std, control_id = id }]
+        if contains(var.securityhub_standards, std)
+      ]) : "${pair.standard}|${pair.control_id}" => merge(pair, { reason = local.cloudwatch_reason })
+    },
+    { for e in var.securityhub_control_exceptions : "${e.standard}|${e.control_id}" => e },
+  )
+}
+
+resource "aws_securityhub_standards_control_association" "disabled" {
+  for_each = local.control_exceptions
+  region   = var.region
+
+  standards_arn       = "arn:${local.partition}:securityhub:${local.region}::standards/${each.value.standard}"
+  security_control_id = each.value.control_id
+  association_status  = "DISABLED"
+  updated_reason      = each.value.reason
+
+  depends_on = [aws_securityhub_standards_subscription.this]
+}
+
 resource "aws_securityhub_standards_subscription" "this" {
   for_each = toset(var.securityhub_standards)
   region   = var.region

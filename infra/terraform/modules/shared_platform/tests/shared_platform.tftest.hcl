@@ -27,6 +27,7 @@ variables {
   github_deploy_environment   = "staging"
   billing_supplier_legal_name = "SchoolOS Staging Synthetic Supplier (not a tax invoice)"
   billing_supplier_gstin      = "37STAGE0000S1Z5"
+  billing_supplier_address    = "Synthetic staging supplier (not a tax invoice); Vijayawada 520001, Andhra Pradesh"
 }
 
 run "every_app_container_gets_the_full_settings" {
@@ -36,7 +37,7 @@ run "every_app_container_gets_the_full_settings" {
     condition = alltrue([
       for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition, module.beat.container_definition, module.migrate.container_definition] :
       length(setsubtract(
-        ["SOS_ENV", "SOS_DEPLOYMENT_MODE", "SOS_VERSION", "AWS_REGION", "SOS_KEY_WRAPPER", "SOS_KMS_DATA_KEY_ARN", "SOS_AUDIT_SIGNING_KEY_ARN", "SOS_BILLING_SUPPLIER_LEGAL_NAME", "SOS_BILLING_SUPPLIER_GSTIN", "SOS_BILLING_SUPPLIER_STATE_CODE", "SOS_S3_BUCKET_FILES", "SOS_S3_BUCKET_AUDIT", "SOS_OIDC_ISSUER", "SOS_OIDC_AUDIENCE", "SOS_SERVICE_NAME"],
+        ["SOS_ENV", "SOS_DEPLOYMENT_MODE", "SOS_VERSION", "AWS_REGION", "SOS_KEY_WRAPPER", "SOS_KMS_DATA_KEY_ARN", "SOS_AUDIT_SIGNING_KEY_ARN", "SOS_BILLING_SUPPLIER_LEGAL_NAME", "SOS_BILLING_SUPPLIER_GSTIN", "SOS_BILLING_SUPPLIER_STATE_CODE", "SOS_BILLING_SUPPLIER_ADDRESS", "SOS_S3_BUCKET_FILES", "SOS_S3_BUCKET_AUDIT", "SOS_OIDC_ISSUER", "SOS_OIDC_AUDIENCE", "SOS_SERVICE_NAME"],
         [for e in c.environment : e.name],
       )) == 0
     ])
@@ -134,8 +135,8 @@ run "pdf_worker_runs_on_the_sandbox_capacity" {
   }
 
   assert {
-    condition     = contains(output.ecs_services, "sos-staging-worker-pdf") && length(output.ecs_services) == 5
-    error_message = "The deploy pipeline rolls web, api, worker, worker-pdf and beat."
+    condition     = contains(output.ecs_services, "sos-staging-worker-pdf") && length(output.ecs_services) == 5 && output.ecs_services[0] == "sos-staging-api"
+    error_message = "The deploy pipeline rolls api (first: the migrate task reuses its network configuration), web, worker, worker-pdf and beat."
   }
 }
 
@@ -301,4 +302,225 @@ run "supplier_name_dev_placeholder_refused" {
   }
 
   expect_failures = [var.billing_supplier_legal_name]
+}
+
+# FR-IAM-001, SEC-004: Cognito redirects exactly where the BFF sends people. apps/web/src/server/config.ts
+# builds every redirect and post-logout URI from APP_BASE_URL (https://app_domain), operators included.
+run "oidc_redirects_match_the_bff" {
+  command = plan
+
+  assert {
+    condition = (
+      module.cognito.posture["tenant"].callback_urls == toset(["https://app.staging.example.test/bff/auth/callback"])
+      && module.cognito.posture["tenant"].logout_urls == toset(["https://app.staging.example.test/signed-out"])
+    )
+    error_message = "Staff client: <APP_BASE_URL>/bff/auth/callback and /signed-out."
+  }
+
+  assert {
+    condition = (
+      module.cognito.posture["platform"].callback_urls == toset(["https://app.staging.example.test/bff/auth/platform/callback"])
+      && module.cognito.posture["platform"].logout_urls == toset(["https://app.staging.example.test/signed-out?kind=operator"])
+    )
+    error_message = "Operator admin client: <APP_BASE_URL>/bff/auth/platform/callback and /signed-out?kind=operator."
+  }
+}
+
+# ADR-0023 option C (US-103, FR-OPS-004, SEC-021): the support app client of the operator pool exists per
+# environment; the API and workers know its audience, the web BFF its client ID and secret.
+run "support_client_is_wired" {
+  command = plan
+
+  assert {
+    condition = (
+      module.cognito.support_posture.callback_urls == toset(["https://app.staging.example.test/bff/auth/support/callback"])
+      && module.cognito.support_posture.logout_urls == toset(["https://app.staging.example.test/signed-out?kind=support"])
+      && module.cognito.support_posture.access_token_min == 10
+      && module.cognito.support_posture.refresh_rotation == "ENABLED"
+    )
+    error_message = "Support client: BFF support callback and sign-out on app_domain, 10-minute tokens, rotation."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      contains([for e in c.environment : e.name], "SOS_SUPPORT_OIDC_AUDIENCE")
+      && !contains([for e in c.environment : e.name], "SOS_SUPPORT_OIDC_ISSUER")
+    ])
+    error_message = "Every app container gets the support audience; the issuer defaults to the operator pool's (SOS_PLATFORM_OIDC_ISSUER)."
+  }
+
+  assert {
+    condition = (
+      contains([for e in module.web.container_definition.environment : e.name], "SUPPORT_OIDC_CLIENT_ID")
+      && contains([for s in module.web.container_definition.secrets : s.name], "SUPPORT_OIDC_CLIENT_SECRET")
+      && !contains([for e in module.web.container_definition.environment : e.name], "SUPPORT_OIDC_CLIENT_SECRET")
+    )
+    error_message = "The web BFF gets the support client ID, and its secret from Secrets Manager only."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      !contains([for s in c.secrets : s.name], "SUPPORT_OIDC_CLIENT_SECRET")
+    ])
+    error_message = "Only the BFF holds the support client secret."
+  }
+}
+
+# FR-PLT-016/017 (invoice PDFs, docs/16 §5.8): the supplier address reaches every app container
+# (worker-pdf renders); a separate invoice bucket is optional and, when set, named in the env and
+# the task role.
+run "invoice_pdf_settings" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_BILLING_SUPPLIER_ADDRESS"] == ["Synthetic staging supplier (not a tax invoice); Vijayawada 520001, Andhra Pradesh"]
+      && !contains([for e in c.environment : e.name], "SOS_PLATFORM_INVOICE_BUCKET")
+    ])
+    error_message = "api, worker and worker-pdf get the supplier address; no invoice bucket unless configured (files bucket)."
+  }
+}
+
+run "invoice_pdf_separate_bucket" {
+  command = plan
+
+  variables {
+    platform_invoice_bucket = "sos-staging-invoices-444455556666"
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_PLATFORM_INVOICE_BUCKET"] == ["sos-staging-invoices-444455556666"]
+    ])
+    error_message = "The configured invoice bucket reaches the containers that render and sign."
+  }
+}
+
+run "invoice_address_dev_placeholder_refused" {
+  command = plan
+
+  variables {
+    billing_supplier_address = "Synthetic supplier address (dev); Vijayawada 520001, Andhra Pradesh"
+  }
+
+  expect_failures = [var.billing_supplier_address]
+}
+
+# US-102, FR-IAM-013 (staff invitation email through SES): off by default; when on, api and worker get
+# the provider, sender, https app URL and configuration set, and only the worker may send.
+run "email_off_by_default" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_EMAIL_PROVIDER"] == ["off"]
+      && !contains([for e in c.environment : e.name], "SOS_EMAIL_FROM")
+    ])
+    error_message = "Email is off unless configured."
+  }
+
+  assert {
+    condition     = length(module.ses) == 0 && output.ses == null
+    error_message = "No SES identity without email_domain."
+  }
+}
+
+run "email_through_ses" {
+  command = plan
+
+  variables {
+    email_provider = "ses"
+    email_domain   = "mail.staging.example.test"
+    email_from     = "SchoolOS <no-reply@mail.staging.example.test>"
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_EMAIL_PROVIDER"] == ["ses"]
+      && [for e in c.environment : e.value if e.name == "SOS_EMAIL_FROM"] == ["SchoolOS <no-reply@mail.staging.example.test>"]
+      && [for e in c.environment : e.value if e.name == "SOS_EMAIL_APP_URL"] == ["https://app.staging.example.test"]
+      && [for e in c.environment : e.value if e.name == "SOS_EMAIL_SES_CONFIGURATION_SET"] == ["sos-staging-email"]
+    ])
+    error_message = "api and worker get the SES provider, sender, https app URL and configuration set."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.beat.container_definition, module.worker_pdf.container_definition, module.migrate.container_definition] :
+      !contains([for e in c.environment : e.name], "SOS_EMAIL_PROVIDER")
+    ])
+    error_message = "Only api (queues) and worker (sends) know about email."
+  }
+
+  assert {
+    condition     = module.ses[0].posture.tls_policy == "REQUIRE" && module.ses[0].posture.default_config_set == "sos-staging-email" && toset(module.ses[0].posture.reputation_alarms) == toset(["bounce", "complaint"])
+    error_message = "The SES identity uses the configuration set with TLS required."
+  }
+}
+
+run "email_ses_needs_a_sender" {
+  command = plan
+
+  variables {
+    email_provider = "ses"
+    email_domain   = "mail.staging.example.test"
+  }
+
+  expect_failures = [var.email_from]
+}
+
+run "email_sender_in_the_domain" {
+  command = plan
+
+  variables {
+    email_domain = "mail.staging.example.test"
+    email_from   = "no-reply@elsewhere.example.test"
+  }
+
+  expect_failures = [var.email_from]
+}
+
+run "email_fake_refused" {
+  command = plan
+
+  variables {
+    email_provider = "fake"
+  }
+
+  expect_failures = [var.email_provider]
+}
+
+# ADR-0025 follow-up: CI publishes linux/amd64 images only, so every task and the pdf capacity run
+# x86_64 by default; a Graviton pdf capacity is refused unless the whole platform is ARM64.
+run "one_architecture_for_every_task" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for m in [module.web, module.api, module.worker, module.worker_pdf, module.beat, module.migrate, module.db_bootstrap] :
+      m.cpu_architecture == "X86_64"
+    ])
+    error_message = "Every task definition is X86_64, matching the amd64 images CI builds."
+  }
+
+  assert {
+    condition     = output.pdf_capacity.posture.ami_parameter == "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended/image_id"
+    error_message = "The pdf capacity uses the x86_64 ECS-optimized AMI (t3.medium)."
+  }
+}
+
+run "graviton_pdf_capacity_needs_arm64_everywhere" {
+  command = plan
+
+  variables {
+    pdf_worker = { instance_type = "t4g.medium" }
+  }
+
+  expect_failures = [var.pdf_worker]
 }

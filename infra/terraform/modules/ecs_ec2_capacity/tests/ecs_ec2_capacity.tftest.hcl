@@ -62,8 +62,8 @@ run "hardened_instances" {
   }
 
   assert {
-    condition     = output.posture.ami_parameter == "/aws/service/ecs/optimized-ami/amazon-linux-2023/arm64/recommended/image_id" && output.cpu_architecture == "ARM64"
-    error_message = "t4g selects the arm64 ECS-optimized Amazon Linux 2023 AMI from its public SSM parameter."
+    condition     = output.posture.ami_parameter == "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended/image_id" && output.cpu_architecture == "X86_64"
+    error_message = "Default t3.medium selects the x86_64 ECS-optimized Amazon Linux 2023 AMI (CI builds amd64 images only)."
   }
 
   assert {
@@ -171,4 +171,17 @@ run "name_must_not_use_reserved_prefixes" {
   }
 
   expect_failures = [var.name]
+}
+
+run "graviton_selects_arm64" {
+  command = plan
+
+  variables {
+    instance_type = "t4g.medium"
+  }
+
+  assert {
+    condition     = output.posture.ami_parameter == "/aws/service/ecs/optimized-ami/amazon-linux-2023/arm64/recommended/image_id" && output.cpu_architecture == "ARM64"
+    error_message = "t4g selects the arm64 ECS-optimized Amazon Linux 2023 AMI from its public SSM parameter."
+  }
 }

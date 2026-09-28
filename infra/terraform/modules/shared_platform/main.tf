@@ -38,7 +38,7 @@ locals {
   # apps/api/app/core/config.py reads, and each container gets them all so it passes the staging/prod
   # start-up guards on its own (no local-dev key wrapper, no dev-only secrets, no placeholder invoice
   # supplier). apps/api/tests/deploy/test_env_contract.py parses these maps and checks both rules.
-  app_env = {
+  app_env = merge({
     SOS_ENV             = var.env
     SOS_DEPLOYMENT_MODE = "shared"
     SOS_VERSION         = var.release_version
@@ -46,18 +46,40 @@ locals {
     SOS_S3_BUCKET_FILES = module.s3.files_bucket
     SOS_S3_BUCKET_AUDIT = module.s3.audit_bucket
     # SSE-KMS with the files bucket's CMK on every write and presigned POST (FR-DOC-003, SEC-011).
-    SOS_S3_KMS_KEY_ID               = local.kms_data
-    SOS_OIDC_ISSUER                 = module.cognito.tenant_issuer
-    SOS_OIDC_AUDIENCE               = module.cognito.tenant_client_id
-    SOS_PLATFORM_OIDC_ISSUER        = module.cognito.platform_issuer
-    SOS_PLATFORM_OIDC_AUDIENCE      = module.cognito.platform_client_id
+    SOS_S3_KMS_KEY_ID          = local.kms_data
+    SOS_OIDC_ISSUER            = module.cognito.tenant_issuer
+    SOS_OIDC_AUDIENCE          = module.cognito.tenant_client_id
+    SOS_PLATFORM_OIDC_ISSUER   = module.cognito.platform_issuer
+    SOS_PLATFORM_OIDC_AUDIENCE = module.cognito.platform_client_id
+    # Break-glass support sign-in (ADR-0023): the support app client of the operator pool. Issuer
+    # and JWKS are left to their defaults (SOS_PLATFORM_OIDC_*, the same pool), which the shared-tier
+    # config guard requires anyway.
+    SOS_SUPPORT_OIDC_AUDIENCE       = module.cognito.support_client_id
     SOS_KEY_WRAPPER                 = "kms"
     SOS_KMS_DATA_KEY_ARN            = local.kms_data
     SOS_AUDIT_SIGNING_KEY_ARN       = local.kms_signing
     SOS_BILLING_SUPPLIER_LEGAL_NAME = var.billing_supplier_legal_name
     SOS_BILLING_SUPPLIER_GSTIN      = var.billing_supplier_gstin
     SOS_BILLING_SUPPLIER_STATE_CODE = var.billing_supplier_state_code
+    SOS_BILLING_SUPPLIER_ADDRESS    = var.billing_supplier_address
     SOS_LOG_LEVEL                   = var.log_level
+  }, local.invoice_env)
+
+  # Staff invitation email (notifications.send_email runs in the worker; the api queues it). Only the
+  # api and worker get these; off by default. Links in emails point at the school app.
+  email_env = merge(
+    { SOS_EMAIL_PROVIDER = var.email_provider },
+    var.email_from == null ? {} : {
+      SOS_EMAIL_FROM                  = var.email_from
+      SOS_EMAIL_APP_URL               = "https://${var.app_domain}"
+      SOS_EMAIL_SES_CONFIGURATION_SET = one(module.ses[*].configuration_set_name)
+    },
+  )
+
+  # Invoice PDFs (docs/16 §5.8): a separate control-plane bucket only when configured; otherwise the
+  # app uses the files bucket under platform/invoices/.
+  invoice_env = var.platform_invoice_bucket == null ? {} : {
+    SOS_PLATFORM_INVOICE_BUCKET = var.platform_invoice_bucket
   }
 
   # Secrets every app container needs to start: the guarded settings and the broker.
@@ -215,17 +237,22 @@ module "secrets" {
 
 # --- Identity ---------------------------------------------------------------------------
 
+# Redirect and sign-out URLs match what the BFF sends: it builds every one of them from APP_BASE_URL
+# (https://app_domain), operators included (apps/web/src/server/config.ts).
 module "cognito" {
   source = "../cognito"
 
   name_prefix            = local.name
   tenant_domain_prefix   = "${var.cognito_domain_prefix}-schools"
   tenant_callback_urls   = ["https://${var.app_domain}${var.bff_callback_path}"]
-  tenant_logout_urls     = ["https://${var.app_domain}/"]
+  tenant_logout_urls     = ["https://${var.app_domain}/signed-out"]
   create_platform_pool   = true
   platform_domain_prefix = "${var.cognito_domain_prefix}-ops"
-  platform_callback_urls = ["https://${var.admin_domain}${var.platform_callback_path}"]
-  platform_logout_urls   = ["https://${var.admin_domain}/"]
+  platform_callback_urls = ["https://${var.app_domain}${var.platform_callback_path}"]
+  platform_logout_urls   = ["https://${var.app_domain}/signed-out?kind=operator"]
+  create_support_client  = true
+  support_callback_urls  = ["https://${var.app_domain}/bff/auth/support/callback"]
+  support_logout_urls    = ["https://${var.app_domain}/signed-out?kind=support"]
   deletion_protection    = var.rds_deletion_protection ? "ACTIVE" : "INACTIVE"
   ses_email_identity_arn = var.ses_email_identity_arn
   from_email_address     = var.from_email_address
@@ -233,6 +260,22 @@ module "cognito" {
   secret_name_prefix     = local.secret_ns
   logs_kms_key_arn       = local.kms_logs
   tags                   = var.tags
+}
+
+# --- Email (staff invitations, US-102) ------------------------------------------------------------
+# SES v2 domain identity with Easy DKIM + default configuration set; reputation alarms to the ops topic.
+# The account starts in the SES sandbox: request production access by hand (docs/10 §5.2).
+
+module "ses" {
+  source = "../ses_email"
+  count  = var.email_domain == null ? 0 : 1
+
+  name_prefix       = local.name
+  domain            = var.email_domain
+  route53_zone_id   = var.email_route53_zone_id
+  reputation_alarms = true
+  alarm_topic_arn   = module.observability.alarm_topic_arn
+  tags              = var.tags
 }
 
 # --- Edge ---------------------------------------------------------------------------------
@@ -335,6 +378,16 @@ data "aws_iam_policy_document" "api" {
       values   = ["SchoolOS"]
     }
   }
+
+  # Optional separate invoice bucket (platform_invoice_bucket): the same prefix as in the files bucket.
+  dynamic "statement" {
+    for_each = var.platform_invoice_bucket == null ? [] : [var.platform_invoice_bucket]
+    content {
+      sid       = "InvoicePdfBucketObjects"
+      actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+      resources = ["arn:aws:s3:::${statement.value}/platform/invoices/*"]
+    }
+  }
 }
 
 data "aws_iam_policy_document" "worker" {
@@ -360,6 +413,22 @@ data "aws_iam_policy_document" "worker" {
     actions   = ["kms:Sign", "kms:GetPublicKey"]
     resources = [local.kms_signing]
   }
+
+  # Staff invitation email: notifications.send_email (worker) sends through the SES identity and its
+  # configuration set only, from the sending domain only.
+  dynamic "statement" {
+    for_each = var.email_provider == "ses" ? [1] : []
+    content {
+      sid       = "SesSendInvitations"
+      actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+      resources = [one(module.ses[*].identity_arn), one(module.ses[*].configuration_set_arn)]
+      condition {
+        test     = "StringLike"
+        variable = "ses:FromAddress"
+        values   = ["*@${coalesce(var.email_domain, "invalid.invalid")}"]
+      }
+    }
+  }
 }
 
 # --- Services -------------------------------------------------------------------------------
@@ -367,6 +436,7 @@ data "aws_iam_policy_document" "worker" {
 module "web" {
   source = "../ecs_service"
 
+  cpu_architecture       = var.cpu_architecture
   name                   = "${local.name}-web"
   cluster_arn            = module.cluster.arn
   cluster_name           = module.cluster.name
@@ -400,6 +470,8 @@ module "web" {
     OIDC_CLIENT_ID          = module.cognito.tenant_client_id
     PLATFORM_OIDC_ISSUER    = module.cognito.platform_issuer
     PLATFORM_OIDC_CLIENT_ID = module.cognito.platform_client_id
+    # Break-glass support sign-in (ADR-0023); the issuer defaults to PLATFORM_OIDC_ISSUER (same pool).
+    SUPPORT_OIDC_CLIENT_ID = module.cognito.support_client_id
     # Origin of presigned upload/preview URLs (CSP connect-src + img-src, SEC-010/SEC-016).
     FILES_ORIGIN = module.s3.files_browser_origin
   }
@@ -408,11 +480,13 @@ module "web" {
     SOS_SERVICE_TOKEN_KEY       = local.rnd_secret["service_token_key"]
     OIDC_CLIENT_SECRET          = module.cognito.tenant_client_secret_arn
     PLATFORM_OIDC_CLIENT_SECRET = module.cognito.platform_client_secret_arn
+    SUPPORT_OIDC_CLIENT_SECRET  = module.cognito.support_client_secret_arn
     REDIS_URL                   = "${module.redis.secret_arn}:url::"
   }
   secret_arns = [
     local.rnd_secret["session_secret"], local.rnd_secret["service_token_key"],
-    module.cognito.tenant_client_secret_arn, module.cognito.platform_client_secret_arn, module.redis.secret_arn,
+    module.cognito.tenant_client_secret_arn, module.cognito.platform_client_secret_arn,
+    module.cognito.support_client_secret_arn, module.redis.secret_arn,
   ]
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
@@ -423,6 +497,7 @@ module "web" {
 module "api" {
   source = "../ecs_service"
 
+  cpu_architecture       = var.cpu_architecture
   name                   = "${local.name}-api"
   cluster_arn            = module.cluster.arn
   cluster_name           = module.cluster.name
@@ -453,7 +528,7 @@ module "api" {
     client_alias_port = 8000
   }
 
-  environment             = merge(local.app_env, { SOS_SERVICE_NAME = "api" })
+  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "api" })
   secrets                 = merge(local.app_base_secrets, local.provider_secrets)
   secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
   secrets_kms_key_arns    = [local.kms_data]
@@ -467,6 +542,7 @@ module "api" {
 module "worker" {
   source = "../ecs_service"
 
+  cpu_architecture       = var.cpu_architecture
   name                   = "${local.name}-worker"
   cluster_arn            = module.cluster.arn
   cluster_name           = module.cluster.name
@@ -486,7 +562,7 @@ module "worker" {
   enable_execute_command = var.enable_execute_command
   service_connect        = { namespace_arn = module.cluster.service_connect_namespace_arn }
 
-  environment             = merge(local.app_env, { SOS_SERVICE_NAME = "worker" })
+  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "worker" })
   secrets                 = merge(local.app_base_secrets, local.provider_secrets)
   secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
   secrets_kms_key_arns    = [local.kms_data]
@@ -535,6 +611,7 @@ module "worker_pdf" {
 module "beat" {
   source = "../ecs_service"
 
+  cpu_architecture = var.cpu_architecture
   name             = "${local.name}-beat"
   cluster_arn      = module.cluster.arn
   cluster_name     = module.cluster.name
@@ -565,6 +642,7 @@ module "beat" {
 module "migrate" {
   source = "../ecs_service"
 
+  cpu_architecture = var.cpu_architecture
   name             = "${local.name}-migrate"
   create_service   = false
   cluster_arn      = module.cluster.arn
@@ -595,6 +673,7 @@ module "migrate" {
 module "db_bootstrap" {
   source = "../ecs_service"
 
+  cpu_architecture = var.cpu_architecture
   name             = "${local.name}-db-bootstrap"
   create_service   = false
   cluster_arn      = module.cluster.arn

@@ -56,6 +56,9 @@ output "oidc" {
     issuer        = module.cognito.tenant_issuer
     client_id     = module.cognito.tenant_client_id
     hosted_domain = module.cognito.tenant_hosted_domain
+    # Break-glass support client in the operator pool (null = support sign-in off).
+    support_issuer    = one(module.support[*].issuer)
+    support_client_id = one(module.support[*].client_id)
   }
 }
 

@@ -35,15 +35,15 @@ variable "cognito_domain_prefix" {
 }
 
 variable "bff_callback_path" {
-  description = "BFF OIDC callback path for school staff."
+  description = "BFF OIDC callback path for school staff (apps/web: /bff/auth/callback)."
   type        = string
-  default     = "/api/auth/callback"
+  default     = "/bff/auth/callback"
 }
 
 variable "platform_callback_path" {
-  description = "BFF OIDC callback path for platform operators."
+  description = "BFF OIDC callback path for platform operators, on app_domain like every BFF route (apps/web: /bff/auth/platform/callback)."
   type        = string
-  default     = "/api/auth/platform/callback"
+  default     = "/bff/auth/platform/callback"
 }
 
 variable "ses_email_identity_arn" {
@@ -189,10 +189,21 @@ variable "worker_queues" {
   }
 }
 
+variable "cpu_architecture" {
+  description = "CPU architecture of every Fargate task (web, api, worker, beat, migrate, db-bootstrap). X86_64 because CI builds linux/amd64 images only (docker build on x86 runners, no multi-arch manifest); switch to ARM64 only together with arm64 images and a Graviton pdf_worker.instance_type."
+  type        = string
+  default     = "X86_64"
+
+  validation {
+    condition     = contains(["X86_64", "ARM64"], var.cpu_architecture)
+    error_message = "cpu_architecture must be X86_64 or ARM64."
+  }
+}
+
 variable "pdf_worker" {
-  description = "The worker-pdf service (queue pdf) and its EC2 capacity whose Docker daemon allows Chromium's sandbox (ADR-0025 option A). A Graviton instance type means ARM64 tasks (the worker image must be built for it). concurrency = Celery processes (one Chromium each)."
+  description = "The worker-pdf service (queue pdf) and its EC2 capacity whose Docker daemon allows Chromium's sandbox (ADR-0025 option A). Default t3.medium (x86_64): the worker image is linux/amd64 only. A Graviton type (t4g, c7g...) means ARM64 tasks and needs cpu_architecture = ARM64 and arm64 images. concurrency = Celery processes (one Chromium each)."
   type = object({
-    instance_type = optional(string, "t4g.medium")
+    instance_type = optional(string, "t3.medium")
     min_instances = optional(number, 1)
     max_instances = optional(number, 2)
     cpu           = optional(number, 1024)
@@ -205,6 +216,11 @@ variable "pdf_worker" {
   validation {
     condition     = var.pdf_worker.max_instances >= 1 && var.pdf_worker.min_instances <= var.pdf_worker.max_instances && var.pdf_worker.concurrency >= 1
     error_message = "pdf_worker: 1 <= max_instances, min_instances <= max_instances, concurrency >= 1."
+  }
+
+  validation {
+    condition     = (can(regex("^[a-z]+[0-9]+[a-z]*g[a-z]*\\.", var.pdf_worker.instance_type)) ? "ARM64" : "X86_64") == var.cpu_architecture
+    error_message = "pdf_worker.instance_type must match cpu_architecture (one worker image for both): x86 types (t3, m6i...) with X86_64, Graviton types (t4g, m7g...) with ARM64."
   }
 }
 
@@ -315,6 +331,75 @@ variable "billing_supplier_state_code" {
   validation {
     condition     = can(regex("^[0-9]{2}$", var.billing_supplier_state_code))
     error_message = "billing_supplier_state_code is two digits, e.g. 37."
+  }
+}
+
+variable "billing_supplier_address" {
+  description = "Supplier registered address printed on invoice PDFs (SOS_BILLING_SUPPLIER_ADDRESS; CGST Rule 46(a)); ';' separates printed lines. No default: staging/prod refuse to render invoices with the app's dev placeholder."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.billing_supplier_address)) >= 10 && length(var.billing_supplier_address) <= 300
+    error_message = "billing_supplier_address is the registered postal address (10-300 characters)."
+  }
+
+  validation {
+    condition     = !startswith(var.billing_supplier_address, "Synthetic supplier address (dev)")
+    error_message = "billing_supplier_address is the app's dev placeholder; staging/prod refuse to render invoices with it."
+  }
+}
+
+variable "platform_invoice_bucket" {
+  description = "Optional control-plane bucket for invoice PDFs (SOS_PLATFORM_INVOICE_BUCKET). Null = the files bucket under platform/invoices/ (never a school prefix). A separate bucket must be private, in ap-south-1 and encrypted with the data CMK (the app writes with SOS_S3_KMS_KEY_ID)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.platform_invoice_bucket == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.platform_invoice_bucket))
+    error_message = "platform_invoice_bucket must be an S3 bucket name, or null."
+  }
+}
+
+variable "email_provider" {
+  description = "Staff invitation email (SOS_EMAIL_PROVIDER): off (default) or ses. The fake provider is local/CI only (staging/prod refuse it)."
+  type        = string
+  default     = "off"
+
+  validation {
+    condition     = contains(["off", "ses"], var.email_provider)
+    error_message = "email_provider must be off or ses (fake is refused in staging/prod)."
+  }
+}
+
+variable "email_domain" {
+  description = "SES sending domain (Easy DKIM identity, modules/ses_email), e.g. mail.schoolos.in. Null = no SES identity. Needed before email_provider = ses."
+  type        = string
+  default     = null
+}
+
+variable "email_route53_zone_id" {
+  description = "Hosted zone of email_domain for the three DKIM CNAMEs (null = publish them by hand from the ses output)."
+  type        = string
+  default     = null
+}
+
+variable "email_from" {
+  description = "Sender (SOS_EMAIL_FROM), e.g. \"SchoolOS <no-reply@mail.schoolos.in>\"; its address must be in email_domain."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.email_provider == "off" || (var.email_from != null && var.email_domain != null)
+    error_message = "email_provider = ses needs email_domain (the SES identity) and email_from."
+  }
+
+  validation {
+    condition = var.email_from == null || (
+      var.email_domain != null
+      && can(regex("^([^<>]*<)?[A-Za-z0-9._%+-]+@([a-z0-9.-]+)>?$", var.email_from))
+      && try(endswith(lower(regex("@([^>]+)>?$", var.email_from)[0]), var.email_domain), false)
+    )
+    error_message = "email_from must be an address (optionally 'Name <address>') in email_domain."
   }
 }
 

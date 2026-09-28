@@ -9,7 +9,7 @@ tenant_id     = "<tenant UUID shown by the platform panel>"
 domain        = "svhs-guntur.<your-domain>"
 custom_domain = "" # e.g. "office.svhs.edu.in" (the school adds an A record to the Elastic IP)
 acme_email    = "<ops@your-domain>"
-instance_type = "t4g.medium"
+instance_type = "t3.medium" # x86_64: release images are linux/amd64 only
 
 release_version = "2026.10.1"
 bundle_sha256   = "<sha256 from the release notes>"
@@ -18,6 +18,9 @@ bundle_sha256   = "<sha256 from the release notes>"
 artifacts_bucket      = "sos-prod-artifacts-<PROD_ACCOUNT_ID>"
 artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<DATA_KEY_ID>"
 control_plane_url     = "https://app.<your-domain>"
+
+# Break-glass support sign-in (ADR-0023): prod output oidc.platform_user_pool_id; null = off.
+operator_user_pool_id = null
 
 route53_zone_id = null
 walg_enabled    = false

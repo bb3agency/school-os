@@ -253,9 +253,21 @@ def synthetic_value(name: str) -> str:
         "SOS_DEPLOYMENT_ID": SYNTHETIC_DEPLOYMENT,
         "AWS_REGION": "ap-south-1",
         "SOS_LOG_LEVEL": "INFO",
+        # Email on (the stricter start-up path): Terraform's `email_provider` is off or ses.
+        "SOS_EMAIL_PROVIDER": "ses",
+        "SOS_EMAIL_FROM": "SchoolOS <no-reply@mail.example.test>",
+        "SOS_EMAIL_APP_URL": "https://app.example.test",
+        "SOS_EMAIL_SES_CONFIGURATION_SET": "sos-staging-email",
+        "SOS_BILLING_SUPPLIER_ADDRESS": "Synthetic Plot 1; Synthetic Road; Vijayawada 520001",
     }
     if name in values:
         return values[name]
+    if name.endswith("_ISSUER"):
+        # Cognito issuers are public https URLs (the support-client guard checks that in
+        # staging/prod);
+        # one pool per name, so the staff and operator issuers differ as they do in reality.
+        pool = name.removeprefix("SOS_").removesuffix("_OIDC_ISSUER").replace("_", "") or "STAFF"
+        return f"https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_{pool.title()}Pool"
     if name.endswith("_ARN"):
         return "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
     return synthetic_secret(name)
@@ -289,7 +301,8 @@ def build_settings(monkeypatch: pytest.MonkeyPatch, env: Mapping[str, str]) -> S
 
 @pytest.mark.parametrize("service", APP_CONTAINERS)
 def test_SEC_009_dedicated_compose_passes_only_settings_names(service: str) -> None:
-    unknown = set(compose_env(service)) - settings_env_names() - set(NOT_SETTINGS)
+    known = settings_env_names() | set(NOT_SETTINGS)
+    unknown = set(compose_env(service)) - known
     assert not unknown, f"compose service {service} sets names config.py never reads: {unknown}"
 
 
@@ -354,6 +367,124 @@ def test_NFR_AVL_002_shared_tier_tasks_start(
     assert settings.version != "0.0.0-dev"
     if module == "migrate":
         assert "dev-only" not in settings.migrator_database_url.get_secret_value()
+
+
+# --- break-glass support sign-in (ADR-0023 option C) ---------------------------------------------
+
+
+@pytest.mark.parametrize("module", SHARED_TASKS)
+def test_US_103_shared_tier_tasks_know_the_support_client(module: str) -> None:
+    """The support app client of the operator pool is created per environment (modules/cognito,
+    create_support_client) and every app container gets its audience; the issuer and JWKS stay at
+    their defaults (the operator pool), which the shared-tier guard requires."""
+    env = shared_hcl().container_env(module)
+    assert env.get("SOS_SUPPORT_OIDC_AUDIENCE") == "module.cognito.support_client_id"
+    assert "SOS_SUPPORT_OIDC_ISSUER" not in env
+    assert "SOS_SUPPORT_OIDC_JWKS_URI" not in env
+    assert shared_hcl().block("module", "cognito")["create_support_client"] == "true"
+
+
+@pytest.mark.parametrize("env", ["staging", "prod"])
+@pytest.mark.parametrize("module", ["api", "worker"])
+def test_US_103_shared_tier_support_sign_in_is_on(
+    module: str, env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = build_settings(monkeypatch, terraform_container_env(module, env))
+    assert settings.support_enabled, "break-glass support sign-in is configured (ADR-0023)"
+    assert settings.resolved_support_issuer == settings.platform_oidc_issuer
+    assert settings.support_oidc_audience not in (
+        settings.oidc_audience,
+        settings.platform_oidc_audience,
+    )
+
+
+def test_US_103_shared_tier_web_gets_the_support_client() -> None:
+    """apps/web/src/server/config.ts: SUPPORT_OIDC_CLIENT_ID (+ secret) turns support sign-in on;
+    SUPPORT_OIDC_ISSUER defaults to PLATFORM_OIDC_ISSUER. The secret comes from Secrets Manager."""
+    attrs = shared_hcl().block("module", "web")
+    environment = shared_hcl().map_entries(attrs["environment"])
+    secrets = shared_hcl().map_entries(attrs["secrets"])
+    assert environment.get("SUPPORT_OIDC_CLIENT_ID") == "module.cognito.support_client_id"
+    assert secrets.get("SUPPORT_OIDC_CLIENT_SECRET") == "module.cognito.support_client_secret_arn"
+    assert "SUPPORT_OIDC_CLIENT_SECRET" not in environment
+    assert "module.cognito.support_client_secret_arn" in attrs["secret_arns"]
+
+
+@pytest.mark.parametrize("service", ["api", "worker"])
+def test_US_103_dedicated_support_sign_in_is_off_by_default(
+    service: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A host without its own support client keeps break-glass access unusable (fail closed)."""
+    host_env = dedicated_host_env()
+    assert host_env["SOS_SUPPORT_OIDC_AUDIENCE"] == ""
+    env = {k: interpolate(v, host_env) for k, v in compose_env(service).items()}
+    settings = build_settings(monkeypatch, env)
+    assert not settings.support_enabled
+
+
+@pytest.mark.parametrize("service", ["api", "worker"])
+def test_US_103_dedicated_support_sign_in_when_configured(
+    service: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Terraform (envs/dedicated-template operator_user_pool_id) fills the three host.env values;
+    the containers then accept the prod operator pool's support tokens for this host only."""
+    host_env = dedicated_host_env()
+    operator_issuer = "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_OperatorPool"
+    host_env.update(
+        SOS_SUPPORT_OIDC_ISSUER=operator_issuer,
+        SOS_SUPPORT_OIDC_AUDIENCE="dedicatedsupportclientid",
+        SUPPORT_OIDC_CLIENT_ID="dedicatedsupportclientid",
+    )
+    env = {k: interpolate(v, host_env) for k, v in compose_env(service).items()}
+    settings = build_settings(monkeypatch, env)
+    assert settings.support_enabled
+    assert settings.resolved_support_issuer == operator_issuer
+    assert settings.resolved_support_issuer != settings.oidc_issuer
+    web = {k: interpolate(v, host_env) for k, v in compose_env("web").items()}
+    assert web["SUPPORT_OIDC_CLIENT_ID"] == "dedicatedsupportclientid"
+    assert web["SUPPORT_OIDC_ISSUER"] == operator_issuer
+    assert web["SUPPORT_OIDC_CLIENT_SECRET"] == host_env["SUPPORT_OIDC_CLIENT_SECRET"]
+
+
+def test_US_103_dedicated_support_client_is_created_in_the_operator_pool() -> None:
+    """envs/dedicated-template creates the host's own support client (callbacks on its hosts) and
+    passes issuer, client ID and secret ARN to the host module (cloud-init host.env)."""
+    root = REPO / "infra" / "terraform" / "envs" / "dedicated-template"
+    hcl = Hcl(root / "main.tf", root / "variables.tf")
+    support = hcl.block("module", "support")
+    assert support["source"] == '"../../modules/cognito_support_client"'
+    assert "var.operator_user_pool_id" in support["user_pool_id"]
+    assert "/bff/auth/support/callback" in support["callback_urls"]
+    host = hcl.block("module", "host")
+    for name in ("support_oidc_issuer", "support_oidc_client_id", "support_oidc_client_secret_arn"):
+        assert "module.support" in host[name], name
+    text = CLOUD_INIT.read_text(encoding="utf-8")
+    for line in (
+        "SOS_SUPPORT_OIDC_ISSUER=${support_oidc_issuer}",
+        "SOS_SUPPORT_OIDC_AUDIENCE=${support_oidc_client_id}",
+        "SUPPORT_OIDC_CLIENT_ID=${support_oidc_client_id}",
+        "SUPPORT_OIDC_CLIENT_SECRET=${support_oidc_client_secret_arn}",
+    ):
+        assert line in text, line
+
+
+# --- staff invitation email (US-102, FR-IAM-013) --------------------------------------------------
+
+
+def test_US_102_email_settings_reach_only_api_and_worker() -> None:
+    """The api queues invitation emails and the worker sends them (notifications.send_email);
+    staging/prod refuse the fake provider and non-https links, so the link is the https app URL."""
+    hcl = shared_hcl()
+    email = hcl.map_entries(hcl.locals["email_env"])
+    assert email["SOS_EMAIL_PROVIDER"] == "var.email_provider"
+    assert email["SOS_EMAIL_APP_URL"] == '"https://${var.app_domain}"'
+    assert "module.ses" in email["SOS_EMAIL_SES_CONFIGURATION_SET"]
+    assert "off" in hcl.var_defaults["email_provider"]
+    for module in ("api", "worker"):
+        assert "local.email_env" in hcl.block("module", module)["environment"], module
+        assert "SOS_EMAIL_PROVIDER" in hcl.container_env(module)
+    for module in ("worker_pdf", "beat", "migrate"):
+        assert "SOS_EMAIL_PROVIDER" not in hcl.container_env(module), module
 
 
 def test_SEC_009_guard_really_refuses_a_bare_task(monkeypatch: pytest.MonkeyPatch) -> None:

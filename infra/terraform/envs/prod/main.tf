@@ -11,6 +11,12 @@ module "platform" {
   billing_supplier_legal_name = var.billing_supplier_legal_name
   billing_supplier_gstin      = var.billing_supplier_gstin
   billing_supplier_state_code = var.billing_supplier_state_code
+  billing_supplier_address    = var.billing_supplier_address
+  platform_invoice_bucket     = var.platform_invoice_bucket
+  email_provider              = var.email_provider
+  email_domain                = var.email_domain
+  email_route53_zone_id       = var.email_route53_zone_id
+  email_from                  = var.email_from
 
   app_domain             = var.app_domain
   admin_domain           = var.admin_domain
@@ -98,5 +104,6 @@ module "security" {
 
   alert_emails                       = coalesce(var.security_alert_emails, var.alarm_emails)
   securityhub_alert_labels           = var.securityhub_alert_labels
+  securityhub_control_exceptions     = var.securityhub_control_exceptions
   guardduty_runtime_agent_management = var.guardduty_runtime_agent_management
 }

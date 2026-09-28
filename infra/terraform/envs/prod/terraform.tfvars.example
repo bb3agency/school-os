@@ -18,6 +18,16 @@ from_email_address     = null
 billing_supplier_legal_name = "<registered legal name>"
 billing_supplier_gstin      = "<15-character GSTIN>"
 billing_supplier_state_code = "37"
+billing_supplier_address    = "<registered address; lines separated by ;>"
+# platform_invoice_bucket   = null # optional separate invoice-PDF bucket (docs/16 §5.8)
+
+# Staff invitation email via SES (US-102; docs/10 §5.2). 1) set email_domain and apply, 2) publish the
+# DKIM CNAMEs (terraform output ses) unless email_route53_zone_id manages them, 3) request SES
+# production access, 4) set email_from and email_provider = "ses" and apply.
+email_provider = "off"
+# email_domain          = "mail.<your-domain>"
+# email_route53_zone_id = null
+# email_from            = "SchoolOS <no-reply@mail.<your-domain>>"
 
 alarm_emails       = ["<oncall@your-domain>"]
 # SEC-023 security alerts (GuardDuty High, critical Security Hub findings, logging tampering).
