@@ -1,9 +1,12 @@
-import { HomeView } from "@/features/school/HomeView";
+import { HomeScreen } from "@/features/school/HomeView";
 import { pageMetadata } from "@/lib/metadata";
 
 export const generateMetadata = pageMetadata((t) => t("school.home.title"));
 
-/** School home. Summary counts come from the BFF in a later task. */
+/**
+ * School home: KPI row and work waiting from existing endpoints (dq summary, pending change
+ * requests, recent imports), each only for members who can open that screen.
+ */
 export default function SchoolHomePage() {
-  return <HomeView summary={null} />;
+  return <HomeScreen />;
 }

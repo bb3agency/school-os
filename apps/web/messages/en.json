@@ -158,9 +158,60 @@
       "checksToReview": "Checks to review",
       "changesWaiting": "Changes waiting for approval",
       "recentImports": "Recent imports",
-      "cardHint": "Appears once your student records are imported.",
       "gettingStartedTitle": "Getting started",
-      "gettingStartedBody": "Set up your academic years, classes and sections first. Then invite your office staff."
+      "gettingStartedBody": "Four steps to get your school ready. Each one opens the screen where you do it.",
+      "eyebrow": "Today at your school",
+      "greeting": "Hello, {name}. Here is the work waiting for you.",
+      "askAction": "Ask the school",
+      "kpi": {
+        "label": "Key numbers",
+        "blockers": "Blocking problems",
+        "blockersNote": "Must be fixed before a portal submission",
+        "warnings": "Warnings",
+        "warningsNote": "Worth checking, not blocking",
+        "studentsAffected": "Students with blocking problems",
+        "studentsAffectedNote": "From the latest checks",
+        "pendingNote": "Identity changes waiting for a second person"
+      },
+      "work": {
+        "title": "Work waiting",
+        "loadError": "This could not be loaded. Reload the page to try again.",
+        "checksAction": "Review checks",
+        "checksNone": "No open problems. Run the checks again after each import.",
+        "checksBody": "{blockers} blocking problems and {warnings} warnings are open.",
+        "lastRun": "Checks last ran on {time}.",
+        "neverRun": "The checks have not run yet.",
+        "changesAction": "Open change requests",
+        "changesNone": "No changes are waiting for approval.",
+        "changesBody": "{count, plural, one {1 change is waiting for approval.} other {{shown} changes are waiting for approval.}}",
+        "changesNote": "Someone other than the person who asked must approve each change.",
+        "importsAction": "Open imports",
+        "importsNone": "No imports yet. Start with your admission register spreadsheet.",
+        "rows": "{count, plural, one {# row} other {# rows}}"
+      },
+      "steps": {
+        "label": "Steps to get started",
+        "startHere": "Start here:",
+        "next": "Next:",
+        "structure": {
+          "title": "Set up academic years, classes and sections",
+          "body": "Records, registers and reports use this structure."
+        },
+        "users": {
+          "title": "Invite your office staff",
+          "body": "Each person signs in with their own account and gets a role."
+        },
+        "import": {
+          "title": "Import student records",
+          "body": "Upload the admission register as an Excel or CSV file. You can undo an import for 24 hours."
+        },
+        "checks": {
+          "title": "Run the checks and fix problems",
+          "body": "SchoolOS compares your records with other sources and lists what does not match."
+        }
+      },
+      "nothingTitle": "Nothing is waiting for you",
+      "nothingBody": "Use the menu to open students, documents or other screens."
     },
     "structure": {
       "title": "School structure",

@@ -11,9 +11,11 @@ import {
   uninstallBffStub,
   type BffStub,
 } from "@/test/bff-stub";
-import { messages, renderWithIntl } from "@/test/render";
+import { me } from "@/test/records-fixtures";
+import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { AnnouncementBanner, resetDismissedAnnouncements } from "./AnnouncementBanner";
 import { BillingScreen } from "./BillingView";
+import { HomeScreen } from "./HomeView";
 import { SupportScreen, SupportTicketScreen } from "./SupportScreens";
 
 /** School-side screens (US-1204, FR-PLT-026, FR-PLT-027, FR-IAM-013). Synthetic data only. */
@@ -27,6 +29,99 @@ beforeEach(() => {
   resetDismissedAnnouncements();
 });
 afterEach(uninstallBffStub);
+
+describe("school home (dashboard)", () => {
+  const IMPORT = {
+    id: "0192f3a4-0000-7000-8000-00000000b001",
+    status: "committed",
+    source: "admission_register",
+    row_count: 412,
+    error_count: 0,
+    created_at: "2026-09-20T05:00:00Z",
+    created_by: "0192f3a4-0000-7000-8000-00000000c001",
+    committed_at: "2026-09-20T05:10:00Z",
+    reverted_at: null,
+  };
+
+  it("shows only numbers the API returns, with work waiting and clear actions", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json(
+        me(["dq.findings.read", "student.identity_change.approve", "import.run", "kb.ask"]),
+      );
+    stub.routes["GET /bff/api/v1/dq/summary"] = () =>
+      Response.json({
+        blockers: 12,
+        warnings: 30,
+        students_with_blockers: 9,
+        by_rule: [],
+        by_severity: {},
+        last_run: null,
+        profile_key: null,
+      });
+    stub.routes["GET /bff/api/v1/change-requests"] = () =>
+      Response.json({ data: [{}, {}, {}], next_cursor: null });
+    stub.routes["GET /bff/api/v1/imports"] = () => page([IMPORT]);
+    renderWithIntl(<HomeScreen />);
+
+    expect(await screen.findByText(/Hello, Office Clerk/)).toBeVisible();
+    const kpis = screen.getByRole("region", { name: sm.home.kpi.label });
+    expect(
+      await within(kpis).findByRole("group", { name: sm.home.kpi.blockers }),
+    ).toHaveTextContent("12");
+    expect(within(kpis).getByRole("group", { name: sm.home.kpi.warnings })).toHaveTextContent("30");
+    expect(within(kpis).getByRole("group", { name: sm.home.changesWaiting })).toHaveTextContent(
+      "3",
+    );
+    expect(await screen.findByText("3 changes are waiting for approval.")).toBeVisible();
+    expect(screen.getByRole("link", { name: sm.home.work.checksAction })).toHaveAttribute(
+      "href",
+      "/en/findings",
+    );
+    expect(await screen.findByRole("link", { name: "Admission register" })).toHaveAttribute(
+      "href",
+      `/en/imports/${IMPORT.id}`,
+    );
+    // Only pending requests are counted, from one page.
+    const call = stub.callsTo("GET /bff/api/v1/change-requests")[0];
+    expect(call?.url.searchParams.get("status")).toBe("pending");
+    // The school has imports: no getting-started steps.
+    expect(screen.queryByRole("list", { name: sm.home.steps.label })).toBeNull();
+    expect(intlErrors).toEqual([]);
+  });
+
+  it("without those permissions: no numbers and no API calls, only the getting-started steps", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["student.read_basic"]));
+    renderWithIntl(<HomeScreen />, "te");
+    expect(
+      await screen.findByRole("list", { name: messages.te.school.home.steps.label }),
+    ).toBeVisible();
+    expect(screen.queryByRole("region", { name: messages.te.school.home.kpi.label })).toBeNull();
+    expect(stub.callsTo("GET /bff/api/v1/dq/summary")).toHaveLength(0);
+    expect(stub.callsTo("GET /bff/api/v1/change-requests")).toHaveLength(0);
+    expect(stub.callsTo("GET /bff/api/v1/imports")).toHaveLength(0);
+    expect(intlErrors).toEqual([]);
+  });
+
+  it("more pending requests than one page reads as '200+', and a failed load shows '—'", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json(me(["dq.findings.read", "student.identity_change.request"]));
+    stub.routes["GET /bff/api/v1/dq/summary"] = () => problem(500, "internal_error");
+    stub.routes["GET /bff/api/v1/change-requests"] = () =>
+      Response.json({ data: Array.from({ length: 200 }, () => ({})), next_cursor: "next" });
+    renderWithIntl(<HomeScreen />);
+    const kpis = await screen.findByRole("region", { name: sm.home.kpi.label });
+    await waitFor(() =>
+      expect(within(kpis).getByRole("group", { name: sm.home.changesWaiting })).toHaveTextContent(
+        "200+",
+      ),
+    );
+    await waitFor(() =>
+      expect(within(kpis).getByRole("group", { name: sm.home.kpi.blockers })).toHaveTextContent(
+        "—",
+      ),
+    );
+  });
+});
 
 describe("Plan and billing (FR-PLT-030)", () => {
   it("shows the plan, usage against limits and invoices", async () => {
