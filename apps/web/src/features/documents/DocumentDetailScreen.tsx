@@ -40,7 +40,6 @@ import {
 import {
   acceptFor,
   DOC_LANGUAGES,
-  docTypesFor,
   DOCUMENT_PERM,
   ifMatch,
   MAX_ISSUER,
@@ -286,7 +285,9 @@ function EditDetails({ doc }: { doc: DocumentDetail }) {
   const ttype = useTranslations("documents.docType");
   const tlang = useTranslations("documents.language");
   const api = useBffClient("staff");
-  const types = docTypesFor(doc.purpose);
+  // The API lists the types that suit the purpose (the PATCH check uses the same rule).
+  const allowed = doc.allowed_doc_types ?? [];
+  const types = allowed.length > 0 ? allowed : [doc.doc_type];
   return (
     <ActionDialog
       triggerLabel={t("trigger")}

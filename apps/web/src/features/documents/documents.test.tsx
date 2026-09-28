@@ -23,7 +23,7 @@ import { DocumentsScreen } from "./DocumentsScreen";
 import { parseDeletedNotice, parseDocumentListFilters } from "./filters";
 import { NewDocumentScreen } from "./NewDocumentScreen";
 import { documentEditSchema, documentPatchBody } from "./forms";
-import { docTypesFor, purposeFor, versionBadge, versionReason } from "./types";
+import { purposeFor, versionBadge, versionReason } from "./types";
 import { checkFile, contentTypeFor, setDocumentStorageSendForTesting } from "./upload";
 
 const push = vi.hoisted(() => vi.fn());
@@ -91,6 +91,16 @@ function detail(overrides: Partial<Schemas["DocumentDetail"]> = {}): Schemas["Do
     created_at: "2026-09-20T05:00:00Z",
     updated_at: "2026-09-21T05:00:00Z",
     version: 3,
+    allowed_doc_types: [
+      "circular",
+      "policy",
+      "minutes",
+      "certificate",
+      "letter",
+      "form",
+      "report",
+      "other",
+    ],
     ...overrides,
     versions,
   };
@@ -99,6 +109,7 @@ function detail(overrides: Partial<Schemas["DocumentDetail"]> = {}): Schemas["Do
 function row(overrides: Partial<Schemas["DocumentDetail"]> = {}): Schemas["DocumentOut"] {
   const full: Partial<Schemas["DocumentDetail"]> = detail(overrides);
   delete full.versions;
+  delete full.allowed_doc_types;
   return full as Schemas["DocumentOut"];
 }
 
@@ -505,20 +516,34 @@ describe("document details, archive and uploader (FR-DOC-005, FR-DOC-006, US-701
     return screen.findByRole("dialog", { name: copy.edit.title });
   }
 
-  it("offers only the types that suit the document's purpose (as the API checks)", () => {
-    expect(docTypesFor("circular")).toEqual([
-      "circular",
-      "policy",
-      "minutes",
-      "certificate",
-      "letter",
-      "form",
-      "report",
-      "other",
-    ]);
-    expect(docTypesFor("evidence")).toEqual(["evidence", "certificate", "letter", "form", "other"]);
-    expect(docTypesFor("register_scan")).toEqual(["register_scan"]);
-    expect(docTypesFor("import_file")).toEqual(["import_file"]);
+  it("offers only the types the API lists for the document's purpose (allowed_doc_types)", async () => {
+    setMe([READ, UPLOAD]);
+    serve({
+      purpose: "evidence",
+      doc_type: "evidence",
+      allowed_doc_types: ["evidence", "certificate", "letter"],
+    });
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    const dialog = await openEdit();
+    const type = within(dialog).getByLabelText(copy.new.docType);
+    const options = within(type)
+      .getAllByRole("option")
+      .map((option) => (option as HTMLOptionElement).value)
+      .filter(Boolean);
+    expect(options).toEqual(["evidence", "certificate", "letter"]);
+  });
+
+  it("offers only the current type when the API lists none", async () => {
+    setMe([READ, UPLOAD]);
+    serve({ purpose: "register_scan", doc_type: "register_scan", allowed_doc_types: [] });
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    const dialog = await openEdit();
+    const type = within(dialog).getByLabelText(copy.new.docType);
+    const options = within(type)
+      .getAllByRole("option")
+      .map((option) => (option as HTMLOptionElement).value)
+      .filter(Boolean);
+    expect(options).toEqual(["register_scan"]);
   });
 
   it("builds a PATCH body with only what changed; emptied optional fields are null", () => {
