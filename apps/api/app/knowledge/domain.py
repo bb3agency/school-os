@@ -117,6 +117,10 @@ class AclKeys:
     (docs/05 §6.1): ``sees_all`` for holders of ``document.manage_acl``; otherwise a chunk is
     visible when an ACL entry matches a role, section, class or the membership, and an EMPTY ACL
     only when ``school_wide`` is true. Tenant isolation is RLS, never these keys.
+
+    ``read_sensitive`` (M2 wave 5, additive; default False = fail closed): the caller holds
+    ``student.read_sensitive``, so restricted (C3) documents their ACL reaches may be retrieved
+    too. Without it retrieval never returns a C3 chunk, whatever the ACL says.
     """
 
     roles: frozenset[str]
@@ -125,6 +129,7 @@ class AclKeys:
     membership_id: uuid.UUID
     school_wide: bool
     sees_all: bool = False
+    read_sensitive: bool = False
 
 
 @dataclass(frozen=True, slots=True)

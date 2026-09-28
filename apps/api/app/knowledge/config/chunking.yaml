@@ -35,7 +35,10 @@ extraction:
   excluded_purposes:
     - "evidence"
     - "import_file"
-  # C3 stays out of the index until retrieval enforces student.read_sensitive (fail closed).
+  # C3 stays out of the index (fail closed). Retrieval already returns C3 chunks only to holders
+  # of student.read_sensitive (AclKeys.read_sensitive, docs/06 §6 as built); indexing C3 would
+  # also store C3 text unencrypted in kb.document_chunks (C3 fields are encrypted, docs/05 §9),
+  # so adding it here waits for an owner decision.
   indexed_sensitivities:
     - "C1"
     - "C2"
