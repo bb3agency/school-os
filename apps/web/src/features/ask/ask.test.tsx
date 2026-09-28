@@ -252,6 +252,172 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     expect(await screen.findByText(/Exams begin soon\./)).toBeInTheDocument();
   });
 
+  it("search-only via final/done even though meta says full (docs/06 §5.1, FR-KB-011)", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("delta", { text: "Exams begin on 22/09" }),
+        sse("error", { type: "ai_budget_exhausted", message_key: "kb.errors.budget" }),
+        sse("final", { text: "", replaced: true, status: "search_only", mode: "search_only" }),
+        sse("citation", { index: 1, source: DOC_SOURCE, title: "Circular", snippet: "Exams at 9" }),
+        sse("done", {
+          latency_ms: 300,
+          cited_sources: 1,
+          status: "search_only",
+          mode: "search_only",
+        }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("AI answers are not available right now")).toBeInTheDocument();
+    expect(screen.getByText(/AI budget for this month is used up/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Matching passages" })).toBeInTheDocument();
+    expect(screen.queryByText(/Exams begin on 22\/09/)).toBeNull();
+    expect(screen.queryByText("Not found in the school records you can access")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save as verified answer" })).toBeNull();
+  });
+
+  it("shows streamed delta text as a marked, unchecked preview without links", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse(
+        [
+          sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+          sse("delta", { text: "Exams begin " }),
+          sse("delta", { text: "on 22/09/2026. [1]" }),
+        ],
+        { close: false },
+      );
+    renderWithIntl(<AskPage />);
+    await ask();
+    const preview = await screen.findByRole("group", { name: "Draft answer, not checked yet" });
+    expect(preview).toHaveTextContent("Exams begin on 22/09/2026. [1]");
+    expect(within(preview).queryByRole("link")).toBeNull();
+    expect(screen.getByText("Writing the answer…")).toBeInTheDocument();
+    expect(screen.queryByText("Was this answer helpful?")).toBeNull();
+  });
+
+  it("final replaces the preview, later tokens are ignored, and a changed answer says so", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("delta", { text: "Exams begin on 21/09/2026 [2] and end soon." }),
+        sse("final", {
+          text: "Exams begin on 22/09/2026. [1]",
+          replaced: true,
+          status: "answered",
+          mode: "full",
+        }),
+        sse("token", { text: "Exams begin on 22/09/2026. [1]" }),
+        sse("citation", { index: 1, source: DOC_SOURCE, title: "Circular", snippet: "x" }),
+        sse("done", { latency_ms: 900, cited_sources: 1, status: "answered", mode: "full" }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("The answer is ready.")).toBeInTheDocument();
+    const answer = screen.getByRole("region", { name: "Answer" });
+    expect(within(answer).getAllByText(/Exams begin on 22\/09\/2026\./)).toHaveLength(1);
+    expect(within(answer).queryByText(/21\/09\/2026/)).toBeNull();
+    expect(screen.queryByRole("group", { name: "Draft answer, not checked yet" })).toBeNull();
+    expect(within(answer).getByRole("link", { name: "Source 1: Circular" })).toBeInTheDocument();
+    expect(
+      within(answer).getByText(
+        "The draft was checked against the sources and changed to what they support.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says when the question was refused (done.status refused)", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("final", { text: "Cannot help.", replaced: false, status: "refused", mode: "full" }),
+        sse("token", { text: "Cannot help." }),
+        sse("done", { latency_ms: 90, cited_sources: 0, status: "refused", mode: "full" }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(
+      await screen.findByText("This question can't be answered from the school records"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Cannot help.")).toBeNull();
+  });
+
+  it("an internal error (done.status error) says to ask again, with no feedback", async () => {
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("delta", { text: "Exams begin" }),
+        sse("error", { type: "internal_error", message_key: "kb.errors.internal" }),
+        sse("done", { latency_ms: 50, cited_sources: 0, status: "error", mode: "full" }),
+      ]);
+    renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(screen.getByText(/could not finish this answer\. Ask again/)).toBeInTheDocument();
+    expect(screen.getByText("The answer could not be finished.")).toBeInTheDocument();
+    expect(screen.queryByText("Exams begin")).toBeNull();
+    expect(screen.queryByText("Was this answer helpful?")).toBeNull();
+  });
+
+  it("shows a student count source as a chip without a link (sos://count)", async () => {
+    const COUNT = "0192f3a4-0000-7000-8000-00000000e201";
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
+        sse("final", {
+          text: "Class 6 has 42 students. [1]",
+          replaced: false,
+          status: "answered",
+          mode: "full",
+        }),
+        sse("citation", {
+          index: 1,
+          source: `sos://count/${COUNT}`,
+          title: "Students enrolled by class",
+          snippet: "Class 6: 42",
+        }),
+        sse("done", { latency_ms: 90, cited_sources: 1, status: "answered", mode: "full" }),
+      ]);
+    const { container } = renderWithIntl(<AskPage />);
+    await ask();
+    expect(await screen.findByText("Students enrolled by class")).toBeInTheDocument();
+    expect(screen.getByText("Student count (numbers only)")).toBeInTheDocument();
+    expect(screen.queryByText("This source cannot be opened here.")).toBeNull();
+    const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "");
+    expect(hrefs.filter((href) => href.includes(COUNT))).toEqual([]);
+    expect(
+      screen.getByRole("link", { name: "Source 1: Students enrolled by class" }),
+    ).toBeVisible();
+  });
+
+  it("new stream states and kb.errors.* work in Telugu without missing messages", async () => {
+    for (const events of [
+      [
+        sse("meta", { query_id: QUERY, language: "te", mode: "full" }),
+        sse("error", { type: "internal_error", message_key: "kb.errors.internal" }),
+        sse("done", { latency_ms: 5, cited_sources: 0, status: "error", mode: "full" }),
+      ],
+      [
+        sse("meta", { query_id: QUERY, language: "te", mode: "full" }),
+        sse("final", { text: "x", replaced: true, status: "refused", mode: "full" }),
+        sse("done", { latency_ms: 5, cited_sources: 0, status: "refused", mode: "full" }),
+      ],
+      [
+        sse("meta", { query_id: QUERY, language: "te", mode: "full" }),
+        sse("delta", { text: "పరీక్షలు" }),
+      ],
+    ]) {
+      stub.routes[ASK] = () => sseResponse(events);
+      const { unmount } = renderWithIntl(<AskPage />, "te");
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText(/^మీ ప్రశ్న/), "ప్రశ్న?");
+      await user.click(screen.getByRole("button", { name: "అడగండి" }));
+      await screen.findByRole("region", { name: "సమాధానం" });
+      await waitFor(() => expect(screen.getByRole("status")).not.toHaveTextContent(/^$/));
+      unmount();
+    }
+  });
+
   it("explains 429 ai_rate_limited in plain words", async () => {
     stub.routes[ASK] = () => problem(429, "ai_rate_limited");
     renderWithIntl(<AskPage />);

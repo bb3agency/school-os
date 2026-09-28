@@ -102,7 +102,8 @@ describe("answer state from SSE events (FR-KB-005, FR-KB-007, FR-KB-011)", () =>
     const before = fold([ev("meta", { query_id: "q1", language: "en", mode: "full" })]);
     const after = fold(
       [
-        ev("delta", { text: "ignored" }),
+        ev("delta", { text: 7 }),
+        ev("final", { text: 7, status: "weird" }),
         ev("tool", { name: "search_documents" }),
         { event: "token", data: "not json" },
         ev("token", { text: 42 }),
@@ -112,22 +113,142 @@ describe("answer state from SSE events (FR-KB-005, FR-KB-007, FR-KB-011)", () =>
       ],
       before,
     );
-    expect(after).toMatchObject({ queryId: "q1", mode: "full", language: "en", text: "" });
+    expect(after).toMatchObject({
+      queryId: "q1",
+      mode: "full",
+      language: "en",
+      text: "",
+      preview: "",
+      finalized: false,
+      status: null,
+    });
     expect(after.citations).toEqual([]);
   });
 
   it("maps message keys, unknown ones to 'unavailable'", () => {
     expect(kbMessage("kb.errors.disabled")).toBe("disabled");
     expect(kbMessage("kb.errors.rate_limited")).toBe("rate_limited");
+    expect(kbMessage("kb.errors.internal")).toBe("internal");
     expect(kbMessage("kb.errors.something_new")).toBe("unavailable");
     expect(kbMessage(undefined)).toBe("unavailable");
   });
 
-  it("joins segments with one space after punctuation or a marker, deltas as sent", () => {
+  it("joins legacy token segments with ONE space (docs/06 §5.1: tokens joined = final.text)", () => {
     expect(joinToken("One. [1]", "Two.")).toBe("One. [1] Two.");
     expect(joinToken("One.", " Two.")).toBe("One. Two.");
-    expect(joinToken("Exa", "ms")).toBe("Exams");
+    expect(joinToken("Exams begin", "on 22/09/2026.")).toBe("Exams begin on 22/09/2026.");
     expect(joinToken("", "Hi")).toBe("Hi");
+  });
+});
+
+describe("answer state, streamed contract v2 (docs/06 §5.1, FR-KB-008, FR-KB-011)", () => {
+  const META = ev("meta", { query_id: "q1", language: "en", mode: "full" });
+  const CITE = ev("citation", {
+    index: 1,
+    source: `sos://doc/${DOC}/v2#p1`,
+    title: "Circular",
+    snippet: "s",
+  });
+
+  it("appends delta text verbatim as an unchecked preview, then final replaces it", () => {
+    const streaming = fold([
+      META,
+      ev("delta", { text: "Exams begin " }),
+      ev("delta", { text: " on 22/09/2026 at 9 [3]" }),
+    ]);
+    expect(streaming).toMatchObject({
+      phase: "streaming",
+      preview: "Exams begin  on 22/09/2026 at 9 [3]",
+      text: "",
+      finalized: false,
+    });
+    expect(outcomeOf(streaming)).toBe("pending");
+
+    const finished = fold(
+      [
+        ev("final", {
+          text: "Exams begin on 22/09/2026. [1]",
+          replaced: true,
+          status: "answered",
+          mode: "full",
+        }),
+        // Legacy segments after final are ignored (they would double the text).
+        ev("token", { text: "Exams begin on 22/09/2026. [1]" }),
+        ev("delta", { text: "late preview" }),
+        CITE,
+        ev("done", { latency_ms: 900, cited_sources: 1, status: "answered", mode: "full" }),
+      ],
+      streaming,
+    );
+    expect(finished).toMatchObject({
+      phase: "done",
+      preview: "",
+      text: "Exams begin on 22/09/2026. [1]",
+      finalized: true,
+      replaced: true,
+      status: "answered",
+      mode: "full",
+    });
+    expect(outcomeOf(finished)).toBe("answered");
+  });
+
+  it("search-only comes from final/done, not from meta (meta always says full)", () => {
+    const state = fold([
+      META,
+      ev("delta", { text: "Exams begin on" }),
+      ev("error", { type: "ai_unavailable", message_key: "kb.errors.unavailable" }),
+      ev("final", { text: "", replaced: true, status: "search_only", mode: "search_only" }),
+      CITE,
+      ev("done", { latency_ms: 300, cited_sources: 1, status: "search_only", mode: "search_only" }),
+    ]);
+    expect(state).toMatchObject({ mode: "search_only", status: "search_only", preview: "" });
+    expect(state.notice).toBe("unavailable");
+    expect(outcomeOf(state)).toBe("search_only");
+  });
+
+  it("done.status is the source of truth for the final state", () => {
+    const base = [META, ev("final", { text: "x", replaced: false, status: "answered" })];
+    for (const status of ["answered", "not_found", "refused", "search_only"] as const) {
+      const state = fold([...base, ev("done", { latency_ms: 1, cited_sources: 0, status })]);
+      expect(outcomeOf(state), status).toBe(status);
+    }
+    // An unknown status keeps what final said.
+    expect(outcomeOf(fold([...base, ev("done", { latency_ms: 1, status: "new" })]))).toBe(
+      "answered",
+    );
+  });
+
+  it("final status is shown before done arrives (e.g. not_found, refused)", () => {
+    const state = fold([
+      META,
+      ev("final", { text: "Not found.", replaced: false, status: "refused", mode: "full" }),
+    ]);
+    expect(state.phase).toBe("streaming");
+    expect(outcomeOf(state)).toBe("refused");
+  });
+
+  it("internal_error sends no final and ends with done.status error", () => {
+    const state = fold([
+      META,
+      ev("delta", { text: "Exams" }),
+      ev("error", { type: "internal_error", message_key: "kb.errors.internal" }),
+      ev("done", { latency_ms: 50, cited_sources: 0, status: "error", mode: "full" }),
+    ]);
+    expect(state).toMatchObject({ phase: "done", status: "error", notice: "internal" });
+    expect(state.errorType).toBe("internal_error");
+    expect(outcomeOf(state)).toBe("error");
+  });
+
+  it("a server without final still works: tokens joined with one space", () => {
+    const state = fold([
+      META,
+      ev("token", { text: "Exams begin on 22/09/2026. [1]" }),
+      ev("token", { text: "Timings are 9 to 12. [1]" }),
+      CITE,
+      ev("done", { latency_ms: 10, cited_sources: 1 }),
+    ]);
+    expect(state.text).toBe("Exams begin on 22/09/2026. [1] Timings are 9 to 12. [1]");
+    expect(outcomeOf(state)).toBe("answered");
   });
 });
 
@@ -162,6 +283,13 @@ describe("sos:// sources (docs/06 §8)", () => {
     expect(sourceHref(parseSource(`sos://finding/${DOC}`)!)).toBe(`/findings/${DOC}`);
     expect(sourceHref(parseSource(`sos://change/${DOC}`)!)).toBe(`/change-requests/${DOC}`);
     expect(sourceHref(parseSource(`sos://verified/${DOC}`)!)).toBe("/ask/verified");
+  });
+
+  it("a student count source (numbers only) parses but has no screen to open", () => {
+    const count = parseSource(`sos://count/${DOC}`);
+    expect(count).toEqual({ kind: "count", id: DOC });
+    expect(sourceHref(count!)).toBeNull();
+    expect(parseSource("sos://count/not-a-uuid")).toBeNull();
   });
 
   it("refuses anything that is not a well-formed sos:// URI", () => {

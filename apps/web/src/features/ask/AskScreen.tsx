@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useRef, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
@@ -51,7 +51,9 @@ function StatusLine({ state }: { state: AskState }) {
       : state.phase === "streaming"
         ? t("streaming")
         : state.phase === "done"
-          ? t("done")
+          ? outcomeOf(state) === "error"
+            ? t("failed")
+            : t("done")
           : state.phase === "stopped"
             ? t("stopped")
             : state.phase === "interrupted"
@@ -61,6 +63,30 @@ function StatusLine({ state }: { state: AskState }) {
     <p role="status" aria-live="polite" className="min-h-5 text-sm text-ink-muted">
       {message}
     </p>
+  );
+}
+
+/**
+ * The streamed preview (`delta` events): shown as plain text in a dashed, muted box that says
+ * it is not checked yet. Its `[n]` markers are not links: citations are validated only when
+ * `final` replaces it (docs/06 §5.1). Hidden once the stream stops, ends or is cut off.
+ */
+function AnswerPreview({ text: preview }: { text: string }) {
+  const ta = useTranslations("ask.answer");
+  const labelId = useId();
+  return (
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      className="space-y-1 rounded-md border border-dashed border-border-strong bg-surface-muted p-3"
+    >
+      <p id={labelId} className="text-sm font-semibold text-ink-muted">
+        {ta("previewLabel")}
+      </p>
+      <p className="text-base leading-relaxed whitespace-pre-wrap text-ink-muted">
+        {displayText(preview)}
+      </p>
+    </div>
   );
 }
 
@@ -122,8 +148,26 @@ function AnswerView({
               {t("notFound.body")}
             </Alert>
           ) : null}
-          {outcome !== "search_only" && outcome !== "not_found" && state.text ? (
+          {outcome === "refused" ? (
+            <Alert tone="info" title={t("refused.title")}>
+              {t("refused.body")}
+            </Alert>
+          ) : null}
+          {outcome === "error" ? (
+            <Alert tone="danger" title={t("failedAnswer.title")}>
+              {t(`kbErrors.${state.notice ?? "internal"}`)}
+            </Alert>
+          ) : null}
+          {state.phase === "streaming" && !state.finalized && state.preview ? (
+            <AnswerPreview text={state.preview} />
+          ) : null}
+          {(outcome === "answered" || outcome === "pending") && state.text ? (
             <AnswerText text={state.text} citations={state.citations} anchorPrefix={ANCHOR} />
+          ) : null}
+          {state.finalized &&
+          state.replaced &&
+          (outcome === "answered" || outcome === "not_found") ? (
+            <p className="text-sm text-ink-muted">{ta("replacedNote")}</p>
           ) : null}
           {outcome === "search_only" && state.phase === "done" && state.citations.length === 0 ? (
             <p>{t("searchOnly.none")}</p>
@@ -136,7 +180,7 @@ function AnswerView({
             </Alert>
           ) : null}
         </div>
-        {state.phase === "done" && state.queryId ? (
+        {state.phase === "done" && state.queryId && outcome !== "error" ? (
           <div className="space-y-3 border-t border-border pt-4">
             <AnswerFeedback key={state.queryId} queryId={state.queryId} />
             {canVerify && outcome === "answered" ? (
@@ -154,8 +198,9 @@ function AnswerView({
 
 /**
  * Ask the school (US-801..803, FR-KB-001..012): one question at a time, the answer streamed
- * through the BFF with its sources, "not found" when nothing you can see answers it, and
- * plain search-only passages when AI answers are off or the budget is used up (FR-KB-011).
+ * through the BFF (an unchecked preview, then the validated answer) with its sources, "not
+ * found" when nothing you can see answers it, and plain search-only passages when AI answers
+ * are off or the budget is used up (FR-KB-011). The final state comes from `done.status`.
  * Stop aborts the request. The question stays in memory (never in the URL or storage).
  */
 export function AskScreen() {

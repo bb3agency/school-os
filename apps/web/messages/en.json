@@ -3856,7 +3856,8 @@
       "streaming": "Writing the answer…",
       "done": "The answer is ready.",
       "stopped": "You stopped the answer.",
-      "interrupted": "The answer was cut off."
+      "interrupted": "The answer was cut off.",
+      "failed": "The answer could not be finished."
     },
     "answer": {
       "heading": "Answer",
@@ -3875,7 +3876,10 @@
       "downloadOf": "Download the cited version of {title}",
       "stoppedNote": "You stopped the answer, so it may be incomplete. Ask again to see all of it.",
       "interruptedTitle": "The answer was cut off",
-      "interruptedBody": "Check your internet connection and ask again."
+      "interruptedBody": "Check your internet connection and ask again.",
+      "previewLabel": "Draft answer, not checked yet",
+      "replacedNote": "The draft was checked against the sources and changed to what they support.",
+      "countNote": "Student count (numbers only)"
     },
     "notFound": {
       "title": "Not found in the school records you can access",
@@ -3891,7 +3895,8 @@
       "budget": "The school's AI budget for this month is used up. Until it is raised or the month ends, you see matching passages instead of answers.",
       "disabled": "AI answers are switched off for this school. The principal can switch them on in school settings.",
       "rate_limited": "Many questions are being asked right now. Wait a minute, then ask again for a full answer.",
-      "unavailable": "AI answers are temporarily unavailable. Try again in a few minutes."
+      "unavailable": "AI answers are temporarily unavailable. Try again in a few minutes.",
+      "internal": "Something went wrong and SchoolOS could not finish this answer. Ask again."
     },
     "errors": {
       "ai_rate_limited": {
@@ -3986,6 +3991,13 @@
       "issued": "issued {date}",
       "noAccessTitle": "You can't search documents",
       "noAccessBody": "Ask the office to give you access to documents."
+    },
+    "refused": {
+      "title": "This question can't be answered from the school records",
+      "body": "Ask about the school's own records and documents, for example a date in a circular or the number of students in a class."
+    },
+    "failedAnswer": {
+      "title": "Something went wrong"
     }
   }
 }
