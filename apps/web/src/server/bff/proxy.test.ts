@@ -316,6 +316,113 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
     expect((await reader.read()).done).toBe(true);
   });
 
+  describe("Ask the school over SSE (FR-KB-008, SEC-004)", () => {
+    function openStream() {
+      let push!: (chunk: string) => void;
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          push = (chunk) => controller.enqueue(new TextEncoder().encode(chunk));
+        },
+      });
+      return { stream, push: (chunk: string) => push(chunk) };
+    }
+
+    it("POST /knowledge/ask needs the CSRF token and never reaches the API without it", async () => {
+      await h.signIn("staff", clerk);
+      h.apiCalls.length = 0;
+      const response = await call("/bff/api/v1/knowledge/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "text/event-stream" },
+        body: JSON.stringify({ question: "q", session_id: TENANT }),
+      });
+      expect(response.status).toBe(403);
+      expect(h.apiCalls).toHaveLength(0);
+    });
+
+    it("forwards the question in the body with the tokens and streams events as they arrive", async () => {
+      await h.signIn("staff", clerk);
+      h.apiCalls.length = 0;
+      const upstream = openStream();
+      h.setApi(
+        () =>
+          new Response(upstream.stream, {
+            headers: {
+              "content-type": "text/event-stream; charset=utf-8",
+              "set-cookie": "leak=1",
+            },
+          }),
+      );
+      const response = await call("/bff/api/v1/knowledge/ask", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "text/event-stream",
+          "x-csrf-token": await h.csrf(),
+        },
+        body: JSON.stringify({ question: "When do exams begin?", session_id: TENANT }),
+      });
+      const [sent] = h.apiCalls;
+      expect(sent?.url).toBe("http://api.internal:8000/api/v1/knowledge/ask");
+      expect(sent?.headers.get("accept")).toBe("text/event-stream");
+      expect(sent?.headers.get("authorization")).toMatch(/^Bearer /);
+      await expect(sent?.json()).resolves.toMatchObject({ question: "When do exams begin?" });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("text/event-stream; charset=utf-8");
+      expect(response.headers.get("cache-control")).toBe("no-cache, no-transform");
+      expect(response.headers.get("x-accel-buffering")).toBe("no");
+      expect(response.headers.get("set-cookie")).toBeNull();
+      const reader = response.body!.getReader();
+      upstream.push('event: meta\ndata: {"query_id":"q1","language":"en","mode":"full"}\n\n');
+      const first = await reader.read();
+      expect(new TextDecoder().decode(first.value)).toContain("event: meta");
+      upstream.push('event: token\ndata: {"text":"Soon."}\n\n');
+      const second = await reader.read();
+      expect(new TextDecoder().decode(second.value)).toContain("Soon.");
+      await reader.cancel();
+    });
+
+    it("aborts the API call when the browser stops the answer", async () => {
+      await h.signIn("staff", clerk);
+      let upstreamSignal: AbortSignal | undefined;
+      h.setApi((request) => {
+        upstreamSignal = request.signal;
+        return new Response(openStream().stream, {
+          headers: { "content-type": "text/event-stream" },
+        });
+      });
+      const browser = new AbortController();
+      const response = await call("/bff/api/v1/knowledge/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-csrf-token": await h.csrf() },
+        body: JSON.stringify({ question: "q", session_id: TENANT }),
+        signal: browser.signal,
+      });
+      expect(response.status).toBe(200);
+      expect(upstreamSignal?.aborted).toBe(false);
+      browser.abort();
+      expect(upstreamSignal?.aborted).toBe(true);
+    });
+
+    it("passes a 429 ai_rate_limited problem through unchanged", async () => {
+      await h.signIn("staff", clerk);
+      h.setApi(() =>
+        json({ code: "ai_rate_limited", status: 429, title: "Too many questions" }, 429, {
+          "content-type": "application/problem+json",
+          "retry-after": "30",
+        }),
+      );
+      const response = await call("/bff/api/v1/knowledge/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-csrf-token": await h.csrf() },
+        body: JSON.stringify({ question: "q", session_id: TENANT }),
+      });
+      expect(response.status).toBe(429);
+      expect(response.headers.get("retry-after")).toBe("30");
+      await expect(response.json()).resolves.toMatchObject({ code: "ai_rate_limited" });
+    });
+  });
+
   it("rewrites API Location headers to the BFF and drops foreign ones", async () => {
     await h.signIn("staff", clerk);
     h.setApi(() => json({}, 202, { location: "/api/v1/jobs/j1" }));

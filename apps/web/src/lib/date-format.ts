@@ -1,4 +1,7 @@
-import { useSyncExternalStore } from "react";
+// Namespace import: server components import this module (lib/format.ts) for the pure
+// formatters; a named `useSyncExternalStore` import fails the RSC build check even though
+// the hook below only ever runs in client components.
+import * as React from "react";
 
 /**
  * Display dates in the school's `date_format` (GET /me `settings`, FR-TEN-012). Display only:
@@ -101,5 +104,5 @@ function subscribe(listener: () => void): () => void {
 
 /** The school's date format as React state (re-renders when /me brings it). */
 export function useSchoolDateFormat(): DateFormat {
-  return useSyncExternalStore(subscribe, schoolDateFormat, () => DEFAULT_DATE_FORMAT);
+  return React.useSyncExternalStore(subscribe, schoolDateFormat, () => DEFAULT_DATE_FORMAT);
 }
