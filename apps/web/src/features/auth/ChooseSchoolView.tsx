@@ -4,10 +4,13 @@ import type { SchoolChoice } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
+import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { cardClasses } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { known, schoolTone } from "@/features/status";
+import { cn } from "@/lib/cn";
 import { chooseSchool, defaultNavigate, type Navigate } from "@/lib/bff/session-client";
 
 /**
@@ -74,28 +77,34 @@ export function ChooseSchoolView({
           return (
             <li
               key={school.tenant_id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4"
+              className={cn(
+                cardClasses({ padding: "sm" }),
+                "flex flex-wrap items-center justify-between gap-3",
+              )}
             >
-              <div className="space-y-1">
-                <p className="font-semibold">
-                  {school.name}{" "}
-                  <span className="font-mono text-xs text-ink-muted">({school.code})</span>
-                </p>
-                <p className="flex flex-wrap items-center gap-2 text-sm">
-                  {status ? (
-                    <Badge tone={schoolTone[status]}>{tstatus(status)}</Badge>
-                  ) : (
-                    <Badge>{school.status}</Badge>
-                  )}
-                  {current ? <Badge tone="info">{t("current")}</Badge> : null}
-                </p>
-                {!usable ? (
-                  <p id={hintId} className="text-sm text-ink-muted">
-                    {school.status === "suspended" || school.status === "offboarding"
-                      ? t("suspendedHint")
-                      : t("notReadyHint")}
+              <div className="flex min-w-0 items-start gap-3">
+                <Avatar name={school.name} decorative size="lg" />
+                <div className="min-w-0 space-y-1">
+                  <p className="font-medium text-ink">
+                    {school.name}{" "}
+                    <span className="font-mono text-xs text-ink-muted">({school.code})</span>
                   </p>
-                ) : null}
+                  <p className="flex flex-wrap items-center gap-2 text-sm">
+                    {status ? (
+                      <Badge tone={schoolTone[status]}>{tstatus(status)}</Badge>
+                    ) : (
+                      <Badge>{school.status}</Badge>
+                    )}
+                    {current ? <Badge tone="info">{t("current")}</Badge> : null}
+                  </p>
+                  {!usable ? (
+                    <p id={hintId} className="text-sm text-ink-muted">
+                      {school.status === "suspended" || school.status === "offboarding"
+                        ? t("suspendedHint")
+                        : t("notReadyHint")}
+                    </p>
+                  ) : null}
+                </div>
               </div>
               <Button
                 onClick={() => open(school)}

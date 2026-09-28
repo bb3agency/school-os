@@ -1,7 +1,10 @@
 import { useLocale, useTranslations } from "next-intl";
+import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
 import { buttonClasses } from "@/components/ui/Button";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { cardClasses } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
+import { cn } from "@/lib/cn";
 
 export const SIGN_IN_ERRORS = [
   "signin_expired",
@@ -33,21 +36,23 @@ export function SignedOutView({
   const t = useTranslations("auth");
   const td = useTranslations("devSignIn");
   const locale = useLocale();
-  const tc = useTranslations("common");
   const signIn = operator ? "/bff/auth/platform/login" : "/bff/auth/login";
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-6 py-3">
-        <p className="text-lg font-bold text-primary">{tc("appName")}</p>
-        <div className="flex flex-wrap items-center justify-end gap-4">
-          <a href={`/${locale}/welcome`} className="text-sm text-primary underline">
-            {t("signedOut.homeLink")}
-          </a>
-          <LanguageSwitcher />
-        </div>
-      </header>
-      <main id="main" className="mx-auto w-full max-w-xl space-y-4 p-6 md:p-10">
-        <h1 className="text-2xl font-bold">{t("signedOut.title")}</h1>
+    <MinimalShell
+      headerActions={
+        <a
+          href={`/${locale}/welcome`}
+          className="inline-flex min-h-10 items-center rounded-full px-3 text-sm font-medium text-primary underline underline-offset-4 hover:bg-primary-soft"
+        >
+          {t("signedOut.homeLink")}
+        </a>
+      }
+    >
+      <div className={cn(cardClasses({ padding: "lg" }), "mx-auto max-w-xl space-y-5")}>
+        <span className="flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">
+          <Icon name="lock" className="size-6" />
+        </span>
+        <h1 className="text-2xl font-semibold text-ink">{t("signedOut.title")}</h1>
         {error ? (
           <Alert tone="danger" live>
             {t(`errors.${error}`)}
@@ -74,7 +79,7 @@ export function SignedOutView({
             </a>
           </p>
         ) : null}
-      </main>
-    </div>
+      </div>
+    </MinimalShell>
   );
 }
