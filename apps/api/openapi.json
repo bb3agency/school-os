@@ -3711,14 +3711,20 @@
           "reason": {
             "anyOf": [
               {
-                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "enum": [
+                  "wrong_source",
+                  "outdated",
+                  "incomplete",
+                  "not_found_but_exists",
+                  "wrong_language"
+                ],
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "A reason code (e.g. wrong_source, outdated, not_found_but_exists); never free text.",
+            "description": "Why the answer did not help, as a code; never free text.",
             "title": "Reason"
           }
         },
@@ -3746,6 +3752,13 @@
           "reason": {
             "anyOf": [
               {
+                "enum": [
+                  "wrong_source",
+                  "outdated",
+                  "incomplete",
+                  "not_found_but_exists",
+                  "wrong_language"
+                ],
                 "type": "string"
               },
               {
@@ -13395,6 +13408,18 @@
             "title": "Verified By",
             "type": "string"
           },
+          "verified_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name of that person in this school (null if no longer a member).",
+            "title": "Verified By Name"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -13414,6 +13439,55 @@
           "created_at"
         ],
         "title": "VerifiedAnswerOut",
+        "type": "object"
+      },
+      "VerifiedAnswerReviewIn": {
+        "additionalProperties": false,
+        "description": "Confirm a verified answer (typically ``needs_review``) as it is, or with a corrected\ntext, new citations or a new review date. Omitted fields keep their stored value.",
+        "properties": {
+          "answer_text": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Text"
+          },
+          "citations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VerifiedCitationIn"
+                },
+                "maxItems": 20,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citations"
+          },
+          "review_due": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Due"
+          }
+        },
+        "title": "VerifiedAnswerReviewIn",
         "type": "object"
       },
       "VerifiedCitationIn": {
@@ -18179,7 +18253,7 @@
     },
     "/api/v1/knowledge/ask": {
       "post": {
-        "description": "Ask a question of the school's records and documents (permission ``kb.ask``).\n\nAnswers cite their sources (``sos://`` URIs) or say the answer was not found in the school\nrecords you can access. Only records and documents you may see are used. When the school's\nAI budget is used up or AI answers are unavailable, you get ranked, cited passages instead\n(``mode: search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.",
+        "description": "Ask a question of the school's records and documents (permission ``kb.ask``).\n\nAnswers cite their sources (``sos://`` URIs) or say the answer was not found in the school\nrecords you can access. Only records and documents you may see are used. The answer streams\nas ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces\nthe preview. Questions asked earlier in the same ``session_id`` by you are context for a\nfollow-up (never another person's). When the school's AI budget is used up or AI answers\nare unavailable, you get ranked, cited passages instead (``mode: search_only``). 429\n``ai_rate_limited`` when you ask too many questions a minute.",
         "operationId": "ask_api_v1_knowledge_ask_post",
         "requestBody": {
           "content": {
@@ -18195,13 +18269,13 @@
           "200": {
             "content": {
               "text/event-stream": {
-                "example": "event: meta\ndata: {\"query_id\":\"\u2026\",\"language\":\"en\",\"mode\":\"full\"}\n\nevent: token\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\"}\n\nevent: citation\ndata: {\"index\":1,\"source\":\"sos://doc/\u2026/v2#p1\",\"title\":\"Circular \u00b7 \u2026\",\"snippet\":\"\u2026\"}\n\nevent: done\ndata: {\"latency_ms\":4120,\"cited_sources\":1}\n\n",
+                "example": "event: meta\ndata: {\"query_id\":\"\u2026\",\"language\":\"en\",\"mode\":\"full\"}\n\nevent: delta\ndata: {\"text\":\"Exams begin on \"}\n\nevent: delta\ndata: {\"text\":\"22/09/2026.\"}\n\nevent: final\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\",\"replaced\":false,\"status\":\"answered\",\"mode\":\"full\"}\n\nevent: token\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\"}\n\nevent: citation\ndata: {\"index\":1,\"source\":\"sos://doc/\u2026/v2#p1\",\"title\":\"Circular \u00b7 \u2026\",\"snippet\":\"\u2026\"}\n\nevent: done\ndata: {\"latency_ms\":4120,\"cited_sources\":1}\n\n",
                 "schema": {
                   "type": "string"
                 }
               }
             },
-            "description": "Server-Sent Events: meta, token, citation, error, done (docs/06 \u00a75.1)."
+            "description": "Server-Sent Events: meta, delta, error, final, token, citation, done (docs/06 \u00a75.1)."
           },
           "422": {
             "content": {
@@ -18439,6 +18513,104 @@
           }
         },
         "summary": "Create Verified Answer",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/verified-answers/{answer_id}/retire": {
+      "post": {
+        "description": "Withdraw a verified answer (permission ``kb.verified_answer.manage``; ``If-Match``): it\nis no longer used by Ask; kept for the record. 409 ``verified_answer_retired`` when it\nalready is; 404 / 412 as for review.",
+        "operationId": "retire_verified_answer_api_v1_knowledge_verified_answers__answer_id__retire_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retire Verified Answer",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/verified-answers/{answer_id}/review": {
+      "post": {
+        "description": "Confirm a verified answer again, as it is or corrected (permission\n``kb.verified_answer.manage``; ``If-Match``; FR-KB-030). Use it for answers flagged\n``needs_review`` after a cited document changed. Its citations (new ones if you send them)\nmust quote the current version of documents you can read (422 as on create); it becomes\n``active`` and you become its verifier. 404 when you cannot read a document it cites; 409\n``verified_answer_retired``; 412 when it changed since you read it.",
+        "operationId": "review_verified_answer_api_v1_knowledge_verified_answers__answer_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifiedAnswerReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Verified Answer",
         "tags": [
           "knowledge"
         ]

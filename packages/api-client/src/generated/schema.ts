@@ -1547,9 +1547,12 @@ export interface paths {
          * @description Ask a question of the school's records and documents (permission ``kb.ask``).
          *
          *     Answers cite their sources (``sos://`` URIs) or say the answer was not found in the school
-         *     records you can access. Only records and documents you may see are used. When the school's
-         *     AI budget is used up or AI answers are unavailable, you get ranked, cited passages instead
-         *     (``mode: search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.
+         *     records you can access. Only records and documents you may see are used. The answer streams
+         *     as ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces
+         *     the preview. Questions asked earlier in the same ``session_id`` by you are context for a
+         *     follow-up (never another person's). When the school's AI budget is used up or AI answers
+         *     are unavailable, you get ranked, cited passages instead (``mode: search_only``). 429
+         *     ``ai_rate_limited`` when you ask too many questions a minute.
          */
         post: operations["ask_api_v1_knowledge_ask_post"];
         delete?: never;
@@ -1623,6 +1626,53 @@ export interface paths {
          *     a cited document changes or is deleted. Accepts ``Idempotency-Key``.
          */
         post: operations["create_verified_answer_api_v1_knowledge_verified_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/verified-answers/{answer_id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire Verified Answer
+         * @description Withdraw a verified answer (permission ``kb.verified_answer.manage``; ``If-Match``): it
+         *     is no longer used by Ask; kept for the record. 409 ``verified_answer_retired`` when it
+         *     already is; 404 / 412 as for review.
+         */
+        post: operations["retire_verified_answer_api_v1_knowledge_verified_answers__answer_id__retire_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/verified-answers/{answer_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Verified Answer
+         * @description Confirm a verified answer again, as it is or corrected (permission
+         *     ``kb.verified_answer.manage``; ``If-Match``; FR-KB-030). Use it for answers flagged
+         *     ``needs_review`` after a cited document changed. Its citations (new ones if you send them)
+         *     must quote the current version of documents you can read (422 as on create); it becomes
+         *     ``active`` and you become its verifier. 404 when you cannot read a document it cites; 409
+         *     ``verified_answer_retired``; 412 when it changed since you read it.
+         */
+        post: operations["review_verified_answer_api_v1_knowledge_verified_answers__answer_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4978,9 +5028,9 @@ export interface components {
             feedback: "helpful" | "not_helpful";
             /**
              * Reason
-             * @description A reason code (e.g. wrong_source, outdated, not_found_but_exists); never free text.
+             * @description Why the answer did not help, as a code; never free text.
              */
-            reason?: string | null;
+            reason?: ("wrong_source" | "outdated" | "incomplete" | "not_found_but_exists" | "wrong_language") | null;
         };
         /** FeedbackOut */
         FeedbackOut: {
@@ -4995,7 +5045,7 @@ export interface components {
              */
             query_id: string;
             /** Reason */
-            reason: string | null;
+            reason: ("wrong_source" | "outdated" | "incomplete" | "not_found_but_exists" | "wrong_language") | null;
             /**
              * Recorded At
              * Format: date-time
@@ -8310,8 +8360,26 @@ export interface components {
              * @description Membership id of the person who verified it.
              */
             verified_by: string;
+            /**
+             * Verified By Name
+             * @description Display name of that person in this school (null if no longer a member).
+             */
+            verified_by_name?: string | null;
             /** Version */
             version: number;
+        };
+        /**
+         * VerifiedAnswerReviewIn
+         * @description Confirm a verified answer (typically ``needs_review``) as it is, or with a corrected
+         *     text, new citations or a new review date. Omitted fields keep their stored value.
+         */
+        VerifiedAnswerReviewIn: {
+            /** Answer Text */
+            answer_text?: string | null;
+            /** Citations */
+            citations?: components["schemas"]["VerifiedCitationIn"][] | null;
+            /** Review Due */
+            review_due?: string | null;
         };
         /** VerifiedCitationIn */
         VerifiedCitationIn: {
@@ -10909,7 +10977,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Server-Sent Events: meta, token, citation, error, done (docs/06 §5.1). */
+            /** @description Server-Sent Events: meta, delta, error, final, token, citation, done (docs/06 §5.1). */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10918,6 +10986,15 @@ export interface operations {
                     /**
                      * @example event: meta
                      *     data: {"query_id":"…","language":"en","mode":"full"}
+                     *
+                     *     event: delta
+                     *     data: {"text":"Exams begin on "}
+                     *
+                     *     event: delta
+                     *     data: {"text":"22/09/2026."}
+                     *
+                     *     event: final
+                     *     data: {"text":"Exams begin on 22/09/2026. [1]","replaced":false,"status":"answered","mode":"full"}
                      *
                      *     event: token
                      *     data: {"text":"Exams begin on 22/09/2026. [1]"}
@@ -11060,6 +11137,72 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifiedAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retire_verified_answer_api_v1_knowledge_verified_answers__answer_id__retire_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                answer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifiedAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_verified_answer_api_v1_knowledge_verified_answers__answer_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                answer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifiedAnswerReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

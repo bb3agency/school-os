@@ -233,11 +233,28 @@ Document errors: 413 `file_too_large`; 415 `unsupported_file_type` / `polyglot_s
 ### Knowledge
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/knowledge/ask` (SSE; body `question` 1-1000 characters, `session_id`) | `kb.ask`. `text/event-stream`: `meta` (`query_id`, `language`, `mode`), `token`, `citation` (`index`, `source`, `title`, `snippet`), `error` (`type`, `message_key`; e.g. `ai_budget_exhausted`, `ai_disabled`, `ai_unavailable`, then `mode: search_only` with cited passages and no prose), `done` (`latency_ms`, `cited_sources`); the question log row and audit event commit before the first event is sent. 429 `ai_rate_limited` when one user asks more than 10 questions a minute (`models.yaml`); 422 for an empty or too long question (**built**; docs/06 §5 as built) |
+| POST | `/knowledge/ask` (SSE; body `question` 1-1000 characters, `session_id`) | `kb.ask`. `text/event-stream`, contract in docs/06 §5.1: `meta` first and at once (`query_id`, `language`, `mode`), `delta` (streamed preview; exact text incl. whitespace, not yet validated), `error` (`type`, `message_key`; see Knowledge error codes below), `final` (the validated answer that REPLACES the preview: `text`, `replaced`, `status`, `mode`), `token` (validated segments without surrounding whitespace, joined by one space = `final.text`; kept for older clients), `citation` (`index`, `source`, `title`, `snippet`), `done` (`latency_ms`, `cited_sources`, `status` `answered`/`not_found`/`refused`/`search_only`/`error`, `mode`). The question log row (`streaming`) and `kb.query.asked` commit before the response starts; the stream completes the row (`kb.query.completed`) or, when the client disconnects, records it `cancelled` (`kb.query.cancelled`). The same user's earlier questions in the same `session_id` (at most 3, 30 minutes) are follow-up context; never another user's. Budget, switch-off or outage is not an HTTP error: `error` + `mode: search_only` with cited passages and no prose. 429 `ai_rate_limited` when one user asks more than 10 questions a minute (`models.yaml`); 422 for an empty or too long question (**built**; docs/06 §5 as built) |
 | POST | `/knowledge/search` (body `query`, optional `doc_types`, `from_date`, `limit` ≤ 50) | `document.read`. Search-only ranked passages you can read (`source`, `document_id`, `version_no`, pages, `doc_type`, `title`, `issued_on`, `snippet`, `score`); the text never goes in the URL (SEC-008) (**built**) |
-| POST | `/knowledge/queries/{query_id}/feedback` (body `feedback`: `helpful`/`not_helpful`, optional `reason` code) | `kb.ask`, own questions only (anyone else's, or another school's, is 404); audited `kb.query.feedback` (**built**) |
-| GET/POST | `/knowledge/verified-answers` | read: `kb.ask` (cursor list, `status` filter; only answers whose cited documents you can all read); write: `kb.verified_answer.manage` (`Idempotency-Key`; `question`, `language`, `answer_text`, `citations` [`sos://doc/{id}/v{n}#p{page}` + `cited_text`], optional `review_due`; each citation must quote the current version of an active document you can read: 422 `citation_not_found`, `citation_not_current`, `citation_text_not_found`, `citation_source_unsupported`); audited `kb.verified_answer.created`; flagged `needs_review` when a cited document gets a new version or is deleted (**built**; FR-KB-030) |
+| POST | `/knowledge/queries/{query_id}/feedback` (body `feedback`: `helpful`/`not_helpful`, optional `reason`: `wrong_source`, `outdated`, `incomplete`, `not_found_but_exists`, `wrong_language`; anything else 422) | `kb.ask`, own questions only (anyone else's, or another school's, is 404); audited `kb.query.feedback` (**built**) |
+| GET/POST | `/knowledge/verified-answers` | read: `kb.ask` (cursor list, `status` filter; only answers whose cited documents you can all read); write: `kb.verified_answer.manage` (`Idempotency-Key`; `question`, `language`, `answer_text`, `citations` [`sos://doc/{id}/v{n}#p{page}` + `cited_text`], optional `review_due`; each citation must quote the current version of an active document you can read: 422 `citation_not_found`, `citation_not_current`, `citation_text_not_found`, `citation_source_unsupported`); audited `kb.verified_answer.created`; each answer carries `verified_by` (membership id) and `verified_by_name` (display name, never an email); a C3 document can be cited or seen only with `student.read_sensitive`; active answers are also offered to Ask as `sos://verified/{id}` sources; flagged `needs_review` when a cited document gets a new version or is deleted (**built**; FR-KB-030) |
+| POST | `/knowledge/verified-answers/{id}/review` (`If-Match`; optional `answer_text`, `citations`, `review_due`) | `kb.verified_answer.manage`. Confirms an answer (typically `needs_review`) again: citations (new, else stored) are re-checked against the current versions (422 as on create); becomes `active`, verified by the caller now; `ETag` of the new version. 404 when you cannot read a cited document; 409 `verified_answer_retired`; 412 stale `If-Match`. Audited `kb.verified_answer.reviewed` (previous status, changed field names) (**built**; FR-KB-030) |
+| POST | `/knowledge/verified-answers/{id}/retire` (`If-Match`) | `kb.verified_answer.manage`. `retired`: never used by Ask again, kept for the record; 409 `verified_answer_retired` when it already is; 404/412 as for review. Audited `kb.verified_answer.retired` (**built**; FR-KB-030) |
 | GET | `/knowledge/resolve?source=sos://…` | permission of the underlying resource (not built) |
+
+#### Knowledge error codes (`kb.errors.*`)
+
+The SSE `error` event carries a stable `type` and an i18n `message_key`; the web translates the key (`en`, `te`) and may use the type for behaviour. The same codes are the RFC 9457 `code` where a request is refused before streaming (429 `ai_rate_limited` for the per-user question limit).
+
+| `type` | `message_key` | Meaning | What the user sees |
+|---|---|---|---|
+| `ai_budget_exhausted` | `kb.errors.budget` | The school's monthly AI budget is used up (FR-KB-011) | Search-only passages until the month resets or the budget is raised |
+| `ai_disabled` | `kb.errors.disabled` | AI is switched off (school setting, `kb.ask.enabled` flag, or `SOS_KB_ENABLED`) | Search-only passages |
+| `ai_rate_limited` | `kb.errors.rate_limited` | Too many AI calls for the school this minute (in the stream), or too many questions from you (HTTP 429 before streaming) | Search-only passages (stream) / wait a minute (429) |
+| `ai_unavailable` | `kb.errors.unavailable` | Provider timeout, outage or overload, the circuit breaker is open, or the provider failed mid-answer | Search-only passages; the streamed preview is replaced (`final.replaced`) |
+| `ai_request_rejected` | `kb.errors.unavailable` | The provider refused our request (a bug or configuration error) | Search-only passages |
+| `ai_invalid_output` | `kb.errors.unavailable` | The model's output could not be used (e.g. a tool that was not offered) | Search-only passages |
+| `internal_error` | `kb.errors.internal` | The stream failed unexpectedly (recorded `error`; `done.status` = `error`) | "Something went wrong, ask again" |
+
 
 ### Exports, audit, admin, jobs
 | Method | Path | Permission |
@@ -368,15 +385,25 @@ Accept: text/event-stream
 event: meta
 data: {"query_id":"0192…","language":"mixed","mode":"full"}
 
+event: delta
+data: {"text":"12 Aug 2026 DEO circular prakaram, "}
+
+event: delta
+data: {"text":"exams 09:30 ki modalavutayi."}
+
+event: final
+data: {"text":"12 Aug 2026 DEO circular prakaram, exams 09:30 ki modalavutayi. [1]","replaced":false,"status":"answered","mode":"full"}
+
 event: token
-data: {"text":"12 Aug 2026 DEO circular prakaram, exams "}
+data: {"text":"12 Aug 2026 DEO circular prakaram, exams 09:30 ki modalavutayi. [1]"}
 
 event: citation
-data: {"index":1,"source":"sos://doc/0192…/v1#p2","title":"Circular · DEO Guntur · Exam timings · 12 Aug 2026 (p.2)"}
+data: {"index":1,"source":"sos://doc/0192…/v1#p2","title":"Circular · DEO Guntur · Exam timings · 12 Aug 2026 (p.2)","snippet":"…"}
 
 event: done
-data: {"latency_ms":4120,"cited_sources":1}
+data: {"latency_ms":4120,"cited_sources":1,"status":"answered","mode":"full"}
 ```
+Show `delta` text as it arrives; on `final`, replace it with `final.text` and ignore the `token` events (docs/06 §5.1).
 
 ### 5.5 Start a pre-check export
 ```http
