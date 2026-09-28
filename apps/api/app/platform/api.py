@@ -35,6 +35,7 @@ from app.platform import (
     dashboard,
     flags,
     fleet,
+    invoice_files,
     operators,
     provisioning,
     support,
@@ -67,6 +68,7 @@ from app.platform.schemas import (
     InvoiceCreate,
     InvoiceOut,
     InvoicePatch,
+    InvoicePdfDownloadOut,
     InvoiceRunIn,
     JobOut,
     MeOut,
@@ -609,6 +611,17 @@ def get_invoice(
     out = billing.get_invoice(invoice_id)
     _etag(response, out.version)
     return out
+
+
+@router.get("/invoices/{invoice_id}/download-url", response_model=InvoicePdfDownloadOut)
+def invoice_download_url(
+    *, invoice_id: uuid.UUID, response: Response, ctx: Annotated[Ctx, InvRead]
+) -> InvoicePdfDownloadOut:
+    """A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF (docs/16
+    §5.8). ``409 invoice_draft`` for a draft, ``409 invoice_pdf_pending`` until the worker has
+    rendered it (usually within a minute of issue). Audited as ``invoice.pdf_downloaded``."""
+    response.headers["Cache-Control"] = "no-store"
+    return invoice_files.download_url(_actor(ctx), invoice_id)
 
 
 @router.post("/invoices", response_model=InvoiceOut, status_code=201)

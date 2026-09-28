@@ -311,6 +311,14 @@ data "aws_iam_policy_document" "api" {
     resources = ["${module.s3.files_bucket_arn}/t/*"]
   }
 
+  # Control-plane invoice PDFs (docs/16 §5.8, ADR-0017 Amendment 2026-09-28): rendered by
+  # worker-pdf, downloaded through presigned GETs signed by the api. Never under a school prefix.
+  statement {
+    sid       = "InvoicePdfObjects"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["${module.s3.files_bucket_arn}/platform/invoices/*"]
+  }
+
   statement {
     sid       = "DataKey"
     actions   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:DescribeKey"]

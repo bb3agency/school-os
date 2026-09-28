@@ -2181,6 +2181,28 @@ export interface paths {
         patch: operations["update_invoice_api_v1_platform_invoices__invoice_id__patch"];
         trace?: never;
     };
+    "/api/v1/platform/invoices/{invoice_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Invoice Download Url
+         * @description A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF (docs/16
+         *     §5.8). ``409 invoice_draft`` for a draft, ``409 invoice_pdf_pending`` until the worker has
+         *     rendered it (usually within a minute of issue). Audited as ``invoice.pdf_downloaded``.
+         */
+        get: operations["invoice_download_url_api_v1_platform_invoices__invoice_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/invoices/{invoice_id}/issue": {
         parameters: {
             query?: never;
@@ -5637,6 +5659,33 @@ export interface components {
             lines?: components["schemas"]["InvoiceLineIn"][] | null;
             /** Notes */
             notes?: string | null;
+        };
+        /**
+         * InvoicePdfDownloadOut
+         * @description A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF.
+         */
+        InvoicePdfDownloadOut: {
+            /**
+             * Content Type
+             * @default application/pdf
+             * @constant
+             */
+            content_type: "application/pdf";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Template Version */
+            template_version: string;
+            /** Url */
+            url: string;
         };
         /** InvoiceRunIn */
         InvoiceRunIn: {
@@ -12120,6 +12169,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvoiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invoice_download_url_api_v1_platform_invoices__invoice_id__download_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePdfDownloadOut"];
                 };
             };
             /** @description Validation Error */

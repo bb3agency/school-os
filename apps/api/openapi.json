@@ -5789,6 +5789,52 @@
         "title": "InvoicePatch",
         "type": "object"
       },
+      "InvoicePdfDownloadOut": {
+        "description": "A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF.",
+        "properties": {
+          "content_type": {
+            "const": "application/pdf",
+            "default": "application/pdf",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "filename",
+          "template_version",
+          "size_bytes",
+          "sha256"
+        ],
+        "title": "InvoicePdfDownloadOut",
+        "type": "object"
+      },
       "InvoiceRunIn": {
         "additionalProperties": false,
         "properties": {
@@ -20159,6 +20205,50 @@
           }
         },
         "summary": "Update Invoice",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices/{invoice_id}/download-url": {
+      "get": {
+        "description": "A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF (docs/16\n\u00a75.8). ``409 invoice_draft`` for a draft, ``409 invoice_pdf_pending`` until the worker has\nrendered it (usually within a minute of issue). Audited as ``invoice.pdf_downloaded``.",
+        "operationId": "invoice_download_url_api_v1_platform_invoices__invoice_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invoice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePdfDownloadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invoice Download Url",
         "tags": [
           "platform"
         ]

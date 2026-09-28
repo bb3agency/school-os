@@ -275,6 +275,37 @@ def next_invoice_number(session: Session, financial_year: str, prefix: str) -> i
     return number
 
 
+def invoice_pdf(session: Session, invoice_id: uuid.UUID) -> RowMapping | None:
+    return (
+        session.execute(select(m.invoice_pdfs).where(m.invoice_pdfs.c.invoice_id == invoice_id))
+        .mappings()
+        .one_or_none()
+    )
+
+
+def insert_invoice_pdf(session: Session, values: Mapping[str, Any]) -> bool:
+    """Record a rendered PDF; False when the invoice already has one (another render won)."""
+    row = session.execute(
+        pg_insert(m.invoice_pdfs)
+        .values(**values)
+        .on_conflict_do_nothing(index_elements=[m.invoice_pdfs.c.invoice_id])
+        .returning(m.invoice_pdfs.c.invoice_id)
+    ).first()
+    return row is not None
+
+
+def invoices_without_pdf(session: Session, limit: int) -> list[uuid.UUID]:
+    """Numbered invoices (issued, paid or void) that have no stored PDF yet, oldest first."""
+    stmt = (
+        select(m.invoices.c.id)
+        .outerjoin(m.invoice_pdfs, m.invoice_pdfs.c.invoice_id == m.invoices.c.id)
+        .where(m.invoices.c.invoice_number.is_not(None), m.invoice_pdfs.c.invoice_id.is_(None))
+        .order_by(m.invoices.c.issued_at, m.invoices.c.id)
+        .limit(limit)
+    )
+    return list(session.execute(stmt).scalars())
+
+
 def payments_total(session: Session, invoice_id: uuid.UUID) -> tuple[Decimal, Decimal]:
     row = session.execute(
         select(
