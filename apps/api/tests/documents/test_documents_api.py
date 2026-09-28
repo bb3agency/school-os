@@ -919,6 +919,80 @@ def test_FR_DOC_007_retention_guard_blocks_delete(
     assert api.call(owner, "GET", f"/api/v1/documents/{doc}").status_code == 200
 
 
+def test_FR_DOC_007_deleted_hooks_run_after_the_delete_in_its_transaction(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """``DELETED_HOOKS`` run once the rows are gone and the delete is audited, in the same
+    transaction (docs/06 §4.8: e.g. flag verified answers citing the document)."""
+    owner = world.person("owner")
+    doc = S.make_document(admin_engine, world.a.tenant_id, owner.user_id)
+    seen: list[tuple[uuid.UUID, int, int]] = []
+
+    def hook(s: Any, document_id: uuid.UUID) -> None:
+        rows = s.execute(
+            text("SELECT count(*) FROM kb.documents WHERE id = :d"), {"d": document_id}
+        ).scalar_one()
+        audited = s.execute(
+            text(
+                "SELECT count(*) FROM audit.events WHERE action = 'document.deleted' "
+                "AND resource_id = :d"
+            ),
+            {"d": document_id},
+        ).scalar_one()
+        seen.append((document_id, rows, audited))
+
+    service.DELETED_HOOKS.append(hook)
+    try:
+        res = api.call(owner, "DELETE", f"/api/v1/documents/{doc}")
+    finally:
+        service.DELETED_HOOKS.remove(hook)
+    assert res.status_code == 204, res.text
+    assert seen == [(doc, 0, 1)]
+
+
+def test_FR_DOC_007_a_failing_deleted_hook_rolls_the_delete_back(
+    world: Any, admin_engine: Engine
+) -> None:
+    owner = world.person("owner")
+    doc = S.make_document(admin_engine, world.a.tenant_id, owner.user_id)
+
+    def hook(s: Any, document_id: uuid.UUID) -> None:
+        raise RuntimeError("hook failed")
+
+    service.DELETED_HOOKS.append(hook)
+    try:
+        with (
+            pytest.raises(RuntimeError, match="hook failed"),
+            tenant_session(world.a.tenant_id) as s,
+        ):
+            service.delete_for_retention(s, doc, reason="import_raw_file")
+    finally:
+        service.DELETED_HOOKS.remove(hook)
+    with admin_engine.connect() as c:
+        kept: Any = c.execute(
+            text("SELECT count(*) FROM kb.documents WHERE id = :d"), {"d": doc}
+        ).scalar_one()
+    assert kept == 1
+    assert _audit_rows(admin_engine, world.a.tenant_id, "document.deleted", doc) == []
+
+
+def test_FR_DOC_007_refused_deletes_never_call_deleted_hooks(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    owner = world.person("owner")
+    doc = S.make_document(admin_engine, world.a.tenant_id, owner.user_id)
+    calls: list[uuid.UUID] = []
+    service.DELETE_GUARDS.append(lambda s, d: "evidence_in_use" if d == doc else None)
+    service.DELETED_HOOKS.append(lambda s, d: calls.append(d))
+    try:
+        res = api.call(owner, "DELETE", f"/api/v1/documents/{doc}")
+    finally:
+        service.DELETE_GUARDS.pop()
+        service.DELETED_HOOKS.pop()
+    assert res.status_code == 409
+    assert calls == []
+
+
 def _audit_rows(admin: Engine, tenant_id: uuid.UUID, action: str, doc: uuid.UUID) -> list[Any]:
     with admin.connect() as c:
         return list(

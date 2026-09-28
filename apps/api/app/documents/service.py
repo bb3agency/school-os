@@ -148,6 +148,14 @@ DeleteGuard = Callable[[Session, uuid.UUID], str | None]
 
 DELETE_GUARDS: list[DeleteGuard] = []
 
+DeletedHook = Callable[[Session, uuid.UUID], None]
+DELETED_HOOKS: list[DeletedHook] = []
+"""``hook(session, document_id)`` after a document was deleted (by a user or a retention job):
+its rows are gone, ``document.deleted`` is audited and the object purge is queued, all in the
+same transaction, so whatever a hook writes (e.g. knowledge flagging verified answers that cite
+the document, docs/06 §4.8) commits or rolls back with the delete. Never called for a refused
+delete (a ``DELETE_GUARDS`` code, evidence in use); a hook that raises rolls the delete back."""
+
 AclChangedHook = Callable[[Session, uuid.UUID], None]
 ACL_CHANGED_HOOKS: list[AclChangedHook] = []
 """M2: rewrite ``acl_*`` arrays on the document's chunks (docs/05 §6)."""
@@ -1143,6 +1151,8 @@ def _delete(session: Session, doc: Document, *, reason: str | None) -> None:
         repo.delete_document(session, doc.id)
         _audit(session, "document.deleted", doc.id, summary, system=reason is not None)
         ops.enqueue_event(session, DELETED_EVENT, {"document_id": doc.id, "batch_ids": batch_ids})
+        for hook in DELETED_HOOKS:
+            hook(session, doc.id)
 
 
 def purge_document_objects(
@@ -1612,6 +1622,7 @@ def delete_export_files(
 
 __all__ = [
     "ACL_CHANGED_HOOKS",
+    "DELETED_HOOKS",
     "DELETE_GUARDS",
     "DISCARDED_EVENT",
     "DISCARD_REASONS",
