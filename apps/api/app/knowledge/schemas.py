@@ -69,19 +69,24 @@ class SearchOut(_Out):
     data: list[SearchResultOut]
 
 
+FeedbackReason = Literal[
+    "wrong_source", "outdated", "incomplete", "not_found_but_exists", "wrong_language"
+]
+"""Why an answer did not help (docs/09 Knowledge): a fixed code the UI translates, never text."""
+
+
 class FeedbackIn(_In):
     feedback: Literal["helpful", "not_helpful"]
-    reason: Code | None = Field(
+    reason: FeedbackReason | None = Field(
         default=None,
-        description="A reason code (e.g. wrong_source, outdated, not_found_but_exists); "
-        "never free text.",
+        description="Why the answer did not help, as a code; never free text.",
     )
 
 
 class FeedbackOut(_Out):
     query_id: uuid.UUID
     feedback: Literal["helpful", "not_helpful"]
-    reason: str | None
+    reason: FeedbackReason | None
     recorded_at: dt.datetime
 
 
@@ -127,6 +132,7 @@ __all__ = [
     "Code",
     "FeedbackIn",
     "FeedbackOut",
+    "FeedbackReason",
     "Locale",
     "SearchIn",
     "SearchOut",

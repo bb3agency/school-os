@@ -20,7 +20,7 @@ from __future__ import annotations
 import itertools
 import json
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -145,7 +145,7 @@ class Gateway:
         system: str,
         conversation: Sequence[ConversationItem],
         tools: Sequence[ToolSpec],
-    ) -> Iterator[TurnEvent]:
+    ) -> Generator[TurnEvent, None, None]:
         """:class:`~app.knowledge.interfaces.StreamingLlmGateway`: the same controls as
         :meth:`run_turn`, text deltas (Aadhaar-masked) as they arrive, then the whole turn."""
         # The span is not made current: a generator resumes in whichever thread iterates it.

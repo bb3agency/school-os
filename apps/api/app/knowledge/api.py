@@ -1,11 +1,13 @@
 """Knowledge routes: "Ask the school" (docs/09 Knowledge, docs/06 §5; FR-KB-001..012, FR-KB-030).
 
-- ``POST /knowledge/ask`` (``kb.ask``): Server-Sent Events ``meta``, ``token``, ``citation``,
-  ``error``, ``done`` (docs/06 §5.1). The whole answer is produced, validated, stored
-  (encrypted) and audited inside the request's transaction, which commits BEFORE the first
-  event is sent: nothing is shown that was not recorded (invariant 7). Budget exhaustion or an
-  outage is not an HTTP error: ``meta`` says ``mode: search_only`` and an ``error`` event
-  carries the reason code and i18n key. Too many questions from one user answers 429.
+- ``POST /knowledge/ask`` (``kb.ask``): Server-Sent Events (docs/06 §5.1): ``meta``,
+  ``delta`` (streamed preview), ``error``, ``final`` (the validated answer, replacing the
+  preview), ``token``, ``citation``, ``done``. The question's ``kb.queries`` row (encrypted)
+  and its audit event are written in the request's transaction, which commits BEFORE the first
+  event is sent (invariant 7); the stream then completes the row (``kb.query.completed``) or,
+  when the client goes away, records it ``cancelled``. Budget exhaustion or an outage is not an
+  HTTP error: an ``error`` event carries the reason code and i18n key and the answer is
+  search-only. Too many questions from one user answers 429.
 - ``POST /knowledge/search`` (``document.read``): search-only retrieval, the text in the body
   (SEC-008). Filtered by the document ACL and your scopes in SQL.
 - ``POST /knowledge/queries/{query_id}/feedback`` (``kb.ask``, own questions only; 404 else).
@@ -17,12 +19,14 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncGenerator
 from dataclasses import asdict
 from typing import Annotated, Any
 
+import anyio
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
@@ -56,11 +60,16 @@ Verifier = Annotated[UserContext, Depends(require(service.MANAGE_VERIFIED))]
 SSE_MEDIA_TYPE = "text/event-stream"
 _SSE_DOC: dict[int | str, dict[str, Any]] = {
     200: {
-        "description": "Server-Sent Events: meta, token, citation, error, done (docs/06 §5.1).",
+        "description": "Server-Sent Events: meta, delta, error, final, token, citation, done "
+        "(docs/06 §5.1).",
         "content": {
             SSE_MEDIA_TYPE: {
                 "schema": {"type": "string"},
                 "example": 'event: meta\ndata: {"query_id":"…","language":"en","mode":"full"}\n\n'
+                'event: delta\ndata: {"text":"Exams begin on "}\n\n'
+                'event: delta\ndata: {"text":"22/09/2026."}\n\n'
+                'event: final\ndata: {"text":"Exams begin on 22/09/2026. [1]","replaced":false,'
+                '"status":"answered","mode":"full"}\n\n'
                 'event: token\ndata: {"text":"Exams begin on 22/09/2026. [1]"}\n\n'
                 'event: citation\ndata: {"index":1,"source":"sos://doc/…/v2#p1",'
                 '"title":"Circular · …","snippet":"…"}\n\n'
@@ -76,6 +85,21 @@ def _sse(event: service.AskEvent) -> str:
     return f"event: {event.event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+async def _sse_stream(stream: service.AskStream) -> AsyncGenerator[str, None]:
+    """The events as SSE frames. Each step of the (synchronous) stream runs in the thread
+    pool; when the client disconnects, Starlette cancels this generator and ``finally`` closes
+    the stream, which stops the provider call and records the question ``cancelled``."""
+    try:
+        while True:
+            event = await run_in_threadpool(next, stream, None)
+            if event is None:
+                return
+            yield _sse(event)
+    finally:
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(stream.close)
+
+
 @router.post(
     "/knowledge/ask",
     response_class=StreamingResponse,
@@ -85,22 +109,20 @@ def ask(ctx: Asker, db: TenantDB, body: AskIn) -> StreamingResponse:
     """Ask a question of the school's records and documents (permission ``kb.ask``).
 
     Answers cite their sources (``sos://`` URIs) or say the answer was not found in the school
-    records you can access. Only records and documents you may see are used. When the school's
-    AI budget is used up or AI answers are unavailable, you get ranked, cited passages instead
-    (``mode: search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.
+    records you can access. Only records and documents you may see are used. The answer streams
+    as ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces
+    the preview. Questions asked earlier in the same ``session_id`` by you are context for a
+    follow-up (never another person's). When the school's AI budget is used up or AI answers
+    are unavailable, you get ranked, cited passages instead (``mode: search_only``). 429
+    ``ai_rate_limited`` when you ask too many questions a minute.
     """
     svc = service.get_service()
     svc.admit(ctx)
-    events = svc.answer(
+    stream = svc.start_stream(
         db, ctx, service.AskRequest(question=body.question, session_id=body.session_id)
     )
-    payload = [_sse(e) for e in events]
-
-    def stream() -> Iterator[str]:
-        yield from payload
-
     return StreamingResponse(
-        stream(),
+        _sse_stream(stream),
         media_type=SSE_MEDIA_TYPE,
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )

@@ -34,7 +34,8 @@ import re
 import time
 import unicodedata
 import uuid
-from collections.abc import Sequence
+from collections.abc import Generator, Iterator, Sequence
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Final, Literal
@@ -56,13 +57,15 @@ from app.knowledge.domain import (
     Metering,
     ModelTurn,
     SearchResultBlock,
+    TextDelta,
     ToolCall,
     ToolOutcome,
     ToolResultsMessage,
+    ToolSpec,
     UserMessage,
 )
-from app.knowledge.gateway.errors import GatewayError
-from app.knowledge.interfaces import LlmGateway
+from app.knowledge.gateway.errors import GatewayError, InvalidModelOutput
+from app.knowledge.interfaces import LlmGateway, StreamingLlmGateway
 from app.knowledge.prompts.registry import PromptTemplate
 from app.knowledge.tools.documents import NAME as SEARCH_TOOL
 from app.knowledge.tools.documents import DocumentSearch, to_block
@@ -160,7 +163,9 @@ class Answer:
 
     @property
     def text(self) -> str:
-        return " ".join(s.text for s in self.segments if s.text)
+        """The segments, each stripped, joined with one space (the ``final`` event text;
+        ``token`` events carry the same stripped segments, docs/06 §5.1)."""
+        return " ".join(t for s in self.segments if (t := s.text.strip()))
 
 
 @dataclass
@@ -191,6 +196,71 @@ class _Provided:
 
     def first(self, source: str) -> SearchResultBlock:
         return self.by_source[source][0]
+
+
+@dataclass
+class Progress:
+    """What a streamed answer has shown and used so far (docs/06 §5.1).
+
+    The service records it when the client goes away before the answer is complete
+    (``kb.queries`` status ``cancelled``): the preview text shown, tool runs, sources given to
+    the model and the model turns (ids and tokens)."""
+
+    shown: list[str] = field(default_factory=list)
+    runs: list[ToolRun] = field(default_factory=list)
+    provided: _Provided = field(default_factory=_Provided)
+    turns: list[ModelTurn] = field(default_factory=list)
+
+    @property
+    def text(self) -> str:
+        return "".join(self.shown)
+
+
+class PreviewSanitiser:
+    """The §9 rule 5 output rules for streamed preview text.
+
+    Holds back the unfinished last word, an HTML tag without its ``>`` and a markdown link
+    without its ``)``, then applies :func:`sanitise` to whole words only, so a link or tag is
+    never shown in pieces (the gateway has already masked Aadhaar numbers across deltas).
+    Beyond ``max_pending`` held characters it emits what it has, sanitised."""
+
+    def __init__(self, max_pending: int, progress: Progress | None = None) -> None:
+        self._max = max_pending
+        self._pending = ""
+        self.progress = progress or Progress()
+
+    def feed(self, text: str) -> str:
+        self._pending += text
+        cut = self._safe_cut(self._pending)
+        if cut == 0 and len(self._pending) > self._max:
+            cut = len(self._pending)
+        out, self._pending = self._pending[:cut], self._pending[cut:]
+        return sanitise(out) if out else ""
+
+    def flush(self) -> str:
+        out, self._pending = self._pending, ""
+        return sanitise(out) if out else ""
+
+    @staticmethod
+    def _safe_cut(text: str) -> int:
+        cut = max(text.rfind(c) for c in " \n\t") + 1
+        head = text[:cut]
+        tag = head.rfind("<")
+        if tag >= 0 and head.rfind(">") < tag:
+            cut = tag
+        link = head[:cut].rfind("[")
+        if link >= 0:
+            rest = head[link:cut]
+            close = rest.find("]")
+            if close < 0 or (rest[close + 1 : close + 2] == "(" and ")" not in rest[close:]):
+                cut = link
+        return cut
+
+
+def _show(text: str, progress: Progress) -> Iterator[TextDelta]:
+    if text:
+        progress.shown.append(text)
+        yield TextDelta(text)
 
 
 def _snippet(text: str) -> str:
@@ -282,7 +352,65 @@ class AnswerEngine:
         *,
         query_id: uuid.UUID,
         school_name: str,
+        earlier: Sequence[str] = (),
     ) -> Answer:
+        """The whole answer at once (the eval harness, the non-streaming service path)."""
+        loop = self._loop(
+            session,
+            ctx,
+            question,
+            query_id=query_id,
+            school_name=school_name,
+            earlier=earlier,
+            progress=Progress(),
+            stream=False,
+        )
+        while True:
+            try:
+                next(loop)
+            except StopIteration as done:
+                answer: Answer = done.value
+                return answer
+
+    def stream(
+        self,
+        session: Session,
+        ctx: UserContext,
+        question: str,
+        *,
+        query_id: uuid.UUID,
+        school_name: str,
+        progress: Progress,
+        earlier: Sequence[str] = (),
+    ) -> Generator[TextDelta, None, Answer]:
+        """The answer as it is written: tool rounds first, then the final turn's text as
+        sanitised preview deltas (docs/06 §5.1); returns the validated :class:`Answer`.
+
+        ``progress`` shows what was streamed and used so far, for a client that goes away
+        (closing this generator closes the provider call)."""
+        return self._loop(
+            session,
+            ctx,
+            question,
+            query_id=query_id,
+            school_name=school_name,
+            earlier=earlier,
+            progress=progress,
+            stream=True,
+        )
+
+    def _loop(
+        self,
+        session: Session,
+        ctx: UserContext,
+        question: str,
+        *,
+        query_id: uuid.UUID,
+        school_name: str,
+        earlier: Sequence[str],
+        progress: Progress,
+        stream: bool,
+    ) -> Generator[TextDelta, None, Answer]:
         language = detect_language(question)
         tools = offered(self._tools, ctx)
         by_name = {t.spec.name: t for t in tools}
@@ -290,15 +418,24 @@ class AnswerEngine:
         limits = self._config.limits
         budget = limits.tool_result_context_tokens * limits.chars_per_token_estimate
         used = 0
-        provided = _Provided()
-        runs: list[ToolRun] = []
-        turns: list[ModelTurn] = []
-        conversation: list[ConversationItem] = [UserMessage(question)]
+        provided = progress.provided
+        runs = progress.runs
+        turns = progress.turns
+        conversation: list[ConversationItem] = [
+            UserMessage(question, earlier_questions=tuple(earlier))
+        ]
         metering = Metering(tenant_id=ctx.tenant_id, feature="ask", query_id=query_id)
         system = self.system_prompt(ctx, school_name)
+        preview = PreviewSanitiser(self._config.streaming.preview_max_pending_chars, progress)
         try:
-            for _ in range(limits.max_tool_rounds + 1):
-                turn = self._gateway.run_turn(metering, "answer", system, conversation, specs)
+            for round_no in range(limits.max_tool_rounds + 1):
+                if stream:
+                    last = not specs or round_no >= limits.max_tool_rounds
+                    turn = yield from self._streamed_turn(
+                        metering, system, conversation, specs, hold=not last, preview=preview
+                    )
+                else:
+                    turn = self._gateway.run_turn(metering, "answer", system, conversation, specs)
                 turns.append(turn)
                 if not turn.tool_calls:
                     break
@@ -317,6 +454,7 @@ class AnswerEngine:
                     runs.append(ToolRun(call.name, len(kept), outcome.is_error))
                     outcomes.append(outcome)
                 conversation += [AssistantMessage(turn), ToolResultsMessage(tuple(outcomes))]
+            yield from _show(preview.flush(), progress)
         except GatewayError as exc:
             if not exc.search_only:
                 raise
@@ -329,6 +467,61 @@ class AnswerEngine:
                 runs=runs,
                 error=(exc.code, exc.message_key),
             )
+        return self._validated(ctx, query_id, language, turns=turns, runs=runs, provided=provided)
+
+    def _streamed_turn(
+        self,
+        metering: Metering,
+        system: str,
+        conversation: Sequence[ConversationItem],
+        specs: Sequence[ToolSpec],
+        *,
+        hold: bool,
+        preview: PreviewSanitiser,
+    ) -> Generator[TextDelta, None, ModelTurn]:
+        """One model turn, its text shown as it arrives. While more tool rounds may follow
+        (``hold``), text is held until ``preview_hold_chars`` long, so a short remark before a
+        tool call is never shown; the preview is replaced by the validated answer anyway."""
+        gateway = self._gateway
+        if not isinstance(gateway, StreamingLlmGateway):
+            whole = gateway.run_turn(metering, "answer", system, conversation, specs)
+            if not whole.tool_calls:
+                text = "".join(s.text for s in whole.segments)
+                yield from _show(preview.feed(text), preview.progress)
+            return whole
+        hold_chars = self._config.streaming.preview_hold_chars if hold else 0
+        held: list[str] = []
+        showing = hold_chars == 0
+        turn: ModelTurn | None = None
+        with closing(gateway.stream_turn(metering, "answer", system, conversation, specs)) as it:
+            for item in it:
+                if isinstance(item, ModelTurn):
+                    turn = item
+                    continue
+                if showing:
+                    yield from _show(preview.feed(item.text), preview.progress)
+                    continue
+                held.append(item.text)
+                if sum(len(t) for t in held) >= hold_chars:
+                    showing = True
+                    yield from _show(preview.feed("".join(held)), preview.progress)
+                    held.clear()
+        if turn is None:
+            raise InvalidModelOutput("the model stream ended without a complete turn")
+        if held and not turn.tool_calls:
+            yield from _show(preview.feed("".join(held)), preview.progress)
+        return turn
+
+    def _validated(
+        self,
+        ctx: UserContext,
+        query_id: uuid.UUID,
+        language: Locale,
+        *,
+        turns: Sequence[ModelTurn],
+        runs: Sequence[ToolRun],
+        provided: _Provided,
+    ) -> Answer:
         final = turns[-1] if turns and not turns[-1].tool_calls else None
         segments, dropped = validate(final.segments if final else (), provided)
         base = self._base(language, turns, runs, provided, dropped)
@@ -481,6 +674,8 @@ __all__ = [
     "Answer",
     "AnswerEngine",
     "CitedSource",
+    "PreviewSanitiser",
+    "Progress",
     "ToolRun",
     "cited_sources",
     "detect_language",

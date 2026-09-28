@@ -26,7 +26,7 @@ invariant 1) or a worker job's. Nothing in these contracts carries a raw Aadhaar
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from app.knowledge.domain import (
@@ -143,7 +143,7 @@ class StreamingLlmGateway(LlmGateway, Protocol):
         system: str,
         conversation: Sequence[ConversationItem],
         tools: Sequence[ToolSpec],
-    ) -> Iterator[TurnEvent]:
+    ) -> Generator[TurnEvent, None, None]:
         """``run_turn`` with the text as it is generated: yields ``TextDelta`` values
         (Aadhaar-masked, not validated), then exactly one ``ModelTurn``, identical to what
         ``run_turn`` returns for the same response.

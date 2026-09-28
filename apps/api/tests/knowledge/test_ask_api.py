@@ -6,8 +6,8 @@ tools, retrieval with SQL ACL filters, citation validation, the encrypted query 
 audit chain. Synthetic data only.
 
 Requirements: FR-KB-001, FR-KB-002, FR-KB-005, FR-KB-007, FR-KB-008 (SSE protocol), FR-KB-009,
-FR-KB-010, FR-KB-011, FR-KB-012, FR-KB-030, SEC-018, SEC-019, SEC-020; invariants 1, 2, 5, 7,
-8, 9.
+FR-KB-010, FR-KB-011, FR-KB-012, FR-KB-030, SEC-018, SEC-019, SEC-020, NFR-AVL-004; invariants
+1, 2, 5, 7, 8, 9.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -23,8 +23,11 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
-from app.knowledge import composition
+from app.core.db import tenant_session
+from app.knowledge import composition, service
 from app.knowledge.config.llm import load_llm_config
+from app.knowledge.gateway.fake import FakeTransport
+from app.knowledge.gateway.transport import MessagesRequest, TransportError
 
 pytestmark = pytest.mark.db
 
@@ -125,7 +128,23 @@ def test_FR_KB_008_ask_streams_meta_tokens_citations_done(
     names = [e for e, _ in events]
     assert names[0] == "meta"
     assert names[-1] == "done"
-    assert set(names) <= {"meta", "token", "citation", "done"}
+    # docs/06 §5.1: meta, delta+ (preview), final, token+, citation+, done, in that order.
+    n_delta, n_token, n_cite = (names.count(n) for n in ("delta", "token", "citation"))
+    assert n_delta > 1
+    assert n_token >= 1
+    assert n_cite >= 1
+    assert names == (
+        ["meta"] + ["delta"] * n_delta + ["final"] + ["token"] * n_token + ["citation"] * n_cite
+    ) + ["done"]
+    # Clients that predate delta/final still see exactly the old sequence.
+    legacy = [n for n in names if n not in ("delta", "final")]
+    assert legacy == ["meta"] + ["token"] * n_token + ["citation"] * n_cite + ["done"]
+    final = next(d for e, d in events if e == "final")
+    assert final["text"] == _text(events)
+    assert final["replaced"] is False
+    assert (final["status"], final["mode"]) == ("answered", "full")
+    preview = "".join(d["text"] for e, d in events if e == "delta")
+    assert "28/11/2026" in preview
     meta = events[0][1]
     assert meta["mode"] == "full"
     assert meta["language"] == "en"
@@ -134,6 +153,11 @@ def test_FR_KB_008_ask_streams_meta_tokens_citations_done(
     assert any(s.startswith(f"sos://doc/{docs['sports']}/v1#p") for s in sources)
     assert "28/11/2026" in _text(events)
     assert events[-1][1]["cited_sources"] == len(sources)
+    assert (events[-1][1]["status"], events[-1][1]["mode"]) == ("answered", "full")
+    # token texts are whole segments without surrounding whitespace, joined by one space.
+    tokens = [d["text"] for e, d in events if e == "token"]
+    assert all(t == t.strip() and t for t in tokens)
+    assert final["text"] == " ".join(tokens)
 
 
 def test_FR_KB_009_query_is_logged_encrypted_and_audited_without_text(
@@ -155,16 +179,23 @@ def test_FR_KB_009_query_is_logged_encrypted_and_audited_without_text(
     assert row["output_tokens"] > 0
     assert {c["source"] for c in row["citations"]} == set(_sources(events))
     assert "sports" not in str(row["retrieved"]).lower()  # sources only, never content
-    audits = [
-        e
-        for e in W.audit_events(admin_engine, world.a.tenant_id, "kb.query.asked")
-        if str(e["resource_id"]) == query_id
-    ]
-    assert len(audits) == 1
-    summary = audits[0]["summary"]
+    audits = {
+        action: [
+            e
+            for e in W.audit_events(admin_engine, world.a.tenant_id, action)
+            if str(e["resource_id"]) == query_id
+        ]
+        for action in ("kb.query.asked", "kb.query.completed")
+    }
+    assert len(audits["kb.query.asked"]) == 1
+    assert audits["kb.query.asked"][0]["summary"]["status"] == "streaming"
+    assert len(audits["kb.query.completed"]) == 1
+    summary = audits["kb.query.completed"][0]["summary"]
     assert summary["status"] == "answered"
     assert summary["citations"] >= 1
-    assert "sports" not in str(summary).lower()
+    assert summary["streamed"] is True
+    for found in audits.values():
+        assert "sports" not in str(found[0]["summary"]).lower()
     with admin_engine.connect() as c:
         calls = c.execute(
             text("SELECT role, feature, outcome, cost_usd FROM kb.llm_calls WHERE query_id = :q"),
@@ -219,7 +250,15 @@ def test_FR_KB_011_school_switch_off_answers_search_only(
         _, events = K.ask(api, world.person("office_staff"), "When is sports day?")
     finally:
         K.enable_ai(admin_engine, world.a.tenant_id)
-    assert events[0][1]["mode"] == "search_only"
+    # meta is sent at once (docs/06 §5.1); the final and done events carry the final mode.
+    assert (events[-1][0], events[-1][1]["mode"], events[-1][1]["status"]) == (
+        "done",
+        "search_only",
+        "search_only",
+    )
+    final = next(d for e, d in events if e == "final")
+    assert (final["mode"], final["replaced"], final["text"]) == ("search_only", False, "")
+    assert "delta" not in [e for e, _ in events]
     errors = [d for e, d in events if e == "error"]
     assert errors == [{"type": "ai_disabled", "message_key": "kb.errors.disabled"}]
     assert _text(events) == ""
@@ -250,7 +289,7 @@ def test_FR_KB_011_budget_exhausted_answers_search_only(
                 ),
                 {"t": b.tenant_id},
             )
-    assert events[0][1]["mode"] == "search_only"
+    assert (events[-1][1]["mode"], events[-1][1]["status"]) == ("search_only", "search_only")
     assert [d["type"] for e, d in events if e == "error"] == ["ai_budget_exhausted"]
     assert fake.sent == []
 
@@ -415,6 +454,14 @@ def test_FR_KB_009_feedback_on_own_question(
     assert (row["feedback"], row["feedback_reason"]) == ("not_helpful", "outdated")
     free_text = _feedback(api, who, query_id, feedback="helpful", reason="The answer was wrong")
     assert free_text.status_code == 422
+    # The reason codes are pinned (the UI translates each one).
+    for code in ("wrong_source", "outdated", "incomplete", "not_found_but_exists"):
+        ok = _feedback(api, who, query_id, feedback="not_helpful", reason=code)
+        assert ok.status_code == 200, ok.text
+    wrong_language = _feedback(api, who, query_id, feedback="not_helpful", reason="wrong_language")
+    assert wrong_language.status_code == 200
+    unknown = _feedback(api, who, query_id, feedback="not_helpful", reason="made_up_code")
+    assert unknown.status_code == 422
 
 
 def test_FR_KB_012_other_users_and_other_schools_get_404_on_feedback(
@@ -510,3 +557,243 @@ def test_FR_KB_030_list_hides_answers_citing_documents_the_caller_cannot_read(
     assert vid in {v["id"] for v in seen_by_principal.json()["data"]}
     assert vid not in {v["id"] for v in seen_by_teacher.json()["data"]}
     assert seen_by_b.json()["data"] == [] or vid not in {v["id"] for v in seen_by_b.json()["data"]}
+
+
+# --- streaming (docs/06 §5.1; FR-KB-008, FR-KB-009) ------------------------------------------
+
+MORE = " The school office can tell you more about this event during working hours on any day."
+
+
+class LongAnswerTransport(FakeTransport):
+    """The fake model with a longer answer (an uncited closing remark without digits), so the
+    answer streams in many deltas; ``fail_mid_answer`` breaks the answer stream part way."""
+
+    def __init__(self, *, fail_mid_answer: bool = False) -> None:
+        super().__init__(record=True)
+        self.fail_mid_answer = fail_mid_answer
+
+    def send(self, request: MessagesRequest) -> Mapping[str, Any]:
+        response = dict(super().send(request))
+        content = list(response["content"])
+        if any(b.get("citations") for b in content):
+            content.append({"type": "text", "text": MORE * 3})
+        response["content"] = content
+        return response
+
+    def stream(self, request: MessagesRequest) -> Iterator[Mapping[str, Any]]:
+        events = list(super().stream(request))
+        answering = any(e.get("delta", {}).get("type") == "citations_delta" for e in events)
+        if not (self.fail_mid_answer and answering):
+            return iter(events)
+
+        def broken() -> Iterator[Mapping[str, Any]]:
+            yield from events[: len(events) - 5]
+            raise TransportError("overloaded", status=529)
+
+        return broken()
+
+
+class WrongCitationTransport(FakeTransport):
+    """Searches, then cites the passage with text it does not contain (a fabricated quote)."""
+
+    def send(self, request: MessagesRequest) -> Mapping[str, Any]:
+        response = dict(super().send(request))
+        content = []
+        for original in response["content"]:
+            block = dict(original)
+            if block.get("citations"):
+                block["text"] = "Sports day is on 01/01/2030."
+                block["citations"] = [
+                    {**c, "cited_text": "held on 01/01/2030"} for c in block["citations"]
+                ]
+            content.append(block)
+        response["content"] = content
+        return response
+
+
+def _office(world: Any) -> Any:
+    return K.SW.ctx_for(world.a.tenant_id, world.person("office_staff"), "office_staff")
+
+
+def _start(ctx: Any, question: str, session_id: uuid.UUID | None = None) -> Any:
+    request = service.AskRequest(question=question, session_id=session_id or uuid.uuid4())
+    with tenant_session(ctx.tenant_id, ctx.user_id) as s:
+        return service.get_service().start_stream(s, ctx, request)
+
+
+def _audits(admin: Engine, world: Any, action: str, query_id: uuid.UUID) -> list[dict[str, Any]]:
+    return [
+        e for e in W.audit_events(admin, world.a.tenant_id, action) if e["resource_id"] == query_id
+    ]
+
+
+def _llm_outcomes(admin: Engine, query_id: uuid.UUID) -> list[str]:
+    with admin.connect() as c:
+        return list(
+            c.execute(
+                text("SELECT outcome FROM kb.llm_calls WHERE query_id = :q ORDER BY occurred_at"),
+                {"q": query_id},
+            ).scalars()
+        )
+
+
+def test_invariant_7_the_row_and_audit_event_commit_before_the_first_event(
+    world: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    stream = _start(_office(world), "When is sports day?")
+    # Committed (another connection sees it) before a single event is produced.
+    row = _query_row(admin_engine, str(stream.query_id))
+    assert (row["status"], row["mode"], row["answer_ciphertext"]) == ("streaming", "full", None)
+    assert len(_audits(admin_engine, world, "kb.query.asked", stream.query_id)) == 1
+    assert fake.sent == []
+    first = next(stream)  # at once: nothing asked of the model yet (FR-KB-008 headers early)
+    assert (first.event, first.query_id, first.mode) == ("meta", stream.query_id, "full")
+    assert fake.sent == []
+    events = [first.event] + [e.event for e in stream]
+    assert events[-1] == "done"
+    assert _query_row(admin_engine, str(stream.query_id))["status"] == "answered"
+    assert len(_audits(admin_engine, world, "kb.query.completed", stream.query_id)) == 1
+
+
+def test_FR_KB_008_client_leaving_mid_answer_records_the_question_cancelled(
+    world: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    K.install_runtime(transport=LongAnswerTransport())
+    try:
+        stream = _start(_office(world), "When is sports day?")
+        assert next(stream).event == "meta"
+        assert next(stream).event == "delta"
+        stream.close()
+        stream.close()  # idempotent
+    finally:
+        composition.set_runtime(None)
+    row = _query_row(admin_engine, str(stream.query_id))
+    assert row["status"] == "cancelled"
+    assert row["answer_ciphertext"] is not None  # what was shown, encrypted
+    assert b"Sports" not in bytes(row["answer_ciphertext"])
+    assert any(str(docs["sports"]) in r["source"] for r in row["retrieved"])
+    cancelled = _audits(admin_engine, world, "kb.query.cancelled", stream.query_id)
+    assert len(cancelled) == 1
+    assert cancelled[0]["summary"]["shown_chars"] > 0
+    assert _audits(admin_engine, world, "kb.query.completed", stream.query_id) == []
+    # The answer call was closed early and metered as such (the tool round was complete).
+    assert _llm_outcomes(admin_engine, stream.query_id) == ["ok", "cancelled"]
+
+
+def test_FR_KB_005_validation_replaces_a_streamed_answer_it_cannot_support(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    K.install_runtime(transport=WrongCitationTransport(record=True))
+    try:
+        _, events = K.ask(api, world.person("office_staff"), "When is sports day?")
+    finally:
+        composition.set_runtime(None)
+    preview = "".join(d["text"] for e, d in events if e == "delta")
+    assert "01/01/2030" in preview
+    final = next(d for e, d in events if e == "final")
+    assert final["replaced"] is True
+    assert final["status"] == "not_found"
+    assert final["text"] == load_llm_config().answer_checks.not_found.en
+    assert "01/01/2030" not in _text(events)
+    assert _sources(events) == []
+    assert events[-1][1]["status"] == "not_found"
+    assert _query_row(admin_engine, events[0][1]["query_id"])["status"] == "not_found"
+
+
+def test_NFR_AVL_004_provider_failure_mid_answer_falls_back_to_search_only(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    K.install_runtime(transport=LongAnswerTransport(fail_mid_answer=True))
+    try:
+        _, events = K.ask(api, world.person("office_staff"), "When is sports day?")
+    finally:
+        composition.set_runtime(None)
+    names = [e for e, _ in events]
+    assert names[0] == "meta"
+    assert events[0][1]["mode"] == "full"  # the answer had started streaming
+    assert "delta" in names
+    assert [d for e, d in events if e == "error"] == [
+        {"type": "ai_unavailable", "message_key": "kb.errors.unavailable"}
+    ]
+    final = next(d for e, d in events if e == "final")
+    assert (final["replaced"], final["status"], final["mode"], final["text"]) == (
+        True,
+        "search_only",
+        "search_only",
+        "",
+    )
+    assert _text(events) == ""
+    assert any(str(docs["sports"]) in s for s in _sources(events))
+    query_id = events[0][1]["query_id"]
+    assert _query_row(admin_engine, query_id)["status"] == "search_only"
+    assert _llm_outcomes(admin_engine, uuid.UUID(query_id)) == ["ok", "unavailable"]
+
+
+# --- conversation (docs/06 §5 conversation rules; FR-KB-012) -----------------------------------
+
+
+def _ask_in(api: Any, who: Any, question: str, session_id: uuid.UUID) -> Any:
+    res = api.call(
+        who,
+        "POST",
+        "/api/v1/knowledge/ask",
+        json={"question": question, "session_id": str(session_id)},
+    )
+    assert res.status_code == 200, res.text
+    return K.parse_sse(res.text)
+
+
+def _earlier_block(body: Mapping[str, Any]) -> str | None:
+    header = load_llm_config().conversation.earlier_questions_header
+    blocks = body["messages"][0]["content"]
+    texts = [b["text"] for b in blocks if b.get("type") == "text"]
+    return next((t for t in texts if t.startswith(header)), None)
+
+
+def test_FR_KB_012_follow_up_gets_the_same_users_earlier_questions_only(
+    world: Any, api: Any, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    session_id = uuid.uuid4()
+    staff, principal = world.person("office_staff"), world.person("principal")
+    _ask_in(api, staff, "When is sports day?", session_id)
+    assert _earlier_block(fake.sent[0]) is None
+    fake.sent.clear()
+    _ask_in(api, staff, "Where is it held?", session_id)
+    earlier = _earlier_block(fake.sent[0])
+    assert earlier is not None
+    assert "- When is sports day?" in earlier
+    # Every follow-up is searched again (re-retrieval per turn, invariant 8).
+    assert [
+        t["name"]
+        for m in fake.sent
+        for b in m["messages"]
+        for t in b["content"]
+        if t.get("type") == "tool_use"
+    ] == ["search_documents"]
+    # Another user reusing the session id sees none of it (no cross-user memory).
+    fake.sent.clear()
+    _ask_in(api, principal, "And the time?", session_id)
+    assert _earlier_block(fake.sent[0]) is None
+    # A new session starts fresh.
+    fake.sent.clear()
+    _ask_in(api, staff, "Where is it held?", uuid.uuid4())
+    assert _earlier_block(fake.sent[0]) is None
+
+
+def test_FR_KB_012_history_is_limited_and_skips_cancelled_questions(
+    world: Any, api: Any, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    session_id = uuid.uuid4()
+    who = world.person("exam_coordinator")
+    limit = load_llm_config().conversation.max_earlier_questions
+    for n in range(limit + 1):
+        _ask_in(api, who, f"Synthetic question number {n}?", session_id)
+    ctx = K.SW.ctx_for(world.a.tenant_id, who, "exam_coordinator")
+    left = _start(ctx, "A question the asker walks away from?", session_id)
+    left.close()
+    fake.sent.clear()
+    _ask_in(api, who, "The last one?", session_id)
+    earlier = _earlier_block(fake.sent[0])
+    assert earlier is not None
+    listed = [line for line in earlier.splitlines() if line.startswith("- ")]
+    assert listed == [f"- Synthetic question number {n}?" for n in range(1, limit + 1)]

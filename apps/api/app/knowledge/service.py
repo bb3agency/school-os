@@ -28,14 +28,17 @@ answer text (invariant 5).
 from __future__ import annotations
 
 import datetime as dt
+import re
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
+from contextlib import closing
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from app.audit import service as audit
 from app.authz.kv import KVUnavailable, kv_store
+from app.core.db import tenant_session
 from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_logger
@@ -44,7 +47,7 @@ from app.core.textnorm import nfc
 from app.documents import service as documents
 from app.knowledge import composition, sources
 from app.knowledge import repository as repo
-from app.knowledge.answer import Answer, elapsed_ms, normalise
+from app.knowledge.answer import Answer, Progress, detect_language, elapsed_ms, normalise
 from app.knowledge.domain import (
     AclKeys,
     AnswerSegment,
@@ -53,8 +56,10 @@ from app.knowledge.domain import (
     AskRequest,
     Citation,
     CitationEvent,
+    DeltaEvent,
     DoneEvent,
     ErrorEvent,
+    FinalEvent,
     Locale,
     MetaEvent,
     RankedChunk,
@@ -64,6 +69,8 @@ from app.knowledge.domain import (
 from app.knowledge.gateway.errors import AiRateLimited
 from app.knowledge.interfaces import IngestionPipeline, KnowledgeService
 from app.knowledge.keys import (
+    ANSWER_COLUMN,
+    QUESTION_COLUMN,
     QUESTION_PURPOSE,
     question_key,
     reencrypt_queries,
@@ -94,6 +101,8 @@ SEARCH: Final = "document.read"
 MANAGE_VERIFIED: Final = "kb.verified_answer.manage"
 QUERIES_TABLE: Final = "kb.queries"
 MAX_QUESTION_CHARS: Final = 1000
+INTERNAL_ERROR: Final = "internal_error"
+INTERNAL_ERROR_KEY: Final = "kb.errors.internal"
 
 
 def _error(field: str, code: str) -> dict[str, str]:
@@ -173,18 +182,56 @@ class SchoolKnowledgeService:
         """The SSE events of one question (recorded and audited before they are returned)."""
         return list(self.respond(session, ctx, request).events)
 
-    def respond(self, session: Session, ctx: UserContext, request: AskRequest) -> AskResponse:
-        """One question: the validated :class:`Answer`, its events, stored and audited."""
+    def _question(self, ctx: UserContext, request: AskRequest) -> str:
         if not ctx.has(ASK):
             raise Forbidden()
-        started = time.monotonic()
         question = mask_aadhaar(nfc(request.question).strip())
         if not question or len(question) > MAX_QUESTION_CHARS:
             raise ValidationFailed([_error("question", "question_length")])
+        return question
+
+    def earlier_questions(
+        self, session: Session, ctx: UserContext, session_id: uuid.UUID
+    ) -> tuple[str, ...]:
+        """The caller's OWN earlier questions in this Ask session, oldest first (docs/06 §5
+        conversation rules, FR-KB-012): at most ``max_earlier_questions``, none older than
+        ``max_age_minutes``, only completed ones. Never another user's, never answers."""
+        rules = self.runtime.llm_config.conversation
+        since = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=rules.max_age_minutes)
+        rows = repo.earlier_questions(
+            session,
+            user_id=ctx.user_id,
+            session_id=session_id,
+            since=since,
+            limit=rules.max_earlier_questions,
+        )
+        out: list[str] = []
+        for row_id, blob in reversed(rows):
+            try:
+                out.append(
+                    crypto.decrypt_value(
+                        session, blob, table=QUERIES_TABLE, column=QUESTION_COLUMN, row_id=row_id
+                    )
+                )
+            except crypto.CryptoError:
+                log.warning(
+                    "kb.query.history_unreadable",
+                    tenant_id=ctx.tenant_id,
+                    resource_type="kb_query",
+                    resource_id=row_id,
+                )
+        return tuple(out)
+
+    def respond(self, session: Session, ctx: UserContext, request: AskRequest) -> AskResponse:
+        """One question answered whole: the validated :class:`Answer`, its events, stored and
+        audited (the eval harness and non-streaming callers)."""
+        question = self._question(ctx, request)
+        started = time.monotonic()
         query_id = new_id()
+        earlier = self.earlier_questions(session, ctx, request.session_id)
         school = tenancy.get_tenant(session)
         result = self.runtime.engine.run(
-            session, ctx, question, query_id=query_id, school_name=school.name
+            session, ctx, question, query_id=query_id, school_name=school.name, earlier=earlier
         )
         latency = elapsed_ms(started)
         self._record(
@@ -199,6 +246,115 @@ class SchoolKnowledgeService:
         events = tuple(self._events(query_id, result, latency))
         return AskResponse(query_id=query_id, answer=result, events=events)
 
+    def start_stream(self, session: Session, ctx: UserContext, request: AskRequest) -> AskStream:
+        """Begin a streamed question (``POST /knowledge/ask``; docs/06 §5.1).
+
+        In the CALLER's transaction: checks, the caller's earlier questions of this session,
+        and the ``kb.queries`` row (status ``streaming``, question encrypted) with its audit
+        event ``kb.query.asked``. The caller commits BEFORE iterating the returned stream, so
+        nothing is shown that was not recorded (invariant 7). The stream then runs in its own
+        transactions and completes the same row (``kb.query.completed``), or records it
+        ``cancelled`` when closed early (``kb.query.cancelled``)."""
+        question = self._question(ctx, request)
+        started = time.monotonic()
+        query_id = new_id()
+        earlier = self.earlier_questions(session, ctx, request.session_id)
+        language = detect_language(question)
+        q_blob, version, digest = self._encrypt_question(session, query_id, question)
+        repo.insert_query(
+            session,
+            {
+                "id": query_id,
+                "session_id": request.session_id,
+                "user_id": ctx.user_id,
+                "question_ciphertext": q_blob,
+                "question_hmac": digest,
+                "key_version": version,
+                "language": language,
+                "mode": "full",
+                "status": "streaming",
+            },
+        )
+        audit.record(
+            session,
+            action="kb.query.asked",
+            resource_type="kb_query",
+            resource_id=query_id,
+            summary={
+                "mode": "full",
+                "status": "streaming",
+                "language": language,
+                "earlier_questions": len(earlier),
+            },
+            request_id=ctx.request_id,
+        )
+        return AskStream(
+            self,
+            ctx,
+            query_id=query_id,
+            question=question,
+            language=language,
+            earlier=earlier,
+            started=started,
+        )
+
+    def _encrypt_question(
+        self, session: Session, query_id: uuid.UUID, question: str
+    ) -> tuple[bytes, int, bytes]:
+        q_blob, version = crypto.encrypt_value(
+            session,
+            question,
+            table=QUERIES_TABLE,
+            column=QUESTION_COLUMN,
+            row_id=query_id,
+        )
+        digest, _ = crypto.blind_index(
+            session, question_key(question), purpose=QUESTION_PURPOSE, key_version=version
+        )
+        return q_blob, version, digest
+
+    def _encrypt_answer(self, session: Session, query_id: uuid.UUID, text: str) -> bytes | None:
+        if not text:
+            return None
+        blob, _ = crypto.encrypt_value(
+            session, text, table=QUERIES_TABLE, column=ANSWER_COLUMN, row_id=query_id
+        )
+        return blob
+
+    @staticmethod
+    def _outcome_values(result: Answer, latency_ms: int) -> dict[str, object]:
+        return {
+            "language": result.language,
+            "mode": result.mode,
+            "route": result.route,
+            "status": result.status,
+            "error": result.error_code,
+            "tools": [
+                {"tool": t.name, "results": t.results, "error": t.error} for t in result.tools
+            ],
+            "retrieved": [{"source": s} for s in result.provided],
+            "citations": [{"source": s} for s in sorted({c.source for c in result.cited})],
+            "model_ids": list(result.model_ids),
+            "input_tokens": result.input_tokens,
+            "output_tokens": result.output_tokens,
+            "latency_ms": latency_ms,
+        }
+
+    @staticmethod
+    def _summary(result: Answer) -> dict[str, object]:
+        return {
+            "mode": result.mode,
+            "status": result.status,
+            "route": result.route,
+            "language": result.language,
+            "error_code": result.error_code,
+            "tool_calls": len(result.tools),
+            "sources_provided": len(result.provided),
+            "citations": len(result.cited),
+            "citations_dropped": result.citations_dropped,
+            "uncited_factual": result.uncited_factual,
+        }
+
     def _record(
         self,
         session: Session,
@@ -210,26 +366,7 @@ class SchoolKnowledgeService:
         result: Answer,
         latency_ms: int,
     ) -> None:
-        q_blob, version = crypto.encrypt_value(
-            session,
-            question,
-            table=QUERIES_TABLE,
-            column="question_ciphertext",
-            row_id=query_id,
-        )
-        a_blob = None
-        if result.text:
-            a_blob, _ = crypto.encrypt_value(
-                session,
-                result.text,
-                table=QUERIES_TABLE,
-                column="answer_ciphertext",
-                row_id=query_id,
-            )
-        digest, _ = crypto.blind_index(
-            session, question_key(question), purpose=QUESTION_PURPOSE, key_version=version
-        )
-        cited = {c.source for c in result.cited}
+        q_blob, version, digest = self._encrypt_question(session, query_id, question)
         repo.insert_query(
             session,
             {
@@ -238,22 +375,9 @@ class SchoolKnowledgeService:
                 "user_id": ctx.user_id,
                 "question_ciphertext": q_blob,
                 "question_hmac": digest,
-                "answer_ciphertext": a_blob,
+                "answer_ciphertext": self._encrypt_answer(session, query_id, result.text),
                 "key_version": version,
-                "language": result.language,
-                "mode": result.mode,
-                "route": result.route,
-                "status": result.status,
-                "error": result.error_code,
-                "tools": [
-                    {"tool": t.name, "results": t.results, "error": t.error} for t in result.tools
-                ],
-                "retrieved": [{"source": s} for s in result.provided],
-                "citations": [{"source": s} for s in sorted(cited)],
-                "model_ids": list(result.model_ids),
-                "input_tokens": result.input_tokens,
-                "output_tokens": result.output_tokens,
-                "latency_ms": latency_ms,
+                **self._outcome_values(result, latency_ms),
             },
         )
         audit.record(
@@ -261,20 +385,15 @@ class SchoolKnowledgeService:
             action="kb.query.asked",
             resource_type="kb_query",
             resource_id=query_id,
-            summary={
-                "mode": result.mode,
-                "status": result.status,
-                "route": result.route,
-                "language": result.language,
-                "error_code": result.error_code,
-                "tool_calls": len(result.tools),
-                "sources_provided": len(result.provided),
-                "citations": len(result.cited),
-                "citations_dropped": result.citations_dropped,
-                "uncited_factual": result.uncited_factual,
-            },
+            summary=self._summary(result),
             request_id=ctx.request_id,
         )
+        self._log_answered(ctx, query_id, result, latency_ms)
+
+    @staticmethod
+    def _log_answered(
+        ctx: UserContext, query_id: uuid.UUID, result: Answer, latency_ms: int
+    ) -> None:
         log.info(
             "kb.query.answered",
             tenant_id=ctx.tenant_id,
@@ -287,17 +406,115 @@ class SchoolKnowledgeService:
             duration_ms=latency_ms,
         )
 
+    def complete_stream(
+        self,
+        session: Session,
+        ctx: UserContext,
+        query_id: uuid.UUID,
+        result: Answer,
+        *,
+        latency_ms: int,
+        replaced: bool,
+    ) -> None:
+        """A streamed question finished: the row gets the validated answer (encrypted), codes
+        and counts; audit ``kb.query.completed`` in the same transaction."""
+        repo.update_query(
+            session,
+            query_id,
+            {
+                "answer_ciphertext": self._encrypt_answer(session, query_id, result.text),
+                **self._outcome_values(result, latency_ms),
+            },
+        )
+        audit.record(
+            session,
+            action="kb.query.completed",
+            resource_type="kb_query",
+            resource_id=query_id,
+            summary={**self._summary(result), "streamed": True, "replaced": replaced},
+            request_id=ctx.request_id,
+        )
+        self._log_answered(ctx, query_id, result, latency_ms)
+
+    def end_stream_early(
+        self,
+        ctx: UserContext,
+        query_id: uuid.UUID,
+        progress: Progress,
+        *,
+        latency_ms: int,
+        status: str,
+        error_code: str | None = None,
+    ) -> None:
+        """A streamed question ended before its answer was complete: the client went away
+        (``cancelled``) or the stream failed (``error``). In a new transaction: the row keeps
+        what was shown (encrypted), the tools, sources and tokens used; audit
+        ``kb.query.cancelled`` or ``kb.query.failed`` (codes and counts only)."""
+        turns = progress.turns
+        with tenant_session(ctx.tenant_id, ctx.user_id) as session:
+            repo.update_query(
+                session,
+                query_id,
+                {
+                    "answer_ciphertext": self._encrypt_answer(session, query_id, progress.text),
+                    "status": status,
+                    "error": error_code,
+                    "tools": [
+                        {"tool": t.name, "results": t.results, "error": t.error}
+                        for t in progress.runs
+                    ],
+                    "retrieved": [{"source": s} for s in progress.provided.order],
+                    "model_ids": sorted({t.model for t in turns}),
+                    "input_tokens": sum(t.usage.input_tokens for t in turns),
+                    "output_tokens": sum(t.usage.output_tokens for t in turns),
+                    "latency_ms": latency_ms,
+                },
+            )
+            audit.record(
+                session,
+                action="kb.query.cancelled" if status == "cancelled" else "kb.query.failed",
+                resource_type="kb_query",
+                resource_id=query_id,
+                summary={
+                    "status": status,
+                    "error_code": error_code,
+                    "tool_calls": len(progress.runs),
+                    "sources_provided": len(progress.provided.order),
+                    "shown_chars": len(progress.text),
+                },
+                request_id=ctx.request_id,
+            )
+        log.info(
+            "kb.query.ended_early",
+            tenant_id=ctx.tenant_id,
+            user_id=ctx.user_id,
+            resource_type="kb_query",
+            resource_id=query_id,
+            outcome=status,
+            error_code=error_code,
+            duration_ms=latency_ms,
+        )
+
     @staticmethod
     def _events(query_id: uuid.UUID, result: Answer, latency_ms: int) -> Iterator[AskEvent]:
         yield MetaEvent(query_id=query_id, language=result.language, mode=result.mode)
+        yield from SchoolKnowledgeService._closing_events(result, latency_ms)
+
+    @staticmethod
+    def _closing_events(result: Answer, latency_ms: int) -> Iterator[AskEvent]:
         if result.error_code is not None and result.message_key is not None:
             yield ErrorEvent(type=result.error_code, message_key=result.message_key)
         for segment in result.segments:
-            if segment.text:
-                yield TokenEvent(text=segment.text)
+            if segment.text.strip():
+                yield TokenEvent(text=segment.text.strip())
         for c in result.cited:
             yield CitationEvent(index=c.index, source=c.source, title=c.title, snippet=c.snippet)
-        yield DoneEvent(latency_ms=latency_ms, cited_sources=len(result.cited))
+        yield DoneEvent(
+            latency_ms=latency_ms,
+            cited_sources=len(result.cited),
+            status=result.status,
+            mode=result.mode,
+        )
 
     # --- search-only ------------------------------------------------------------------------
 
@@ -449,6 +666,156 @@ class SchoolKnowledgeService:
         return _verified_out(row)
 
 
+_MARKER = re.compile(r"\s*\[\d+\]")
+_SPACE = re.compile(r"\s+")
+
+
+def _squash(text: str) -> str:
+    return _SPACE.sub("", _MARKER.sub("", text))
+
+
+def was_replaced(shown: str, result: Answer) -> bool:
+    """Whether the validated answer differs from the streamed preview beyond whitespace and the
+    ``[n]`` citation markers (the ``final`` event's ``replaced`` flag, docs/06 §5.1)."""
+    return bool(shown) and _squash(shown) != _squash(result.text)
+
+
+class AskStream:
+    """The SSE events of one streamed question (docs/06 §5.1). Iterate it once; call
+    :meth:`close` when the client goes away (the question is then recorded ``cancelled``).
+
+    Order: ``meta`` at once (the row and audit event are already committed; ``mode`` is
+    ``full`` until the answer says otherwise), ``delta``* (preview), then after the answer is
+    validated, stored and audited (its transaction commits first): ``error``?, ``final``,
+    ``token``* (the validated answer again, for clients that predate ``final``),
+    ``citation``*, ``done`` (with the final ``status`` and ``mode``)."""
+
+    def __init__(
+        self,
+        service: SchoolKnowledgeService,
+        ctx: UserContext,
+        *,
+        query_id: uuid.UUID,
+        question: str,
+        language: Locale,
+        earlier: tuple[str, ...],
+        started: float,
+    ) -> None:
+        self._service = service
+        self._ctx = ctx
+        self.query_id = query_id
+        self._question = question
+        self._language: Locale = language
+        self._earlier = earlier
+        self._started = started
+        self.progress = Progress()
+        self._finished = False
+        self._gen = self._run()
+
+    def __iter__(self) -> AskStream:
+        return self
+
+    def __next__(self) -> AskEvent:
+        return next(self._gen)
+
+    def close(self) -> None:
+        """Stop the stream (the provider call is closed); an unfinished question is recorded
+        ``cancelled`` with what was shown so far. Idempotent."""
+        self._gen.close()
+        if self._finished:
+            return
+        self._finished = True
+        self._end_early("cancelled", None)
+
+    def _end_early(self, status: str, error_code: str | None) -> None:
+        try:
+            self._service.end_stream_early(
+                self._ctx,
+                self.query_id,
+                self.progress,
+                latency_ms=elapsed_ms(self._started),
+                status=status,
+                error_code=error_code,
+            )
+        except Exception as exc:  # the row stays "streaming"; never break the response for it
+            log.error(
+                "kb.query.end_unrecorded",
+                tenant_id=self._ctx.tenant_id,
+                resource_type="kb_query",
+                resource_id=self.query_id,
+                error_type=type(exc).__name__,
+            )
+
+    def _meta(self, mode: AskMode) -> MetaEvent:
+        return MetaEvent(query_id=self.query_id, language=self._language, mode=mode)
+
+    def _run(self) -> Generator[AskEvent, None, None]:
+        svc, ctx = self._service, self._ctx
+        # First, before any work: the client (and a BFF waiting for the response to start)
+        # hears at once that the question was accepted and recorded.
+        yield self._meta("full")
+        try:
+            with tenant_session(ctx.tenant_id, ctx.user_id) as session:
+                school = tenancy.get_tenant(session)
+                engine = svc.runtime.engine.stream(
+                    session,
+                    ctx,
+                    self._question,
+                    query_id=self.query_id,
+                    school_name=school.name,
+                    progress=self.progress,
+                    earlier=self._earlier,
+                )
+                with closing(engine):
+                    while True:
+                        try:
+                            delta = next(engine)
+                        except StopIteration as done:
+                            result: Answer = done.value
+                            break
+                        yield DeltaEvent(text=delta.text)
+                latency = elapsed_ms(self._started)
+                replaced = was_replaced(self.progress.text, result)
+                svc.complete_stream(
+                    session, ctx, self.query_id, result, latency_ms=latency, replaced=replaced
+                )
+        except Exception as exc:
+            log.warning(
+                "kb.query.stream_failed",
+                tenant_id=ctx.tenant_id,
+                resource_type="kb_query",
+                resource_id=self.query_id,
+                error_type=type(exc).__name__,
+            )
+            self._finished = True
+            self._end_early("error", INTERNAL_ERROR)
+            yield ErrorEvent(type=INTERNAL_ERROR, message_key=INTERNAL_ERROR_KEY)
+            yield DoneEvent(
+                latency_ms=elapsed_ms(self._started),
+                cited_sources=0,
+                status="error",
+                mode="search_only",
+            )
+            return
+        self._finished = True
+        if result.error_code is not None and result.message_key is not None:
+            yield ErrorEvent(type=result.error_code, message_key=result.message_key)
+        yield FinalEvent(
+            text=result.text, replaced=replaced, status=result.status, mode=result.mode
+        )
+        for segment in result.segments:
+            if segment.text.strip():
+                yield TokenEvent(text=segment.text.strip())
+        for c in result.cited:
+            yield CitationEvent(index=c.index, source=c.source, title=c.title, snippet=c.snippet)
+        yield DoneEvent(
+            latency_ms=latency,
+            cited_sources=len(result.cited),
+            status=result.status,
+            mode=result.mode,
+        )
+
+
 _service: SchoolKnowledgeService | None = None
 
 
@@ -469,10 +836,13 @@ __all__ = [
     "AskMode",
     "AskRequest",
     "AskResponse",
+    "AskStream",
     "Citation",
     "CitationEvent",
+    "DeltaEvent",
     "DoneEvent",
     "ErrorEvent",
+    "FinalEvent",
     "IngestionPipeline",
     "KnowledgeService",
     "Locale",

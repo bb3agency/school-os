@@ -294,6 +294,9 @@ class MetaEvent:
 class TokenEvent:
     event: ClassVar[str] = "token"
     text: str
+    """One whole validated answer segment (with its ``[n]`` markers), without surrounding
+    whitespace: join token texts with ONE space to get ``final.text`` (docs/06 §5.1). Only
+    ``delta`` texts carry their own whitespace and are appended verbatim."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -310,6 +313,11 @@ class DoneEvent:
     event: ClassVar[str] = "done"
     latency_ms: int
     cited_sources: int
+    status: str = "answered"
+    """How the question ended (M2 wave 5, additive): ``answered``, ``not_found``, ``refused``,
+    ``search_only`` or ``error`` (the stored query status; ``error`` = the stream failed)."""
+    mode: AskMode = "full"
+    """The final mode (``meta.mode`` is sent before the answer and may still say ``full``)."""
 
 
 @dataclass(frozen=True, slots=True)
