@@ -62,6 +62,18 @@
             "title": "Id",
             "type": "string"
           },
+          "in_use": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
+            "title": "In Use"
+          },
           "is_current": {
             "title": "Is Current",
             "type": "boolean"
@@ -1852,6 +1864,18 @@
             "title": "Id",
             "type": "string"
           },
+          "in_use": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
+            "title": "In Use"
+          },
           "sort_order": {
             "title": "Sort Order",
             "type": "integer"
@@ -2614,6 +2638,28 @@
               "$ref": "#/components/schemas/AclEntryOut"
             },
             "title": "Acl",
+            "type": "array"
+          },
+          "allowed_doc_types": {
+            "description": "Document types that suit this document's purpose; PATCH answers 422 ``doc_type_not_allowed_for_purpose`` for any other (FR-DOC-005).",
+            "items": {
+              "enum": [
+                "circular",
+                "policy",
+                "minutes",
+                "register_scan",
+                "certificate",
+                "letter",
+                "form",
+                "report",
+                "verified_answer",
+                "other",
+                "evidence",
+                "import_file"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Doc Types",
             "type": "array"
           },
           "created_at": {
@@ -8856,6 +8902,18 @@
             ],
             "title": "Committed By"
           },
+          "committed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name of who committed it (no contact details); null when they are no longer a member of this school.",
+            "title": "Committed By Name"
+          },
           "counts": {
             "$ref": "#/components/schemas/PromotionCounts"
           },
@@ -8914,6 +8972,18 @@
               }
             ],
             "title": "Undone By"
+          },
+          "undone_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name of who undid it (no contact details).",
+            "title": "Undone By Name"
           },
           "version": {
             "title": "Version",
@@ -9507,6 +9577,12 @@
           "name_te": {
             "title": "Name Te",
             "type": "string"
+          },
+          "needs_mfa": {
+            "default": false,
+            "description": "Members holding this role must sign in with two-step verification (roles.yaml ``mfa_required``; FR-IAM-002, ADR-0018).",
+            "title": "Needs Mfa",
+            "type": "boolean"
           },
           "permissions": {
             "items": {
@@ -10274,6 +10350,18 @@
             "title": "Id",
             "type": "string"
           },
+          "in_use": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
+            "title": "In Use"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -10464,12 +10552,22 @@
             },
             "title": "Roles",
             "type": "array"
+          },
+          "status": {
+            "description": "``invited`` until the person first signs in (ADR-0019).",
+            "enum": [
+              "active",
+              "invited"
+            ],
+            "title": "Status",
+            "type": "string"
           }
         },
         "required": [
           "membership_id",
           "display_name",
-          "roles"
+          "roles",
+          "status"
         ],
         "title": "StaffMemberOut",
         "type": "object"
@@ -10749,6 +10847,19 @@
         "additionalProperties": false,
         "description": "``POST /students/search`` body (SEC-008): names and admission numbers are personal data\nand never travel in the URL, where proxies and load balancers log them. Same filters, page\nsize and cursor as ``GET /students``.",
         "properties": {
+          "academic_year_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422.",
+            "title": "Academic Year Id"
+          },
           "admission_no": {
             "anyOf": [
               {
@@ -12876,6 +12987,12 @@
             ],
             "title": "Preferred Language",
             "type": "string"
+          },
+          "profile_shared": {
+            "default": false,
+            "description": "The person also belongs to another school on SchoolOS, so their name, email and language are shared and cannot be edited here (PATCH answers 409 ``profile_shared``, ADR-0028). The other schools are never named.",
+            "title": "Profile Shared",
+            "type": "boolean"
           },
           "roles": {
             "items": {
@@ -23246,6 +23363,25 @@
               "deprecated": true,
               "description": "Deprecated: names and admission numbers in the URL end up in proxy and load-balancer access logs. Send them in the body of POST /api/v1/students/search instead (SEC-008). Stops working after the Sunset date, Thu, 31 Dec 2026 23:59:59 GMT.",
               "title": "Admission No"
+            }
+          },
+          {
+            "description": "Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422.",
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422.",
+              "title": "Academic Year Id"
             }
           },
           {
