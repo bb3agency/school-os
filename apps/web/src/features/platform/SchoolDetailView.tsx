@@ -6,13 +6,17 @@ import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
+import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TabNav } from "@/components/ui/TabNav";
 import { DataTable, type Column } from "@/components/ui/Table";
+import { StatCard } from "@/components/ui/StatCard";
+import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
-import { deploymentTone, known, schoolTone, subscriptionTone } from "@/features/status";
+import { deploymentTone, known, subscriptionTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
@@ -27,9 +31,11 @@ import {
   ProvisioningStatus,
   ResumeProvisioningAction,
 } from "./ProvisioningStatus";
+import { MonoTime, SchoolStatusPill, TierTag } from "./pills";
 import { TicketTable } from "./SupportScreens";
 import { SCHOOL_TABS, type SchoolTab } from "./school-tabs";
 import { ReasonField, SubscriptionActions } from "./SubscriptionActions";
+import { PlanUsageMeters } from "./PlanUsageMeters";
 import { UsageTable } from "./UsageTable";
 
 const reasonSchema = z.object({ reason });
@@ -42,9 +48,9 @@ const reasonSchema = z.object({ reason });
  */
 export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: SchoolTab }) {
   const t = useTranslations("platform.schoolDetail");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
-  const tschool = useTranslations("status.school");
   const api = useBffClient("operator");
   const can = useCan();
   const path = { tenant_id: schoolId };
@@ -71,7 +77,6 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
       <>
         {status === "provisioning" && can("platform.tenants.provision") ? (
           <>
-            {data.provisioning?.resumable ? <ResumeProvisioningAction schoolId={schoolId} /> : null}
             <ActionDialog
               triggerLabel={t("activate")}
               triggerVariant={data.provisioning?.resumable ? "secondary" : "primary"}
@@ -199,6 +204,12 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
             }
           />
         ) : null}
+        {can("platform.audit.read") ? (
+          <ButtonLink href={`/platform/audit?school=${schoolId}`} variant="ghost">
+            <Icon name="clipboard" className="size-4" />
+            {t("viewAudit")}
+          </ButtonLink>
+        ) : null}
       </>
     );
   }
@@ -222,7 +233,7 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
       case "invoices":
         return <InvoiceTable invoices={ready(school.invoices)} caption={t("tabs.invoices")} />;
       case "usage":
-        return <UsageTab schoolId={schoolId} />;
+        return <UsageTab schoolId={schoolId} planId={school.subscription?.plan_id ?? null} />;
       case "deployment":
         return <DeploymentTab schoolId={schoolId} />;
       case "flags":
@@ -232,90 +243,169 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
     }
   }
 
+  const offboardSteps =
+    school?.offboard_requested_at != null
+      ? [
+          {
+            id: "requested",
+            title: t("offboardSteps.requested"),
+            time: <MonoTime value={school.offboard_requested_at} />,
+            status: "done" as const,
+            statusLabel: t("offboardSteps.done"),
+          },
+          {
+            id: "approved",
+            title: t("offboardSteps.approved"),
+            ...(school.offboard_approved_at
+              ? { time: <MonoTime value={school.offboard_approved_at} /> }
+              : {}),
+            status: school.offboard_approved_at ? ("done" as const) : ("current" as const),
+            statusLabel: school.offboard_approved_at
+              ? t("offboardSteps.done")
+              : t("offboardSteps.waiting"),
+          },
+        ]
+      : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={school?.school_name ?? t("title")}
-        description={school ? t("codeLine", { code: school.code }) : undefined}
+        breadcrumb={[
+          { label: tn("dashboard"), href: "/platform" },
+          { label: tn("schools"), href: "/platform/schools" },
+          { label: school?.school_name ?? t("title") },
+        ]}
+        description={
+          school ? (
+            <>
+              {t("codeLabel")} <code className="font-mono text-sm">{school.code}</code>
+            </>
+          ) : undefined
+        }
         badge={
           school ? (
-            <Badge tone={schoolTone[school.tenant_status]}>{tschool(school.tenant_status)}</Badge>
+            <span className="flex flex-wrap items-center gap-2">
+              <SchoolStatusPill status={school.tenant_status} />
+              <TierTag tier={school.tier} />
+            </span>
           ) : undefined
         }
         actions={school ? actions(school) : undefined}
       />
       {school?.offboard_requested_at && !school.offboard_approved_at ? (
         <Alert tone="warning" title={t("offboardPendingTitle")}>
-          {t("offboardPendingBody", {
-            date: formatDateTime(school.offboard_requested_at) ?? "",
-          })}
+          <p>
+            {t("offboardPendingBody", {
+              date: formatDateTime(school.offboard_requested_at) ?? "",
+            })}
+          </p>
+          {offboardSteps ? (
+            <Timeline items={offboardSteps} label={t("offboardStepsTitle")} className="mt-4" />
+          ) : null}
         </Alert>
       ) : null}
       {school?.offboard_approved_at ? (
         <Alert tone="warning" title={t("offboardApprovedTitle")}>
-          {t("offboardApprovedBody", { date: formatDateTime(school.offboard_approved_at) ?? "" })}
+          <p>
+            {t("offboardApprovedBody", {
+              date: formatDateTime(school.offboard_approved_at) ?? "",
+            })}
+          </p>
+          {offboardSteps ? (
+            <Timeline items={offboardSteps} label={t("offboardStepsTitle")} className="mt-4" />
+          ) : null}
         </Alert>
       ) : null}
-      {school ? <ProvisioningStatus school={school} /> : null}
-      <p className="text-sm text-ink-muted">{t("offboardNote")}</p>
+      {school ? (
+        <ProvisioningStatus
+          school={school}
+          action={
+            school.tenant_status === "provisioning" &&
+            can("platform.tenants.provision") &&
+            school.provisioning?.resumable ? (
+              <ResumeProvisioningAction schoolId={schoolId} />
+            ) : undefined
+          }
+        />
+      ) : null}
       <TabNav label={t("tabsLabel")} items={tabs} activeId={tab} />
-      <Card title={t(`tabs.${tab}`)}>{panel()}</Card>
+      {tab === "overview" && school ? panel() : <Card title={t(`tabs.${tab}`)}>{panel()}</Card>}
+      <p className="text-sm text-ink-muted">{t("offboardNote")}</p>
     </div>
   );
 }
 
 function OverviewTab({ school }: { school: TenantDetail }) {
   const t = useTranslations("platform.schoolDetail");
-  const tmode = useTranslations("deploymentMode");
+  const tc = useTranslations("common");
   const tschool = useTranslations("status.school");
   const locale = useLocale();
-  const count = (value: number | undefined) => <Value>{formatCount(value, locale)}</Value>;
+  const count = (value: number | undefined) => formatCount(value, locale);
+  const stats: Array<{ key: string; label: string; value: string | null }> = [
+    { key: "users", label: t("fields.users"), value: count(school.counts?.users) },
+    {
+      key: "active",
+      label: t("fields.activeMembers"),
+      value: count(school.counts?.active_memberships),
+    },
+    { key: "sections", label: t("fields.sections"), value: count(school.counts?.sections) },
+    { key: "tickets", label: t("fields.openTickets"), value: count(school.open_tickets) },
+  ];
   return (
     <div className="space-y-6">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt className="text-ink-muted">{t("fields.code")}</dt>
-        <dd className="font-mono">{school.code}</dd>
-        <dt className="text-ink-muted">{t("fields.status")}</dt>
-        <dd>
-          {tschool(school.tenant_status)}
-          {school.tenant_status_reason ? ` · ${school.tenant_status_reason}` : ""}
-        </dd>
-        {school.provisioning ? (
-          <>
-            <dt className="text-ink-muted">{t("fields.setup")}</dt>
-            <dd>
-              <ProvisioningLabel school={school} />
-            </dd>
-          </>
-        ) : null}
-        <dt className="text-ink-muted">{t("fields.deployment")}</dt>
-        <dd>{tmode(school.tier)}</dd>
-        <dt className="text-ink-muted">{t("fields.boards")}</dt>
-        <dd>
-          <Value>{school.boards.join(", ")}</Value>
-        </dd>
-        <dt className="text-ink-muted">{t("fields.plan")}</dt>
-        <dd>
-          <Value>{school.plan_code}</Value>
-        </dd>
-        <dt className="text-ink-muted">{t("fields.createdOn")}</dt>
-        <dd>
-          <Value>{formatDate(school.created_at)}</Value>
-        </dd>
-        <dt className="text-ink-muted">{t("fields.version")}</dt>
-        <dd>
-          <Value>{school.app_version}</Value>
-        </dd>
-        <dt className="text-ink-muted">{t("fields.users")}</dt>
-        <dd>{count(school.counts?.users)}</dd>
-        <dt className="text-ink-muted">{t("fields.activeMembers")}</dt>
-        <dd>{count(school.counts?.active_memberships)}</dd>
-        <dt className="text-ink-muted">{t("fields.sections")}</dt>
-        <dd>{count(school.counts?.sections)}</dd>
-        <dt className="text-ink-muted">{t("fields.openTickets")}</dt>
-        <dd>{count(school.open_tickets)}</dd>
+      <dl aria-label={t("countsLabel")} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map((stat) => (
+          <StatCard
+            key={stat.key}
+            label={stat.label}
+            value={stat.value}
+            unavailableLabel={tc("notAvailable")}
+          />
+        ))}
       </dl>
-      <BillingAccountCard schoolId={school.tenant_id} />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card title={t("tabs.overview")}>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+            <dt className="text-ink-muted">{t("fields.code")}</dt>
+            <dd className="font-mono">{school.code}</dd>
+            <dt className="text-ink-muted">{t("fields.status")}</dt>
+            <dd>
+              {tschool(school.tenant_status)}
+              {school.tenant_status_reason ? ` · ${school.tenant_status_reason}` : ""}
+            </dd>
+            {school.provisioning ? (
+              <>
+                <dt className="text-ink-muted">{t("fields.setup")}</dt>
+                <dd>
+                  <ProvisioningLabel school={school} />
+                </dd>
+              </>
+            ) : null}
+            <dt className="text-ink-muted">{t("fields.deployment")}</dt>
+            <dd>
+              <TierTag tier={school.tier} />
+            </dd>
+            <dt className="text-ink-muted">{t("fields.boards")}</dt>
+            <dd>
+              <Value>{school.boards.join(", ")}</Value>
+            </dd>
+            <dt className="text-ink-muted">{t("fields.plan")}</dt>
+            <dd className="font-mono">
+              <Value>{school.plan_code}</Value>
+            </dd>
+            <dt className="text-ink-muted">{t("fields.createdOn")}</dt>
+            <dd>
+              <Value>{formatDate(school.created_at)}</Value>
+            </dd>
+            <dt className="text-ink-muted">{t("fields.version")}</dt>
+            <dd className="font-mono">
+              <Value>{school.app_version}</Value>
+            </dd>
+          </dl>
+        </Card>
+        <BillingAccountCard schoolId={school.tenant_id} />
+      </div>
     </div>
   );
 }
@@ -350,7 +440,6 @@ function BillingAccountCard({ schoolId }: { schoolId: string }) {
   return (
     <Card
       title={t("title")}
-      headingLevel={3}
       actions={
         can("platform.subscriptions.manage") && account.status === "ready" ? (
           <ActionDialog
@@ -385,15 +474,15 @@ function BillingAccountCard({ schoolId }: { schoolId: string }) {
         <p className="text-sm text-ink-muted">{t("none")}</p>
       ) : null}
       {data ? (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
           <dt className="text-ink-muted">{t("legalName")}</dt>
           <dd>{data.legal_name}</dd>
           <dt className="text-ink-muted">{t("gstin")}</dt>
-          <dd>
+          <dd className="font-mono">
             <Value>{data.gstin}</Value>
           </dd>
           <dt className="text-ink-muted">{t("stateCode")}</dt>
-          <dd>{data.state_code}</dd>
+          <dd className="font-mono">{data.state_code}</dd>
           <dt className="text-ink-muted">{t("billingEmail")}</dt>
           <dd>{data.billing_email}</dd>
           <dt className="text-ink-muted">{t("address")}</dt>
@@ -447,7 +536,7 @@ function SubscriptionTab({ school }: { school: TenantDetail }) {
   );
 }
 
-function UsageTab({ schoolId }: { schoolId: string }) {
+function UsageTab({ schoolId, planId }: { schoolId: string; planId: string | null }) {
   const t = useTranslations("platform.usage");
   const api = useBffClient("operator");
   const usage = useApiQuery([...PK.usage, schoolId], () =>
@@ -457,7 +546,12 @@ function UsageTab({ schoolId }: { schoolId: string }) {
       }),
     ),
   );
-  return <UsageTable usage={usage} caption={t("title")} />;
+  return (
+    <div className="space-y-6">
+      <PlanUsageMeters usage={usage} planId={planId} />
+      <UsageTable usage={usage} caption={t("title")} />
+    </div>
+  );
 }
 
 function DeploymentTab({ schoolId }: { schoolId: string }) {
@@ -501,13 +595,13 @@ function DeploymentTab({ schoolId }: { schoolId: string }) {
           <Value>{deployment.custom_domain}</Value>
         </dd>
         <dt className="text-ink-muted">{t("colVersion")}</dt>
-        <dd>
+        <dd className="font-mono">
           <Value>{deployment.app_version}</Value>
           {deployment.target_version ? ` → ${deployment.target_version}` : ""}
         </dd>
         <dt className="text-ink-muted">{t("colHeartbeat")}</dt>
         <dd>
-          <Value>{formatDateTime(deployment.last_heartbeat_at)}</Value>
+          <MonoTime value={deployment.last_heartbeat_at} />
         </dd>
       </dl>
       <DeploymentActions deployment={deployment} />

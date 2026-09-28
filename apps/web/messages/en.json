@@ -551,7 +551,24 @@
       "aiSpend": "AI spend this month",
       "openTickets": "Open support tickets",
       "slaBreachedHint": "{count, plural, one {# past its SLA} other {# past their SLA}}",
-      "noTiles": "Your roles don't include any dashboard numbers."
+      "noTiles": "Your roles don't include any dashboard numbers.",
+      "fleetHealthShort": "{healthy}/{total}",
+      "fleetHealthyShare": "Healthy deployments",
+      "attention": {
+        "title": "Needs attention",
+        "description": "From the numbers above. Each link opens the list behind it.",
+        "fleet": "{count, plural, one {# deployment is degraded or unreachable} other {# deployments are degraded or unreachable}}",
+        "pastDue": "{count, plural, one {# subscription is past due} other {# subscriptions are past due}}",
+        "sla": "{count, plural, one {# support ticket is past its SLA} other {# support tickets are past their SLA}}",
+        "trials": "{count, plural, one {# trial ends in the next 14 days} other {# trials end in the next 14 days}}",
+        "provisioning": "{count, plural, one {# school is still being set up} other {# schools are still being set up}}",
+        "suspended": "{count, plural, one {# school is suspended} other {# schools are suspended}}",
+        "openFleet": "Open fleet",
+        "openSchools": "Open schools",
+        "openSupport": "Open support",
+        "noneTitle": "Nothing needs attention right now",
+        "noneBody": "No unhealthy deployments, past-due subscriptions or late tickets."
+      }
     },
     "schools": {
       "title": "Schools",
@@ -574,7 +591,10 @@
       "colVersion": "Version",
       "colHeartbeat": "Last heartbeat",
       "emptyTitle": "No schools found",
-      "emptyBody": "Clear the filters, or provision a school to create its tenant, encryption key and owner invite."
+      "emptyBody": "Clear the filters, or provision a school to create its tenant, encryption key and owner invite.",
+      "clearFilters": "Clear filters",
+      "noMatchTitle": "No schools match these filters",
+      "noMatchBody": "Change the search or filters, or clear them to see every school."
     },
     "schoolDetail": {
       "title": "School details",
@@ -656,7 +676,33 @@
         "resume": "Resume provisioning",
         "resumeTitle": "Resume setting up this school?",
         "resumeBody": "SchoolOS continues from the step that stopped. Steps already done are kept and not repeated.",
-        "activateIncomplete": "Setup is not finished, so SchoolOS will refuse to make this school live. Resume provisioning first, then go live."
+        "activateIncomplete": "Setup is not finished, so SchoolOS will refuse to make this school live. Resume provisioning first, then go live.",
+        "eyebrow": "Setup progress",
+        "timelineLabel": "Setup steps",
+        "timeline": {
+          "register": "School registered",
+          "initialise": "Keys and roles set up",
+          "owner_invite": "Owner invited"
+        },
+        "stepStatus": {
+          "done": "Done:",
+          "current": "Next:",
+          "pending": "Not started:",
+          "stopped": "Stopped:",
+          "running": "Running:"
+        },
+        "stoppedHere": "Stopped here",
+        "runningNow": "Running now"
+      },
+      "codeLabel": "Code:",
+      "viewAudit": "Audit log",
+      "countsLabel": "School counts",
+      "offboardStepsTitle": "Offboarding approvals",
+      "offboardSteps": {
+        "requested": "Requested by the first operator",
+        "approved": "Approved by a second operator",
+        "done": "Done:",
+        "waiting": "Waiting:"
       }
     },
     "provision": {
@@ -888,7 +934,13 @@
       "colAiTokens": "AI tokens",
       "colAiCost": "AI cost",
       "emptyTitle": "No usage recorded",
-      "emptyBody": "Usage totals appear the day after a school starts using SchoolOS. Try a wider date range."
+      "emptyBody": "Usage totals appear the day after a school starts using SchoolOS. Try a wider date range.",
+      "limitsTitle": "Latest day against plan limits",
+      "limitsDescription": "Counts for {date}, compared with the limits of the school's current plan.",
+      "meter": "{used} of {limit}",
+      "meterNoLimit": "{used} (no limit on this plan)",
+      "meterGb": "{used} GB of {limit} GB",
+      "meterGbNoLimit": "{used} GB (no limit on this plan)"
     },
     "flags": {
       "title": "Feature flags",
