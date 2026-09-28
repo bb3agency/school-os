@@ -146,7 +146,8 @@ tf-validate: ## terraform fmt/init/validate/test on every root, pinned image as 
 
 # EVAL_SUITE: fast (pull requests) or full (nightly, release). EVAL_ADAPTER: stub-perfect (harness
 # self-check), app-fake (the real knowledge service on a throwaway database with offline fake
-# providers; needs Docker or SOS_TEST_ADMIN_DATABASE_URL; apps/api/tests/knowledge/eval_bridge.py);
+# providers; needs Docker or SOS_TEST_ADMIN_DATABASE_URL; apps/api/tests/knowledge/eval_bridge.py;
+# exits 3 when the harness's visibility oracle and the application disagree for an asker);
 # stub-leaky and stub-injectable must fail (exit 1).
 # EVAL_ARGS: extra flags, e.g. --fail-on-soft (release) or --out <dir>. Report: evals/reports/.
 EVAL_SUITE   ?= fast
