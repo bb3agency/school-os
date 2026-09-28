@@ -112,9 +112,7 @@ def test_invariant_12_0029_round_trips_on_a_populated_database(
         _query(admin, tid, "streaming")
     with pytest.raises(IntegrityError):
         _call(admin, tid, "cancelled")
-    assert not _scalar(
-        admin, "SELECT count(*) FROM pg_indexes WHERE indexname = 'queries_session'"
-    )
+    assert not _scalar(admin, "SELECT count(*) FROM pg_indexes WHERE indexname = 'queries_session'")
 
     command.upgrade(cfg, REVISION)
     _query(admin, tid, "streaming")

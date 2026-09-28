@@ -6,8 +6,9 @@ school scope; ``school_wide`` for school-wide ``document.read`` holders; otherwi
 and classes a scoped ``document.read`` grant reaches through the academic structure (a class
 scope covers its sections, a section scope makes its class match class-level ACL entries).
 Roles and the membership always count. ``read_sensitive`` (C3 documents) follows
-``student.read_sensitive``, as the documents service does for opening C3 files. ``tests/knowledge/test_ask_service.py`` checks that the
-index filter built from these keys agrees with ``documents.service.is_visible``.
+``student.read_sensitive``, as the documents service does for opening C3 files.
+``tests/knowledge/test_ask_service.py`` checks that the index filter built from these keys
+agrees with ``documents.service.is_visible``.
 
 Tenant isolation stays RLS (invariant 1): these keys only narrow within the school.
 """

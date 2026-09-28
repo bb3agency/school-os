@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
 from app.knowledge.gateway.schema_check import example
@@ -107,6 +107,12 @@ class FakeTransport:
             },
         }
 
+    def stream(self, request: MessagesRequest) -> Iterator[Mapping[str, Any]]:
+        """The same response as :meth:`send`, as Messages API stream events: text in pieces
+        of at most :data:`STREAM_WORDS` words, citations after their text, tool input as
+        JSON in two pieces. Deterministic: the same request always streams the same events."""
+        return _stream_events(self.send(request))
+
     def _turn(
         self, body: Mapping[str, Any], messages: Sequence[Mapping[str, Any]]
     ) -> tuple[list[dict[str, Any]], str]:
@@ -153,4 +159,69 @@ class FakeTransport:
         return content, "end_turn"
 
 
-__all__ = ["NOT_FOUND_EN", "NOT_FOUND_TE", "FakeTransport"]
+STREAM_WORDS = 3
+_PIECE = re.compile(r"(?:\S+\s*){1,3}|\s+")
+
+
+def text_pieces(text: str) -> list[str]:
+    """``text`` cut after every :data:`STREAM_WORDS` words (whitespace kept, nothing lost)."""
+    return _PIECE.findall(text) or ([text] if text else [])
+
+
+def _stream_events(response: Mapping[str, Any]) -> Iterator[dict[str, Any]]:
+    usage = response.get("usage") or {}
+    yield {
+        "type": "message_start",
+        "message": {
+            "id": response.get("id"),
+            "type": "message",
+            "role": "assistant",
+            "model": response.get("model"),
+            "content": [],
+            "stop_reason": None,
+            "usage": {"input_tokens": usage.get("input_tokens", 0), "output_tokens": 1},
+        },
+    }
+    for index, block in enumerate(response.get("content") or ()):
+        if block.get("type") == "text":
+            yield {
+                "type": "content_block_start",
+                "index": index,
+                "content_block": {"type": "text", "text": ""},
+            }
+            for piece in text_pieces(str(block.get("text", ""))):
+                yield {
+                    "type": "content_block_delta",
+                    "index": index,
+                    "delta": {"type": "text_delta", "text": piece},
+                }
+            for citation in block.get("citations") or ():
+                yield {
+                    "type": "content_block_delta",
+                    "index": index,
+                    "delta": {"type": "citations_delta", "citation": citation},
+                }
+        else:
+            start = {k: v for k, v in block.items() if k != "input"}
+            yield {
+                "type": "content_block_start",
+                "index": index,
+                "content_block": {**start, "input": {}},
+            }
+            raw = json.dumps(block.get("input") or {}, ensure_ascii=False)
+            for piece in (raw[: len(raw) // 2], raw[len(raw) // 2 :]):
+                yield {
+                    "type": "content_block_delta",
+                    "index": index,
+                    "delta": {"type": "input_json_delta", "partial_json": piece},
+                }
+        yield {"type": "content_block_stop", "index": index}
+    yield {
+        "type": "message_delta",
+        "delta": {"stop_reason": response.get("stop_reason")},
+        "usage": {"output_tokens": usage.get("output_tokens", 0)},
+    }
+    yield {"type": "message_stop"}
+
+
+__all__ = ["NOT_FOUND_EN", "NOT_FOUND_TE", "STREAM_WORDS", "FakeTransport", "text_pieces"]

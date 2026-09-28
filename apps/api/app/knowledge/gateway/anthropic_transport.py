@@ -21,7 +21,7 @@ can echo input).
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 import anthropic
@@ -82,6 +82,33 @@ class AnthropicTransport:
             raise classify(exc) from None
         data: Mapping[str, Any] = message.to_dict()
         return data
+
+    def stream(self, request: MessagesRequest) -> Iterator[Mapping[str, Any]]:
+        """Server-sent events of one call as dicts (``stream=True``). An ``error`` event or a
+        broken connection mid-stream raises :class:`TransportError`; closing the iterator
+        closes the HTTP response, so the provider stops generating."""
+        try:
+            stream = self._client.messages.create(
+                **dict(request.body), stream=True, timeout=request.timeout_s
+            )
+        except anthropic.AnthropicError as exc:
+            raise classify(exc) from None
+        return _events(stream)
+
+
+def _events(stream: Any) -> Iterator[Mapping[str, Any]]:
+    try:
+        for event in stream:
+            data: Mapping[str, Any] = event.to_dict()
+            if data.get("type") == "error":
+                error = data.get("error")
+                kind = error.get("type") if isinstance(error, Mapping) else None
+                raise TransportError("overloaded" if kind == "overloaded_error" else "server")
+            yield data
+    except anthropic.AnthropicError as exc:
+        raise classify(exc) from None
+    finally:
+        stream.close()
 
 
 __all__ = ["AnthropicTransport", "classify"]

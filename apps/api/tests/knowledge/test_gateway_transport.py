@@ -383,3 +383,50 @@ def test_ADR_0005_platform_and_knowledge_use_the_same_usd_inr_rate() -> None:
         (REPO / "apps" / "api" / "app" / "platform" / "billing.yaml").read_text(encoding="utf-8")
     )
     assert Decimal(billing["billing"]["usd_inr_rate"]) == load_llm_config().budget.usd_inr_rate
+
+
+# --- streaming through the SDK (docs/06 §5.1; FR-KB-008) -----------------------------------------
+
+
+def sse_response(events: list[dict[str, Any]]) -> httpx.Response:
+    body = "".join(f"event: {e['type']}\ndata: {json.dumps(e)}\n\n" for e in events)
+    return httpx.Response(
+        200, headers={"content-type": "text/event-stream"}, content=body.encode("utf-8")
+    )
+
+
+def message_events() -> list[dict[str, Any]]:
+    from app.knowledge.gateway.fake import _stream_events
+
+    return list(_stream_events(ok_message().json()))
+
+
+def test_FR_KB_008_live_stream_yields_deltas_then_the_cited_turn() -> None:
+    from app.knowledge.domain import TextDelta
+
+    recorder = Recorder(sse_response(message_events()))
+    gw = gateway_with(live(recorder))
+    items = list(
+        gw.stream_turn(Metering(TENANT, "ask"), "answer", "s", [UserMessage("q")], [SEARCH])
+    )
+    body = json.loads(recorder.requests[0].content)
+    assert body["stream"] is True
+    text = "".join(i.text for i in items if isinstance(i, TextDelta))
+    assert text == "Exams start at 09:30."
+    turn = items[-1]
+    assert isinstance(turn, ModelTurn)
+    assert turn.segments[0].citations[0].source == f"sos://doc/{DOC}/v2#p1"
+    assert turn.usage.output_tokens == 12
+
+
+def test_NFR_AVL_004_live_error_event_mid_stream_is_unavailable() -> None:
+    from app.knowledge.gateway.errors import ProviderUnavailable
+
+    events = [
+        *message_events()[:3],
+        {"type": "error", "error": {"type": "overloaded_error", "message": "synthetic"}},
+    ]
+    gw = gateway_with(live(Recorder(sse_response(events))))
+    stream = gw.stream_turn(Metering(TENANT, "ask"), "answer", "s", [UserMessage("q")], [SEARCH])
+    with pytest.raises(ProviderUnavailable):
+        list(stream)

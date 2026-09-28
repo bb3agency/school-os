@@ -29,7 +29,9 @@ Outcome = Literal[
     "invalid_output",
     "unavailable",
     "rejected",
+    "cancelled",
 ]
+"""``cancelled``: a streamed call closed early because the client went away (0029_kb_v2)."""
 
 
 def cost_usd(price: ModelPrice, cache: CachePriceMultipliers, usage: RawUsage) -> Decimal:

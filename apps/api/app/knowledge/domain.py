@@ -227,8 +227,27 @@ class ModelTurn:
 
 
 @dataclass(frozen=True, slots=True)
+class TextDelta:
+    """A piece of answer text as the model generates it (streaming, docs/06 §5.1).
+
+    Already Aadhaar-masked by the gateway; NOT validated: citations are checked only on the
+    complete :class:`ModelTurn` that ends every stream (FR-KB-005)."""
+
+    text: str
+
+
+TurnEvent = TextDelta | ModelTurn
+"""What :meth:`~app.knowledge.interfaces.StreamingLlmGateway.stream_turn` yields: text deltas,
+then exactly one complete :class:`ModelTurn`."""
+
+
+@dataclass(frozen=True, slots=True)
 class UserMessage:
     text: str
+    earlier_questions: tuple[str, ...] = ()
+    """Earlier questions of the SAME user's session, oldest first (FR-KB-012; docs/06 §5
+    conversation rules). Context only: never earlier answers or tool results, so every turn
+    re-retrieves under the caller's current permissions (invariant 8)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,4 +321,28 @@ class ErrorEvent:
     """An i18n key (``kb.errors.budget``); the UI renders it in en/te."""
 
 
-AskEvent = MetaEvent | TokenEvent | CitationEvent | DoneEvent | ErrorEvent
+@dataclass(frozen=True, slots=True)
+class DeltaEvent:
+    """Streaming preview (docs/06 §5.1, M2 wave 5): append ``text`` verbatim to the answer
+    being shown. NOT yet validated; the ``final`` event replaces it."""
+
+    event: ClassVar[str] = "delta"
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class FinalEvent:
+    """The validated answer (docs/06 §5.1): show ``text`` INSTEAD of every ``delta`` received
+    so far, and ignore the ``token`` events that follow (they repeat it for older clients).
+    ``replaced`` is true when validation changed what was streamed (citations dropped, "not
+    found", search-only fallback), beyond adding the ``[n]`` citation markers."""
+
+    event: ClassVar[str] = "final"
+    text: str
+    replaced: bool
+    status: str
+    """``answered``, ``not_found``, ``refused`` or ``search_only`` (the stored query status)."""
+    mode: AskMode
+
+
+AskEvent = MetaEvent | TokenEvent | CitationEvent | DoneEvent | ErrorEvent | DeltaEvent | FinalEvent

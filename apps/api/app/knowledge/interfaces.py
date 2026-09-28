@@ -6,6 +6,10 @@
 - ``Chunker``: ``chunking``; used by ``ingestion``.
 - ``Retriever``: ``retrieval``; used by ``tools`` (``search_documents``) and ``service``.
 - ``LlmGateway``: ``gateway``; used by ``service`` (ask loop) and ``ingestion`` (metadata).
+- ``StreamingLlmGateway`` (M2 wave 5, additive): ``LlmGateway`` plus ``stream_turn``, so the
+  answer can stream (FR-KB-008 first-token target). A separate Protocol rather than a new method
+  on ``LlmGateway``: every existing implementation and test double stays a valid
+  ``LlmGateway``, and the answer loop falls back to ``run_turn`` for one that cannot stream.
 - ``RecordTool``: ``tools``; used by ``service`` (ask loop).
 - ``IngestionPipeline``: ``ingestion``; run by worker tasks.
 - ``KnowledgeService``: ``service`` (later); used by routes and other modules.
@@ -42,6 +46,7 @@ from app.knowledge.domain import (
     SearchFilters,
     ToolOutcome,
     ToolSpec,
+    TurnEvent,
 )
 
 if TYPE_CHECKING:
@@ -130,6 +135,27 @@ class LlmGateway(Protocol):
 
 
 @runtime_checkable
+class StreamingLlmGateway(LlmGateway, Protocol):
+    def stream_turn(
+        self,
+        metering: Metering,
+        role: ModelRole,
+        system: str,
+        conversation: Sequence[ConversationItem],
+        tools: Sequence[ToolSpec],
+    ) -> Iterator[TurnEvent]:
+        """``run_turn`` with the text as it is generated: yields ``TextDelta`` values
+        (Aadhaar-masked, not validated), then exactly one ``ModelTurn``, identical to what
+        ``run_turn`` returns for the same response.
+
+        Same controls and errors as ``run_turn``; a provider failure after some deltas raises
+        too (the caller degrades to search-only). Closing the iterator early stops the provider
+        call and meters what was used (outcome ``cancelled``).
+        """
+        ...
+
+
+@runtime_checkable
 class RecordTool(Protocol):
     @property
     def spec(self) -> ToolSpec: ...
@@ -190,5 +216,6 @@ __all__ = [
     "LlmGateway",
     "RecordTool",
     "Retriever",
+    "StreamingLlmGateway",
     "TenantEmbedder",
 ]
