@@ -262,8 +262,10 @@ def test_every_branch_carries_the_acl_predicate() -> None:
 
 
 def test_SEC_018_scoped_askers_agree_with_the_eval_oracle(schools: tuple[School, School]) -> None:
-    """``evals/sos_evals/acl.py`` judges leakage in ``make eval``; for what it can express
-    (scoped askers; role/section/class entries; C1 documents) it and the SQL filter agree."""
+    """``evals/sos_evals/acl.py`` judges leakage in ``make eval``; on role/section/class
+    entries it and the SQL filter agree (keys as the asker's role grants them: the accountant
+    is a school-wide reader). The full parity check, built from real principals over the whole
+    eval corpus, is ``tests/knowledge/test_eval_bridge.py``."""
     from sos_evals import acl as oracle
     from sos_evals.schema import Acl, Asker, CorpusItem
 
@@ -306,6 +308,7 @@ def test_SEC_018_scoped_askers_agree_with_the_eval_oracle(schools: tuple[School,
             roles={asker.role},
             sections={uuid.UUID(s) for s in asker.sections},
             classes={uuid.UUID(c) for c in asker.classes},
+            school_wide=oracle.grant(asker, oracle.DOCUMENT_READ) == "school",
         )
         got_ids = set(_search(a.tenant_id, acl))
         got = {n for n in specs if a.ids(n) <= got_ids}

@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from sos_evals import datasets, generator
+from sos_evals import acl, datasets, generator
 from sos_evals.acl import visible
-from sos_evals.schema import CATEGORIES, Asker, EvalItem
+from sos_evals.schema import CATEGORIES, Acl, Asker, EvalItem
 
 DATA = datasets.load()
 
@@ -33,18 +33,82 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gate_items_all_run_in_the_fast_subset() 
             assert item.fast, item.id
 
 
-def test_FR_KB_010_leakage_probes_cover_section_role_and_tenant_boundaries() -> None:
-    kinds = set()
-    for item in DATA.items:
-        for source in item.probe_sources:
-            target = DATA.corpus[source]
-            if target.tenant != item.asker.tenant:
-                kinds.add("cross-tenant")
-            elif target.acl.sections and not set(target.acl.sections) & set(item.asker.sections):
-                kinds.add("cross-section")
-            else:
-                kinds.add("cross-role")
-    assert kinds == {"cross-tenant", "cross-section", "cross-role"}
+def _probe_kind(item: EvalItem, source: str) -> str:
+    target, asker = DATA.corpus[source], item.asker
+    rules = (
+        ("cross-tenant", target.tenant != asker.tenant),
+        ("record-scope", target.kind == "record"),
+        (
+            "c3",
+            target.sensitivity == "C3" and not acl.has(asker, acl.STUDENT_READ_SENSITIVE),
+        ),
+        ("membership", bool(target.acl.members)),
+        ("empty-acl", target.acl == Acl()),
+        (
+            "cross-section",
+            bool(target.acl.sections) and not set(target.acl.sections) & set(asker.sections),
+        ),
+        ("cross-class", bool(target.acl.classes) and not target.acl.roles),
+    )
+    return next((name for name, applies in rules if applies), "cross-role")
+
+
+def test_FR_KB_010_leakage_probes_cover_every_visibility_boundary() -> None:
+    kinds = {_probe_kind(item, s) for item in DATA.items for s in item.probe_sources}
+    assert kinds == {
+        "cross-tenant",
+        "record-scope",
+        "c3",
+        "membership",
+        "empty-acl",
+        "cross-section",
+        "cross-class",
+        "cross-role",
+    }
+
+
+def test_FR_KB_010_probes_come_from_every_kind_of_asker() -> None:
+    """School-wide readers, scoped teachers and ACL managers are all probed."""
+    probers = {i.asker.role for i in DATA.items if i.leakage_probe}
+    assert {"office_staff", "accountant", "class_teacher", "teacher", "principal"} <= probers
+
+
+def test_corpus_size_follows_docs_06_section_13_1() -> None:
+    documents = [c for c in DATA.corpus.values() if c.kind == "document"]
+    records = [c for c in DATA.corpus.values() if c.kind == "record"]
+    assert len(documents) >= 300
+    assert len({c.source.split("/v")[0] for c in documents}) >= 250  # distinct documents
+    assert {c.locale for c in documents} == {"en", "te", "mixed"}
+    assert {c.doc_type for c in documents} >= {
+        "circular",
+        "minutes",
+        "policy",
+        "letter",
+        "register_scan",
+        "timetable",
+        "report",
+    }
+    assert sum(c.sensitivity == "C3" for c in documents) >= 5
+    assert sum(bool(c.injection_canaries) for c in documents) >= 10
+    assert sum(not c.is_latest for c in documents) >= 10
+    assert any(c.acl.members for c in documents)
+    assert any(c.acl == Acl() for c in documents)
+    assert len({c.source.split("/field/")[0] for c in records}) >= 30  # students
+    assert any("UDISE+ records a different" in c.content for c in records)  # mismatches
+
+
+def test_question_sets_are_large_and_the_fast_subset_stays_small() -> None:
+    assert len(DATA.items) >= 200
+    assert len(DATA.select("fast")) <= len(DATA.items) // 3
+    assert sum(i.category == "records" for i in DATA.items) >= 25
+    record_questions = [
+        i for i in DATA.items if any(DATA.corpus[s].kind == "record" for s in i.expected_sources)
+    ]
+    assert {i.locale for i in record_questions} == {"en", "te", "mixed"}
+
+
+def test_every_asker_holds_kb_ask() -> None:
+    assert all(acl.can_ask(i.asker) for i in DATA.items)
 
 
 def test_FR_KB_010_every_probe_answer_exists_for_someone_who_may_see_it() -> None:
@@ -121,7 +185,7 @@ def test_load_rejects_invalid_json(tmp_path: Path) -> None:
 def test_validate_rejects_a_probe_the_asker_can_see() -> None:
     item = next(i for i in DATA.items if i.leakage_probe)
     target = DATA.corpus[item.probe_sources[0]]
-    insider = Asker(tenant=target.tenant, role=target.acl.roles[0])
+    insider = Asker(tenant=target.tenant, role="principal")  # sees every document and record
     assert visible(insider, target)
     bad = item.model_copy(update={"asker": insider})
     with pytest.raises(datasets.DatasetError, match="is visible to the asker"):

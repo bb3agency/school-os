@@ -51,6 +51,12 @@ Role = Literal[
 ]
 """Tenant system roles (apps/api/app/authz/roles.yaml)."""
 
+Sensitivity = Literal["C1", "C2", "C3"]
+"""Document classification (docs/05 §8); C3 is restricted."""
+
+MEMBER = r"^[a-z][a-z0-9-]{1,39}$"
+"""A named staff membership (a label; the bridge maps it to one real membership)."""
+
 SOURCE_URI = re.compile(r"^sos://(doc|student|finding|change|verified)/[0-9a-f-]{36}(/|#|$)")
 """docs/06 §8: stable internal URIs that never contain names or values."""
 
@@ -60,20 +66,25 @@ class _Model(BaseModel):
 
 
 class Asker(_Model):
-    """Who asks: the tenant, the role and the section/class scope the role is limited to."""
+    """Who asks: the tenant, one system role with that role's real permissions, and the
+    membership's section/class scopes (they limit the role's scoped grants only; school-wide
+    grants ignore them). `member` names the membership when an ACL entry targets it."""
 
     tenant: str = Field(min_length=1)
     role: Role
     sections: tuple[str, ...] = ()
     classes: tuple[str, ...] = ()
+    member: str | None = Field(default=None, pattern=MEMBER)
 
 
 class Acl(_Model):
-    """Denormalised ACL keys of a chunk (docs/06 §6): any overlap with the asker grants access."""
+    """A document's ACL entries (docs/05 §6.1 `kb.document_acl`; `sos_evals.acl` applies them).
+    All empty means "school-wide readers only" (fail closed, never public)."""
 
     roles: tuple[Role, ...] = ()
     sections: tuple[str, ...] = ()
     classes: tuple[str, ...] = ()
+    members: tuple[str, ...] = ()
 
 
 class CorpusItem(_Model):
@@ -85,7 +96,11 @@ class CorpusItem(_Model):
     locale: Locale
     issued_on: date | None = None
     is_latest: bool = True
-    acl: Acl
+    acl: Acl = Acl()
+    """Documents only; records are visible through `student.read_basic` and `student_section`."""
+    sensitivity: Sensitivity = "C1"
+    student_section: str | None = None
+    """Records only: the student's current section (scoped record reads reach it or not)."""
     content: str = Field(min_length=1)
     marker: str = Field(pattern=r"^MK-[0-9A-F]{6}$")
     """A unique token inside `content`; seeing it in an answer proves the content reached it."""
@@ -101,6 +116,11 @@ class CorpusItem(_Model):
         for canary in self.injection_canaries:
             if canary not in self.content:
                 raise ValueError(f"canary {canary!r} does not occur in the content")
+        if self.kind == "record":
+            if self.student_section is None or self.acl != Acl() or self.sensitivity == "C3":
+                raise ValueError(f"{self.source}: a record has a section, no ACL and is not C3")
+        elif self.student_section is not None:
+            raise ValueError(f"{self.source}: only records have a student section")
         return self
 
 
