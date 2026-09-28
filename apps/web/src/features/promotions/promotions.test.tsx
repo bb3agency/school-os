@@ -8,6 +8,7 @@ import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me } from "@/test/school-fixtures";
 import PromotionsPage from "@/app/[locale]/(school)/settings/structure/years/[yearId]/promotions/page";
+import { PromotionsIndexScreen } from "./PromotionsIndexScreen";
 import { PromotionsScreen } from "./PromotionsScreen";
 import { planRequest, promotionError, targetYears } from "./data";
 
@@ -482,6 +483,28 @@ describe("promotions screen (FR-TEN-011, US-202 AC2)", () => {
     expect(within(history).getAllByText("2027-28")).toHaveLength(2);
   });
 
+  it("history names who promoted and who undid (display names only)", async () => {
+    school(
+      [READ, MANAGE],
+      [
+        { ...RUN, can_undo: false, committed_by_name: "Lakshmi Office" },
+        {
+          ...RUN,
+          id: id("f0"),
+          status: "undone",
+          committed_by_name: "Lakshmi Office",
+          undone_by: id("b2"),
+          undone_by_name: "Ravi Principal",
+          undone_at: "2026-09-26T06:00:00Z",
+        },
+      ],
+    );
+    renderWithIntl(<PromotionsScreen yearId={FROM.id} />);
+    const history = await screen.findByRole("table", { name: "Promotions of this year" });
+    expect(within(history).getAllByText("by Lakshmi Office")).toHaveLength(2);
+    expect(within(history).getByText("by Ravi Principal")).toBeInTheDocument();
+  });
+
   it("says to add the next year first when there is no later year", async () => {
     school([READ, MANAGE]);
     stub.routes["GET /bff/api/v1/academic-years"] = () => page([FROM, OLD]);
@@ -562,5 +585,29 @@ describe("promotion helpers", () => {
     expect(codeOf(promotionError(err("x", "something_else")))).toBe("validation_error");
     const conflict = new ApiError(409, "nothing_to_promote");
     expect(promotionError(conflict)).toBe(conflict);
+  });
+});
+
+describe("promotions menu entry (FR-TEN-011, US-202 AC2)", () => {
+  it("lists the years, the current one first, each linking to its promotion (ids only)", async () => {
+    school([READ, MANAGE]);
+    stub.routes["GET /bff/api/v1/academic-years"] = () => page([NEXT, FROM, OLD]);
+    renderWithIntl(<PromotionsIndexScreen />);
+    const links = await screen.findAllByRole("link", { name: /Promote students/ });
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      `/en/settings/structure/years/${FROM.id}/promotions`,
+      `/en/settings/structure/years/${NEXT.id}/promotions`,
+      `/en/settings/structure/years/${OLD.id}/promotions`,
+    ]);
+    expect(links[0]).toHaveAccessibleName("Promote students (academic year 2026-27)");
+  });
+
+  it("without tenant.structure.manage it explains instead", async () => {
+    school([READ]);
+    renderWithIntl(<PromotionsIndexScreen />, "te");
+    expect(
+      await screen.findByText(messages.te.academicStructure.promotions.noAccessTitle),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Promote/ })).toBeNull();
   });
 });

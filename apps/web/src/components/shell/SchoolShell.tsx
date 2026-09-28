@@ -42,6 +42,14 @@ export function SchoolShell({
     { href: "/settings/school", label: t("schoolSettings.nav") },
     { href: "/documents", label: t("documents.nav"), permission: "document.read" },
     { href: "/settings/structure", label: t("school.nav.structure") },
+    {
+      // FR-TEN-011, US-202 AC2: year-end promotion, under the structure it changes.
+      href: "/settings/structure/promotions",
+      label: t("school.nav.promotions"),
+      permission: "tenant.structure.manage",
+      nested: true,
+      activePattern: "^/settings/structure/years/[^/]+/promotions/?$",
+    },
     { href: "/settings/users", label: t("school.nav.users"), permission: "user.manage" },
     {
       href: "/settings/billing",
@@ -72,7 +80,13 @@ export function SchoolShell({
           permissions.includes(key),
         ),
     )
-    .map(({ href, label, exact }) => ({ href, label, ...(exact ? { exact } : {}) }));
+    .map(({ href, label, exact, nested, activePattern }) => ({
+      href,
+      label,
+      ...(exact ? { exact } : {}),
+      ...(nested ? { nested } : {}),
+      ...(activePattern ? { activePattern } : {}),
+    }));
   return (
     <div className="flex min-h-screen flex-col">
       <SkipLink label={t("common.skipToContent")} />

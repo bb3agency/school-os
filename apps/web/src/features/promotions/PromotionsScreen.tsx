@@ -150,6 +150,25 @@ function yearLabel(years: Loadable<readonly AcademicYear[]>, id: string): string
 
 /* -------------------------------------------------------------- status, history and undo */
 
+/** When, and by whom (display name from the API; never an email). */
+function WhenBy({
+  when,
+  name,
+}: {
+  when: string | null | undefined;
+  name?: string | null | undefined;
+}) {
+  const t = useTranslations("academicStructure.promotions");
+  const at = formatDateTime(when ?? null);
+  if (!at) return <Value>{null}</Value>;
+  return (
+    <span>
+      <span className="block">{at}</span>
+      {name ? <span className="block text-sm text-ink-muted">{t("byName", { name })}</span> : null}
+    </span>
+  );
+}
+
 function StatusCard({
   from,
   runs,
@@ -187,12 +206,12 @@ function StatusCard({
     {
       key: "committed",
       header: t("colCommitted"),
-      cell: (run) => <Value>{formatDateTime(run.committed_at)}</Value>,
+      cell: (run) => <WhenBy when={run.committed_at} name={run.committed_by_name} />,
     },
     {
       key: "undone",
       header: t("colUndone"),
-      cell: (run) => <Value>{formatDateTime(run.undone_at)}</Value>,
+      cell: (run) => <WhenBy when={run.undone_at} name={run.undone_by_name} />,
     },
     {
       key: "counts",
