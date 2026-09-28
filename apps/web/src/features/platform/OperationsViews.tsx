@@ -9,13 +9,13 @@ import type {
   PlatformAuditVerify,
 } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -532,6 +532,12 @@ export function FleetScreen({ status = "" }: { status?: string }) {
 
 /* ------------------------------------------------------------ break-glass */
 
+/** ADR-0023: sign in to the school app with the support client for one approved request. */
+export function supportSignInUrl(row: Pick<BreakGlassRequest, "id" | "tenant_id">): string {
+  const params = new URLSearchParams({ request: row.id, tenant: row.tenant_id });
+  return `/bff/auth/support/login?${params.toString()}`;
+}
+
 const breakGlassSchema = z.object({
   tenant_id: uuid,
   reason_code: z.enum(["support_request", "security_incident", "legal_obligation"], {
@@ -545,7 +551,9 @@ const breakGlassSchema = z.object({
 /**
  * Break-glass requests (docs/16 §5.15; 07 §6.4): status list for every operator, request
  * form (M1 workflow), and the second confirmation of an emergency request — which must come
- * from a different operator (409 same_operator otherwise).
+ * from a different operator (409 same_operator otherwise). An active request links to the
+ * support sign-in of the school app (ADR-0023): a plain link, because the BFF route starts an
+ * OIDC redirect; the API lets only the requesting operator in.
  */
 export function BreakGlassScreen() {
   const t = useTranslations("platform.breakGlass");
@@ -553,6 +561,7 @@ export function BreakGlassScreen() {
   const tstatus = useTranslations("status.breakGlass");
   const api = useBffClient("operator");
   const can = useCan();
+  const hintId = useId();
   const { nameOf, schools } = useSchoolDirectory();
   const requests = useApiQuery(
     [...PK.breakGlass, "list"],
@@ -616,10 +625,23 @@ export function BreakGlassScreen() {
       key: "actions",
       header: tc("actions"),
       cell: (row) =>
-        row.emergency &&
-        row.status === "requested" &&
-        row.emergency_confirmed_by_2 === null &&
-        can("platform.breakglass.emergency") ? (
+        row.status === "active" ? (
+          <span className="flex flex-col gap-1">
+            <a
+              href={supportSignInUrl(row)}
+              className={buttonClasses("secondary", "sm")}
+              aria-describedby={`${hintId}-${row.id}`}
+            >
+              {t("openSchool")}
+            </a>
+            <span id={`${hintId}-${row.id}`} className="text-xs text-ink-muted">
+              {t("openSchoolHint")}
+            </span>
+          </span>
+        ) : row.emergency &&
+          row.status === "requested" &&
+          row.emergency_confirmed_by_2 === null &&
+          can("platform.breakglass.emergency") ? (
           <ActionDialog
             triggerLabel={t("confirmEmergency")}
             triggerSize="sm"

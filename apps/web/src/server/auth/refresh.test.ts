@@ -41,7 +41,7 @@ function fakeIdp(options: { rotate?: boolean; delayMs?: number } = {}) {
 function refresherFor(client: OidcClient, sharedStore = store) {
   return new TokenRefresher({
     store: sharedStore,
-    oidc: { staff: client, operator: client },
+    oidc: { staff: client, operator: client, support: client },
     pollMs: 2,
   });
 }
@@ -157,7 +157,7 @@ describe("token refresh (FR-IAM-004)", () => {
     await kv.set(`sos:web:sess:lock:${session.id}`, "someone-else", { pxMs: 60_000 });
     const refresher = new TokenRefresher({
       store,
-      oidc: { staff: idp.client, operator: idp.client },
+      oidc: { staff: idp.client, operator: idp.client, support: idp.client },
       pollMs: 2,
       lockWaitMs: 20,
     });

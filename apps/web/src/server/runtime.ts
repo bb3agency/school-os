@@ -38,6 +38,8 @@ export function createAuthRuntime(config: AuthConfig, deps: RuntimeDependencies)
   const oidc: Record<SessionKind, OidcClient> = {
     staff: deps.oidc?.staff ?? createOidcClient(config.staff, oidcOptions),
     operator: deps.oidc?.operator ?? createOidcClient(config.operator, oidcOptions),
+    // Lazy (discovery on first use); never used while config.supportEnabled is false.
+    support: deps.oidc?.support ?? createOidcClient(config.support, oidcOptions),
   };
   return {
     config,

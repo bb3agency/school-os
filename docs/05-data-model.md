@@ -177,9 +177,10 @@ These are the **only** cross-tenant read/write paths (`definer_functions` in `rl
 
 | Function | EXECUTE | Returns | Behaviour | Migration |
 |---|---|---|---|---|
-| `core.resolve_login(p_subject text)` | `sos_app` | `TABLE (user_id, tenant_id, membership_id, tenant_status)` | Active, unexpired memberships of the active user with that IdP subject, ordered by creation; reports the tenant status (suspended schools are handled by the API) | 0003 |
-| `core.find_user_id_by_subject(p_subject text)` | `sos_app` | `uuid` or NULL | — | 0003 |
-| `core.create_user_for_invite(p_subject text, p_display_name text, p_email citext, p_language text)` | `sos_app` | `uuid` (user id) | Requires tenant **and** user context and an active, unexpired inviter membership in a `provisioning`/`active` school (else `insufficient_privilege`); inserts a UUIDv7 user or returns the existing one for the subject without overwriting it. Membership, roles and scopes are then written by the app under RLS | 0003 |
+| `core.resolve_login(p_subject text, p_issuer text DEFAULT NULL, p_support_only boolean DEFAULT false)` | `sos_app` | `TABLE (user_id, tenant_id, membership_id, tenant_status)` | Active, unexpired memberships of the active identity `(p_issuer, p_subject)`, ordered by creation; reports the tenant status (suspended schools are handled by the API). `p_support_only` (break-glass support principals, ADR-0023): only memberships holding exactly the system role `platform_support` with a future `expires_at`; otherwise `platform_support` memberships are never returned. NULL issuer = API image older than 0027 (subject only, as before) | 0003, 0027 |
+| `core.find_user_id_by_subject(p_subject text, p_issuer text DEFAULT NULL)` | `sos_app` | `uuid` or NULL | The identity `(p_issuer, p_subject)` | 0003, 0027 |
+| `core.create_user_for_invite(p_subject text, p_display_name text, p_email citext, p_language text)` | `sos_app` | `uuid` (user id) | **Expand-phase wrapper** (0027) for API images older than 0027: calls the five-argument form below with the staff issuer of the environment (the pre-0027 behaviour for staff invites). Dropped by the contract migration | 0003, 0027 |
+| `core.create_user_for_invite(p_subject text, p_display_name text, p_email citext, p_language text, p_issuer text)` | `sos_app` | `uuid` (user id) | Requires tenant **and** user context and an active, unexpired inviter membership in a `provisioning`/`active` school (else `insufficient_privilege`); inserts a UUIDv7 user `(p_issuer, p_subject)` or returns the existing one without overwriting it; a subject held by ANOTHER issuer's identity raises `unique_violation` (ADR-0023). Membership, roles and scopes are then written by the app under RLS | 0003, 0027 |
 | `core.list_tenant_ids(p_status text[])` | `sos_app`, `sos_platform` | `TABLE (tenant_id uuid)` | Tenant IDs with the given statuses (all when NULL), for per-tenant job fan-out | 0003 |
 | `core.provision_tenant(p_id uuid, p_code text, p_name text, p_boards text[], p_plan_tier text, p_deployment_mode text)` | `sos_platform` | `uuid` | Inserts **only** the tenant row, status `provisioning`. Keys (`tenancy.initialise_tenant`), system roles (post-provision hooks) and the owner invite (`core.create_owner_invite`) follow as separate steps (16 §5.4) | 0003 |
 | `core.set_tenant_status(p_tenant uuid, p_status text)` | `sos_platform` | `text` — the **previous** status | Locks the row; allows only `provisioning→active`, `active→suspended`, `suspended→active`, `active→offboarding`, `suspended→offboarding`, `offboarding→deleted` (else `object_not_in_prerequisite_state`); **`provisioning→active` requires an unretired `core.tenant_keys` row**; bumps `version`. Writes no audit event (the caller does) | 0003 |
@@ -187,9 +188,10 @@ These are the **only** cross-tenant read/write paths (`definer_functions` in `rl
 | `core.current_subscription()` | `sos_app` | `jsonb` | For `core.current_tenant()` only: live subscription (non-cancelled first), plan code/version/name/tier/period, status, period dates, trial end, past-due and grace dates, `cancel_at_period_end`, `limits`, latest `usage_daily` row, and the last 24 non-draft invoices with `amount_due_inr` | 0005 |
 | `core.create_owner_invite(p_tenant uuid, p_subject text, p_display_name text, p_email citext, p_language text)` | `sos_platform` | `TABLE (user_id, membership_id, owner_role_assigned boolean)` | Only while the tenant is `provisioning` and has no memberships: creates/reuses the user (refuses a disabled one), an `invited` membership with `mfa_required = true`, a `school` scope, and the `owner` role if it has been cloned | 0005 |
 | `core.accept_invitations(p_subject text)` | `sos_app` | `TABLE (tenant_id, membership_id, user_id)` | Activates the caller's own `invited` memberships created in the last 30 days, unexpired, in `active` schools (ADR-0019) | 0007 |
+| `core.user_membership_count(p_user uuid)` | `sos_app` | `integer` or NULL | Needs tenant context (else `insufficient_privilege`); NULL unless `p_user` is a member of the current school; otherwise the number of that person's memberships in all schools, any status. Used by `PATCH /users/{id}` to refuse editing a shared profile (`409 profile_shared`, ADR-0028) | 0028 |
 | `ops.claim_outbox(p_batch int)` | `sos_app` | `TABLE (id, tenant_id, event_type, payload)` | Claims up to `clamp(p_batch, 1, 500)` (default 100) pending rows `FOR UPDATE SKIP LOCKED`, sets `dispatched_at` | 0006 |
 
-`sos_definer` table privileges (granted in the migrations, nothing via default privileges): `core.tenants` SELECT, INSERT, UPDATE; `core.users` SELECT, INSERT; `core.memberships` SELECT, INSERT, `UPDATE (status, updated_at, version)`; SELECT on `core.tenant_keys`, `core.sections`, `core.academic_years`, `core.roles`; INSERT on `core.membership_scopes`, `core.membership_roles`; SELECT, INSERT on `audit.events`, `audit.chain_heads`; SELECT, `UPDATE (dispatched_at)` on `ops.outbox`; SELECT on `platform.plans`, `platform.subscriptions`, `platform.invoices`, `platform.usage_daily`.
+`sos_definer` table privileges (granted in the migrations, nothing via default privileges): `core.tenants` SELECT, INSERT, UPDATE; `core.users` SELECT, INSERT; `core.memberships` SELECT, INSERT, `UPDATE (status, updated_at, version)`; SELECT on `core.tenant_keys`, `core.sections`, `core.academic_years`, `core.roles`, `core.membership_roles` (0027); INSERT on `core.membership_scopes`, `core.membership_roles`; SELECT, INSERT on `audit.events`, `audit.chain_heads`; SELECT, `UPDATE (dispatched_at)` on `ops.outbox`; SELECT on `platform.plans`, `platform.subscriptions`, `platform.invoices`, `platform.usage_daily`.
 
 **Migration pattern for a definer function** (never `ALTER FUNCTION … OWNER TO`, which `sos_owner` cannot do for a role it is not a member of):
 
@@ -282,6 +284,9 @@ CREATE TABLE core.tenant_keys (
 
 CREATE TABLE core.users (
   id                 uuid PRIMARY KEY,
+  -- 0027 (ADR-0023, expand): the identity is (idp_issuer, idp_subject). Nullable with
+  -- DEFAULT = the staff issuer until the contract step (NOT NULL, drop UNIQUE (idp_subject)).
+  idp_issuer         text DEFAULT '<SOS_OIDC_ISSUER at migration time>',
   idp_subject        text NOT NULL,
   display_name       text NOT NULL,
   email              public.citext,
@@ -293,6 +298,9 @@ CREATE TABLE core.users (
   last_login_at      timestamptz,
   version            int NOT NULL DEFAULT 1,
   CONSTRAINT users_idp_subject_key UNIQUE (idp_subject),
+  CONSTRAINT users_idp_issuer_subject_key UNIQUE (idp_issuer, idp_subject),
+  CONSTRAINT users_idp_issuer_length
+    CHECK (idp_issuer IS NULL OR char_length(idp_issuer) BETWEEN 1 AND 255),
   CONSTRAINT users_idp_subject_length CHECK (char_length(idp_subject) BETWEEN 1 AND 255),
   CONSTRAINT users_display_name_length CHECK (char_length(display_name) BETWEEN 1 AND 200),
   CONSTRAINT users_preferred_language_check CHECK (preferred_language IN ('en','te')),

@@ -287,6 +287,9 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_OIDC_ISSUER`, `SOS_OIDC_AUDIENCE` | local stub `/schoolos`, `schoolos-web` | Staff tokens (Cognito: audience = app client ID) |
 | `SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE` | local stub `/platform`, `schoolos-platform` | Operator tokens |
 | `SOS_OIDC_JWKS_URI`, `SOS_PLATFORM_OIDC_JWKS_URI` | none (discovery) | Explicit JWKS URLs; compose points them at `http://oidc:8080/...` |
+| `SOS_SUPPORT_OIDC_AUDIENCE` | none (off) | Break-glass support sign-in (ADR-0023): the support app client ID of the OPERATOR pool. Unset = support tokens are refused and approved break-glass access cannot be used (fail closed). Must differ from the staff and operator admin clients |
+| `SOS_SUPPORT_OIDC_ISSUER` | `SOS_PLATFORM_OIDC_ISSUER` | Issuer of support tokens; on the shared tier it must equal the operator pool issuer, never the staff issuer; public https in staging/prod. Dedicated hosts set it explicitly |
+| `SOS_SUPPORT_OIDC_JWKS_URI` | `SOS_PLATFORM_OIDC_JWKS_URI` when the issuers match, else discovery | Explicit JWKS URL for support tokens |
 | `SOS_SERVICE_TOKEN_KEY` | dev-only value | HS256 key for the BFF's `X-Service-Token` (same value in the web app) |
 | `SOS_KEY_WRAPPER` | `local-dev` | `kms` or `local-dev` (local/CI only) |
 | `SOS_LOCAL_DEV_MASTER_KEY` | none | Local-dev key wrapper and local audit-archive signing key |
@@ -303,7 +306,7 @@ Deployments use exactly these names: Terraform `shared_platform` (§5) and `depl
 
 Test-only: `SOS_TEST_ADMIN_DATABASE_URL` (use an existing database instead of testcontainers), `SOS_WEB_TEST_REDIS_URL` (real-Valkey web test), `SOS_WEB_TEST_LOGS` (print the web app's JSON logs during vitest). Compose-only: `SOS_DB_ADMIN_PASSWORD`, `SOS_DB_APP_PASSWORD`, `SOS_DB_MIGRATOR_PASSWORD`, `SOS_DB_PLATFORM_PASSWORD`, `SOS_DB_READONLY_PASSWORD`, `SOS_INSTALL_PSQL`.
 
-**Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`.
+**Web (BFF) settings** (`apps/web/src/server/config.ts`; see `apps/web/README.md`): `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY`, `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`, and optional `SUPPORT_OIDC_CLIENT_ID`, `SUPPORT_OIDC_CLIENT_SECRET`, `SUPPORT_OIDC_ISSUER` (break-glass support app client of the operator pool, ADR-0023; unset client ID = off; callback `/bff/auth/support/callback`).
 
 `FILES_ORIGIN` is the origin of presigned upload and preview URLs, added to the CSP `connect-src` and `img-src` (docs/07 §10, §11; https only, except a loopback http origin under `next dev`). It must equal the origin the API presigns with, which the files bucket's CORS rule allows the app to `POST` to:
 

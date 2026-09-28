@@ -63,16 +63,31 @@ class LoginMembership:
     tenant_status: str
 
 
-def resolve_login(session: Session, subject: str) -> list[LoginMembership]:
-    """Memberships the OIDC ``subject`` may sign in to (use a ``context_free_session``).
+def _issuer(issuer: str) -> str:
+    # Never call the definer functions without an issuer: NULL means "older API image" there
+    # (subject-only matching, ADR-0023 expand phase).
+    if not isinstance(issuer, str) or not issuer.strip():
+        raise ValueError("an OIDC issuer is required")
+    return issuer
 
-    Returns [] for unknown or disabled users. The caller picks the tenant (FR-IAM-013) and must
-    refuse tenants whose status is not ``active``. Audit: ``auth.login.succeeded`` /
-    ``auth.login.denied`` in the chosen tenant.
+
+def resolve_login(
+    session: Session, subject: str, *, issuer: str, support_only: bool = False
+) -> list[LoginMembership]:
+    """Memberships the identity ``(issuer, subject)`` may sign in to (``context_free_session``).
+
+    ``support_only`` (SchoolOS support principals, ADR-0023): only unexpired memberships holding
+    exactly ``platform_support``; otherwise memberships holding ``platform_support`` are never
+    returned. Returns [] for unknown or disabled users. The caller picks the tenant
+    (FR-IAM-013) and must refuse tenants whose status is not ``active``. Audit:
+    ``auth.login.succeeded`` / ``auth.login.denied`` in the chosen tenant.
     """
     rows = session.execute(
-        text("SELECT user_id, tenant_id, membership_id, tenant_status FROM core.resolve_login(:s)"),
-        {"s": subject},
+        text(
+            "SELECT user_id, tenant_id, membership_id, tenant_status "
+            "FROM core.resolve_login(:s, :i, :p)"
+        ),
+        {"s": subject, "i": _issuer(issuer), "p": support_only},
     ).all()
     return [
         LoginMembership(
@@ -102,30 +117,38 @@ def accept_invitations(
     ]
 
 
-def find_user_id_by_subject(session: Session, subject: str) -> uuid.UUID | None:
+def find_user_id_by_subject(session: Session, subject: str, *, issuer: str) -> uuid.UUID | None:
     value: object = session.execute(
-        text("SELECT core.find_user_id_by_subject(:s)"), {"s": subject}
+        text("SELECT core.find_user_id_by_subject(:s, :i)"), {"s": subject, "i": _issuer(issuer)}
     ).scalar_one()
     return uuid.UUID(str(value)) if value is not None else None
 
 
 def create_user_for_invite(
-    session: Session, *, subject: str, display_name: str, email: str | None, language: str
+    session: Session,
+    *,
+    subject: str,
+    issuer: str,
+    display_name: str,
+    email: str | None,
+    language: str,
 ) -> uuid.UUID:
-    """Create (or find) the global user for an invite; returns only the user id.
+    """Create (or find) the global user ``(issuer, subject)``; returns only the user id.
 
     ``session`` must be a ``tenant_session(tenant_id, inviter_user_id)`` and the inviter must hold
     an active membership there, else :class:`Forbidden`. The new user stays invisible to the
-    tenant until :func:`create_membership` links it. Audit: ``user.invited``.
+    tenant until :func:`create_membership` links it. A subject already used by another issuer's
+    identity raises ``unique_violation`` (never that identity). Audit: ``user.invited``.
     """
     try:
         value: object = session.execute(
-            text("SELECT core.create_user_for_invite(:s, :n, CAST(:e AS public.citext), :l)"),
+            text("SELECT core.create_user_for_invite(:s, :n, CAST(:e AS public.citext), :l, :i)"),
             {
                 "s": subject,
                 "n": _nfc(display_name),
                 "e": _nfc(email) if email else None,
                 "l": language,
+                "i": _issuer(issuer),
             },
         ).scalar_one()
     except DBAPIError as exc:
@@ -133,6 +156,17 @@ def create_user_for_invite(
             raise Forbidden() from exc
         raise
     return uuid.UUID(str(value))
+
+
+def user_membership_count(session: Session, user_id: uuid.UUID) -> int | None:
+    """Schools ``user_id`` has a membership in (any status), via the ADR-0028 definer function.
+
+    ``None`` when the person is not a member of the current school. Needs a ``tenant_session``.
+    """
+    value: object = session.execute(
+        text("SELECT core.user_membership_count(:u)"), {"u": user_id}
+    ).scalar_one()
+    return int(str(value)) if value is not None else None
 
 
 # --- users ---------------------------------------------------------------------------------

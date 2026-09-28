@@ -13,8 +13,10 @@ cloning hook -> activation). School A has one active member per system role plus
     a "target" member (teacher role) used as the object of user-management calls
 
 School B has its own year, class, section and member (cross-tenant IDs).
-Authentication: ``get_principal`` is overridden to read ``X-Test-Subject``, ``X-Test-Mfa`` and
-``X-Test-Auth-Age`` headers; one end-to-end test elsewhere uses real tokens.
+Authentication: ``get_principal`` is overridden to read ``X-Test-Subject``, ``X-Test-Mfa``,
+``X-Test-Auth-Age`` and ``X-Test-Kind`` (``user`` = staff pool, ``support`` = the break-glass
+support client of the operator pool, ADR-0023) headers; a caller object with a ``kind``
+attribute sets the last one. End-to-end tests elsewhere use real tokens.
 """
 
 from __future__ import annotations
@@ -48,7 +50,9 @@ ROLES = tuple(system_roles())
 SUBJECT_HEADER = "X-Test-Subject"
 MFA_HEADER = "X-Test-Mfa"
 AUTH_AGE_HEADER = "X-Test-Auth-Age"
+KIND_HEADER = "X-Test-Kind"
 ISSUER = "https://idp.synthetic.test/pool"
+SUPPORT_ISSUER = "https://idp.synthetic.test/operator-pool"
 _counter = itertools.count(1)
 
 
@@ -89,10 +93,11 @@ def fake_principal(request: Request) -> Principal:
         raise Unauthenticated()
     age = int(request.headers.get(AUTH_AGE_HEADER, "60"))
     now = dt.datetime.now(dt.UTC)
+    support = request.headers.get(KIND_HEADER) == "support"
     return Principal(
         subject=subject,
-        issuer=ISSUER,
-        kind="user",
+        issuer=SUPPORT_ISSUER if support else ISSUER,
+        kind="support" if support else "user",
         auth_time=now - dt.timedelta(seconds=age),
         mfa=request.headers.get(MFA_HEADER, "true") == "true",
         session_id="synthetic-session",
@@ -244,6 +249,9 @@ class Api:
     ) -> httpx.Response:
         h = {SUBJECT_HEADER: who.subject, MFA_HEADER: "true" if mfa else "false"}
         h[AUTH_AGE_HEADER] = str(auth_age_s)
+        kind = getattr(who, "kind", None)
+        if isinstance(kind, str):
+            h[KIND_HEADER] = kind
         if tenant is not None:
             h["X-Active-Tenant"] = str(tenant)
         h.update(headers or {})

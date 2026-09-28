@@ -191,7 +191,7 @@ Queue with SLA timers, filters by status, priority, school, assignee. Ticket vie
 
 ### 5.15 Break-glass requests
 *Permission:* `platform.breakglass.request` to create (M1); any platform role to view the list.
-M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. An approved grant cannot be used yet: the membership is opened for the operator's operator-pool subject, and the school app accepts only staff-pool tokens (fails closed). How operators sign in to the school app for a grant is proposed in [ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md).
+M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. **Using an active grant** ([ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) option C): for an `active` request the list offers **Open the school (support sign-in)**, a link to `/bff/auth/support/login?request=<request id>&tenant=<school id>`. The operator signs in again (MFA, fresh sign-in) with the support app client of the operator pool; the school app shows a read-only "SchoolOS support" banner and a sign-out button. The session start is recorded as `breakglass.session_started` in both chains. A host without the support client (`SOS_SUPPORT_OIDC_AUDIENCE` / `SUPPORT_OIDC_CLIENT_ID` unset) keeps the grant unusable (fail closed).
 
 ### 5.16 Operators and roles
 *Permission:* `platform.operators.manage` (ᴿ).
@@ -1054,7 +1054,7 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Fleet | `deployment.created`, `deployment.updated`, `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.decommissioned` (rejected heartbeats are logged, not audited) |
 | Announcements | `announcement.created`, `announcement.updated`, `announcement.cancelled` |
 | Support | `support.ticket_opened`, `support.ticket_updated`, `support.personal_data_flagged`, `support.tickets_purged` (system) |
-| Break-glass | `breakglass.requested`, `breakglass.emergency_confirmed` (M1) |
+| Break-glass | `breakglass.requested`, `breakglass.emergency_confirmed` (M1); outcomes reported by the school (`breakglass.active`, `.denied`, `.expired`, `.revoked`) and `breakglass.session_started` (ADR-0023; grant ID and a session reference only) |
 | Audit | `audit.verify_run` |
 
 Summaries hold IDs, field names and before/after values of non-personal fields (e.g., plan code, status, amounts). Never ticket text, emails or phone numbers.

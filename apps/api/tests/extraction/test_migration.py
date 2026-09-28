@@ -223,6 +223,8 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0023_api_gaps",
         "0026_dek_rotation",
         "0024_kb_metering",
+        "0027_identity_issuer",
+        "0028_profile_scope",
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

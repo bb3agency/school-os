@@ -24,7 +24,7 @@ function idleTarget(target: string): string {
 }
 
 function signedOutIdle(kind: SessionKind): string {
-  return idleTarget(kind === "operator" ? "/signed-out?kind=operator" : "/signed-out");
+  return idleTarget(kind === "staff" ? "/signed-out" : `/signed-out?kind=${kind}`);
 }
 
 export interface SessionControlsProps {

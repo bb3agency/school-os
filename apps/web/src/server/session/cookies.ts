@@ -14,10 +14,12 @@ import type { SessionKind } from "@/server/config";
 const SESSION_COOKIE: Record<SessionKind, string> = {
   staff: "sos_session",
   operator: "sos_platform_session",
+  support: "sos_support_session",
 };
 const TRANSACTION_COOKIE: Record<SessionKind, string> = {
   staff: "sos_auth_tx",
   operator: "sos_platform_auth_tx",
+  support: "sos_support_auth_tx",
 };
 
 export function sessionCookieName(kind: SessionKind, secure: boolean): string {

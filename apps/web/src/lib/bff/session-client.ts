@@ -4,7 +4,8 @@
  * stored in localStorage/sessionStorage; the CSRF token lives in memory only.
  */
 
-export type SessionKind = "staff" | "operator";
+/** `support`: a SchoolOS operator using an approved break-glass grant (ADR-0023). */
+export type SessionKind = "staff" | "operator" | "support";
 
 export type SessionInfo =
   | {
@@ -70,6 +71,8 @@ export async function csrfToken(kind: SessionKind): Promise<string | null> {
 }
 
 export function loginUrl(kind: SessionKind, next: string): string {
+  // A support session starts again only from the admin panel (it needs the approved request).
+  if (kind === "support") return "/signed-out?kind=support";
   const path = kind === "operator" ? "/bff/auth/platform/login" : "/bff/auth/login";
   return `${path}?next=${encodeURIComponent(next)}`;
 }

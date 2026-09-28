@@ -8,6 +8,13 @@ Missing or invalid -> 401 problem+json; IdP unreachable -> 503.
 This module answers "who is calling", nothing more. Tenant/membership resolution (docs/04 §5
 step 3) needs ``core.resolve_login`` and lives in ``authz``, which implements
 :class:`PrincipalResolver`. Step-up (SEC-005, docs/07 §5.2) is :func:`require_recent_auth`.
+
+Tenant routes accept two token families (ADR-0023 option C): staff-pool tokens (kind ``user``)
+and, only when ``SOS_SUPPORT_OIDC_AUDIENCE`` is set, tokens of the dedicated support app client
+of the OPERATOR pool (kind ``support``; MFA always). The operator admin client is never accepted
+here, and the support client is never accepted on ``/api/v1/platform/*``. What a support
+principal may reach is decided by membership resolution: only unexpired ``platform_support``
+memberships with an active break-glass grant.
 """
 
 from __future__ import annotations
@@ -30,10 +37,12 @@ from app.identity.tokens import (
     TokenVerifier,
     VerifiedToken,
     get_platform_token_verifier,
+    get_support_token_verifier,
     get_tenant_token_verifier,
+    unverified_issuer,
 )
 
-PrincipalKind = Literal["user", "operator"]
+PrincipalKind = Literal["user", "operator", "support"]
 STEP_UP_MAX_AGE: Final = timedelta(minutes=5)
 _MISSING_SERVICE_TOKEN = "Requests must come through the SchoolOS web app"  # noqa: S105
 _MISSING_BEARER = "Sign in required"
@@ -76,16 +85,21 @@ def _bearer_token(request: Request) -> str:
     return token
 
 
-def _authenticate(
-    request: Request, tokens: TokenVerifier, service: ServiceTokenVerifier
-) -> VerifiedToken:
+def _checked_bearer(request: Request, service: ServiceTokenVerifier) -> str:
+    """The bearer access token (unverified) once the BFF service token has been checked."""
     service_token = request.headers.get(SERVICE_TOKEN_HEADER)
     if not service_token:
         raise Unauthenticated(_MISSING_SERVICE_TOKEN)
     access_token = _bearer_token(request)
     # Service token first: an HMAC check, no network, so junk never reaches the JWKS cache.
     service.verify(service_token)
-    return tokens.verify(access_token)
+    return access_token
+
+
+def _authenticate(
+    request: Request, tokens: TokenVerifier, service: ServiceTokenVerifier
+) -> VerifiedToken:
+    return tokens.verify(_checked_bearer(request, service))
 
 
 def _principal(token: VerifiedToken, kind: PrincipalKind) -> Principal:
@@ -104,9 +118,25 @@ def get_principal(
     request: Request,
     tokens: Annotated[TokenVerifier, Depends(get_tenant_token_verifier)],
     service: Annotated[ServiceTokenVerifier, Depends(get_service_token_verifier)],
+    support: Annotated[TokenVerifier | None, Depends(get_support_token_verifier)],
 ) -> Principal:
-    """School staff (tenant user pool / app client)."""
-    return _principal(_authenticate(request, tokens, service), "user")
+    """Callers of tenant routes: school staff (tenant user pool / app client), or SchoolOS
+    support during break-glass (support app client of the operator pool, ADR-0023).
+
+    The unverified ``iss`` only picks the verifier; that verifier checks signature, issuer,
+    audience/client and lifetime. Support principals must carry the MFA claim (the operator
+    pool enforces MFA; the API checks it again)."""
+    access_token = _checked_bearer(request, service)
+    if (
+        support is not None
+        and support.issuer != tokens.issuer
+        and unverified_issuer(access_token) == support.issuer
+    ):
+        principal = _principal(support.verify(access_token), "support")
+        if not principal.mfa:
+            raise Forbidden("SchoolOS support must sign in with MFA", code="mfa_required")
+        return principal
+    return _principal(tokens.verify(access_token), "user")
 
 
 def get_operator_principal(

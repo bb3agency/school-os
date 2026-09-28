@@ -1,7 +1,10 @@
-"""Allowlisted SECURITY DEFINER functions of migration 0003 (ADR-0013, SEC-026, FR-IAM-013).
+"""Allowlisted SECURITY DEFINER functions of migrations 0003, 0027 and 0028 (ADR-0013,
+ADR-0023, ADR-0028, SEC-026, FR-IAM-013).
 
 Each function must be owned by ``sos_definer``, pin ``search_path``, deny EXECUTE to PUBLIC and to
-every role not listed, and return only the minimum it promises.
+every role not listed, and return only the minimum it promises. ADR-0023 (0027) gave the three
+identity functions an issuer: identities are ``(idp_issuer, idp_subject)``. ADR-0028 (0028) adds
+``core.user_membership_count`` (a count for one person of the current school, nothing else).
 """
 
 from __future__ import annotations
@@ -13,21 +16,33 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 
+from app.core.config import get_settings
 from app.core.db import context_free_session, platform_session, tenant_session
 
 pytestmark = pytest.mark.db
 
 # function signature -> roles that may EXECUTE it
 EXPECTED: dict[str, set[str]] = {
-    "core.resolve_login(text)": {"sos_app"},
-    "core.find_user_id_by_subject(text)": {"sos_app"},
+    "core.resolve_login(text,text,boolean)": {"sos_app"},
+    "core.find_user_id_by_subject(text,text)": {"sos_app"},
+    "core.create_user_for_invite(text,text,citext,text,text)": {"sos_app"},
+    # Expand-phase wrapper for API images older than 0027 (dropped by the contract migration).
     "core.create_user_for_invite(text,text,citext,text)": {"sos_app"},
+    "core.user_membership_count(uuid)": {"sos_app"},
     "core.list_tenant_ids(text[])": {"sos_app", "sos_platform"},
     "core.provision_tenant(uuid,text,text,text[],text,text)": {"sos_platform"},
     "core.set_tenant_status(uuid,text)": {"sos_platform"},
     "core.tenant_usage_summary(uuid)": {"sos_platform"},
 }
+# Replaced by ADR-0023 (0027): the one-argument forms now resolve to the new functions
+# through parameter defaults (no separate overload may exist).
+REMOVED = (
+    "core.resolve_login(text)",
+    "core.find_user_id_by_subject(text)",
+)
 ROLES = ("sos_app", "sos_platform", "sos_readonly", "sos_owner", "sos_migrator")
+STAFF = get_settings().oidc_issuer
+OPERATOR = "https://idp.synthetic.test/operator-pool"
 DEFINER_TABLES_NEEDED = {
     "core.tenants",
     "core.users",
@@ -55,17 +70,49 @@ def make_tenant(admin: Engine, status: str = "active") -> uuid.UUID:
     return tid
 
 
-def make_user(admin: Engine, status: str = "active") -> tuple[uuid.UUID, str]:
+def make_user(
+    admin: Engine, status: str = "active", *, issuer: str | None = None
+) -> tuple[uuid.UUID, str]:
+    """A user; ``issuer=None`` leaves the column default (the staff issuer, migration 0027)."""
     uid, subject = uuid.uuid4(), f"sub-{uuid.uuid4().hex}"
+    with admin.begin() as c:
+        if issuer is None:
+            c.execute(
+                text(
+                    "INSERT INTO core.users (id, idp_subject, display_name, status) "
+                    "VALUES (:i, :s, 'Synthetic User', :st)"
+                ),
+                {"i": uid, "s": subject, "st": status},
+            )
+        else:
+            c.execute(
+                text(
+                    "INSERT INTO core.users (id, idp_issuer, idp_subject, display_name, status) "
+                    "VALUES (:i, :iss, :s, 'Synthetic User', :st)"
+                ),
+                {"i": uid, "iss": issuer, "s": subject, "st": status},
+            )
+    return uid, subject
+
+
+def give_role(admin: Engine, tenant: uuid.UUID, membership: uuid.UUID, key: str) -> None:
+    """Attach role ``key`` (created as a system role of this school if missing)."""
     with admin.begin() as c:
         c.execute(
             text(
-                "INSERT INTO core.users (id, idp_subject, display_name, status) "
-                "VALUES (:i, :s, 'Synthetic User', :st)"
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te, is_system) "
+                "VALUES (gen_random_uuid(), :t, :k, 'Synthetic', 'Synthetic', true) "
+                "ON CONFLICT (tenant_id, key) DO NOTHING"
             ),
-            {"i": uid, "s": subject, "st": status},
+            {"t": tenant, "k": key},
         )
-    return uid, subject
+        c.execute(
+            text(
+                "INSERT INTO core.membership_roles (tenant_id, membership_id, role_id) "
+                "SELECT :t, :m, r.id FROM core.roles r WHERE r.tenant_id = :t AND r.key = :k"
+            ),
+            {"t": tenant, "m": membership, "k": key},
+        )
 
 
 def make_membership(
@@ -144,6 +191,12 @@ def test_ADR_0013_definer_functions_owned_pinned_and_granted(admin_engine: Engin
                     {"r": role, "o": r.oid},
                 ).scalar_one()
                 assert can is (role in allowed), f"{role} EXECUTE {sig} should be {role in allowed}"
+
+
+def test_ADR_0023_subject_only_overloads_are_gone(admin_engine: Engine) -> None:
+    with admin_engine.connect() as c:
+        for sig in REMOVED:
+            assert c.execute(text("SELECT to_regprocedure(:s)"), {"s": sig}).scalar() is None, sig
 
 
 def test_ADR_0013_definer_role_cannot_log_in_or_bypass_rls(admin_engine: Engine) -> None:
@@ -245,28 +298,119 @@ def test_ADR_0013_resolve_login_denied_to_other_roles(
         c.execute(text("SELECT * FROM core.resolve_login('x')"))
 
 
+# --- resolve_login with issuers (ADR-0023) --------------------------------------------------
+
+RESOLVE = text("SELECT * FROM core.resolve_login(:s, :i, :p)")
+
+
+def _resolve(subject: str, issuer: str, support_only: bool) -> set[uuid.UUID]:
+    with context_free_session() as s:
+        rows = s.execute(RESOLVE, {"s": subject, "i": issuer, "p": support_only}).all()
+    return {r.membership_id for r in rows}
+
+
+def _in_14_days() -> datetime:
+    return datetime.now(UTC) + timedelta(days=14)
+
+
+def test_ADR_0023_resolve_login_matches_issuer_and_subject_together(
+    admin_engine: Engine, engines: None
+) -> None:
+    uid, subject = make_user(admin_engine)  # staff issuer (column default)
+    mid = make_membership(admin_engine, make_tenant(admin_engine), uid)
+    assert _resolve(subject, STAFF, False) == {mid}
+    assert _resolve(subject, OPERATOR, False) == set()
+    assert _resolve(subject, OPERATOR, True) == set()
+    with admin_engine.connect() as c:
+        issuer: object = c.execute(
+            text("SELECT idp_issuer FROM core.users WHERE id = :u"), {"u": uid}
+        ).scalar_one()
+    assert issuer == STAFF
+
+
+def test_ADR_0023_support_only_returns_just_unexpired_platform_support_memberships(
+    admin_engine: Engine, engines: None
+) -> None:
+    uid, subject = make_user(admin_engine, issuer=OPERATOR)
+    t_ok, t_mixed, t_no_expiry, t_plain, t_custom = (make_tenant(admin_engine) for _ in range(5))
+    ok = make_membership(admin_engine, t_ok, uid, expires_at=_in_14_days())
+    give_role(admin_engine, t_ok, ok, "platform_support")
+    mixed = make_membership(admin_engine, t_mixed, uid, expires_at=_in_14_days())
+    give_role(admin_engine, t_mixed, mixed, "platform_support")
+    give_role(admin_engine, t_mixed, mixed, "teacher")
+    no_expiry = make_membership(admin_engine, t_no_expiry, uid)
+    give_role(admin_engine, t_no_expiry, no_expiry, "platform_support")
+    plain = make_membership(admin_engine, t_plain, uid, expires_at=_in_14_days())
+    give_role(admin_engine, t_plain, plain, "teacher")
+    custom = make_membership(admin_engine, t_custom, uid, expires_at=_in_14_days())
+    with admin_engine.begin() as c:  # a school-made role that merely uses the name
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te, is_system) "
+                "VALUES (gen_random_uuid(), :t, 'platform_support', 'Fake', 'Fake', false)"
+            ),
+            {"t": t_custom},
+        )
+    give_role(admin_engine, t_custom, custom, "platform_support")
+    assert _resolve(subject, OPERATOR, True) == {ok}
+    # Staff resolution of the same identity never reaches a platform_support membership.
+    assert _resolve(subject, OPERATOR, False) == {plain}
+
+
+def test_ADR_0023_staff_resolution_never_returns_platform_support(
+    admin_engine: Engine, engines: None
+) -> None:
+    uid, subject = make_user(admin_engine)
+    tid = make_tenant(admin_engine)
+    mid = make_membership(admin_engine, tid, uid, expires_at=_in_14_days())
+    give_role(admin_engine, tid, mid, "platform_support")
+    assert _resolve(subject, STAFF, False) == set()
+
+
+def test_ADR_0023_support_only_refuses_expired_membership(
+    admin_engine: Engine, engines: None
+) -> None:
+    uid, subject = make_user(admin_engine, issuer=OPERATOR)
+    tid = make_tenant(admin_engine)
+    mid = make_membership(admin_engine, tid, uid, expires_at=datetime.now(UTC) + timedelta(1))
+    give_role(admin_engine, tid, mid, "platform_support")
+    assert _resolve(subject, OPERATOR, True) == {mid}
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE core.memberships SET created_at = now() - interval '3 days', "
+                "expires_at = now() - interval '1 day' WHERE id = :m"
+            ),
+            {"m": mid},
+        )
+    assert _resolve(subject, OPERATOR, True) == set()
+
+
 # --- find_user_id_by_subject ---------------------------------------------------------------
 
 
 def test_FR_IAM_013_find_user_id_by_subject(admin_engine: Engine, engines: None) -> None:
     uid, subject = make_user(admin_engine)
     with context_free_session() as s:
-        q = text("SELECT core.find_user_id_by_subject(:s)")
-        assert s.execute(q, {"s": subject}).scalar_one() == uid
-        assert s.execute(q, {"s": "nobody"}).scalar_one() is None
+        q = text("SELECT core.find_user_id_by_subject(:s, :i)")
+        assert s.execute(q, {"s": subject, "i": STAFF}).scalar_one() == uid
+        assert s.execute(q, {"s": "nobody", "i": STAFF}).scalar_one() is None
+        # ADR-0023: the same subject in another issuer is another identity.
+        assert s.execute(q, {"s": subject, "i": OPERATOR}).scalar_one() is None
 
 
 # --- create_user_for_invite ----------------------------------------------------------------
 
-INVITE = text("SELECT core.create_user_for_invite(:s, :n, CAST(:e AS public.citext), :l)")
+INVITE = text("SELECT core.create_user_for_invite(:s, :n, CAST(:e AS public.citext), :l, :i)")
 
 
-def _invite_args(subject: str | None = None) -> dict[str, str]:
+def _invite_args(subject: str | None = None, issuer: str = STAFF) -> dict[str, str]:
     return {
         "s": subject or f"sub-{uuid.uuid4().hex}",
         "n": "Invited Teacher",
         "e": "Teacher@Example.test",
         "l": "te",
+        "i": issuer,
     }
 
 
@@ -367,11 +511,137 @@ def test_FR_IAM_010_invite_returns_only_an_id(admin_engine: Engine) -> None:
         rettype = c.execute(
             text(
                 "SELECT pg_catalog.format_type(prorettype, NULL), proretset FROM pg_proc "
-                "WHERE oid = 'core.create_user_for_invite(text,text,public.citext,text)'"
+                "WHERE oid = 'core.create_user_for_invite(text,text,public.citext,text,text)'"
                 "::regprocedure"
             )
         ).one()
     assert tuple(rettype) == ("uuid", False)
+
+
+def test_ADR_0023_invite_never_hands_out_another_issuers_identity(
+    admin_engine: Engine, engines: None
+) -> None:
+    tid = make_tenant(admin_engine)
+    inviter, _ = make_user(admin_engine)
+    make_membership(admin_engine, tid, inviter)
+    staff_user, subject = make_user(admin_engine)  # staff identity with this subject
+    with (
+        pytest.raises(IntegrityError, match="another identity provider"),
+        tenant_session(tid, inviter) as s,
+    ):
+        s.execute(INVITE, _invite_args(subject, issuer=OPERATOR))
+    # The operator identity with a fresh subject is created with its issuer; asking again with
+    # the same issuer finds it.
+    fresh = f"op-sub-{uuid.uuid4().hex}"
+    with tenant_session(tid, inviter) as s:
+        created: uuid.UUID = s.execute(INVITE, _invite_args(fresh, issuer=OPERATOR)).scalar_one()
+    with tenant_session(tid, inviter) as s:
+        again: uuid.UUID = s.execute(INVITE, _invite_args(fresh, issuer=OPERATOR)).scalar_one()
+    assert again == created != staff_user
+    with admin_engine.connect() as c:
+        issuer: object = c.execute(
+            text("SELECT idp_issuer FROM core.users WHERE id = :u"), {"u": created}
+        ).scalar_one()
+    assert issuer == OPERATOR
+
+
+LEGACY_INVITE = text("SELECT core.create_user_for_invite(:s, :n, CAST(:e AS public.citext), :l)")
+
+
+def test_CLAUDE_6_12_four_argument_invite_behaves_as_before_0027(
+    admin_engine: Engine, engines: None
+) -> None:
+    """Exactly the pre-0027 call (repository before ADR-0023): creates the staff identity,
+    returns the same id again without overwriting, and still needs an active inviter."""
+    tid = make_tenant(admin_engine)
+    inviter, _ = make_user(admin_engine)
+    make_membership(admin_engine, tid, inviter)
+    args = {"s": f"sub-{uuid.uuid4().hex}", "n": "Legacy Teacher", "e": "L@Example.test", "l": "te"}
+    with tenant_session(tid, inviter) as s:
+        first: uuid.UUID = s.execute(LEGACY_INVITE, args).scalar_one()
+    with tenant_session(tid, inviter) as s:
+        again: uuid.UUID = s.execute(LEGACY_INVITE, {**args, "n": "Changed"}).scalar_one()
+    assert again == first
+    assert first.version == 7
+    with admin_engine.connect() as c:
+        row = c.execute(text("SELECT * FROM core.users WHERE id = :i"), {"i": first}).one()
+    assert (row.idp_issuer, row.idp_subject, row.display_name, row.preferred_language) == (
+        STAFF,
+        args["s"],
+        "Legacy Teacher",
+        "te",
+    )
+    # Same answer as the new form with the staff issuer.
+    with tenant_session(tid, inviter) as s:
+        assert s.execute(INVITE, {**args, "i": STAFF}).scalar_one() == first
+    with (
+        pytest.raises(ProgrammingError, match="tenant and inviter context"),
+        context_free_session() as s,
+    ):
+        s.execute(LEGACY_INVITE, args)
+    # A staff-issuer call never hands out an operator identity with that subject.
+    op_user, op_subject = make_user(admin_engine, issuer=OPERATOR)
+    with (
+        pytest.raises(IntegrityError, match="another identity provider"),
+        tenant_session(tid, inviter) as s,
+    ):
+        s.execute(LEGACY_INVITE, {**args, "s": op_subject})
+    assert op_user
+
+
+def test_ADR_0023_new_invite_requires_an_issuer(admin_engine: Engine, engines: None) -> None:
+    tid = make_tenant(admin_engine)
+    inviter, _ = make_user(admin_engine)
+    make_membership(admin_engine, tid, inviter)
+    with pytest.raises(DBAPIError, match="issuer is required"), tenant_session(tid, inviter) as s:
+        s.execute(INVITE, {**_invite_args(), "i": None})
+
+
+def test_CLAUDE_6_12_one_argument_lookups_behave_as_before_0027(
+    admin_engine: Engine, engines: None
+) -> None:
+    uid, subject = make_user(admin_engine)
+    tid = make_tenant(admin_engine)
+    mid = make_membership(admin_engine, tid, uid)
+    with context_free_session() as s:
+        assert (
+            s.execute(text("SELECT core.find_user_id_by_subject(:s)"), {"s": subject}).scalar_one()
+            == uid
+        )
+        assert (
+            s.execute(text("SELECT core.find_user_id_by_subject(:s)"), {"s": "nobody"}).scalar_one()
+            is None
+        )
+        rows = s.execute(text("SELECT * FROM core.resolve_login(:s)"), {"s": subject}).all()
+    assert [(r.user_id, r.tenant_id, r.membership_id, r.tenant_status) for r in rows] == [
+        (uid, tid, mid, "active")
+    ]
+
+
+def test_ADR_0023_older_callers_without_issuer_still_work(
+    admin_engine: Engine, engines: None
+) -> None:
+    """Expand phase: an API image that predates 0027 calls the functions without an issuer."""
+    tid = make_tenant(admin_engine)
+    inviter, _ = make_user(admin_engine)
+    make_membership(admin_engine, tid, inviter)
+    subject = f"sub-{uuid.uuid4().hex}"
+    legacy = text("SELECT core.create_user_for_invite(:s, 'Legacy', NULL, 'en')")
+    with tenant_session(tid, inviter) as s:
+        uid: uuid.UUID = s.execute(legacy, {"s": subject}).scalar_one()
+    make_membership(admin_engine, tid, uid)
+    with context_free_session() as s:
+        assert (
+            s.execute(text("SELECT core.find_user_id_by_subject(:s)"), {"s": subject}).scalar_one()
+            == uid
+        )
+        rows = s.execute(text("SELECT * FROM core.resolve_login(:s)"), {"s": subject}).all()
+    assert [r.user_id for r in rows] == [uid]
+    with admin_engine.connect() as c:
+        issuer: object = c.execute(
+            text("SELECT idp_issuer FROM core.users WHERE id = :u"), {"u": uid}
+        ).scalar_one()
+    assert issuer == STAFF
 
 
 def test_FR_IAM_010_new_user_invisible_to_inviting_tenant_until_membership_exists(
@@ -397,6 +667,60 @@ def test_FR_IAM_010_new_user_invisible_to_inviting_tenant_until_membership_exist
             s.execute(text("SELECT count(*) FROM core.users WHERE id = :i"), {"i": new_id}).scalar()
             == 1
         )
+
+
+# --- user_membership_count (ADR-0028) ------------------------------------------------------
+
+COUNT = text("SELECT core.user_membership_count(:u)")
+
+
+def test_ADR_0028_membership_count_counts_schools_of_own_member_only(
+    admin_engine: Engine, engines: None
+) -> None:
+    a, b, c_ = (make_tenant(admin_engine) for _ in range(3))
+    person, _ = make_user(admin_engine)
+    viewer, _ = make_user(admin_engine)
+    make_membership(admin_engine, a, person)
+    make_membership(admin_engine, a, viewer)
+    with tenant_session(a, viewer) as s:
+        assert s.execute(COUNT, {"u": person}).scalar_one() == 1
+    make_membership(admin_engine, b, person, status="removed")
+    with tenant_session(a, viewer) as s:
+        assert s.execute(COUNT, {"u": person}).scalar_one() == 2
+    # A school cannot ask about someone who is not its member (no cross-school probing).
+    stranger, _ = make_user(admin_engine)
+    make_membership(admin_engine, c_, stranger)
+    with tenant_session(a, viewer) as s:
+        assert s.execute(COUNT, {"u": stranger}).scalar_one() is None
+        assert s.execute(COUNT, {"u": uuid.uuid4()}).scalar_one() is None
+
+
+def test_ADR_0028_membership_count_needs_tenant_context(engines: None) -> None:
+    with (
+        pytest.raises(ProgrammingError, match="tenant context"),
+        context_free_session() as s,
+    ):
+        s.execute(COUNT, {"u": uuid.uuid4()})
+
+
+def test_ADR_0028_membership_count_returns_only_an_integer(admin_engine: Engine) -> None:
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT pg_catalog.format_type(prorettype, NULL), proretset, provolatile "
+                "FROM pg_proc WHERE oid = 'core.user_membership_count(uuid)'::regprocedure"
+            )
+        ).one()
+    assert tuple(row) == ("integer", False, "s")
+
+
+@pytest.mark.parametrize("engine_name", ["platform_engine", "readonly_engine"])
+def test_ADR_0028_membership_count_denied_to_other_roles(
+    engine_name: str, request: pytest.FixtureRequest
+) -> None:
+    engine: Engine = request.getfixturevalue(engine_name)
+    with pytest.raises(ProgrammingError, match="permission denied"), engine.begin() as c:
+        c.execute(COUNT, {"u": uuid.uuid4()})
 
 
 # --- list_tenant_ids -----------------------------------------------------------------------

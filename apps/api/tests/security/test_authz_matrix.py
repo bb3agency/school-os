@@ -985,6 +985,13 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # SchoolOS support only (ADR-0023): every school role is refused (support principals are
+    # tested in tests/breakglass/test_support_signin.py).
+    ("POST", "/api/v1/breakglass/support-session"): lambda w, r, a: (
+        "/api/v1/breakglass/support-session",
+        {"platform_request_id": str(uuid.uuid4())},
+        {},
+    ),
     ("POST", "/api/v1/breakglass/grants/{grant_id}/revoke"): lambda w, r, a: (
         f"/api/v1/breakglass/grants/{_bg().active_grant(w.a.tenant_id, w.person('owner'))}/revoke",
         None,
@@ -1139,6 +1146,9 @@ def _route_table() -> dict[tuple[str, str], Any]:
 
 ROUTES = _route_table()
 ROLES = tuple(system_roles())
+# Routes guarded by session.authenticated whose service accepts ONLY a SchoolOS support
+# principal (ADR-0023): 403 ``breakglass_only`` for every school role.
+SUPPORT_ONLY = frozenset({("POST", "/api/v1/breakglass/support-session")})
 STEP_UP_ROUTES = sorted(k for k, g in ROUTES.items() if g.sos_step_up)
 
 
@@ -1200,8 +1210,10 @@ def test_SEC_003_role_route_matrix(
     held = system_roles()[role].permission_keys
     granted = AUTHENTICATED in permissions or any(p in held for p in permissions)
     res = _call(api, world, admin_engine, role, key)
-    expected = _success(*key) if granted else 403
+    expected = _success(*key) if granted and key not in SUPPORT_ONLY else 403
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"
+    if key in SUPPORT_ONLY:
+        assert res.json()["code"] == "breakglass_only"
 
 
 @pytest.mark.parametrize("key", STEP_UP_ROUTES, ids=lambda k: f"{k[0]} {k[1]}")

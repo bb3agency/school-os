@@ -104,6 +104,22 @@ export function csrfFailed(requestId: string): Response {
   });
 }
 
+/**
+ * The session a school-console request runs as: the staff session, or, when there is none,
+ * a SchoolOS support session (break-glass, ADR-0023). Staff wins when both exist.
+ */
+export async function readSchoolSession(
+  request: Request,
+  runtime: AuthRuntime,
+  options: { touch: boolean },
+): Promise<RequestSession | null> {
+  const staff = await readSession(request, runtime, "staff", options);
+  if (staff || !runtime.config.supportEnabled) return staff;
+  return readSession(request, runtime, "support", options);
+}
+
 export function kindParam(request: Request): SessionKind {
-  return new URL(request.url).searchParams.get("kind") === "operator" ? "operator" : "staff";
+  const kind = new URL(request.url).searchParams.get("kind");
+  if (kind === "operator" || kind === "support") return kind;
+  return "staff";
 }

@@ -19,15 +19,19 @@ export const SESSION_KEY_PREFIX = "sos:web:sess:";
 /**
  * Idle timeout (docs/07 §5.2, FR-IAM-003): 15 minutes unless the active school set its own
  * value between 5 and 30 minutes (GET /me `settings.idle_timeout_minutes`, FR-TEN-012).
- * Operators always get 15 minutes (docs/07 §5.1).
+ * Operators and break-glass support sessions always get 15 minutes (docs/07 §5.1, ADR-0023).
  */
 export const IDLE_TIMEOUT_MINUTES = { min: 5, max: 30, fallback: 15 } as const;
 /** The secure default, used whenever the school's value is not known. */
 export const IDLE_TIMEOUT_MS = IDLE_TIMEOUT_MINUTES.fallback * 60_000;
-/** Absolute lifetime: 12 h for school staff, 8 h for operators (docs/16 §2). */
+/**
+ * Absolute lifetime: 12 h for school staff, 8 h for operators (docs/16 §2) and for break-glass
+ * support sessions (a grant lasts at most 8 h; the API refuses once it ends, ADR-0023).
+ */
 export const ABSOLUTE_TIMEOUT_MS: Record<SessionKind, number> = {
   staff: 12 * 60 * 60_000,
   operator: 8 * 60 * 60_000,
+  support: 8 * 60 * 60_000,
 };
 
 const SESSION_ID = /^[A-Za-z0-9_-]{43}$/;

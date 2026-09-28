@@ -44,6 +44,9 @@ class User(Base):
     __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    # The identity is (idp_issuer, idp_subject) (ADR-0023; migration 0027). Nullable until the
+    # contract step; the column default is the staff issuer. Not editable by the app.
+    idp_issuer: Mapped[str | None] = mapped_column(Text)
     idp_subject: Mapped[str] = mapped_column(Text, unique=True)
     display_name: Mapped[str] = mapped_column(Text)
     email: Mapped[str | None] = mapped_column(Text)  # citext in the database

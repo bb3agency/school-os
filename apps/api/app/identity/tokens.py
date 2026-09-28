@@ -294,6 +294,8 @@ class TokenVerifier:
         http_client: httpx.Client | None = None,
         jwks_uri: str | None = None,
         mfa_policy: MfaClaimPolicy | None = None,
+        forbidden_audiences: frozenset[str] = frozenset(),
+        require_client_id: bool = False,
         leeway: timedelta = DEFAULT_LEEWAY,
         max_lifetime: timedelta = DEFAULT_MAX_LIFETIME,
         clock: Callable[[], float] = time.monotonic,
@@ -311,6 +313,11 @@ class TokenVerifier:
             raise ValueError("JWKS URI for the OIDC issuer must be https in staging/prod")
         self.issuer = issuer
         self.audience = audience
+        # Other app clients' IDs: a token naming one of them is refused here even if it also
+        # names this audience (ADR-0023: support, admin and staff clients never overlap).
+        self._forbidden = frozenset(a for a in forbidden_audiences if a and a != audience)
+        # Cognito-style access tokens only: token_use == "access" and client_id == audience.
+        self._require_client_id = require_client_id
         self._mfa = mfa_policy or MfaClaimPolicy()
         self._leeway = leeway
         self._max_lifetime = max_lifetime.total_seconds()
@@ -364,10 +371,19 @@ class TokenVerifier:
         token_use = claims.get("token_use")
         if token_use is not None and token_use != ACCESS_TOKEN_USE:
             raise Unauthenticated(_GENERIC_REJECTION)  # e.g. a Cognito ID token
+        client_id = claims.get("client_id")
+        if client_id is not None and client_id in self._forbidden:
+            raise Unauthenticated(_GENERIC_REJECTION)
+        if self._require_client_id and (
+            token_use != ACCESS_TOKEN_USE or client_id != self.audience
+        ):
+            raise Unauthenticated(_GENERIC_REJECTION)
         aud = claims.get("aud")
         if aud is not None:
             audiences = [aud] if isinstance(aud, str) else aud
             if not isinstance(audiences, list) or self.audience not in audiences:
+                raise Unauthenticated(_GENERIC_REJECTION)
+            if any(a in self._forbidden for a in audiences if isinstance(a, str)):
                 raise Unauthenticated(_GENERIC_REJECTION)
             return
         # Amazon Cognito access tokens: no `aud`; `client_id` names the app client.
@@ -410,6 +426,13 @@ class TokenVerifier:
         )
 
 
+def _other_clients(settings: Settings, *, own: str) -> frozenset[str]:
+    clients = {settings.oidc_audience, settings.platform_oidc_audience}
+    if settings.support_enabled and settings.support_oidc_audience:
+        clients.add(settings.support_oidc_audience.strip())
+    return frozenset(c for c in clients if c and c != own)
+
+
 def build_tenant_verifier(settings: Settings) -> TokenVerifier:
     """Verifier for school staff (SOS_OIDC_ISSUER / SOS_OIDC_AUDIENCE)."""
     return TokenVerifier(
@@ -417,16 +440,44 @@ def build_tenant_verifier(settings: Settings) -> TokenVerifier:
         audience=settings.oidc_audience,
         production_like=settings.is_production_like,
         jwks_uri=settings.oidc_jwks_uri,
+        forbidden_audiences=_other_clients(settings, own=settings.oidc_audience),
     )
 
 
 def build_platform_verifier(settings: Settings) -> TokenVerifier:
-    """Verifier for platform operators (SOS_PLATFORM_OIDC_*): separate pool/app client."""
+    """Verifier for platform operators (SOS_PLATFORM_OIDC_*): separate pool/app client.
+
+    The support app client of the same pool is refused here (ADR-0023: support tokens never
+    reach ``/api/v1/platform/*``)."""
     return TokenVerifier(
         issuer=settings.platform_oidc_issuer,
         audience=settings.platform_oidc_audience,
         production_like=settings.is_production_like,
         jwks_uri=settings.platform_oidc_jwks_uri,
+        forbidden_audiences=_other_clients(settings, own=settings.platform_oidc_audience),
+    )
+
+
+def build_support_verifier(settings: Settings) -> TokenVerifier | None:
+    """Verifier for the break-glass support app client (ADR-0023 option C), or ``None`` when
+    ``SOS_SUPPORT_OIDC_AUDIENCE`` is unset (support sign-in off: fail closed).
+
+    Operator pool issuer, ``client_id`` = the support client and ``token_use = access`` are all
+    required; tokens of the operator admin client and of the staff client are refused."""
+    if not settings.support_enabled or not settings.support_oidc_audience:
+        return None
+    issuer = settings.resolved_support_issuer
+    audience = settings.support_oidc_audience.strip()
+    jwks_uri = settings.support_oidc_jwks_uri
+    if jwks_uri is None and issuer == settings.platform_oidc_issuer:
+        jwks_uri = settings.platform_oidc_jwks_uri
+    return TokenVerifier(
+        issuer=issuer,
+        audience=audience,
+        production_like=settings.is_production_like,
+        jwks_uri=jwks_uri,
+        forbidden_audiences=_other_clients(settings, own=audience),
+        require_client_id=True,
     )
 
 
@@ -439,3 +490,24 @@ def get_tenant_token_verifier() -> TokenVerifier:
 @lru_cache(maxsize=1)
 def get_platform_token_verifier() -> TokenVerifier:
     return build_platform_verifier(get_settings())
+
+
+@lru_cache(maxsize=1)
+def get_support_token_verifier() -> TokenVerifier | None:
+    """FastAPI dependency: the support-client verifier; ``None`` when support sign-in is off."""
+    return build_support_verifier(get_settings())
+
+
+def unverified_issuer(token: str) -> str | None:
+    """The ``iss`` claim of a JWT WITHOUT verifying it, only to pick which verifier checks it.
+
+    The chosen verifier checks the signature and the issuer again, so a forged ``iss`` merely
+    selects a verifier that then refuses the token."""
+    if not isinstance(token, str) or not token or len(token) > MAX_TOKEN_BYTES:
+        return None
+    try:
+        claims = jwt.decode(token, options={"verify_signature": False})
+    except (PyJWTError, ValueError, TypeError):
+        return None
+    issuer = claims.get("iss") if isinstance(claims, dict) else None
+    return issuer if isinstance(issuer, str) else None

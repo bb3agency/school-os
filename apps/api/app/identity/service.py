@@ -40,6 +40,7 @@ from app.authz.catalog import (
     system_roles,
 )
 from app.authz.context import UserContext
+from app.core.config import get_settings
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
 from app.core.logging import get_context
@@ -225,6 +226,29 @@ def _guard_not_breakglass(session: Session, membership: Membership) -> None:
         )
 
 
+def _guard_not_own(ctx: UserContext, user_id: uuid.UUID) -> None:
+    """Nobody suspends or removes their own membership (as ``own_account`` for operators)."""
+    if user_id == ctx.user_id:
+        raise Conflict(
+            "You cannot change your own access. Ask another administrator to do it.",
+            code="own_account",
+        )
+
+
+def _guard_profile_not_shared(session: Session, user_id: uuid.UUID) -> None:
+    """ADR-0028: a profile is shared by every school the person belongs to; a school may edit
+    it only when the person belongs to that school alone."""
+    count = repo.user_membership_count(session, user_id)
+    if count is None:  # pragma: no cover - the membership was read in this transaction
+        raise NotFound("User not found")
+    if count > 1:
+        raise Conflict(
+            "This person also works at another school on SchoolOS, so their name, email and "
+            "language are shared. Ask them to update their profile, or contact SchoolOS support.",
+            code="profile_shared",
+        )
+
+
 def _guard_last_owner(session: Session, membership: Membership) -> None:
     owner = repo.get_role_by_key(session, OWNER_ROLE)
     if owner is None:
@@ -240,8 +264,26 @@ def _guard_last_owner(session: Session, membership: Membership) -> None:
 # --- login and permission resolution (used by authz) ------------------------------------------
 
 
-def login_memberships(subject: str) -> list[LoginChoice]:
-    """Active, unexpired memberships of the active user with IdP ``subject`` (FR-IAM-013)."""
+def staff_issuer() -> str:
+    """Issuer of school staff identities (``SOS_OIDC_ISSUER``; the tenant token verifier
+    accepts only this issuer for staff tokens)."""
+    return get_settings().oidc_issuer
+
+
+def operator_issuer() -> str:
+    """Issuer of SchoolOS operator identities: the operator pool, whose support app client signs
+    operators in to a school during break-glass (ADR-0023)."""
+    return get_settings().resolved_support_issuer
+
+
+def login_memberships(subject: str, *, support: bool = False) -> list[LoginChoice]:
+    """Active, unexpired memberships of the active user ``(issuer, subject)`` (FR-IAM-013).
+
+    Staff principals (``support=False``) resolve in the staff issuer and never reach a
+    ``platform_support`` membership. Support principals (ADR-0023) resolve in the operator
+    issuer and reach ONLY unexpired memberships holding exactly ``platform_support``
+    (``core.resolve_login`` filters; the authz resolver checks again)."""
+    issuer = operator_issuer() if support else staff_issuer()
     with context_free_session() as session:
         return [
             LoginChoice(
@@ -250,7 +292,7 @@ def login_memberships(subject: str) -> list[LoginChoice]:
                 membership_id=m.membership_id,
                 tenant_status=m.tenant_status,
             )
-            for m in repo.resolve_login(session, subject)
+            for m in repo.resolve_login(session, subject, issuer=issuer, support_only=support)
         ]
 
 
@@ -286,12 +328,17 @@ def record_login_event(
     reason: str | None = None,
     request_id: str | None = None,
     session_id_present: bool = False,
+    issuer_kind: str | None = None,
 ) -> None:
-    """Audit ``auth.login.succeeded`` / ``auth.login.denied`` in the school's own chain."""
+    """Audit ``auth.login.succeeded`` / ``auth.login.denied`` in the school's own chain.
+
+    ``issuer_kind`` = ``operator_support`` for SchoolOS support sign-ins (ADR-0023)."""
     with tenant_session(tenant_id, user_id) as session:
         summary: dict[str, Any] = {"membership_id": membership_id, "session": session_id_present}
         if reason:
             summary["reason"] = reason
+        if issuer_kind:
+            summary["issuer_kind"] = issuer_kind
         audit.record(
             session,
             action="auth.login.succeeded" if succeeded else "auth.login.denied",
@@ -460,6 +507,7 @@ def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
         user_id = repo.create_user_for_invite(
             session,
             subject=data.idp_subject,
+            issuer=staff_issuer(),
             display_name=data.display_name,
             email=data.email,
             language=data.preferred_language,
@@ -520,6 +568,7 @@ def set_membership_status(
         raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
     if previous == "active":
         _guard_last_owner(session, membership)
+    _guard_not_own(ctx, user_id)
     updated = repo.set_membership_status(
         session, membership.id, status=status, expected_version=expected_version
     )
@@ -554,8 +603,11 @@ def update_user(
     ``status`` follows :func:`set_membership_status` (transitions, last owner). Profile fields
     (display name, email, language) change the person's account (visible only through their
     membership here, RLS ``users_in_tenant_update``); a removed member's profile is not edited
-    (409 ``invalid_state``). Unchanged values are ignored; with nothing to change the member
-    is returned as is. Otherwise the membership version is bumped once (the ETag changes).
+    (409 ``invalid_state``), and a profile shared with another school is not edited either
+    (409 ``profile_shared``, ADR-0028; the whole request is refused). Nobody changes the status
+    of their own membership (409 ``own_account``). Unchanged values are ignored; with nothing
+    to change the member is returned as is. Otherwise the membership version is bumped once
+    (the ETag changes).
     Audit: ``user.profile_updated`` with the changed field NAMES only (never values) and
     ``membership.status_changed`` {from, to}.
     """
@@ -583,7 +635,9 @@ def update_user(
             raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
         if previous == "active":
             _guard_last_owner(session, membership)
+        _guard_not_own(ctx, user_id)
     if profile:
+        _guard_profile_not_shared(session, user_id)
         with _db_errors():
             repo.update_user_profile(
                 session, user_id, expected_version=user.version, values=profile
@@ -845,6 +899,7 @@ def open_breakglass_membership(
     ctx: UserContext | None,
     *,
     subject: str,
+    issuer: str,
     display_name: str,
     email: str | None,
     expires_at: dt.datetime,
@@ -852,11 +907,14 @@ def open_breakglass_membership(
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """Give an operator temporary, read-only ``platform_support`` access until ``expires_at``.
 
-    ``ctx`` is the approving owner/principal (``breakglass.approve``, step-up). The account is
-    created or found with ``core.create_user_for_invite`` (the approver is the inviter), so no
-    new definer function is needed. ``ctx=None`` is the emergency path (two operators confirmed,
-    no school approver): only an existing SchoolOS account can be used, else
-    :class:`BreakglassIdentityMissing` (fail closed).
+    ``ctx`` is the approving owner/principal (``breakglass.approve``, step-up). The operator's
+    identity ``(issuer, subject)`` (operator pool, ADR-0023) is created or found with
+    ``core.create_user_for_invite`` (the approver is the inviter), so no new definer function is
+    needed. A staff account that happens to use the same subject is a different identity and
+    is never given the membership: while the subject is taken by another issuer the approval
+    fails with 409 ``breakglass_identity_conflict`` (fail closed). ``ctx=None`` is the emergency
+    path (two operators confirmed, no school approver): only an existing identity of that
+    operator can be used, else :class:`BreakglassIdentityMissing` (fail closed).
 
     Refuses self-approval and people who already hold ordinary access to this school. A past
     support membership of the same person is reopened (one membership per person and school).
@@ -865,14 +923,26 @@ def open_breakglass_membership(
     Returns (user_id, membership_id).
     """
     if ctx is not None:
-        with _db_errors():
-            user_id = repo.create_user_for_invite(
-                session, subject=subject, display_name=display_name, email=email, language="en"
-            )
+        try:
+            with _db_errors():
+                user_id = repo.create_user_for_invite(
+                    session,
+                    subject=subject,
+                    issuer=issuer,
+                    display_name=display_name,
+                    email=email,
+                    language="en",
+                )
+        except Conflict as exc:
+            raise Conflict(
+                "SchoolOS support cannot be given access with this sign-in. "
+                "Deny this request and ask SchoolOS support to contact you.",
+                code="breakglass_identity_conflict",
+            ) from exc
         if user_id == ctx.user_id:
             raise Forbidden("You cannot approve support access for yourself.", code="self_approval")
     else:
-        found = repo.find_user_id_by_subject(session, subject)
+        found = repo.find_user_id_by_subject(session, subject, issuer=issuer)
         if found is None:
             raise BreakglassIdentityMissing(
                 "The SchoolOS support person has no sign-in for schools yet.",

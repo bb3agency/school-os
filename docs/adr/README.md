@@ -87,19 +87,20 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0009](ADR-0009-aws-india-hosting.md) | Host on AWS in India | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0015 |
 | [ADR-0010](ADR-0010-maker-checker.md) | Maker-checker for identity changes | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0011](ADR-0011-hash-chained-audit.md) | Hash-chained, append-only audit log | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013 |
-| [ADR-0012](ADR-0012-managed-oidc-identity.md) | Managed OIDC identity provider | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013, ADR-0018 |
-| [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths, platform privilege separation and platform identity | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020 · implementation amendments 2026-09-26, 2026-09-27 |
+| [ADR-0012](ADR-0012-managed-oidc-identity.md) | Managed OIDC identity provider | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013, ADR-0018, ADR-0023 |
+| [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths, platform privilege separation and platform identity | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028 · implementation amendments 2026-09-26, 2026-09-27 |
 | [ADR-0014](ADR-0014-local-ci-service-images.md) | Local and CI service images: SeaweedFS and Valkey | Accepted |
 | [ADR-0015](ADR-0015-deployment-and-commercial-model.md) | Deployment and commercial model: managed SaaS, shared and dedicated tiers | Accepted |
 | [ADR-0016](ADR-0016-payments-provider.md) | Payments provider | Proposed |
 | [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) | Platform admin panel (control plane) architecture | Accepted · Amended by ADR-0020 |
-| [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) | MFA enforcement and step-up with Amazon Cognito | Accepted |
+| [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) | MFA enforcement and step-up with Amazon Cognito | Accepted · Amended by ADR-0023 |
 | [ADR-0019](ADR-0019-invitation-acceptance-on-first-sign-in.md) | Invitation acceptance on first sign-in | Accepted |
 | [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) | Control-plane boundaries and guaranteed audit copies | Accepted |
 | [ADR-0021](ADR-0021-export-access-and-step-up.md) | Export access and step-up | Accepted |
 | [ADR-0022](ADR-0022-system-role-sync-for-existing-schools.md) | System-role sync for existing schools | Accepted · Amended by ADR-0026 |
-| [ADR-0023](ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) | Operator sign-in for break-glass across the two user pools | Accepted |
+| [ADR-0023](ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) | Operator sign-in for break-glass across the two user pools | Accepted · implementation amendments 2026-09-27 |
 | [ADR-0024](ADR-0024-resumable-school-provisioning.md) | Resumable school provisioning instead of one transaction | Accepted |
 | [ADR-0025](ADR-0025-chromium-sandbox-for-pdf-rendering.md) | Chromium sandbox for PDF rendering on Fargate and dedicated hosts | Accepted |
 | [ADR-0026](ADR-0026-dedicated-upgrades-apply-system-role-sync.md) | Dedicated upgrades apply the system-role sync | Accepted |
 | [ADR-0027](ADR-0027-pdf-text-layer-extraction.md) | PDF text-layer extraction library for knowledge ingestion | Accepted |
+| [ADR-0028](ADR-0028-profiles-shared-across-schools.md) | A person's profile is shared across schools | Accepted |

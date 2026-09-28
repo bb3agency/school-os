@@ -23,6 +23,17 @@
       "requestMappings": [
         {
           "requestParam": "client_id",
+          "match": "schoolos-support",
+          "claims": {
+            "aud": ["schoolos-support"],
+            "client_id": "schoolos-support",
+            "token_use": "access",
+            "amr": ["pwd", "mfa"],
+            "sos:mfa": "true"
+          }
+        },
+        {
+          "requestParam": "client_id",
           "match": "*",
           "claims": {
             "aud": ["schoolos-platform"],

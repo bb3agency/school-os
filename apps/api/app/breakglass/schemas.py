@@ -11,6 +11,26 @@ from pydantic import BaseModel, ConfigDict
 GrantStatus = Literal["requested", "approved", "active", "expired", "revoked", "denied"]
 
 
+class SupportSessionIn(BaseModel):
+    """Start a SchoolOS support session (ADR-0023): the control-plane request it belongs to."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    platform_request_id: uuid.UUID
+
+
+class SupportSessionOut(BaseModel):
+    """The grant a support session runs under: read-only access ends at ``expires_at``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    grant_id: uuid.UUID
+    platform_request_id: uuid.UUID
+    tenant_id: uuid.UUID
+    expires_at: dt.datetime
+    scope: dict[str, Any]
+
+
 class GrantOut(BaseModel):
     """A support-access request and, once decided, its grant.
 

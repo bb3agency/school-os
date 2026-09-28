@@ -11119,6 +11119,61 @@
         "title": "SummaryOut",
         "type": "object"
       },
+      "SupportSessionIn": {
+        "additionalProperties": false,
+        "description": "Start a SchoolOS support session (ADR-0023): the control-plane request it belongs to.",
+        "properties": {
+          "platform_request_id": {
+            "format": "uuid",
+            "title": "Platform Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform_request_id"
+        ],
+        "title": "SupportSessionIn",
+        "type": "object"
+      },
+      "SupportSessionOut": {
+        "description": "The grant a support session runs under: read-only access ends at ``expires_at``.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "grant_id": {
+            "format": "uuid",
+            "title": "Grant Id",
+            "type": "string"
+          },
+          "platform_request_id": {
+            "format": "uuid",
+            "title": "Platform Request Id",
+            "type": "string"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "title": "Scope",
+            "type": "object"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant_id",
+          "platform_request_id",
+          "tenant_id",
+          "expires_at",
+          "scope"
+        ],
+        "title": "SupportSessionOut",
+        "type": "object"
+      },
       "SuspendSubscriptionIn": {
         "additionalProperties": false,
         "properties": {
@@ -14874,6 +14929,48 @@
         ]
       }
     },
+    "/api/v1/breakglass/support-session": {
+      "post": {
+        "description": "Start a SchoolOS support session (ADR-0023). Only for SchoolOS support signed in with the\nsupport client, on the school's own active approval (403 ``breakglass_only`` otherwise;\n404 for a request that is not this membership's; 409 ``breakglass_grant_inactive`` once it\nended). Needs a sign-in within 5 minutes (428 ``step_up_required``). Recorded in the\nschool's audit log as ``breakglass.session_started``.",
+        "operationId": "start_support_session_api_v1_breakglass_support_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportSessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Support Session",
+        "tags": [
+          "break-glass"
+        ]
+      }
+    },
     "/api/v1/change-requests": {
       "get": {
         "description": "Change requests of students you can see, newest first (permission\n``student.identity_change.request`` or ``student.identity_change.approve``). Values of\nsensitive (C3) fields are masked.",
@@ -18371,7 +18468,7 @@
     },
     "/api/v1/me/accept-invitations": {
       "post": {
-        "description": "Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the\nOIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged\nactive membership without MFA gets 403 ``mfa_required`` (FR-IAM-002).",
+        "description": "Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the\nOIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged\nactive membership without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support\nsign-ins never accept invitations (403 ``breakglass_only``, ADR-0023).",
         "operationId": "accept_my_invitations_api_v1_me_accept_invitations_post",
         "responses": {
           "200": {

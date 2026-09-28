@@ -94,8 +94,13 @@ re-running Authorization Code + PKCE with `prompt=login`. Cognito managed login 
 `principal.py` stops at a verified `Principal(subject, issuer, kind, auth_time, mfa, session_id,
 expires_at)`. `authz` implements `PrincipalResolver[UserContext]`:
 
-1. `core.resolve_login(principal.subject)`: the SECURITY DEFINER function (ADR-0013) returns the
-   subject's user id and active memberships across tenants (minimal columns).
+1. `core.resolve_login(principal.subject, issuer, support_only)`: the SECURITY DEFINER function
+   (ADR-0013) returns the identity's user id and active memberships across tenants (minimal
+   columns). The identity is `(issuer, subject)` (ADR-0023): staff principals resolve in
+   `SOS_OIDC_ISSUER` and never reach a `platform_support` membership; support principals
+   (`kind == "support"`, the support app client of the operator pool, `SOS_SUPPORT_OIDC_*`)
+   resolve in the operator issuer and reach only unexpired memberships holding exactly
+   `platform_support`, and the resolver also requires an active break-glass grant.
 2. Pick the tenant from `tenant_hint` (the BFF's active tenant; `POST /me/active-tenant`) or
    the only membership. With no membership, or the hinted tenant not among them: 401/403.
    Never reveal which tenants exist.
@@ -108,6 +113,13 @@ expires_at)`. `authz` implements `PrincipalResolver[UserContext]`:
 
 `get_operator_principal` already requires `mfa` for every platform operator (contract §5:
 "MFA mandatory for every operator"), and refuses without it with 403 `mfa_required`.
+
+`get_principal` (tenant routes) accepts two token families: staff-pool tokens (kind `user`) and,
+only when `SOS_SUPPORT_OIDC_AUDIENCE` is set, support-client tokens of the operator pool (kind
+`support`, MFA required; `token_use = access` and `client_id` = the support client). The
+unverified `iss` only picks the verifier. Every verifier refuses a token naming another app
+client (`client_id` or `aud`), so the operator admin client never passes on tenant routes and
+the support client never passes on `/api/v1/platform/*` (`tests/identity/test_support_tokens.py`).
 
 ## Research: Amazon Cognito facts (checked 2026-09-26)
 

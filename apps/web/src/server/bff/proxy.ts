@@ -6,14 +6,23 @@ import type { SessionKind } from "@/server/config";
 import { logEvent } from "@/server/log";
 import type { AuthRuntime } from "@/server/runtime";
 import type { Session } from "@/server/session/store";
-import { csrfFailed, csrfOk, isUnsafeMethod, problem, readSession } from "./http";
+import {
+  csrfFailed,
+  csrfOk,
+  isUnsafeMethod,
+  problem,
+  readSchoolSession,
+  readSession,
+} from "./http";
 import { callApi } from "./upstream";
 
 /**
  * BFF proxy: browser → /bff/api/v1/* → API /api/v1/* (docs/09 §1; SEC-004).
  *
  * - Needs a session of the right kind: operators may call only /platform/*, school staff
- *   never /platform/* (403 wrong_session). No session: 401.
+ *   never /platform/* (403 wrong_session). No session: 401. A SchoolOS support session
+ *   (break-glass, ADR-0023) counts as a school session when there is no staff session; the
+ *   API decides what it may read.
  * - State-changing methods need the CSRF synchronizer token (403 csrf_failed).
  * - Adds the user's access token and a fresh service token; copies only allowlisted
  *   headers each way (never cookies, never Set-Cookie from the API).
@@ -143,7 +152,10 @@ async function problemCode(response: Response): Promise<string | null> {
 }
 
 function loginUrl(kind: SessionKind): string {
-  return kind === "operator" ? "/bff/auth/platform/login" : "/bff/auth/login";
+  if (kind === "operator") return "/bff/auth/platform/login";
+  // A support session is restarted from the admin panel (it needs the grant).
+  if (kind === "support") return "/signed-out?kind=support";
+  return "/bff/auth/login";
 }
 
 function sessionEnded(requestId: string, kind: SessionKind): Response {
@@ -160,10 +172,16 @@ async function resolveSession(
   requestId: string,
   touch: boolean,
 ): Promise<Session | Response> {
-  const own = await readSession(request, runtime, kind, { touch });
+  const own =
+    kind === "staff"
+      ? await readSchoolSession(request, runtime, { touch })
+      : await readSession(request, runtime, kind, { touch });
   if (own) return own.session;
-  const otherKind: SessionKind = kind === "operator" ? "staff" : "operator";
-  if (await readSession(request, runtime, otherKind, { touch: false })) {
+  const other =
+    kind === "operator"
+      ? await readSchoolSession(request, runtime, { touch: false })
+      : await readSession(request, runtime, "operator", { touch: false });
+  if (other) {
     return problem(requestId, 403, "wrong_session", "Not available with this sign-in", {
       detail:
         kind === "operator"
@@ -219,10 +237,10 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
         attempt === 0 ? { force: false } : { force: true, staleAccessToken },
       );
       const stored = await runtime.store.tokens(session.id);
-      if (!stored) return sessionEnded(requestId, kind);
+      if (!stored) return sessionEnded(requestId, session.kind);
       accessToken = stored.tokens.accessToken;
     } catch (error) {
-      if (error instanceof SessionEndedError) return sessionEnded(requestId, kind);
+      if (error instanceof SessionEndedError) return sessionEnded(requestId, session.kind);
       if (error instanceof RefreshBusyError) {
         return problem(
           requestId,
@@ -274,9 +292,13 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
       const next = nextFromReferer(
         request.headers.get("referer"),
         runtime.config.appBaseUrl.origin,
-        kind,
+        session.kind,
       );
-      const stepUpPath = kind === "operator" ? "/bff/auth/platform/step-up" : "/bff/auth/step-up";
+      const stepUpPath = {
+        operator: "/bff/auth/platform/step-up",
+        staff: "/bff/auth/step-up",
+        support: "/bff/auth/support/step-up",
+      }[session.kind];
       return problem(requestId, 428, "step_up_required", "Confirm it's you", {
         detail: "For your security, sign in again to continue.",
         step_up_url: `${stepUpPath}?next=${encodeURIComponent(next)}`,
@@ -289,5 +311,5 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
       headers: responseHeaders(upstream, requestId),
     });
   }
-  return sessionEnded(requestId, kind);
+  return sessionEnded(requestId, session.kind);
 }

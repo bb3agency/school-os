@@ -395,6 +395,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/breakglass/support-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Support Session
+         * @description Start a SchoolOS support session (ADR-0023). Only for SchoolOS support signed in with the
+         *     support client, on the school's own active approval (403 ``breakglass_only`` otherwise;
+         *     404 for a request that is not this membership's; 409 ``breakglass_grant_inactive`` once it
+         *     ended). Needs a sign-in within 5 minutes (428 ``step_up_required``). Recorded in the
+         *     school's audit log as ``breakglass.session_started``.
+         */
+        post: operations["start_support_session_api_v1_breakglass_support_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/change-requests": {
         parameters: {
             query?: never;
@@ -1640,7 +1664,8 @@ export interface paths {
          * Accept My Invitations
          * @description Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the
          *     OIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged
-         *     active membership without MFA gets 403 ``mfa_required`` (FR-IAM-002).
+         *     active membership without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support
+         *     sign-ins never accept invitations (403 ``breakglass_only``, ADR-0023).
          */
         post: operations["accept_my_invitations_api_v1_me_accept_invitations_post"];
         delete?: never;
@@ -7460,6 +7485,47 @@ export interface components {
             /** Warnings */
             warnings: number;
         };
+        /**
+         * SupportSessionIn
+         * @description Start a SchoolOS support session (ADR-0023): the control-plane request it belongs to.
+         */
+        SupportSessionIn: {
+            /**
+             * Platform Request Id
+             * Format: uuid
+             */
+            platform_request_id: string;
+        };
+        /**
+         * SupportSessionOut
+         * @description The grant a support session runs under: read-only access ends at ``expires_at``.
+         */
+        SupportSessionOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Grant Id
+             * Format: uuid
+             */
+            grant_id: string;
+            /**
+             * Platform Request Id
+             * Format: uuid
+             */
+            platform_request_id: string;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+        };
         /** SuspendSubscriptionIn */
         SuspendSubscriptionIn: {
             /**
@@ -8932,6 +8998,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_support_session_api_v1_breakglass_support_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportSessionOut"];
                 };
             };
             /** @description Validation Error */

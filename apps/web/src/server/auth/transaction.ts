@@ -19,6 +19,8 @@ export interface AuthTransaction {
   next: string;
   /** Step-up re-authentication of the session with this storage id. */
   stepUpSessionId: string | null;
+  /** Break-glass support sign-in (ADR-0023): the control-plane request and its school. */
+  support?: { requestId: string; tenantId: string } | undefined;
   expiresAt: number;
 }
 

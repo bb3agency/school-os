@@ -24,11 +24,19 @@ Every decision is audited in the same transaction in the school's chain and repo
 control plane after commit (:func:`report_outcomes`, retried by the sweep), which writes the
 control-plane chain. Every call made with a ``platform_support`` membership is recorded by the
 authz guard as ``breakglass.access`` (``via_breakglass: true``).
+
+Signing in (ADR-0023 option C): the operator signs in to the school app with the support app
+client of the operator pool (MFA, fresh sign-in); the membership belongs to the identity
+``(operator pool issuer, operator subject)``, never to a staff account with the same subject.
+:func:`start_support_session` (step-up) opens the session: it checks the grant, writes
+``breakglass.session_started`` to the school's chain and, in the same request, to the
+control-plane chain. :func:`support_grant_active` is checked on every support request.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -44,14 +52,23 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
+from app.authz.resolver import register_support_grant_check
 from app.breakglass import repository as repo
-from app.breakglass.schemas import GrantOut
+from app.breakglass.schemas import GrantOut, SupportSessionOut
 from app.core.config import DeploymentMode, get_settings
 from app.core.db import tenant_session
-from app.core.errors import Conflict, DomainError, NotFound, ValidationFailed
+from app.core.errors import (
+    Conflict,
+    DomainError,
+    Forbidden,
+    NotFound,
+    ServiceUnavailable,
+    ValidationFailed,
+)
 from app.core.ids import new_id
 from app.core.logging import get_logger
 from app.identity import service as identity
+from app.identity.principal import Principal, require_recent_auth
 from app.notifications import service as notifications
 from app.platform import service as control_plane
 
@@ -197,6 +214,7 @@ def _try_open_emergency_membership(
                 session,
                 None,
                 subject=req.operator_subject,
+                issuer=req.operator_issuer,
                 display_name=req.operator_display_name,
                 email=req.operator_email,
                 expires_at=grant["expires_at"],
@@ -408,6 +426,7 @@ def approve(session: Session, ctx: UserContext, grant_id: uuid.UUID) -> GrantOut
         session,
         ctx,
         subject=req.operator_subject,
+        issuer=req.operator_issuer,
         display_name=req.operator_display_name,
         email=req.operator_email,
         expires_at=expires,
@@ -530,6 +549,97 @@ def revoke(session: Session, ctx: UserContext, grant_id: uuid.UUID) -> GrantOut:
     return _out(row)
 
 
+# --- support sign-in (ADR-0023 option C) ------------------------------------------------------
+
+
+SESSION_STARTED = "breakglass.session_started"
+
+
+def _session_ref(session_id: str | None) -> str | None:
+    """A short, non-reversible reference to the IdP session (never the raw ID or a token)."""
+    if not session_id:
+        return None
+    return hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:16]
+
+
+def support_grant_active(tenant_id: uuid.UUID, membership_id: uuid.UUID) -> bool:
+    """True while ``membership_id`` belongs to an active grant whose window is open now.
+
+    Checked by the authz resolver on every request of a support principal (ADR-0023), on top
+    of the membership's own expiry and ``core.resolve_login``'s filter."""
+    with tenant_session(tenant_id) as session:
+        return repo.active_grant_for_membership(session, membership_id, _now()) is not None
+
+
+def start_support_session(
+    session: Session, ctx: UserContext, principal: Principal, platform_request_id: uuid.UUID
+) -> SupportSessionOut:
+    """Start a SchoolOS support session for the grant of ``platform_request_id`` (ADR-0023 §4).
+
+    Only a support principal whose resolved membership is that grant's membership, with a
+    sign-in within 5 minutes (428 ``step_up_required``). Another school's or another operator's
+    request answers 404. Audit ``breakglass.session_started`` (grant, operator, membership,
+    session reference; no token) in the school's chain in this transaction and, on the shared
+    tier, in the control-plane chain before this transaction commits (a failure there refuses
+    the session, 503).
+    """
+    if principal.kind != "support" or not ctx.via_breakglass:
+        raise Forbidden("Only SchoolOS support starts a support session.", code="breakglass_only")
+    require_recent_auth(principal)
+    grant = repo.get_by_request(session, platform_request_id)
+    if grant is None or grant["membership_id"] != ctx.membership_id:
+        raise NotFound("Support access request not found")
+    now = _now()
+    if grant["status"] != "active" or grant["expires_at"] is None or grant["expires_at"] <= now:
+        raise Conflict("This support access is not open.", code="breakglass_grant_inactive")
+    session_ref = _session_ref(principal.session_id)
+    summary: dict[str, Any] = {
+        "platform_request_id": platform_request_id,
+        "membership_id": ctx.membership_id,
+        "operator_id": grant["platform_user_id"],
+        "issuer_kind": "operator_support",
+        "via_breakglass": True,
+    }
+    if session_ref:
+        summary["session_ref"] = session_ref
+    audit.record(
+        session,
+        action=SESSION_STARTED,
+        resource_type=RESOURCE,
+        resource_id=grant["id"],
+        summary=summary,
+        actor_type="user",
+        actor_id=ctx.user_id,
+        request_id=ctx.request_id,
+    )
+    if _control_plane_here():
+        try:
+            recorded = control_plane.record_breakglass_session_started(
+                ctx.tenant_id, platform_request_id, grant_id=grant["id"], session_ref=session_ref
+            )
+        except (SQLAlchemyError, DomainError) as exc:
+            log.warning(
+                "breakglass.session_report_failed",
+                resource_type=RESOURCE,
+                resource_id=grant["id"],
+                error_type=type(exc).__name__,
+            )
+            raise ServiceUnavailable(
+                "Support access could not be started right now. Try again in a minute."
+            ) from exc
+        if not recorded:
+            log.warning(
+                "breakglass.session_report_skipped", resource_type=RESOURCE, resource_id=grant["id"]
+            )
+    return SupportSessionOut(
+        grant_id=grant["id"],
+        platform_request_id=platform_request_id,
+        tenant_id=ctx.tenant_id,
+        expires_at=grant["expires_at"],
+        scope=dict(grant["scope"] or {}),
+    )
+
+
 # --- reads -----------------------------------------------------------------------------------
 
 
@@ -624,6 +734,9 @@ def sweep_school(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> dic
     return {"expired": expired, "stale_requests": stale, "reported": report_outcomes(tenant_id)}
 
 
+# The authz resolver checks the grant of every support request (ADR-0023).
+register_support_grant_check(support_grant_active)
+
 __all__ = [
     "SyncResult",
     "approve",
@@ -634,6 +747,8 @@ __all__ = [
     "refresh_requests",
     "report_outcomes",
     "revoke",
+    "start_support_session",
+    "support_grant_active",
     "sweep_interval_seconds",
     "sweep_school",
     "sync_school",

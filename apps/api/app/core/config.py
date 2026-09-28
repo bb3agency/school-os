@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -58,6 +59,22 @@ class KnowledgeProviderMode(StrEnum):
 
 
 MIB = 1024 * 1024
+_LOCAL_HOSTS = frozenset(
+    {"localhost", "127.0.0.1", "::1", "0.0.0.0", "oidc", "mock-oauth2-server"}  # noqa: S104
+)
+
+
+def _is_public_https(url: str) -> bool:
+    """https and not a loopback / dev-stub host (same idea as identity.tokens.is_dev_issuer)."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    return (
+        parts.scheme == "https"
+        and bool(host)
+        and host not in _LOCAL_HOSTS
+        and not host.endswith(".localhost")
+        and not host.startswith("127.")
+    )
 
 
 # Placeholder supplier identity for local/CI invoices; refused in staging/prod (FR-PLT-016).
@@ -141,6 +158,13 @@ class Settings(BaseSettings):
     # is not reachable from inside the api container, so compose points these at the stub.
     oidc_jwks_uri: str | None = None
     platform_oidc_jwks_uri: str | None = None
+    # SchoolOS support sign-in to a school during break-glass (ADR-0023 option C): a dedicated
+    # app client in the OPERATOR pool. Off unless the audience (support app client ID) is set;
+    # a host without it keeps break-glass access unusable (fail closed). The issuer defaults to
+    # SOS_PLATFORM_OIDC_ISSUER (same pool); set it on dedicated hosts.
+    support_oidc_issuer: str | None = None
+    support_oidc_audience: str | None = None
+    support_oidc_jwks_uri: str | None = None
     service_token_key: SecretStr = SecretStr("dev-only-service-token-key-change-me-0123456789")
 
     key_wrapper: KeyWrapperKind = KeyWrapperKind.LOCAL_DEV
@@ -168,6 +192,43 @@ class Settings(BaseSettings):
         return self.env in (Environment.STAGING, Environment.PROD)
 
     @property
+    def support_enabled(self) -> bool:
+        """True when the break-glass support app client is configured (ADR-0023)."""
+        return bool(self.support_oidc_audience and self.support_oidc_audience.strip())
+
+    @property
+    def resolved_support_issuer(self) -> str:
+        """The operator pool issuer that support tokens and operator identities come from."""
+        value = (self.support_oidc_issuer or "").strip()
+        return value or self.platform_oidc_issuer
+
+    def _guard_support_client(self) -> None:
+        """ADR-0023: the support client lives in the operator pool and is never one of the other
+        app clients, so no token can be accepted in two places (T1/T2 token confusion)."""
+        if not self.support_enabled:
+            return
+        issuer = self.resolved_support_issuer
+        audience = (self.support_oidc_audience or "").strip()
+        if issuer.rstrip("/") == self.oidc_issuer.rstrip("/"):
+            raise ValueError("SOS_SUPPORT_OIDC_ISSUER must not be the staff issuer")
+        if audience in (self.oidc_audience, self.platform_oidc_audience):
+            raise ValueError(
+                "SOS_SUPPORT_OIDC_AUDIENCE must be a dedicated app client "
+                "(not the staff or operator admin client)"
+            )
+        if self.deployment_mode is DeploymentMode.SHARED and issuer.rstrip(
+            "/"
+        ) != self.platform_oidc_issuer.rstrip("/"):
+            raise ValueError("SOS_SUPPORT_OIDC_ISSUER must be the operator pool issuer")
+        if self.is_production_like:
+            for name, url in (
+                ("SOS_SUPPORT_OIDC_ISSUER", issuer),
+                ("SOS_SUPPORT_OIDC_JWKS_URI", self.support_oidc_jwks_uri),
+            ):
+                if url is not None and not _is_public_https(url):
+                    raise ValueError(f"{name} must be a public https URL in {self.env}")
+
+    @property
     def resolved_kb_provider_mode(self) -> KnowledgeProviderMode:
         """The configured mode; unset means ``fake`` locally/in CI and ``live`` elsewhere."""
         if self.kb_provider_mode is not None:
@@ -192,6 +253,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _guard_production(self) -> Settings:
         """Fail closed: dev-only conveniences can never run in staging or production."""
+        self._guard_support_client()
         if self.is_production_like:
             if self.key_wrapper is KeyWrapperKind.LOCAL_DEV:
                 raise ValueError("SOS_KEY_WRAPPER=local-dev is not allowed in staging/prod")
