@@ -102,7 +102,9 @@ Error budget policy: if a month's budget is exhausted, freeze feature work and p
 | Usage limit crossed | first 80% / 100% per metric per period | Info | — |
 | Operator role change, offboarding approved, school suspended | any | Info (notify all platform owners) | — |
 
-Delivery: phone push + SMS/email to the on-call (founder) for P1/P2; daily digest for P3/P4.
+| SES bounce / complaint rate | account `Reputation.BounceRate` ≥ 5% or `Reputation.ComplaintRate` ≥ 0.1% (10 §5.2) | P3 | — |
+
+Delivery: phone push + SMS/email to the on-call (founder) for P1/P2; daily digest for P3/P4. **Pilot (owner decision 2026-09-27, SEC-023):** the AWS security alerts (`sos-<env>-security-alerts`) and CloudWatch alarms reach the on-call by **email** only; before the first school beyond the pilot, or after any P1 that email delivered late, a paging service is subscribed to the same SNS topics (10 §5.1, upgrade path).
 
 ## 7. Incident response
 
