@@ -318,6 +318,32 @@ variable "billing_supplier_state_code" {
   }
 }
 
+variable "billing_supplier_address" {
+  description = "Supplier registered address printed on invoice PDFs (SOS_BILLING_SUPPLIER_ADDRESS; CGST Rule 46(a)); ';' separates printed lines. No default: staging/prod refuse to render invoices with the app's dev placeholder."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.billing_supplier_address)) >= 10 && length(var.billing_supplier_address) <= 300
+    error_message = "billing_supplier_address is the registered postal address (10-300 characters)."
+  }
+
+  validation {
+    condition     = !startswith(var.billing_supplier_address, "Synthetic supplier address (dev)")
+    error_message = "billing_supplier_address is the app's dev placeholder; staging/prod refuse to render invoices with it."
+  }
+}
+
+variable "platform_invoice_bucket" {
+  description = "Optional control-plane bucket for invoice PDFs (SOS_PLATFORM_INVOICE_BUCKET). Null = the files bucket under platform/invoices/ (never a school prefix). A separate bucket must be private, in ap-south-1 and encrypted with the data CMK (the app writes with SOS_S3_KMS_KEY_ID)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.platform_invoice_bucket == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.platform_invoice_bucket))
+    error_message = "platform_invoice_bucket must be an S3 bucket name, or null."
+  }
+}
+
 variable "enable_execute_command" {
   description = "ECS Exec on services (staging only)."
   type        = bool

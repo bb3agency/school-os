@@ -206,6 +206,17 @@ variable "billing_supplier_state_code" {
   default     = "37"
 }
 
+variable "billing_supplier_address" {
+  description = "Supplier registered address on invoice PDFs (validated by modules/shared_platform)."
+  type        = string
+}
+
+variable "platform_invoice_bucket" {
+  description = "Optional separate bucket for invoice PDFs; null = the files bucket under platform/invoices/."
+  type        = string
+  default     = null
+}
+
 variable "security_alert_emails" {
   description = "Security alert recipients (GuardDuty/Security Hub/tampering, SEC-023). Null = alarm_emails. The on-call path is docs/11 §6-7."
   type        = list(string)

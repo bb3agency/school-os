@@ -48,6 +48,16 @@ NOT_SETTINGS: dict[str, str] = {
     "SOS_HOST_STATE_DIR": "dedicated host state mount",
 }
 
+# Settings added by branches that are merged on the integration branch, not on this one (invoice
+# PDFs: docs/16 §5.8). Deploy files may already pass them. Remove each entry when this branch's
+# app/core/config.py has the field: test_SEC_009_pending_settings_are_really_pending then fails.
+PENDING_SETTINGS: frozenset[str] = frozenset(
+    {
+        "SOS_BILLING_SUPPLIER_ADDRESS",
+        "SOS_PLATFORM_INVOICE_BUCKET",
+    }
+)
+
 SYNTHETIC_TENANT = "0192a0de-0000-7000-8000-00000000a001"
 SYNTHETIC_DEPLOYMENT = "0192a0de-0000-7000-8000-00000000d001"
 
@@ -295,7 +305,8 @@ def build_settings(monkeypatch: pytest.MonkeyPatch, env: Mapping[str, str]) -> S
 
 @pytest.mark.parametrize("service", APP_CONTAINERS)
 def test_SEC_009_dedicated_compose_passes_only_settings_names(service: str) -> None:
-    unknown = set(compose_env(service)) - settings_env_names() - set(NOT_SETTINGS)
+    known = settings_env_names() | set(NOT_SETTINGS) | PENDING_SETTINGS
+    unknown = set(compose_env(service)) - known
     assert not unknown, f"compose service {service} sets names config.py never reads: {unknown}"
 
 
@@ -303,7 +314,7 @@ def test_SEC_009_dedicated_compose_passes_only_settings_names(service: str) -> N
 def test_SEC_009_shared_tier_tasks_pass_only_settings_names(module: str) -> None:
     names = set(shared_hcl().container_env(module))
     assert names, f"no environment parsed for module {module}"
-    unknown = names - settings_env_names() - set(NOT_SETTINGS)
+    unknown = names - settings_env_names() - set(NOT_SETTINGS) - PENDING_SETTINGS
     assert not unknown, f"ECS task {module} sets names config.py never reads: {unknown}"
 
 
@@ -316,6 +327,11 @@ def test_SEC_009_allowlist_entries_are_really_used() -> None:
     stale = set(NOT_SETTINGS) - used
     assert not stale, f"remove stale NOT_SETTINGS entries: {stale}"
     assert not set(NOT_SETTINGS) & settings_env_names(), "allowlisted names are Settings fields"
+
+
+def test_SEC_009_pending_settings_are_really_pending() -> None:
+    landed = PENDING_SETTINGS & settings_env_names()
+    assert not landed, f"now Settings fields; remove from PENDING_SETTINGS: {sorted(landed)}"
 
 
 # --- start-up guards per container ----------------------------------------------------------------

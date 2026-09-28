@@ -38,7 +38,7 @@ locals {
   # apps/api/app/core/config.py reads, and each container gets them all so it passes the staging/prod
   # start-up guards on its own (no local-dev key wrapper, no dev-only secrets, no placeholder invoice
   # supplier). apps/api/tests/deploy/test_env_contract.py parses these maps and checks both rules.
-  app_env = {
+  app_env = merge({
     SOS_ENV             = var.env
     SOS_DEPLOYMENT_MODE = "shared"
     SOS_VERSION         = var.release_version
@@ -61,7 +61,14 @@ locals {
     SOS_BILLING_SUPPLIER_LEGAL_NAME = var.billing_supplier_legal_name
     SOS_BILLING_SUPPLIER_GSTIN      = var.billing_supplier_gstin
     SOS_BILLING_SUPPLIER_STATE_CODE = var.billing_supplier_state_code
+    SOS_BILLING_SUPPLIER_ADDRESS    = var.billing_supplier_address
     SOS_LOG_LEVEL                   = var.log_level
+  }, local.invoice_env)
+
+  # Invoice PDFs (docs/16 §5.8): a separate control-plane bucket only when configured; otherwise the
+  # app uses the files bucket under platform/invoices/.
+  invoice_env = var.platform_invoice_bucket == null ? {} : {
+    SOS_PLATFORM_INVOICE_BUCKET = var.platform_invoice_bucket
   }
 
   # Secrets every app container needs to start: the guarded settings and the broker.
@@ -320,6 +327,14 @@ data "aws_iam_policy_document" "api" {
     resources = ["${module.s3.files_bucket_arn}/t/*"]
   }
 
+  # Control-plane invoice PDFs (docs/16 §5.8, ADR-0017 Amendment 2026-09-28): rendered by
+  # worker-pdf, downloaded through presigned GETs signed by the api. Never under a school prefix.
+  statement {
+    sid       = "InvoicePdfObjects"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["${module.s3.files_bucket_arn}/platform/invoices/*"]
+  }
+
   statement {
     sid       = "DataKey"
     actions   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:DescribeKey"]
@@ -334,6 +349,16 @@ data "aws_iam_policy_document" "api" {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
       values   = ["SchoolOS"]
+    }
+  }
+
+  # Optional separate invoice bucket (platform_invoice_bucket): the same prefix as in the files bucket.
+  dynamic "statement" {
+    for_each = var.platform_invoice_bucket == null ? [] : [var.platform_invoice_bucket]
+    content {
+      sid       = "InvoicePdfBucketObjects"
+      actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+      resources = ["arn:aws:s3:::${statement.value}/platform/invoices/*"]
     }
   }
 }

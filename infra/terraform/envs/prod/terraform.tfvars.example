@@ -18,6 +18,8 @@ from_email_address     = null
 billing_supplier_legal_name = "<registered legal name>"
 billing_supplier_gstin      = "<15-character GSTIN>"
 billing_supplier_state_code = "37"
+billing_supplier_address    = "<registered address; lines separated by ;>"
+# platform_invoice_bucket   = null # optional separate invoice-PDF bucket (docs/16 §5.8)
 
 alarm_emails       = ["<oncall@your-domain>"]
 # SEC-023 security alerts (GuardDuty High, critical Security Hub findings, logging tampering).

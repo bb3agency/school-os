@@ -38,6 +38,7 @@ variables {
   release_version = "2026.10.1"
   # Same synthetic values as terraform.tfvars.example (staging only, not valid for tax invoices).
   billing_supplier_legal_name = "SchoolOS Staging Synthetic Supplier (not a tax invoice)"
+  billing_supplier_address    = "Synthetic Test Supplier; Vijayawada 520001, Andhra Pradesh"
   billing_supplier_gstin      = "37STAGE0000S1Z5"
   app_domain                  = "app.staging.example.test"
   admin_domain                = "admin.staging.example.test"

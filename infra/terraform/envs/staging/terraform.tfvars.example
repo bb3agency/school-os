@@ -15,6 +15,8 @@ cognito_domain_prefix = "<globally-unique-prefix>-staging"
 billing_supplier_legal_name = "SchoolOS Staging Synthetic Supplier (not a tax invoice)"
 billing_supplier_gstin      = "37STAGE0000S1Z5"
 billing_supplier_state_code = "37"
+billing_supplier_address    = "Synthetic staging supplier (not a tax invoice); Vijayawada 520001, Andhra Pradesh"
+# platform_invoice_bucket   = null # optional separate invoice-PDF bucket (docs/16 §5.8)
 
 alarm_emails       = ["<dev-alerts@your-domain>"]
 # SEC-023 baseline in the staging account (on by default; 180-day GOVERNANCE-locked CloudTrail).

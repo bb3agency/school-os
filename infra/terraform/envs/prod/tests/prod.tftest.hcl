@@ -38,6 +38,7 @@ variables {
   release_version = "2026.10.1"
   # Synthetic supplier (test only).
   billing_supplier_legal_name = "Synthetic Test Supplier Private Limited"
+  billing_supplier_address    = "Synthetic Test Supplier; Vijayawada 520001, Andhra Pradesh"
   billing_supplier_gstin      = "37ABCDE1234F1Z5"
   app_domain                  = "app.example.test"
   admin_domain                = "admin.example.test"

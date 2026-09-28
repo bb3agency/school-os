@@ -27,6 +27,7 @@ variables {
   github_deploy_environment   = "staging"
   billing_supplier_legal_name = "SchoolOS Staging Synthetic Supplier (not a tax invoice)"
   billing_supplier_gstin      = "37STAGE0000S1Z5"
+  billing_supplier_address    = "Synthetic staging supplier (not a tax invoice); Vijayawada 520001, Andhra Pradesh"
 }
 
 run "every_app_container_gets_the_full_settings" {
@@ -36,7 +37,7 @@ run "every_app_container_gets_the_full_settings" {
     condition = alltrue([
       for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition, module.beat.container_definition, module.migrate.container_definition] :
       length(setsubtract(
-        ["SOS_ENV", "SOS_DEPLOYMENT_MODE", "SOS_VERSION", "AWS_REGION", "SOS_KEY_WRAPPER", "SOS_KMS_DATA_KEY_ARN", "SOS_AUDIT_SIGNING_KEY_ARN", "SOS_BILLING_SUPPLIER_LEGAL_NAME", "SOS_BILLING_SUPPLIER_GSTIN", "SOS_BILLING_SUPPLIER_STATE_CODE", "SOS_S3_BUCKET_FILES", "SOS_S3_BUCKET_AUDIT", "SOS_OIDC_ISSUER", "SOS_OIDC_AUDIENCE", "SOS_SERVICE_NAME"],
+        ["SOS_ENV", "SOS_DEPLOYMENT_MODE", "SOS_VERSION", "AWS_REGION", "SOS_KEY_WRAPPER", "SOS_KMS_DATA_KEY_ARN", "SOS_AUDIT_SIGNING_KEY_ARN", "SOS_BILLING_SUPPLIER_LEGAL_NAME", "SOS_BILLING_SUPPLIER_GSTIN", "SOS_BILLING_SUPPLIER_STATE_CODE", "SOS_BILLING_SUPPLIER_ADDRESS", "SOS_S3_BUCKET_FILES", "SOS_S3_BUCKET_AUDIT", "SOS_OIDC_ISSUER", "SOS_OIDC_AUDIENCE", "SOS_SERVICE_NAME"],
         [for e in c.environment : e.name],
       )) == 0
     ])
@@ -365,4 +366,46 @@ run "support_client_is_wired" {
     ])
     error_message = "Only the BFF holds the support client secret."
   }
+}
+
+# FR-PLT-016/017 (invoice PDFs, docs/16 §5.8): the supplier address reaches every app container
+# (worker-pdf renders); a separate invoice bucket is optional and, when set, named in the env and
+# the task role.
+run "invoice_pdf_settings" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_BILLING_SUPPLIER_ADDRESS"] == ["Synthetic staging supplier (not a tax invoice); Vijayawada 520001, Andhra Pradesh"]
+      && !contains([for e in c.environment : e.name], "SOS_PLATFORM_INVOICE_BUCKET")
+    ])
+    error_message = "api, worker and worker-pdf get the supplier address; no invoice bucket unless configured (files bucket)."
+  }
+}
+
+run "invoice_pdf_separate_bucket" {
+  command = plan
+
+  variables {
+    platform_invoice_bucket = "sos-staging-invoices-444455556666"
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_PLATFORM_INVOICE_BUCKET"] == ["sos-staging-invoices-444455556666"]
+    ])
+    error_message = "The configured invoice bucket reaches the containers that render and sign."
+  }
+}
+
+run "invoice_address_dev_placeholder_refused" {
+  command = plan
+
+  variables {
+    billing_supplier_address = "Synthetic supplier address (dev); Vijayawada 520001, Andhra Pradesh"
+  }
+
+  expect_failures = [var.billing_supplier_address]
 }
