@@ -336,7 +336,7 @@ services:
 
   valkey:
     <<: [*hardening, *logging]
-    image: valkey/valkey:8.1.10-alpine
+    image: valkey/valkey:9.1.1-alpine
     user: "999:999"
     # The password goes into a tmpfs config file, never onto the command line (visible in `ps`).
     entrypoint: ["/bin/sh", "-c"]
