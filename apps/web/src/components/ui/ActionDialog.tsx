@@ -140,15 +140,15 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
           triggerRef.current?.focus();
         }}
         className={cn(
-          "m-auto w-[min(36rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-ink shadow-xl",
+          "m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover",
           className,
         )}
       >
         {open ? (
           <>
-            <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+            <div className="flex items-start justify-between gap-4 p-6 pb-2">
               <div className="space-y-1">
-                <h2 id={titleId} className="text-lg font-semibold">
+                <h2 id={titleId} className="text-lg font-medium">
                   {title}
                 </h2>
                 {description ? (
@@ -161,7 +161,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                 type="button"
                 onClick={close}
                 aria-label={t("close")}
-                className="rounded-md p-1 text-ink-muted hover:bg-surface-muted hover:text-ink"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink"
               >
                 <svg
                   aria-hidden="true"
@@ -176,18 +176,18 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
               </button>
             </div>
             {renderResult !== undefined && result !== undefined ? (
-              <div className="space-y-4 p-5">
+              <div className="space-y-4 px-6 py-4">
                 <ResultSlot render={renderResult} result={result} onDone={close} />
               </div>
             ) : (
               <form noValidate onSubmit={form.onSubmit}>
-                <div className="max-h-[60vh] space-y-4 overflow-y-auto p-5">
+                <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-4">
                   {note ? <Alert tone="info">{note}</Alert> : null}
                   {children?.(form.errors)}
                   {stepUp ? <p className="text-sm text-ink-muted">{t("stepUpNote")}</p> : null}
                   <ApiErrorAlert error={form.error} namespace={errorNamespace} />
                 </div>
-                <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
+                <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-6 py-4">
                   <Button variant="secondary" onClick={close}>
                     {t("cancel")}
                   </Button>

@@ -4,10 +4,10 @@ import { cn } from "@/lib/cn";
 export type AlertTone = "info" | "success" | "warning" | "danger";
 
 const tones: Record<AlertTone, string> = {
-  info: "border-info-ink/40 bg-info-soft text-info-ink",
-  success: "border-success-ink/40 bg-success-soft text-success-ink",
-  warning: "border-warning-border bg-warning-soft text-warning-ink",
-  danger: "border-danger bg-danger-soft text-danger",
+  info: "border-info-border border-l-info-ink bg-info-soft text-info-ink",
+  success: "border-success-ink/25 border-l-success-ink bg-success-soft text-success-ink",
+  warning: "border-warning-border/40 border-l-warning-border bg-warning-soft text-warning-ink",
+  danger: "border-danger/30 border-l-danger bg-danger-soft text-danger",
 };
 
 const icons: Record<AlertTone, ReactNode> = {
@@ -34,7 +34,11 @@ export function Alert({ tone = "info", title, children, className, live = false 
   return (
     <div
       role={role}
-      className={cn("flex gap-3 rounded-md border-l-4 border p-4", tones[tone], className)}
+      className={cn(
+        "flex gap-3 rounded-lg border border-l-4 p-4 print:border-black print:bg-white print:text-black",
+        tones[tone],
+        className,
+      )}
     >
       <svg
         aria-hidden="true"

@@ -1,37 +1,33 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Icon, type IconName } from "./Icon";
 
-/** Empty states say what to do next (PRD §8). */
+/** Empty states say what to do next (PRD §8): a title, one line of help and one action. */
 export function EmptyState({
   title,
   body,
   action,
+  icon = "inbox",
   className,
 }: {
   title: ReactNode;
   body?: ReactNode;
   action?: ReactNode;
+  /** Decorative icon in the soft circle. */
+  icon?: IconName;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-2 rounded-md border border-dashed border-border px-6 py-10 text-center",
+        "flex flex-col items-center gap-2 rounded-xl border border-dashed border-border-soft bg-surface px-6 py-10 text-center",
         className,
       )}
     >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="size-8 text-ink-muted"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-      >
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <path d="M3 10h18" />
-      </svg>
-      <p className="font-semibold text-ink">{title}</p>
+      <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">
+        <Icon name={icon} className="size-6" />
+      </span>
+      <p className="font-medium text-ink">{title}</p>
       {body ? <p className="max-w-prose text-sm text-ink-muted">{body}</p> : null}
       {action ? (
         <div className="mt-2" data-print="hide">
