@@ -1,5 +1,11 @@
 .git
+# Local-only trees (tests/deploy/test_dockerignore.py): agent worktrees are full checkouts with
+# their own node_modules and .venv, and made every build send gigabytes to the daemon.
+.claude
+.data
+evals/reports
 .venv
+**/.venv
 **/__pycache__
 **/.mypy_cache
 **/.ruff_cache
