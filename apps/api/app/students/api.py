@@ -125,6 +125,13 @@ def search_students(
     admission_no: Annotated[
         str | None, Query(max_length=32, deprecated=True, description=_PII_IN_URL)
     ] = None,
+    academic_year_id: Annotated[
+        uuid.UUID | None,
+        Query(
+            description="Academic year whose enrolments are listed (class, section and scope); "
+            "the current year when left out. Unknown years answer 422."
+        ),
+    ] = None,
     limit: Limit = 50,
     cursor: Cursor = None,
 ) -> Page[StudentSummary]:
@@ -146,6 +153,7 @@ def search_students(
         class_id=class_id,
         status=status,
         admission_no=admission_no,
+        academic_year_id=academic_year_id,
     )
     return students.search(db, ctx, filters, limit=limit, cursor=cursor)
 
