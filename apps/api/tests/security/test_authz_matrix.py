@@ -795,6 +795,12 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/documents/{document_id}/archive"): _doc_archive("archive"),
     ("POST", "/api/v1/documents/{document_id}/unarchive"): _doc_archive("unarchive"),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
+    # CSV export (FR-AUD-005): a narrow filter keeps each matrix call small.
+    ("GET", "/api/v1/audit/export"): lambda w, r, a: (
+        "/api/v1/audit/export?action=section.created",
+        None,
+        {},
+    ),
     # School-side routes backed by the control plane (app/platform/tenant_api.py).
     ("GET", "/api/v1/tenant/billing"): lambda w, r, a: ("/api/v1/tenant/billing", None, {}),
     ("GET", "/api/v1/tenant/billing/invoices"): lambda w, r, a: (

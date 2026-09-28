@@ -130,7 +130,7 @@ Review the model at each milestone and after any incident.
 - Server-side session in Valkey, referenced by a `__Host-sos_session` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`.
 - Tokens stored server-side, encrypted; access token ≤ 10 min; refresh token rotated on every use; reuse detection revokes the whole session family.
 - Idle timeout 15 min (tenant-configurable 5–30), absolute 12 h. Shared-PC mode shows a visible "Lock now" button.
-- **Step-up authentication** (MFA within the last 5 minutes) for: approving identity changes, role/permission changes, waiving blockers, creating any export (board/portal pre-checks and student lists, ADR-0021), downloading an export another member requested (`export.download_any`), full tenant export, break-glass approval, and every platform permission marked ᴿ (§6.5). The API requires `sos:mfa = "true"` and `auth_time` within 5 minutes, otherwise returns `428 step_up_required`; the BFF re-authenticates with `prompt=login` and retries (ADR-0018).
+- **Step-up authentication** (MFA within the last 5 minutes) for: approving identity changes, role/permission changes, waiving blockers, creating any export (board/portal pre-checks and student lists, ADR-0021; the audit log CSV export, FR-AUD-005), downloading an export another member requested (`export.download_any`), full tenant export, break-glass approval, and every platform permission marked ᴿ (§6.5). The API requires `sos:mfa = "true"` and `auth_time` within 5 minutes, otherwise returns `428 step_up_required`; the BFF re-authenticates with `prompt=login` and retries (ADR-0018).
 - CSRF: synchronizer token on all state-changing BFF routes in addition to SameSite.
 - Users can list and revoke sessions; admins can force sign-out for a user.
 

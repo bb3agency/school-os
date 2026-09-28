@@ -14638,6 +14638,146 @@
         ]
       }
     },
+    "/api/v1/audit/export": {
+      "get": {
+        "description": "Download the school audit log as a CSV file (permission ``audit.read`` and a recent\nsign-in with MFA, 428 ``step_up_required``).\n\nSame filters as ``GET /audit/events``: acting user, resource type/id, action and a time\nrange ``[from, to)``. Oldest event first; IDs, codes and summaries only, never names or\ncontact details. At most 200,000 events per file (422 ``too_many_events``: choose a shorter\ndate range). Every export is recorded in the audit log (``audit.exported``) before the file\nis sent.",
+        "operationId": "export_audit_events_api_v1_audit_export_get",
+        "parameters": [
+          {
+            "description": "Acting user id",
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Acting user id",
+              "title": "Actor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "pattern": "^[a-z_]+(\\.[a-z_]+)+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "example": "seq,occurred_at_utc,occurred_at_ist,actor_type,actor_id,action,resource_type,resource_id,request_id,summary\r\n41,2026-09-01T04:30:00Z,2026-09-01 10:00:00,user,\u2026,section.created,section,\u2026,req_\u2026,\"{\"\"fields\"\":[\"\"name_en\"\"]}\"\r\n",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV file (UTF-8 with BOM), oldest event first"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Audit Events",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/api/v1/audit/verify": {
       "get": {
         "description": "Check that the school's audit chain is unbroken (permission ``audit.read``; US-1001 AC2).",
