@@ -2940,9 +2940,14 @@
     "loading": "Loading…",
     "empty": "No notifications",
     "emptyBody": "You'll see messages here when a request needs you or a check finishes.",
-    "unreadOnly": "Show unread only",
     "seeAll": "See all notifications",
-    "showMore": "Show more"
+    "showMore": "Show more",
+    "filterLegend": "Show notifications",
+    "filterAll": "All",
+    "filterUnread": "Unread",
+    "today": "Today · {date}",
+    "emptyUnread": "No unread notifications",
+    "emptyUnreadBody": "You have read everything. Choose \"All\" to see older messages."
   },
   "breakGlass": {
     "nav": "Support access",

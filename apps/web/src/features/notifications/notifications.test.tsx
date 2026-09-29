@@ -8,7 +8,7 @@ import { intlErrors, renderWithIntl } from "@/test/render";
 import { notification } from "@/test/school-fixtures";
 import { bellPollDelay, notificationHref } from "./data";
 import { NotificationBell } from "./NotificationBell";
-import { NotificationsScreen } from "./NotificationsScreen";
+import { groupByDay, NotificationsScreen } from "./NotificationsScreen";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
@@ -182,7 +182,7 @@ describe("notifications page (FR-NOT-001)", () => {
     expect(
       screen.getByRole("button", { name: "Mark as read: New message from SchoolOS" }),
     ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: "Show unread only" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Unread" }));
     await waitFor(() =>
       expect(
         stub
@@ -190,5 +190,28 @@ describe("notifications page (FR-NOT-001)", () => {
           .some((call) => call.url.searchParams.get("unread") === "true"),
       ).toBe(true),
     );
+  });
+});
+
+describe("notifications grouped by day (FR-NOT-001)", () => {
+  it("keeps the API's newest-first order and splits at IST midnight", () => {
+    const groups = groupByDay([
+      notification({ id: "a", created_at: "2026-09-27T04:00:00Z" }),
+      notification({ id: "b", created_at: "2026-09-26T19:00:00Z" }),
+      notification({ id: "c", created_at: "2026-09-26T05:00:00Z" }),
+    ]);
+    expect(groups.map((g) => [g.day, g.items.map((i) => i.id)])).toEqual([
+      ["27/09/2026", ["a", "b"]],
+      ["26/09/2026", ["c"]],
+    ]);
+  });
+
+  it("shows a day heading above each group, and 'Unread' as a segmented filter", async () => {
+    stub.routes["GET /bff/api/v1/notifications"] = () =>
+      page([notification({ title: "Export ready", created_at: "2026-09-26T05:00:00Z" })]);
+    renderWithIntl(<NotificationsScreen />, "te");
+    expect(await screen.findByRole("heading", { level: 2, name: "26/09/2026" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "చదవనివి" })).not.toBeChecked();
+    expect(intlErrors).toEqual([]);
   });
 });
