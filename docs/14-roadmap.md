@@ -172,6 +172,23 @@ Not done: embeddings model chosen by evaluation on real providers (ADR-0006), li
 **Scope:** templates for TC, bonafide, study, conduct certificates (EN/TE, school formats) · serial numbers · automatic register entries · duplicate marking · print views of registers in familiar formats · certificate PDFs indexed as documents.
 **Exit:** certificates issued in production with median time < 5 minutes; register entries reconcile with paper.
 
+### M3 status (2026-09-29)
+
+Built on the worktree branch, and not yet merged. The stories (US-1101..US-1108) and requirements (FR-CERT-001..014, FR-REG-001..005) are **proposed from the roadmap scope; the PO still has to confirm them**.
+
+| Scope item | Status | Evidence | Missing |
+|---|---|---|---|
+| Certificate types and templates (EN/TE) | **Done (v1 layout)** | `app/certificates/config.yaml`, `templates.py`; TC, bonafide, study and conduct; letterhead in school settings | The official AP TC format. Fields SchoolOS cannot fill yet (e.g. caste/religion, which are C3) print as labelled blanks, marked `TODO(official format)`. No logo. |
+| Serial numbers | **Done** | `0033_certificates` (`certificate_counters`, unique serials); gap-free under concurrency (`tests/certificates/test_service.py`) | A serial format per school (PO) |
+| Maker-checker TC that ends the enrolment | **Done** | DB CHECK plus service; `students.withdraw_for_transfer_certificate` in the same transaction | — |
+| Duplicates and cancellation | **Done** | DUPLICATE mark with the original serial and a reason; cancelled certificates keep their number | — |
+| Register print views | **Done** | TC register, certificate issue register, admission and withdrawal register (A4 landscape, bilingual, step-up) | Checking against paper at the design partner |
+| PDFs stored and indexed as documents | **Done** | Queue `pdf`, purpose `certificate` (C2, ACL by role), scanned and indexed | Whether certificate text should be answerable in Ask (PO) |
+| Web | **Done** | `/certificates`, `/certificates/[id]`, `/students/[id]/certificates/new`, `/registers`; vitest; responsive e2e entries | e2e run in CI |
+| Public verification (QR or serial lookup) | **Not built** | — | Needs a PO decision and an ADR (it would be a public route) |
+
+Release notes: run `python -m app.identity.sync_system_roles --apply` after `0033_certificates`. The system-role fingerprint changed because of the four new permissions.
+
 ### M4 · Circulars → tasks and bilingual notices
 **Scope:** circular metadata/deadline extraction · task list with owners and due dates · reminders · parent notice generator (EN/TE text + printable/image) for posting in existing groups.
 **Exit:** ≥ 90% of circulars in a term processed with deadlines captured; staff confirm fewer missed tasks.

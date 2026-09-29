@@ -73,6 +73,8 @@ UIDAI circulars have directed organisations storing Aadhaar numbers in databases
 | PRV-015 | Every text pipeline (OCR, extraction, document ingestion, imports, logs, prompts) masks 12-digit sequences that pass the Verhoeff checksum. |
 | PRV-016 | If an uploaded image appears to contain a full Aadhaar number (detected via OCR + Verhoeff), the stored image is **redacted** (region blacked out using OCR bounding boxes) and the original discarded. The upload UI warns: "Don't upload Aadhaar card images. Enter only the last 4 digits." |
 
+Certificates (M3, FR-CERT-009) print only configured C1/C2 fields. The Aadhaar-as-printed fields and `aadhaar_last4` can never be configured as printed, no restricted (C3) field such as caste or religion is printed, and every printed value and typed input is Verhoeff-masked. Official-format fields that would need C3 data print as labelled blanks until the PO decides (02 C15).
+
 ## 6. CERT-In directions and logging
 
 The April 2022 CERT-In directions apply to service providers and body corporates in India. SchoolOS commits to:

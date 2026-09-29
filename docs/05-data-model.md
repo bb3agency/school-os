@@ -815,6 +815,47 @@ US-402, FR-IMP-020..024, PRV-015/016. Photo batches have their own table (`sis.i
 - All three: RLS ENABLE + FORCE with `tenant_isolation`, `UNIQUE (tenant_id, id)`; the app role has no DELETE/TRUNCATE (provenance of confirmed register values). The FKs to `kb.documents` keep a register page from being deleted while rows point at it (409 `document_in_use`).
 - **Redacted and discarded document versions (PRV-016).** `documents.replace_with_redacted` stores the redacted copy as the next `kb.document_versions` row (`queued`, malware-scanned like any upload, current version) and discards the original; `documents.discard_version` marks a version `quarantined` with `error` `aadhaar_redacted` or `aadhaar_unredactable` (the row stays for history and audit). The object is deleted after commit by the outbox task `documents.discard_object` (event `document.version.discarded` carries `document_id` and `version_id` only; the worker reads the key from the version row, and still accepts older events that carry `object_key`) (plus a daily sweep of the last 7 days), which tags it `sos-lifecycle=discarded` first so the bucket rule `discarded-1d` expires the noncurrent copy after one day instead of the 90-day recovery window. Audit: `document.version_redacted`, `document.version_discarded`, `extraction.page.image_redacted`, `extraction.page.image_withheld` (IDs, counts and codes only).
 
+### 5.7 Certificates and registers as built (migration `0033_certificates`; M3, US-1101..US-1108, FR-CERT-001..014, FR-REG-001..005)
+
+Two tenant tables in `sis`, with the usual rules: `tenant_id` first, `UNIQUE (tenant_id, id)`, RLS ENABLE + FORCE with `tenant_isolation`, composite FKs. Offboarding uses the restrictive `offboarding_purge` policy with `SELECT, DELETE` for `sos_purger`, and `certificates` sits after `changes` in `app/tenancy/offboarding.yaml` `purge_order`. The certificate types, serial format, reason bounds, labels and the printed fields for each type live in `app/certificates/config.yaml` (`template_version` `v1`).
+
+- **`sis.certificates`**: one row per request. Once issued, the same row is the register entry.
+  - Columns: `certificate_type` (`transfer`, `bonafide`, `study`, `conduct`); `status` (`pending → issued | rejected | withdrawn`, and `issued → cancelled`); `inputs` (the details typed at request time, e.g. leaving date and reason, purpose). Once issued: `academic_year_id`, `serial_no` + `serial` (e.g. `TC/2026-27/0001`), `content` (the printed values frozen as JSON) + `content_sha256`, `template_version`, `issued_by`/`issued_at`. Decision columns: `requested_by`/`decided_by`/`issued_by`/`cancelled_by` are memberships (composite FKs); `decision_note`, `cancel_reason`. PDF columns: `document_id` (composite FK to `kb.documents`, so the PDF cannot be deleted while the entry points at it), `pdf_status` (`none|queued|ready|failed`) + `pdf_error` (a code). Also `updated_at` and `version` (ETag).
+  - **Maker-checker** (ADR-0010, FR-CERT-004): `certificates_maker_checker CHECK (decided_by IS NULL OR decided_by <> requested_by)`. The service also refuses self-approval (`403 self_approval_forbidden`).
+  - **Duplicates** (FR-CERT-007): `original_certificate_id` (self composite FK) + `duplicate_reason` (10–1000 characters) + `duplicate_no` (copy 1, 2, … once issued). A duplicate has no serial of its own; its content is the original's with the DUPLICATE mark. `certificates_one_pending_duplicate` allows one pending duplicate per original.
+  - **One live TC per student**: the partial unique index `certificates_one_live_tc` covers original TCs that are `pending` or `issued`.
+  - **Records never change** (FR-CERT-003, FR-REG-005). The trigger `certificates_frozen` refuses:
+    - any change to what was requested;
+    - any change to a closed request;
+    - once issued, any change to the number, content, dates or decision. The only allowed changes are `issued → cancelled` with its reason, the PDF state and linking the first document.
+
+    `sos_app` has column-level `UPDATE` on the workflow columns only, and no `DELETE`/`TRUNCATE`. The trigger `certificates_append_only` refuses deletes, except in the offboarding purge (`core.tenant_purge_allowed()`, ADR-0029).
+  - CHECKs tie each status to its columns (`certificates_issued_fields`, `_serial_when_issued`, `_decision`, `_cancelled_fields`, `_pdf_ready`, `_pdf_error_shape`) and bound every reason to 10–1000 characters.
+  - Uniqueness: `certificates_serial_unique (tenant_id, certificate_type, academic_year_id, serial_no)` and `certificates_serial_text_unique (tenant_id, serial)`, so a number is never reused. Cancelled certificates keep their number.
+- **`sis.certificate_counters`**: `(tenant_id, certificate_type, academic_year_id) → last_no`.
+  - Serials are allocated with `INSERT … ON CONFLICT DO UPDATE SET last_no = last_no + 1 RETURNING last_no` in the transaction that issues the certificate. That locks the row, so concurrent issues get consecutive numbers, and a rolled-back issue releases its number (gap-free, FR-CERT-006).
+  - The trigger `certificate_counters_never_down` stops a number from going down. `sos_app` may update `last_no` and `updated_at` only, and cannot delete.
+  - Serial format: `{prefix}/{year}/{number}`, number width 4 (`config.yaml`). The format per school is a PO question.
+- **TC ends the enrolment** (FR-CERT-005): approving a TC calls `students.withdraw_for_transfer_certificate` in the same transaction as the register entry. That call ends the active enrolments on the leaving date (enrolment status `transferred`), sets the student to `left` and audits `student.withdrawn`. It fails with `422 leaving_date_before_enrolment`. Cancelling a TC does not re-admit the student.
+- **Blockers** (FR-CERT-002): nothing is issued while one of these is true:
+  - `dq.open_blockers` returns an open blocker finding on a printed field;
+  - a printed field has no value;
+  - the student is not active, has no enrolment (for the types that need one), or there is no current year.
+
+  Approval checks again. Provisional (unverified) values print with a warning in the preview. Nothing is ever corrected automatically.
+- **What is printed** (FR-CERT-009): only the configured C1/C2 fields. Aadhaar-as-printed keys and `aadhaar_last4` are never printable (`NEVER_PRINTED`), no C3 field is printed, and every value goes through `mask_aadhaar` and HTML escaping. Fields of the official AP TC that SchoolOS cannot fill yet are printed as labelled blanks (`official_format_todo`, `TODO(official format)`).
+- **Letterhead** (FR-CERT-013): `core.tenants.settings.certificate_letterhead` holds `school_name_te`, `address_en`, `address_te`, `affiliation` and `place`. It is edited through `PATCH /tenant` with `tenant.settings.manage`. The English name is the school's name.
+- **PDF** (FR-CERT-010): the outbox event `certificate.render_requested` → task `certificates.render` on queue `pdf` (`app.core.pdf`, bundled Noto Sans Telugu, at most 3 retries, then `pdf_status = failed`). The PDF is stored as a `kb.documents` row with purpose `certificate` (below). A cancelled certificate's document is archived, not deleted.
+- **Audit** (same transaction; IDs, codes and serials only, never names or values):
+  - `certificate.requested`, `.approval_requested`, `.issued`, `.approved`, `.rejected`, `.withdrawn`, `.cancelled`, `.duplicate_requested`;
+  - `.print_viewed`, `.downloaded`, `.pdf_stored`, `.pdf_failed`;
+  - `register.viewed`;
+  - `student.withdrawn`.
+- **Notifications** (EN/TE): `certificate.approval_requested` (to approvers), `certificate.approved` and `certificate.rejected` (to the requester).
+- **Full data export** (FR-ADM-001): both tables are in `records/` (`certificates.export_records`).
+- **Permissions** (upserted into `core.permissions`): `certificate.read`, `certificate.issue`, `certificate.approve` (step-up) and `register.read` (step-up). Role grants are in `roles.yaml` (07 §6.2). Existing schools get them from `python -m app.identity.sync_system_roles --apply` after the migration (ADR-0022).
+- **Downgrade** drops both tables. This is lossy: the register is lost, and the PDFs stay as documents. It also re-adds the old `kb.documents` purpose CHECK as `NOT VALID`, and deletes the permission keys unless a role still holds them.
+
 ## 6. Knowledge schema (`kb`)
 
 ```sql
@@ -907,7 +948,7 @@ When a document's ACL changes, a job rewrites `acl_*` arrays on its chunks (same
 
 M1 creates `kb.documents`, `kb.document_versions`, `kb.document_acl` and `kb.upload_intents` (chunks, embeddings and queries arrive in M2). Differences from the DDL above:
 
-- `kb.documents.purpose` (`evidence`, `register_scan`, `circular`, `policy`, `other`, `import_file`) sets the accepted kinds, size limit, minimum sensitivity (evidence C3, register scans and import files C2) and S3 layout (04 §8.2; import files use `t/<tenant>/imports/<batch_id>/raw.<ext>` and never get versions). `doc_type` also allows `evidence` and `import_file`. `updated_at` is added. `current_version_id` is a composite FK `DEFERRABLE INITIALLY DEFERRED`.
+- `kb.documents.purpose` (`evidence`, `register_scan`, `circular`, `policy`, `other`, `import_file`) sets the accepted kinds, size limit, minimum sensitivity (evidence C3, register scans and import files C2) and S3 layout (04 §8.2; import files use `t/<tenant>/imports/<batch_id>/raw.<ext>` and never get versions). `doc_type` also allows `evidence` and `import_file`. `updated_at` is added. `current_version_id` is a composite FK `DEFERRABLE INITIALLY DEFERRED`. Migration `0033_certificates` adds the purpose `certificate`. These documents are only generated by `app.certificates` (FR-CERT-010) and cannot be uploaded (`UploadPurpose` leaves it out). They are PDF only, C2, never versioned, and their ACL is the roles in `app/certificates/config.yaml` `document_acl_roles`. They are scanned and indexed like any C2 document (§5.7).
 - `kb.document_versions.object_key` and `kb.upload_intents.object_key` are checked for shape and must start with `t/<tenant_id>/`. `mime_type` is limited to PDF, JPEG, PNG, DOCX, XLSX and CSV (CSV only for imports). `error` holds a code, never free text.
 - `kb.upload_intents` records every presigned POST (purpose, target document and version, staging key `t/<tenant>/uploads/<intent_id>/original.<ext>`, declared type and size, uploader, expiry ≤ 1 hour, `consumed_at`). An object can be registered once, by the uploader, before expiry, and only if its bytes match the declared kind (magic bytes; CSV: UTF-8 text without NUL). The checked bytes are then copied to the final key, on condition that their ETag is unchanged. No presigned POST can write a final key, so a file cannot be swapped after it was checked. A daily job removes expired and used staging objects.
 - `kb.document_acl.principal_ref` is a role key or a section, class or membership UUID, checked by the documents service within the tenant.

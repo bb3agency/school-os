@@ -166,6 +166,56 @@ Change-request notes (M1, as built; US-601, FR-CR-001..005):
 - **Memo**: bilingual (EN/TE) print-ready page: school, student name, admission number, class, field, source, old/new value (C3 masked unless the viewer holds `student.read_sensitive`), reason, evidence reference, requester/approver names, times in IST and register-correction instructions (only when approved). `Content-Disposition: inline`, `Cache-Control: no-store`, no scripts; every value HTML-escaped. Audited (`change_request.memo_viewed`).
 - Scope: requests are reached through their student (scoped holders only see their sections' students; otherwise `404`).
 
+### Certificates and registers (M3; US-1101..US-1108, FR-CERT-*, FR-REG-*)
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/certificates/types` (types, printed fields, inputs with EN/TE choice labels) | `certificate.read`, `.issue` or `.approve` (`require_any`) — **built** |
+| GET | `/students/{student_id}/certificates/preview?certificate_type=` | `certificate.issue`, student in scope — **built** |
+| POST | `/students/{student_id}/certificates` (`certificate_type`, `inputs`) → 201 | `certificate.issue`, student in scope (`Idempotency-Key`) — **built** |
+| GET | `/certificates?student_id=&certificate_type=&status=&academic_year_id=&limit=&cursor=` | `certificate.read`, `.issue` or `.approve` (`require_any`); only students in scope — **built** |
+| GET | `/certificates/{certificate_id}` | as the list; `ETag` — **built** |
+| POST | `/certificates/{certificate_id}/approve` (optional `{"note"}`) | `certificate.approve` (**step-up**; approver ≠ requester; `If-Match`) — **built** |
+| POST | `/certificates/{certificate_id}/reject` (`{"reason"}`) | `certificate.approve` (**step-up**; `If-Match`) — **built** |
+| POST | `/certificates/{certificate_id}/withdraw` | `certificate.issue` (requester only; `If-Match`) — **built** |
+| POST | `/certificates/{certificate_id}/cancel` (`{"reason"}`) | `certificate.approve` (**step-up**; `If-Match`) — **built** |
+| POST | `/certificates/{certificate_id}/duplicates` (`{"reason"}`) → 201 | `certificate.issue` (`Idempotency-Key`) — **built** |
+| POST | `/certificates/{certificate_id}/render` (retry a failed PDF) | `certificate.issue` — **built** |
+| GET | `/certificates/{certificate_id}/print` → `text/html` A4 page | `certificate.read`, `.issue` or `.approve` (`require_any`) — **built** |
+| GET | `/certificates/{certificate_id}/download-url` → presigned URL (≤ 5 min) | `certificate.read` — **built** |
+| GET | `/registers/transfer-certificates?academic_year_id=` → `text/html` | `register.read` school-wide, **step-up** — **built** |
+| GET | `/registers/certificates?academic_year_id=&certificate_type=` → `text/html` | `register.read` school-wide, **step-up** — **built** |
+| GET | `/registers/admission-withdrawal?academic_year_id=` → `text/html` | `register.read` school-wide, **step-up** — **built** |
+
+Certificate notes (M3, as built; data model 05 §5.7). The stories and requirements are proposed from the roadmap scope and still need PO confirmation.
+- **Request** (`POST /students/{id}/certificates`):
+  - `certificate_type` is one of `transfer`, `bonafide`, `study`, `conduct`.
+  - `inputs` are the type's declared inputs (`GET /certificates/types`), such as leaving date, reason, promotion and conduct for a TC, or purpose for a bonafide certificate. Unknown keys, bad choices and control characters give `422` with a per-field code. A full Aadhaar number in free text is refused.
+  - The certificate is built only from the canonical record (BR-01). An open blocker DQ finding on a printed field, an empty printed field, an inactive student, no enrolment or no current year gives `409 certificate_blocked`. Its `errors[]` carry the `code` (`dq_blocker`, `missing_value`, `student_not_active`, `no_enrolment`, `no_current_year`, `transfer_certificate_exists`) with `attribute_key`, `finding_id` and `rule_id`. The preview returns the same list as `blockers`, plus `warnings` for provisional values.
+  - A bonafide, study or conduct certificate is issued at once: serial number, register entry and PDF queued. A TC is saved as `pending`. A second live TC gives `409 transfer_certificate_exists`.
+- **Approve** (TC and TC duplicates): errors are `403 self_approval_forbidden`, `428 step_up_required`, `412` for a stale `If-Match`, `409 certificate_not_pending`, and `409 certificate_blocked` (checked again). In one transaction the TC gets the next serial and its register entry, and the student's enrolment ends on the leaving date (`422 leaving_date_before_enrolment`). The requester is notified.
+- **Reject**, withdraw and cancel:
+  - Reject and cancel need a reason of 10–1000 characters.
+  - Withdraw by anyone else gives `403 not_requester`.
+  - Cancel gives `409 certificate_not_issued` unless the certificate is issued. A cancelled certificate keeps its number, is marked CANCELLED on the print view and in the registers, and its PDF document is archived. Cancelling a TC does not re-admit the student.
+- **Duplicate** (of an issued original): copies the frozen content and is marked DUPLICATE with the original serial and a copy number. It has no serial of its own. `409 certificate_not_issued` or `duplicate_pending`. A TC duplicate needs approval like the TC.
+- **Response** `CertificateOut`:
+  - ids and type, `status`, `requires_approval`, `inputs`;
+  - `serial` and `academic_year_id`;
+  - `student_name` and `admission_no` (for the list);
+  - `content` (the frozen printed values once issued: EN/TE labels, values, details, blanks for official-format fields not yet filled);
+  - the requester, decider, issuer and canceller (membership ids), with times;
+  - `decision_note`, `cancel_reason`, `document_id`, `pdf_status` (`none|queued|ready|failed`), `version`;
+  - for the caller: `can_approve`, `can_withdraw`, `can_cancel`, `can_duplicate`.
+- **Print view and registers**:
+  - Bilingual (EN/TE) A4 pages rendered by the API: certificates are portrait, registers landscape.
+  - Every value is HTML-escaped and Aadhaar-masked. There are no scripts, only style blocks pinned by hash in the CSP. Headers are `Content-Disposition: inline` and `Cache-Control: no-store`. The BFF leaves the API's CSP on these paths (`proxy.ts` `OWN_CSP_PATHS`).
+  - A pending certificate prints as DRAFT with no serial.
+  - Registers list every issued serial of the year in order, including cancelled ones. Rows are capped at 5,000 (`register_max_rows`).
+  - Audited as `certificate.print_viewed` and `register.viewed`.
+- **Download** gives `{url, expires_at, filename}` (`attachment`, ≤ 5 min), or `409 pdf_not_ready` / `document_not_ready`. Audited as `certificate.downloaded`.
+- **Scope**: certificates are reached through their student. Holders of a scoped role see only their sections' students. Another school's id, or a student out of scope, gives `404`.
+- **No public verification route** (QR or serial lookup). It would need an ADR (PO question).
+
 ### Imports and extraction
 | Method | Path | Permission |
 |---|---|---|
@@ -433,5 +483,5 @@ Idempotency-Key: 9c1e…
 
 ## 6. Internal domain events (for workers and future webhooks)
 
-`student.value.recorded` · `student.canonical.changed` · `change_request.submitted|approved|rejected` · `import.committed|reverted` · `dq.run.completed` · `document.version.ready|failed|deleted` · `kb.verified_answer.needs_review` · `export.requested|render_requested` (worker hand-off; `export.ready`/`export.failed` are in-app notifications) · `breakglass.granted|expired`.
+`student.value.recorded` · `student.canonical.changed` · `change_request.submitted|approved|rejected` · `import.committed|reverted` · `dq.run.completed` · `document.version.ready|failed|deleted` · `kb.verified_answer.needs_review` · `export.requested|render_requested` (worker hand-off; `export.ready`/`export.failed` are in-app notifications) · `certificate.render_requested` (queue `pdf`) · `breakglass.granted|expired`.
 Events are emitted after commit (transactional outbox table `ops.outbox`) and consumed by workers; payloads carry IDs only, never personal values. Control-plane actions are not published as tenant events; they are recorded in the platform audit log (16 §16).
