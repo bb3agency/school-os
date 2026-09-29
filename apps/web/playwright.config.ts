@@ -31,6 +31,10 @@ export default defineConfig({
     viewport: { width: 1366, height: 768 },
     locale: "en-IN",
     timezoneId: "Asia/Kolkata",
+    // A preinstalled Chromium where the Playwright browser download is blocked.
+    ...(process.env.PW_CHROMIUM_PATH
+      ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } }
+      : {}),
   },
   projects: [
     {

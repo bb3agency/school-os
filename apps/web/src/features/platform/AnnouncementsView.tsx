@@ -78,7 +78,7 @@ export function AnnouncementsScreen() {
             {locale === "te" ? row.body_te : row.body_en}
           </p>
         </div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dl className="grid grid-cols-label-value gap-x-3 gap-y-1 text-sm">
           <dt className="text-ink-muted">{t("colStarts")}</dt>
           <dd>
             <MonoTime value={row.starts_at} />

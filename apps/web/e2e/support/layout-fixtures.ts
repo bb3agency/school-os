@@ -1,12 +1,13 @@
 /**
- * Responsive-layout audit fixtures (throwaway; not committed). Answers browser GET requests to
+ * Responsive-layout fixtures (e2e/responsive.spec.ts, e2e/audit/responsive.audit.ts). Answers browser GET requests to
  * /bff/api/v1/<path> with SYNTHETIC data in the generated OpenAPI shapes, so every list and
  * detail screen has rows to lay out. Content is deliberately stressful: 60-character school
  * names, long e-mails, unbroken tokens and URLs, Telugu text, long free text and nulls.
  *
  * Synthetic data only ("Synthetica …" names, SYN-… admission numbers). No Aadhaar number of any
  * kind appears here; only masked aadhaar_last4 values, as the API sends them.
- * Non-GET requests and paths not listed here fall through to the stand-in API (route.fallback()).
+ * Other requests (writes, and paths not listed here) fall through to the stand-in API
+ * (route.fallback()); the only POST answered here is the read-only student search.
  */
 import type { Page, Route } from "@playwright/test";
 import type { components } from "@schoolos/api-client";
@@ -1683,11 +1684,23 @@ const ROUTES: Array<[RegExp, Handler]> = [
   ],
 ];
 
+/** Searches sent as POST that only read (answered like the GET lists above). */
+const SEARCHES: Array<[RegExp, () => unknown]> = [[re("/students/search"), () => page(STUDENTS)]];
+
 async function answer(route: Route): Promise<void> {
   const request = route.request();
-  if (request.method() !== "GET") return route.fallback();
   const url = new URL(request.url());
   const path = url.pathname.replace(/^\/bff/, "");
+  if (request.method() === "POST") {
+    const search = SEARCHES.find(([pattern]) => pattern.test(path));
+    if (!search) return route.fallback();
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(search[1]()),
+    });
+  }
+  if (request.method() !== "GET") return route.fallback();
   for (const [pattern, handler] of ROUTES) {
     const match = pattern.exec(path);
     if (!match) continue;

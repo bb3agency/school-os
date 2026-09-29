@@ -366,7 +366,7 @@ function OverviewTab({ school }: { school: TenantDetail }) {
       </dl>
       <div className="grid gap-6 xl:grid-cols-2">
         <Card title={t("tabs.overview")}>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+          <dl className="grid grid-cols-label-value gap-x-6 gap-y-3 text-sm">
             <dt className="text-ink-muted">{t("fields.code")}</dt>
             <dd className="font-mono">{school.code}</dd>
             <dt className="text-ink-muted">{t("fields.status")}</dt>
@@ -474,7 +474,7 @@ function BillingAccountCard({ schoolId }: { schoolId: string }) {
         <p className="text-sm text-ink-muted">{t("none")}</p>
       ) : null}
       {data ? (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+        <dl className="grid grid-cols-label-value gap-x-6 gap-y-3 text-sm">
           <dt className="text-ink-muted">{t("legalName")}</dt>
           <dd>{data.legal_name}</dd>
           <dt className="text-ink-muted">{t("gstin")}</dt>
@@ -506,7 +506,7 @@ function SubscriptionTab({ school }: { school: TenantDetail }) {
   if (!sub) return <p className="text-sm text-ink-muted">{t("none")}</p>;
   return (
     <div className="space-y-4">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+      <dl className="grid grid-cols-label-value gap-x-6 gap-y-2 text-sm">
         <dt className="text-ink-muted">{t("colPlan")}</dt>
         <dd>{nameOf(sub.plan_id)}</dd>
         <dt className="text-ink-muted">{t("colStatus")}</dt>
@@ -571,7 +571,7 @@ function DeploymentTab({ schoolId }: { schoolId: string }) {
   const status = known(deploymentTone, deployment.status);
   return (
     <div className="space-y-4">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+      <dl className="grid grid-cols-label-value gap-x-6 gap-y-2 text-sm">
         <dt className="text-ink-muted">{t("colStatus")}</dt>
         <dd>
           {status ? (

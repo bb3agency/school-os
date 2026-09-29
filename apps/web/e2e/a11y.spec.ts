@@ -65,6 +65,8 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
   test("school settings, structure, users, documents, audit check: axe and keyboard (NFR-A11Y-001)", async ({
     page,
   }) => {
+    // Fourteen pages, each with axe and a Tab-through: about 35s against a production build.
+    test.setTimeout(90_000);
     await signIn(page, "/en/settings/structure", "clerk");
     await expect(page).toHaveURL(/\/en\/settings\/structure$/);
     // [page, text that proves the data (not only the shell or an error) is shown]

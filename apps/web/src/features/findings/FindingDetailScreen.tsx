@@ -14,7 +14,7 @@ import { TextAreaField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { Table, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
+import { Table, TableScroll, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
 import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { CR_APPROVE, CR_REQUEST, ifMatch } from "@/features/change-requests/types";
@@ -327,12 +327,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
         {data.values.length === 0 ? (
           <p className="text-sm text-ink-muted">{t("noValues")}</p>
         ) : (
-          <div
-            role="region"
-            aria-label={tc("scrollableTable", { caption: td("valuesTitle") })}
-            tabIndex={0}
-            className="overflow-x-auto rounded-xl border border-border"
-          >
+          <TableScroll label={tc("scrollableTable", { caption: td("valuesTitle") })}>
             <Table>
               <caption className="sr-only">{td("valuesTitle")}</caption>
               <THead>
@@ -366,7 +361,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                 ))}
               </TBody>
             </Table>
-          </div>
+          </TableScroll>
         )}
       </Card>
 

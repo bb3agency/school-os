@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-09-29 |
-| Changes | 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
+| Version | 0.2 · 2026-09-29 |
+| Changes | 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
 | Requirements | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English and Telugu), SEC-010 (CSP, self-hosted assets) |
 | Related | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10 |
 | Code | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/shell/` (shells) |
@@ -37,7 +37,8 @@ rail and top bar so operators always know they are in the control plane.
    SVG geometry uses presentation attributes (`strokeDashoffset`, `points`), which CSP allows.
    Fonts are self-hosted via `@fontsource` (`font-src 'self'`).
 4. **Baseline Widely Available** only (CLAUDE.md §10). Used: CSS gradients, `:has()` (segmented
-   control), native `<dialog>`, `<details>`, `accent-color`, `@media (prefers-reduced-motion)`,
+   control, drawer scroll lock), `:modal`, native `<dialog>`, `<details>`, `accent-color`,
+   `env()`, `dvh` (after a `vh` fallback), `@media (prefers-reduced-motion)`,
    `@media (forced-colors)`. Not used: `backdrop-filter` (slow office PCs), anchor positioning,
    container queries, `appearance: base-select`.
 5. **Print.** Gradients, shadows and tints disappear; cards print as plain bordered boxes; chrome
@@ -110,8 +111,9 @@ marked (client).
 | `SegmentedControl` (client) | `legend` (required), `legendVisible`, `options` `{value,label,disabled?}[]`, `value`/`defaultValue`, `onValueChange`, `name`, `size` `sm`·`md`, `block` | Fieldset of native radios: arrows, form value, announcements for free |
 | `Tabs` (client) | `label`, `items`, `defaultTabId`, `variant` `segmented` (default) · `underline` | WAI-ARIA tabs; panels stay in the DOM |
 | `TabNav` | `label`, `items`, `activeId`, `variant` | Tabs that are links (`aria-current`) |
-| `Table`, `THead`, `TBody`, `Tr`, `Th`, `Td` | `Table` `density` `comfortable` (≈56px rows) · `compact` | Light header, dividers, hover |
-| `DataTable` | unchanged + `density` | Loading, error, empty states; focusable scroll region |
+| `Table`, `THead`, `TBody`, `Tr`, `Th`, `Td` | `Table` `density` `comfortable` (≈56px rows) · `compact`; `stickyFirstColumn` (below md) | Light header, dividers, hover |
+| `TableScroll` | `label` (required: names the region), `framed` (card frame) | Wrap every hand-built `Table` in it: the table scrolls sideways inside a focusable region, never the page |
+| `DataTable` | unchanged + `density`, `stickyFirstColumn` | Loading, error, empty states; renders `TableScroll framed` |
 | `EmptyState` | `title`, `body`, `action`, `icon` | Say what to do next |
 | `LoadingState`, `Skeleton` | `label`, `rows`, `variant` `rows`·`cards` | `role="status"`; shimmer off under reduced motion |
 | `Alert` | unchanged (`tone`, `title`, `live`) | |
@@ -126,8 +128,9 @@ marked (client).
 
 Shells (`@/components/shell`): `SchoolShell` and `PlatformShell` (props unchanged) render
 `AppShell` (client): skip link, icon rail (md and up; one round button per non-empty group,
-current group dark-filled), list panel (lg and up; "Menu" button below lg, Escape closes it),
-top bar card (bell, session controls, "Switch school", language) and `<main id="main">`.
+current group dark-filled), list panel (lg and up; below lg the "Menu" button opens the same
+list in a drawer, see §5.1), top bar card (bell, session controls, "Switch school", language)
+and `<main id="main">`.
 `MinimalShell` (`wide` for tables) and `Wordmark` serve pages outside a school.
 
 ## 5. Page recipe (for screen agents)
@@ -150,6 +153,47 @@ top bar card (bell, session controls, "Switch school", language) and `<main id="
 - Filters: `<form role="search">` with `SearchInput` + `Select` + `Button variant="secondary"` "Filter".
 - Status: `Badge` for record states (active/suspended), `Pill` gradients for workflow states
   (in progress/review/done), `Pill positive/negative` for matches/mismatches.
+
+### 5.1 Responsive layout
+
+Every screen must work at **1366×768** (office PC, the design baseline) and **375×812** (phone),
+in English and Telugu: no horizontal page scroll, nothing past the screen or its card edge, no
+clipped text, touch targets of at least 24×24 px (WCAG 2.5.8; inline links in a sentence and
+well-spaced small targets are the exceptions). `e2e/responsive.spec.ts` checks all of it for
+every screen (`make e2e` with `E2E_STAND_IN=1`); `e2e/audit/responsive.audit.ts` sweeps ten
+viewports with screenshots.
+
+- **Spacing scale** (`globals.css`): `--page-gutter` 16px on phones, 24px from md, 32px from lg
+  (utility `px-page`, outside the consoles); `--shell-gutter` 16/24px (`shell-gutter`, inside
+  the consoles); `--content-max` 108rem (`shell-frame`). Both gutter utilities add the
+  safe-area insets (`viewport-fit=cover`), which are 0 on desktops.
+- **Full height**: `min-h-viewport` / `h-viewport` write `100vh` first and `100dvh` second, so
+  browsers without dynamic viewport units keep the `vh` value.
+- **Shell**: rail from md, list panel from lg. Below lg the "Menu" button opens the list in a
+  **modal `<dialog>` drawer** (`.drawer`): focus moves to its close button and cannot leave it
+  (the page behind is inert and does not scroll), Escape, the close button, a tap on the dimmed
+  page, following a link or widening the window to lg close it, and focus returns to the
+  button. The drawer renders its navigation only while open, so there is one "Main" landmark.
+- **Cards** carry `min-w-0`, so in a grid or flex row they shrink to their track and a wide
+  child scrolls inside instead of pushing the page wider.
+- **Tables** always sit in `TableScroll` (or `DataTable`): `position: relative` keeps sr-only
+  captions inside the scroll box. Use `stickyFirstColumn` when the first cell names the row.
+- **Long strings**: `body` has `overflow-wrap: break-word`; `dd` values and the page title wrap
+  anywhere; use `break-anywhere` for emails, IDs and URLs in flex rows.
+- **Dialogs** are `w-[min(<n>rem,calc(100vw-2rem))]` and `m-auto`; padding tightens below sm
+  and the footer buttons share the row on phones. The native modal keeps them inside the
+  viewport and scrolls a tall body.
+- **Buttons** wrap a long (Telugu) label below sm instead of overflowing.
+- **Motion**: buttons fade colour only on hover and only without `prefers-reduced-motion`;
+  under it every transition and animation is cut to 0.01ms (`globals.css`). The drawer opens
+  without animation.
+- **Print** is unchanged by all of this: chrome is hidden, scroll regions print in full, table
+  headers wrap and A4 content stays inside the page (checked in `e2e/responsive.spec.ts`).
+
+Web-platform features used here and their status: `dvh` (Baseline 2022, with the `vh`
+fallback), `env(safe-area-inset-*)`, `:has()` and `:modal` (Baseline widely available),
+media query range syntax, `overscroll-behavior`, `overflow-wrap: anywhere`, native modal
+`<dialog>` (inert background, Escape close request).
 
 ## 6. Do and don't
 

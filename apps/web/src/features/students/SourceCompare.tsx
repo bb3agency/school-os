@@ -6,7 +6,7 @@ import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
-import { Table, TBody, THead, Th, Tr } from "@/components/ui/Table";
+import { Table, TableScroll, TBody, THead, Th, Tr } from "@/components/ui/Table";
 import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { asList, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
@@ -222,13 +222,8 @@ export function ValuesBySourceView({
       {keys.length === 0 ? (
         <p className="text-sm text-ink-muted">{t("empty")}</p>
       ) : (
-        <div
-          role="region"
-          aria-label={t("table")}
-          tabIndex={0}
-          className="overflow-x-auto rounded-xl border border-border print:overflow-visible print:border-0"
-        >
-          <Table>
+        <TableScroll label={t("table")}>
+          <Table stickyFirstColumn>
             <caption className="sr-only">{t("table")}</caption>
             <THead>
               <Tr>
@@ -324,7 +319,7 @@ export function ValuesBySourceView({
               })}
             </TBody>
           </Table>
-        </div>
+        </TableScroll>
       )}
     </Card>
   );

@@ -199,6 +199,12 @@
   width: 100%;
 }
 
+/* Label/value lists (<dl>): the label column takes what it needs up to 40% and then wraps,
+   so a long (Telugu) label never squeezes the values into a narrow strip on a phone. */
+@utility grid-cols-label-value {
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+}
+
 /* Long unbroken strings (emails, IDs, URLs, Telugu compounds) wrap instead of widening the
    page. `anywhere` also lowers the min-content width, so use it on text, not table cells. */
 @utility break-anywhere {
@@ -242,6 +248,13 @@
        (0 on desktops); the gutters add the left and right insets. */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Description-list values (emails, GSTINs, addresses, IDs) wrap anywhere rather than
+     widen a label/value grid past its card; min-width: 0 lets a 1fr track shrink. */
+  dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   /* Telugu has tall vowel signs and conjuncts: give lines room so glyphs never clip. */
@@ -493,6 +506,21 @@
   td {
     border: 1px solid #000000;
     padding: 4pt 6pt;
+    overflow-wrap: anywhere;
+  }
+
+  /* The page does not scroll: headers and long values wrap, and the screen's minimum
+     column widths (legible inside a scroll region) give way, so tables stay inside A4. */
+  th,
+  td,
+  th *,
+  td * {
+    white-space: normal !important;
+    min-width: 0 !important;
+  }
+
+  .table-scroll {
+    overflow: visible !important;
   }
 
   thead {
