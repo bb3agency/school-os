@@ -54,6 +54,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -84,6 +85,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -114,6 +116,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -147,6 +150,7 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 
 # The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
 # a neutral building block. The control plane prints its invoices through it and never through
@@ -182,6 +186,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.platform
 
@@ -210,6 +215,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -240,6 +246,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -270,6 +277,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -300,6 +308,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -330,6 +339,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -360,6 +370,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -414,6 +425,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.imports.repository
     app.imports.models
@@ -468,6 +480,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.changes.repository
     app.changes.models
@@ -498,6 +511,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.extraction.repository
     app.extraction.models
@@ -527,6 +541,7 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.exports.repository
     app.exports.models
@@ -578,6 +593,7 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.admin.repository
     app.admin.models
@@ -610,6 +626,7 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.admin
 
@@ -663,6 +680,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 forbidden_modules =
     app.knowledge.gateway
     app.knowledge.embeddings
@@ -736,6 +754,7 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 allow_indirect_imports = True
 
 # Record tools are read-only and have no network (invariant 9, ADR-0008, SEC-020): no model
@@ -800,6 +819,7 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.tally
 
 # --- 5. circulars (M4: circular readings, tasks, parent notices) ---------------------------
 # Other modules use only app.circulars.service. It reaches the model only through
@@ -830,6 +850,7 @@ source_modules =
     app.knowledge
     app.admin
     app.certificates
+    app.tally
 forbidden_modules =
     app.circulars.repository
     app.circulars.models
@@ -881,6 +902,7 @@ source_modules =
     app.knowledge
     app.admin
     app.circulars
+    app.tally
 forbidden_modules =
     app.certificates.repository
     app.certificates.models
@@ -908,3 +930,57 @@ forbidden_modules =
     app.students
     app.documents
     app.dq
+
+# --- 6. tally (M6: Tally read connector; ADR-0032 Proposed) ----------------------------------
+# Other modules use only app.tally.service (the knowledge tool get_fee_dues reads through it).
+
+[importlinter:contract:tally-internals]
+name = tally: repository/models/agent_auth are private (use app.tally.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+forbidden_modules =
+    app.tally.repository
+    app.tally.models
+    app.tally.agent_auth
+allow_indirect_imports = True
+
+# The configuration stays pure (no database, web or feature modules).
+[importlinter:contract:tally-pure-library]
+name = tally config stays pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.tally.config
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.students
+    app.knowledge

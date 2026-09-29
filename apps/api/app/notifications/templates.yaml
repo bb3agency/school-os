@@ -322,3 +322,14 @@ templates:
     te:
       title: పని గడువు దాటింది
       body: మీ పనుల్లో ఒకదాని గడువు దాటిపోయింది. వీలైనంత త్వరగా పూర్తి చేయండి, లేదా తేదీ మార్చమని కార్యాలయాన్ని అడగండి.
+
+  # --- Tally connector (M6; FR-TALLY-009; ADR-0032 Proposed, behind tally.connector.enabled) ---
+  tally.agent_silent:
+    params: [device_id, hours]
+    resource_type: tally_device
+    en:
+      title: Tally agent has stopped syncing
+      body: "The Tally agent on the office PC has not contacted SchoolOS for over {hours} hours, so fee dues may be out of date. Check that the PC is on, TallyPrime is open and the internet works."
+    te:
+      title: Tally ఏజెంట్ సింక్ ఆగిపోయింది
+      body: "కార్యాలయ PCలోని Tally ఏజెంట్ {hours} గంటలకు పైగా SchoolOSను సంప్రదించలేదు, కాబట్టి ఫీజు బకాయిలు పాతవి కావచ్చు. PC ఆన్‌లో ఉందా, TallyPrime తెరిచి ఉందా, ఇంటర్నెట్ పనిచేస్తోందా చూడండి."
