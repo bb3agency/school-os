@@ -104,3 +104,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0026](ADR-0026-dedicated-upgrades-apply-system-role-sync.md) | Dedicated upgrades apply the system-role sync | Accepted |
 | [ADR-0027](ADR-0027-pdf-text-layer-extraction.md) | PDF text-layer extraction library for knowledge ingestion | Accepted |
 | [ADR-0028](ADR-0028-profiles-shared-across-schools.md) | A person's profile is shared across schools | Accepted |
+| [ADR-0029](ADR-0029-tenant-data-deletion-at-offboarding.md) | Deleting a school's data at offboarding (purge role, crypto-shredding, certificate) | Proposed |
