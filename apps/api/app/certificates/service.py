@@ -1464,6 +1464,39 @@ def _status_text(row: Certificate, original: Certificate | None) -> str:
     return " · ".join(parts) or "Issued"
 
 
+def _register_types(kind: str, certificate_type: str | None) -> tuple[str, ...]:
+    if kind == "transfer":
+        return ("transfer",)
+    others = tuple(t for t in settings().types if t != "transfer")
+    if certificate_type is not None and certificate_type not in others:
+        raise ValidationFailed([_error("certificate_type", "invalid_choice")])
+    return (certificate_type,) if certificate_type else others
+
+
+def check_register(
+    session: Session,
+    ctx: UserContext,
+    *,
+    kind: str,
+    academic_year_id: uuid.UUID | None,
+    certificate_type: str | None = None,
+) -> None:
+    """Whether a register can be printed now, without printing it (the registers screen asks
+    before it links to the print view): the year (404 / 409 ``no_current_year``), the type
+    (422) and the size (422 ``too_many_rows``) are checked like the view checks them; the
+    caller's guard has already checked ``register.read`` and step-up. Not a view: nothing is
+    rendered and nothing audited (the print view itself is audited, once)."""
+    year = _register_year(session, academic_year_id)
+    if kind == "admission":
+        _too_many(len(_admission_students(session, ctx, year.id)[0]))
+        return
+    limit = settings().register_max_rows
+    rows = repo.register_entries(
+        session, _register_types(kind, certificate_type), year.id, limit=limit + 1
+    )
+    _too_many(len(rows))
+
+
 def register_page(
     session: Session,
     ctx: UserContext,
@@ -1476,13 +1509,7 @@ def register_page(
     (``kind=certificates``, FR-REG-002) of an academic year (default: the current one), as an A4
     landscape print page (``register.read``, step-up, school-wide). Audit ``register.viewed``."""
     year = _register_year(session, academic_year_id)
-    if kind == "transfer":
-        types: tuple[str, ...] = ("transfer",)
-    else:
-        others = tuple(t for t in settings().types if t != "transfer")
-        if certificate_type is not None and certificate_type not in others:
-            raise ValidationFailed([_error("certificate_type", "invalid_choice")])
-        types = (certificate_type,) if certificate_type else others
+    types = _register_types(kind, certificate_type)
     limit = settings().register_max_rows
     rows = repo.register_entries(session, types, year.id, limit=limit + 1)
     _too_many(len(rows))
@@ -1617,6 +1644,18 @@ def _admission_sort_key(value: str | None) -> AdmissionKey:
     return (0 if text else 1, parts)
 
 
+def _admission_students(
+    session: Session, ctx: UserContext, year_id: uuid.UUID
+) -> tuple[list[uuid.UUID], dict[uuid.UUID, list[EnrollmentOut]]]:
+    """The students with an enrolment in the year, and every student's enrolment history."""
+    student_ids = students.list_students_in_scope(session, ctx)
+    histories = students.enrolment_histories(session, student_ids)
+    in_year = [
+        sid for sid, hist in histories.items() if any(e.academic_year_id == year_id for e in hist)
+    ]
+    return in_year, histories
+
+
 def admission_register_page(
     session: Session, ctx: UserContext, *, academic_year_id: uuid.UUID | None
 ) -> str:
@@ -1625,11 +1664,7 @@ def admission_register_page(
     step-up, school-wide). Audit ``register.viewed``."""
     year = _register_year(session, academic_year_id)
     structure = _Structure.load(session)
-    student_ids = students.list_students_in_scope(session, ctx)
-    histories = students.enrolment_histories(session, student_ids)
-    in_year = [
-        sid for sid, hist in histories.items() if any(e.academic_year_id == year.id for e in hist)
-    ]
+    in_year, histories = _admission_students(session, ctx, year.id)
     _too_many(len(in_year))
     values = students.canonical_values(session, in_year, REGISTER_KEYS)
     tcs = repo.transfer_certificates_of(session, in_year)
@@ -1767,6 +1802,7 @@ __all__ = [
     "admission_register_page",
     "approve",
     "cancel",
+    "check_register",
     "download_url",
     "export_records",
     "get_certificate",

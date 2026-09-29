@@ -3773,7 +3773,8 @@ export interface paths {
          * Admission Withdrawal Register
          * @description The admission and withdrawal register of the students enrolled in an academic year, in
          *     admission-number order, as an A4 landscape print page (permission ``register.read``,
-         *     school-wide, MFA within 5 minutes). Audited.
+         *     school-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204
+         *     only, not audited.
          */
         get: operations["admission_withdrawal_register_api_v1_registers_admission_withdrawal_get"];
         put?: never;
@@ -3795,7 +3796,8 @@ export interface paths {
          * Certificate Register
          * @description The certificate issue register (bonafide, study and conduct certificates, or one of them)
          *     of an academic year as an A4 landscape print page (permission ``register.read``,
-         *     school-wide, MFA within 5 minutes). Audited.
+         *     school-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204
+         *     only, not audited.
          */
         get: operations["certificate_register_api_v1_registers_certificates_get"];
         put?: never;
@@ -3817,7 +3819,7 @@ export interface paths {
          * Transfer Certificate Register
          * @description The TC register (counterfoil) of an academic year (default: the current one) as an A4
          *     landscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).
-         *     Audited.
+         *     Audited (``register.viewed``); with ``check=true`` 204 only, not audited.
          */
         get: operations["transfer_certificate_register_api_v1_registers_transfer_certificates_get"];
         put?: never;
@@ -17785,6 +17787,8 @@ export interface operations {
         parameters: {
             query?: {
                 academic_year_id?: string | null;
+                /** @description true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once. */
+                check?: boolean;
             };
             header?: never;
             path?: never;
@@ -17800,6 +17804,13 @@ export interface operations {
                 content: {
                     "text/html": string;
                 };
+            };
+            /** @description With check=true: the register can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -17817,6 +17828,8 @@ export interface operations {
             query?: {
                 academic_year_id?: string | null;
                 certificate_type?: ("transfer" | "bonafide" | "study" | "conduct") | null;
+                /** @description true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once. */
+                check?: boolean;
             };
             header?: never;
             path?: never;
@@ -17832,6 +17845,13 @@ export interface operations {
                 content: {
                     "text/html": string;
                 };
+            };
+            /** @description With check=true: the register can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -17848,6 +17868,8 @@ export interface operations {
         parameters: {
             query?: {
                 academic_year_id?: string | null;
+                /** @description true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once. */
+                check?: boolean;
             };
             header?: never;
             path?: never;
@@ -17863,6 +17885,13 @@ export interface operations {
                 content: {
                     "text/html": string;
                 };
+            };
+            /** @description With check=true: the register can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

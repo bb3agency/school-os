@@ -11,6 +11,7 @@ reader, the maker and the checker share. The service applies the student scope t
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -69,6 +70,26 @@ def _with_etag(response: Response, item: CertificateOut) -> CertificateOut:
 _PAGE_RESPONSES: dict[int | str, dict[str, Any]] = {
     200: {"content": {"text/html": {}}, "description": "Print-ready A4 page"}
 }
+_REGISTER_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **_PAGE_RESPONSES,
+    204: {"description": "With check=true: the register can be printed now (nothing audited)"},
+}
+RegisterCheck = Annotated[
+    bool,
+    Query(
+        description="true: only check that the register can be printed now (step-up, year, "
+        "type, size) and answer 204 without the page; the print view itself is audited once."
+    ),
+]
+
+
+def _register(
+    check: bool, page: Callable[[], str], verify: Callable[[], None], filename: str
+) -> Response:
+    if check:
+        verify()
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
+    return _html(page(), filename)
 
 
 @router.get("/certificates/types", response_model=list[CertificateTypeOut])
@@ -267,48 +288,71 @@ def certificate_download_url(
 @router.get(
     "/registers/transfer-certificates",
     response_class=HTMLResponse,
-    responses=_PAGE_RESPONSES,
+    responses=_REGISTER_RESPONSES,
 )
 def transfer_certificate_register(
-    ctx: RegisterReader, db: TenantDB, academic_year_id: uuid.UUID | None = None
-) -> HTMLResponse:
+    ctx: RegisterReader,
+    db: TenantDB,
+    academic_year_id: uuid.UUID | None = None,
+    check: RegisterCheck = False,
+) -> Response:
     """The TC register (counterfoil) of an academic year (default: the current one) as an A4
     landscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).
-    Audited."""
-    page = service.register_page(db, ctx, kind="transfer", academic_year_id=academic_year_id)
-    return _html(page, "tc-register.html")
+    Audited (``register.viewed``); with ``check=true`` 204 only, not audited."""
+    kw: dict[str, Any] = {"kind": "transfer", "academic_year_id": academic_year_id}
+    return _register(
+        check,
+        lambda: service.register_page(db, ctx, **kw),
+        lambda: service.check_register(db, ctx, **kw),
+        "tc-register.html",
+    )
 
 
-@router.get("/registers/certificates", response_class=HTMLResponse, responses=_PAGE_RESPONSES)
+@router.get("/registers/certificates", response_class=HTMLResponse, responses=_REGISTER_RESPONSES)
 def certificate_register(
     ctx: RegisterReader,
     db: TenantDB,
     academic_year_id: uuid.UUID | None = None,
     certificate_type: CertificateType | None = None,
-) -> HTMLResponse:
+    check: RegisterCheck = False,
+) -> Response:
     """The certificate issue register (bonafide, study and conduct certificates, or one of them)
     of an academic year as an A4 landscape print page (permission ``register.read``,
-    school-wide, MFA within 5 minutes). Audited."""
-    page = service.register_page(
-        db,
-        ctx,
-        kind="certificates",
-        academic_year_id=academic_year_id,
-        certificate_type=certificate_type,
+    school-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204
+    only, not audited."""
+    kw: dict[str, Any] = {
+        "kind": "certificates",
+        "academic_year_id": academic_year_id,
+        "certificate_type": certificate_type,
+    }
+    return _register(
+        check,
+        lambda: service.register_page(db, ctx, **kw),
+        lambda: service.check_register(db, ctx, **kw),
+        "certificate-register.html",
     )
-    return _html(page, "certificate-register.html")
 
 
 @router.get(
     "/registers/admission-withdrawal",
     response_class=HTMLResponse,
-    responses=_PAGE_RESPONSES,
+    responses=_REGISTER_RESPONSES,
 )
 def admission_withdrawal_register(
-    ctx: RegisterReader, db: TenantDB, academic_year_id: uuid.UUID | None = None
-) -> HTMLResponse:
+    ctx: RegisterReader,
+    db: TenantDB,
+    academic_year_id: uuid.UUID | None = None,
+    check: RegisterCheck = False,
+) -> Response:
     """The admission and withdrawal register of the students enrolled in an academic year, in
     admission-number order, as an A4 landscape print page (permission ``register.read``,
-    school-wide, MFA within 5 minutes). Audited."""
-    page = service.admission_register_page(db, ctx, academic_year_id=academic_year_id)
-    return _html(page, "admission-withdrawal-register.html")
+    school-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204
+    only, not audited."""
+    return _register(
+        check,
+        lambda: service.admission_register_page(db, ctx, academic_year_id=academic_year_id),
+        lambda: service.check_register(
+            db, ctx, kind="admission", academic_year_id=academic_year_id
+        ),
+        "admission-withdrawal-register.html",
+    )

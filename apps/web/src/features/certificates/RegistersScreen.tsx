@@ -35,15 +35,17 @@ export function registerQuery(kind: RegisterKind, yearId: string, type: string):
 }
 
 /**
- * Load a register once through the BFF (openapi-fetch needs each path spelled out). A 428
- * step-up answer is handled by the BFF client (confirm it's you, then the same request again).
+ * Check through the BFF that a register can be printed now (openapi-fetch needs each path
+ * spelled out): `check=true` answers 204 without the page and is not audited, so only opening
+ * the print view counts as a view (`register.viewed`, once). A 428 step-up answer is handled by
+ * the BFF client (confirm it's you, then the same request again).
  */
-async function loadRegister(api: Api, kind: RegisterKind, yearId: string, type: string) {
-  const year = yearId ? { academic_year_id: yearId } : {};
+async function checkRegister(api: Api, kind: RegisterKind, yearId: string, type: string) {
+  const query = { check: true, ...(yearId ? { academic_year_id: yearId } : {}) };
   if (kind === "transfer") {
     await unwrap(
       api.GET("/api/v1/registers/transfer-certificates", {
-        params: { query: year },
+        params: { query },
         parseAs: "text",
       }),
     );
@@ -54,7 +56,7 @@ async function loadRegister(api: Api, kind: RegisterKind, yearId: string, type: 
     await unwrap(
       api.GET("/api/v1/registers/certificates", {
         params: {
-          query: { ...year, ...(certificateType ? { certificate_type: certificateType } : {}) },
+          query: { ...query, ...(certificateType ? { certificate_type: certificateType } : {}) },
         },
         parseAs: "text",
       }),
@@ -63,7 +65,7 @@ async function loadRegister(api: Api, kind: RegisterKind, yearId: string, type: 
   }
   await unwrap(
     api.GET("/api/v1/registers/admission-withdrawal", {
-      params: { query: year },
+      params: { query },
       parseAs: "text",
     }),
   );
@@ -100,7 +102,7 @@ function RegisterCard({
     setError(undefined);
     setReady(null);
     try {
-      await loadRegister(api, kind, year, kind === "certificates" ? type : "");
+      await checkRegister(api, kind, year, kind === "certificates" ? type : "");
       setReady(href);
     } catch (failure) {
       setError(failure);

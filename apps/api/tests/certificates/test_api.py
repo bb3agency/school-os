@@ -140,6 +140,40 @@ def test_FR_REG_004_registers_need_step_up_and_print_html(school: Any, api: Any,
     assert staff.status_code == 403, "office staff print certificates, not registers"
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/registers/transfer-certificates",
+        "/api/v1/registers/certificates",
+        "/api/v1/registers/admission-withdrawal",
+    ],
+)
+def test_FR_REG_004_a_register_view_is_audited_once(
+    school: Any, api: Any, admin_engine: Engine, path: str
+) -> None:
+    """The registers screen first checks that the register can be opened now (step-up, year,
+    type, size) with ``check=true``: 204, nothing printed, nothing audited. Opening the print
+    view is the one view, audited once (``register.viewed``)."""
+    admin = school.people["office_admin"]
+
+    def viewed() -> int:
+        return len(C.W.audit_events(admin_engine, school.tenant_id, "register.viewed"))
+
+    before = viewed()
+    stale = api.call(admin, "GET", path, params={"check": "true"}, auth_age_s=301)
+    assert stale.status_code == 428, "the check asks for the same step-up as the view"
+    checked = api.call(admin, "GET", path, params={"check": "true"})
+    assert checked.status_code == 204, checked.text
+    assert checked.content == b""
+    assert viewed() == before, "a check is not a view"
+    unknown = {"check": "true", "academic_year_id": str(uuid.uuid4())}
+    assert api.call(admin, "GET", path, params=unknown).status_code == 404
+    assert viewed() == before
+    shown = api.call(admin, "GET", path)
+    assert shown.status_code == 200, shown.text
+    assert viewed() == before + 1
+
+
 def test_SEC_003_accountant_has_no_certificate_access(school: Any, api: Any) -> None:
     res = api.call(school.people["accountant"], "GET", "/api/v1/certificates")
     assert res.status_code == 403

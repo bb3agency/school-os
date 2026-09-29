@@ -598,9 +598,7 @@ describe("registers (US-1106, FR-REG-004)", () => {
         },
       ]);
     stub.routes["GET /bff/api/v1/registers/transfer-certificates"] = () =>
-      new Response("<!doctype html><p>register</p>", {
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      new Response(null, { status: 204 });
     renderWithIntl(<RegistersScreen />);
     const card = (await screen.findByRole("region", {
       name: "TC register (counterfoil)",
@@ -612,8 +610,13 @@ describe("registers (US-1106, FR-REG-004)", () => {
       `/bff/api/v1/registers/transfer-certificates?academic_year_id=${YEAR}`,
     );
     expect(link).toHaveAttribute("target", "_blank");
-    const call = stub.callsTo("GET /bff/api/v1/registers/transfer-certificates")[0];
-    expect(call?.url.searchParams.get("academic_year_id")).toBe(YEAR);
+    // "Prepare" only checks (204, not audited); the print view opened from the link is the one
+    // audited view, so the screen never fetches the register page itself (FR-REG-004).
+    const calls = stub.callsTo("GET /bff/api/v1/registers/transfer-certificates");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url.searchParams.get("academic_year_id")).toBe(YEAR);
+    expect(calls[0]?.url.searchParams.get("check")).toBe("true");
+    expect(link.getAttribute("href")).not.toContain("check");
   });
 });
 

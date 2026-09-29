@@ -182,9 +182,9 @@ Change-request notes (M1, as built; US-601, FR-CR-001..005):
 | POST | `/certificates/{certificate_id}/render` (retry a failed PDF) | `certificate.issue` — **built** |
 | GET | `/certificates/{certificate_id}/print` → `text/html` A4 page | `certificate.read`, `.issue` or `.approve` (`require_any`) — **built** |
 | GET | `/certificates/{certificate_id}/download-url` → presigned URL (≤ 5 min) | `certificate.read` — **built** |
-| GET | `/registers/transfer-certificates?academic_year_id=` → `text/html` | `register.read` school-wide, **step-up** — **built** |
-| GET | `/registers/certificates?academic_year_id=&certificate_type=` → `text/html` | `register.read` school-wide, **step-up** — **built** |
-| GET | `/registers/admission-withdrawal?academic_year_id=` → `text/html` | `register.read` school-wide, **step-up** — **built** |
+| GET | `/registers/transfer-certificates?academic_year_id=&check=` → `text/html` (204 with `check=true`) | `register.read` school-wide, **step-up** — **built** |
+| GET | `/registers/certificates?academic_year_id=&certificate_type=&check=` → `text/html` (204 with `check=true`) | `register.read` school-wide, **step-up** — **built** |
+| GET | `/registers/admission-withdrawal?academic_year_id=&check=` → `text/html` (204 with `check=true`) | `register.read` school-wide, **step-up** — **built** |
 
 Certificate notes (M3, as built; data model 05 §5.7). The stories and requirements are proposed from the roadmap scope and still need PO confirmation.
 - **Request** (`POST /students/{id}/certificates`):
@@ -212,6 +212,7 @@ Certificate notes (M3, as built; data model 05 §5.7). The stories and requireme
   - A pending certificate prints as DRAFT with no serial.
   - Registers list every issued serial of the year in order, including cancelled ones. Rows are capped at 5,000 (`register_max_rows`).
   - Audited as `certificate.print_viewed` and `register.viewed`.
+  - `?check=true` on a register route only checks that it can be printed now (step-up, year, type, row cap) and answers `204` without the page; it is not audited. The registers screen checks first and then links to the print view, so one view is audited once.
 - **Download** gives `{url, expires_at, filename}` (`attachment`, ≤ 5 min), or `409 pdf_not_ready` / `document_not_ready`. Audited as `certificate.downloaded`.
 - **Scope**: certificates are reached through their student. Holders of a scoped role see only their sections' students. Another school's id, or a student out of scope, gives `404`.
 - **No public verification route** (QR or serial lookup). It would need an ADR (PO question).

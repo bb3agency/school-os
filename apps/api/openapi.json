@@ -29278,7 +29278,7 @@
     },
     "/api/v1/registers/admission-withdrawal": {
       "get": {
-        "description": "The admission and withdrawal register of the students enrolled in an academic year, in\nadmission-number order, as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited.",
+        "description": "The admission and withdrawal register of the students enrolled in an academic year, in\nadmission-number order, as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204\nonly, not audited.",
         "operationId": "admission_withdrawal_register_api_v1_registers_admission_withdrawal_get",
         "parameters": [
           {
@@ -29297,6 +29297,18 @@
               ],
               "title": "Academic Year Id"
             }
+          },
+          {
+            "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+              "title": "Check",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -29309,6 +29321,9 @@
               }
             },
             "description": "Print-ready A4 page"
+          },
+          "204": {
+            "description": "With check=true: the register can be printed now (nothing audited)"
           },
           "422": {
             "content": {
@@ -29329,7 +29344,7 @@
     },
     "/api/v1/registers/certificates": {
       "get": {
-        "description": "The certificate issue register (bonafide, study and conduct certificates, or one of them)\nof an academic year as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited.",
+        "description": "The certificate issue register (bonafide, study and conduct certificates, or one of them)\nof an academic year as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204\nonly, not audited.",
         "operationId": "certificate_register_api_v1_registers_certificates_get",
         "parameters": [
           {
@@ -29370,6 +29385,18 @@
               ],
               "title": "Certificate Type"
             }
+          },
+          {
+            "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+              "title": "Check",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -29382,6 +29409,9 @@
               }
             },
             "description": "Print-ready A4 page"
+          },
+          "204": {
+            "description": "With check=true: the register can be printed now (nothing audited)"
           },
           "422": {
             "content": {
@@ -29402,7 +29432,7 @@
     },
     "/api/v1/registers/transfer-certificates": {
       "get": {
-        "description": "The TC register (counterfoil) of an academic year (default: the current one) as an A4\nlandscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).\nAudited.",
+        "description": "The TC register (counterfoil) of an academic year (default: the current one) as an A4\nlandscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).\nAudited (``register.viewed``); with ``check=true`` 204 only, not audited.",
         "operationId": "transfer_certificate_register_api_v1_registers_transfer_certificates_get",
         "parameters": [
           {
@@ -29421,6 +29451,18 @@
               ],
               "title": "Academic Year Id"
             }
+          },
+          {
+            "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+              "title": "Check",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -29433,6 +29475,9 @@
               }
             },
             "description": "Print-ready A4 page"
+          },
+          "204": {
+            "description": "With check=true: the register can be printed now (nothing audited)"
           },
           "422": {
             "content": {
