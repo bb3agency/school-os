@@ -17,6 +17,7 @@ from kombu import Queue
 from app.admin.tasks import beat_schedule as admin_beat_schedule
 from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
 from app.changes.tasks import beat_schedule as changes_beat_schedule
+from app.circulars.tasks import beat_schedule as circulars_beat_schedule
 from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
@@ -36,6 +37,7 @@ import app.identity.service  # isort: skip
 import app.admin.service  # isort: skip
 import app.breakglass.service  # isort: skip
 import app.changes.service  # isort: skip
+import app.circulars.service  # isort: skip
 import app.documents.service  # isort: skip
 import app.dq.service  # isort: skip
 import app.exports.service  # isort: skip
@@ -65,6 +67,7 @@ TASK_MODULES: list[str] = [
     "app.knowledge.tasks",
     "app.students.tasks",
     "app.admin.tasks",
+    "app.circulars.tasks",
 ]
 
 
@@ -120,6 +123,12 @@ def create_celery() -> Celery:
             # docs/06 §4: document ingestion (extract, redact, chunk, embed, index), ACL
             # refresh and chunk removal (outbox consumers of the kb.* events).
             "knowledge.*": {"queue": "ingest"},
+            # M4 (FR-CIR-002): circular reading through the knowledge gateway, next to the
+            # ingestion that triggers it; notice PDFs/PNGs on the Chromium workers
+            # (FR-NOTICE-006); the daily task reminders on "maintenance" (FR-TASK-007).
+            "circulars.read_version": {"queue": "ingest"},
+            "circulars.render_notice": {"queue": "pdf"},
+            "circulars.send_task_reminders": {"queue": "maintenance"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
@@ -147,6 +156,8 @@ def create_celery() -> Celery:
             **exports_beat_schedule(),
             # FR-ADM-001: full export archives deleted 24 hours after they were ready (hourly).
             **admin_beat_schedule(),
+            # FR-TASK-007: task due-soon and overdue reminders (daily, 07:10 IST).
+            **circulars_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

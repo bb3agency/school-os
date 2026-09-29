@@ -40,6 +40,18 @@ roles:
     model: claude-haiku-4-5-20251001
     max_output_tokens: 2000
     thinking: disabled
+  # Circular reading (M4, docs/06 §4.10, FR-CIR-002): strict-JSON metadata, EN/TE summary and
+  # deadline suggestions with passage citations, from one circular's indexed passages.
+  circular:
+    model: claude-haiku-4-5-20251001
+    max_output_tokens: 2000
+    thinking: disabled
+  # Parent notice drafting (M4, docs/06 §10.5, FR-NOTICE-003): short EN + TE notice from a
+  # circular's passages or staff text (never student records). Mid tier for Telugu quality.
+  notice:
+    model: claude-sonnet-5
+    max_output_tokens: 1200
+    thinking: disabled
   # Offline evaluation judge (top tier, §12, §13). Never used for product traffic. Opus 5.5 cannot
   # turn thinking off and rejects forced tool_choice: thinking left to the model, effort kept low
   # (its default is medium), JSON through structured outputs, never a forced tool.

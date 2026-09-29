@@ -346,6 +346,28 @@ def latest_page_texts(session: Session, version_id: uuid.UUID, page: int) -> lis
     return list(rows)
 
 
+@dataclass(frozen=True, slots=True)
+class VersionChunk:
+    """One indexed chunk of a version, in reading order (circular reading, M4)."""
+
+    chunk_no: int
+    page_from: int | None
+    content: str
+
+
+def version_chunks(
+    session: Session, document_id: uuid.UUID, version_id: uuid.UUID
+) -> list[VersionChunk]:
+    """Every chunk of one version of a document, in chunk order (already Aadhaar-masked at
+    ingestion). Callers decide who may see the result (workers, or after a visibility check)."""
+    rows = session.execute(
+        select(DocumentChunk.chunk_no, DocumentChunk.page_from, DocumentChunk.content)
+        .where(DocumentChunk.document_id == document_id, DocumentChunk.version_id == version_id)
+        .order_by(DocumentChunk.chunk_no)
+    ).all()
+    return [VersionChunk(r.chunk_no, r.page_from, r.content) for r in rows]
+
+
 # --- query log (kb.queries; FR-KB-009) ----------------------------------------------------------
 
 

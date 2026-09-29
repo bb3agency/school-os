@@ -60,6 +60,12 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 SessionFactory = Callable[[uuid.UUID], AbstractContextManager["Session"]]
+IndexedHook = Callable[["Session", uuid.UUID, uuid.UUID, str], None]
+INDEXED_HOOKS: list[IndexedHook] = []
+"""Called in the write transaction when a document's current version was (re)indexed, with
+``(session, document_id, version_id, doc_type)``; an extension point for later modules (M4
+circular reading enqueues its job here, so it is queued exactly when the index commits). Also
+called when the version has no readable text (no chunks), so the caller can say so."""
 RETIRED_STATUSES: Final = ("quarantined", "failed")
 
 INDEXED: Final = "indexed"
@@ -224,6 +230,8 @@ class DocumentIngestionPipeline:
             )
             if is_latest:
                 self._store.set_latest(s, document_id, version_id)
+                for hook in INDEXED_HOOKS:
+                    hook(s, document_id, version_id, fresh.doc_type)
             elif archived:
                 self._store.hide_document(s, document_id)
             retired = [v.id for v in fresh.versions if v.status in RETIRED_STATUSES]
@@ -332,6 +340,7 @@ def _filters(facts: DocumentFacts) -> ChunkFilters:
 __all__ = [
     "EXCLUDED",
     "INDEXED",
+    "INDEXED_HOOKS",
     "MISSING",
     "NOT_READY",
     "UNSUPPORTED",

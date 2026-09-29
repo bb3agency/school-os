@@ -10,7 +10,8 @@ breaker run exactly as in live mode, and the same inputs always give the same ou
   in order), each citing its source with the block's full text as ``cited_text``
   (``search_result_location``, docs/06 §7, §9). No results: an honest "not found" in the
   question's script (Telugu or English).
-- Structured output (``output_config.format``): a minimal instance of the schema.
+- Structured output (``output_config.format``): circular readings and parent notices from the
+  deterministic rules of :mod:`.fake_circulars`; any other schema gets a minimal instance.
 
 Token counts are estimates (4 characters per token) so metering and budgets can be exercised.
 """
@@ -23,6 +24,7 @@ import re
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
+from app.knowledge.gateway.fake_circulars import structured_reply
 from app.knowledge.gateway.schema_check import example
 from app.knowledge.gateway.transport import MessagesRequest
 
@@ -88,7 +90,10 @@ class FakeTransport:
         messages: list[Mapping[str, Any]] = list(body.get("messages") or ())
         output_format = (body.get("output_config") or {}).get("format")
         if isinstance(output_format, Mapping):
-            text = json.dumps(example(output_format["schema"]), ensure_ascii=False)
+            schema = output_format["schema"]
+            reply = structured_reply(schema, _question(messages))
+            value = reply if reply is not None else example(schema)
+            text = json.dumps(value, ensure_ascii=False)
             content: list[dict[str, Any]] = [{"type": "text", "text": text}]
             stop = "end_turn"
         else:

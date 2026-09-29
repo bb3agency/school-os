@@ -1,0 +1,26 @@
+# Circulars, tasks and parent notices (M4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
+# Versioned configuration shipped inside the package (read by app/circulars/config.py;
+# CLAUDE.md invariant 13). What the AI sees and its limits live in
+# app/knowledge/config/circulars.yaml; the model in app/knowledge/config/models.yaml.
+version: 1
+
+reading:
+  # Readings of one circular version (automatic + "Try again"); after this, staff add tasks by hand.
+  max_attempts: 3
+
+reminders:
+  # FR-TASK-007: one in-app reminder this many days before the due date (and one when overdue).
+  days_before_due: 2
+
+tasks:
+  max_title_chars: 200
+  max_details_chars: 2000
+
+notices:
+  max_title_chars: 120
+  max_body_chars: 1500
+  # Rendered files live under the school's exports/ prefix, which the bucket deletes after 7 days
+  # (docs/05 §13); after this many days a download asks for a fresh rendering.
+  render_keep_days: 6
+  # PNG width in CSS pixels (square-ish card for phone screens and messaging groups).
+  image_width_px: 1080

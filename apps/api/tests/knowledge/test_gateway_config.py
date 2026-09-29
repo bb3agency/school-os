@@ -44,6 +44,8 @@ def test_SEC_020_output_caps_per_role() -> None:
         "metadata": 500,
         "translation": 1500,
         "extraction": 2000,
+        "circular": 2000,
+        "notice": 1200,
         "eval_judge": 2000,
     }
 

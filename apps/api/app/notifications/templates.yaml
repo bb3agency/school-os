@@ -241,3 +241,54 @@ templates:
     te:
       title: SchoolOS నుండి కొత్త సందేశం
       body: SchoolOS నుండి కొత్త సందేశం వచ్చింది. పేజీ పైభాగంలోని బ్యానర్‌లో దాన్ని చదవండి.
+
+  # --- circulars and tasks (M4; FR-CIR-001, FR-CIR-005, FR-TASK-003, FR-TASK-007) ---------------
+  circular.read_ready:
+    params: [document_id, suggestions]
+    resource_type: circular
+    en:
+      title: Circular read, please check
+      body: "A circular was read with AI. {suggestions, plural, =0 {No deadlines were found; check the circular and mark it reviewed.} one {# deadline is suggested; confirm or dismiss it.} other {# deadlines are suggested; confirm or dismiss each one.}} Nothing becomes a task until you confirm it."
+    te:
+      title: సర్క్యులర్ చదవబడింది, దయచేసి చూడండి
+      body: "ఒక సర్క్యులర్‌ను AI చదివింది. {suggestions, plural, =0 {గడువులు ఏవీ కనబడలేదు; సర్క్యులర్ చూసి సమీక్షించినట్లు గుర్తించండి.} one {# గడువు సూచించబడింది; దాన్ని నిర్ధారించండి లేదా తీసివేయండి.} other {# గడువులు సూచించబడ్డాయి; ఒక్కొక్కటి నిర్ధారించండి లేదా తీసివేయండి.}} మీరు నిర్ధారించే వరకు ఏదీ పనిగా మారదు."
+
+  circular.needs_review:
+    params: [document_id, code]
+    resource_type: circular
+    en:
+      title: Circular needs manual review
+      body: "A circular could not be read with AI {code, select, ai_disabled {because AI is switched off for your school} ai_budget_exhausted {because this month's AI budget is used up} no_text {because it has no readable text} other {just now}}. Open it, read it yourself and add its tasks by hand, or try again later."
+    te:
+      title: సర్క్యులర్‌ను మీరే చూడాలి
+      body: "{code, select, ai_disabled {మీ పాఠశాలకు AI ఆపివేయబడినందున} ai_budget_exhausted {ఈ నెల AI బడ్జెట్ పూర్తయినందున} no_text {చదవగలిగే వచనం లేనందున} other {ప్రస్తుతం}} ఒక సర్క్యులర్‌ను AI చదవలేకపోయింది. దాన్ని తెరిచి మీరే చదివి, పనులను చేతితో జోడించండి, లేదా తర్వాత మళ్లీ ప్రయత్నించండి."
+
+  task.assigned:
+    params: [task_id]
+    resource_type: task
+    en:
+      title: New task for you
+      body: A task was given to you. Open it to see what is needed and by when.
+    te:
+      title: మీకు కొత్త పని
+      body: మీకు ఒక పని ఇవ్వబడింది. ఏమి చేయాలో, ఎప్పటిలోగా చేయాలో చూడటానికి దాన్ని తెరవండి.
+
+  task.due_soon:
+    params: [task_id, days]
+    resource_type: task
+    en:
+      title: Task due soon
+      body: "One of your tasks is due {days, plural, =0 {today} one {tomorrow} other {in # days}}. Open it and mark it done when it is finished."
+    te:
+      title: పని గడువు దగ్గర పడింది
+      body: "మీ పనుల్లో ఒకదాని గడువు {days, plural, =0 {ఈరోజే} one {రేపు} other {# రోజుల్లో}}. దాన్ని తెరిచి, పూర్తయ్యాక పూర్తయినట్లు గుర్తించండి."
+
+  task.overdue:
+    params: [task_id]
+    resource_type: task
+    en:
+      title: Task overdue
+      body: One of your tasks is past its due date. Finish it as soon as you can, or ask the office to change the date.
+    te:
+      title: పని గడువు దాటింది
+      body: మీ పనుల్లో ఒకదాని గడువు దాటిపోయింది. వీలైనంత త్వరగా పూర్తి చేయండి, లేదా తేదీ మార్చమని కార్యాలయాన్ని అడగండి.
