@@ -43,7 +43,7 @@ export function SubscriptionActions({
   const status = subscription.status;
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="relative flex flex-wrap gap-2">
       {status === "trial" ? (
         <ActionDialog
           triggerLabel={t("activate")}

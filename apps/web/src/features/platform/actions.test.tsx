@@ -268,12 +268,19 @@ describe("school detail actions (FR-PLT-004..005, SEC-027)", () => {
     await user.click(screen.getByRole("button", { name: cm.edit }));
     const dialog = screen.getByRole("dialog", { name: pm.billingAccount.editTitle });
     const ba = pm.billingAccount;
-    await user.type(within(dialog).getByLabelText(ba.legalName), "Sample Education Society");
+    // Fields that are not under test are pasted: typing ~70 characters one key event at a
+    // time made this test take 2 s on its own and hit the 5 s timeout when the suite ran
+    // under load. The GSTIN, which is under test, is still typed key by key.
+    const fill = async (label: string, value: string) => {
+      await user.click(within(dialog).getByLabelText(label));
+      await user.paste(value);
+    };
+    await fill(ba.legalName, "Sample Education Society");
     await user.type(within(dialog).getByLabelText(ba.gstin), "36abcde1234f1z5");
-    await user.type(within(dialog).getByLabelText(ba.billingEmail), "accounts@example.org");
-    await user.type(within(dialog).getByLabelText(ba.addressLine1), "1 Main Road");
-    await user.type(within(dialog).getByLabelText(ba.city), "Guntur");
-    await user.type(within(dialog).getByLabelText(ba.postalCode), "522001");
+    await fill(ba.billingEmail, "accounts@example.org");
+    await fill(ba.addressLine1, "1 Main Road");
+    await fill(ba.city, "Guntur");
+    await fill(ba.postalCode, "522001");
     await user.click(within(dialog).getByRole("button", { name: cm.save }));
     expect(within(dialog).getByLabelText(ba.gstin)).toHaveAccessibleDescription(
       expect.stringContaining(messages.en.validation.gstinStateMismatch),

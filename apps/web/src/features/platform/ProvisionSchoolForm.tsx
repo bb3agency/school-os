@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { cardClasses } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SecretOnce } from "@/components/ui/SecretOnce";
 import { SelectField } from "@/components/ui/Select";
@@ -128,7 +130,7 @@ export function ProvisionSchoolForm() {
   if (done) {
     if (secretShown && done.heartbeat_key) {
       return (
-        <div className="max-w-3xl space-y-4 rounded-lg border border-border bg-surface p-6">
+        <div className={cn(cardClasses({ padding: "lg" }), "max-w-3xl space-y-4")}>
           <h2 className="text-xl font-semibold">{t("heartbeatTitle")}</h2>
           <p className="text-sm">{t("heartbeatBody")}</p>
           <SecretOnce
@@ -147,12 +149,12 @@ export function ProvisionSchoolForm() {
       );
     }
     return (
-      <div className="max-w-3xl space-y-4">
+      <div className={cn(cardClasses({ padding: "lg" }), "max-w-3xl space-y-4")}>
         <Alert tone="success" live title={t("doneTitle")}>
           <p>{done.tier === "dedicated" ? t("doneDedicated") : t("doneShared")}</p>
           <p>{t(`ownerInvite.${done.owner_invite}`)}</p>
         </Alert>
-        <div className="flex flex-wrap gap-2">
+        <div className="relative flex flex-wrap gap-2">
           <ButtonLink href={`/platform/schools/${done.tenant_id}`}>{t("openSchool")}</ButtonLink>
           <ButtonLink href="/platform/schools" variant="secondary">
             {t("backToSchools")}
@@ -166,51 +168,102 @@ export function ProvisionSchoolForm() {
     .filter((plan) => plan.status === "published" && plan.tier === tier)
     .map((plan) => ({ value: plan.id, label: planLabel(plan) }));
 
-  const reviewRows: Array<{ label: string; value: string }> = [
-    { label: t("fields.schoolName"), value: review.school_name ?? "" },
-    { label: t("fields.code"), value: review.code ?? "" },
-    { label: t("fields.boards"), value: review.boards ?? "" },
+  const reviewGroups: Array<{
+    step: ProvisionStep;
+    rows: Array<{ label: string; value: string; mono?: boolean }>;
+  }> = [
     {
-      label: t("fields.deploymentMode"),
-      value: review.tier === "dedicated" || review.tier === "shared" ? tmode(review.tier) : "",
-    },
-    { label: t("fields.customDomain"), value: review.custom_domain ?? "" },
-    { label: t("fields.ownerName"), value: review["owner.display_name"] ?? "" },
-    { label: t("fields.ownerEmail"), value: review["owner.email"] ?? "" },
-    { label: t("fields.ownerSubject"), value: review["owner.idp_subject"] ?? "" },
-    {
-      label: t("fields.plan"),
-      value: plans.find((plan) => plan.id === review.plan_id)?.name ?? "",
+      step: "school",
+      rows: [
+        { label: t("fields.schoolName"), value: review.school_name ?? "" },
+        { label: t("fields.code"), value: review.code ?? "", mono: true },
+        { label: t("fields.boards"), value: review.boards ?? "" },
+      ],
     },
     {
-      label: t("fields.startAs"),
-      value: review.start_as === "active" ? t("fields.startActive") : t("fields.startTrial"),
+      step: "deployment",
+      rows: [
+        {
+          label: t("fields.deploymentMode"),
+          value: review.tier === "dedicated" || review.tier === "shared" ? tmode(review.tier) : "",
+        },
+        { label: t("fields.customDomain"), value: review.custom_domain ?? "", mono: true },
+      ],
     },
-    { label: t("fields.priceOverride"), value: review.price_override_inr ?? "" },
-    { label: t("fields.legalName"), value: review["billing_account.legal_name"] ?? "" },
-    { label: t("fields.gstin"), value: (review["billing_account.gstin"] ?? "").toUpperCase() },
-    { label: t("fields.billingEmail"), value: review["billing_account.billing_email"] ?? "" },
+    {
+      step: "owner",
+      rows: [
+        { label: t("fields.ownerName"), value: review["owner.display_name"] ?? "" },
+        { label: t("fields.ownerEmail"), value: review["owner.email"] ?? "" },
+        { label: t("fields.ownerSubject"), value: review["owner.idp_subject"] ?? "", mono: true },
+      ],
+    },
+    {
+      step: "plan",
+      rows: [
+        {
+          label: t("fields.plan"),
+          value: plans.find((plan) => plan.id === review.plan_id)?.name ?? "",
+        },
+        {
+          label: t("fields.startAs"),
+          value: review.start_as === "active" ? t("fields.startActive") : t("fields.startTrial"),
+        },
+        { label: t("fields.priceOverride"), value: review.price_override_inr ?? "", mono: true },
+      ],
+    },
+    {
+      step: "billing",
+      rows: [
+        { label: t("fields.legalName"), value: review["billing_account.legal_name"] ?? "" },
+        {
+          label: t("fields.gstin"),
+          value: (review["billing_account.gstin"] ?? "").toUpperCase(),
+          mono: true,
+        },
+        { label: t("fields.billingEmail"), value: review["billing_account.billing_email"] ?? "" },
+      ],
+    },
   ];
 
   return (
     <div className="max-w-3xl space-y-6">
-      <ol aria-label={t("stepsLabel")} className="flex flex-wrap gap-2 text-sm">
-        {PROVISION_STEPS.map((id, index) => (
-          <li
-            key={id}
-            aria-current={index === stepIndex ? "step" : undefined}
-            className={cn(
-              "rounded-full border px-3 py-1",
-              index === stepIndex
-                ? "border-primary bg-primary font-semibold text-on-primary"
-                : index < stepIndex
-                  ? "border-primary text-primary"
-                  : "border-border text-ink-muted",
-            )}
-          >
-            {stepLabels[id]}
-          </li>
-        ))}
+      <ol
+        aria-label={t("stepsLabel")}
+        className={cn(cardClasses({ padding: "sm" }), "flex flex-wrap gap-x-2 gap-y-3 text-sm")}
+      >
+        {PROVISION_STEPS.map((id, index) => {
+          const current = index === stepIndex;
+          const done = index < stepIndex;
+          return (
+            <li
+              key={id}
+              aria-current={current ? "step" : undefined}
+              className="flex items-center gap-2 pr-2"
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "flex size-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold tabular-nums",
+                  current
+                    ? "border-platform bg-platform text-platform-ink"
+                    : done
+                      ? "border-success bg-success text-white"
+                      : "border-border-control bg-surface text-ink-muted",
+                )}
+              >
+                {done ? <Icon name="check" className="size-3.5" /> : index + 1}
+              </span>
+              <span className={current ? "font-semibold text-ink" : "text-ink-muted"}>
+                {stepLabels[id]}
+                {done ? <span className="sr-only"> ({t("stepDone")})</span> : null}
+              </span>
+              {index < PROVISION_STEPS.length - 1 ? (
+                <Icon name="chevronRight" className="size-4 text-ink-muted" />
+              ) : null}
+            </li>
+          );
+        })}
       </ol>
 
       {errorFields.length > 0 ? (
@@ -236,10 +289,10 @@ export function ProvisionSchoolForm() {
           form.onSubmit(event);
         }}
         noValidate
-        className="space-y-6 rounded-lg border border-border bg-surface p-6"
+        className={cn(cardClasses({ padding: "lg" }), "space-y-6")}
       >
         <div className="space-y-1">
-          <p className="text-sm text-ink-muted">
+          <p className="eyebrow text-ink-muted">
             {t("stepOf", { current: stepIndex + 1, total: PROVISION_STEPS.length })}
           </p>
           <h2
@@ -292,7 +345,7 @@ export function ProvisionSchoolForm() {
             {(["shared", "dedicated"] as const).map((mode) => (
               <div
                 key={mode}
-                className="flex items-start gap-3 rounded-md border border-border p-3"
+                className="flex items-start gap-3 rounded-lg border border-border-soft bg-surface-muted p-4 has-[:checked]:border-platform has-[:checked]:bg-platform-soft"
               >
                 <input
                   type="radio"
@@ -425,16 +478,44 @@ export function ProvisionSchoolForm() {
         </fieldset>
 
         {step === "review" ? (
-          <section className="space-y-3">
+          <section className="space-y-4">
             <p>{t("reviewIntro")}</p>
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
-              {reviewRows.map((row) => (
-                <div key={row.label} className="contents">
-                  <dt className="text-ink-muted">{row.label}</dt>
-                  <dd className="font-semibold break-words">{row.value || t("notProvided")}</dd>
+            <div className="grid gap-4 md:grid-cols-2">
+              {reviewGroups.map((group) => (
+                <div
+                  key={group.step}
+                  className={cn(cardClasses({ padding: "sm", tone: "muted" }), "space-y-3")}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-medium text-ink">{stepLabels[group.step]}</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => goTo(PROVISION_STEPS.indexOf(group.step))}
+                      disabled={form.pending}
+                    >
+                      {t("reviewEdit")}
+                      <span className="sr-only">: {stepLabels[group.step]}</span>
+                    </Button>
+                  </div>
+                  <dl className="space-y-2 text-sm">
+                    {group.rows.map((row) => (
+                      <div key={row.label}>
+                        <dt className="text-ink-muted">{row.label}</dt>
+                        <dd
+                          className={cn(
+                            "font-medium break-words text-ink",
+                            row.mono && row.value ? "font-mono" : "",
+                          )}
+                        >
+                          {row.value || t("notProvided")}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
               ))}
-            </dl>
+            </div>
             <p className="text-sm text-ink-muted">{tc("stepUpNote")}</p>
           </section>
         ) : null}

@@ -4,12 +4,11 @@ import { PAYMENT_METHODS, type Invoice } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
-import { Badge } from "@/components/ui/Badge";
+import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
-import { invoiceTone } from "@/features/status";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { formatDate, formatInr } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
@@ -22,9 +21,24 @@ import {
   reason,
 } from "@/lib/validation";
 import { PK, useCan } from "./data";
+import { InvoiceDownload } from "./InvoiceDownload";
+import { Mono } from "./pills";
 import { ReasonField } from "./SubscriptionActions";
 
 const INVALIDATE = [PK.invoices, PK.tenants, PK.dashboard] as const;
+
+/** Invoice workflow as pills: draft, issued (awaiting payment), paid, void. */
+const INVOICE_PILL: Record<Invoice["status"], PillVariant> = {
+  draft: "tag",
+  issued: "review",
+  paid: "done",
+  void: "negative",
+};
+
+export function InvoiceStatusPill({ status }: { status: Invoice["status"] }) {
+  const t = useTranslations("status.invoice");
+  return <Pill variant={INVOICE_PILL[status]}>{t(status)}</Pill>;
+}
 
 const paymentSchema = z.object({
   method: z.enum(PAYMENT_METHODS, { error: "chooseOption" }),
@@ -60,20 +74,24 @@ export function InvoiceTable({
   caption: string;
 }) {
   const t = useTranslations("platform.invoices");
-  const tstatus = useTranslations("status.invoice");
   const tm = useTranslations("platform.invoices.methods");
   const locale = useLocale();
   const api = useBffClient("operator");
   const can = useCan();
   const manage = can("platform.invoices.manage");
-  const money = (value: string) => <Value>{formatInr(value, locale)}</Value>;
+  const money = (value: string) => (
+    <Mono>
+      <Value>{formatInr(value, locale)}</Value>
+    </Mono>
+  );
 
   function actions(row: Invoice) {
-    if (!manage) return null;
     const path = { invoice_id: row.id };
     const label = row.invoice_number ?? `${t("draftNumber")} ${formatDate(row.period_start) ?? ""}`;
+    if (!manage) return <InvoiceDownload invoice={row} label={label} />;
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="relative flex flex-wrap items-start gap-2">
+        <InvoiceDownload invoice={row} label={label} />
         {row.status === "draft" ? (
           <>
             <ActionDialog
@@ -224,7 +242,9 @@ export function InvoiceTable({
           {
             key: "school",
             header: t("colSchool"),
-            cell: (row: Invoice) => schoolName(row.tenant_id),
+            cell: (row: Invoice) => (
+              <span className="block min-w-44">{schoolName(row.tenant_id)}</span>
+            ),
           },
         ]
       : []),
@@ -253,8 +273,23 @@ export function InvoiceTable({
       key: "gst",
       header: t("colGst"),
       className: "text-right tabular-nums",
-      cell: (row) =>
-        money((Number(row.cgst_inr) + Number(row.sgst_inr) + Number(row.igst_inr)).toFixed(2)),
+      cell: (row) => (
+        <span className="flex flex-col items-end">
+          {money((Number(row.cgst_inr) + Number(row.sgst_inr) + Number(row.igst_inr)).toFixed(2))}
+          {Number(row.igst_inr) > 0 ? (
+            <span className="text-xs whitespace-nowrap text-ink-muted">
+              {t("gstSplitInter", { igst: formatInr(row.igst_inr, locale) ?? "" })}
+            </span>
+          ) : Number(row.cgst_inr) + Number(row.sgst_inr) > 0 ? (
+            <span className="text-xs whitespace-nowrap text-ink-muted">
+              {t("gstSplitIntra", {
+                cgst: formatInr(row.cgst_inr, locale) ?? "",
+                sgst: formatInr(row.sgst_inr, locale) ?? "",
+              })}
+            </span>
+          ) : null}
+        </span>
+      ),
     },
     {
       key: "total",
@@ -271,9 +306,9 @@ export function InvoiceTable({
     {
       key: "status",
       header: t("colStatus"),
-      cell: (row) => <Badge tone={invoiceTone[row.status]}>{tstatus(row.status)}</Badge>,
+      cell: (row) => <InvoiceStatusPill status={row.status} />,
     },
-    ...(manage ? [{ key: "actions", header: t("colActions"), cell: actions }] : []),
+    { key: "actions", header: t("colActions"), cell: actions },
   ];
 
   return (

@@ -14,18 +14,20 @@ import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
+import { Toggle } from "@/components/ui/Toggle";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { breakGlassTone, deploymentTone, known } from "@/features/status";
+import { Link } from "@/i18n/navigation";
 import { createBffFetch } from "@/lib/bff/fetch";
 import { ApiError, unwrap, useApiQuery, useApiMutation, useBffClient } from "@/lib/bff/query";
-import { formatCount, formatDateTime } from "@/lib/format";
+import { formatCount } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
 import {
   FLAG_KEY_PATTERN,
@@ -38,6 +40,10 @@ import {
 } from "@/lib/validation";
 import { PK, useCan, useSchoolDirectory } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
+import { FilterCard } from "./FilterCard";
+import { FlagSwitch } from "./FlagSwitch";
+import { HeartbeatPill } from "./HeartbeatPill";
+import { Mono, MonoTime, TierTag } from "./pills";
 import { UsageTable } from "./UsageTable";
 
 /* ------------------------------------------------------------------ usage */
@@ -53,6 +59,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** FR-PLT-020..021 (docs/16 §5.10): daily aggregates per school. */
 export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
   const t = useTranslations("platform.usage");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const api = useBffClient("operator");
   const { nameOf, schools } = useSchoolDirectory();
@@ -68,8 +75,14 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
   );
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
+      />
+      <FilterCard
+        clearHref={filters.from || filters.to || filters.tenantId ? "/platform/usage" : undefined}
+      >
         <TextField
           name="from"
           type="date"
@@ -95,10 +108,7 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
           }))}
           className="w-72"
         />
-        <Button type="submit" variant="secondary">
-          {tc("applyFilters")}
-        </Button>
-      </form>
+      </FilterCard>
       <UsageTable usage={usage} caption={t("title")} schoolName={nameOf} />
     </div>
   );
@@ -147,15 +157,7 @@ function FlagForm({ errors, flag }: { errors: Record<string, string>; flag?: Fea
         maxLength={300}
         rows={2}
       />
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          name="enabled"
-          defaultChecked={flag?.enabled ?? false}
-          className="size-4 accent-primary"
-        />
-        {t("enabledLabel")}
-      </label>
+      <Toggle name="enabled" label={t("enabledLabel")} defaultChecked={flag?.enabled ?? false} />
       <TextField
         name="rollout_percent"
         label={t("colRollout")}
@@ -171,6 +173,7 @@ function FlagForm({ errors, flag }: { errors: Record<string, string>; flag?: Fea
 /** FR-PLT-022 (docs/16 §5.11): global flags with % rollout and per-school overrides. */
 export function FlagsScreen() {
   const t = useTranslations("platform.flags");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const locale = useLocale();
   const api = useBffClient("operator");
@@ -213,7 +216,7 @@ export function FlagsScreen() {
     {
       key: "global",
       header: t("colGlobal"),
-      cell: (row) => (row.enabled ? <Badge tone="success">{tc("yes")}</Badge> : tc("no")),
+      cell: (row) => <FlagSwitch flag={row} manage={manage} />,
     },
     {
       key: "rollout",
@@ -223,7 +226,7 @@ export function FlagsScreen() {
         row.rollout_percent === null ? (
           <Value>{null}</Value>
         ) : (
-          t("rolloutValue", { percent: row.rollout_percent })
+          <Mono>{t("rolloutValue", { percent: row.rollout_percent })}</Mono>
         ),
     },
     {
@@ -245,7 +248,7 @@ export function FlagsScreen() {
             key: "actions",
             header: tc("actions"),
             cell: (row: FeatureFlag) => (
-              <div className="flex flex-wrap gap-2">
+              <div className="relative flex flex-wrap gap-2">
                 <ActionDialog
                   triggerLabel={tc("edit")}
                   triggerSize="sm"
@@ -321,9 +324,9 @@ export function FlagsScreen() {
       key: "value",
       header: t("overrideValue"),
       cell: (row) => (
-        <Badge tone={row.enabled ? "success" : "neutral"}>
+        <Pill variant={row.enabled ? "positive" : "tag"}>
           {row.enabled ? t("forcedOn") : t("forcedOff")}
-        </Badge>
+        </Pill>
       ),
     },
     ...(manage
@@ -361,6 +364,7 @@ export function FlagsScreen() {
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={
           manage ? (
             <ActionDialog
@@ -378,7 +382,7 @@ export function FlagsScreen() {
           ) : undefined
         }
       />
-      <Card title={t("globalTitle")}>
+      <Card title={t("globalTitle")} description={manage ? t("switchHint") : undefined}>
         <DataTable
           caption={t("globalTitle")}
           captionHidden
@@ -409,9 +413,9 @@ export function FlagsScreen() {
 /** FR-PLT-023..025 (docs/16 §5.12): deployments, versions, last heartbeat, actions. */
 export function FleetScreen({ status = "" }: { status?: string }) {
   const t = useTranslations("platform.fleet");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const tstatus = useTranslations("status.deployment");
-  const tmode = useTranslations("deploymentMode");
   const locale = useLocale();
   const api = useBffClient("operator");
   const query = status ? { status } : {};
@@ -426,21 +430,47 @@ export function FleetScreen({ status = "" }: { status?: string }) {
     {
       key: "school",
       header: t("colSchool"),
-      cell: (row) => `${row.school_name} (${row.tenant_code})`,
+      cell: (row) => (
+        <span className="flex min-w-40 flex-col gap-0.5">
+          <Link
+            href={`/platform/schools/${row.tenant_id}?tab=deployment`}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {row.school_name}
+          </Link>
+          <code className="font-mono text-xs text-ink-muted">{row.tenant_code}</code>
+        </span>
+      ),
     },
-    { key: "mode", header: t("colMode"), cell: (row) => tmode(row.mode) },
-    { key: "region", header: t("colRegion"), cell: (row) => row.region },
+    { key: "mode", header: t("colMode"), cell: (row) => <TierTag tier={row.mode} /> },
+    {
+      key: "region",
+      header: t("colRegion"),
+      cell: (row) => <span className="font-mono text-xs whitespace-nowrap">{row.region}</span>,
+    },
     {
       key: "host",
       header: t("colHost"),
-      cell: (row) => <Value>{row.hostname ?? row.host_ref}</Value>,
+      cell: (row) => (
+        <span className="font-mono text-xs whitespace-nowrap">
+          <Value>{row.hostname ?? row.host_ref}</Value>
+        </span>
+      ),
     },
-    { key: "domain", header: t("colDomain"), cell: (row) => <Value>{row.custom_domain}</Value> },
+    {
+      key: "domain",
+      header: t("colDomain"),
+      cell: (row) => (
+        <span className="font-mono text-xs whitespace-nowrap">
+          <Value>{row.custom_domain}</Value>
+        </span>
+      ),
+    },
     {
       key: "version",
       header: t("colVersion"),
       cell: (row) => (
-        <span>
+        <span className="font-mono text-xs">
           <Value>{row.app_version}</Value>
           {row.target_version && row.target_version !== row.app_version ? (
             <span className="block text-xs text-ink-muted">
@@ -453,7 +483,12 @@ export function FleetScreen({ status = "" }: { status?: string }) {
     {
       key: "heartbeat",
       header: t("colHeartbeat"),
-      cell: (row) => <Value>{formatDateTime(row.last_heartbeat_at)}</Value>,
+      cell: (row) => (
+        <span className="relative flex flex-col items-start gap-1">
+          <HeartbeatPill at={row.last_heartbeat_at} status={row.status} />
+          <MonoTime value={row.last_heartbeat_at} />
+        </span>
+      ),
     },
     {
       key: "status",
@@ -483,13 +518,21 @@ export function FleetScreen({ status = "" }: { status?: string }) {
       key: "count",
       header: t("colDeployments"),
       className: "text-right tabular-nums",
-      cell: (row) => <Value>{formatCount(row.deployments, locale)}</Value>,
+      cell: (row) => (
+        <Mono>
+          <Value>{formatCount(row.deployments, locale)}</Value>
+        </Mono>
+      ),
     },
   ];
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
+      />
+      <FilterCard clearHref={status ? "/platform/fleet" : undefined}>
         <SelectField
           name="status"
           label={t("colStatus")}
@@ -500,10 +543,7 @@ export function FleetScreen({ status = "" }: { status?: string }) {
           ).map((value) => ({ value, label: tstatus(value) }))}
           className="w-52"
         />
-        <Button type="submit" variant="secondary">
-          {tc("applyFilters")}
-        </Button>
-      </form>
+      </FilterCard>
       <Card title={t("deploymentsTitle")}>
         <DataTable
           caption={t("deploymentsTitle")}
@@ -557,6 +597,7 @@ const breakGlassSchema = z.object({
  */
 export function BreakGlassScreen() {
   const t = useTranslations("platform.breakGlass");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const tstatus = useTranslations("status.breakGlass");
   const api = useBffClient("operator");
@@ -589,20 +630,7 @@ export function BreakGlassScreen() {
     {
       key: "emergency",
       header: t("colEmergency"),
-      cell: (row) =>
-        row.emergency ? (
-          <span>
-            <Badge tone="danger">{t("emergency")}</Badge>
-            <span className="block text-xs text-ink-muted">
-              {t("confirmations", {
-                count: [row.emergency_confirmed_by_1, row.emergency_confirmed_by_2].filter(Boolean)
-                  .length,
-              })}
-            </span>
-          </span>
-        ) : (
-          tc("no")
-        ),
+      cell: (row) => (row.emergency ? <EmergencyConfirmations request={row} /> : tc("no")),
     },
     {
       key: "status",
@@ -619,7 +647,7 @@ export function BreakGlassScreen() {
     {
       key: "created",
       header: t("colCreated"),
-      cell: (row) => <Value>{formatDateTime(row.created_at)}</Value>,
+      cell: (row) => <MonoTime value={row.created_at} />,
     },
     {
       key: "actions",
@@ -671,6 +699,7 @@ export function BreakGlassScreen() {
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={
           can("platform.breakglass.request") ? (
             <ActionDialog
@@ -727,7 +756,7 @@ export function BreakGlassScreen() {
                     defaultValue="60"
                     error={errors.duration_minutes}
                   />
-                  <label className="flex items-start gap-2 text-sm">
+                  <label className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
                     <input
                       type="checkbox"
                       name="emergency"
@@ -780,6 +809,7 @@ function summaryText(summary: Record<string, unknown>): string {
 /** FR-PLT-029 (docs/16 §5.17): filters, CSV export and chain verification. */
 export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditFilters }) {
   const t = useTranslations("platform.audit");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const locale = useLocale();
   const api = useBffClient("operator");
@@ -839,19 +869,29 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
   }
 
   const columns: Column<PlatformAuditEvent>[] = [
-    { key: "seq", header: t("colSeq"), className: "tabular-nums", cell: (row) => row.seq },
+    {
+      key: "seq",
+      header: t("colSeq"),
+      className: "tabular-nums",
+      cell: (row) => <Mono>{row.seq}</Mono>,
+    },
     {
       key: "when",
       header: t("colWhen"),
-      cell: (row) => <Value>{formatDateTime(row.occurred_at)}</Value>,
+      cell: (row) => <MonoTime value={row.occurred_at} />,
     },
     {
       key: "operator",
       header: t("colOperator"),
       cell: (row) =>
-        row.actor_type === "system"
-          ? t("system")
-          : `${t("operatorShort")} · ${row.actor_id?.slice(0, 8) ?? ""}`,
+        row.actor_type === "system" ? (
+          <Pill variant="tag">{t("system")}</Pill>
+        ) : (
+          <span className="whitespace-nowrap">
+            {t("operatorShort")}{" "}
+            <code className="font-mono text-xs">{row.actor_id?.slice(0, 8) ?? ""}</code>
+          </span>
+        ),
     },
     {
       key: "action",
@@ -866,10 +906,17 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
     {
       key: "resource",
       header: t("colResource"),
-      cell: (row) =>
-        `${row.resource_type}${row.resource_id ? ` · ${row.resource_id.slice(0, 8)}` : ""}`,
+      cell: (row) => (
+        <code className="font-mono text-xs">
+          {`${row.resource_type}${row.resource_id ? ` · ${row.resource_id.slice(0, 8)}` : ""}`}
+        </code>
+      ),
     },
-    { key: "summary", header: t("colSummary"), cell: (row) => summaryText(row.summary) },
+    {
+      key: "summary",
+      header: t("colSummary"),
+      cell: (row) => <span className="block max-w-md break-words">{summaryText(row.summary)}</span>,
+    },
   ];
 
   const result = verify.data;
@@ -878,6 +925,7 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={
           <>
             <Button variant="secondary" onClick={downloadCsv} disabled={exporting}>
@@ -902,7 +950,13 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
       ) : null}
       <ApiErrorAlert error={verify.error ?? undefined} />
       <ApiErrorAlert error={exportError} />
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      <FilterCard
+        clearHref={
+          filters.actor || filters.action || filters.tenantId || filters.from || filters.to
+            ? "/platform/audit"
+            : undefined
+        }
+      >
         <TextField
           name="actor"
           label={t("filterOperator")}
@@ -942,10 +996,7 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
           defaultValue={filters.to ?? ""}
           className="w-44"
         />
-        <Button type="submit" variant="secondary">
-          {tc("applyFilters")}
-        </Button>
-      </form>
+      </FilterCard>
       <DataTable
         caption={t("title")}
         captionHidden
@@ -956,5 +1007,24 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
         emptyBody={t("emptyBody")}
       />
     </div>
+  );
+}
+
+/** Two-person rule for an emergency request, spelled out: who has confirmed so far. */
+function EmergencyConfirmations({ request }: { request: BreakGlassRequest }) {
+  const t = useTranslations("platform.breakGlass");
+  const confirmed = [request.emergency_confirmed_by_1, request.emergency_confirmed_by_2].filter(
+    Boolean,
+  ).length;
+  return (
+    <span className="relative flex flex-col items-start gap-1">
+      <Badge tone="danger">{t("emergency")}</Badge>
+      <Pill variant={confirmed >= 2 ? "done" : "review"}>
+        {t("confirmations", { count: confirmed })}
+      </Pill>
+      {confirmed < 2 ? (
+        <span className="text-xs text-ink-muted">{t("needsSecondOperator")}</span>
+      ) : null}
+    </span>
   );
 }
