@@ -249,9 +249,7 @@ export function AppShell({
       >
         <div className="drawer-sheet">
           <div className="mb-3 flex items-center justify-between gap-2 px-1">
-            <p className="font-semibold text-ink">
-              {t("appName")}
-            </p>
+            <p className="font-semibold text-ink">{t("appName")}</p>
             <button
               type="button"
               onClick={closeMenu}

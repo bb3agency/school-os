@@ -1,9 +1,11 @@
-import { screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
+import { NextIntlClientProvider } from "next-intl";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/shell/AppShell";
-import { renderWithIntl } from "@/test/render";
+import { messages, renderWithIntl } from "@/test/render";
 import { AiPanel, QuoteBlock } from "./AiPanel";
 import { Avatar, AvatarStack, initials } from "./Avatar";
 import { DeltaPill, Pill } from "./Badge";
@@ -349,5 +351,78 @@ describe("grouped navigation and the app shell", () => {
     await user.keyboard("{Escape}");
     expect(menu).toHaveAttribute("aria-expanded", "false");
     expect(menu).toHaveFocus();
+  });
+
+  it("AppShell drawer: a named modal dialog with the grouped menu; focus moves in and comes back (NFR-A11Y-001)", async () => {
+    path.current = "/en/students";
+    const user = userEvent.setup();
+    renderWithIntl(
+      <AppShell brand={<p>SchoolOS</p>} homeHref="/" navLabel="Main" sections={SECTIONS}>
+        <h1>Page</h1>
+      </AppShell>,
+    );
+    const menu = screen.getByRole("button", { name: "Menu" });
+    const drawer = document.getElementById(menu.getAttribute("aria-controls") ?? "");
+    expect(drawer?.tagName).toBe("DIALOG");
+    expect(menu).toHaveAttribute("aria-haspopup", "dialog");
+    // Closed: no second "Main" navigation (only the lg panel's) and nothing to tab into.
+    expect(screen.getAllByRole("navigation", { name: "Main" })).toHaveLength(1);
+    expect(drawer).not.toHaveAttribute("open");
+
+    // Keyboard: Enter on the menu button opens the drawer and puts focus inside it.
+    menu.focus();
+    await user.keyboard("{Enter}");
+    const dialog = screen.getByRole("dialog", { name: "Menu" });
+    expect(dialog).toBe(drawer);
+    expect(dialog).toHaveAttribute("open");
+    const close = within(dialog).getByRole("button", { name: "Close menu" });
+    expect(close).toHaveFocus();
+    const nav = within(dialog).getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "Students" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    // Touch target: the close button is 44px (size-11), above the 24px minimum (WCAG 2.5.8).
+    expect(close).toHaveClass("size-11");
+
+    // The close button closes it and focus goes back to the menu button.
+    await user.click(close);
+    expect(dialog).not.toHaveAttribute("open");
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(menu).toHaveFocus();
+    expect(within(dialog).queryByRole("navigation")).toBeNull();
+
+    // A tap on the dimmed page (the <dialog> box itself, outside the sheet) closes it too.
+    await user.click(menu);
+    expect(dialog).toHaveAttribute("open");
+    await user.click(dialog);
+    expect(dialog).not.toHaveAttribute("open");
+    expect(menu).toHaveFocus();
+  });
+
+  it("AppShell drawer: following a link closes it (NFR-A11Y-001)", async () => {
+    path.current = "/en/students";
+    const user = userEvent.setup();
+    const shell = () => (
+      <AppShell brand={<p>SchoolOS</p>} homeHref="/" navLabel="Main" sections={SECTIONS}>
+        <h1>Page</h1>
+      </AppShell>
+    );
+    // Providers as a wrapper, so a re-render keeps them.
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <NextIntlClientProvider locale="en" messages={messages.en} timeZone="Asia/Kolkata">
+        {children}
+      </NextIntlClientProvider>
+    );
+    const { rerender } = render(shell(), { wrapper });
+    const menu = screen.getByRole("button", { name: "Menu" });
+    await user.click(menu);
+    const dialog = screen.getByRole("dialog", { name: "Menu" });
+    expect(dialog).toHaveAttribute("open");
+    // The router changes the path (same tree, new pathname).
+    path.current = "/en/imports";
+    rerender(shell());
+    expect(dialog).not.toHaveAttribute("open");
+    expect(menu).toHaveAttribute("aria-expanded", "false");
   });
 });
