@@ -9,7 +9,7 @@ presigned GETs valid for at most 5 minutes that always download as attachments.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
 
@@ -33,10 +33,13 @@ from app.documents.schemas import (
     DocumentCreate,
     DocumentDetail,
     DocumentOut,
+    DocumentSheetOut,
     DocumentStatus,
     DocumentUpdate,
     DownloadUrlOut,
     Purpose,
+    SheetExportIn,
+    SheetSaveIn,
     UploadCreate,
     UploadOut,
     VersionCreate,
@@ -47,6 +50,19 @@ router = APIRouter(prefix="/api/v1", tags=["documents"])
 Uploader = Annotated[UserContext, Depends(require(service.UPLOAD))]
 Reader = Annotated[UserContext, Depends(require(service.READ))]
 Manager = Annotated[UserContext, Depends(require(service.MANAGE, scope="school"))]
+SheetLimit = Annotated[int, Query(ge=1, le=200, description="Rows per page (max 200).")]
+
+_SHEET_FILE_DOC: dict[int | str, dict[str, Any]] = {
+    200: {
+        "description": "The sheet as a file (CSV: UTF-8 with BOM; XLSX: text cells)",
+        "content": {
+            "text/csv": {"schema": {"type": "string"}},
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {"type": "string", "format": "binary"}
+            },
+        },
+    }
+}
 
 
 def _created(doc: DocumentOut) -> dict[str, str]:
@@ -240,3 +256,71 @@ def delete_document(ctx: Manager, db: TenantDB, document_id: uuid.UUID) -> Respo
     Evidence still linked to a student record answers 409 ``document_in_use``."""
     service.delete_document(db, ctx, document_id)
     return Response(status_code=204)
+
+
+@router.get("/documents/{document_id}/sheet", response_model=DocumentSheetOut)
+def get_sheet(
+    *,
+    ctx: Reader,
+    db: TenantDB,
+    document_id: uuid.UUID,
+    response: Response,
+    limit: SheetLimit = 100,
+    cursor: Cursor = None,
+) -> DocumentSheetOut:
+    """Open an XLSX or CSV document as a table (permission ``document.read``; FR-DOC-009):
+    the first worksheet of the newest checked version, row 1 as column names, 100 rows per
+    page. ``sheet_count`` says when the workbook has more sheets (not shown). Aadhaar-like
+    numbers are masked; formulas are shown as text, never run. 415 ``not_a_sheet`` for other
+    files, 413 above 10 MB (download instead), 403 for restricted (C3) files as downloads.
+    ``editable`` says whether you may save edits as a new version; ``ETag`` is needed to save."""
+    response.headers["Cache-Control"] = "no-store"
+    out = service.get_sheet(db, ctx, document_id, limit=limit, cursor=cursor)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.post("/documents/{document_id}/sheet/versions", response_model=DocumentOut, status_code=202)
+def save_sheet_version(
+    *,
+    ctx: Uploader,
+    db: TenantDB,
+    document_id: uuid.UUID,
+    body: SheetSaveIn,
+    version: IfMatch,
+    idem: IdempotencyDep,
+) -> Response:
+    """Save edited cells as the next version (permission ``document.upload``; ``If-Match``;
+    FR-DOC-010). The current file is kept in the history; the new version (values only, an
+    XLSX) is checked for viruses and indexed like an upload (202). 409 for import files and
+    CSVs, archived documents, workbooks with several sheets or with formulas (edit those in a
+    spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full
+    Aadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.save_sheet_version(db, ctx, document_id, body, expected_version=version),
+        status_code=202,
+        headers=_created,
+    )
+
+
+@router.post(
+    "/documents/{document_id}/sheet/export", response_class=Response, responses=_SHEET_FILE_DOC
+)
+def export_sheet(
+    ctx: Reader, db: TenantDB, document_id: uuid.UUID, body: SheetExportIn
+) -> Response:
+    """Download the sheet, with any unsaved edits, as CSV or XLSX (permission
+    ``document.read``, as downloads; FR-DOC-011). Aadhaar-like numbers masked, formulas
+    neutralised, CSV in UTF-8 with BOM so Telugu opens in Excel. Every download is audited."""
+    file = service.export_sheet(db, ctx, document_id, body)
+    return Response(
+        content=file.content,
+        media_type=file.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{file.filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

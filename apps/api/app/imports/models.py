@@ -10,7 +10,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKeyConstraint, Integer, Text, text
+from sqlalchemy import Boolean, ForeignKeyConstraint, Integer, LargeBinary, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -94,3 +94,30 @@ class ImportRow(Base):
     student_id: Mapped[uuid.UUID | None]
     created_student: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     student_version: Mapped[int | None] = mapped_column(Integer)
+
+
+class ImportCellEdit(Base):
+    """One staged cell edit (migration 0030_import_cell_edits; FR-IMP-008). Values are
+    ciphertext under the school's key; the history is append-only for ``sos_app``."""
+
+    __tablename__ = "import_cell_edits"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "batch_id"],
+            ["sis.import_batches.tenant_id", "sis.import_batches.id"],
+            ondelete="CASCADE",
+        ),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    batch_id: Mapped[uuid.UUID]
+    batch_version: Mapped[int] = mapped_column(Integer)
+    row_no: Mapped[int] = mapped_column(Integer)
+    column_index: Mapped[int] = mapped_column(Integer)
+    old_value_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    new_value_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    key_version: Mapped[int | None] = mapped_column(Integer)
+    edited_by: Mapped[uuid.UUID]
+    edited_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))

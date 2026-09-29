@@ -48,8 +48,17 @@ from app.core.errors import Conflict, DomainError, NotFound, PreconditionFailed,
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.core.redaction import mask_aadhaar
+from app.core.spreadsheet import (
+    CSV_MIME,
+    XLSX_MIME,
+    column_letter,
+    display_text,
+    write_csv,
+    write_xlsx,
+)
 from app.documents import service as documents
 from app.identity import service as identity
+from app.imports import cells
 from app.imports import repository as repo
 from app.imports.config import import_config
 from app.imports.mapping import (
@@ -66,15 +75,32 @@ from app.imports.schemas import (
     ImportCreate,
     ImportOut,
     ImportRowOut,
+    ImportSheetOut,
     ImportSummary,
     Issue,
     MappingIn,
+    RowEditIn,
+    SheetCellOut,
+    SheetColumnOut,
+    SheetEditOut,
+    SheetFormat,
+    SheetReadOnly,
+    SheetRowOut,
     TemplateCreate,
     TemplateOut,
 )
-from app.imports.sheet import FileKind, Sheet, SheetError, read_sheet
+from app.imports.sheet import (
+    Cell,
+    FileKind,
+    Sheet,
+    SheetError,
+    SheetRow,
+    read_sheet,
+    with_edits,
+)
 from app.imports.validation import (
     AADHAAR_CODE,
+    AADHAAR_MESSAGE_KEY,
     ANCHOR_SOURCE,
     AttributeSpec,
     ExistingStudent,
@@ -92,6 +118,7 @@ from app.imports.validation import (
 from app.imports.values import ClassInfo, ClassResolver, cell_text
 from app.notifications import service as notifications
 from app.ops import service as ops
+from app.students import rotation as key_rotation
 from app.students import service as students
 from app.students.schemas import StudentCreate, ValueIn
 from app.tenancy import service as tenancy
@@ -101,6 +128,7 @@ log = get_logger(__name__)
 RUN: Final = "import.run"
 COMMIT: Final = "import.commit"
 CREATE_STUDENT: Final = "student.create"
+READ_SENSITIVE: Final = "student.read_sensitive"
 
 PARSE_EVENT: Final = "import.parse_requested"
 VALIDATE_EVENT: Final = "import.validate_requested"
@@ -491,28 +519,36 @@ def _store_validation(
 # --- file -----------------------------------------------------------------------------------------
 
 
+def _raw_file(session: Session, batch: ImportBatch) -> tuple[bytes, FileKind]:
+    """The batch's raw file (SHA-256 checked); ``SheetError`` for any problem."""
+    if batch.document_id is None:
+        raise SheetError("file_missing")
+    try:
+        obj = documents.document_object(session, batch.document_id)
+    except NotFound as exc:
+        raise SheetError("file_missing") from exc
+    except Conflict as exc:
+        raise SheetError(exc.code) from exc
+    kind = MIME_KINDS.get(obj.mime_type)
+    if kind is None:
+        raise SheetError("unsupported_file_type")
+    try:
+        data = documents.read_document_object(session, obj)
+    except (Conflict, NotFound) as exc:
+        raise SheetError("file_changed" if isinstance(exc, Conflict) else "file_missing") from exc
+    return data, kind
+
+
 def _load_sheet(tenant_id: uuid.UUID, user_id: uuid.UUID, batch_id: uuid.UUID) -> Sheet:
-    """Read and parse the batch's raw file (SHA-256 checked); ``SheetError`` for any problem."""
+    """Read and parse the batch's raw file with its staged cell edits applied (FR-IMP-008):
+    parsing, validation and commit all see the edited sheet; the file itself never changes."""
     with tenant_session(tenant_id, user_id) as s:
         batch = repo.get_batch(s, batch_id)
-        if batch is None or batch.document_id is None:
+        if batch is None:
             raise SheetError("file_missing")
-        try:
-            obj = documents.document_object(s, batch.document_id)
-        except NotFound as exc:
-            raise SheetError("file_missing") from exc
-        except Conflict as exc:
-            raise SheetError(exc.code) from exc
-        kind = MIME_KINDS.get(obj.mime_type)
-        if kind is None:
-            raise SheetError("unsupported_file_type")
-        try:
-            data = documents.read_document_object(s, obj)
-        except (Conflict, NotFound) as exc:
-            raise SheetError(
-                "file_changed" if isinstance(exc, Conflict) else "file_missing"
-            ) from exc
-    return read_sheet(data, kind, import_config().limits)
+        data, kind = _raw_file(s, batch)
+        edits = cells.current_values(s, batch_id)
+    return with_edits(read_sheet(data, kind, import_config().limits), edits)
 
 
 # --- create, read, mapping (API) ------------------------------------------------------------------
@@ -790,6 +826,410 @@ def request_commit(
         },
     )
     return _out(session, updated)
+
+
+# --- staged sheet: view, edit, download (FR-IMP-008, FR-IMP-009) ---------------------------------
+
+NOT_READY: Final = ("uploaded", "parsing")
+IN_PROGRESS: Final = ("validating", "committing", "reverting")
+_EDIT_CONTROL_RE: Final = re.compile(r"[\x00-\x1f\x7f]")
+_READ_ONLY_MESSAGES: Final[dict[str, str]] = {
+    "committed": (
+        "These rows were added to the student records, so the sheet can no longer be edited. "
+        "Correct a record on the student's profile or with a change request."
+    ),
+    "reverted": "This import was reverted. Upload the file again to import it.",
+    "in_progress": "The file is being checked or added right now. Try again in a minute.",
+    "failed": "This import stopped with an error. Upload the file again.",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class SheetFile:
+    """A generated download: bytes in memory, never stored."""
+
+    filename: str
+    media_type: str
+    content: bytes
+
+
+def _read_only_reason(batch: ImportBatch) -> SheetReadOnly | None:
+    if batch.status in EDITABLE:
+        return None
+    if batch.status in ("committed", "reverted", "failed"):
+        return batch.status  # type: ignore[return-value]  # literal members checked above
+    return "in_progress"
+
+
+def _staged_sheet(
+    session: Session, batch: ImportBatch
+) -> tuple[Sheet, dict[cells.CellKey, str | None]]:
+    """The raw file with the batch's current cell edits applied, in the caller's transaction."""
+    if batch.status in NOT_READY:
+        raise Conflict(
+            "The file is still being read. Try again in a minute.", code="import_not_ready"
+        )
+    try:
+        data, kind = _raw_file(session, batch)
+        sheet = read_sheet(data, kind, import_config().limits)
+    except SheetError as exc:
+        if exc.code == "file_missing":
+            raise Conflict(
+                "The uploaded file is no longer kept (it is deleted 90 days after the import).",
+                code="file_missing",
+            ) from exc
+        raise Conflict(
+            "The uploaded file cannot be read. Upload the file again.", code=exc.code
+        ) from exc
+    edits = cells.current_values(session, batch.id)
+    return with_edits(sheet, edits), edits
+
+
+def _restricted_columns(
+    batch: ImportBatch, width: int, specs: Mapping[str, AttributeSpec]
+) -> set[int]:
+    """Columns that fill a restricted (C3) field: never shown or edited in the sheet."""
+    out: set[int] = set()
+    for key, target in batch.mapping.items():
+        spec = specs.get(target)
+        if key.isdigit() and int(key) < width and spec is not None and spec.sensitive:
+            out.add(int(key))
+    return out
+
+
+def _sheet_cell(cell: Cell, *, restricted: bool, edited: bool) -> SheetCellOut:
+    if restricted:
+        return SheetCellOut(value=None, edited=edited, restricted=True, formula=False)
+    text = display_text(cell.value)
+    return SheetCellOut(
+        value=mask_aadhaar(text) if text is not None else None,
+        edited=edited,
+        restricted=False,
+        formula=cell.formula,
+    )
+
+
+def _sheet_row(
+    row: SheetRow,
+    width: int,
+    stored: ImportRow | None,
+    restricted: set[int],
+    edited: set[tuple[int, int]],
+) -> SheetRowOut:
+    return SheetRowOut(
+        row_no=row.row_no,
+        cells=[
+            _sheet_cell(row.cell(i), restricted=i in restricted, edited=(row.row_no, i) in edited)
+            for i in range(width)
+        ],
+        status=stored.status if stored is not None else None,
+        errors=[Issue(**e) for e in stored.errors] if stored is not None else [],
+        warnings=[Issue(**w) for w in stored.warnings] if stored is not None else [],
+    )
+
+
+def _sheet_offset(cursor: str | None) -> int:
+    decoded = decode_cursor(cursor)
+    if decoded is None:
+        return 0
+    value = decoded.get("o")
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValidationFailed([issue("cursor", "invalid", "errors.invalid_cursor")])
+    return value
+
+
+def get_sheet(
+    session: Session,
+    ctx: UserContext,
+    batch_id: uuid.UUID,
+    *,
+    limit: int,
+    cursor: str | None = None,
+) -> ImportSheetOut:
+    """A page of the staged sheet: every uploaded column (with the field it fills), the cells
+    with staged edits applied, and each row's check result (``import.run``). Restricted (C3)
+    columns show no values; Aadhaar-like numbers are masked (invariant 4)."""
+    batch = _visible(session, ctx, batch_id, RUN)
+    sheet, edits = _staged_sheet(session, batch)
+    offset = _sheet_offset(cursor)
+    width = len(sheet.headers)
+    specs = _specs(session)
+    restricted = _restricted_columns(batch, width, specs)
+    reason = _read_only_reason(batch)
+    page = sheet.rows[offset : offset + limit]
+    stored = {r.row_no: r for r in repo.rows_by_no(session, batch.id, [r.row_no for r in page])}
+    edited = set(edits)
+    more = offset + limit < len(sheet.rows)
+    return ImportSheetOut(
+        import_id=batch.id,
+        status=batch.status,
+        version=batch.version,
+        editable=reason is None,
+        read_only_reason=reason,
+        header_row=sheet.header_row,
+        total_rows=len(sheet.rows),
+        offset=offset,
+        edited_cells=len(edits),
+        columns=[
+            SheetColumnOut(
+                index=i,
+                letter=column_letter(i),
+                header=mask_aadhaar(header)[:100],
+                target=batch.mapping.get(str(i)),
+                restricted=i in restricted,
+                editable=reason is None and i not in restricted,
+            )
+            for i, header in enumerate(sheet.headers)
+        ],
+        data=[_sheet_row(r, width, stored.get(r.row_no), restricted, edited) for r in page],
+        next_cursor=encode_cursor({"o": offset + limit}) if more else None,
+    )
+
+
+def _edit_problems(data: RowEditIn, width: int, restricted: set[int]) -> list[dict[str, str]]:
+    """Field errors for a row edit; values are never echoed (invariant 4 and 5)."""
+    limits = import_config().limits
+    problems: list[dict[str, str]] = []
+    seen: set[int] = set()
+    for i, change in enumerate(data.cells):
+        where = f"cells.{i}"
+        if change.column in seen:
+            problems.append(issue(f"{where}.column", "duplicate_column"))
+        seen.add(change.column)
+        if change.column >= width:
+            problems.append(issue(f"{where}.column", "unknown_column"))
+        elif change.column in restricted:
+            problems.append(issue(f"{where}.column", "column_restricted"))
+        value = change.value
+        if value is None:
+            continue
+        if is_full_aadhaar(value):
+            problems.append(issue(f"{where}.value", AADHAAR_CODE, AADHAAR_MESSAGE_KEY))
+        elif _EDIT_CONTROL_RE.search(value):
+            problems.append(issue(f"{where}.value", "control_characters"))
+        elif len(value) > limits.max_cell_chars:
+            problems.append(issue(f"{where}.value", "too_long"))
+    return problems
+
+
+def _refresh_checks(
+    session: Session,
+    ctx: UserContext,
+    batch: ImportBatch,
+    sheet: Sheet,
+    specs: Mapping[str, AttributeSpec],
+) -> tuple[ValidationResult, list[int]]:
+    """Re-check the edited sheet with the existing validation (FR-IMP-003) and store the rows
+    whose result changed; returns the result and the changed row numbers."""
+    context = _validation_context(session, ctx, batch, sheet, RUN)
+    result = validate_sheet(sheet, batch.mapping, context)
+    stored = {r.row_no: r for r in repo.all_rows(session, batch.id)}
+    if set(stored) != {r.row_no for r in result.rows}:
+        rows = [_row_values(r, specs) for r in result.rows]
+        repo.replace_rows(session, batch.tenant_id, batch.id, rows)
+        return result, [r.row_no for r in result.rows]
+    changed: list[int] = []
+    for r in result.rows:
+        values = _row_values(r, specs)
+        old = stored[r.row_no]
+        if (
+            old.parsed != values["parsed"]
+            or old.errors != values["errors"]
+            or old.warnings != values["warnings"]
+            or old.status != values["status"]
+            or old.action != values["action"]
+            or old.student_id != values["student_id"]
+        ):
+            repo.update_row(
+                session,
+                batch.id,
+                r.row_no,
+                parsed=values["parsed"],
+                errors=values["errors"],
+                warnings=values["warnings"],
+                status=values["status"],
+                action=values["action"],
+                student_id=values["student_id"],
+            )
+            changed.append(r.row_no)
+    return result, changed
+
+
+def edit_row(
+    session: Session,
+    ctx: UserContext,
+    batch_id: uuid.UUID,
+    row_no: int,
+    data: RowEditIn,
+    *,
+    expected_version: int,
+) -> SheetEditOut:
+    """Change cells of one staged row before the import is added (``import.run``; ``If-Match``
+    with the import's ETag; FR-IMP-008).
+
+    Only a ``parsed`` or ``validated`` import can be edited (409 ``import_not_editable`` once
+    it was added, reverted, or while a check runs): official records are never edited here
+    (invariant 6). The raw file is kept as uploaded; each edit is stored encrypted with who and
+    when (``sis.import_cell_edits``) and applied whenever the file is read, so the commit adds
+    the edited values. A full Aadhaar number, control characters, over-long text, restricted
+    (C3) or unknown columns answer 422 without storing anything. A checked import re-checks
+    the edited sheet with the same rules as ``validate`` and stores the rows whose result
+    changed. Audit: ``import.cell_edited`` per cell (row, column and field only, never values).
+    """
+    batch = _visible(session, ctx, batch_id, RUN, lock=True)
+    if batch.version != expected_version:
+        raise PreconditionFailed(
+            "The import was changed meanwhile. Reload the sheet and try again."
+        )
+    reason = _read_only_reason(batch)
+    if reason is not None:
+        raise Conflict(_READ_ONLY_MESSAGES[reason], code="import_not_editable")
+    sheet, edits = _staged_sheet(session, batch)
+    width = len(sheet.headers)
+    specs = _specs(session)
+    restricted = _restricted_columns(batch, width, specs)
+    problems = _edit_problems(data, width, restricted)
+    if problems:
+        raise ValidationFailed(problems)
+    row = next((r for r in sheet.rows if r.row_no == row_no), None)
+    if row is None:
+        raise NotFound("Row not found")
+    changes = {
+        c.column: c.value for c in data.cells if display_text(row.cell(c.column).value) != c.value
+    }
+    if not changes:
+        stored = repo.rows_by_no(session, batch.id, [row_no])
+        return SheetEditOut(
+            row=_sheet_row(row, width, stored[0] if stored else None, restricted, set(edits)),
+            version=batch.version,
+            status=batch.status,
+            row_count=batch.row_count,
+            error_count=batch.error_count,
+            changed_rows=[],
+        )
+    new_version = batch.version + 1
+    records: list[dict[str, Any]] = []
+    for column, value in changes.items():
+        edit_id = new_id()
+        old = display_text(row.cell(column).value)
+        old_blob, old_key = cells.encrypt(session, old, column=cells.OLD_COLUMN, edit_id=edit_id)
+        new_blob, new_key = cells.encrypt(session, value, column=cells.NEW_COLUMN, edit_id=edit_id)
+        records.append(
+            {
+                "id": edit_id,
+                "tenant_id": batch.tenant_id,
+                "batch_id": batch.id,
+                "batch_version": new_version,
+                "row_no": row_no,
+                "column_index": column,
+                "old_value_ciphertext": old_blob,
+                "new_value_ciphertext": new_blob,
+                "key_version": new_key or old_key,
+                "edited_by": ctx.user_id,
+            }
+        )
+    repo.insert_cell_edits(session, records)
+    edited_sheet = with_edits(sheet, {(row_no, c): v for c, v in changes.items()})
+    changed: list[int] = []
+    counts: dict[str, Any] = {}
+    if batch.status == "validated":
+        result, changed = _refresh_checks(session, ctx, batch, edited_sheet, specs)
+        counts = {
+            "stats": result.stats,
+            "row_count": len(result.rows),
+            "error_count": result.error_rows,
+        }
+    updated = repo.update_batch(session, batch.id, **counts)
+    if updated is None:  # pragma: no cover - locked above
+        raise _not_found()
+    for record in records:
+        column = int(record["column_index"])
+        target = batch.mapping.get(str(column))
+        _audit(
+            session,
+            "import.cell_edited",
+            batch.id,
+            {
+                "edit_id": record["id"],
+                "row_no": row_no,
+                "column": column,
+                "field": target if target is not None else f"column_{column + 1}",
+                "cleared": changes[column] is None,
+                "revalidated": batch.status == "validated",
+            },
+        )
+    log.info(
+        "imports.sheet.cells_edited",
+        resource_type="import_batch",
+        resource_id=batch.id,
+        count=len(records),
+    )
+    edited = set(edits) | {(row_no, c) for c in changes}
+    new_row = next(r for r in edited_sheet.rows if r.row_no == row_no)
+    stored = repo.rows_by_no(session, batch.id, [row_no])
+    return SheetEditOut(
+        row=_sheet_row(new_row, width, stored[0] if stored else None, restricted, edited),
+        version=updated.version,
+        status=updated.status,
+        row_count=updated.row_count,
+        error_count=updated.error_count,
+        changed_rows=[n for n in changed if n != row_no],
+    )
+
+
+def export_sheet(
+    session: Session, ctx: UserContext, batch_id: uuid.UUID, fmt: SheetFormat
+) -> SheetFile:
+    """The staged sheet with its edits as CSV (UTF-8 with BOM) or XLSX (FR-IMP-009;
+    ``import.run`` and a recent sign-in with MFA, FR-EXP-004).
+
+    One header row (the file's headers) and every data row in file order. Aadhaar-like numbers
+    are masked, formula-like text is neutralised (SEC-017), XLSX cells are text. Restricted (C3)
+    columns keep their header but are empty unless the caller may see sensitive fields
+    (``student.read_sensitive``). Audit ``import.sheet_exported`` (counts only) in this
+    transaction, before the file is returned; nothing is stored.
+    """
+    batch = _visible(session, ctx, batch_id, RUN)
+    sheet, edits = _staged_sheet(session, batch)
+    width = len(sheet.headers)
+    restricted = _restricted_columns(batch, width, _specs(session))
+    reveal = ctx.has(READ_SENSITIVE)
+    hidden = set() if reveal else restricted
+    header = list(sheet.headers)
+    rows = [
+        [None if i in hidden else display_text(row.cell(i).value) for i in range(width)]
+        for row in sheet.rows
+    ]
+    stem = f"import-{str(batch.id)[:8]}-sheet"
+    if fmt == "csv":
+        out = SheetFile(f"{stem}.csv", CSV_MIME, write_csv(header, rows))
+    else:
+        out = SheetFile(
+            f"{stem}.xlsx",
+            XLSX_MIME,
+            write_xlsx(header, rows, title="Import", watermark=import_config().sheet_watermark),
+        )
+    _audit(
+        session,
+        "import.sheet_exported",
+        batch.id,
+        {
+            "format": fmt,
+            "rows": len(rows),
+            "columns": width,
+            "edited_cells": len(edits),
+            "restricted_columns": len(restricted),
+            "restricted_included": bool(restricted) and reveal,
+            "status": batch.status,
+        },
+    )
+    log.info(
+        "imports.sheet.exported",
+        resource_type="import_batch",
+        resource_id=batch.id,
+        count=len(rows),
+    )
+    return out
 
 
 # --- templates ------------------------------------------------------------------------------------
@@ -1406,6 +1846,9 @@ def _retention_guard(session: Session, document_id: uuid.UUID) -> str | None:
 if _retention_guard not in documents.DELETE_GUARDS:
     documents.DELETE_GUARDS.append(_retention_guard)
 
+# DEK rotation re-encrypts the staged cell edits too (SEC-012; docs/05 §9).
+key_rotation.register_reencryptor("import_cell_edits", cells.reencrypt_batch)
+
 
 def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> int:
     """Delete raw import files kept past the retention period (daily job, FR-IMP-007); the
@@ -1454,10 +1897,14 @@ __all__ = [
     "REVERTED_EVENT",
     "RUN",
     "VALIDATE_TASK",
+    "SheetFile",
     "abandon",
     "create_import",
     "create_template",
+    "edit_row",
+    "export_sheet",
     "get_import",
+    "get_sheet",
     "list_imports",
     "list_rows",
     "list_templates",

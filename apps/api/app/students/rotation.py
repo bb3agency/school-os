@@ -82,6 +82,8 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     ("sis.guardians", "address_ciphertext"),
     ("sis.change_requests", "new_value_ciphertext"),
     ("sis.change_requests", "old_value_ciphertext"),
+    ("sis.import_cell_edits", "old_value_ciphertext"),
+    ("sis.import_cell_edits", "new_value_ciphertext"),
     ("kb.queries", "question_ciphertext"),
     ("kb.queries", "answer_ciphertext"),
 )

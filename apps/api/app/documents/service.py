@@ -37,8 +37,9 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import re
 import uuid
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Final
@@ -48,6 +49,7 @@ from sqlalchemy.orm import Session
 
 from app.audit import service as audit
 from app.authz.context import ScopeGrant, UserContext
+from app.authz.http import decode_cursor, encode_cursor
 from app.core.config import Settings, get_settings
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -60,7 +62,18 @@ from app.core.errors import (
 )
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
-from app.documents import filetypes
+from app.core.redaction import contains_full_aadhaar
+from app.core.spreadsheet import (
+    CSV_MIME,
+    XLSX_MIME,
+    SpreadsheetError,
+    column_letter,
+    display_text,
+    write_csv,
+    write_xlsx,
+)
+from app.core.spreadsheet import FileKind as SpreadsheetKind
+from app.documents import filetypes, sheets
 from app.documents import repository as repo
 from app.documents.filetypes import FileKind
 from app.documents.models import Document, DocumentAcl, DocumentVersion, UploadIntent
@@ -68,11 +81,19 @@ from app.documents.scanning import AvScanner, ScanResult, Verdict, build_scanner
 from app.documents.schemas import (
     AclEntry,
     AclEntryOut,
+    DocSheetCellOut,
+    DocSheetColumnOut,
+    DocSheetRowOut,
     DocumentCreate,
     DocumentDetail,
     DocumentOut,
+    DocumentSheetOut,
     DocumentUpdate,
     DownloadUrlOut,
+    SheetCellEdit,
+    SheetExportIn,
+    SheetReadOnly,
+    SheetSaveIn,
     UploadCreate,
     UploaderOut,
     UploadOut,
@@ -1584,6 +1605,386 @@ def store_page_image(
     return key
 
 
+# --- sheets: view, save as new version, download (FR-DOC-009..011) ------------------------------
+
+SHEET_KINDS: Final[dict[str, SpreadsheetKind]] = {
+    filetypes.XLSX.mime: "xlsx",
+    filetypes.CSV.mime: "csv",
+}
+_SHEET_CONTROL_RE: Final = re.compile(r"[\x00-\x1f\x7f]")
+
+
+@dataclass(frozen=True, slots=True)
+class SheetFile:
+    """A generated download: bytes in memory, never stored."""
+
+    filename: str
+    media_type: str
+    content: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class _SheetSource:
+    doc: Document
+    version: DocumentVersion
+    grid: sheets.Grid
+
+
+def _sheet_source(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    *,
+    version_no: int | None = None,
+    for_update: bool = False,
+) -> _SheetSource:
+    """The document's newest checked version (or ``version_no``) read as a sheet: visible to
+    the caller (404), C3 only for sensitive readers or the uploader (403, as downloads),
+    scanned (409), XLSX or CSV (415) and within the viewer limits (413)."""
+    doc = repo.get_document(
+        session, document_id, visibility=_visibility(session, ctx), for_update=for_update
+    )
+    if doc is None:
+        raise _not_found()
+    if doc.sensitivity == "C3" and not (
+        ctx.has("student.read_sensitive") or doc.created_by == ctx.user_id
+    ):
+        raise Forbidden(
+            "Restricted (C3) files can be opened only by staff allowed to see sensitive data.",
+            code="sensitive_document",
+        )
+    if version_no is None:
+        version = repo.latest_version_with_status(session, doc.id, ("ready",))
+        if version is None:
+            raise Conflict(
+                "The file is still being checked. Try again shortly.", code="document_not_ready"
+            )
+    else:
+        version = repo.get_version(session, doc.id, version_no)
+        if version is None:
+            raise NotFound("Version not found")
+        if version.status != "ready":
+            raise Conflict("This version cannot be opened yet.", code="document_not_ready")
+    kind = SHEET_KINDS.get(version.mime_type)
+    if kind is None:
+        raise UnsupportedFileType(
+            "Only spreadsheets (XLSX or CSV) open as a sheet. Download the file instead.",
+            code="not_a_sheet",
+        )
+    limits = sheets.sheet_config().limits
+    if version.size_bytes > limits.max_file_bytes:
+        raise FileTooLarge(
+            f"Sheets larger than {limits.max_file_bytes // 2**20} MB cannot be opened here. "
+            "Download the file instead."
+        )
+    obj = StoredObject(
+        document_id=doc.id,
+        version_id=version.id,
+        version_no=version.version_no,
+        purpose=doc.purpose,
+        object_key=version.object_key,
+        mime_type=version.mime_type,
+        size_bytes=version.size_bytes,
+        sha256_hex=version.sha256.hex(),
+        status=version.status,
+    )
+    data = read_document_object(session, obj)
+    try:
+        grid = sheets.read_grid(data, kind, limits)
+    except SpreadsheetError as exc:
+        raise Conflict(
+            "This spreadsheet cannot be shown here. Download the file instead.", code=exc.code
+        ) from exc
+    return _SheetSource(doc, version, grid)
+
+
+def _sheet_read_only(ctx: UserContext, source: _SheetSource) -> SheetReadOnly | None:
+    """Why the caller cannot save edits of this sheet as a new version (``None``: they can);
+    the first rule that applies, in this order."""
+    doc, grid = source.doc, source.grid
+    rules: tuple[tuple[bool, SheetReadOnly], ...] = (
+        (not ctx.has(UPLOAD), "no_permission"),
+        (not purpose_rule(doc.purpose).versionable or grid.kind != "xlsx", "not_versionable"),
+        (doc.status == "archived", "archived"),
+        (grid.sheet_count > 1, "several_sheets"),
+        (grid.formula_cells > 0, "formulas"),
+        (doc.current_version_id != source.version.id, "newer_version"),
+    )
+    return next((reason for applies, reason in rules if applies), None)
+
+
+_SAVE_REFUSALS: Final[dict[str, tuple[str, str]]] = {
+    "no_permission": ("You cannot upload new versions of documents.", "forbidden"),
+    "not_versionable": (
+        "This file cannot get new versions here. Download it, edit it and upload it again.",
+        "not_versionable",
+    ),
+    "archived": ("This document is archived. Unarchive it first.", "document_archived"),
+    "several_sheets": (
+        "This workbook has more than one sheet. Edit it in a spreadsheet program and upload a "
+        "new version, so the other sheets are kept.",
+        "workbook_has_several_sheets",
+    ),
+    "formulas": (
+        "This sheet has formulas. Edit it in a spreadsheet program and upload a new version, so "
+        "the formulas are kept.",
+        "workbook_has_formulas",
+    ),
+    "newer_version": (
+        "A newer version of this document is being checked. Reload the sheet when it is ready.",
+        "version_conflict",
+    ),
+}
+
+
+def _sheet_edits(
+    data: Sequence[SheetCellEdit], grid: sheets.Grid
+) -> dict[sheets.CellKey, str | None]:
+    """Checked edits keyed by cell; 422 without echoing any value (invariants 4 and 5)."""
+    cfg = sheets.sheet_config()
+    problems: list[dict[str, str]] = []
+    out: dict[sheets.CellKey, str | None] = {}
+    if len(data) > cfg.max_edit_cells:
+        raise _invalid("edits", "too_many_edits")
+    for i, edit in enumerate(data):
+        where = f"edits.{i}"
+        key = (edit.row_no, edit.column)
+        if key in out:
+            problems.append(_error(where, "duplicate_cell"))
+        if edit.row_no > len(grid.rows):
+            problems.append(_error(f"{where}.row_no", "unknown_row"))
+        if edit.column >= sheets.sheet_config().limits.max_columns:
+            problems.append(_error(f"{where}.column", "unknown_column"))
+        value = edit.value
+        if value is not None:
+            if contains_full_aadhaar(value):
+                problems.append(
+                    {
+                        "field": f"{where}.value",
+                        "code": "aadhaar_full_number_rejected",
+                        "message_key": "errors.aadhaar_last4_only",
+                    }
+                )
+            elif _SHEET_CONTROL_RE.search(value):
+                problems.append(_error(f"{where}.value", "control_characters"))
+            elif len(value) > cfg.max_value_chars:
+                problems.append(_error(f"{where}.value", "too_long"))
+        out[key] = value
+    if problems:
+        raise ValidationFailed(problems)
+    return out
+
+
+def _sheet_offset(cursor: str | None) -> int:
+    decoded = decode_cursor(cursor)
+    if decoded is None:
+        return 0
+    value = decoded.get("o")
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise _invalid("cursor", "invalid")
+    return value
+
+
+def get_sheet(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    *,
+    limit: int,
+    cursor: str | None = None,
+) -> DocumentSheetOut:
+    """A page of the first worksheet of the newest checked XLSX/CSV version (permission
+    ``document.read``; FR-DOC-009). Row 1 gives the column names; Aadhaar-like numbers are
+    masked; formulas are shown as text and never evaluated."""
+    source = _sheet_source(session, ctx, document_id)
+    grid = source.grid
+    offset = _sheet_offset(cursor)
+    first = offset + 2  # data rows start at spreadsheet row 2
+    page = range(first, min(first + limit, len(grid.rows) + 1))
+    reason = _sheet_read_only(ctx, source)
+    return DocumentSheetOut(
+        document_id=source.doc.id,
+        version_no=source.version.version_no,
+        version=source.doc.version,
+        kind=grid.kind,
+        sheet_count=grid.sheet_count,
+        editable=reason is None,
+        read_only_reason=reason,
+        total_rows=grid.data_rows,
+        offset=offset,
+        columns=[
+            DocSheetColumnOut(
+                index=i, letter=column_letter(i), header=sheets.cell_display(grid.cell(1, i))
+            )
+            for i in range(grid.width)
+        ],
+        data=[
+            DocSheetRowOut(
+                row_no=row_no,
+                cells=[
+                    DocSheetCellOut(
+                        value=sheets.cell_display(grid.cell(row_no, i)),
+                        formula=grid.cell(row_no, i).formula,
+                    )
+                    for i in range(grid.width)
+                ],
+            )
+            for row_no in page
+        ],
+        next_cursor=encode_cursor({"o": offset + limit})
+        if offset + limit < grid.data_rows
+        else None,
+    )
+
+
+def _cell_refs(edits: Mapping[sheets.CellKey, str | None]) -> list[str]:
+    return [f"{column_letter(c)}{r}" for r, c in sorted(edits)][:100]
+
+
+def save_sheet_version(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    data: SheetSaveIn,
+    *,
+    expected_version: int,
+    store: ObjectStore | None = None,
+) -> DocumentOut:
+    """Save edited cells as the next version (permission ``document.upload``; ``If-Match``;
+    FR-DOC-010). The stored file is never changed: the edited sheet is written as a new XLSX
+    version (values only; Aadhaar-like numbers masked), stored SSE-KMS under the tenant prefix,
+    made current, and queued for the malware scan and indexing like any upload (FR-DOC-002,
+    FR-DOC-006). Refused (409) for import files and CSVs, archived documents, workbooks with
+    more than one sheet or with formulas, and when ``base_version_no`` is not the current
+    version. Audit ``document.version_added`` and ``document.sheet_edited`` (cell references and
+    counts, never values)."""
+    source = _sheet_source(
+        session, ctx, document_id, version_no=data.base_version_no, for_update=True
+    )
+    doc = source.doc
+    if doc.version != expected_version:
+        raise PreconditionFailed("The document was changed meanwhile. Reload the sheet.")
+    reason = _sheet_read_only(ctx, source)
+    if reason is not None:
+        message, code = _SAVE_REFUSALS[reason]
+        if reason == "no_permission":
+            raise Forbidden(message, code=code)
+        raise Conflict(message, code=code)
+    edits = _sheet_edits(data.edits, source.grid)
+    edited = sheets.apply_edits(source.grid, edits)
+    content = sheets.build_xlsx(edited, title=doc.title)
+    rule = purpose_rule(doc.purpose)
+    if len(content) > rule.max_bytes:
+        raise FileTooLarge("The edited sheet is larger than allowed for this document.")
+    digest = hashlib.sha256(content).digest()
+    if source.version.sha256 == digest:
+        raise Conflict("The sheet is the same as the current version.", code="version_unchanged")
+    tenant_id = repo.current_tenant_id(session)
+    new_no = repo.max_version_no(session, doc.id) + 1
+    key = document_key(tenant_id, doc.id, new_no, filetypes.XLSX.ext)
+    store = store or get_object_store()
+    try:
+        store.put(key, content, filetypes.XLSX.mime)
+    except ObjectStoreError as exc:
+        raise Conflict(
+            "The new version could not be stored. Try again.", code="storage_unavailable"
+        ) from exc
+    with _undo_object_on_error(store, key), _db_errors():
+        version = repo.insert_version(
+            session,
+            id=new_id(),
+            tenant_id=tenant_id,
+            document_id=doc.id,
+            version_no=new_no,
+            object_key=key,
+            sha256=digest,
+            mime_type=filetypes.XLSX.mime,
+            size_bytes=len(content),
+            status="queued",
+            created_by=ctx.user_id,
+        )
+        updated = repo.update_document(
+            session, doc.id, expected_version=None, current_version_id=version.id
+        )
+        if updated is None:  # pragma: no cover - row locked above
+            raise _not_found()
+        _audit(
+            session,
+            "document.version_added",
+            doc.id,
+            {
+                "version_no": version.version_no,
+                "mime_type": version.mime_type,
+                "size_bytes": version.size_bytes,
+                "source": "sheet_editor",
+                "base_version_no": source.version.version_no,
+            },
+        )
+        _audit(
+            session,
+            "document.sheet_edited",
+            doc.id,
+            {
+                "version_no": version.version_no,
+                "base_version_no": source.version.version_no,
+                "edited_cells": len(edits),
+                "cells": _cell_refs(edits),
+            },
+        )
+        ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
+    log.info(
+        "documents.sheet.saved", resource_type="document", resource_id=doc.id, count=len(edits)
+    )
+    return _load_out(session, ctx, updated)
+
+
+def export_sheet(
+    session: Session, ctx: UserContext, document_id: uuid.UUID, data: SheetExportIn
+) -> SheetFile:
+    """The sheet (with any unsaved ``edits``) as CSV (UTF-8 with BOM) or XLSX (permission
+    ``document.read``; FR-DOC-011). Row 1 stays the header row; Aadhaar-like numbers are masked,
+    formula-like text is neutralised and XLSX cells are text (SEC-017). Audit
+    ``document.sheet_exported`` (counts only) in this transaction; nothing is stored."""
+    source = _sheet_source(session, ctx, document_id, version_no=data.base_version_no)
+    edits = _sheet_edits(data.edits, source.grid)
+    grid = sheets.apply_edits(source.grid, edits)
+    values = [
+        [display_text(grid.cell(r, c).value) for c in range(grid.width)]
+        for r in range(1, len(grid.rows) + 1)
+    ]
+    header, rows = values[0], values[1:]
+    stem = f"{source.doc.doc_type}-{str(source.doc.id)[:8]}-v{source.version.version_no}-sheet"
+    if data.format == "csv":
+        out = SheetFile(f"{stem}.csv", CSV_MIME, write_csv(header, rows))
+    else:
+        out = SheetFile(
+            f"{stem}.xlsx",
+            XLSX_MIME,
+            write_xlsx(
+                header, rows, title=source.doc.title, watermark=sheets.sheet_config().watermark
+            ),
+        )
+    _audit(
+        session,
+        "document.sheet_exported",
+        source.doc.id,
+        {
+            "format": data.format,
+            "version_no": source.version.version_no,
+            "rows": len(rows),
+            "columns": grid.width,
+            "edited_cells": len(edits),
+        },
+    )
+    log.info(
+        "documents.sheet.exported",
+        resource_type="document",
+        resource_id=source.doc.id,
+        count=len(rows),
+    )
+    return out
+
+
 # --- export files (app.exports; docs/04 §8.2 t/<tenant>/exports/<export_id>/<file>) ---------------
 
 
@@ -1653,6 +2054,7 @@ __all__ = [
     "RETENTION_REASONS",
     "STATUS_CHANGED_HOOKS",
     "FileTooLarge",
+    "SheetFile",
     "StoredObject",
     "UnsupportedFileType",
     "add_version",
@@ -1665,8 +2067,10 @@ __all__ = [
     "document_object",
     "evidence_exists",
     "export_download_url",
+    "export_sheet",
     "get_document",
     "get_download_url",
+    "get_sheet",
     "is_visible",
     "list_documents",
     "mark_scan_failed",
@@ -1675,6 +2079,7 @@ __all__ = [
     "read_document_object",
     "register_document",
     "replace_with_redacted",
+    "save_sheet_version",
     "scan_version",
     "set_acl",
     "set_document_status",

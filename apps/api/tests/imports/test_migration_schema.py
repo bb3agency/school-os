@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import sys
+import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any
@@ -82,6 +83,7 @@ def test_SEC_001_import_tables_are_isolated(world: Any, admin_engine: Engine) ->
         "import_batches",
         "import_rows",
         "import_mapping_templates",
+        "import_cell_edits",  # 0030_import_cell_edits (FR-IMP-008)
     }
     assert all(r.relrowsecurity and r.relforcerowsecurity for r in rows)
     assert "(tenant_id, import_batch_id)" in fk
@@ -195,3 +197,43 @@ def test_CLAUDE_6_12_imports_migration_reversible_with_data(populated: _Walk) ->
         )
         == 1
     )
+
+
+def test_CLAUDE_6_12_cell_edits_migration_reversible_with_data(populated: _Walk) -> None:
+    """0030_import_cell_edits (FR-IMP-008) walks down and up on a populated database: the edit
+    history goes with the table, batches and their rows stay."""
+    admin = populated.admin
+    with admin.begin() as c:
+        batch = c.execute(
+            text("SELECT id, tenant_id, created_by FROM sis.import_batches ORDER BY id LIMIT 1")
+        ).one()
+        c.execute(
+            text(
+                "INSERT INTO sis.import_cell_edits (id, tenant_id, batch_id, batch_version, "
+                "row_no, column_index, new_value_ciphertext, key_version, edited_by) VALUES "
+                "(:i, :t, :b, 2, 2, 1, :blob, 1, :u)"
+            ),
+            {
+                "i": uuid.uuid4(),
+                "t": batch.tenant_id,
+                "b": batch.id,
+                "blob": b"\x01\x00\x01synthetic",
+                "u": batch.created_by,
+            },
+        )
+    batches = _scalar(admin, "SELECT count(*) FROM sis.import_batches")
+    rows = _scalar(admin, "SELECT count(*) FROM sis.import_rows")
+    command.downgrade(populated.cfg, "0029_kb_v2")
+    assert _scalar(admin, "SELECT to_regclass('sis.import_cell_edits') IS NULL") is True
+    assert _scalar(admin, "SELECT count(*) FROM sis.import_batches") == batches
+    assert _scalar(admin, "SELECT count(*) FROM sis.import_rows") == rows
+    command.upgrade(populated.cfg, "head")
+    assert _scalar(admin, "SELECT count(*) FROM sis.import_cell_edits") == 0
+    grants = _scalar(
+        admin,
+        "SELECT string_agg(privilege_type, ',' ORDER BY privilege_type) "
+        "FROM information_schema.role_table_grants WHERE grantee = 'sos_app' "
+        "AND table_schema = 'sis' AND table_name = 'import_cell_edits'",
+    )
+    assert "DELETE" not in grants  # the edit history is append-only for the app
+    assert "UPDATE" not in grants  # only the ciphertext columns (column grants, re-encryption)
