@@ -216,6 +216,72 @@ def _load_promotion_support() -> ModuleType:
 
 PR = _load_promotion_support()
 
+
+def _load_circulars_support() -> ModuleType:
+    """tests/circulars/support.py (circulars, tasks and notices through the real services)."""
+    name = "sos_test_circulars_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "circulars" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+CI = _load_circulars_support()
+
+
+def _circular_read(w: Any, r: str, a: Engine) -> Request:
+    document_id, _, _ = CI.fresh_circular(a, w.a)
+    return f"/api/v1/circulars/{document_id}/read", {}, {}
+
+
+def _circular_review(w: Any, r: str, a: Engine) -> Request:
+    document_id, _, _ = CI.fresh_circular(a, w.a, reading="needs_review")
+    return f"/api/v1/circulars/{document_id}/review", {}, _if_match(1)
+
+
+def _suggestion(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        _, _, suggestion_id = CI.fresh_circular(a, w.a, reading="ready", suggestion=True)
+        body: dict[str, Any] = {}
+        if action == "confirm":
+            body = {"owner_membership_id": str(w.person(r).membership_id)}
+        path = f"/api/v1/circular-suggestions/{suggestion_id}/{action}"
+        return path, body, _if_match(1)
+
+    return build
+
+
+def _own_task(w: Any, r: str) -> uuid.UUID:
+    task_id: uuid.UUID = CI.task(w.a, owner=w.person(r), by="owner")
+    return task_id
+
+
+def _notice(state: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        if state == "draft":
+            notice_id, version = CI.complete_notice(w.a)
+            return (
+                f"/api/v1/notices/{notice_id}",
+                {"title_en": "Sports day 2026"},
+                _if_match(version),
+            )
+        if state == "approve":
+            notice_id, version = CI.complete_notice(w.a)
+            return f"/api/v1/notices/{notice_id}/approve", {}, _if_match(version)
+        if state == "render":
+            notice_id, version = CI.rendered_notice(a, w.a, state="failed")
+            return f"/api/v1/notices/{notice_id}/render", {}, _if_match(version)
+        notice_id, _version = CI.rendered_notice(a, w.a)
+        return f"/api/v1/notices/{notice_id}/download-url?format=png", None, {}
+
+    return build
+
+
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
 _years = itertools.count(2100)
@@ -1249,6 +1315,54 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/knowledge/verified-answers"): _kb_verified,
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): _kb_manage("review"),
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): _kb_manage("retire"),
+    # Circulars, tasks and parent notices (M4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
+    ("GET", "/api/v1/circulars"): lambda w, r, a: ("/api/v1/circulars", None, {}),
+    ("GET", "/api/v1/circulars/{document_id}"): lambda w, r, a: (
+        f"/api/v1/circulars/{KB.shared_document(a, w.a)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/circulars/{document_id}/read"): _circular_read,
+    ("POST", "/api/v1/circulars/{document_id}/review"): _circular_review,
+    ("POST", "/api/v1/circular-suggestions/{suggestion_id}/confirm"): _suggestion("confirm"),
+    ("POST", "/api/v1/circular-suggestions/{suggestion_id}/dismiss"): _suggestion("dismiss"),
+    ("GET", "/api/v1/tasks"): lambda w, r, a: ("/api/v1/tasks", None, {}),
+    ("POST", "/api/v1/tasks"): lambda w, r, a: (
+        "/api/v1/tasks",
+        {
+            "title": "Send the synthetic report",
+            "owner_membership_id": str(w.person(r).membership_id),
+            "due_on": "2026-12-01",
+        },
+        {},
+    ),
+    ("GET", "/api/v1/task-assignees"): lambda w, r, a: ("/api/v1/task-assignees", None, {}),
+    ("GET", "/api/v1/tasks/{task_id}"): lambda w, r, a: (
+        f"/api/v1/tasks/{_own_task(w, r)}",
+        None,
+        {},
+    ),
+    ("PATCH", "/api/v1/tasks/{task_id}"): lambda w, r, a: (
+        f"/api/v1/tasks/{_own_task(w, r)}",
+        {"title": "Send the synthetic report today"},
+        _if_match(1),
+    ),
+    ("POST", "/api/v1/tasks/{task_id}/status"): lambda w, r, a: (
+        f"/api/v1/tasks/{_own_task(w, r)}/status",
+        {"status": "in_progress"},
+        _if_match(1),
+    ),
+    ("GET", "/api/v1/notices"): lambda w, r, a: ("/api/v1/notices", None, {}),
+    ("POST", "/api/v1/notices"): lambda w, r, a: ("/api/v1/notices", {"source": "blank"}, {}),
+    ("GET", "/api/v1/notices/{notice_id}"): lambda w, r, a: (
+        f"/api/v1/notices/{CI.complete_notice(w.a)[0]}",
+        None,
+        {},
+    ),
+    ("PATCH", "/api/v1/notices/{notice_id}"): _notice("draft"),
+    ("POST", "/api/v1/notices/{notice_id}/approve"): _notice("approve"),
+    ("POST", "/api/v1/notices/{notice_id}/render"): _notice("render"),
+    ("GET", "/api/v1/notices/{notice_id}/download-url"): _notice("download"),
 }
 
 
@@ -1343,6 +1457,9 @@ def _success(method: str, path: str) -> int:
         "/api/v1/change-requests",
         "/api/v1/academic-years/{year_id}/promotions:commit",
         "/api/v1/knowledge/verified-answers",
+        "/api/v1/tasks",
+        "/api/v1/notices",
+        "/api/v1/circular-suggestions/{suggestion_id}/confirm",
     }
     accepted = {
         "/api/v1/documents",
@@ -1356,6 +1473,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/exports",
         "/api/v1/exports/student-list",
         "/api/v1/admin/tenant-export",
+        "/api/v1/circulars/{document_id}/read",
+        "/api/v1/notices/{notice_id}/render",
     }
     if method == "POST" and path in accepted:
         return 202

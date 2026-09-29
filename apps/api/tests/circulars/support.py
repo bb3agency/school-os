@@ -196,6 +196,109 @@ def render_all(school: Any, notice_id: uuid.UUID) -> str:
     return service.render_notice(school.tenant_id, notice_id)
 
 
+# --- fresh objects for the security suites (authz matrix, BOLA): synthetic rows per call ---------
+
+
+def fresh_circular(
+    admin: Engine, school: Any, *, reading: str | None = None, suggestion: bool = False
+) -> tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None]:
+    """A circular every role may see, not indexed (so no reading is queued), optionally with a
+    reading row (``ready`` or ``needs_review``) and one suggestion (ids only, synthetic text)."""
+    document_id, version_id = KB.text_document(
+        admin,
+        school,
+        "Submit the synthetic report by 15/10/2026.",
+        title=f"Synthetic circular {W.unique()}",
+        acl=KB.ALL_ROLES_ACL,
+        ingest=False,
+    )
+    reading_id = suggestion_id = None
+    if reading is not None:
+        reading_id, suggestion_id = uuid.uuid4(), uuid.uuid4()
+        with admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO kb.circular_readings (id, tenant_id, document_id, version_id, "
+                    "version_no, status, error_code, completed_at) VALUES (:i, :t, :d, :v, 1, :s, "
+                    ":e, now())"
+                ),
+                {
+                    "i": reading_id,
+                    "t": school.tenant_id,
+                    "d": document_id,
+                    "v": version_id,
+                    "s": reading,
+                    "e": "ai_unavailable" if reading == "needs_review" else None,
+                },
+            )
+            if suggestion:
+                c.execute(
+                    text(
+                        "INSERT INTO kb.circular_suggestions (id, tenant_id, reading_id, position, "
+                        "title, due_on, citation) VALUES (:i, :t, :r, 1, 'Submit the report', "
+                        "'2026-10-15', CAST(:c AS jsonb))"
+                    ),
+                    {
+                        "i": suggestion_id,
+                        "t": school.tenant_id,
+                        "r": reading_id,
+                        "c": '{"source": "sos://doc/' + str(document_id) + '/v1#p1", '
+                        '"passage": 1, "page": 1, "quote": "Submit the synthetic report by '
+                        '15/10/2026."}',
+                    },
+                )
+    return document_id, reading_id, suggestion_id if suggestion else None
+
+
+def complete_notice(school: Any, *, approved: bool = False) -> tuple[uuid.UUID, int]:
+    """A draft with both languages filled (version 2), or approved (version 3)."""
+    actor = ctx(school, "owner")
+    from app.circulars.schemas import NoticeUpdate
+
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        out = service.create_notice(db, actor, NoticeCreate(source="blank"))
+        draft = service.update_notice(
+            db,
+            actor,
+            out.id,
+            NoticeUpdate(
+                title_en="Sports day",
+                body_en="Sports day is on 14/11/2026.",
+                title_te="క్రీడా దినోత్సవం",
+                body_te="క్రీడా దినోత్సవం 14/11/2026న.",
+            ),
+            out.version,
+        )
+        version = draft.version
+        if approved:
+            version = service.approve_notice(db, actor, out.id, draft.version).version
+    return out.id, version
+
+
+def rendered_notice(admin: Engine, school: Any, *, state: str = "ready") -> tuple[uuid.UUID, int]:
+    """An approved notice whose files are ``ready`` (keys set) or whose rendering ``failed``."""
+    notice_id, version = complete_notice(school, approved=True)
+    prefix = f"t/{school.tenant_id}/exports/{notice_id}/notice"
+    with admin.begin() as c:
+        if state == "ready":
+            c.execute(
+                text(
+                    "UPDATE ops.parent_notices SET render_status = 'ready', pdf_key = :p, "
+                    "png_key = :g, rendered_at = now() WHERE id = :i"
+                ),
+                {"p": prefix + ".pdf", "g": prefix + ".png", "i": notice_id},
+            )
+        else:
+            c.execute(
+                text(
+                    "UPDATE ops.parent_notices SET render_status = 'failed', "
+                    "render_error = 'render_failed' WHERE id = :i"
+                ),
+                {"i": notice_id},
+            )
+    return notice_id, version
+
+
 def db_value(admin: Engine, sql: str, **params: Any) -> Any:
     with admin.connect() as c:
         return c.execute(text(sql), params).scalar_one()

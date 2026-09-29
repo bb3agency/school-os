@@ -139,6 +139,18 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): {"feedback": "helpful"},
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): {},
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): None,
+    # M4: circulars (document ids), suggestions, tasks and notices of school B are 404.
+    ("POST", "/api/v1/circulars/{document_id}/read"): {},
+    ("POST", "/api/v1/circulars/{document_id}/review"): {},
+    ("POST", "/api/v1/circular-suggestions/{suggestion_id}/confirm"): {
+        "owner_membership_id": "01920000-0000-7000-8000-000000000001"
+    },
+    ("POST", "/api/v1/circular-suggestions/{suggestion_id}/dismiss"): {},
+    ("PATCH", "/api/v1/tasks/{task_id}"): {"title": "Synthetic"},
+    ("POST", "/api/v1/tasks/{task_id}/status"): {"status": "done"},
+    ("PATCH", "/api/v1/notices/{notice_id}"): {"title_en": "Synthetic"},
+    ("POST", "/api/v1/notices/{notice_id}/approve"): {},
+    ("POST", "/api/v1/notices/{notice_id}/render"): {},
 }
 
 
@@ -434,6 +446,47 @@ def _b_verified_answer(w: Any) -> uuid.UUID:
     return value
 
 
+def _circ() -> ModuleType:
+    """tests/circulars/support.py (circulars, tasks and notices through the real services)."""
+    name = "sos_test_circulars_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "circulars" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_suggestion(w: Any) -> uuid.UUID:
+    """A suggested deadline of a circular of school B (M4, FR-CIR-004)."""
+    if "bola_suggestion" not in w.b.ids:
+        _doc, _reading, suggestion = _circ().fresh_circular(
+            _ADMIN[0], w.b, reading="ready", suggestion=True
+        )
+        w.b.ids["bola_suggestion"] = suggestion
+    value: uuid.UUID = w.b.ids["bola_suggestion"]
+    return value
+
+
+def _b_task(w: Any) -> uuid.UUID:
+    """A task of school B (FR-TASK-002)."""
+    if "bola_task" not in w.b.ids:
+        w.b.ids["bola_task"] = _circ().task(w.b)
+    value: uuid.UUID = w.b.ids["bola_task"]
+    return value
+
+
+def _b_notice(w: Any) -> uuid.UUID:
+    """An approved parent notice of school B with rendered files (FR-NOTICE-006)."""
+    if "bola_notice" not in w.b.ids:
+        w.b.ids["bola_notice"] = _circ().rendered_notice(_ADMIN[0], w.b)[0]
+    value: uuid.UUID = w.b.ids["bola_notice"]
+    return value
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -467,6 +520,10 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "query_id": _b_query,
     # Knowledge (FR-KB-030): a verified answer of school B.
     "answer_id": _b_verified_answer,
+    # Circulars, tasks and notices (M4): a suggestion, a task and a notice of school B.
+    "suggestion_id": _b_suggestion,
+    "task_id": _b_task,
+    "notice_id": _b_notice,
 }
 
 

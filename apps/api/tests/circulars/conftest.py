@@ -32,6 +32,12 @@ def _load(name: str, path: Path) -> ModuleType:
     return sys.modules[name]
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers", "chromium: renders with the real headless Chromium (skipped when absent)"
+    )
+
+
 C = _load("sos_test_circulars_support", Path(__file__).with_name("support.py"))
 W = C.W
 world = W.world
