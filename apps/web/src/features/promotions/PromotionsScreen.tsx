@@ -489,7 +489,10 @@ function PlanCard({
           />
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Keyed by variant: a new button, not a colour transition, when the main action
+                moves to "Promote students" (no half-faded text for a moment). */}
             <Button
+              key={preview && !stale ? "secondary" : "primary"}
               variant={preview && !stale ? "secondary" : "primary"}
               onClick={() => {
                 setPreviewedFor(request);
