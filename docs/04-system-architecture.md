@@ -234,7 +234,7 @@ s3://sos-<env>-files/
   t/<tenant_id>/docs/<document_id>/v<version>/derived/pages/<n>.png  # page renders for citations
   t/<tenant_id>/imports/<batch_id>/raw.<ext>
   t/<tenant_id>/exports/<export_id>/<file>                            # lifecycle: delete after 7 days
-  t/<tenant_id>/tenant-export/<job_id>.zip                            # lifecycle: delete after 2 days
+  t/<tenant_id>/tenant-export/<export_id>.zip                         # FR-ADM-001; purged 24 h after ready, lifecycle backstop 2 days
 s3://sos-<env>-audit-archive/  (Object Lock, compliance mode)
   t/<tenant_id>/yyyy/mm/dd/audit-<date>.jsonl.gz + .sig
 ```

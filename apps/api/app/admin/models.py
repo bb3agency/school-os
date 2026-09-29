@@ -1,4 +1,4 @@
-"""Admin tables in schema ``ops`` (migration 0031_admin, docs/05 §7.4).
+"""Admin tables in schema ``ops`` (migration 0031_admin, docs/05 §7.3).
 
 Typed mappings for queries only; DDL (RLS, CHECKs, the one-live index, composite FKs, column
 grants) lives in the migration.

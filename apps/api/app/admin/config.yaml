@@ -1,4 +1,4 @@
-# School admin console: the school's full data export (US-1201, FR-ADM-001; docs/05 §7.4).
+# School admin console: the school's full data export (US-1201, FR-ADM-001; docs/05 §7.3).
 # Versioned configuration shipped inside the package next to the module that reads it
 # (app/admin/config.py; CLAUDE.md §4, invariant 13).
 version: 1

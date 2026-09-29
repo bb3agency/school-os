@@ -1,4 +1,4 @@
-"""School admin console data: full data exports and retention settings (docs/05 §7.4;
+"""School admin console data: full data exports and retention settings (docs/05 §7.3;
 US-1201, FR-ADM-001, FR-ADM-002, BR-08).
 
 Tables (tenant-owned in schema ``ops``: ``tenant_id`` first, ``UNIQUE (tenant_id, id)``, RLS
