@@ -157,6 +157,7 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
                           type="checkbox"
                           name={`${rule.key}.enabled`}
                           defaultChecked={rule.enabled}
+                          aria-label={t("enabledFor", { rule: ruleName(rule.key) })}
                         />
                         {t("on")}
                       </label>

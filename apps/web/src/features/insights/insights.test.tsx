@@ -331,8 +331,14 @@ describe("flags list (US-1705, US-1706, US-1708; FR-EW-009, FR-EW-015)", () => {
     );
     await userEvent.clear(input);
     await userEvent.type(input, "80");
-    // Only one on/off switch: attendance_rate (attendance_streak is always on).
+    // Only one on/off switch: attendance_rate (attendance_streak is always on). It is named
+    // after its rule, not just "On" (several switches would otherwise sound the same).
     expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+    expect(
+      screen.getByRole("checkbox", {
+        name: `Use the rule ${en.insights.rules.names.attendance_rate}`,
+      }),
+    ).toBeChecked();
     await userEvent.click(screen.getByRole("button", { name: en.insights.rules.save }));
     await waitFor(() => expect(stub.callsTo("PUT /bff/api/v1/insights/settings")).toHaveLength(1));
     const call = stub.callsTo("PUT /bff/api/v1/insights/settings")[0];
