@@ -44,7 +44,6 @@ roles:
       kb.ask: school
       audit.read: school
       finance.read: school
-      insights.read: school
       breakglass.approve: school_step_up
       tenant.export_all: school_step_up
       export.read_all: school
@@ -93,6 +92,14 @@ roles:
       audit.read: school
       finance.read: school
       insights.read: school
+      insights.note: school
+      insights.act: school
+      insights.manage: school_step_up
+      attendance.record: school
+      attendance.read: school
+      exam.manage: school
+      marks.record: school
+      marks.read: school
       breakglass.approve: school_step_up
       support.ticket.create: school
       certificate.read: school
@@ -136,6 +143,8 @@ roles:
       certificate.read: school
       certificate.issue: school
       register.read: school_step_up
+      attendance.record: school
+      attendance.read: school
 
   office_staff:
     name_en: Office staff
@@ -192,6 +201,9 @@ roles:
       export.board: school_step_up
       export.portal: school_step_up
       support.ticket.create: school
+      exam.manage: school
+      marks.record: school
+      marks.read: school
 
   class_teacher:
     name_en: Class teacher
@@ -206,6 +218,12 @@ roles:
       document.read: scoped
       kb.ask: scoped
       insights.read: scoped
+      insights.note: scoped
+      insights.act: scoped
+      attendance.record: scoped
+      attendance.read: scoped
+      marks.record: scoped
+      marks.read: scoped
       support.ticket.create: school
 
   teacher:

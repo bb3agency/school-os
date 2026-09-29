@@ -187,6 +187,42 @@ permissions:
     sensitivity: sensitive
     step_up: false
 
+  # --- student timeline and early warning (M5; 0035_student_insights; FR-ATT/MRK/EW) -------
+  # Attendance and marks are C2 school records; notes and flags are C3 and purpose-limited
+  # (docs/08 §4 PRV-003..005): only educational roles for that student (class teacher, principal).
+  attendance.record:
+    description: "Mark and import attendance (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  attendance.read:
+    description: "See attendance registers (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  exam.manage:
+    description: Add exams to the academic year
+    sensitivity: normal
+    step_up: false
+  marks.record:
+    description: "Enter and import marks (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  marks.read:
+    description: "See marks (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  insights.note:
+    description: Write behaviour notes about students (educational purposes only)
+    sensitivity: sensitive
+    step_up: false
+  insights.act:
+    description: "Follow up early-warning flags: record actions, raise and close flags"
+    sensitivity: sensitive
+    step_up: false
+  insights.manage:
+    description: Reassign flags, set the school's early-warning thresholds and erase notes or flags
+    sensitivity: critical
+    step_up: true
+
   # --- certificates and registers (M3; US-1101..US-1108, FR-CERT-*, FR-REG-*) --------------
   # Migration 0033_certificates upserts these into core.permissions.
   certificate.read:

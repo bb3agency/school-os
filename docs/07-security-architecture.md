@@ -188,7 +188,15 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | export.download_any (download other staff's exports; ADR-0021) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | audit.read | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
 | finance.read (M6) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
-| insights.read (M5) | ✓ | ✓ | — | — | — | — | S | — | — |
+| insights.read (M5: see behaviour notes, flags, indicators and the student timeline; educational roles only, 08 PRV-004, so not the owner; also needs student.read_sensitive in the same scope; proposed, PO to confirm) | — | ✓ | — | — | — | — | S | — | — |
+| insights.note (M5: write behaviour notes) | — | ✓ | — | — | — | — | S | — | — |
+| insights.act (M5: record actions on flags, raise and close flags) | — | ✓ | — | — | — | — | S | — | — |
+| insights.manage (M5: reassign flags, set thresholds within bounds, erase notes or flags) | — | ✓ᴿ | — | — | — | — | — | — | — |
+| attendance.record (M5: mark and import attendance) | — | ✓ | ✓ | — | — | — | S | — | — |
+| attendance.read (M5: attendance registers) | — | ✓ | ✓ | — | — | — | S | — | — |
+| exam.manage (M5: add exams to the year) | — | ✓ | — | — | — | ✓ | — | — | — |
+| marks.record (M5: enter and import marks) | — | ✓ | — | — | — | ✓ | S | — | — |
+| marks.read (M5: see marks) | — | ✓ | — | — | — | ✓ | S | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | tenant.export_all | ✓ᴿ | — | — | — | — | — | — | — | — |
 | certificate.read (see, print and download certificates; M3) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ |
