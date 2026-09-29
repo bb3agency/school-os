@@ -26,6 +26,7 @@ Nothing here is ever sent to an AI provider. Logs carry ids and counts only (inv
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 import uuid
 from collections import Counter
@@ -258,10 +259,15 @@ def attendance_day(
 
 
 def _month_bounds(month: str) -> tuple[dt.date, dt.date]:
+    """First and last day of ``YYYY-MM``; 422 ``invalid_month`` outside the calendar (years 1
+    to 9999)."""
     year, mon = (int(p) for p in month.split("-"))
-    first = dt.date(year, mon, 1)
-    nxt = dt.date(year + (mon == 12), mon % 12 + 1, 1)
-    return first, nxt - dt.timedelta(days=1)
+    try:
+        first = dt.date(year, mon, 1)
+        last = dt.date(year, mon, calendar.monthrange(year, mon)[1])
+    except ValueError:
+        raise ValidationFailed([_error("month", "invalid_month")]) from None
+    return first, last
 
 
 def attendance_month(

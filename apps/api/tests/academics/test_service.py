@@ -211,6 +211,21 @@ def test_FR_ATT_003_month_register_lists_school_days(school: Any) -> None:
         assert day.isoformat() in row.days
 
 
+def test_FR_ATT_003_a_month_outside_the_calendar_is_refused_not_an_error(school: Any) -> None:
+    # "YYYY-MM" passes the route's pattern; dt.date() refused year 0 and, for December 9999,
+    # the first day of the next month (500).
+    actor = S.principal_ctx(school)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, actor.user_id) as db,
+    ):
+        academics.attendance_month(db, actor, school.ids["section_9a"], "0000-01")
+    assert _codes(err) == {"invalid_month"}
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        last = academics.attendance_month(db, actor, school.ids["section_9a"], "9999-12")
+    assert last.school_days == []
+
+
 # --- sheets ---------------------------------------------------------------------------------------
 
 
