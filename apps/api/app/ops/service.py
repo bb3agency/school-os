@@ -21,6 +21,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.audit.schemas import sanitize_summary
+from app.core import purge as purging
 from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
 from app.ops import repository as repo
@@ -249,6 +250,33 @@ __all__ = [
     "fail_job",
     "finish_job",
     "purge_idempotency_keys",
+    "purge_tenant_data",
     "register_outbox_route",
     "start_job",
+    "tenant_data_counts",
 ]
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Job runs, idempotency keys and the outbox.
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=("ops.job_runs", "ops.idempotency_keys", "ops.outbox"),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="ops", count=tenant_data_counts, purge=purge_tenant_data)
+)

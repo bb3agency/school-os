@@ -40,6 +40,7 @@ from app.authz.catalog import (
     system_roles,
 )
 from app.authz.context import UserContext
+from app.core import purge as purging
 from app.core.config import get_settings
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
@@ -1344,3 +1345,54 @@ def _register_hooks() -> None:
 
 
 _register_hooks()
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+
+FORMER_STAFF_DISPLAY_NAME = "Former staff member"
+"""Profile name left on a person whose only school was offboarded (ADR-0029). The account row
+(and its sign-in identity) is removed by the identity work that replaces Cognito (docs/16 §5.5)."""
+
+
+def clear_sole_profiles(session: Session) -> int:
+    """Offboarding prepare step (as ``sos_app``, before memberships go): clear the profile
+    (name, email, phone, last sign-in) of each person whose ONLY membership is the current school
+    (``core.user_membership_count``, ADR-0028). People who also work at another school keep their
+    shared profile. Returns the number of profiles cleared. No audit here: the purge records
+    ``tenant.data_purged`` with this count in the same transaction."""
+    return repo.clear_sole_profiles(session, placeholder=FORMER_STAFF_DISPLAY_NAME)
+
+
+# Memberships with their roles and scopes, the school's roles (profiles: prepare step).
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=(
+        "core.membership_scopes",
+        "core.membership_roles",
+        "core.memberships",
+        "core.role_permissions",
+        "core.roles",
+    ),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(
+        name="identity",
+        count=tenant_data_counts,
+        purge=purge_tenant_data,
+        prepare=clear_sole_profiles,
+    )
+)

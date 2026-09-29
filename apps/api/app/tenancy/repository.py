@@ -240,6 +240,17 @@ def update_tenant_settings(
     ).one_or_none()
 
 
+def clear_tenant_settings(session: Session) -> int:
+    """Offboarding (ADR-0029): reset the current school's settings to ``{}``; 1 if it changed."""
+    result = session.execute(
+        update(Tenant)
+        .where(Tenant.settings != text("'{}'::jsonb"))
+        .values(settings={}, version=Tenant.version + 1),
+        execution_options={"synchronize_session": False},
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 # --- academic years ------------------------------------------------------------------------
 
 

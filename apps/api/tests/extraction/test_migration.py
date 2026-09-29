@@ -160,7 +160,9 @@ def test_SEC_001_extraction_tables_are_tenant_isolated(admin_engine: Engine) -> 
                     {"s": schema, "n": name},
                 ).scalars()
             )
-            assert policies == {"tenant_isolation"}, table
+            # ADR-0029: plus the restrictive offboarding purge policy for sos_purger only
+            # (its shape is pinned by tests/tenancy/test_offboarding_purge.py).
+            assert policies == {"tenant_isolation", "offboarding_purge"}, table
             can_delete: object = c.execute(
                 text("SELECT has_table_privilege('sos_app', :t, 'DELETE')"), {"t": table}
             ).scalar_one()
@@ -228,6 +230,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0029_invoice_pdfs",
         "0029_kb_v2",
         "0030_import_cell_edits",
+        "0032_offboarding",
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

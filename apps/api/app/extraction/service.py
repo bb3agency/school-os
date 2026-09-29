@@ -50,6 +50,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, encode_cursor
+from app.core import purge as purging
 from app.core.config import Settings, get_settings
 from app.core.db import tenant_session
 from app.core.errors import Conflict, DomainError, Forbidden, NotFound, ValidationFailed
@@ -86,6 +87,7 @@ from app.notifications import service as notifications
 from app.ops import service as ops
 from app.students import service as students
 from app.students.schemas import SearchFilters, StudentCreate, StudentSummary, ValueIn
+from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
 
@@ -999,5 +1001,32 @@ __all__ = [
     "list_batches",
     "list_items",
     "process_batch",
+    "purge_tenant_data",
     "reject_item",
+    "tenant_data_counts",
 ]
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Register-photo extraction batches, pages and items.
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=("sis.extraction_items", "sis.extraction_pages", "sis.extraction_batches"),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="extraction", count=tenant_data_counts, purge=purge_tenant_data)
+)

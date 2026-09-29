@@ -202,6 +202,17 @@ class MemoryStore:
             del self.objects[k]
         return len(doomed)
 
+    def count_prefix(self, prefix: str) -> int:
+        storage.check_tenant_prefix(prefix)
+        return sum(1 for k in self.objects if k.startswith(prefix))
+
+    def purge_prefix(self, prefix: str) -> int:
+        storage.check_tenant_prefix(prefix)
+        doomed = [k for k in self.objects if k.startswith(prefix)]
+        for key in doomed:
+            self.discard(key)
+        return len(doomed)
+
 
 _STORE = MemoryStore()
 

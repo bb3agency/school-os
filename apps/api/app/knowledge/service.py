@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Final
 
 from app.audit import service as audit
 from app.authz.kv import KVUnavailable, kv_store
+from app.core import purge as purging
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
@@ -970,9 +971,43 @@ __all__ = [
     "SearchFilters",
     "TokenEvent",
     "get_service",
+    "purge_tenant_data",
     "reencrypt_queries",
+    "tenant_data_counts",
 ]
 
 
 # DEK rotation (SEC-012) covers the query log: rotation batches re-encrypt kb.queries too.
 key_rotation.register_reencryptor("kb_queries", reencrypt_queries_batch)
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Ask-the-school data: chunks, verified answers, the query and model-call logs, the
+# embedding cache.
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=(
+        "kb.document_chunks",
+        "kb.verified_answers",
+        "kb.queries",
+        "kb.llm_calls",
+        "kb.embedding_cache",
+    ),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="knowledge", count=tenant_data_counts, purge=purge_tenant_data)
+)

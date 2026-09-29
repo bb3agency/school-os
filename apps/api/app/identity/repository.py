@@ -599,3 +599,26 @@ def role_keys_by_membership(
     for membership_id, key in rows:
         out.setdefault(membership_id, set()).add(key)
     return out
+
+
+# --- offboarding (FR-PLT-005, ADR-0029) ------------------------------------------------------
+
+_CLEAR_SOLE_PROFILES = text(
+    """
+    UPDATE core.users AS u
+    SET display_name = :placeholder, email = NULL, phone_ciphertext = NULL,
+        last_login_at = NULL, version = u.version + 1
+    WHERE u.id IN (SELECT m.user_id FROM core.memberships AS m
+                   WHERE m.tenant_id = core.current_tenant())
+      AND core.user_membership_count(u.id) = 1
+      AND (u.display_name <> :placeholder OR u.email IS NOT NULL
+           OR u.phone_ciphertext IS NOT NULL OR u.last_login_at IS NOT NULL)
+    """
+)
+
+
+def clear_sole_profiles(session: Session, *, placeholder: str) -> int:
+    """Clear the profile of people whose only membership is the current school (RLS
+    ``users_in_tenant_update``; column grants of ``sos_app``). Returns rows changed."""
+    result = session.execute(_CLEAR_SOLE_PROFILES, {"placeholder": placeholder})
+    return int(getattr(result, "rowcount", 0) or 0)

@@ -50,6 +50,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import ScopeGrant, UserContext
 from app.authz.http import decode_cursor, encode_cursor
+from app.core import purge as purging
 from app.core.config import Settings, get_settings
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -2082,6 +2083,7 @@ __all__ = [
     "StoredObject",
     "UnsupportedFileType",
     "add_version",
+    "count_tenant_objects",
     "create_upload",
     "delete_document",
     "delete_export_files",
@@ -2100,6 +2102,8 @@ __all__ = [
     "mark_scan_failed",
     "purge_document_objects",
     "purge_expired_uploads",
+    "purge_tenant_data",
+    "purge_tenant_objects",
     "read_document_object",
     "register_document",
     "replace_with_redacted",
@@ -2110,6 +2114,55 @@ __all__ = [
     "store_export_file",
     "store_page_image",
     "sweep_discarded_objects",
+    "tenant_data_counts",
     "update_document",
     "validate_acl",
 ]
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Documents with their versions and ACLs, upload intents (files: see below).
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=("kb.upload_intents", "kb.documents"),
+    cascaded=("kb.document_versions", "kb.document_acl"),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="documents", count=tenant_data_counts, purge=purge_tenant_data)
+)
+
+
+def count_tenant_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
+    """Offboarding: current files under ``t/<tenant_id>/`` (documents, imports, exports,
+    uploads)."""
+    return (store or get_object_store()).count_prefix(tenant_prefix(tenant_id))
+
+
+def purge_tenant_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
+    """Offboarding (ADR-0029): discard every file under ``t/<tenant_id>/`` (tag
+    ``sos-lifecycle=discarded``, delete; the noncurrent versions expire after a day).
+    Idempotent and resumable; returns the number of files deleted in this call."""
+    deleted = (store or get_object_store()).purge_prefix(tenant_prefix(tenant_id))
+    log.info("documents.tenant_objects_purged", tenant_id=str(tenant_id), objects=deleted)
+    return deleted
+
+
+tenancy.register_object_owner(
+    tenancy.TenantObjectOwner(
+        name="documents", count=count_tenant_objects, purge=purge_tenant_objects
+    )
+)

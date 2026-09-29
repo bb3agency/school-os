@@ -56,6 +56,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
+from app.core import purge as purging
 from app.core.errors import (
     Conflict,
     Forbidden,
@@ -2580,3 +2581,46 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
     )
     log.info("promotion.undone", resource_type="promotion", resource_id=run.id)
     return _run_out(run, repo.now(session), _run_names(session, [run]))
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Students, their values and profiles, guardians, enrolments, promotions and the school's
+# own attribute definitions (global definitions have no tenant and stay).
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=(
+        "sis.promotion_runs",
+        "sis.student_guardians",
+        "sis.guardians",
+        "sis.enrollments",
+        "sis.students",
+        "sis.attribute_definitions",
+    ),
+    cascaded=("sis.promotion_items", "sis.student_profiles", "sis.attribute_values"),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="students", count=tenant_data_counts, purge=purge_tenant_data)
+)
+
+
+def forget_destroyed_keys(tenant_id: uuid.UUID) -> None:
+    """After crypto-shredding, drop the school's unwrapped keys cached in this process."""
+    crypto.get_keyring().forget(tenant_id)
+
+
+if forget_destroyed_keys not in tenancy.KEYS_DESTROYED_HOOKS:
+    tenancy.KEYS_DESTROYED_HOOKS.append(forget_destroyed_keys)

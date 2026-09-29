@@ -1,0 +1,33 @@
+# Offboarding purge of one school's data (FR-PLT-005; ADR-0029; docs/16 §5.5, docs/05 §13).
+# Versioned configuration shipped inside the package (read by app/tenancy/offboarding.py).
+version: 1
+# Modules that own school tables, in purge order (children before parents). Each registers its
+# tenant_data_counts / purge_tenant_data with app.tenancy.service at import time. The purge
+# refuses to start when any of them is not registered (fail closed).
+purge_order:
+  - knowledge
+  - extraction
+  - dq
+  - changes
+  - students
+  - imports
+  - documents
+  - exports
+  - notifications
+  - breakglass
+  - ops
+  - identity
+  - tenancy
+# Modules that own files under the school prefix t/<tenant_id>/ (object storage).
+object_owners:
+  - documents
+# Deferrable keys checked at commit instead of per statement (change requests and the attribute
+# values that reference them go in one transaction; migration 0032).
+deferred_constraints:
+  - sis.attribute_values_change_request_fk
+# Kept after the purge, deleted when their retention ends (product owner 2026-09-29).
+retained:
+  audit.events: School audit chain (IDs, codes, counts only); deleted after the audit retention.
+  audit.chain_heads: Head of the school audit chain; deleted with the chain.
+# Destroyed by the crypto-shredding step after the purge is verified.
+keys_table: core.tenant_keys

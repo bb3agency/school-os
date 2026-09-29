@@ -55,6 +55,7 @@ from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import register_support_grant_check
 from app.breakglass import repository as repo
 from app.breakglass.schemas import GrantOut, SupportSessionOut
+from app.core import purge as purging
 from app.core.config import DeploymentMode, get_settings
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -71,6 +72,7 @@ from app.identity import service as identity
 from app.identity.principal import Principal, require_recent_auth
 from app.notifications import service as notifications
 from app.platform import service as control_plane
+from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
 APPROVERS = notifications.PermissionSelector("breakglass.approve")
@@ -749,6 +751,7 @@ __all__ = [
     "get_grant",
     "list_grants",
     "pending_ttl",
+    "purge_tenant_data",
     "refresh_requests",
     "report_outcomes",
     "revoke",
@@ -757,4 +760,30 @@ __all__ = [
     "sweep_interval_seconds",
     "sweep_school",
     "sync_school",
+    "tenant_data_counts",
 ]
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Break-glass grants.
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=("ops.break_glass_grants",),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="breakglass", count=tenant_data_counts, purge=purge_tenant_data)
+)

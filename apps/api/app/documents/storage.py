@@ -182,6 +182,25 @@ class ObjectStore(Protocol):
 
     def delete_prefix(self, prefix: str) -> int: ...
 
+    def count_prefix(self, prefix: str) -> int:
+        """Current objects under a tenant prefix (``t/<tenant_id>/`` or below)."""
+        ...
+
+    def purge_prefix(self, prefix: str) -> int:
+        """Offboarding (ADR-0029): :meth:`discard` every current object under a tenant prefix,
+        so the versioned bucket expires the bytes after one day. Idempotent and resumable."""
+        ...
+
+
+_TENANT_ROOT = re.compile(r"^t/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/")
+
+
+def check_tenant_prefix(prefix: str) -> str:
+    """A prefix inside one school's objects (``t/<tenant_id>/...``), never the bucket root."""
+    if not _TENANT_ROOT.match(prefix) or ".." in prefix.split("/"):
+        raise ValueError("refusing a prefix outside one tenant")
+    return prefix
+
 
 def _utcnow() -> dt.datetime:
     return dt.datetime.now(dt.UTC)
@@ -395,6 +414,26 @@ class S3ObjectStore:
         except ClientError as exc:
             raise ObjectStoreError("delete_failed") from exc
         return deleted
+
+    def _keys(self, prefix: str) -> Iterator[str]:
+        try:
+            paginator = self._client.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+                for obj in page.get("Contents", []):
+                    if "Key" in obj:
+                        yield obj["Key"]
+        except ClientError as exc:
+            raise ObjectStoreError("list_failed") from exc
+
+    def count_prefix(self, prefix: str) -> int:
+        return sum(1 for _ in self._keys(check_tenant_prefix(prefix)))
+
+    def purge_prefix(self, prefix: str) -> int:
+        # Collect first: deleting while paginating would shift the listing.
+        keys = list(self._keys(check_tenant_prefix(prefix)))
+        for key in keys:
+            self.discard(key)
+        return len(keys)
 
 
 def _client(settings: Settings, endpoint: str | None) -> S3Client:

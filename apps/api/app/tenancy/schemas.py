@@ -114,6 +114,29 @@ class TenantUsage(_Out):
     academic_years: int
 
 
+class TenantDataCounts(_Out):
+    """Offboarding (ADR-0029): rows per category (owning module, or table for what remains after
+    a purge) and files of one school. Counts only."""
+
+    rows: dict[str, int]
+    objects: int
+
+
+class TenantPurgeResult(_Out):
+    """Rows per category removed by the offboarding purge, profiles cleared, files deleted."""
+
+    rows: dict[str, int]
+    profiles_cleared: int
+    objects_deleted: int
+
+
+class TenantKeysDestroyed(_Out):
+    """Crypto-shredding result: wrapped key rows deleted and their versions (no key material)."""
+
+    count: int
+    key_versions: list[int]
+
+
 # --- academic years ------------------------------------------------------------------------
 
 

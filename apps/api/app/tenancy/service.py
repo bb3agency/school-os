@@ -24,6 +24,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
+from app.core import purge as purging
 from app.core.config import get_settings
 from app.core.crypto import (
     KEY_CACHE_MAX_S,
@@ -36,6 +37,7 @@ from app.core.db import platform_session, tenant_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_context
+from app.tenancy import offboarding
 from app.tenancy import repository as repo
 from app.tenancy.schemas import (
     AcademicYearCreate,
@@ -47,10 +49,13 @@ from app.tenancy.schemas import (
     SectionCreate,
     SectionOut,
     SectionUpdate,
+    TenantDataCounts,
+    TenantKeysDestroyed,
     TenantKeyVersion,
     TenantOut,
     TenantProvisioned,
     TenantProvisionIn,
+    TenantPurgeResult,
     TenantSettings,
     TenantSettingsPatch,
     TenantStatus,
@@ -965,3 +970,86 @@ def session_settings(session: Session) -> TenantSettings:
     """The school settings a signed-in session applies (idle timeout, date format, languages),
     read in the caller's ``tenant_session`` (FR-TEN-012, FR-IAM-003). Any member."""
     return get_tenant(session).settings
+
+
+# --- offboarding: deleting a school's data (FR-PLT-005, ADR-0029) ---------------------------
+#
+# Lifecycle "offboard" (ADR-0020): the control plane calls these with a tenant id; each opens
+# the school's own tenant_session (sos_app) and returns counts only. The database lets the purge
+# role act only on a school in ``offboarding`` (``core.tenant_purge_allowed``).
+
+TenantDataOwner = offboarding.TenantDataOwner
+TenantObjectOwner = offboarding.TenantObjectOwner
+KEYS_DESTROYED_HOOKS = offboarding.KEYS_DESTROYED_HOOKS
+"""``hook(tenant_id)`` after a school's keys were destroyed (e.g. drop cached unwrapped keys)."""
+
+
+def register_data_owner(owner: TenantDataOwner) -> None:
+    """Each tenant module registers its school tables at import time (``offboarding.yaml``)."""
+    offboarding.register_data_owner(owner)
+
+
+def register_object_owner(owner: TenantObjectOwner) -> None:
+    """The documents module registers the files under ``t/<tenant_id>/``."""
+    offboarding.register_object_owner(owner)
+
+
+def tenant_data_inventory(
+    tenant_id: uuid.UUID, *, engine: Engine | None = None
+) -> TenantDataCounts:
+    """Rows per category and files of an ``offboarding`` school, before deletion (counts only).
+    Called by the offboarding job (``platform.tenants.offboard``)."""
+    return offboarding.inventory(tenant_id, engine=engine)
+
+
+def purge_tenant(tenant_id: uuid.UUID, *, engine: Engine | None = None) -> TenantPurgeResult:
+    """Delete every row (one transaction) and file of an ``offboarding`` school. Idempotent.
+    Audit (school chain, system): ``tenant.data_purged`` with counts per category."""
+    return offboarding.purge(tenant_id, engine=engine)
+
+
+def verify_tenant_purged(tenant_id: uuid.UUID, *, engine: Engine | None = None) -> TenantDataCounts:
+    """What remains of the school (rows per table, files); empty means the purge is complete."""
+    return offboarding.verify(tenant_id, engine=engine)
+
+
+def destroy_tenant_keys(
+    tenant_id: uuid.UUID, *, engine: Engine | None = None
+) -> TenantKeysDestroyed:
+    """Crypto-shredding once nothing else remains (``409 data_remaining`` otherwise).
+    Audit (school chain, system): ``tenant.keys_destroyed`` (versions and key id only)."""
+    return offboarding.destroy_keys(tenant_id, engine=engine)
+
+
+def purge_expired_audit_chain(tenant_id: uuid.UUID, *, engine: Engine | None = None) -> int:
+    """Delete a ``deleted`` school's audit chain after its retention (events older than a year)."""
+    return offboarding.purge_expired_audit_chain(tenant_id, engine=engine)
+
+
+# The academic structure and settings are this module's own school data.
+_STRUCTURE = purging.PurgeTables(deleted=("core.sections", "core.classes", "core.academic_years"))
+
+
+def structure_data_counts(session: Session) -> dict[str, int]:
+    return _STRUCTURE.count(session)
+
+
+def purge_structure_data(session: Session) -> dict[str, int]:
+    """Offboarding purge (as ``sos_purger``): sections, classes, academic years."""
+    return _STRUCTURE.delete(session)
+
+
+def clear_school_settings(session: Session) -> int:
+    """Offboarding prepare step (as ``sos_app``): the school's settings become ``{}``; the
+    tenant row itself stays (status, code, registered name)."""
+    return repo.clear_tenant_settings(session)
+
+
+register_data_owner(
+    TenantDataOwner(
+        name="tenancy",
+        count=structure_data_counts,
+        purge=purge_structure_data,
+        prepare=clear_school_settings,
+    )
+)

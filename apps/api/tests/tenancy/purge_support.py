@@ -3,8 +3,8 @@
 ``populate_school(admin_engine, tenant_id)`` writes at least one row into each table of the
 tenant schemas for one school (as the test superuser, setup only), including the ones the app
 role cannot delete in normal operation (append-only and frozen tables). The deletion tests
-(ADR-0029, Proposed; not written until the ADR is decided) are meant to prove the purge leaves
-none of them, whatever new table a migration adds, and to assert ``tables_without_rows`` lists
+(ADR-0029; ``tests/tenancy/test_offboarding_purge.py``) prove the purge leaves
+none of them, whatever new table a migration adds, and assert ``tables_without_rows`` lists
 only the retained audit tables, so this helper grows with the schema. Checked on 2026-09-29
 against ``0030_import_cell_edits``: every tenant table except ``audit.events`` gets a row.
 
@@ -47,11 +47,13 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
     *,
     status: str = "active",
     shared_user_id: uuid.UUID | None = None,
+    existing: bool = False,
 ) -> School:
     """Create the school (status ``status``) and one row in every tenant table.
 
     ``shared_user_id``: an existing user (a member of another school) who also gets a membership
-    here, so the tests can check a shared profile is left alone.
+    here, so the tests can check a shared profile is left alone. ``existing``: the school (and
+    its key) already exists, e.g. provisioned through the control plane; only rows are added.
     """
     u = {k: uuid.uuid4() for k in ("user", "user2")}
     ids = {
@@ -100,19 +102,28 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
     }
     t = tenant_id
     with admin_engine.begin() as c:
-        _run(
-            c,
-            "INSERT INTO core.tenants (id, code, name, status, settings) "
-            "VALUES (:t, :code, 'Synthetic Offboarding School', :st, "
-            '\'{"address_line1": "Synthetic Road 1"}\')',
-            t=t,
-            code=f"o-{uuid.uuid4().hex[:12]}",
-            st=status,
-        )
+        if existing:
+            _run(
+                c,
+                "UPDATE core.tenants SET settings = settings || "
+                '\'{"address_line1": "Synthetic Road 1"}\' WHERE id = :t',
+                t=t,
+            )
+        else:
+            _run(
+                c,
+                "INSERT INTO core.tenants (id, code, name, status, settings) "
+                "VALUES (:t, :code, 'Synthetic Offboarding School', :st, "
+                '\'{"address_line1": "Synthetic Road 1"}\')',
+                t=t,
+                code=f"o-{uuid.uuid4().hex[:12]}",
+                st=status,
+            )
         _run(
             c,
             "INSERT INTO core.tenant_keys (tenant_id, key_version, wrapped_dek, wrapped_hmac, "
-            "kms_key_arn) VALUES (:t, 1, '\\x01', '\\x02', 'local-dev')",
+            "kms_key_arn) VALUES (:t, 1, '\\x01', '\\x02', 'local-dev') "
+            "ON CONFLICT DO NOTHING",
             t=t,
         )
         for key, name in (("user", "Synthetic Clerk"), ("user2", "Synthetic Teacher")):
@@ -147,7 +158,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
         _run(
             c,
             "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
-            "VALUES (:r, :t, 'office_admin', 'Office admin', 'Office admin te')",
+            "VALUES (:r, :t, 'synthetic_role', 'Synthetic role', 'Synthetic role te')",
             r=ids["role"],
             t=t,
         )
@@ -302,7 +313,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
         _run(
             c,
             "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, principal_ref) "
-            "VALUES (:t, :d, 'role', 'office_admin')",
+            "VALUES (:t, :d, 'role', 'synthetic_role')",
             t=t,
             d=ids["doc"],
         )

@@ -46,6 +46,7 @@ from app.changes import memo as memo_page
 from app.changes import repository as repo
 from app.changes.models import ChangeRequest
 from app.changes.schemas import ApproveIn, ChangeRequestCreate, ChangeRequestOut, RejectIn
+from app.core import purge as purging
 from app.core.errors import (
     Conflict,
     Forbidden,
@@ -829,8 +830,35 @@ __all__ = [
     "get_request",
     "list_requests",
     "memo",
+    "purge_tenant_data",
     "reject",
     "request_student",
     "settings",
     "submit",
+    "tenant_data_counts",
 ]
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Change requests (maker-checker history).
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=("sis.change_requests",),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="changes", count=tenant_data_counts, purge=purge_tenant_data)
+)

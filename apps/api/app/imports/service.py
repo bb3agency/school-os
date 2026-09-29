@@ -43,6 +43,7 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
+from app.core import purge as purging
 from app.core.db import tenant_session
 from app.core.errors import Conflict, DomainError, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
@@ -1926,6 +1927,7 @@ __all__ = [
     "list_templates",
     "member_context",
     "purge_raw_files",
+    "purge_tenant_data",
     "request_commit",
     "request_validation",
     "revert",
@@ -1933,4 +1935,31 @@ __all__ = [
     "run_parse",
     "run_validate",
     "set_mapping",
+    "tenant_data_counts",
 ]
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Import batches with their rows and staged cell edits, mapping templates.
+# Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
+# them as sos_purger (children before parents) inside the school's tenant_session.
+_PURGE = purging.PurgeTables(
+    deleted=("sis.import_batches", "sis.import_mapping_templates"),
+    cascaded=("sis.import_rows", "sis.import_cell_edits"),
+)
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="imports", count=tenant_data_counts, purge=purge_tenant_data)
+)

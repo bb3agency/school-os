@@ -78,7 +78,9 @@ def test_SEC_001_kb_tables_force_rls_with_the_standard_policy(admin_engine: Engi
     for r in rows:
         assert r.rls, r.name
         assert r.force, r.name
-        assert r.pols == ["tenant_isolation"], r.name  # no definer_access (ADR-0013)
+        # No definer_access (ADR-0013); the restrictive offboarding purge policy for sos_purger
+        # only (ADR-0029; shape pinned by tests/tenancy/test_offboarding_purge.py).
+        assert sorted(r.pols) == ["offboarding_purge", "tenant_isolation"], r.name
         assert "current_tenant()" in r.qual, r.name
 
 
