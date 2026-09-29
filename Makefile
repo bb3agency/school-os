@@ -26,7 +26,7 @@ SEED_ARGS ?=
 ORDER_SEED   ?=
 ORDER_BUCKET ?= module
 
-.PHONY: help install dev dev-host dev-stop down logs migrate seed-synthetic sync-system-roles test test-api test-web test-security \
+.PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic sync-system-roles test test-api test-web test-security \
         migration-check e2e lint format typecheck security eval check db-shell openapi tf-validate
 
 help: ## List targets
@@ -56,9 +56,13 @@ down: ## Stop the local stack
 logs: ## Tail local stack logs
 	$(COMPOSE) logs -f --tail=100
 
-migrate: .env ## Apply database migrations and create audit partitions (as sos_migrator)
+migrate: .env ## Re-run bootstrap.sql (roles), apply migrations and create audit partitions
 	$(COMPOSE) up -d --wait db
+	$(MAKE) db-bootstrap
 	$(COMPOSE) run --rm migrate
+
+db-bootstrap: .env ## Re-run infra/db/bootstrap.sql in the local db (idempotent; new roles such as sos_purger)
+	$(COMPOSE) exec -T db bash /docker-entrypoint-initdb.d/10-bootstrap.sh
 
 db-shell: ## psql into the local database as the admin
 	$(COMPOSE) exec db psql -U postgres -d schoolos

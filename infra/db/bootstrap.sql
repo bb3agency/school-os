@@ -26,6 +26,9 @@ SELECT 'CREATE ROLE sos_platform LOGIN'
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sos_platform') \gexec
 SELECT 'CREATE ROLE sos_readonly LOGIN'
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sos_readonly') \gexec
+-- ADR-0029: deletes a school's rows at offboarding. Reachable only by SET ROLE from sos_app.
+SELECT 'CREATE ROLE sos_purger NOLOGIN'
+ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sos_purger') \gexec
 
 -- Enforce attributes every run (fail closed even if a role pre-existed with other attributes).
 ALTER ROLE sos_owner    NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION;
@@ -38,6 +41,7 @@ ALTER ROLE sos_platform LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NO
   PASSWORD :'platform_password';
 ALTER ROLE sos_readonly LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION
   PASSWORD :'readonly_password';
+ALTER ROLE sos_purger   NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION;
 
 -- The admin running this script must be able to act as sos_owner (needed on RDS).
 GRANT sos_owner TO CURRENT_USER;
@@ -47,6 +51,11 @@ GRANT sos_definer TO CURRENT_USER;
 -- INHERIT FALSE: membership grants SET ROLE only, never implicit privileges.
 GRANT sos_owner   TO sos_migrator WITH INHERIT FALSE, SET TRUE;
 GRANT sos_definer TO sos_migrator WITH INHERIT FALSE, SET TRUE;
+-- ADR-0029: the offboarding deletion job (worker, as sos_app inside the school's tenant_session)
+-- runs SET LOCAL ROLE sos_purger. INHERIT FALSE: sos_app gains no privilege from this; its own
+-- grants stay exactly as narrowed in the migrations. sos_purger is still subject to RLS
+-- (tenant_isolation) and to the restrictive policy offboarding_purge (migration 0032).
+GRANT sos_purger  TO sos_app WITH INHERIT FALSE, SET TRUE;
 
 -- Safe search_path for login roles: application code always schema-qualifies names.
 ALTER ROLE sos_app      SET search_path = pg_catalog, public;
@@ -78,6 +87,8 @@ GRANT USAGE ON SCHEMA platform TO sos_app, sos_platform, sos_definer;
 -- sos_platform gets USAGE on core only to call allowlisted definer functions (no table grants).
 GRANT USAGE ON SCHEMA core TO sos_platform;
 GRANT USAGE, CREATE ON SCHEMA core, sis, kb, audit, ops, platform TO sos_owner;
+-- ADR-0029: table grants for sos_purger are made per table in migration 0032.
+GRANT USAGE ON SCHEMA core, sis, kb, audit, ops TO sos_purger;
 
 -- 4. Default privileges for objects created by sos_owner -----------------------------------
 -- Functions are NOT executable by PUBLIC by default; each migration grants EXECUTE explicitly.
@@ -112,6 +123,6 @@ CREATE OR REPLACE FUNCTION core.current_user_id() RETURNS uuid
 
 REVOKE ALL ON FUNCTION core.current_tenant(), core.current_user_id() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION core.current_tenant(), core.current_user_id()
-  TO sos_app, sos_readonly, sos_definer, sos_platform;
+  TO sos_app, sos_readonly, sos_definer, sos_platform, sos_purger;
 
 RESET ROLE;
