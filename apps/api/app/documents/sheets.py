@@ -5,7 +5,8 @@
   the limits in ``sheets.yaml``. Row 1 is the header row; physical row numbers are kept.
 - :func:`apply_edits` puts edited values over the grid (the stored file never changes).
 - :func:`build_xlsx` makes the bytes of a new version: one worksheet, values only. Unedited
-  cells keep their type (numbers and dates stay numbers and dates); edited cells are text;
+  cells keep their type (numbers and dates stay numbers and dates); an edited cell keeps the
+  type of the cell it replaces when the new text is that type's display form, else it is text;
   every text cell is written as an explicit string (never a formula) and any Aadhaar-like number
   is masked (invariant 4). Workbooks with more sheets or with formulas are never rebuilt (the
   service refuses them), so nothing but formatting is lost, and the UI says so.
@@ -133,8 +134,38 @@ def read_grid(data: bytes, kind: FileKind, limits: SheetLimits) -> Grid:
     return Grid(kind, tuple(rows), width, count, formulas)
 
 
+def changed_cells(grid: Grid, edits: Mapping[CellKey, str | None]) -> dict[CellKey, str | None]:
+    """The edits whose value differs from what the cell shows now (display text)."""
+    return {
+        key: value for key, value in edits.items() if display_text(grid.cell(*key).value) != value
+    }
+
+
+def _typed(before: CellValue, text: str) -> CellValue:
+    """An edited value keeps the type of the cell it replaces when the text is that type's
+    display form exactly (``1300`` in a number cell stays a number, ``2026-06-01`` in a date
+    cell stays a date); anything else is text, so leading zeros and codes are never lost."""
+    candidate: CellValue = None
+    try:
+        if isinstance(before, bool):
+            candidate = None
+        elif isinstance(before, int | float):
+            number = float(text)
+            candidate = int(number) if number.is_integer() and "." not in text else number
+        elif isinstance(before, dt.datetime):
+            candidate = dt.datetime.combine(dt.date.fromisoformat(text), dt.time())
+        elif isinstance(before, dt.date):
+            candidate = dt.date.fromisoformat(text)
+    except ValueError:
+        candidate = None
+    if candidate is not None and display_text(candidate) == text:
+        return candidate
+    return text
+
+
 def apply_edits(grid: Grid, edits: Mapping[CellKey, str | None]) -> Grid:
-    """``grid`` with edited values (text; ``None`` clears). Unknown rows are ignored."""
+    """``grid`` with edited values (``None`` or blank clears; see :func:`_typed` for types).
+    Unknown rows are ignored."""
     if not edits:
         return grid
     rows = [list(r) for r in grid.rows]
@@ -145,7 +176,10 @@ def apply_edits(grid: Grid, edits: Mapping[CellKey, str | None]) -> Grid:
         row = rows[row_no - 1]
         if column >= len(row):
             row.extend([Cell(None)] * (column + 1 - len(row)))
-        row[column] = Cell(value) if value is not None and value.strip() else Cell(None)
+        if value is None or not value.strip():
+            row[column] = Cell(None)
+        else:
+            row[column] = Cell(_typed(row[column].value, value))
         width = max(width, column + 1)
     cells = tuple(tuple(r) for r in rows)
     return Grid(grid.kind, cells, width, grid.sheet_count, grid.formula_cells)
@@ -198,6 +232,7 @@ __all__ = [
     "apply_edits",
     "build_xlsx",
     "cell_display",
+    "changed_cells",
     "read_grid",
     "sheet_config",
 ]

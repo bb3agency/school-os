@@ -287,13 +287,16 @@ def make_document(
     doc_type: str = "circular",
     data: bytes | None = None,
     document_id: uuid.UUID | None = None,
+    mime_type: str = "application/pdf",
+    ext: str = "pdf",
 ) -> uuid.UUID:
     """Insert a document with one version (default ``ready``) and its object. ``document_id``
-    pins the ID (e.g. a digit-heavy UUID, whose object key must still pass the outbox checks)."""
+    pins the ID (e.g. a digit-heavy UUID, whose object key must still pass the outbox checks);
+    ``mime_type``/``ext`` describe ``data`` (e.g. an XLSX for the sheet viewer)."""
     store = memory_store()
     doc_id, version_id = document_id or uuid.uuid4(), uuid.uuid4()
     content = data or pdf()
-    key = f"t/{tenant_id}/docs/{doc_id}/v1/original.pdf"
+    key = f"t/{tenant_id}/docs/{doc_id}/v1/original.{ext}"
     with admin.begin() as c:
         c.execute(
             text(
@@ -315,9 +318,10 @@ def make_document(
             text(
                 "INSERT INTO kb.document_versions (id, tenant_id, document_id, version_no, "
                 "object_key, sha256, mime_type, size_bytes, status, created_by) VALUES "
-                "(:v, :t, :d, 1, :k, :h, 'application/pdf', :n, :st, :u)"
+                "(:v, :t, :d, 1, :k, :h, :mt, :n, :st, :u)"
             ),
             {
+                "mt": mime_type,
                 "v": version_id,
                 "t": tenant_id,
                 "d": doc_id,
@@ -336,7 +340,7 @@ def make_document(
                 ),
                 {"t": tenant_id, "d": doc_id, "pt": ptype, "r": ref},
             )
-    store.put(key, content, "application/pdf")
+    store.put(key, content, mime_type)
     return doc_id
 
 

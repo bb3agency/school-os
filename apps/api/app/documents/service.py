@@ -58,6 +58,7 @@ from app.core.errors import (
     Forbidden,
     NotFound,
     PreconditionFailed,
+    StepUpRequired,
     ValidationFailed,
 )
 from app.core.ids import new_id
@@ -117,6 +118,7 @@ from app.documents.storage import (
     upload_key,
 )
 from app.identity import service as identity
+from app.identity.principal import STEP_UP_MAX_AGE
 from app.ops import service as ops
 from app.tenancy import service as tenancy
 
@@ -1639,8 +1641,9 @@ def _sheet_source(
     for_update: bool = False,
 ) -> _SheetSource:
     """The document's newest checked version (or ``version_no``) read as a sheet: visible to
-    the caller (404), C3 only for sensitive readers or the uploader (403, as downloads),
-    scanned (409), XLSX or CSV (415) and within the viewer limits (413)."""
+    the caller (404), C3 only for sensitive readers or the uploader (403, as downloads), not
+    an import file (409 ``import_file_sheet``), scanned (409), XLSX or CSV (415) and within the
+    viewer limits (413)."""
     doc = repo.get_document(
         session, document_id, visibility=_visibility(session, ctx), for_update=for_update
     )
@@ -1652,6 +1655,12 @@ def _sheet_source(
         raise Forbidden(
             "Restricted (C3) files can be opened only by staff allowed to see sensitive data.",
             code="sensitive_document",
+        )
+    if doc.purpose == "import_file":
+        # Its restricted (C3) columns are hidden only by the import's own sheet (FR-IMP-008).
+        raise Conflict(
+            "This file was uploaded for an import. Open it from the import to see its rows.",
+            code="import_file_sheet",
         )
     if version_no is None:
         version = repo.latest_version_with_status(session, doc.id, ("ready",))
@@ -1696,6 +1705,15 @@ def _sheet_source(
             "This spreadsheet cannot be shown here. Download the file instead.", code=exc.code
         ) from exc
     return _SheetSource(doc, version, grid)
+
+
+def _require_step_up(ctx: UserContext) -> None:
+    """FR-EXP-004 / SEC-005: an MFA sign-in within 5 minutes (428 ``step_up_required``)."""
+    if not ctx.mfa or ctx.auth_time is None:
+        raise StepUpRequired()
+    age = dt.datetime.now(dt.UTC) - ctx.auth_time
+    if age > STEP_UP_MAX_AGE or age < -dt.timedelta(seconds=30):
+        raise StepUpRequired()
 
 
 def _sheet_read_only(ctx: UserContext, source: _SheetSource) -> SheetReadOnly | None:
@@ -1870,15 +1888,17 @@ def save_sheet_version(
         if reason == "no_permission":
             raise Forbidden(message, code=code)
         raise Conflict(message, code=code)
-    edits = _sheet_edits(data.edits, source.grid)
+    # Only cells whose value really changes count (a rebuilt workbook never has the same bytes
+    # as the uploaded one, so comparing file hashes would never find "nothing changed").
+    edits = sheets.changed_cells(source.grid, _sheet_edits(data.edits, source.grid))
+    if not edits:
+        raise Conflict("The sheet is the same as the current version.", code="version_unchanged")
     edited = sheets.apply_edits(source.grid, edits)
     content = sheets.build_xlsx(edited, title=doc.title)
     rule = purpose_rule(doc.purpose)
     if len(content) > rule.max_bytes:
         raise FileTooLarge("The edited sheet is larger than allowed for this document.")
     digest = hashlib.sha256(content).digest()
-    if source.version.sha256 == digest:
-        raise Conflict("The sheet is the same as the current version.", code="version_unchanged")
     tenant_id = repo.current_tenant_id(session)
     new_no = repo.max_version_no(session, doc.id) + 1
     key = document_key(tenant_id, doc.id, new_no, filetypes.XLSX.ext)
@@ -1942,10 +1962,14 @@ def export_sheet(
     session: Session, ctx: UserContext, document_id: uuid.UUID, data: SheetExportIn
 ) -> SheetFile:
     """The sheet (with any unsaved ``edits``) as CSV (UTF-8 with BOM) or XLSX (permission
-    ``document.read``; FR-DOC-011). Row 1 stays the header row; Aadhaar-like numbers are masked,
-    formula-like text is neutralised and XLSX cells are text (SEC-017). Audit
-    ``document.sheet_exported`` (counts only) in this transaction; nothing is stored."""
+    ``document.read``; FR-DOC-011). Personal (C2) and restricted (C3) documents need a recent
+    sign-in with MFA (428 ``step_up_required``; FR-EXP-004). Row 1 stays the header row;
+    Aadhaar-like numbers are masked, formula-like text is neutralised and XLSX cells are text
+    (SEC-017). Audit ``document.sheet_exported`` (counts only) in this transaction; nothing is
+    stored."""
     source = _sheet_source(session, ctx, document_id, version_no=data.base_version_no)
+    if source.doc.sensitivity != "C1":
+        _require_step_up(ctx)
     edits = _sheet_edits(data.edits, source.grid)
     grid = sheets.apply_edits(source.grid, edits)
     values = [
