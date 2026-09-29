@@ -200,7 +200,8 @@ class RowEditIn(_In):
 class SheetColumnOut(_Out):
     """A column as uploaded: its letter and header, the field it fills (``target``, null when
     not imported), and whether its cells may be shown and edited. ``restricted`` columns fill a
-    restricted (C3) field: their values are never shown or edited here."""
+    restricted (C3) field, or their header was suggested for one (even when the column is not
+    imported): their values are never shown or edited here."""
 
     index: int
     letter: str

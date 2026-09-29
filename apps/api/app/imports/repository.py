@@ -285,6 +285,23 @@ def set_cell_edit_ciphertext(
     )
 
 
+def erase_cell_edit_values(session: Session, batch_ids: Sequence[uuid.UUID]) -> int:
+    """Drop the values of the batches' edits (retention, FR-IMP-007): the ciphertext columns
+    become NULL; who edited which cell and when stays. Returns the rows changed."""
+    if not batch_ids:
+        return 0
+    result = session.execute(
+        update(ImportCellEdit)
+        .where(
+            ImportCellEdit.batch_id.in_(list(batch_ids)),
+            ImportCellEdit.key_version.is_not(None),
+        )
+        .values(old_value_ciphertext=None, new_value_ciphertext=None, key_version=None)
+        .execution_options(synchronize_session=False)
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 # --- templates ------------------------------------------------------------------------------------
 
 

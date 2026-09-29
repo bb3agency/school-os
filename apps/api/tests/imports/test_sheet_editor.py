@@ -462,3 +462,113 @@ def test_CLAUDE_6_5_no_cell_values_in_logs(
     logs = captured.out + captured.err + caplog.text
     assert secret not in logs
     assert aadhaar not in logs
+
+
+def test_CLAUDE_6_4_old_value_of_an_edited_cell_is_stored_masked(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """The value before an edit comes from the uploaded file: an Aadhaar number in it is
+    masked before the history stores it (invariant 4: never stored, not even encrypted)."""
+    from app.core.db import tenant_session
+    from app.core.redaction import contains_full_aadhaar
+    from app.imports import cells
+
+    admin = world.person("office_admin")
+    aadhaar = S.valid_aadhaar("67890123456")
+    rows, _ = S.class_list(1)
+    rows[0].append("Remarks")
+    rows[1].append(f"Card {aadhaar}")
+    batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
+    etag = _sheet(api, admin, batch_id).headers["ETag"]
+    res = _edit(api, admin, batch_id, 2, [{"column": 7, "value": "Card on file"}], etag=etag)
+    assert res.status_code == 200, res.text
+    with admin_engine.connect() as c:
+        edit = c.execute(
+            text("SELECT id, old_value_ciphertext FROM sis.import_cell_edits WHERE batch_id = :b"),
+            {"b": batch_id},
+        ).one()
+    with tenant_session(world.a.tenant_id) as s:
+        old = cells.decrypt(s, edit.old_value_ciphertext, column=cells.OLD_COLUMN, edit_id=edit.id)
+    assert old is not None
+    assert old.startswith("Card ")
+    assert old.endswith(aadhaar[-4:])
+    assert not contains_full_aadhaar(old)
+
+
+def test_FR_IMP_008_columns_suggested_as_restricted_stay_hidden_when_not_imported(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A column whose header names a restricted (C3) field stays hidden even when the office
+    chose not to import it (docs/05 §5.2: C3 values are never shown in the staged sheet)."""
+    admin = world.person("office_admin")
+    rows, _ = S.class_list(1)
+    rows[0].append("Religion")
+    rows[1].append("Synthetic faith")
+    batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
+    batch = S.batch(admin_engine, batch_id)
+    columns = [
+        {"index": int(k), "target": v} for k, v in batch["mapping"].items() if v != "religion"
+    ]
+    res = api.call(
+        admin,
+        "PUT",
+        f"/api/v1/imports/{batch_id}/mapping",
+        json={"columns": columns},
+        headers={"If-Match": f'W/"{batch["version"]}"'},
+    )
+    assert res.status_code == 200, res.text
+    sheet = _sheet(api, admin, batch_id)
+    religion = sheet.json()["columns"][7]
+    assert religion["target"] is None
+    assert religion["restricted"] is True
+    assert religion["editable"] is False
+    assert "Synthetic faith" not in sheet.text
+    refused = _edit(
+        api, admin, batch_id, 2, [{"column": 7, "value": "Other"}], etag=sheet.headers["ETag"]
+    )
+    assert refused.status_code == 422
+    assert refused.json()["errors"][0]["code"] == "column_restricted"
+    # Staff without student.read_sensitive download it without the column's values.
+    staff = world.person("office_staff")
+    export = api.call(staff, "GET", f"/api/v1/imports/{batch_id}/sheet/export")
+    assert export.status_code == 200, export.text
+    assert "Synthetic faith" not in export.content.decode("utf-8-sig")
+
+
+def test_FR_IMP_007_raw_file_purge_erases_staged_edit_values(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Edits hold values from the uploaded file: when the raw file is deleted after the
+    retention period, their ciphertext goes too (who edited which cell, and when, stays)."""
+    import datetime as dt
+
+    from app.imports import service
+
+    admin = world.person("office_admin")
+    batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(S.class_list(1)[0]))
+    etag = _sheet(api, admin, batch_id).headers["ETag"]
+    res = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "Synthetic Purge"}], etag=etag)
+    assert res.status_code == 200, res.text
+    assert S.commit(world.a, batch_id) == "committed"
+    S.age_batch(
+        admin_engine,
+        batch_id,
+        committed_at=dt.timedelta(days=91),
+        revert_deadline=dt.timedelta(days=91),
+        created_at=dt.timedelta(days=91),
+    )
+    assert service.purge_raw_files(world.a.tenant_id) >= 1
+    with admin_engine.connect() as c:
+        edit = c.execute(
+            text(
+                "SELECT old_value_ciphertext, new_value_ciphertext, key_version, edited_by, "
+                "row_no, column_index FROM sis.import_cell_edits WHERE batch_id = :b"
+            ),
+            {"b": batch_id},
+        ).one()
+    assert (edit.old_value_ciphertext, edit.new_value_ciphertext, edit.key_version) == (
+        None,
+        None,
+        None,
+    )
+    assert (edit.row_no, edit.column_index, edit.edited_by) == (2, 2, admin.user_id)

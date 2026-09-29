@@ -888,12 +888,18 @@ def _staged_sheet(
 def _restricted_columns(
     batch: ImportBatch, width: int, specs: Mapping[str, AttributeSpec]
 ) -> set[int]:
-    """Columns that fill a restricted (C3) field: never shown or edited in the sheet."""
+    """Columns that fill a restricted (C3) field, or whose header was suggested for one (even
+    when the office chose not to import them): never shown or edited in the sheet."""
     out: set[int] = set()
     for key, target in batch.mapping.items():
         spec = specs.get(target)
         if key.isdigit() and int(key) < width and spec is not None and spec.sensitive:
             out.add(int(key))
+    for column in batch.columns or ():
+        index, suggested = column.get("index"), column.get("suggested")
+        spec = specs.get(suggested) if isinstance(suggested, str) else None
+        if isinstance(index, int) and 0 <= index < width and spec is not None and spec.sensitive:
+            out.add(index)
     return out
 
 
@@ -1111,7 +1117,10 @@ def edit_row(
     records: list[dict[str, Any]] = []
     for column, value in changes.items():
         edit_id = new_id()
-        old = display_text(row.cell(column).value)
+        # The value before comes from the uploaded file: an Aadhaar number in it is masked
+        # before the history stores it (invariant 4; the new value was refused above).
+        before = display_text(row.cell(column).value)
+        old = mask_aadhaar(before) if before is not None else None
         old_blob, old_key = cells.encrypt(session, old, column=cells.OLD_COLUMN, edit_id=edit_id)
         new_blob, new_key = cells.encrypt(session, value, column=cells.NEW_COLUMN, edit_id=edit_id)
         records.append(
@@ -1874,12 +1883,19 @@ def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> 
                 continue  # already gone
             repo.mark_raw_file_deleted(s, [b.id for b in batches], moment)
             for batch in batches:
+                # Staged edits hold values from the file (and the values before them): they go
+                # with it; who edited which cell, and when, stays (FR-IMP-007, FR-IMP-008).
+                erased = repo.erase_cell_edit_values(s, [batch.id])
                 audit.record(
                     s,
                     action="import.raw_file_deleted",
                     resource_type="import_batch",
                     resource_id=batch.id,
-                    summary={"document_id": document_id, "reason": "retention"},
+                    summary={
+                        "document_id": document_id,
+                        "reason": "retention",
+                        **({"cell_edits_erased": erased} if erased else {}),
+                    },
                     actor_type="system",
                 )
             deleted += 1
