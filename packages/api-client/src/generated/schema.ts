@@ -425,6 +425,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/behaviour-notes/{note_id}/erase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Erase Note
+         * @description Erase a behaviour note on a parent's request or when entered in error
+         *     (``insights.manage``, recent MFA sign-in).
+         */
+        post: operations["erase_note_api_v1_behaviour_notes__note_id__erase_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/breakglass/grants/{grant_id}/revoke": {
         parameters: {
             query?: never;
@@ -1631,6 +1652,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Exams
+         * @description Exams of an academic year by date (``marks.read``, ``marks.record`` or
+         *     ``exam.manage``).
+         */
+        get: operations["list_exams_api_v1_exams_get"];
+        put?: never;
+        /**
+         * Create Exam
+         * @description Add an exam to the current academic year (``exam.manage``). 422 ``exam_name_taken`` or
+         *     ``date_out_of_range``. Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_exam_api_v1_exams_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/export-profiles": {
         parameters: {
             query?: never;
@@ -2174,6 +2221,202 @@ export interface paths {
          *     saved to student records. Accepts ``Idempotency-Key``.
          */
         post: operations["validate_import_api_v1_imports__import_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Flags
+         * @description Early-warning flags (``insights.read``): ``mine`` = flags you own; ``all`` = every flag
+         *     of students in your scope (class teachers: their sections). Without ``status``: open and in
+         *     progress. Soonest due first. Audited.
+         */
+        get: operations["list_flags_api_v1_insights_flags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/flags/{flag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Flag
+         * @description One flag with the numbers that raised it and its action log (``insights.read``; 404
+         *     outside your scope). Audited.
+         */
+        get: operations["get_flag_api_v1_insights_flags__flag_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/flags/{flag_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Action
+         * @description Record what was done about a flag (``insights.act``): talked with the student, called or
+         *     met a parent, home visit, remedial support, referral, other; optional note. The first
+         *     action marks the flag actioned. 409 ``flag_closed``.
+         */
+        post: operations["add_action_api_v1_insights_flags__flag_id__actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/flags/{flag_id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign Flag
+         * @description Give a flag another owner (``insights.manage``, recent MFA sign-in; ``If-Match``). 422
+         *     ``owner_not_eligible``.
+         */
+        post: operations["assign_flag_api_v1_insights_flags__flag_id__assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/flags/{flag_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Flag
+         * @description Close a flag with a reason (``insights.act``; ``If-Match``). 409 ``flag_closed``.
+         */
+        post: operations["close_flag_api_v1_insights_flags__flag_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/flags/{flag_id}/erase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Erase Flag
+         * @description Erase a flag and its action log on a parent's request or when raised in error
+         *     (``insights.manage``, recent MFA sign-in). The reason is recorded, never the text.
+         */
+        post: operations["erase_flag_api_v1_insights_flags__flag_id__erase_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/flags/{flag_id}/owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Flag Owners
+         * @description Staff who may own this flag: active and allowed to act for the student's section
+         *     (``insights.manage``).
+         */
+        get: operations["flag_owners_api_v1_insights_flags__flag_id__owners_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Settings
+         * @description The school's early-warning rules with thresholds and their bounds (``insights.read``).
+         *     The ETag is the settings version (0 = defaults).
+         */
+        get: operations["get_settings_api_v1_insights_settings_get"];
+        /**
+         * Update Settings
+         * @description Change thresholds or switch rules off within the bounds SchoolOS sets
+         *     (``insights.manage``, recent MFA sign-in; ``If-Match``). The AP consecutive-absence rule
+         *     cannot be switched off (422 ``rule_required``).
+         */
+        put: operations["update_settings_api_v1_insights_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Summary
+         * @description Counts only for your scope in this school: flags raised, first acted on by their due
+         *     date (the M5 exit metric), late, not yet, overdue and open (``insights.read``).
+         */
+        get: operations["summary_api_v1_insights_summary_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3925,6 +4168,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sections/{section_id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attendance Day
+         * @description One day of the section's register: every student of the section (roll-number order)
+         *     with their status, or none when not marked (``attendance.read``; class teachers: their
+         *     sections, 404 for others).
+         */
+        get: operations["attendance_day_api_v1_sections__section_id__attendance_get"];
+        put?: never;
+        /**
+         * Record Attendance
+         * @description Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a
+         *     day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range`` or
+         *     ``duplicate_entry`` per entry. The early-warning rules look at these students again.
+         */
+        post: operations["record_attendance_api_v1_sections__section_id__attendance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/attendance/month": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attendance Month
+         * @description The month register (school days x students) for the A4 print view
+         *     (``attendance.read``).
+         */
+        get: operations["attendance_month_api_v1_sections__section_id__attendance_month_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/attendance/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Attendance Sheet
+         * @description Read an uploaded attendance sheet (``attendance.record``): first column admission or
+         *     roll number, then one date per column, cells P/A/L/LV. Returns the entries and every
+         *     problem; stores no attendance. The uploaded file is deleted once read. 422
+         *     ``aadhaar_full_number_rejected``, ``student_column_missing``, ``too_many_dates``...; 409
+         *     ``document_not_ready`` while the virus check runs.
+         */
+        post: operations["preview_attendance_sheet_api_v1_sections__section_id__attendance_sheet_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/exams/{exam_id}/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Section Marks
+         * @description The section's marks for one exam with each student's overall percentage
+         *     (``marks.read``).
+         */
+        get: operations["section_marks_api_v1_sections__section_id__exams__exam_id__marks_get"];
+        put?: never;
+        /**
+         * Record Marks
+         * @description Save marks per student and subject with the maximum marks, or absent, all or nothing
+         *     (``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,
+         *     ``exam_other_year``...
+         */
+        post: operations["record_marks_api_v1_sections__section_id__exams__exam_id__marks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Marks Sheet
+         * @description Read an uploaded marks sheet (``marks.record``): row 1 admission or roll number and
+         *     subjects, row 2 maximum marks, then one row per student (``AB`` = absent). Returns entries
+         *     and problems; stores no marks; the file is deleted once read.
+         */
+        post: operations["preview_marks_sheet_api_v1_sections__section_id__exams__exam_id__marks_sheet_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sections/{section_id}/unarchive": {
         parameters: {
             query?: never;
@@ -4024,6 +4389,32 @@ export interface paths {
          *     ``If-Match`` required).
          */
         patch: operations["update_student_api_v1_students__student_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/behaviour-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notes
+         * @description A student's behaviour notes, newest first (``insights.read``; restricted: class teacher
+         *     and principal only; 404 outside your scope). Audited.
+         */
+        get: operations["list_notes_api_v1_students__student_id__behaviour_notes_get"];
+        put?: never;
+        /**
+         * Add Note
+         * @description Write a short behaviour note (``insights.note``): positive, observation or concern, up
+         *     to 500 characters, stored encrypted and never sent to AI. Accepts ``Idempotency-Key``.
+         */
+        post: operations["add_note_api_v1_students__student_id__behaviour_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/students/{student_id}/certificates": {
@@ -4145,6 +4536,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Raise Flag
+         * @description Raise a concern for a student in your scope (``insights.act``); owned by the class
+         *     teacher when they may act, else by you. Accepts ``Idempotency-Key``.
+         */
+        post: operations["raise_flag_api_v1_students__student_id__flags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/guardians": {
         parameters: {
             query?: never;
@@ -4212,6 +4624,27 @@ export interface paths {
          *     ``student.read_sensitive``, class teachers only for their sections).
          */
         post: operations["reveal_sensitive_api_v1_students__student_id__sensitive_reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Timeline
+         * @description The student's timeline, newest first, with the attendance, behaviour and course
+         *     indicators (``insights.read``; 404 outside your scope). Audited.
+         */
+        get: operations["timeline_api_v1_students__student_id__timeline_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4788,6 +5221,50 @@ export interface components {
             /** Acl */
             acl: components["schemas"]["AclEntry"][];
         };
+        /** ActionIn */
+        ActionIn: {
+            /**
+             * Acted On
+             * @description Default: today (IST)
+             */
+            acted_on?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "talked_with_student" | "called_parent" | "met_parent" | "home_visit" | "remedial_support" | "referred_counsellor" | "referred_principal" | "other";
+            /** Note */
+            note?: string | null;
+        };
+        /** ActionOut */
+        ActionOut: {
+            /**
+             * Acted On
+             * Format: date
+             */
+            acted_on: string;
+            by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "raised" | "talked_with_student" | "called_parent" | "met_parent" | "home_visit" | "remedial_support" | "referred_counsellor" | "referred_principal" | "other" | "closed";
+            /**
+             * Note
+             * @description Restricted (C3); shown only to people who may act
+             */
+            note: string | null;
+        };
         /** ActiveTenantIn */
         ActiveTenantIn: {
             /**
@@ -4905,6 +5382,29 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** SectionOut */
+        app__academics__schemas__SectionOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Label
+             * @description Class code and section name, e.g. IX-A
+             */
+            label: string;
+        };
         /**
          * MemberOut
          * @description A staff member shown next to a record: membership id and display name only (``null``
@@ -4929,6 +5429,13 @@ export interface components {
             ok: boolean;
             /** Reason */
             reason: string | null;
+        };
+        /** Page[FlagOut] */
+        app__authz__http__Page_FlagOut_: {
+            /** Data */
+            data: components["schemas"]["app__insights__schemas__FlagOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** Page[TicketOut] */
         app__authz__http__Page_TicketOut_: {
@@ -4978,6 +5485,39 @@ export interface components {
             /** Version No */
             version_no: number;
         };
+        /** StudentRef */
+        app__dq__schemas__StudentRef: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /**
+         * SummaryOut
+         * @description Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).
+         */
+        app__dq__schemas__SummaryOut: {
+            /** Blockers */
+            blockers: number;
+            /** By Rule */
+            by_rule: components["schemas"]["RuleCount"][];
+            /** By Severity */
+            by_severity: {
+                [key: string]: number;
+            };
+            last_run: components["schemas"]["RunOut"] | null;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Students With Blockers */
+            students_with_blockers: number;
+            /** Warnings */
+            warnings: number;
+        };
         /** MeOut */
         app__identity__schemas__MeOut: {
             /** Display Name */
@@ -5024,6 +5564,131 @@ export interface components {
              */
             user_id: string;
         };
+        /** FlagOut */
+        app__insights__schemas__FlagOut: {
+            /** Actioned */
+            actioned: boolean;
+            /** Close Reason */
+            close_reason: ("improved" | "support_in_place" | "parent_informed" | "no_concern" | "student_left" | "raised_in_error") | null;
+            /** Closed At */
+            closed_at: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /**
+             * Evidence
+             * @description What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)
+             */
+            evidence: {
+                [key: string]: number | string;
+            };
+            /** First Action At */
+            first_action_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Indicator
+             * @enum {string}
+             */
+            indicator: "attendance" | "behaviour" | "course";
+            /**
+             * Overdue
+             * @description Past the due date and nobody has acted yet
+             */
+            overdue: boolean;
+            /** @description None: unassigned (the principal assigns it) */
+            owner: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            /** @description Set for flags a person raised (manual) */
+            raised_by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            /**
+             * Raised On
+             * Format: date
+             */
+            raised_on: string;
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "attendance_streak" | "attendance_rate" | "course_low" | "course_decline" | "behaviour_concerns" | "manual";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "closed";
+            student: components["schemas"]["app__insights__schemas__StudentRef"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * MemberOut
+         * @description A staff member next to a record: membership id and display name only.
+         */
+        app__insights__schemas__MemberOut: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+        };
+        /** StudentRef */
+        app__insights__schemas__StudentRef: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Full Name */
+            full_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Section Label
+             * @description Current section, e.g. IX-A
+             */
+            section_label: string | null;
+        };
+        /**
+         * SummaryOut
+         * @description Counts only, for the caller's scope in this school (FR-EW-015; the M5 exit metric).
+         */
+        app__insights__schemas__SummaryOut: {
+            /** Actioned Late */
+            actioned_late: number;
+            /**
+             * Actioned On Time
+             * @description Of those, first acted on by their due date
+             */
+            actioned_on_time: number;
+            /** Not Actioned */
+            not_actioned: number;
+            /**
+             * Open
+             * @description Flags not closed (now)
+             */
+            open: number;
+            /**
+             * Overdue
+             * @description Open flags past their due date with no action (now)
+             */
+            overdue: number;
+            /**
+             * Raised
+             * @description Flags raised since the date
+             */
+            raised: number;
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+        };
         /** AuditVerifyOut */
         app__platform__schemas__AuditVerifyOut: {
             /** Checked */
@@ -5040,6 +5705,23 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** FlagOut */
+        app__platform__schemas__FlagOut: {
+            /** Description */
+            description: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Key */
+            key: string;
+            /** Rollout Percent */
+            rollout_percent: number | null;
+            /** Tenant Id */
+            tenant_id: string | null;
+            /** Updated At */
+            updated_at: string | null;
+            /** Version */
+            version: number;
+        };
         /** MeOut */
         app__platform__schemas__MeOut: {
             /**
@@ -5054,12 +5736,63 @@ export interface components {
             /** Step Up Fresh */
             step_up_fresh: boolean;
         };
+        /** Page[FlagOut] */
+        app__platform__schemas__Page_FlagOut_: {
+            /** Data */
+            data: components["schemas"]["app__platform__schemas__FlagOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[TicketOut] */
         app__platform__schemas__Page_TicketOut_: {
             /** Data */
             data: components["schemas"]["TicketOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** SectionOut */
+        app__tenancy__schemas__SectionOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Archived At
+             * @description When it was archived (hidden from lists); null while in use.
+             */
+            archived_at?: string | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Teacher Membership Id */
+            class_teacher_membership_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * In Use
+             * @description Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.
+             */
+            in_use?: boolean | null;
+            /** Name */
+            name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
         };
         /** ApproveIn */
         ApproveIn: {
@@ -5091,6 +5824,161 @@ export interface components {
             membership_id: string;
             /** Roles */
             roles: string[];
+        };
+        /** AssignIn */
+        AssignIn: {
+            /**
+             * Owner Membership Id
+             * Format: uuid
+             */
+            owner_membership_id: string;
+        };
+        /** AttendanceDayOut */
+        AttendanceDayOut: {
+            /**
+             * Counts
+             * @description Students per status that day
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Marked
+             * @description Whether any student of the section is marked that day
+             */
+            marked: boolean;
+            /**
+             * On Date
+             * Format: date
+             */
+            on_date: string;
+            section: components["schemas"]["app__academics__schemas__SectionOut"];
+            /** Students */
+            students: components["schemas"]["AttendanceDayStudent"][];
+        };
+        /** AttendanceDayStudent */
+        AttendanceDayStudent: {
+            /**
+             * Status
+             * @description None: not marked that day
+             */
+            status: ("present" | "absent" | "late" | "leave") | null;
+            student: components["schemas"]["RosterStudentOut"];
+        };
+        /** AttendanceEntryIn */
+        AttendanceEntryIn: {
+            /**
+             * On Date
+             * Format: date
+             */
+            on_date: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "present" | "absent" | "late" | "leave";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** AttendanceIndicatorOut */
+        AttendanceIndicatorOut: {
+            /** Absent */
+            absent: number;
+            /** Concern */
+            concern: boolean;
+            /**
+             * Days
+             * @description Marked school days in the window
+             */
+            days: number;
+            /** Late */
+            late: number;
+            /** Leave */
+            leave: number;
+            /** Present */
+            present: number;
+            /** Rate */
+            rate: number | null;
+            /**
+             * Streak
+             * @description Consecutive absences up to the last marked day
+             */
+            streak: number;
+        };
+        /** AttendanceMonthEvent */
+        AttendanceMonthEvent: {
+            /** Absent */
+            absent: number;
+            /** Days */
+            days: number;
+            /** Late */
+            late: number;
+            /** Leave */
+            leave: number;
+            /** Month */
+            month: string;
+            /** Present */
+            present: number;
+        };
+        /**
+         * AttendanceMonthOut
+         * @description The month register: school days (dates with any mark) x students (A4 print).
+         */
+        AttendanceMonthOut: {
+            /** Month */
+            month: string;
+            /** School Days */
+            school_days: string[];
+            section: components["schemas"]["app__academics__schemas__SectionOut"];
+            /** Students */
+            students: components["schemas"]["AttendanceMonthStudent"][];
+        };
+        /** AttendanceMonthStudent */
+        AttendanceMonthStudent: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Days
+             * @description ISO date -> status (marked days only)
+             */
+            days: {
+                [key: string]: "present" | "absent" | "late" | "leave";
+            };
+            student: components["schemas"]["RosterStudentOut"];
+        };
+        /**
+         * AttendanceSheetOut
+         * @description What the sheet would add. Nothing is stored until the entries are sent to
+         *     ``POST /sections/{section_id}/attendance`` with ``source=import``.
+         */
+        AttendanceSheetOut: {
+            /** Dates */
+            dates: string[];
+            /** Entries */
+            entries: components["schemas"]["AttendanceEntryIn"][];
+            /** Issue Count */
+            issue_count: number;
+            /** Issues */
+            issues: components["schemas"]["SheetIssueOut"][];
+            /** Students */
+            students: number;
+        };
+        /** AttendanceWrite */
+        AttendanceWrite: {
+            /** Entries */
+            entries: components["schemas"]["AttendanceEntryIn"][];
+            /**
+             * Source
+             * @description mark (screen) or import (sheet)
+             * @default mark
+             * @enum {string}
+             */
+            source: "mark" | "import";
         };
         /** AttributeOut */
         AttributeOut: {
@@ -5267,6 +6155,15 @@ export interface components {
             status: "queued" | "processing" | "review" | "completed" | "failed";
             /** Version */
             version: number;
+        };
+        /** BehaviourIndicatorOut */
+        BehaviourIndicatorOut: {
+            /** Concern */
+            concern: boolean;
+            /** Concerns */
+            concerns: number;
+            /** Window Days */
+            window_days: number;
         };
         /** Bilingual */
         Bilingual: {
@@ -5536,6 +6433,20 @@ export interface components {
             size_bytes: number;
             /** Url */
             url: string;
+        };
+        /** CertificateEvent */
+        CertificateEvent: {
+            /**
+             * Certificate Id
+             * Format: uuid
+             */
+            certificate_id: string;
+            /** Certificate Type */
+            certificate_type: string;
+            /** Serial */
+            serial: string | null;
+            /** Status */
+            status: string;
         };
         /**
          * CertificateLetterhead
@@ -6054,6 +6965,16 @@ export interface components {
             /** Sort Order */
             sort_order?: number | null;
         };
+        /** CloseIn */
+        CloseIn: {
+            /** Note */
+            note?: string | null;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "improved" | "support_in_place" | "parent_informed" | "no_concern" | "student_left" | "raised_in_error";
+        };
         /** ColumnMap */
         ColumnMap: {
             /** Index */
@@ -6119,6 +7040,19 @@ export interface components {
             label_te: string;
             /** Value */
             value: string | null;
+        };
+        /** CourseIndicatorOut */
+        CourseIndicatorOut: {
+            /** Change */
+            change: number | null;
+            /** Concern */
+            concern: boolean;
+            /** Exam Id */
+            exam_id: string | null;
+            /** Percent */
+            percent: number | null;
+            /** Previous Percent */
+            previous_percent: number | null;
         };
         /** DashboardOut */
         DashboardOut: {
@@ -6583,6 +7517,89 @@ export interface components {
             /** Section Id */
             section_id?: string | null;
         };
+        /** EnrolmentEvent */
+        EnrolmentEvent: {
+            /** Ended On */
+            ended_on: string | null;
+            /** Section Label */
+            section_label: string | null;
+            /** Started On */
+            started_on: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * ErasedOut
+         * @description What an erasure removed (the text itself is never returned or kept).
+         */
+        ErasedOut: {
+            /**
+             * Erased
+             * @default true
+             */
+            erased: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** EraseIn */
+        EraseIn: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "parent_request" | "entered_in_error";
+        };
+        /** ExamCreate */
+        ExamCreate: {
+            /**
+             * Held On
+             * Format: date
+             */
+            held_on: string;
+            /** Name */
+            name: string;
+        };
+        /** ExamEvent */
+        ExamEvent: {
+            /** Absent Papers */
+            absent_papers: number;
+            /**
+             * Exam Id
+             * Format: uuid
+             */
+            exam_id: string;
+            /** Name */
+            name: string;
+            /** Papers */
+            papers: number;
+            /** Percent */
+            percent: number | null;
+        };
+        /** ExamOut */
+        ExamOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Held On
+             * Format: date
+             */
+            held_on: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
+        };
         /** ExportDownloadOut */
         ExportDownloadOut: {
             /** Content Type */
@@ -6847,7 +7864,7 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "resolved" | "waived" | "reopened";
-            student: components["schemas"]["StudentRef"];
+            student: components["schemas"]["app__dq__schemas__StudentRef"];
             /** Values */
             values: components["schemas"]["FindingValue"][];
             /** Version */
@@ -6881,6 +7898,68 @@ export interface components {
              */
             value_id: string;
         };
+        /** FlagDetail */
+        FlagDetail: {
+            /** Actioned */
+            actioned: boolean;
+            /** Actions */
+            actions: components["schemas"]["ActionOut"][];
+            /** Close Reason */
+            close_reason: ("improved" | "support_in_place" | "parent_informed" | "no_concern" | "student_left" | "raised_in_error") | null;
+            /** Closed At */
+            closed_at: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /**
+             * Evidence
+             * @description What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)
+             */
+            evidence: {
+                [key: string]: number | string;
+            };
+            /** First Action At */
+            first_action_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Indicator
+             * @enum {string}
+             */
+            indicator: "attendance" | "behaviour" | "course";
+            /**
+             * Overdue
+             * @description Past the due date and nobody has acted yet
+             */
+            overdue: boolean;
+            /** @description None: unassigned (the principal assigns it) */
+            owner: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            /** @description Set for flags a person raised (manual) */
+            raised_by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            /**
+             * Raised On
+             * Format: date
+             */
+            raised_on: string;
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "attendance_streak" | "attendance_rate" | "course_low" | "course_decline" | "behaviour_concerns" | "manual";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "closed";
+            student: components["schemas"]["app__insights__schemas__StudentRef"];
+            /** Version */
+            version: number;
+        };
         /** FlagIn */
         FlagIn: {
             /** Description */
@@ -6889,23 +7968,6 @@ export interface components {
             enabled: boolean;
             /** Rollout Percent */
             rollout_percent?: number | null;
-        };
-        /** FlagOut */
-        FlagOut: {
-            /** Description */
-            description: string | null;
-            /** Enabled */
-            enabled: boolean;
-            /** Key */
-            key: string;
-            /** Rollout Percent */
-            rollout_percent: number | null;
-            /** Tenant Id */
-            tenant_id: string | null;
-            /** Updated At */
-            updated_at: string | null;
-            /** Version */
-            version: number;
         };
         /** FlagOverrideIn */
         FlagOverrideIn: {
@@ -7280,6 +8342,12 @@ export interface components {
              * @enum {string}
              */
             status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
+        };
+        /** IndicatorsOut */
+        IndicatorsOut: {
+            attendance: components["schemas"]["AttendanceIndicatorOut"];
+            behaviour: components["schemas"]["BehaviourIndicatorOut"];
+            course: components["schemas"]["CourseIndicatorOut"];
         };
         /** InputOut */
         InputOut: {
@@ -7726,6 +8794,16 @@ export interface components {
              */
             tenant_id: string;
         };
+        /** ManualFlagIn */
+        ManualFlagIn: {
+            /**
+             * Indicator
+             * @enum {string}
+             */
+            indicator: "attendance" | "behaviour" | "course";
+            /** Note */
+            note?: string | null;
+        };
         /**
          * MappingIn
          * @description The full column mapping (unlisted columns are not imported).
@@ -7738,6 +8816,145 @@ export interface components {
         MarkedReadOut: {
             /** Updated */
             updated: number;
+        };
+        /** MarkIn */
+        "MarkIn-Input": {
+            /**
+             * Absent
+             * @default false
+             */
+            absent: boolean;
+            /** Marks */
+            marks?: number | string | null;
+            /** Max Marks */
+            max_marks: number | string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Subject */
+            subject: string;
+        };
+        /** MarkIn */
+        "MarkIn-Output": {
+            /**
+             * Absent
+             * @default false
+             */
+            absent: boolean;
+            /** Marks */
+            marks?: string | null;
+            /** Max Marks */
+            max_marks: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Subject */
+            subject: string;
+        };
+        /** MarkOut */
+        MarkOut: {
+            /** Absent */
+            absent: boolean;
+            /** Marks */
+            marks: string | null;
+            /** Max Marks */
+            max_marks: string;
+            /** Subject */
+            subject: string;
+        };
+        /** MarksGridOut */
+        MarksGridOut: {
+            exam: components["schemas"]["ExamOut"];
+            section: components["schemas"]["app__academics__schemas__SectionOut"];
+            /** Students */
+            students: components["schemas"]["MarksStudentOut"][];
+            /** Subjects */
+            subjects: string[];
+        };
+        /** MarksSheetOut */
+        MarksSheetOut: {
+            /** Entries */
+            entries: components["schemas"]["MarkIn-Output"][];
+            /** Issue Count */
+            issue_count: number;
+            /** Issues */
+            issues: components["schemas"]["SheetIssueOut"][];
+            /** Students */
+            students: number;
+            /** Subjects */
+            subjects: string[];
+        };
+        /** MarksStudentOut */
+        MarksStudentOut: {
+            /** Marks */
+            marks: components["schemas"]["MarkOut"][];
+            /**
+             * Percent
+             * @description Overall percentage over the subjects with marks (absent papers left out)
+             */
+            percent: number | null;
+            student: components["schemas"]["RosterStudentOut"];
+        };
+        /** MarksWrite */
+        MarksWrite: {
+            /** Entries */
+            entries: components["schemas"]["MarkIn-Input"][];
+            /**
+             * Source
+             * @default mark
+             * @enum {string}
+             */
+            source: "mark" | "import";
+        };
+        /** NoteIn */
+        NoteIn: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "positive" | "observation" | "concern";
+            /**
+             * Noted On
+             * @description Default: today (IST)
+             */
+            noted_on?: string | null;
+            /** Text */
+            text: string;
+        };
+        /** NoteOut */
+        NoteOut: {
+            by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "positive" | "observation" | "concern";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Noted On
+             * Format: date
+             */
+            noted_on: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Text */
+            text: string;
         };
         /**
          * NoticeApproveIn
@@ -8033,6 +9250,18 @@ export interface components {
              */
             language: "en" | "te";
         };
+        /** OwnerOut */
+        OwnerOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /** Roles */
+            roles: string[];
+        };
         /** Page[AcademicYearOut] */
         Page_AcademicYearOut_: {
             /** Data */
@@ -8124,13 +9353,6 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
-        /** Page[FlagOut] */
-        Page_FlagOut_: {
-            /** Data */
-            data: components["schemas"]["FlagOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
         /** Page[GrantOut] */
         Page_GrantOut_: {
             /** Data */
@@ -8218,7 +9440,7 @@ export interface components {
         /** Page[SectionOut] */
         Page_SectionOut_: {
             /** Data */
-            data: components["schemas"]["SectionOut"][];
+            data: components["schemas"]["app__tenancy__schemas__SectionOut"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -9200,6 +10422,23 @@ export interface components {
             roles: string[];
         };
         /**
+         * RosterStudentOut
+         * @description A student of the section's roster (current-year active enrolment).
+         */
+        RosterStudentOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Full Name */
+            full_name: string | null;
+            /** Roll No */
+            roll_no: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
          * RowEditIn
          * @description Cells to change in one staged row (each column at most once).
          */
@@ -9239,6 +10478,39 @@ export interface components {
             sources: string[];
             /** Version */
             version: number;
+        };
+        /** RuleSettingIn */
+        RuleSettingIn: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Threshold */
+            threshold?: number | null;
+        };
+        /** RuleSettingOut */
+        RuleSettingOut: {
+            /** Can Disable */
+            can_disable: boolean;
+            /** Default */
+            default: number;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Indicator
+             * @enum {string}
+             */
+            indicator: "attendance" | "behaviour" | "course";
+            /** Key */
+            key: string;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
+            /** Min Days */
+            min_days: number | null;
+            /** Threshold */
+            threshold: number;
+            /** Window */
+            window: number | null;
         };
         /** RunCreate */
         RunCreate: {
@@ -9441,50 +10713,6 @@ export interface components {
              */
             to_section_id: string;
         };
-        /** SectionOut */
-        SectionOut: {
-            /**
-             * Academic Year Id
-             * Format: uuid
-             */
-            academic_year_id: string;
-            /**
-             * Archived At
-             * @description When it was archived (hidden from lists); null while in use.
-             */
-            archived_at?: string | null;
-            /**
-             * Class Id
-             * Format: uuid
-             */
-            class_id: string;
-            /** Class Teacher Membership Id */
-            class_teacher_membership_id: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * In Use
-             * @description Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.
-             */
-            in_use?: boolean | null;
-            /** Name */
-            name: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-            /** Version */
-            version: number;
-        };
         /**
          * SectionUpdate
          * @description Omit a field to keep it; send ``class_teacher_membership_id: null`` to clear it.
@@ -9515,6 +10743,29 @@ export interface components {
              * @description Languages the school uses, first is default.
              */
             languages: ("en" | "te")[];
+        };
+        /** SettingsIn */
+        SettingsIn: {
+            /** Rules */
+            rules: {
+                [key: string]: components["schemas"]["RuleSettingIn"];
+            };
+        };
+        /** SettingsOut */
+        SettingsOut: {
+            /** Due Days */
+            due_days: number;
+            /** Rules */
+            rules: components["schemas"]["RuleSettingOut"][];
+            /** Rules Version */
+            rules_version: number;
+            /** Updated At */
+            updated_at: string | null;
+            /**
+             * Version
+             * @description ETag for PUT (0 until the school first changes them)
+             */
+            version: number;
         };
         /** SeverityPolicyOut */
         SeverityPolicyOut: {
@@ -9618,6 +10869,27 @@ export interface components {
              * @enum {string}
              */
             format: "csv" | "xlsx";
+        };
+        /** SheetIn */
+        SheetIn: {
+            /**
+             * Document Id
+             * Format: uuid
+             * @description An uploaded, virus-checked import file (POST /documents/uploads with purpose import_file); it is deleted once read.
+             */
+            document_id: string;
+        };
+        /** SheetIssueOut */
+        SheetIssueOut: {
+            /** Code */
+            code: string;
+            /**
+             * Column
+             * @description 1-based column (A = 1); None for the whole row
+             */
+            column: number | null;
+            /** Row */
+            row: number;
         };
         /**
          * SheetRowOut
@@ -9762,18 +11034,6 @@ export interface components {
              * @enum {string}
              */
             status: "provisional" | "active" | "left" | "graduated";
-        };
-        /** StudentRef */
-        StudentRef: {
-            /** Admission No */
-            admission_no: string | null;
-            /** Display Name */
-            display_name: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
         };
         /**
          * StudentSearchIn
@@ -9937,27 +11197,6 @@ export interface components {
             title: string;
             /** Version */
             version: number;
-        };
-        /**
-         * SummaryOut
-         * @description Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).
-         */
-        SummaryOut: {
-            /** Blockers */
-            blockers: number;
-            /** By Rule */
-            by_rule: components["schemas"]["RuleCount"][];
-            /** By Severity */
-            by_severity: {
-                [key: string]: number;
-            };
-            last_run: components["schemas"]["RunOut"] | null;
-            /** Profile Key */
-            profile_key: string | null;
-            /** Students With Blockers */
-            students_with_blockers: number;
-            /** Warnings */
-            warnings: number;
         };
         /**
          * SupportSessionIn
@@ -10633,6 +11872,35 @@ export interface components {
             /** Status */
             status?: ("open" | "in_progress" | "waiting_on_school" | "resolved" | "closed") | null;
         };
+        /**
+         * TimelineItem
+         * @description One event; exactly the field named by ``kind`` is set.
+         */
+        TimelineItem: {
+            attendance?: components["schemas"]["AttendanceMonthEvent"] | null;
+            certificate?: components["schemas"]["CertificateEvent"] | null;
+            enrolment?: components["schemas"]["EnrolmentEvent"] | null;
+            exam?: components["schemas"]["ExamEvent"] | null;
+            flag?: components["schemas"]["FlagDetail"] | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "enrolment" | "attendance_month" | "exam" | "note" | "flag" | "certificate";
+            note?: components["schemas"]["NoteOut"] | null;
+            /**
+             * On
+             * Format: date
+             */
+            on: string;
+        };
+        /** TimelineOut */
+        TimelineOut: {
+            indicators: components["schemas"]["IndicatorsOut"];
+            /** Items */
+            items: components["schemas"]["TimelineItem"][];
+            student: components["schemas"]["app__insights__schemas__StudentRef"];
+        };
         /** UnreadCountOut */
         UnreadCountOut: {
             /** Count */
@@ -11068,6 +12336,18 @@ export interface components {
         WaiveIn: {
             /** Reason */
             reason: string;
+        };
+        /** WriteResultOut */
+        WriteResultOut: {
+            /** Dates */
+            dates?: string[];
+            /** Unchanged */
+            unchanged: number;
+            /**
+             * Written
+             * @description Entries created or changed
+             */
+            written: number;
         };
     };
     responses: never;
@@ -11758,6 +13038,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__audit__viewer__AuditVerifyOut"];
+                };
+            };
+        };
+    };
+    erase_note_api_v1_behaviour_notes__note_id__erase_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EraseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErasedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -13693,7 +15008,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SummaryOut"];
+                    "application/json": components["schemas"]["app__dq__schemas__SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_exams_api_v1_exams_get: {
+        parameters: {
+            query?: {
+                /** @description Default: the current academic year */
+                academic_year_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExamOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_exam_api_v1_exams_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExamCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExamOut"];
                 };
             };
             /** @description Validation Error */
@@ -14563,6 +15943,334 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_flags_api_v1_insights_flags_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                due?: ("overdue" | "due_soon") | null;
+                indicator?: ("attendance" | "behaviour" | "course") | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                section_id?: string | null;
+                status?: ("open" | "in_progress" | "closed") | null;
+                student_id?: string | null;
+                /** @description mine (default) or all in your scope */
+                view?: "mine" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__authz__http__Page_FlagOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_flag_api_v1_insights_flags__flag_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_action_api_v1_insights_flags__flag_id__actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_flag_api_v1_insights_flags__flag_id__assign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_flag_api_v1_insights_flags__flag_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    erase_flag_api_v1_insights_flags__flag_id__erase_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EraseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErasedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flag_owners_api_v1_insights_flags__flag_id__owners_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_v1_insights_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+        };
+    };
+    update_settings_api_v1_insights_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_v1_insights_summary_get: {
+        parameters: {
+            query?: {
+                /** @description Default: 30 days ago */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__insights__schemas__SummaryOut"];
                 };
             };
             /** @description Validation Error */
@@ -15800,7 +17508,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_FlagOut_"];
+                    "application/json": components["schemas"]["app__platform__schemas__Page_FlagOut_"];
                 };
             };
         };
@@ -15826,7 +17534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlagOut"];
+                    "application/json": components["schemas"]["app__platform__schemas__FlagOut"];
                 };
             };
             /** @description Validation Error */
@@ -15862,7 +17570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlagOut"];
+                    "application/json": components["schemas"]["app__platform__schemas__FlagOut"];
                 };
             };
             /** @description Validation Error */
@@ -17966,7 +19674,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectionOut"];
+                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -17997,7 +19705,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectionOut"];
+                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -18032,7 +19740,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectionOut"];
+                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -18063,7 +19771,249 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectionOut"];
+                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attendance_day_api_v1_sections__section_id__attendance_get: {
+        parameters: {
+            query?: {
+                /** @description IST date; default today */
+                date?: string | null;
+            };
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceDayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_attendance_api_v1_sections__section_id__attendance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttendanceWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attendance_month_api_v1_sections__section_id__attendance_month_get: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceMonthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_attendance_sheet_api_v1_sections__section_id__attendance_sheet_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SheetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    section_marks_api_v1_sections__section_id__exams__exam_id__marks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exam_id: string;
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarksGridOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_marks_api_v1_sections__section_id__exams__exam_id__marks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exam_id: string;
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarksWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_marks_sheet_api_v1_sections__section_id__exams__exam_id__marks_sheet_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exam_id: string;
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SheetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarksSheetOut"];
                 };
             };
             /** @description Validation Error */
@@ -18094,7 +20044,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectionOut"];
+                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -18277,6 +20227,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_students__student_id__behaviour_notes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_note_api_v1_students__student_id__behaviour_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
                 };
             };
             /** @description Validation Error */
@@ -18496,6 +20512,41 @@ export interface operations {
             };
         };
     };
+    raise_flag_api_v1_students__student_id__flags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualFlagIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_guardians_api_v1_students__student_id__guardians_get: {
         parameters: {
             query?: never;
@@ -18650,6 +20701,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevealOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    timeline_api_v1_students__student_id__timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineOut"];
                 };
             };
             /** @description Validation Error */

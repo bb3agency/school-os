@@ -239,6 +239,122 @@
         "title": "AclUpdate",
         "type": "object"
       },
+      "ActionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "acted_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default: today (IST)",
+            "title": "Acted On"
+          },
+          "kind": {
+            "enum": [
+              "talked_with_student",
+              "called_parent",
+              "met_parent",
+              "home_visit",
+              "remedial_support",
+              "referred_counsellor",
+              "referred_principal",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ActionIn",
+        "type": "object"
+      },
+      "ActionOut": {
+        "properties": {
+          "acted_on": {
+            "format": "date",
+            "title": "Acted On",
+            "type": "string"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "raised",
+              "talked_with_student",
+              "called_parent",
+              "met_parent",
+              "home_visit",
+              "remedial_support",
+              "referred_counsellor",
+              "referred_principal",
+              "other",
+              "closed"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Restricted (C3); shown only to people who may act",
+            "title": "Note"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "acted_on",
+          "note",
+          "by",
+          "created_at"
+        ],
+        "title": "ActionOut",
+        "type": "object"
+      },
       "ActiveTenantIn": {
         "additionalProperties": false,
         "properties": {
@@ -538,6 +654,21 @@
         "title": "AskIn",
         "type": "object"
       },
+      "AssignIn": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_membership_id": {
+            "format": "uuid",
+            "title": "Owner Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner_membership_id"
+        ],
+        "title": "AssignIn",
+        "type": "object"
+      },
       "AssigneeOut": {
         "properties": {
           "display_name": {
@@ -563,6 +694,348 @@
           "roles"
         ],
         "title": "AssigneeOut",
+        "type": "object"
+      },
+      "AttendanceDayOut": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Students per status that day",
+            "title": "Counts",
+            "type": "object"
+          },
+          "marked": {
+            "description": "Whether any student of the section is marked that day",
+            "title": "Marked",
+            "type": "boolean"
+          },
+          "on_date": {
+            "format": "date",
+            "title": "On Date",
+            "type": "string"
+          },
+          "section": {
+            "$ref": "#/components/schemas/app__academics__schemas__SectionOut"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceDayStudent"
+            },
+            "title": "Students",
+            "type": "array"
+          }
+        },
+        "required": [
+          "section",
+          "on_date",
+          "marked",
+          "students",
+          "counts"
+        ],
+        "title": "AttendanceDayOut",
+        "type": "object"
+      },
+      "AttendanceDayStudent": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "present",
+                  "absent",
+                  "late",
+                  "leave"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None: not marked that day",
+            "title": "Status"
+          },
+          "student": {
+            "$ref": "#/components/schemas/RosterStudentOut"
+          }
+        },
+        "required": [
+          "student",
+          "status"
+        ],
+        "title": "AttendanceDayStudent",
+        "type": "object"
+      },
+      "AttendanceEntryIn": {
+        "additionalProperties": false,
+        "properties": {
+          "on_date": {
+            "format": "date",
+            "title": "On Date",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "present",
+              "absent",
+              "late",
+              "leave"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "on_date",
+          "status"
+        ],
+        "title": "AttendanceEntryIn",
+        "type": "object"
+      },
+      "AttendanceIndicatorOut": {
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "integer"
+          },
+          "concern": {
+            "title": "Concern",
+            "type": "boolean"
+          },
+          "days": {
+            "description": "Marked school days in the window",
+            "title": "Days",
+            "type": "integer"
+          },
+          "late": {
+            "title": "Late",
+            "type": "integer"
+          },
+          "leave": {
+            "title": "Leave",
+            "type": "integer"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "streak": {
+            "description": "Consecutive absences up to the last marked day",
+            "title": "Streak",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "days",
+          "present",
+          "late",
+          "absent",
+          "leave",
+          "rate",
+          "streak",
+          "concern"
+        ],
+        "title": "AttendanceIndicatorOut",
+        "type": "object"
+      },
+      "AttendanceMonthEvent": {
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "integer"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "late": {
+            "title": "Late",
+            "type": "integer"
+          },
+          "leave": {
+            "title": "Leave",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "days",
+          "present",
+          "late",
+          "absent",
+          "leave"
+        ],
+        "title": "AttendanceMonthEvent",
+        "type": "object"
+      },
+      "AttendanceMonthOut": {
+        "description": "The month register: school days (dates with any mark) x students (A4 print).",
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "school_days": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "School Days",
+            "type": "array"
+          },
+          "section": {
+            "$ref": "#/components/schemas/app__academics__schemas__SectionOut"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceMonthStudent"
+            },
+            "title": "Students",
+            "type": "array"
+          }
+        },
+        "required": [
+          "section",
+          "month",
+          "school_days",
+          "students"
+        ],
+        "title": "AttendanceMonthOut",
+        "type": "object"
+      },
+      "AttendanceMonthStudent": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "days": {
+            "additionalProperties": {
+              "enum": [
+                "present",
+                "absent",
+                "late",
+                "leave"
+              ],
+              "type": "string"
+            },
+            "description": "ISO date -> status (marked days only)",
+            "title": "Days",
+            "type": "object"
+          },
+          "student": {
+            "$ref": "#/components/schemas/RosterStudentOut"
+          }
+        },
+        "required": [
+          "student",
+          "days",
+          "counts"
+        ],
+        "title": "AttendanceMonthStudent",
+        "type": "object"
+      },
+      "AttendanceSheetOut": {
+        "description": "What the sheet would add. Nothing is stored until the entries are sent to\n``POST /sections/{section_id}/attendance`` with ``source=import``.",
+        "properties": {
+          "dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceEntryIn"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "issue_count": {
+            "title": "Issue Count",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/SheetIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entries",
+          "dates",
+          "students",
+          "issues",
+          "issue_count"
+        ],
+        "title": "AttendanceSheetOut",
+        "type": "object"
+      },
+      "AttendanceWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceEntryIn"
+            },
+            "maxItems": 2500,
+            "minItems": 1,
+            "title": "Entries",
+            "type": "array"
+          },
+          "source": {
+            "default": "mark",
+            "description": "mark (screen) or import (sheet)",
+            "enum": [
+              "mark",
+              "import"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "AttendanceWrite",
         "type": "object"
       },
       "AttributeOut": {
@@ -1035,6 +1508,29 @@
           "version"
         ],
         "title": "BatchOut",
+        "type": "object"
+      },
+      "BehaviourIndicatorOut": {
+        "properties": {
+          "concern": {
+            "title": "Concern",
+            "type": "boolean"
+          },
+          "concerns": {
+            "title": "Concerns",
+            "type": "integer"
+          },
+          "window_days": {
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "concerns",
+          "window_days",
+          "concern"
+        ],
+        "title": "BehaviourIndicatorOut",
         "type": "object"
       },
       "Bilingual": {
@@ -1806,6 +2302,42 @@
           "sha256"
         ],
         "title": "CertificateDownloadOut",
+        "type": "object"
+      },
+      "CertificateEvent": {
+        "properties": {
+          "certificate_id": {
+            "format": "uuid",
+            "title": "Certificate Id",
+            "type": "string"
+          },
+          "certificate_type": {
+            "title": "Certificate Type",
+            "type": "string"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "certificate_id",
+          "certificate_type",
+          "status",
+          "serial"
+        ],
+        "title": "CertificateEvent",
         "type": "object"
       },
       "CertificateLetterhead-Input": {
@@ -3129,6 +3661,40 @@
         "title": "ClassUpdate",
         "type": "object"
       },
+      "CloseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reason": {
+            "enum": [
+              "improved",
+              "support_in_place",
+              "parent_informed",
+              "no_concern",
+              "student_left",
+              "raised_in_error"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "CloseIn",
+        "type": "object"
+      },
       "ColumnMap": {
         "additionalProperties": false,
         "properties": {
@@ -3288,6 +3854,68 @@
           "value"
         ],
         "title": "ContentLine",
+        "type": "object"
+      },
+      "CourseIndicatorOut": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "concern": {
+            "title": "Concern",
+            "type": "boolean"
+          },
+          "exam_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exam Id"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "previous_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Percent"
+          }
+        },
+        "required": [
+          "exam_id",
+          "percent",
+          "previous_percent",
+          "change",
+          "concern"
+        ],
+        "title": "CourseIndicatorOut",
         "type": "object"
       },
       "DashboardOut": {
@@ -4740,6 +5368,194 @@
         "title": "EnrollmentPatch",
         "type": "object"
       },
+      "EnrolmentEvent": {
+        "properties": {
+          "ended_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended On"
+          },
+          "section_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Label"
+          },
+          "started_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started On"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_label",
+          "status",
+          "started_on",
+          "ended_on"
+        ],
+        "title": "EnrolmentEvent",
+        "type": "object"
+      },
+      "EraseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "parent_request",
+              "entered_in_error"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "EraseIn",
+        "type": "object"
+      },
+      "ErasedOut": {
+        "description": "What an erasure removed (the text itself is never returned or kept).",
+        "properties": {
+          "erased": {
+            "default": true,
+            "title": "Erased",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ErasedOut",
+        "type": "object"
+      },
+      "ExamCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "held_on": {
+            "format": "date",
+            "title": "Held On",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "held_on"
+        ],
+        "title": "ExamCreate",
+        "type": "object"
+      },
+      "ExamEvent": {
+        "properties": {
+          "absent_papers": {
+            "title": "Absent Papers",
+            "type": "integer"
+          },
+          "exam_id": {
+            "format": "uuid",
+            "title": "Exam Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "papers": {
+            "title": "Papers",
+            "type": "integer"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          }
+        },
+        "required": [
+          "exam_id",
+          "name",
+          "percent",
+          "papers",
+          "absent_papers"
+        ],
+        "title": "ExamEvent",
+        "type": "object"
+      },
+      "ExamOut": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "held_on": {
+            "format": "date",
+            "title": "Held On",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "academic_year_id",
+          "name",
+          "held_on",
+          "version"
+        ],
+        "title": "ExamOut",
+        "type": "object"
+      },
       "ExportDownloadOut": {
         "properties": {
           "content_type": {
@@ -5516,7 +6332,7 @@
             "type": "string"
           },
           "student": {
-            "$ref": "#/components/schemas/StudentRef"
+            "$ref": "#/components/schemas/app__dq__schemas__StudentRef"
           },
           "values": {
             "items": {
@@ -5655,6 +6471,182 @@
         "title": "FindingValue",
         "type": "object"
       },
+      "FlagDetail": {
+        "properties": {
+          "actioned": {
+            "title": "Actioned",
+            "type": "boolean"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionOut"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "improved",
+                  "support_in_place",
+                  "parent_informed",
+                  "no_concern",
+                  "student_left",
+                  "raised_in_error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)",
+            "title": "Evidence",
+            "type": "object"
+          },
+          "first_action_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Action At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "indicator": {
+            "enum": [
+              "attendance",
+              "behaviour",
+              "course"
+            ],
+            "title": "Indicator",
+            "type": "string"
+          },
+          "overdue": {
+            "description": "Past the due date and nobody has acted yet",
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None: unassigned (the principal assigns it)"
+          },
+          "raised_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for flags a person raised (manual)"
+          },
+          "raised_on": {
+            "format": "date",
+            "title": "Raised On",
+            "type": "string"
+          },
+          "rule": {
+            "enum": [
+              "attendance_streak",
+              "attendance_rate",
+              "course_low",
+              "course_decline",
+              "behaviour_concerns",
+              "manual"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/app__insights__schemas__StudentRef"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student",
+          "indicator",
+          "rule",
+          "evidence",
+          "status",
+          "owner",
+          "raised_on",
+          "due_on",
+          "overdue",
+          "actioned",
+          "first_action_at",
+          "closed_at",
+          "close_reason",
+          "raised_by",
+          "version",
+          "actions"
+        ],
+        "title": "FlagDetail",
+        "type": "object"
+      },
       "FlagIn": {
         "additionalProperties": false,
         "properties": {
@@ -5692,79 +6684,6 @@
           "enabled"
         ],
         "title": "FlagIn",
-        "type": "object"
-      },
-      "FlagOut": {
-        "properties": {
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "enabled": {
-            "title": "Enabled",
-            "type": "boolean"
-          },
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "rollout_percent": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rollout Percent"
-          },
-          "tenant_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tenant Id"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "key",
-          "tenant_id",
-          "enabled",
-          "rollout_percent",
-          "description",
-          "updated_at",
-          "version"
-        ],
-        "title": "FlagOut",
         "type": "object"
       },
       "FlagOverrideIn": {
@@ -6915,6 +7834,26 @@
           "reverted_at"
         ],
         "title": "ImportSummary",
+        "type": "object"
+      },
+      "IndicatorsOut": {
+        "properties": {
+          "attendance": {
+            "$ref": "#/components/schemas/AttendanceIndicatorOut"
+          },
+          "behaviour": {
+            "$ref": "#/components/schemas/BehaviourIndicatorOut"
+          },
+          "course": {
+            "$ref": "#/components/schemas/CourseIndicatorOut"
+          }
+        },
+        "required": [
+          "attendance",
+          "behaviour",
+          "course"
+        ],
+        "title": "IndicatorsOut",
         "type": "object"
       },
       "InputOut": {
@@ -8109,6 +9048,37 @@
         "title": "LoginEventOut",
         "type": "object"
       },
+      "ManualFlagIn": {
+        "additionalProperties": false,
+        "properties": {
+          "indicator": {
+            "enum": [
+              "attendance",
+              "behaviour",
+              "course"
+            ],
+            "title": "Indicator",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "indicator"
+        ],
+        "title": "ManualFlagIn",
+        "type": "object"
+      },
       "MappingIn": {
         "additionalProperties": false,
         "description": "The full column mapping (unlisted columns are not imported).",
@@ -8128,6 +9098,146 @@
         "title": "MappingIn",
         "type": "object"
       },
+      "MarkIn-Input": {
+        "additionalProperties": false,
+        "properties": {
+          "absent": {
+            "default": false,
+            "title": "Absent",
+            "type": "boolean"
+          },
+          "marks": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,4}|(?=[\\d.]{1,7}0*$)\\d{0,4}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marks"
+          },
+          "max_marks": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,4}|(?=[\\d.]{1,7}0*$)\\d{0,4}\\.\\d{0,2}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Max Marks"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "subject",
+          "max_marks"
+        ],
+        "title": "MarkIn",
+        "type": "object"
+      },
+      "MarkIn-Output": {
+        "additionalProperties": false,
+        "properties": {
+          "absent": {
+            "default": false,
+            "title": "Absent",
+            "type": "boolean"
+          },
+          "marks": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,4}|(?=[\\d.]{1,7}0*$)\\d{0,4}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marks"
+          },
+          "max_marks": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,4}|(?=[\\d.]{1,7}0*$)\\d{0,4}\\.\\d{0,2}0*$)",
+            "title": "Max Marks",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "subject",
+          "max_marks"
+        ],
+        "title": "MarkIn",
+        "type": "object"
+      },
+      "MarkOut": {
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "boolean"
+          },
+          "marks": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marks"
+          },
+          "max_marks": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Max Marks",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "max_marks",
+          "marks",
+          "absent"
+        ],
+        "title": "MarkOut",
+        "type": "object"
+      },
       "MarkedReadOut": {
         "properties": {
           "updated": {
@@ -8139,6 +9249,238 @@
           "updated"
         ],
         "title": "MarkedReadOut",
+        "type": "object"
+      },
+      "MarksGridOut": {
+        "properties": {
+          "exam": {
+            "$ref": "#/components/schemas/ExamOut"
+          },
+          "section": {
+            "$ref": "#/components/schemas/app__academics__schemas__SectionOut"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/MarksStudentOut"
+            },
+            "title": "Students",
+            "type": "array"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subjects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "section",
+          "exam",
+          "subjects",
+          "students"
+        ],
+        "title": "MarksGridOut",
+        "type": "object"
+      },
+      "MarksSheetOut": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/MarkIn-Output"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "issue_count": {
+            "title": "Issue Count",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/SheetIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subjects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "subjects",
+          "students",
+          "issues",
+          "issue_count"
+        ],
+        "title": "MarksSheetOut",
+        "type": "object"
+      },
+      "MarksStudentOut": {
+        "properties": {
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/MarkOut"
+            },
+            "title": "Marks",
+            "type": "array"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overall percentage over the subjects with marks (absent papers left out)",
+            "title": "Percent"
+          },
+          "student": {
+            "$ref": "#/components/schemas/RosterStudentOut"
+          }
+        },
+        "required": [
+          "student",
+          "marks",
+          "percent"
+        ],
+        "title": "MarksStudentOut",
+        "type": "object"
+      },
+      "MarksWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/MarkIn-Input"
+            },
+            "maxItems": 2500,
+            "minItems": 1,
+            "title": "Entries",
+            "type": "array"
+          },
+          "source": {
+            "default": "mark",
+            "enum": [
+              "mark",
+              "import"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "MarksWrite",
+        "type": "object"
+      },
+      "NoteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "positive",
+              "observation",
+              "concern"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "noted_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default: today (IST)",
+            "title": "Noted On"
+          },
+          "text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "text"
+        ],
+        "title": "NoteIn",
+        "type": "object"
+      },
+      "NoteOut": {
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "enum": [
+              "positive",
+              "observation",
+              "concern"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "noted_on": {
+            "format": "date",
+            "title": "Noted On",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "category",
+          "noted_on",
+          "text",
+          "by",
+          "created_at"
+        ],
+        "title": "NoteOut",
         "type": "object"
       },
       "NoticeApproveIn": {
@@ -9100,6 +10442,33 @@
         "title": "OwnerIn",
         "type": "object"
       },
+      "OwnerOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name",
+          "roles"
+        ],
+        "title": "OwnerOut",
+        "type": "object"
+      },
       "PageImage": {
         "properties": {
           "expires_at": {
@@ -9581,33 +10950,6 @@
         "title": "Page[FindingOut]",
         "type": "object"
       },
-      "Page_FlagOut_": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/FlagOut"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "Page[FlagOut]",
-        "type": "object"
-      },
       "Page_GrantOut_": {
         "properties": {
           "data": {
@@ -9944,7 +11286,7 @@
         "properties": {
           "data": {
             "items": {
-              "$ref": "#/components/schemas/SectionOut"
+              "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
             },
             "title": "Data",
             "type": "array"
@@ -12528,6 +13870,57 @@
         "title": "RolesIn",
         "type": "object"
       },
+      "RosterStudentOut": {
+        "description": "A student of the section's roster (current-year active enrolment).",
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "roll_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "full_name",
+          "admission_no",
+          "roll_no"
+        ],
+        "title": "RosterStudentOut",
+        "type": "object"
+      },
       "RowEditIn": {
         "additionalProperties": false,
         "description": "Cells to change in one staged row (each column at most once).",
@@ -12641,6 +14034,114 @@
           "routes"
         ],
         "title": "RuleOut",
+        "type": "object"
+      },
+      "RuleSettingIn": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "title": "RuleSettingIn",
+        "type": "object"
+      },
+      "RuleSettingOut": {
+        "properties": {
+          "can_disable": {
+            "title": "Can Disable",
+            "type": "boolean"
+          },
+          "default": {
+            "title": "Default",
+            "type": "integer"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "indicator": {
+            "enum": [
+              "attendance",
+              "behaviour",
+              "course"
+            ],
+            "title": "Indicator",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "max": {
+            "title": "Max",
+            "type": "integer"
+          },
+          "min": {
+            "title": "Min",
+            "type": "integer"
+          },
+          "min_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Days"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "integer"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window"
+          }
+        },
+        "required": [
+          "key",
+          "indicator",
+          "enabled",
+          "can_disable",
+          "threshold",
+          "default",
+          "min",
+          "max",
+          "window",
+          "min_days"
+        ],
+        "title": "RuleSettingOut",
         "type": "object"
       },
       "RunCreate": {
@@ -13221,92 +14722,6 @@
         "title": "SectionMapEntry",
         "type": "object"
       },
-      "SectionOut": {
-        "properties": {
-          "academic_year_id": {
-            "format": "uuid",
-            "title": "Academic Year Id",
-            "type": "string"
-          },
-          "archived_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "When it was archived (hidden from lists); null while in use.",
-            "title": "Archived At"
-          },
-          "class_id": {
-            "format": "uuid",
-            "title": "Class Id",
-            "type": "string"
-          },
-          "class_teacher_membership_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Class Teacher Membership Id"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "in_use": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
-            "title": "In Use"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "updated_at": {
-            "format": "date-time",
-            "title": "Updated At",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "academic_year_id",
-          "class_id",
-          "name",
-          "class_teacher_membership_id",
-          "version",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "SectionOut",
-        "type": "object"
-      },
       "SectionUpdate": {
         "additionalProperties": false,
         "description": "Omit a field to keep it; send ``class_teacher_membership_id: null`` to clear it.",
@@ -13376,6 +14791,69 @@
           "languages"
         ],
         "title": "SessionSettingsOut",
+        "type": "object"
+      },
+      "SettingsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "rules": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RuleSettingIn"
+            },
+            "maxProperties": 10,
+            "title": "Rules",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "title": "SettingsIn",
+        "type": "object"
+      },
+      "SettingsOut": {
+        "properties": {
+          "due_days": {
+            "title": "Due Days",
+            "type": "integer"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleSettingOut"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "rules_version": {
+            "title": "Rules Version",
+            "type": "integer"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "version": {
+            "description": "ETag for PUT (0 until the school first changes them)",
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rules",
+          "rules_version",
+          "due_days",
+          "version",
+          "updated_at"
+        ],
+        "title": "SettingsOut",
         "type": "object"
       },
       "SeverityPolicyOut": {
@@ -13659,6 +15137,53 @@
           }
         },
         "title": "SheetExportIn",
+        "type": "object"
+      },
+      "SheetIn": {
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "description": "An uploaded, virus-checked import file (POST /documents/uploads with purpose import_file); it is deleted once read.",
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "title": "SheetIn",
+        "type": "object"
+      },
+      "SheetIssueOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "1-based column (A = 1); None for the whole row",
+            "title": "Column"
+          },
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row",
+          "column",
+          "code"
+        ],
+        "title": "SheetIssueOut",
         "type": "object"
       },
       "SheetRowOut": {
@@ -14014,44 +15539,6 @@
           "status"
         ],
         "title": "StudentPatch",
-        "type": "object"
-      },
-      "StudentRef": {
-        "properties": {
-          "admission_no": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admission No"
-          },
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Display Name"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "display_name",
-          "admission_no"
-        ],
-        "title": "StudentRef",
         "type": "object"
       },
       "StudentSearchIn": {
@@ -14523,69 +16010,6 @@
           "version"
         ],
         "title": "SuggestionOut",
-        "type": "object"
-      },
-      "SummaryOut": {
-        "description": "Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).",
-        "properties": {
-          "blockers": {
-            "title": "Blockers",
-            "type": "integer"
-          },
-          "by_rule": {
-            "items": {
-              "$ref": "#/components/schemas/RuleCount"
-            },
-            "title": "By Rule",
-            "type": "array"
-          },
-          "by_severity": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "By Severity",
-            "type": "object"
-          },
-          "last_run": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RunOut"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "profile_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Key"
-          },
-          "students_with_blockers": {
-            "title": "Students With Blockers",
-            "type": "integer"
-          },
-          "warnings": {
-            "title": "Warnings",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "profile_key",
-          "blockers",
-          "warnings",
-          "students_with_blockers",
-          "by_severity",
-          "by_rule",
-          "last_run"
-        ],
-        "title": "SummaryOut",
         "type": "object"
       },
       "SupportSessionIn": {
@@ -16470,6 +17894,118 @@
         "title": "TicketPatch",
         "type": "object"
       },
+      "TimelineItem": {
+        "description": "One event; exactly the field named by ``kind`` is set.",
+        "properties": {
+          "attendance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceMonthEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "certificate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CertificateEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enrolment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnrolmentEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exam": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExamEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlagDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "enrolment",
+              "attendance_month",
+              "exam",
+              "note",
+              "flag",
+              "certificate"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "on"
+        ],
+        "title": "TimelineItem",
+        "type": "object"
+      },
+      "TimelineOut": {
+        "properties": {
+          "indicators": {
+            "$ref": "#/components/schemas/IndicatorsOut"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "student": {
+            "$ref": "#/components/schemas/app__insights__schemas__StudentRef"
+          }
+        },
+        "required": [
+          "student",
+          "indicators",
+          "items"
+        ],
+        "title": "TimelineOut",
+        "type": "object"
+      },
       "UnreadCountOut": {
         "properties": {
           "count": {
@@ -17613,6 +19149,65 @@
         "title": "WaiveIn",
         "type": "object"
       },
+      "WriteResultOut": {
+        "properties": {
+          "dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "written": {
+            "description": "Entries created or changed",
+            "title": "Written",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "written",
+          "unchanged"
+        ],
+        "title": "WriteResultOut",
+        "type": "object"
+      },
+      "app__academics__schemas__SectionOut": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "description": "Class code and section name, e.g. IX-A",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "class_id",
+          "academic_year_id",
+          "label"
+        ],
+        "title": "SectionOut",
+        "type": "object"
+      },
       "app__admin__schemas__MemberOut": {
         "description": "A staff member shown next to a record: membership id and display name only (``null``\nwhen the account is no longer visible).",
         "properties": {
@@ -17680,6 +19275,34 @@
           "reason"
         ],
         "title": "AuditVerifyOut",
+        "type": "object"
+      },
+      "app__authz__http__Page_FlagOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/app__insights__schemas__FlagOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[FlagOut]",
         "type": "object"
       },
       "app__authz__http__Page_TicketOut_": {
@@ -17795,6 +19418,107 @@
         "title": "DownloadUrlOut",
         "type": "object"
       },
+      "app__dq__schemas__StudentRef": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "admission_no"
+        ],
+        "title": "StudentRef",
+        "type": "object"
+      },
+      "app__dq__schemas__SummaryOut": {
+        "description": "Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).",
+        "properties": {
+          "blockers": {
+            "title": "Blockers",
+            "type": "integer"
+          },
+          "by_rule": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCount"
+            },
+            "title": "By Rule",
+            "type": "array"
+          },
+          "by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Severity",
+            "type": "object"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "students_with_blockers": {
+            "title": "Students With Blockers",
+            "type": "integer"
+          },
+          "warnings": {
+            "title": "Warnings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_key",
+          "blockers",
+          "warnings",
+          "students_with_blockers",
+          "by_severity",
+          "by_rule",
+          "last_run"
+        ],
+        "title": "SummaryOut",
+        "type": "object"
+      },
       "app__identity__schemas__MeOut": {
         "properties": {
           "display_name": {
@@ -17889,6 +19613,301 @@
         "title": "MeOut",
         "type": "object"
       },
+      "app__insights__schemas__FlagOut": {
+        "properties": {
+          "actioned": {
+            "title": "Actioned",
+            "type": "boolean"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "improved",
+                  "support_in_place",
+                  "parent_informed",
+                  "no_concern",
+                  "student_left",
+                  "raised_in_error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)",
+            "title": "Evidence",
+            "type": "object"
+          },
+          "first_action_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Action At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "indicator": {
+            "enum": [
+              "attendance",
+              "behaviour",
+              "course"
+            ],
+            "title": "Indicator",
+            "type": "string"
+          },
+          "overdue": {
+            "description": "Past the due date and nobody has acted yet",
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None: unassigned (the principal assigns it)"
+          },
+          "raised_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for flags a person raised (manual)"
+          },
+          "raised_on": {
+            "format": "date",
+            "title": "Raised On",
+            "type": "string"
+          },
+          "rule": {
+            "enum": [
+              "attendance_streak",
+              "attendance_rate",
+              "course_low",
+              "course_decline",
+              "behaviour_concerns",
+              "manual"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/app__insights__schemas__StudentRef"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student",
+          "indicator",
+          "rule",
+          "evidence",
+          "status",
+          "owner",
+          "raised_on",
+          "due_on",
+          "overdue",
+          "actioned",
+          "first_action_at",
+          "closed_at",
+          "close_reason",
+          "raised_by",
+          "version"
+        ],
+        "title": "FlagOut",
+        "type": "object"
+      },
+      "app__insights__schemas__MemberOut": {
+        "description": "A staff member next to a record: membership id and display name only.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "MemberOut",
+        "type": "object"
+      },
+      "app__insights__schemas__StudentRef": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "section_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current section, e.g. IX-A",
+            "title": "Section Label"
+          }
+        },
+        "required": [
+          "id",
+          "full_name",
+          "admission_no",
+          "section_label"
+        ],
+        "title": "StudentRef",
+        "type": "object"
+      },
+      "app__insights__schemas__SummaryOut": {
+        "description": "Counts only, for the caller's scope in this school (FR-EW-015; the M5 exit metric).",
+        "properties": {
+          "actioned_late": {
+            "title": "Actioned Late",
+            "type": "integer"
+          },
+          "actioned_on_time": {
+            "description": "Of those, first acted on by their due date",
+            "title": "Actioned On Time",
+            "type": "integer"
+          },
+          "not_actioned": {
+            "title": "Not Actioned",
+            "type": "integer"
+          },
+          "open": {
+            "description": "Flags not closed (now)",
+            "title": "Open",
+            "type": "integer"
+          },
+          "overdue": {
+            "description": "Open flags past their due date with no action (now)",
+            "title": "Overdue",
+            "type": "integer"
+          },
+          "raised": {
+            "description": "Flags raised since the date",
+            "title": "Raised",
+            "type": "integer"
+          },
+          "since": {
+            "format": "date",
+            "title": "Since",
+            "type": "string"
+          }
+        },
+        "required": [
+          "since",
+          "raised",
+          "actioned_on_time",
+          "actioned_late",
+          "not_actioned",
+          "overdue",
+          "open"
+        ],
+        "title": "SummaryOut",
+        "type": "object"
+      },
       "app__platform__schemas__AuditVerifyOut": {
         "properties": {
           "checked": {
@@ -17937,6 +19956,79 @@
         "title": "AuditVerifyOut",
         "type": "object"
       },
+      "app__platform__schemas__FlagOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "rollout_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rollout Percent"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "tenant_id",
+          "enabled",
+          "rollout_percent",
+          "description",
+          "updated_at",
+          "version"
+        ],
+        "title": "FlagOut",
+        "type": "object"
+      },
       "app__platform__schemas__MeOut": {
         "properties": {
           "operator_id": {
@@ -17972,6 +20064,33 @@
         "title": "MeOut",
         "type": "object"
       },
+      "app__platform__schemas__Page_FlagOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/app__platform__schemas__FlagOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Page[FlagOut]",
+        "type": "object"
+      },
       "app__platform__schemas__Page_TicketOut_": {
         "properties": {
           "data": {
@@ -17997,6 +20116,92 @@
           "data"
         ],
         "title": "Page[TicketOut]",
+        "type": "object"
+      },
+      "app__tenancy__schemas__SectionOut": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was archived (hidden from lists); null while in use.",
+            "title": "Archived At"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "class_teacher_membership_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Teacher Membership Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "in_use": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
+            "title": "In Use"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "academic_year_id",
+          "class_id",
+          "name",
+          "class_teacher_membership_id",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SectionOut",
         "type": "object"
       }
     }
@@ -19198,6 +21403,60 @@
         "summary": "Verify Audit Chain",
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/api/v1/behaviour-notes/{note_id}/erase": {
+      "post": {
+        "description": "Erase a behaviour note on a parent's request or when entered in error\n(``insights.manage``, recent MFA sign-in).",
+        "operationId": "erase_note_api_v1_behaviour_notes__note_id__erase_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EraseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Erase Note",
+        "tags": [
+          "student insights"
         ]
       }
     },
@@ -22542,7 +24801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SummaryOut"
+                  "$ref": "#/components/schemas/app__dq__schemas__SummaryOut"
                 }
               }
             },
@@ -22562,6 +24821,103 @@
         "summary": "Get Summary",
         "tags": [
           "data-quality"
+        ]
+      }
+    },
+    "/api/v1/exams": {
+      "get": {
+        "description": "Exams of an academic year by date (``marks.read``, ``marks.record`` or\n``exam.manage``).",
+        "operationId": "list_exams_api_v1_exams_get",
+        "parameters": [
+          {
+            "description": "Default: the current academic year",
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Default: the current academic year",
+              "title": "Academic Year Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExamOut"
+                  },
+                  "title": "Response List Exams Api V1 Exams Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Exams",
+        "tags": [
+          "attendance and marks"
+        ]
+      },
+      "post": {
+        "description": "Add an exam to the current academic year (``exam.manage``). 422 ``exam_name_taken`` or\n``date_out_of_range``. Accepts ``Idempotency-Key``.",
+        "operationId": "create_exam_api_v1_exams_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Exam",
+        "tags": [
+          "attendance and marks"
         ]
       }
     },
@@ -24049,6 +26405,608 @@
         "summary": "Validate Import",
         "tags": [
           "imports"
+        ]
+      }
+    },
+    "/api/v1/insights/flags": {
+      "get": {
+        "description": "Early-warning flags (``insights.read``): ``mine`` = flags you own; ``all`` = every flag\nof students in your scope (class teachers: their sections). Without ``status``: open and in\nprogress. Soonest due first. Audited.",
+        "operationId": "list_flags_api_v1_insights_flags_get",
+        "parameters": [
+          {
+            "description": "mine (default) or all in your scope",
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "mine",
+              "description": "mine (default) or all in your scope",
+              "enum": [
+                "mine",
+                "all"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "in_progress",
+                    "closed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "indicator",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "attendance",
+                    "behaviour",
+                    "course"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indicator"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "overdue",
+                    "due_soon"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__authz__http__Page_FlagOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Flags",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/flags/{flag_id}": {
+      "get": {
+        "description": "One flag with the numbers that raised it and its action log (``insights.read``; 404\noutside your scope). Audited.",
+        "operationId": "get_flag_api_v1_insights_flags__flag_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Flag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Flag",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/flags/{flag_id}/actions": {
+      "post": {
+        "description": "Record what was done about a flag (``insights.act``): talked with the student, called or\nmet a parent, home visit, remedial support, referral, other; optional note. The first\naction marks the flag actioned. 409 ``flag_closed``.",
+        "operationId": "add_action_api_v1_insights_flags__flag_id__actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Flag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Action",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/flags/{flag_id}/assign": {
+      "post": {
+        "description": "Give a flag another owner (``insights.manage``, recent MFA sign-in; ``If-Match``). 422\n``owner_not_eligible``.",
+        "operationId": "assign_flag_api_v1_insights_flags__flag_id__assign_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Flag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Assign Flag",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/flags/{flag_id}/close": {
+      "post": {
+        "description": "Close a flag with a reason (``insights.act``; ``If-Match``). 409 ``flag_closed``.",
+        "operationId": "close_flag_api_v1_insights_flags__flag_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Flag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Flag",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/flags/{flag_id}/erase": {
+      "post": {
+        "description": "Erase a flag and its action log on a parent's request or when raised in error\n(``insights.manage``, recent MFA sign-in). The reason is recorded, never the text.",
+        "operationId": "erase_flag_api_v1_insights_flags__flag_id__erase_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Flag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EraseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Erase Flag",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/flags/{flag_id}/owners": {
+      "get": {
+        "description": "Staff who may own this flag: active and allowed to act for the student's section\n(``insights.manage``).",
+        "operationId": "flag_owners_api_v1_insights_flags__flag_id__owners_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Flag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OwnerOut"
+                  },
+                  "title": "Response Flag Owners Api V1 Insights Flags  Flag Id  Owners Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Flag Owners",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/settings": {
+      "get": {
+        "description": "The school's early-warning rules with thresholds and their bounds (``insights.read``).\nThe ETag is the settings version (0 = defaults).",
+        "operationId": "get_settings_api_v1_insights_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "student insights"
+        ]
+      },
+      "put": {
+        "description": "Change thresholds or switch rules off within the bounds SchoolOS sets\n(``insights.manage``, recent MFA sign-in; ``If-Match``). The AP consecutive-absence rule\ncannot be switched off (422 ``rule_required``).",
+        "operationId": "update_settings_api_v1_insights_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Settings",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
+    "/api/v1/insights/summary": {
+      "get": {
+        "description": "Counts only for your scope in this school: flags raised, first acted on by their due\ndate (the M5 exit metric), late, not yet, overdue and open (``insights.read``).",
+        "operationId": "summary_api_v1_insights_summary_get",
+        "parameters": [
+          {
+            "description": "Default: 30 days ago",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Default: 30 days ago",
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__insights__schemas__SummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Summary",
+        "tags": [
+          "student insights"
         ]
       }
     },
@@ -25973,7 +28931,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_FlagOut_"
+                  "$ref": "#/components/schemas/app__platform__schemas__Page_FlagOut_"
                 }
               }
             },
@@ -26017,7 +28975,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlagOut"
+                  "$ref": "#/components/schemas/app__platform__schemas__FlagOut"
                 }
               }
             },
@@ -26126,7 +29084,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlagOut"
+                  "$ref": "#/components/schemas/app__platform__schemas__FlagOut"
                 }
               }
             },
@@ -29648,7 +32606,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SectionOut"
+                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
                 }
               }
             },
@@ -29692,7 +32650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SectionOut"
+                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
                 }
               }
             },
@@ -29744,7 +32702,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SectionOut"
+                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
                 }
               }
             },
@@ -29788,7 +32746,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SectionOut"
+                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
                 }
               }
             },
@@ -29808,6 +32766,411 @@
         "summary": "Archive Section",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/attendance": {
+      "get": {
+        "description": "One day of the section's register: every student of the section (roll-number order)\nwith their status, or none when not marked (``attendance.read``; class teachers: their\nsections, 404 for others).",
+        "operationId": "attendance_day_api_v1_sections__section_id__attendance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "IST date; default today",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST date; default today",
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceDayOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attendance Day",
+        "tags": [
+          "attendance and marks"
+        ]
+      },
+      "post": {
+        "description": "Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a\nday again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range`` or\n``duplicate_entry`` per entry. The early-warning rules look at these students again.",
+        "operationId": "record_attendance_api_v1_sections__section_id__attendance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Attendance",
+        "tags": [
+          "attendance and marks"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/attendance/month": {
+      "get": {
+        "description": "The month register (school days x students) for the A4 print view\n(``attendance.read``).",
+        "operationId": "attendance_month_api_v1_sections__section_id__attendance_month_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "YYYY-MM",
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "description": "YYYY-MM",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceMonthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attendance Month",
+        "tags": [
+          "attendance and marks"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/attendance/sheet": {
+      "post": {
+        "description": "Read an uploaded attendance sheet (``attendance.record``): first column admission or\nroll number, then one date per column, cells P/A/L/LV. Returns the entries and every\nproblem; stores no attendance. The uploaded file is deleted once read. 422\n``aadhaar_full_number_rejected``, ``student_column_missing``, ``too_many_dates``...; 409\n``document_not_ready`` while the virus check runs.",
+        "operationId": "preview_attendance_sheet_api_v1_sections__section_id__attendance_sheet_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceSheetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Attendance Sheet",
+        "tags": [
+          "attendance and marks"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/exams/{exam_id}/marks": {
+      "get": {
+        "description": "The section's marks for one exam with each student's overall percentage\n(``marks.read``).",
+        "operationId": "section_marks_api_v1_sections__section_id__exams__exam_id__marks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "exam_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exam Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarksGridOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Section Marks",
+        "tags": [
+          "attendance and marks"
+        ]
+      },
+      "post": {
+        "description": "Save marks per student and subject with the maximum marks, or absent, all or nothing\n(``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,\n``exam_other_year``...",
+        "operationId": "record_marks_api_v1_sections__section_id__exams__exam_id__marks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "exam_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exam Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarksWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Marks",
+        "tags": [
+          "attendance and marks"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet": {
+      "post": {
+        "description": "Read an uploaded marks sheet (``marks.record``): row 1 admission or roll number and\nsubjects, row 2 maximum marks, then one row per student (``AB`` = absent). Returns entries\nand problems; stores no marks; the file is deleted once read.",
+        "operationId": "preview_marks_sheet_api_v1_sections__section_id__exams__exam_id__marks_sheet_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "exam_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exam Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarksSheetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Marks Sheet",
+        "tags": [
+          "attendance and marks"
         ]
       }
     },
@@ -29832,7 +33195,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SectionOut"
+                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
                 }
               }
             },
@@ -30284,6 +33647,106 @@
         ]
       }
     },
+    "/api/v1/students/{student_id}/behaviour-notes": {
+      "get": {
+        "description": "A student's behaviour notes, newest first (``insights.read``; restricted: class teacher\nand principal only; 404 outside your scope). Audited.",
+        "operationId": "list_notes_api_v1_students__student_id__behaviour_notes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NoteOut"
+                  },
+                  "title": "Response List Notes Api V1 Students  Student Id  Behaviour Notes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notes",
+        "tags": [
+          "student insights"
+        ]
+      },
+      "post": {
+        "description": "Write a short behaviour note (``insights.note``): positive, observation or concern, up\nto 500 characters, stored encrypted and never sent to AI. Accepts ``Idempotency-Key``.",
+        "operationId": "add_note_api_v1_students__student_id__behaviour_notes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Note",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
     "/api/v1/students/{student_id}/certificates": {
       "post": {
         "description": "Issue a bonafide, study or conduct certificate, or prepare a transfer certificate for the\nprincipal's approval (permission ``certificate.issue``). Accepts ``Idempotency-Key``.\nErrors: ``certificate_blocked``, ``transfer_certificate_exists``,\n``no_current_academic_year`` (409); input errors (422).",
@@ -30632,6 +34095,60 @@
         ]
       }
     },
+    "/api/v1/students/{student_id}/flags": {
+      "post": {
+        "description": "Raise a concern for a student in your scope (``insights.act``); owned by the class\nteacher when they may act, else by you. Accepts ``Idempotency-Key``.",
+        "operationId": "raise_flag_api_v1_students__student_id__flags_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualFlagIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Raise Flag",
+        "tags": [
+          "student insights"
+        ]
+      }
+    },
     "/api/v1/students/{student_id}/guardians": {
       "get": {
         "description": "Parents and guardians (permission ``student.read_basic``); phone and address masked.",
@@ -30892,6 +34409,50 @@
         "summary": "Reveal Sensitive",
         "tags": [
           "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/timeline": {
+      "get": {
+        "description": "The student's timeline, newest first, with the attendance, behaviour and course\nindicators (``insights.read``; 404 outside your scope). Audited.",
+        "operationId": "timeline_api_v1_students__student_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Timeline",
+        "tags": [
+          "student insights"
         ]
       }
     },
