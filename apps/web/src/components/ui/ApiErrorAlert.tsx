@@ -21,7 +21,8 @@ export type ErrorNamespace =
   | "schoolSettings"
   | "documents"
   | "ask"
-  | "ask.verified";
+  | "ask.verified"
+  | "school.audit";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

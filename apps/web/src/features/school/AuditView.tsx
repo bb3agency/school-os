@@ -11,6 +11,8 @@ import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import { formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
+import type { AuditFilters } from "./audit-filters";
+import { AuditExportButton } from "./AuditExportButton";
 
 const KNOWN_ACTORS = ["user", "system", "operator"] as const;
 const MAX_SUMMARY = 240;
@@ -34,13 +36,6 @@ export function formatSummary(summary: Readonly<Record<string, unknown>>): strin
   return text.length > MAX_SUMMARY ? `${text.slice(0, MAX_SUMMARY - 1)}…` : text;
 }
 
-export interface AuditFilterValues {
-  actor?: string | undefined;
-  action?: string | undefined;
-  from?: string | undefined;
-  to?: string | undefined;
-}
-
 /**
  * US-1001 / FR-AUD-005: audit viewer with a filter bar (a GET form: the filters live in the
  * URL and are shown again after filtering), the integrity check and CSV export.
@@ -50,7 +45,7 @@ export function AuditView({
   filters = {},
 }: {
   events: Loadable<readonly AuditEvent[]>;
-  filters?: AuditFilterValues;
+  filters?: AuditFilters;
 }) {
   const t = useTranslations("school.audit");
   const tc = useTranslations("common");
@@ -132,13 +127,7 @@ export function AuditView({
               <Icon name="shieldCheck" className="size-4" />
               {t("verify")}
             </ButtonLink>
-            <Button variant="secondary" disabled aria-describedby="audit-export-note">
-              <Icon name="file" className="size-4" />
-              {t("exportCsv")}
-            </Button>
-            <span id="audit-export-note" className="sr-only">
-              {t("exportLater")}
-            </span>
+            <AuditExportButton filters={filters} />
           </>
         }
       />

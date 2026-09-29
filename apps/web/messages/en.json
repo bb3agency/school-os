@@ -531,7 +531,15 @@
       "filterUserPlaceholder": "The person's user ID",
       "filterByUser": "Show only events by {who}",
       "clearFilters": "Clear filters",
-      "exportLater": "Downloading the audit log as a CSV file is not available on this screen yet."
+      "exporting": "Preparing the file…",
+      "exportNote": "The file holds the events the filters select, oldest first. You may be asked to sign in again to confirm it's you. Every download is recorded in this audit log.",
+      "exported": "Downloaded {name}.",
+      "errors": {
+        "too_many_events": {
+          "title": "Too many events for one file",
+          "body": "Choose a shorter date range with the From and To dates, then download again."
+        }
+      }
     },
     "switchSchool": "Switch school",
     "announcements": {
