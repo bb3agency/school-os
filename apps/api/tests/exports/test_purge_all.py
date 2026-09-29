@@ -12,6 +12,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from app.exports import service, tasks
+from app.tenancy import service as tenancy
 
 
 def test_FR_EXP_004_one_failing_school_does_not_stop_the_purge(
@@ -20,7 +21,7 @@ def test_FR_EXP_004_one_failing_school_does_not_stop_the_purge(
     first, broken, last = (uuid.uuid4() for _ in range(3))
     monkeypatch.setattr(tasks, "context_free_session", lambda: contextlib.nullcontext(None))
     monkeypatch.setattr(
-        tasks.tenancy, "list_tenant_ids", lambda _session, _statuses: [first, broken, last]
+        tenancy, "list_tenant_ids", lambda _session, _statuses: [first, broken, last]
     )
     calls: list[uuid.UUID] = []
 
