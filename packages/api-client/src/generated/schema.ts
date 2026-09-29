@@ -2454,9 +2454,12 @@ export interface paths {
          * @description Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a
          *     circular (only C1, else 422 ``notice_source_personal``) or from your text (422
          *     ``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or
-         *     ``blank``. Only the circular's text is sent to the AI, never student records. If AI is not
-         *     available the notice starts empty and ``draft_error`` says why. Accepts
-         *     ``Idempotency-Key``.
+         *     ``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the
+         *     background; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``
+         *     (``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it
+         *     yourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the
+         *     AI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer
+         *     and queues nothing).
          */
         post: operations["create_notice_api_v1_notices_post"];
         delete?: never;
@@ -2484,7 +2487,9 @@ export interface paths {
         head?: never;
         /**
          * Update Notice
-         * @description Edit a draft notice (``notice.draft``; ``If-Match``). 409 ``notice_approved``.
+         * @description Edit a draft notice (``notice.draft``; ``If-Match``); editing a ``draft_failed`` notice
+         *     makes it a ``draft``. 409 ``notice_approved`` or ``notice_drafting`` (the AI is still
+         *     drafting it).
          */
         patch: operations["update_notice_api_v1_notices__notice_id__patch"];
         trace?: never;
@@ -2502,7 +2507,8 @@ export interface paths {
          * Approve Notice
          * @description Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and
          *     bodies filled (422 ``notice_incomplete``) and no personal numbers (422
-         *     ``notice_personal_data``). The A4 PDF and the image are made next.
+         *     ``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and
+         *     the image are made next.
          */
         post: operations["approve_notice_api_v1_notices__notice_id__approve_post"];
         delete?: never;
@@ -2526,6 +2532,28 @@ export interface paths {
         get: operations["notice_download_url_api_v1_notices__notice_id__download_url_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices/{notice_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Notice Draft
+         * @description Ask the AI to draft the notice again after it could not (``notice.draft``;
+         *     ``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as
+         *     for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state.
+         */
+        post: operations["retry_notice_draft_api_v1_notices__notice_id__draft_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7797,7 +7825,7 @@ export interface components {
             document_id: string | null;
             /**
              * Draft Error
-             * @description Why the AI did not draft it (ai_disabled, ai_unavailable, ...): write it.
+             * @description Why the AI did not draft it (ai_disabled, ai_budget_exhausted, ai_unavailable, no_text, source_unavailable, notice_source_personal, worker_error, ...): try again or write it.
              */
             draft_error: string | null;
             /** Files Available */
@@ -7818,9 +7846,10 @@ export interface components {
             source: "circular" | "staff_text" | "blank";
             /**
              * Status
+             * @description drafting (the AI is drafting it in the background: ask again shortly), draft, draft_failed (see draft_error: try again or write it yourself) or approved.
              * @enum {string}
              */
-            status: "draft" | "approved";
+            status: "drafting" | "draft" | "draft_failed" | "approved";
             /** Title En */
             title_en: string;
             /** Title Te */
@@ -7833,6 +7862,11 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * NoticeRedraftIn
+         * @description Ask the AI to draft a notice again after it could not (``draft_failed``).
+         */
+        NoticeRedraftIn: Record<string, never>;
         /**
          * NoticeRenderIn
          * @description Render the A4 PDF and the image again (files are kept for a few days only).
@@ -14955,7 +14989,7 @@ export interface operations {
                 cursor?: string | null;
                 /** @description Page size (max 200). */
                 limit?: number;
-                status?: ("draft" | "approved") | null;
+                status?: ("drafting" | "draft" | "draft_failed" | "approved") | null;
             };
             header?: never;
             path?: never;
@@ -14997,7 +15031,7 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            201: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15138,6 +15172,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoticeDownloadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_notice_draft_api_v1_notices__notice_id__draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeRedraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"];
                 };
             };
             /** @description Validation Error */

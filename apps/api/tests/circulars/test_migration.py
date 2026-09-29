@@ -316,3 +316,117 @@ def test_CLAUDE_6_12_circulars_migration_reversible_with_data(populated: _Walk) 
     assert _scalar(admin, "SELECT count(*) FROM core.permissions WHERE key = 'task.manage'") == 1
     command.downgrade(populated.cfg, before)
     command.upgrade(populated.cfg, "head")
+
+
+# --- 0037_notice_drafting (FR-NOTICE-003) ---------------------------------------------------------
+
+DRAFTING = "0037_notice_drafting"
+
+
+def _notice_row(c: Any, tenant_id: uuid.UUID, user_id: uuid.UUID, **values: Any) -> uuid.UUID:
+    notice_id = uuid.uuid4()
+    columns = {"id": notice_id, "tenant_id": tenant_id, "created_by": user_id, **values}
+    names = ", ".join(columns)
+    params = ", ".join(f":{k}" for k in columns)
+    c.execute(text(f"INSERT INTO ops.parent_notices ({names}) VALUES ({params})"), columns)
+    return notice_id
+
+
+@pytest.mark.parametrize(
+    ("values", "constraint"),
+    [
+        ({"source": "blank", "status": "draft_failed"}, "parent_notices_failed_has_error"),
+        (
+            {"source": "staff_text", "status": "draft", "source_text": "Sports day"},
+            "parent_notices_source_text_while_drafting",
+        ),
+        (
+            {"source": "circular", "status": "drafting", "source_text": "Sports day"},
+            "parent_notices_source_text_while_drafting",
+        ),
+        ({"source": "blank", "status": "writing"}, "parent_notices_status_check"),
+        (
+            {"source": "staff_text", "status": "drafting", "source_text": "x" * 4001},
+            "parent_notices_source_text_length",
+        ),
+    ],
+    ids=["failed_without_code", "text_on_draft", "text_on_circular", "state", "long"],
+)
+def test_FR_NOTICE_003_drafting_states_are_checked_by_the_database(
+    world: Any, admin_engine: Engine, values: dict[str, Any], constraint: str
+) -> None:
+    tenant_id, user_id = world.a.tenant_id, world.a.people["owner"].user_id
+    with pytest.raises(DBAPIError, match=constraint), admin_engine.begin() as c:
+        _notice_row(c, tenant_id, user_id, **values)
+
+
+def test_FR_NOTICE_003_the_app_may_record_the_draft_outcome(admin_engine: Engine) -> None:
+    columns = {
+        r[0]
+        for r in admin_engine.connect().execute(
+            text(
+                "SELECT column_name FROM information_schema.column_privileges "
+                "WHERE grantee = 'sos_app' AND table_schema = 'ops' "
+                "AND table_name = 'parent_notices' AND privilege_type = 'UPDATE'"
+            )
+        )
+    }
+    assert {"ai_drafted", "draft_error", "source_text", "status"} <= columns
+    assert not columns & {"source", "document_id", "created_by", "tenant_id"}
+
+
+def test_CLAUDE_6_12_notice_drafting_migration_reversible_with_data(populated: _Walk) -> None:
+    admin = populated.admin
+    before = ScriptDirectory.from_config(populated.cfg).get_revision(DRAFTING).down_revision
+    assert before == "0034_circulars"
+    tenant_id, user_id, _membership_id = _member(admin)
+    with admin.begin() as c:
+        drafting = _notice_row(
+            c, tenant_id, user_id, source="staff_text", status="drafting", source_text="Sports"
+        )
+        failed = _notice_row(
+            c,
+            tenant_id,
+            user_id,
+            source="circular",
+            status="draft_failed",
+            draft_error="ai_unavailable",
+        )
+        _notice_row(c, tenant_id, user_id, source="blank", status="draft")
+    events = _scalar(admin, "SELECT count(*) FROM audit.events")
+
+    command.downgrade(populated.cfg, before)
+    assert _scalar(admin, "SELECT version_num FROM ops.alembic_version") == before
+    assert (
+        _scalar(
+            admin,
+            "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'ops' "
+            "AND table_name = 'parent_notices' AND column_name = 'source_text'",
+        )
+        == 0
+    )
+    # Rows already drafting or failed are kept (NOT VALID checks); new rows obey 0034 again.
+    assert _scalar(admin, "SELECT count(*) FROM ops.parent_notices") == 3
+    assert _scalar(admin, "SELECT status FROM ops.parent_notices WHERE id = :i", i=drafting) == (
+        "drafting"
+    )
+    assert _scalar(admin, "SELECT status FROM ops.parent_notices WHERE id = :i", i=failed) == (
+        "draft_failed"
+    )
+    assert _scalar(admin, "SELECT count(*) FROM audit.events") == events
+    new_rows = "parent_notices_(status_check|approved_complete)"
+    with pytest.raises(DBAPIError, match=new_rows), admin.begin() as c:
+        _notice_row(c, tenant_id, user_id, source="blank", status="drafting")
+
+    command.upgrade(populated.cfg, "head")
+    assert _scalar(admin, "SELECT count(*) FROM ops.parent_notices") == 3
+    with admin.begin() as c:
+        _notice_row(
+            c, tenant_id, user_id, source="staff_text", status="drafting", source_text="Again"
+        )
+    with admin.begin() as c:
+        c.execute(
+            text("DELETE FROM ops.parent_notices WHERE status IN ('drafting','draft_failed')")
+        )
+    command.downgrade(populated.cfg, before)
+    command.upgrade(populated.cfg, "head")

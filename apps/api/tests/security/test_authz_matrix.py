@@ -276,6 +276,9 @@ def _notice(state: str) -> Builder:
         if state == "render":
             notice_id, version = CI.rendered_notice(a, w.a, state="failed")
             return f"/api/v1/notices/{notice_id}/render", {}, _if_match(version)
+        if state == "redraft":
+            notice_id, version = CI.failed_notice(a, w.a)
+            return f"/api/v1/notices/{notice_id}/draft", {}, _if_match(version)
         notice_id, _version = CI.rendered_notice(a, w.a)
         return f"/api/v1/notices/{notice_id}/download-url?format=png", None, {}
 
@@ -1486,6 +1489,7 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("PATCH", "/api/v1/notices/{notice_id}"): _notice("draft"),
     ("POST", "/api/v1/notices/{notice_id}/approve"): _notice("approve"),
     ("POST", "/api/v1/notices/{notice_id}/render"): _notice("render"),
+    ("POST", "/api/v1/notices/{notice_id}/draft"): _notice("redraft"),
     ("GET", "/api/v1/notices/{notice_id}/download-url"): _notice("download"),
 }
 
@@ -1584,7 +1588,6 @@ def _success(method: str, path: str) -> int:
         "/api/v1/students/{student_id}/certificates",
         "/api/v1/certificates/{certificate_id}/duplicates",
         "/api/v1/tasks",
-        "/api/v1/notices",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
     }
     accepted = {
@@ -1600,6 +1603,9 @@ def _success(method: str, path: str) -> int:
         "/api/v1/exports/student-list",
         "/api/v1/admin/tenant-export",
         "/api/v1/circulars/{document_id}/read",
+        # FR-NOTICE-003: a notice is accepted at once and drafted in the background.
+        "/api/v1/notices",
+        "/api/v1/notices/{notice_id}/draft",
         "/api/v1/notices/{notice_id}/render",
     }
     if method == "POST" and path in accepted:

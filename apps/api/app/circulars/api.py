@@ -28,6 +28,7 @@ from app.circulars.schemas import (
     NoticeDownloadOut,
     NoticeFileFormat,
     NoticeOut,
+    NoticeRedraftIn,
     NoticeRenderIn,
     NoticeStatus,
     NoticeUpdate,
@@ -42,7 +43,6 @@ from app.circulars.schemas import (
     TaskUpdate,
     TaskView,
 )
-from app.core.db import tenant_session
 
 router = APIRouter(prefix="/api/v1", tags=["circulars"])
 
@@ -249,26 +249,30 @@ def list_notices(
     return service.list_notices(db, ctx, status=status, limit=limit, cursor=cursor)
 
 
-@router.post("/notices", response_model=NoticeOut, status_code=201)
-def create_notice(ctx: NoticeDrafter, body: NoticeCreate, idem: IdempotencyDep) -> Response:
+def _notice_headers(out: NoticeOut) -> dict[str, str]:
+    return {"Location": f"/api/v1/notices/{out.id}", "ETag": etag(out.version)}
+
+
+@router.post("/notices", response_model=NoticeOut, status_code=202)
+def create_notice(
+    ctx: NoticeDrafter, db: TenantDB, body: NoticeCreate, idem: IdempotencyDep
+) -> Response:
     """Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a
     circular (only C1, else 422 ``notice_source_personal``) or from your text (422
     ``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or
-    ``blank``. Only the circular's text is sent to the AI, never student records. If AI is not
-    available the notice starts empty and ``draft_error`` says why. Accepts
-    ``Idempotency-Key``."""
-    # The AI draft may take longer than the database lets a transaction sit idle: the write
-    # transaction begins only when the notice is stored (deferred), after the model call.
-    with tenant_session(ctx.tenant_id, ctx.user_id, deferred=True) as db:
-        return idem.run(
-            db,
-            body,
-            lambda: service.create_notice(db, ctx, body),
-            headers=lambda out: {
-                "Location": f"/api/v1/notices/{out.id}",
-                "ETag": etag(out.version),
-            },
-        )
+    ``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the
+    background; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``
+    (``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it
+    yourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the
+    AI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer
+    and queues nothing)."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.create_notice(db, ctx, body),
+        status_code=202,
+        headers=_notice_headers,
+    )
 
 
 @router.get("/notices/{notice_id}", response_model=NoticeOut)
@@ -291,8 +295,28 @@ def update_notice(
     version: IfMatch,
     response: Response,
 ) -> NoticeOut:
-    """Edit a draft notice (``notice.draft``; ``If-Match``). 409 ``notice_approved``."""
+    """Edit a draft notice (``notice.draft``; ``If-Match``); editing a ``draft_failed`` notice
+    makes it a ``draft``. 409 ``notice_approved`` or ``notice_drafting`` (the AI is still
+    drafting it)."""
     out = service.update_notice(db, ctx, notice_id, body, version)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.post("/notices/{notice_id}/draft", response_model=NoticeOut, status_code=202)
+def retry_notice_draft(
+    ctx: NoticeDrafter,
+    db: TenantDB,
+    *,
+    notice_id: uuid.UUID,
+    body: NoticeRedraftIn,
+    version: IfMatch,
+    response: Response,
+) -> NoticeOut:
+    """Ask the AI to draft the notice again after it could not (``notice.draft``;
+    ``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as
+    for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state."""
+    out = service.retry_notice_draft(db, ctx, notice_id, version)
     response.headers["ETag"] = etag(out.version)
     return out
 
@@ -309,7 +333,8 @@ def approve_notice(
 ) -> NoticeOut:
     """Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and
     bodies filled (422 ``notice_incomplete``) and no personal numbers (422
-    ``notice_personal_data``). The A4 PDF and the image are made next."""
+    ``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and
+    the image are made next."""
     out = service.approve_notice(db, ctx, notice_id, version)
     response.headers["ETag"] = etag(out.version)
     return out

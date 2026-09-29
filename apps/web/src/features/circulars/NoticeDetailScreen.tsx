@@ -2,13 +2,13 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
+import { Skeleton } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
@@ -19,7 +19,9 @@ import { translateOr } from "@/lib/i18n-dynamic";
 import {
   KEYS,
   NOTICE_APPROVE,
+  NOTICE_SLOW_MS,
   ifMatch,
+  isNoticeDrafting,
   looksPersonal,
   noticeComplete,
   noticeSchema,
@@ -28,7 +30,7 @@ import {
   useNotice,
   type Notice,
 } from "./data";
-import { AiNote, LoadGate } from "./parts";
+import { AiNote, LoadGate, NoticeStatusPill } from "./parts";
 
 type Field = "title_en" | "body_en" | "title_te" | "body_te";
 const FIELDS: readonly Field[] = ["title_en", "body_en", "title_te", "body_te"];
@@ -183,6 +185,89 @@ function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<vo
   );
 }
 
+/** True once `since` (an ISO time) is more than NOTICE_SLOW_MS ago. */
+function useSlow(since: string): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const left = Date.parse(since) + NOTICE_SLOW_MS - Date.now();
+    const timer = setTimeout(() => setSlow(true), Math.max(left, 0));
+    return () => clearTimeout(timer);
+  }, [since]);
+  return slow;
+}
+
+/**
+ * The AI drafts the notice in the background (FR-NOTICE-003); the page asks again with
+ * backoff until it is a draft or the AI could not draft it. Leaving the page is fine.
+ */
+function Drafting({ notice }: { notice: Notice }) {
+  const t = useTranslations("notices.drafting");
+  const slow = useSlow(notice.updated_at);
+  return (
+    <div className="space-y-4">
+      <div role="status" aria-live="polite" className="space-y-1">
+        <p className="font-medium text-ink">{t("title")}</p>
+        <p className="text-sm text-ink-muted">{slow ? t("slow") : t("body")}</p>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2" aria-hidden="true">
+        {["en", "te"].map((language) => (
+          <div key={language} className="space-y-2">
+            <Skeleton className="h-9 rounded-md" />
+            <Skeleton className="h-40 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The AI could not draft the notice: say why, and offer to try again (or write it below). */
+function DraftFailed({ notice, onChanged }: { notice: Notice; onChanged: () => Promise<void> }) {
+  const t = useTranslations("notices.draftFailed");
+  const tr = useTranslations("notices.draftError");
+  const tc = useTranslations("common");
+  const api = useBffClient("staff");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<unknown>(undefined);
+
+  async function retry() {
+    setPending(true);
+    setError(undefined);
+    try {
+      await unwrap(
+        api.POST("/api/v1/notices/{notice_id}/draft", {
+          params: { path: { notice_id: notice.id } },
+          headers: { "If-Match": ifMatch(notice.version) },
+          body: {},
+        }),
+      );
+      await onChanged();
+    } catch (failure) {
+      setError(failure);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <Alert tone="warning" title={t("title")}>
+        <p>{translateOr(tr, notice.draft_error ?? "other", "other")}</p>
+        <p>{t("body")}</p>
+      </Alert>
+      <Button
+        variant="secondary"
+        disabled={pending}
+        aria-disabled={pending || undefined}
+        onClick={() => void retry()}
+      >
+        {pending ? tc("working") : t("retry")}
+      </Button>
+      <ApiErrorAlert error={error} namespace="notices" />
+    </div>
+  );
+}
+
 /** An approved notice: the text to copy, the printable page and the downloads. */
 function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Promise<void> }) {
   const t = useTranslations("notices.approved");
@@ -307,9 +392,11 @@ function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Prom
 }
 
 /**
- * One parent notice (US-1605, US-1606): edit the English and Telugu text of a draft (an AI
- * draft is marked as such), approve it (`notice.approve`), then copy the text for the parents'
- * groups, print it on A4 or download the PDF or image. Approved notices cannot change.
+ * One parent notice (US-1605, US-1606): while the AI drafts it in the background the page shows
+ * progress and asks again (FR-NOTICE-003); if the AI could not draft it, try again or write it
+ * yourself. Edit the English and Telugu text of a draft (an AI draft is marked as such),
+ * approve it (`notice.approve`), then copy the text for the parents' groups, print it on A4 or
+ * download the PDF or image. Approved notices cannot change.
  */
 export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
   const t = useTranslations("notices");
@@ -334,11 +421,7 @@ export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
                 { label: t("title"), href: "/notices" },
                 { label: notice.title_en || t("untitled") },
               ]}
-              badge={
-                <Pill variant={notice.status === "approved" ? "done" : "tag"}>
-                  {t(`status.${notice.status}`)}
-                </Pill>
-              }
+              badge={<NoticeStatusPill status={notice.status} />}
             />
             {notice.document_id ? (
               <p className="text-sm" data-print="hide">
@@ -351,14 +434,26 @@ export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
               </p>
             ) : null}
             {notice.ai_drafted ? <AiNote>{t("aiDrafted")}</AiNote> : null}
-            {notice.draft_error ? (
+            {notice.status === "draft_failed" ? (
+              <DraftFailed notice={notice} onChanged={refresh} />
+            ) : notice.draft_error && !isNoticeDrafting(notice.status) ? (
               <Alert tone="info" title={t("draftErrorTitle")}>
                 {translateOr(tr, notice.draft_error, "other")}
               </Alert>
             ) : null}
-            <Card title={notice.status === "approved" ? t("approvedTitle") : t("editTitle")}>
+            <Card
+              title={
+                notice.status === "approved"
+                  ? t("approvedTitle")
+                  : isNoticeDrafting(notice.status)
+                    ? t("draftingTitle")
+                    : t("editTitle")
+              }
+            >
               {notice.status === "approved" ? (
                 <Approved notice={notice} onChanged={refresh} />
+              ) : isNoticeDrafting(notice.status) ? (
+                <Drafting notice={notice} />
               ) : (
                 <Editor key={notice.version} notice={notice} onSaved={refresh} />
               )}

@@ -113,6 +113,8 @@ class ParentNotice(Base):
     body_en: Mapped[str] = mapped_column(Text, server_default=text("''"))
     title_te: Mapped[str] = mapped_column(Text, server_default=text("''"))
     body_te: Mapped[str] = mapped_column(Text, server_default=text("''"))
+    # The staff text to draft from, only while drafting or failed (0037_notice_drafting).
+    source_text: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID]
     approved_by: Mapped[uuid.UUID | None]
     approved_at: Mapped[dt.datetime | None]

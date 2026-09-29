@@ -33,6 +33,7 @@ export type Task = S["TaskOut"];
 export type TaskStatus = Task["status"];
 export type Assignee = S["AssigneeOut"];
 export type Notice = S["NoticeOut"];
+export type NoticeStatus = Notice["status"];
 
 export interface Paged<T> {
   data: T[];
@@ -61,7 +62,18 @@ export function isReadingBusy(status: ReadingStatus | undefined): boolean {
   return status === "queued" || status === "running";
 }
 
-/** Pause before asking again while a circular is read or a notice rendered (tests shorten it). */
+/** True while the AI drafts a notice in the background (FR-NOTICE-003). */
+export function isNoticeDrafting(status: NoticeStatus | undefined): boolean {
+  return status === "drafting";
+}
+
+/** A notice still drafting after this long gets a "taking longer than usual" note. */
+export const NOTICE_SLOW_MS = 90_000;
+
+/**
+ * Pause before asking again while a circular is read or a notice drafted or rendered: 2 s,
+ * then 1.5 times longer each time, at most 15 s (tests shorten it).
+ */
 let pollDelay: (attempt: number) => number = (attempt) =>
   Math.min(2000 * 1.5 ** Math.max(attempt - 1, 0), 15_000);
 export function setCircularsPollDelayForTesting(delay: ((attempt: number) => number) | null) {
@@ -163,6 +175,7 @@ export function useAssignees(enabled: boolean): Loadable<Assignee[]> {
   return toLoadable(query);
 }
 
+/** GET /notices (newest first; polls, with backoff, while one is being drafted). */
 export function useNotices(enabled: boolean): Loadable<Paged<Notice>> {
   const api = useBffClient("staff");
   const query = useQuery({
@@ -170,11 +183,16 @@ export function useNotices(enabled: boolean): Loadable<Paged<Notice>> {
     queryFn: () => unwrap(api.GET("/api/v1/notices", { params: { query: { limit: 50 } } })),
     enabled,
     retry,
+    refetchInterval: (q: Query<Paged<Notice>, Error, Paged<Notice>, readonly unknown[]>) =>
+      q.state.status !== "error" && q.state.data?.data.some((n) => isNoticeDrafting(n.status))
+        ? pollDelay(q.state.dataUpdateCount)
+        : false,
+    refetchIntervalInBackground: false,
   });
   return toLoadable(query);
 }
 
-/** GET /notices/{id} (polls while its files are being made). */
+/** GET /notices/{id} (polls, with backoff, while it is drafted or its files are made). */
 export function useNotice(id: string, enabled: boolean): Loadable<Notice> {
   const api = useBffClient("staff");
   const query = useQuery({
@@ -184,7 +202,8 @@ export function useNotice(id: string, enabled: boolean): Loadable<Notice> {
     enabled,
     retry,
     refetchInterval: (q: Query<Notice, Error, Notice, readonly unknown[]>) =>
-      q.state.status !== "error" && q.state.data?.render_status === "queued"
+      q.state.status !== "error" &&
+      (isNoticeDrafting(q.state.data?.status) || q.state.data?.render_status === "queued")
         ? pollDelay(q.state.dataUpdateCount)
         : false,
     refetchIntervalInBackground: false,

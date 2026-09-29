@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { LoadingState } from "@/components/ui/LoadingState";
 import type { Loadable } from "@/lib/loadable";
-import type { DueState, ReadingStatus, TaskStatus } from "./data";
+import type { DueState, NoticeStatus, ReadingStatus, TaskStatus } from "./data";
 
 const readingPill: Record<ReadingStatus, PillVariant> = {
   not_read: "tag",
@@ -31,6 +31,19 @@ const taskPill: Record<TaskStatus, PillVariant> = {
 export function TaskStatusPill({ status }: { status: TaskStatus }) {
   const t = useTranslations("tasks.status");
   return <Pill variant={taskPill[status]}>{t(status)}</Pill>;
+}
+
+const noticePill: Record<NoticeStatus, PillVariant> = {
+  drafting: "progress",
+  draft: "tag",
+  draft_failed: "review",
+  approved: "done",
+};
+
+/** A parent notice's state in words (drafting, draft, AI draft failed, approved). */
+export function NoticeStatusPill({ status }: { status: NoticeStatus }) {
+  const t = useTranslations("notices.status");
+  return <Pill variant={noticePill[status]}>{t(status)}</Pill>;
 }
 
 const duePill: Record<Exclude<DueState, "later" | "closed">, PillVariant> = {

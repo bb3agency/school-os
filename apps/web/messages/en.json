@@ -5486,7 +5486,9 @@
     },
     "status": {
       "draft": "Draft",
-      "approved": "Approved"
+      "approved": "Approved",
+      "drafting": "Drafting…",
+      "draft_failed": "AI draft failed"
     },
     "fromCircular": "Made from a circular",
     "aiDrafted": "Drafted by AI from the circular only. Check every date and word before approving.",
@@ -5495,7 +5497,9 @@
       "ai_disabled": "AI is switched off for your school, so the notice starts empty.",
       "ai_budget_exhausted": "This month's AI budget is used up, so the notice starts empty.",
       "no_text": "The circular has no readable text, so the notice starts empty.",
-      "other": "AI could not draft this notice just now, so it starts empty."
+      "other": "AI could not draft this notice just now, so it starts empty.",
+      "source_unavailable": "The circular or text this notice was started from can no longer be used.",
+      "notice_source_personal": "The circular is now marked personal or restricted, so AI can't use it."
     },
     "editTitle": "Edit the notice",
     "approvedTitle": "Approved notice",
@@ -5573,7 +5577,26 @@
       "version_mismatch": {
         "title": "Changed meanwhile",
         "body": "Someone else changed this notice. The page shows the latest; try again."
+      },
+      "notice_drafting": {
+        "title": "Still drafting",
+        "body": "AI is still drafting this notice. Wait a moment, then try again."
+      },
+      "notice_not_draft_failed": {
+        "title": "Nothing to try again",
+        "body": "AI is drafting this notice now or has already drafted it. The page shows the latest."
       }
+    },
+    "draftingTitle": "Drafting the notice",
+    "drafting": {
+      "title": "AI is drafting this notice in English and Telugu…",
+      "body": "This usually takes under a minute. You can leave this page; the notice stays in the list.",
+      "slow": "This is taking longer than usual. You can leave this page and open the notice later from the list."
+    },
+    "draftFailed": {
+      "title": "AI could not draft this notice",
+      "body": "Try again, or write the notice yourself below.",
+      "retry": "Try AI draft again"
     }
   }
 }

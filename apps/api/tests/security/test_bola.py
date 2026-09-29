@@ -168,6 +168,7 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/notices/{notice_id}"): {"title_en": "Synthetic"},
     ("POST", "/api/v1/notices/{notice_id}/approve"): {},
     ("POST", "/api/v1/notices/{notice_id}/render"): {},
+    ("POST", "/api/v1/notices/{notice_id}/draft"): {},
 }
 
 

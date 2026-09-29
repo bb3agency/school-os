@@ -324,6 +324,25 @@ def test_FR_TASK_007_reminders_are_sent_once(ai_on: Any, admin_engine: Engine) -
 # --- notices (US-1605, US-1606) -------------------------------------------------------------
 
 
+def _outbox(admin: Engine, notice_id: Any) -> list[str]:
+    with admin.connect() as c:
+        rows = c.execute(
+            text(
+                "SELECT event_type FROM ops.outbox "
+                "WHERE payload ->> 'notice_id' = CAST(:n AS text) ORDER BY created_at"
+            ),
+            {"n": str(notice_id)},
+        )
+        return [r[0] for r in rows]
+
+
+def _source_text(admin: Engine, notice_id: Any) -> str | None:
+    value: str | None = C.db_value(
+        admin, "SELECT source_text FROM ops.parent_notices WHERE id = :i", i=notice_id
+    )
+    return value
+
+
 def test_US_1605_notice_from_a_circular_is_bilingual_and_never_sees_students(
     ai_on: Any, api: Any, admin_engine: Engine, installed: Any
 ) -> None:
@@ -336,16 +355,38 @@ def test_US_1605_notice_from_a_circular_is_bilingual_and_never_sees_students(
         "/api/v1/notices",
         json={"source": "circular", "document_id": str(document_id)},
     )
-    assert res.status_code == 201, res.text
-    notice = res.json()
+    # FR-NOTICE-003: accepted at once and drafted in the background (the request never waits
+    # for the model, so the web BFF's 30-second wait for headers is never reached).
+    assert res.status_code == 202, res.text
+    started = res.json()
+    assert started["status"] == "drafting"
+    assert started["ai_drafted"] is False
+    assert res.headers["Location"] == f"/api/v1/notices/{started['id']}"
+    assert _outbox(admin_engine, started["id"]) == ["circulars.notice.draft_requested"]
+    assert C.draft_now(ai_on.a, uuid.UUID(started["id"])) == "draft"
+    shown = api.call(office, "GET", res.headers["Location"])
+    notice = shown.json()
     assert notice["ai_drafted"] is True
     assert notice["title_te"]
     assert notice["body_te"]
     assert notice["status"] == "draft"
+    assert notice["draft_error"] is None
+    assert shown.headers["ETag"] == f'W/"{notice["version"]}"'
     sent = str(transport.sent[-1])
     assert "Synthetic Student" not in sent
     assert "admission" not in sent.lower()
-    assert C.W.audit_events(admin_engine, ai_on.a.tenant_id, "notice.drafted")
+    requested = C.W.audit_events(admin_engine, ai_on.a.tenant_id, "notice.draft_requested")
+    assert [e for e in requested if e["resource_id"] == uuid.UUID(started["id"])]
+    drafted = [
+        e
+        for e in C.W.audit_events(admin_engine, ai_on.a.tenant_id, "notice.drafted")
+        if e["resource_id"] == uuid.UUID(started["id"])
+    ]
+    assert len(drafted) == 1
+    assert drafted[0]["actor_id"] == office.user_id, "the person who asked, not the worker"
+    assert drafted[0]["summary"]["ai_drafted"] is True
+    # Delivered twice (at-least-once): the second run drafts nothing.
+    assert C.draft_now(ai_on.a, uuid.UUID(started["id"])) == "skipped"
     assert (
         C.db_value(
             admin_engine,
@@ -360,9 +401,10 @@ def test_FR_NOTICE_003_the_ai_draft_runs_with_no_database_transaction_open(
     ai_on: Any, api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The model call may take longer than ``idle_in_transaction_session_timeout`` (30 s for
-    ``sos_app``, docs/05 §3.1): drafting must not hold a transaction open, or the database ends
-    the connection and the request fails. Like the circular reading, the draft runs between two
-    short transactions."""
+    ``sos_app``, docs/05 §3.1) and than the web BFF waits for response headers (30 s): the
+    request only stores the notice and queues the draft; the worker drafts it with no
+    transaction open, between two short transactions like the circular reading. The source
+    text is kept only until the draft is made."""
     from app.knowledge import service as knowledge
 
     original = knowledge.draft_notice
@@ -388,15 +430,126 @@ def test_FR_NOTICE_003_the_ai_draft_runs_with_no_database_transaction_open(
     headers = {"Idempotency-Key": f"notice-draft-{uuid.uuid4().hex}"}
     body = {"source": "staff_text", "text": "Sports day is on 14/11/2026 at the school ground."}
     res = api.call(office, "POST", "/api/v1/notices", json=body, headers=headers)
-    assert res.status_code == 201, res.text
-    assert res.json()["ai_drafted"] is True
+    assert res.status_code == 202, res.text
+    assert res.json()["status"] == "drafting"
+    assert seen == [], "the request does not call the model"
+    notice_id = uuid.UUID(res.json()["id"])
+    assert _source_text(admin_engine, notice_id) == body["text"]
+    assert C.draft_now(ai_on.a, notice_id) == "draft"
     assert seen == [0]
-    # A retry with the same key replays the first answer without drafting again.
+    assert _source_text(admin_engine, notice_id) is None, "kept only until the draft is made"
+    # A retry with the same key replays the first answer without queueing another draft.
     again = api.call(office, "POST", "/api/v1/notices", json=body, headers=headers)
-    assert again.status_code == 201
+    assert again.status_code == 202
     assert again.headers["Idempotent-Replayed"] == "true"
-    assert again.json()["id"] == res.json()["id"]
+    assert again.json()["id"] == str(notice_id)
+    assert _outbox(admin_engine, notice_id) == ["circulars.notice.draft_requested"]
+    assert C.draft_now(ai_on.a, notice_id) == "skipped"
     assert seen == [0]
+
+
+def test_FR_NOTICE_003_a_failed_draft_can_be_tried_again_or_written_by_hand(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """While the AI drafts, the notice cannot be edited or approved (409 ``notice_drafting``).
+    When it cannot draft (AI off here), the notice is ``draft_failed`` with the code: "Try
+    again" queues a new draft (202), and editing it by hand makes it a ``draft``."""
+    school = ai_on.a
+    office = school.people["office_staff"]
+    principal = school.people["principal"]
+    body = {"source": "staff_text", "text": "School reopens on 02/06/2027 after the holidays."}
+    res = api.call(office, "POST", "/api/v1/notices", json=body)
+    assert res.status_code == 202, res.text
+    notice = res.json()
+    path = f"/api/v1/notices/{notice['id']}"
+    busy = api.call(office, "PATCH", path, json={"title_en": "x"}, headers=_if(notice["version"]))
+    assert busy.status_code == 409
+    assert busy.json()["code"] == "notice_drafting"
+    early = api.call(principal, "POST", f"{path}/approve", json={}, headers=_if(notice["version"]))
+    assert early.status_code == 409
+    assert early.json()["code"] == "notice_drafting"
+    not_failed = api.call(office, "POST", f"{path}/draft", json={}, headers=_if(notice["version"]))
+    assert not_failed.status_code == 409
+    assert not_failed.json()["code"] == "notice_not_draft_failed"
+
+    C.KB.enable_ai(admin_engine, school.tenant_id, enabled=False)
+    try:
+        assert C.draft_now(school, uuid.UUID(notice["id"])) == "ai_disabled"
+    finally:
+        C.KB.enable_ai(admin_engine, school.tenant_id)
+    failed = api.call(office, "GET", path).json()
+    assert (failed["status"], failed["draft_error"]) == ("draft_failed", "ai_disabled")
+    assert failed["ai_drafted"] is False
+    drafted = [
+        e
+        for e in C.W.audit_events(admin_engine, school.tenant_id, "notice.drafted")
+        if e["resource_id"] == uuid.UUID(notice["id"])
+    ]
+    assert drafted[-1]["summary"]["draft_error"] == "ai_disabled"
+
+    stale = api.call(office, "POST", f"{path}/draft", json={}, headers=_if(notice["version"]))
+    assert stale.status_code == 412
+    again = api.call(office, "POST", f"{path}/draft", json={}, headers=_if(failed["version"]))
+    assert again.status_code == 202, again.text
+    assert again.json()["status"] == "drafting"
+    assert again.headers["ETag"] == f'W/"{again.json()["version"]}"'
+    assert _outbox(admin_engine, notice["id"]) == ["circulars.notice.draft_requested"] * 2
+    assert C.draft_now(school, uuid.UUID(notice["id"])) == "draft"
+    assert api.call(office, "GET", path).json()["ai_drafted"] is True
+
+    # Written by hand after a failure: the notice becomes a draft and the staff text goes.
+    other = api.call(office, "POST", "/api/v1/notices", json=body).json()
+    C.KB.enable_ai(admin_engine, school.tenant_id, enabled=False)
+    try:
+        C.draft_now(school, uuid.UUID(other["id"]))
+    finally:
+        C.KB.enable_ai(admin_engine, school.tenant_id)
+    failed = api.call(office, "GET", f"/api/v1/notices/{other['id']}").json()
+    written = api.call(
+        office,
+        "PATCH",
+        f"/api/v1/notices/{other['id']}",
+        json={"title_en": "School reopens"},
+        headers=_if(failed["version"]),
+    )
+    assert written.status_code == 200, written.text
+    assert written.json()["status"] == "draft"
+    assert _source_text(admin_engine, other["id"]) is None
+
+
+def test_invariant_8_the_worker_drafts_only_what_the_requester_can_still_see(
+    ai_on: Any, api: Any, admin_engine: Engine, installed: Any
+) -> None:
+    """The source is read again in the worker with the requester's CURRENT access: a circular
+    they can no longer see is not sent to the AI (``draft_failed``, ``source_unavailable``)."""
+    _store, transport, _pdf = installed
+    school = ai_on.a
+    office = school.people["office_staff"]
+    document_id = C.read_circular(admin_engine, school)
+    res = api.call(
+        office,
+        "POST",
+        "/api/v1/notices",
+        json={"source": "circular", "document_id": str(document_id)},
+    )
+    assert res.status_code == 202, res.text
+    with admin_engine.begin() as c:  # the circular is now for the principal only
+        c.execute(text("DELETE FROM kb.document_acl WHERE document_id = :d"), {"d": document_id})
+        c.execute(
+            text(
+                "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, "
+                "principal_ref) VALUES (:t, :d, 'role', 'principal')"
+            ),
+            {"t": school.tenant_id, "d": document_id},
+        )
+    calls = len(transport.sent)
+    assert C.draft_now(school, uuid.UUID(res.json()["id"])) == "source_unavailable"
+    assert len(transport.sent) == calls, "nothing was sent to the AI"
+    shown = api.call(school.people["owner"], "GET", f"/api/v1/notices/{res.json()['id']}")
+    assert (shown.json()["status"], shown.json()["draft_error"]) == (
+        "draft_failed",
+        "source_unavailable",
+    )
 
 
 def test_FR_NOTICE_002_personal_circulars_and_numbers_are_refused(
@@ -425,7 +578,10 @@ def test_FR_NOTICE_005_approve_render_and_download(
     school = ai_on.a
     _store, _transport, fake_pdf = installed
     office = school.people["office_staff"]
-    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    started = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"})
+    assert started.status_code == 202, started.text
+    blank = started.json()
+    assert blank["status"] == "draft", "a blank notice has nothing to draft"
     path = f"/api/v1/notices/{blank['id']}"
     incomplete = api.call(
         school.people["principal"], "POST", f"{path}/approve", json={}, headers=_if(1)
@@ -524,12 +680,13 @@ def test_invariant_5_no_circular_or_notice_text_in_logs(
             json={"owner_membership_id": str(office.membership_id), "title": "Secret title ZQX"},
             headers=_if(first["version"]),
         )
-        api.call(
+        drafting = api.call(
             office,
             "POST",
             "/api/v1/notices",
             json={"source": "circular", "document_id": str(document_id)},
         )
+        C.draft_now(school, uuid.UUID(drafting.json()["id"]))
         notice_id = C.notice(school, approved=True)
         C.render_all(school, notice_id)
     text_ = str(logs)

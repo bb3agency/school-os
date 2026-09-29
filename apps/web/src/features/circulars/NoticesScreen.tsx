@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,7 +17,7 @@ import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
 import { KEYS, NOTICE_DRAFT, looksPersonal, useNotices } from "./data";
-import { LoadGate } from "./parts";
+import { LoadGate, NoticeStatusPill } from "./parts";
 
 /** Start a notice from staff text (AI drafts both languages) or blank (write it yourself). */
 function NewNoticeCard() {
@@ -153,9 +152,7 @@ export function NoticesScreen() {
                               ) : null}
                             </Td>
                             <Td>
-                              <Pill variant={notice.status === "approved" ? "done" : "tag"}>
-                                {t(`status.${notice.status}`)}
-                              </Pill>
+                              <NoticeStatusPill status={notice.status} />
                             </Td>
                             <Td>
                               <Value>{formatDateTime(notice.updated_at)}</Value>
