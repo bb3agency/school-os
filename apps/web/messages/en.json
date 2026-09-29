@@ -1978,7 +1978,9 @@
       "historyDescription": "Every value recorded for this student, newest first. Replaced values stay in the history; nothing is deleted.",
       "historyTimeline": "Recorded values, newest first",
       "historyInUse": "In use",
-      "historyCorrection": "Correction request"
+      "historyCorrection": "Correction request",
+      "issueCertificateLink": "Issue a certificate",
+      "certificatesLink": "Certificates of this student"
     },
     "record": {
       "open": "Record a value",
@@ -3916,7 +3918,8 @@
       "other": "Other documents",
       "evidence": "Evidence for corrections",
       "register_scan": "Register photos",
-      "import_file": "Spreadsheet imports"
+      "import_file": "Spreadsheet imports",
+      "certificate": "Issued certificates"
     },
     "docStatus": {
       "active": "In use",
@@ -4977,6 +4980,268 @@
         "title": "Someone else changed these settings first",
         "body": "Select “Load the latest settings” to see their change, then make yours again."
       }
+    }
+  },
+  "certificates": {
+    "nav": "Certificates",
+    "title": "Certificates",
+    "description": "Transfer, bonafide, study and conduct certificates made from the checked student record. Each one gets a serial number and a line in the register.",
+    "crumbHome": "Home",
+    "studentsCrumb": "Students",
+    "studentCrumb": "Student",
+    "titleSerial": "{type} {serial}",
+    "titleDuplicate": "{type} {serial} (duplicate {copy})",
+    "types": {
+      "transfer": "Transfer certificate",
+      "bonafide": "Bonafide certificate",
+      "study": "Study certificate",
+      "conduct": "Conduct certificate"
+    },
+    "status": {
+      "pending": "Waiting for approval",
+      "issued": "Issued",
+      "rejected": "Not approved",
+      "withdrawn": "Withdrawn",
+      "cancelled": "Cancelled"
+    },
+    "colRequested": "Date",
+    "colCertificate": "Certificate",
+    "colStudent": "Student",
+    "colStatus": "Status",
+    "noSerialYet": "Gets its serial number when approved",
+    "waitingForYou": "Waiting for you",
+    "open": "Open",
+    "filtersTitle": "Filters",
+    "filterType": "Certificate",
+    "filterStatus": "Status",
+    "oneStudentOnly": "Showing one student only.",
+    "allStudents": "Show all students",
+    "issueForStudent": "Issue a certificate",
+    "emptyTitle": "No certificates",
+    "emptyBody": "Nothing matches these filters.",
+    "emptyBodyIssuer": "Nothing matches these filters. To issue one, open a student and choose “Issue a certificate”.",
+    "showMore": "Show more",
+    "inputs": {
+      "leaving_date": "Date of leaving",
+      "leaving_reason": "Reason for leaving",
+      "promotion": "Qualified for promotion to a higher class",
+      "conduct": "Conduct and character",
+      "remarks": "Remarks",
+      "purpose": "Purpose",
+      "purpose_note": "Purpose (details)"
+    },
+    "errors": {
+      "certificate_blocked": {
+        "title": "This certificate cannot be issued yet",
+        "body": "Something it prints needs fixing first. Check the preview: resolve the finding or request a correction, then try again."
+      },
+      "certificate_not_pending": {
+        "title": "This certificate was already decided",
+        "body": "Reload the page to see what happened."
+      },
+      "certificate_not_issued": {
+        "title": "Only issued certificates can be copied or cancelled",
+        "body": "Reload the page to see the certificate's status."
+      },
+      "transfer_certificate_exists": {
+        "title": "This student already has a transfer certificate",
+        "body": "A TC is issued or waiting for approval. Open the student's certificates instead of preparing another one. For a lost TC, issue a duplicate."
+      },
+      "duplicate_pending": {
+        "title": "A duplicate is already waiting",
+        "body": "Wait for the principal to decide it first."
+      },
+      "self_approval_forbidden": {
+        "title": "Someone else must decide this",
+        "body": "You prepared this certificate, so another person with approval rights must approve or reject it."
+      },
+      "not_requester": {
+        "title": "Only the person who prepared it can withdraw it",
+        "body": "Ask them to withdraw it, or ask the principal to reject it."
+      },
+      "no_current_academic_year": {
+        "title": "Set the current academic year first",
+        "body": "Serial numbers run per academic year. Mark one year as current in Settings, School structure."
+      },
+      "pdf_not_ready": {
+        "title": "The PDF is still being made",
+        "body": "Try again in a moment. You can print from the print view meanwhile."
+      },
+      "document_not_ready": {
+        "title": "The PDF is still being checked",
+        "body": "Every file is checked for viruses first. Try again in a moment."
+      },
+      "not_printable": {
+        "title": "Nothing to print",
+        "body": "This request was closed without a certificate."
+      },
+      "serial_number_conflict": {
+        "title": "The serial number was just taken",
+        "body": "Try again: the next free number will be used."
+      },
+      "too_many_rows": {
+        "title": "This register is too long to print at once",
+        "body": "Choose one certificate type or a single academic year."
+      }
+    },
+    "detail": {
+      "admissionNo": "Adm. no. {number}",
+      "prepared": "Prepared",
+      "requested": "Requested",
+      "byYou": "By you",
+      "bySomeoneElse": "By someone else",
+      "waitingApproval": "Waiting for the principal",
+      "approvedIssued": "Approved and issued",
+      "issued": "Issued",
+      "waitingForYouTitle": "Waiting for your decision",
+      "waitingForYouBody": "Open the print view to check the draft against the paper register, then approve or reject it. Approving a TC takes the student off the rolls.",
+      "ownRequestTitle": "You prepared this",
+      "ownRequestBody": "Someone else with approval rights must approve it. You can withdraw it while it waits.",
+      "duplicateOfTitle": "Duplicate, copy {copy}",
+      "openOriginal": "Open the original",
+      "cancelledTitle": "This certificate is cancelled",
+      "cancelledBody": "It keeps its serial number and shows as cancelled in the register.",
+      "cancelledBodyTc": "It keeps its serial number and shows as cancelled in the register. The student was not re-admitted: do that separately if needed.",
+      "printedTitle": "What the certificate prints",
+      "printedBody": "Frozen when it was issued. To correct a value, request a correction, cancel this certificate and issue a new one.",
+      "requestedTitle": "Details asked for",
+      "requestedBody": "The values from the student record are taken when it is approved.",
+      "noInputs": "No extra details.",
+      "timelineTitle": "History",
+      "timelineLabel": "What happened to this certificate",
+      "printTitle": "Print",
+      "printBody": "Print on the school's paper and have the principal sign and seal it. Reprints of the same certificate are fine; a lost certificate needs a duplicate.",
+      "draftBody": "A draft marked “not valid”, to check before approving.",
+      "retryPdf": "Make the PDF again",
+      "issuedActionsTitle": "Duplicate or cancel",
+      "issuedActionsBody": "Issue a marked duplicate for a lost certificate, or cancel one issued by mistake.",
+      "relatedLabel": "Related pages",
+      "openStudent": "Open the student",
+      "allForStudent": "All certificates of this student",
+      "backToList": "Back to certificates",
+      "approve": "Approve and issue",
+      "approveTitle": "Approve and issue this certificate?",
+      "approveBody": "It gets the next serial number and a line in the register. A transfer certificate also takes the student off the rolls from the date of leaving.",
+      "approveNote": "Note (optional)",
+      "approveNoteHint": "The person who prepared it will see this.",
+      "reject": "Reject",
+      "rejectTitle": "Reject this certificate?",
+      "rejectBody": "Nothing is issued. Say what needs to change.",
+      "rejectReason": "Reason",
+      "reasonHint": "At least 10 characters. Never type an Aadhaar number.",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw this request?",
+      "withdrawBody": "Nothing is issued and the principal no longer sees it.",
+      "duplicate": "Issue a duplicate",
+      "duplicateTitle": "Issue a duplicate?",
+      "duplicateBody": "A copy of what the original printed, marked “Duplicate” with the original serial number.",
+      "duplicateBodyApproval": "A copy of what the original printed, marked “Duplicate” with the original serial number. A TC duplicate waits for the principal's approval.",
+      "duplicateReason": "Why is a duplicate needed?",
+      "cancel": "Cancel certificate",
+      "cancelTitle": "Cancel this certificate?",
+      "cancelBody": "It keeps its serial number and shows as cancelled in the register. This cannot be undone.",
+      "cancelBodyTc": "It keeps its serial number and shows as cancelled in the register. The student is not re-admitted automatically. This cannot be undone.",
+      "cancelReason": "Reason for cancelling",
+      "openPrint": "Open print view",
+      "newTab": "opens in a new tab",
+      "downloadPdf": "Download PDF",
+      "pdfFailed": "The PDF could not be made.",
+      "pdfPreparing": "The PDF is being made and checked. It is usually ready within a minute."
+    },
+    "issue": {
+      "title": "Issue a certificate",
+      "typeTitle": "Which certificate?",
+      "typeBody": "Bonafide, study and conduct certificates are issued at once. A transfer certificate goes to the principal for approval.",
+      "typeLegend": "Certificate",
+      "previewTitle": "What it will print",
+      "previewBody": "From the student record, as it is now. Check it against the admission register.",
+      "recheck": "Check again",
+      "working": "Working…",
+      "blockedTitle": "Fix these first",
+      "blockedBody": "SchoolOS never changes a record by itself. Correct the value through a change request or resolve the finding, then check again.",
+      "provisionalTitle": "Not yet verified",
+      "provisionalBody": "These values are not verified against the admission register yet: {fields}. Check them on paper before issuing.",
+      "classLabel": "Class:",
+      "yearLabel": "Academic year:",
+      "colField": "Field",
+      "colValue": "Value",
+      "colSource": "Source",
+      "verified": "Verified",
+      "provisional": "Not verified",
+      "inputsTitle": "Details for this certificate",
+      "inputsBody": "When you issue it, it gets the next serial number and a line in the register.",
+      "inputsBodyApproval": "It is sent to the principal. It gets its serial number when approved.",
+      "noInputs": "Nothing else is needed.",
+      "optional": "Optional",
+      "choose": "Choose",
+      "endsEnrolmentTitle": "The student leaves the rolls",
+      "endsEnrolmentBody": "When the principal approves this TC, the student's class enrolment ends on the date of leaving and the student is marked as left.",
+      "submitForApproval": "Send for approval",
+      "submitIssue": "Issue certificate",
+      "back": "Back to the student",
+      "blockedHint": "Fix the problems above to continue.",
+      "blockers": {
+        "dq_blocker": "A data check found a blocking problem ({rule}) in {field}.",
+        "missing_value": "{field} is empty in the admission register.",
+        "no_enrolment": "The student is not in a class this academic year.",
+        "student_not_active": "The student is not studying here now.",
+        "no_current_year": "No academic year is marked as current.",
+        "transfer_certificate_exists": "This student already has a transfer certificate.",
+        "openFinding": "Open the finding",
+        "requestCorrection": "Request a correction",
+        "openStructure": "Open school structure",
+        "openCertificates": "Open the student's certificates"
+      }
+    },
+    "registers": {
+      "nav": "Registers",
+      "title": "Registers",
+      "description": "Print the registers in their familiar A4 format, in English and Telugu, to keep the paper registers complete.",
+      "noPermission": "You can see certificates but not print the registers. Ask the principal if you need them.",
+      "stepUpTitle": "You may be asked to confirm it's you",
+      "stepUpBody": "Registers list many students' details, so SchoolOS asks for a fresh sign-in with your second step every few minutes.",
+      "year": "Academic year",
+      "currentYear": "{label} (current)",
+      "type": "Certificate",
+      "allTypes": "Bonafide, study and conduct",
+      "prepare": "Prepare print view",
+      "open": "Open print view",
+      "newTab": "opens in a new tab",
+      "readyNote": "Ready. Print it from the new tab (landscape, A4).",
+      "transfer": {
+        "title": "TC register (counterfoil)",
+        "body": "Every transfer certificate of the year by serial number, with cancelled ones and duplicates."
+      },
+      "certificates": {
+        "title": "Certificate issue register",
+        "body": "Bonafide, study and conduct certificates issued in the year."
+      },
+      "admission": {
+        "title": "Admission and withdrawal register",
+        "body": "Students enrolled in the year, in admission-number order, with their leaving details and TC number."
+      }
+    },
+    "letterhead": {
+      "title": "Certificate letterhead",
+      "description": "Printed at the top of every certificate and at the signature. Leave a field empty to leave it out.",
+      "nameEnNote": "The English name is the school's name: {name}. SchoolOS sets it when the school is added.",
+      "fields": {
+        "school_name_te": "School name in Telugu",
+        "address_en": "Address in English",
+        "address_te": "Address in Telugu",
+        "affiliation": "Recognition or affiliation",
+        "place": "Place"
+      },
+      "hints": {
+        "school_name_te": "As it should appear on certificates.",
+        "address_en": "One line, for example the street, town and PIN code.",
+        "address_te": "One line, in Telugu.",
+        "affiliation": "For example the recognition order number or the UDISE code.",
+        "place": "Printed next to the date, for example the town."
+      },
+      "logoNote": "A school logo cannot be added yet.",
+      "save": "Save letterhead",
+      "saved": "Letterhead saved. New certificates use it."
     }
   }
 }

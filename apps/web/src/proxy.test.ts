@@ -104,4 +104,28 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       );
     }
   });
+
+  it("leaves certificate and register print views' CSP to the API, and only those paths (FR-CERT-011, FR-REG-004)", () => {
+    for (const path of [
+      "/bff/api/v1/certificates/0192f3a4-0000-7000-8000-0000000ce001/print",
+      "/bff/api/v1/registers/transfer-certificates",
+      "/bff/api/v1/registers/certificates",
+      "/bff/api/v1/registers/admission-withdrawal",
+    ]) {
+      const response = proxy(request(path));
+      expect(response.headers.get("content-security-policy"), path).toBeNull();
+      expect(response.headers.get("x-content-type-options"), path).toBe("nosniff");
+    }
+    for (const path of [
+      "/bff/api/v1/certificates/0192f3a4-0000-7000-8000-0000000ce001",
+      "/bff/api/v1/certificates/0192f3a4-0000-7000-8000-0000000ce001/print/x",
+      "/bff/api/v1/certificates/../print",
+      "/bff/api/v1/registers/other",
+      "/bff/api/v1/registers/certificates/x",
+    ]) {
+      expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
+        "default-src 'self'",
+      );
+    }
+  });
 });

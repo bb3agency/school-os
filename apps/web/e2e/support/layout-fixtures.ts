@@ -1543,6 +1543,261 @@ const PLATFORM_BREAK_GLASS: Schemas["BreakGlassOut"][] = Array.from({ length: 7 
   created_at: at(20 + i),
 }));
 
+/* ------------------------------------------------------------------ certificates (US-1101..US-1108) */
+
+const CERT_MAIN = "0192f3a4-0000-7000-8000-0000000ce001";
+const CERT_TYPES = ["transfer", "bonafide", "study", "conduct"] as const;
+const CERT_STATUSES = [
+  "pending",
+  "issued",
+  "issued",
+  "rejected",
+  "withdrawn",
+  "cancelled",
+] as const;
+const CERT_PREFIX = { transfer: "TC", bonafide: "BC", study: "SC", conduct: "CC" } as const;
+const CERT_TITLES = {
+  transfer: ["Transfer certificate", "బదిలీ ధృవీకరణ పత్రం"],
+  bonafide: ["Bonafide certificate", "బోనఫైడ్ ధృవీకరణ పత్రం"],
+  study: ["Study certificate", "చదువు ధృవీకరణ పత్రం"],
+  conduct: ["Conduct certificate", "ప్రవర్తన ధృవీకరణ పత్రం"],
+} as const;
+
+const certLine = (key: string, en: string, te: string, value: string): Schemas["ContentLine"] => ({
+  key,
+  label_en: en,
+  label_te: te,
+  value,
+});
+
+function certificateContent(
+  type: (typeof CERT_TYPES)[number],
+  serial: string,
+  name: string,
+): Schemas["CertificateContent"] {
+  const [title_en, title_te] = CERT_TITLES[type];
+  return {
+    certificate_type: type,
+    title_en,
+    title_te,
+    serial,
+    academic_year_label: "2026-27",
+    issued_on: date(9, 29),
+    school_name_en: LONG_SCHOOL,
+    school_name_te: "శ్రీ వేంకటేశ్వర జిల్లా పరిషత్ ఉన్నత పాఠశాల మరియు జూనియర్ కళాశాల",
+    school_address_en: "Door No. 12-3-45, Synthetic Main Road, Near Bus Stand, Synthetic Town",
+    school_address_te: "డోర్ నం. 12-3-45, సింథటిక్ మెయిన్ రోడ్, సింథటిక్ పట్టణం",
+    school_affiliation: `Recognition No. ${LONG_TOKEN}`,
+    school_place: "Synthetic Town",
+    student_name: name,
+    admission_no: "SYN-2026-014",
+    class_label_en: "Class 10 · B (Telugu medium)",
+    class_label_te: "10వ తరగతి · B (తెలుగు మాధ్యమం)",
+    fields: [
+      certLine("full_name", "Full name", "పూర్తి పేరు", name),
+      certLine("father_name", "Father's name", "తండ్రి పేరు", TE_GUARDIAN),
+      certLine("dob", "Date of birth", "పుట్టిన తేదీ", "14/03/2012"),
+      certLine("admission_no", "Admission number", "ప్రవేశ సంఖ్య", "SYN-2026-014"),
+    ],
+    details:
+      type === "transfer"
+        ? [
+            certLine("leaving_date", "Date of leaving", "విడిచిన తేదీ", "29/09/2026"),
+            certLine("leaving_reason", "Reason for leaving", "విడిచిన కారణం", "Parent transferred"),
+            certLine("remarks", "Remarks", "వ్యాఖ్యలు", LONG_TEXT),
+          ]
+        : [certLine("purpose", "Purpose", "ప్రయోజనం", "Bus pass")],
+    blanks:
+      type === "transfer"
+        ? [certLine("tc_caste", "Caste (as in the admission register)", "కులం", "")]
+        : [],
+  };
+}
+
+const CERTIFICATES: Schemas["CertificateOut"][] = Array.from({ length: 12 }, (_, i) => {
+  const type = pick(CERT_TYPES, i);
+  const status = pick(CERT_STATUSES, i);
+  const hasSerial = status === "issued" || status === "cancelled";
+  const serial = hasSerial
+    ? `${CERT_PREFIX[type]}/2026-27/${String(i + 1).padStart(4, "0")}`
+    : null;
+  const name = pick(STUDENT_NAMES, i);
+  const duplicate = i === 7;
+  return {
+    id: i === 0 ? CERT_MAIN : uid("0000000ce", i + 1),
+    student_id: studentId(i % STUDENT_NAMES.length),
+    certificate_type: type,
+    status,
+    requires_approval: type === "transfer",
+    inputs:
+      type === "transfer"
+        ? {
+            leaving_date: date(9, 29),
+            leaving_reason: "parent_transferred",
+            promotion: "promoted",
+            conduct: "good",
+            remarks: LONG_TEXT,
+          }
+        : { purpose: "bus_pass" },
+    original_certificate_id: duplicate ? uid("0000000ce", 2) : null,
+    duplicate_no: duplicate ? 1 : null,
+    duplicate_reason: duplicate ? LONG_TEXT : null,
+    academic_year_id: hasSerial ? YEAR_ID : null,
+    serial,
+    student_name: i === 9 ? null : name,
+    admission_no: i === 4 ? null : `SYN-2026-${String(i + 14).padStart(3, "0")}`,
+    content: hasSerial || i === 0 ? certificateContent(type, serial ?? "", name) : null,
+    requested_by: i % 2 === 0 ? OTHER_MEMBERSHIP : ME_MEMBERSHIP,
+    requested_at: at(10 + i),
+    decided_by: status === "pending" ? null : ME_MEMBERSHIP,
+    decided_at: status === "pending" ? null : at(11 + i),
+    decision_note: status === "rejected" ? LONG_TEXT : null,
+    issued_by: hasSerial ? ME_MEMBERSHIP : null,
+    issued_at: hasSerial ? at(11 + i) : null,
+    cancelled_by: status === "cancelled" ? ME_MEMBERSHIP : null,
+    cancelled_at: status === "cancelled" ? at(12 + i) : null,
+    cancel_reason: status === "cancelled" ? LONG_TEXT : null,
+    document_id: hasSerial ? uid("0000000d0", i + 1) : null,
+    pdf_status: hasSerial ? pick(["ready", "queued", "failed"] as const, i) : "none",
+    version: 1 + (i % 3),
+    can_approve: status === "pending" && i % 2 === 0,
+    can_withdraw: status === "pending" && i % 2 === 1,
+    can_cancel: status === "issued",
+    can_duplicate: status === "issued",
+  };
+});
+
+const choice = (value: string, en: string, te: string): Schemas["ChoiceOut"] => ({
+  value,
+  label_en: en,
+  label_te: te,
+});
+
+const PURPOSE_INPUTS = (required: boolean): Schemas["InputOut"][] => [
+  {
+    key: "purpose",
+    kind: "choice",
+    required,
+    max_length: null,
+    choices: [
+      choice("bus_pass", "Bus pass", "బస్ పాస్"),
+      choice("scholarship", "Scholarship application", "ఉపకార వేతన దరఖాస్తు"),
+    ],
+  },
+  { key: "purpose_note", kind: "text", required: false, max_length: 120, choices: [] },
+];
+
+const CERTIFICATE_TYPE_INFO: Schemas["CertificateTypeOut"][] = [
+  {
+    key: "transfer",
+    label_en: CERT_TITLES.transfer[0],
+    label_te: CERT_TITLES.transfer[1],
+    requires_approval: true,
+    ends_enrolment: true,
+    printed: ["full_name", "father_name", "dob", "admission_no"],
+    inputs: [
+      { key: "leaving_date", kind: "date", required: true, max_length: null, choices: [] },
+      {
+        key: "leaving_reason",
+        kind: "choice",
+        required: true,
+        max_length: null,
+        choices: [
+          choice("parent_request", "At the request of the parent", "తల్లిదండ్రుల అభ్యర్థన మేరకు"),
+          choice("parent_transferred", "Parent transferred", "తల్లిదండ్రుల బదిలీ"),
+        ],
+      },
+      {
+        key: "promotion",
+        kind: "choice",
+        required: true,
+        max_length: null,
+        choices: [choice("promoted", "Yes, promoted", "అవును, ఉత్తీర్ణత")],
+      },
+      {
+        key: "conduct",
+        kind: "choice",
+        required: true,
+        max_length: null,
+        choices: [choice("good", "Good", "మంచిది")],
+      },
+      { key: "remarks", kind: "text", required: false, max_length: 200, choices: [] },
+    ],
+  },
+  ...(["bonafide", "study", "conduct"] as const).map((key): Schemas["CertificateTypeOut"] => ({
+    key,
+    label_en: CERT_TITLES[key][0],
+    label_te: CERT_TITLES[key][1],
+    requires_approval: false,
+    ends_enrolment: false,
+    printed: ["full_name", "father_name", "dob"],
+    inputs: PURPOSE_INPUTS(key === "bonafide"),
+  })),
+];
+
+/** The transfer preview shows the blocker list; the others show the form. */
+function certificatePreview(type: string, studentName: string): Schemas["CertificatePreview"] {
+  const transfer = type === "transfer";
+  return {
+    student_id: STUDENT_MAIN,
+    certificate_type: transfer ? "transfer" : "bonafide",
+    requires_approval: transfer,
+    fields: [
+      {
+        key: "full_name",
+        label_en: "Full name",
+        label_te: "పూర్తి పేరు",
+        value: studentName,
+        source: "admission_register",
+        verified: false,
+        provisional: true,
+      },
+      {
+        key: "father_name",
+        label_en: "Father's name",
+        label_te: "తండ్రి పేరు",
+        value: TE_GUARDIAN,
+        source: "aadhaar_as_printed",
+        verified: true,
+        provisional: false,
+      },
+      {
+        key: "dob",
+        label_en: "Date of birth",
+        label_te: "పుట్టిన తేదీ",
+        value: "14/03/2012",
+        source: "admission_register",
+        verified: true,
+        provisional: false,
+      },
+      {
+        key: "admission_no",
+        label_en: "Admission number",
+        label_te: "ప్రవేశ సంఖ్య",
+        value: `SYN-${LONG_TOKEN}`,
+        source: null,
+        verified: false,
+        provisional: false,
+      },
+    ],
+    class_label: "Class 10 · B (Telugu medium)",
+    academic_year_label: "2026-27",
+    blockers: transfer
+      ? [
+          {
+            code: "dq_blocker",
+            attribute_key: "dob",
+            finding_id: uid("0000000f1", 1),
+            rule_id: "DQ-002",
+          },
+          { code: "missing_value", attribute_key: "mother_name", finding_id: null, rule_id: null },
+        ]
+      : [],
+    warnings: [{ code: "provisional_value", attribute_key: "full_name" }],
+    can_issue: !transfer,
+  };
+}
+
 /* ------------------------------------------------------------------ routing */
 
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
@@ -1594,6 +1849,25 @@ const ROUTES: Array<[RegExp, Handler]> = [
       ),
   ],
   [re("/exports"), () => page(EXPORTS)],
+  // Certificates (US-1101..US-1105). Register print views are HTML and fall through.
+  [re("/certificates/types"), () => CERTIFICATE_TYPE_INFO],
+  [
+    re("/certificates"),
+    (_, q) => {
+      let rows = by(CERTIFICATES, q, "status", (r) => r.status);
+      rows = by(rows, q, "certificate_type", (r) => r.certificate_type);
+      rows = by(rows, q, "student_id", (r) => r.student_id);
+      return page(rows);
+    },
+  ],
+  [
+    re("/certificates/{id}"),
+    ([, id = CERT_MAIN]) => ({ ...(CERTIFICATES.find((c) => c.id === id) ?? CERTIFICATES[0]), id }),
+  ],
+  [
+    re("/students/{id}/certificates/preview"),
+    (_, q) => certificatePreview(q.get("certificate_type") ?? "bonafide", pick(STUDENT_NAMES, 2)),
+  ],
   // Register photos.
   [re("/extraction-batches"), () => page(BATCHES)],
   [re("/extraction-items"), (_, q) => page(by(ITEMS, q, "status", (r) => r.status))],
@@ -1757,4 +2031,5 @@ export const FIXTURE_IDS = {
   export: EXPORTS[0]?.id ?? "",
   batch: BATCHES[0]?.id ?? "",
   item: ITEMS[0]?.id ?? "",
+  certificate: CERT_MAIN,
 } as const;

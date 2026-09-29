@@ -31,6 +31,8 @@ export function bellPollDelay(consecutiveFailures: number): number {
 /** Screens that notifications may open. Other resource types are shown without a link. */
 const LINKS: Record<string, (id: string) => string> = {
   change_request: (id) => `/change-requests/${id}`,
+  // US-1102: TC approvals and decisions open the certificate.
+  certificate: (id) => `/certificates/${id}`,
   dq_run: (id) => `/findings/runs/${id}`,
   breakglass_grant: (id) => `/break-glass/${id}`,
   export: (id) => `/exports/${id}`,

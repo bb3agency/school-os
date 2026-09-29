@@ -76,6 +76,20 @@ function RelatedLinks({ studentId, permissions }: { studentId: string; permissio
     ...(permissions.has(PERM.requestChange) || permissions.has(PERM.approveChange)
       ? [{ href: `/change-requests?${q}`, label: t("changeRequestsLink") }]
       : []),
+    // US-1101: certificates are issued from the checked record, starting here.
+    ...(permissions.has(PERM.certificateIssue)
+      ? [
+          {
+            href: `/students/${encodeURIComponent(studentId)}/certificates/new`,
+            label: t("issueCertificateLink"),
+          },
+        ]
+      : []),
+    ...(permissions.has(PERM.certificateRead) ||
+    permissions.has(PERM.certificateIssue) ||
+    permissions.has(PERM.certificateApprove)
+      ? [{ href: `/certificates?${q}`, label: t("certificatesLink") }]
+      : []),
   ];
   if (links.length === 0) return null;
   return (

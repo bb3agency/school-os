@@ -54,4 +54,7 @@ export const PERM = {
   importRun: "import.run",
   importCommit: "import.commit",
   documentUpload: "document.upload",
+  certificateRead: "certificate.read",
+  certificateIssue: "certificate.issue",
+  certificateApprove: "certificate.approve",
 } as const;

@@ -25,6 +25,9 @@ const NON_LOCALISED_PREFIXES = ["/bff/", "/healthz"] as const;
  */
 const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/change-requests\/[0-9a-f-]{36}\/memo$/i,
+  // FR-CERT-011, FR-REG-004: certificate and register print views (hashed style blocks only).
+  /^\/bff\/api\/v1\/certificates\/[0-9a-f-]{36}\/print$/i,
+  /^\/bff\/api\/v1\/registers\/(transfer-certificates|certificates|admission-withdrawal)$/i,
 ];
 
 function isNonLocalised(pathname: string): boolean {

@@ -13,6 +13,7 @@ import { Alert } from "./Alert";
 export type ErrorNamespace =
   | "findings"
   | "changeRequests"
+  | "certificates"
   | "breakGlass"
   | "notifications"
   | "exports"

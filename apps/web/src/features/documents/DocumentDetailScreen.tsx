@@ -52,6 +52,7 @@ import {
   isVersionBusy,
   type DocumentDetail,
   type DocumentVersion,
+  type UploadPurpose,
 } from "./types";
 import { createUploadKeys, StorageUploadError, uploadVersion } from "./upload";
 
@@ -217,7 +218,7 @@ function VersionsSection({ doc }: { doc: DocumentDetail }) {
   );
 }
 
-function NewVersion({ doc }: { doc: DocumentDetail }) {
+function NewVersion({ doc, purpose }: { doc: DocumentDetail; purpose: UploadPurpose }) {
   const t = useTranslations("documents.newVersion");
   const api = useBffClient("staff");
   const keys = useRef(createUploadKeys(newIdempotencyKey));
@@ -233,7 +234,7 @@ function NewVersion({ doc }: { doc: DocumentDetail }) {
       errorNamespace="documents"
       submit={async (data, key) => {
         try {
-          return await uploadVersion(api, doc.id, data.file, doc.purpose, keys.current.for(key));
+          return await uploadVersion(api, doc.id, data.file, purpose, keys.current.for(key));
         } catch (failure) {
           if (failure instanceof StorageUploadError) keys.current.storageFailed();
           throw storageFailure(failure);
@@ -502,7 +503,13 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   const busy = doc.versions.some((version) => isVersionBusy(version.status));
   const canManage = can(DOCUMENT_PERM.manage);
   const archived = doc.status === "archived";
-  const canUpload = can(DOCUMENT_PERM.upload) && doc.purpose !== "import_file" && !archived;
+  // Import files and generated certificate PDFs never get a new version (FR-CERT-010).
+  const uploadPurpose = doc.purpose === "certificate" ? null : doc.purpose;
+  const canUpload =
+    can(DOCUMENT_PERM.upload) &&
+    uploadPurpose !== null &&
+    uploadPurpose !== "import_file" &&
+    !archived;
   const canEdit = can(DOCUMENT_PERM.upload) && !archived;
   const uploader = doc.uploaded_by_me
     ? td("you")
@@ -523,7 +530,12 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
         {doc.current_version && busy ? td("stillChecking") : ""}
       </p>
       <div className="grid gap-6 xl:grid-cols-[2fr_3fr]">
-        <Card title={td("fileTitle")} actions={canUpload ? <NewVersion doc={doc} /> : null}>
+        <Card
+          title={td("fileTitle")}
+          actions={
+            canUpload && uploadPurpose ? <NewVersion doc={doc} purpose={uploadPurpose} /> : null
+          }
+        >
           <FileSection doc={doc} />
         </Card>
         <Card title={td("versionsTitle")} description={td("versionsHint")}>

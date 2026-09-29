@@ -1,6 +1,12 @@
 import type { ApiClient, components } from "@schoolos/api-client";
 import { unwrap } from "@/lib/bff/query";
-import { GENERAL_TYPES, MAX_UPLOAD_BYTES, SCAN_EXTENSIONS, type Purpose } from "./types";
+import {
+  GENERAL_TYPES,
+  MAX_UPLOAD_BYTES,
+  SCAN_EXTENSIONS,
+  type Purpose,
+  type UploadPurpose,
+} from "./types";
 
 /**
  * Document upload through the presigned flow (docs/09 Documents, FR-DOC-001..003):
@@ -70,7 +76,7 @@ export interface UploadKeys {
 async function sendFile(
   api: ApiClient,
   file: File,
-  purpose: Purpose,
+  purpose: UploadPurpose,
   key: string,
   documentId?: string,
 ): Promise<string> {
@@ -110,7 +116,7 @@ export type NewDocument = Omit<DocumentCreate, "upload_id">;
 export async function uploadDocument(
   api: ApiClient,
   file: File,
-  purpose: Purpose,
+  purpose: UploadPurpose,
   metadata: NewDocument,
   keys: UploadKeys,
 ): Promise<DocumentOut> {
@@ -128,7 +134,7 @@ export async function uploadVersion(
   api: ApiClient,
   documentId: string,
   file: File,
-  purpose: Purpose,
+  purpose: UploadPurpose,
   keys: UploadKeys,
 ): Promise<DocumentOut> {
   const uploadId = await sendFile(api, file, purpose, keys.upload, documentId);

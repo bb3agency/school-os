@@ -21,6 +21,7 @@ const STUDENT = "0192f3a4-0000-7000-8000-00000000e501";
 const FINDING = "0192f3a4-0000-7000-8000-0000000f1001";
 const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
 const USER = "0192f3a4-0000-7000-8000-0000000000d1";
+const CERTIFICATE = "0192f3a4-0000-7000-8000-0000000ce001";
 
 export interface ScreenGroup {
   /** Stand-in IdP subject to sign in as (null: public pages). */
@@ -56,6 +57,11 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/findings/rules",
       "/change-requests",
       "/change-requests/new",
+      "/certificates",
+      `/certificates/${CERTIFICATE}`,
+      `/students/${STUDENT}/certificates/new`,
+      `/students/${STUDENT}/certificates/new?type=transfer`,
+      "/registers",
       "/exports",
       "/exports/new/precheck",
       "/exports/new/student-list",

@@ -71,6 +71,20 @@ export function SchoolShell({
           permission: "document.read",
           icon: "folder",
         },
+        {
+          // US-1101..US-1107: certificates and their register.
+          href: "/certificates",
+          label: t("certificates.nav"),
+          permission: ["certificate.read", "certificate.issue", "certificate.approve"],
+          icon: "receipt",
+        },
+        {
+          // US-1106, FR-REG-001..004: register print views.
+          href: "/registers",
+          label: t("certificates.registers.nav"),
+          permission: "register.read",
+          icon: "clipboard",
+        },
       ],
     },
     {
