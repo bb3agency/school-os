@@ -231,6 +231,10 @@ describe("documents list (US-701, FR-DOC-005..008)", () => {
     const blocked = screen.getAllByRole("row")[2];
     expect(blocked && within(blocked).getByText("Blocked")).toBeInTheDocument();
     expect(blocked && within(blocked).getByText("Only some staff")).toBeInTheDocument();
+    // File-type chip and the size in mono from the current version (NFR-A11Y-001: text, not icons).
+    const first = screen.getAllByRole("row")[1];
+    expect(first && within(first).getByText("PDF")).toBeInTheDocument();
+    expect(first && within(first).getByText(/v1/)).toHaveClass("font-mono");
     const calls = stub.callsTo("GET /bff/api/v1/documents");
     expect(calls[0]?.url.searchParams.get("purpose")).toBe("circular");
     expect(calls[0]?.url.searchParams.has("doc_type")).toBe(false);
@@ -297,6 +301,11 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
     renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
     await userEvent.click(await screen.findByRole("button", { name: "Download version 1" }));
     await waitFor(() => expect(opened).toEqual([presigned]));
+    // Version history is a timeline: one entry per version, its state said in words.
+    const history = screen.getByRole("list", { name: "Versions" });
+    const entries = within(history).getAllByRole("listitem");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toHaveTextContent(/Ready\s*Version 1/);
     const call = stub.callsTo(`GET /bff/api/v1/documents/${DOC}/download-url`)[0];
     expect(call?.url.searchParams.get("version")).toBe("1");
     // Read-only member: no ACL change, no new version, no delete.
@@ -326,6 +335,10 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
       );
     renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
     expect(await screen.findByText("Version 2 cannot be opened")).toBeInTheDocument();
+    const history = screen.getByRole("list", { name: "Versions" });
+    const [newest, older] = within(history).getAllByRole("listitem");
+    expect(newest).toHaveTextContent(/Version 2/);
+    expect(older).toHaveTextContent(/Version 1/);
     expect(screen.getAllByText(/showed a full Aadhaar number/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Withheld").length).toBeGreaterThan(0);
     // The newest version that passed the check is still offered, and says why.

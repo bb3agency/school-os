@@ -6,12 +6,13 @@ import { useRef, type ReactNode } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Field, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { Timeline, type TimelineStatus } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
@@ -37,10 +38,12 @@ import {
   VersionReason,
   VersionStatusBadge,
 } from "./parts";
+import { versionBadge } from "./types";
 import {
   acceptFor,
   DOC_LANGUAGES,
   DOCUMENT_PERM,
+  fileKind,
   ifMatch,
   MAX_ISSUER,
   MAX_TITLE,
@@ -54,19 +57,10 @@ function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="space-y-0.5">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-semibold text-ink">{children}</dd>
+      <dd className="font-medium text-ink">{children}</dd>
     </div>
   );
 }
-
-const KINDS: Record<string, string> = {
-  "application/pdf": "PDF",
-  "image/jpeg": "JPG",
-  "image/png": "PNG",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
-  "text/csv": "CSV",
-};
 
 /** C3 files open only for staff who may see sensitive data, or the uploader (docs/09). */
 function useMayOpen(
@@ -135,74 +129,68 @@ function FileSection({ doc }: { doc: DocumentDetail }) {
   );
 }
 
+function versionMarker(version: DocumentVersion): TimelineStatus {
+  if (version.status === "ready") return "done";
+  if (isVersionBusy(version.status)) return "current";
+  return "pending";
+}
+
+/** Every upload of the document, newest first, as a timeline (FR-DOC-002). */
 function VersionsSection({ doc }: { doc: DocumentDetail }) {
   const t = useTranslations("documents.detail");
+  const tv = useTranslations("documents.version.status");
   const locale = useLocale() as Locale;
   const mayOpen = useMayOpen(doc);
   const versions = [...doc.versions].sort((a, b) => b.version_no - a.version_no);
-  const columns: Column<DocumentVersion>[] = [
-    {
-      key: "version",
-      header: t("colVersion"),
-      cell: (row) => (
-        <>
-          {row.version_no}
-          {doc.current_version?.id === row.id ? (
-            <span className="ml-2 text-xs text-ink-muted">{t("latest")}</span>
-          ) : null}
-        </>
-      ),
-    },
-    {
-      key: "status",
-      header: t("colStatus"),
-      cell: (row) => (
-        <span className="flex max-w-md flex-col items-start gap-1">
-          <VersionStatusBadge version={row} />
-          {row.status !== "ready" ? (
-            <span className="text-sm">
-              <VersionReason version={row} />
-            </span>
-          ) : null}
-        </span>
-      ),
-    },
-    { key: "kind", header: t("colKind"), cell: (row) => KINDS[row.mime_type] ?? t("otherKind") },
-    {
-      key: "size",
-      header: t("colSize"),
-      cell: (row) => <Value>{formatBytes(row.size_bytes, locale)}</Value>,
-    },
-    {
-      key: "uploaded",
-      header: t("colUploaded"),
-      cell: (row) => <Value>{formatDateTime(row.created_at)}</Value>,
-    },
-    {
-      key: "open",
-      header: t("colOpen"),
-      cell: (row) =>
-        row.status === "ready" && mayOpen ? (
-          <DownloadButton
-            documentId={doc.id}
-            versionNo={row.version_no}
-            label={t("downloadShort")}
-            description={t("downloadVersion", { version: row.version_no })}
-            variant="secondary"
-          />
-        ) : (
-          <span className="text-sm text-ink-muted">{t("cannotOpen")}</span>
-        ),
-    },
-  ];
+  if (versions.length === 0) return <p className="text-sm text-ink-muted">{t("noVersions")}</p>;
   return (
-    <DataTable
-      caption={t("versionsTitle")}
-      captionHidden
-      columns={columns}
-      state={{ status: "ready", data: versions }}
-      rowKey={(row) => row.id}
-      emptyTitle={t("noVersions")}
+    <Timeline
+      label={t("versionsTitle")}
+      items={versions.map((row) => ({
+        id: row.id,
+        status: versionMarker(row),
+        statusLabel: tv(versionBadge(row)),
+        title: (
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {t("versionTitle", { version: row.version_no })}
+            {doc.current_version?.id === row.id ? (
+              <span className="text-xs font-normal text-ink-muted">{t("latest")}</span>
+            ) : null}
+          </span>
+        ),
+        time: <Value>{formatDateTime(row.created_at)}</Value>,
+        chips: (
+          <>
+            <VersionStatusBadge version={row} />
+            <Pill variant="command">{fileKind(row.mime_type) ?? t("otherKind")}</Pill>
+            <Pill variant="tag">
+              <span className="font-mono">
+                <Value>{formatBytes(row.size_bytes, locale)}</Value>
+              </span>
+            </Pill>
+          </>
+        ),
+        body: (
+          <div className="space-y-2">
+            {row.status !== "ready" ? (
+              <p>
+                <VersionReason version={row} />
+              </p>
+            ) : null}
+            {row.status === "ready" && mayOpen ? (
+              <DownloadButton
+                documentId={doc.id}
+                versionNo={row.version_no}
+                label={t("downloadShort")}
+                description={t("downloadVersion", { version: row.version_no })}
+                variant="secondary"
+              />
+            ) : (
+              <p className="text-ink-muted">{t("cannotOpen")}</p>
+            )}
+          </div>
+        ),
+      }))}
     />
   );
 }
@@ -442,6 +430,7 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   const tlang = useTranslations("documents.language");
   const tstatus = useTranslations("documents.docStatus");
   const tc = useTranslations("common");
+  const tn = useTranslations("school.nav");
   const can = useStaffCan();
   const meQuery = useStaffMeQuery();
   const allowed = can(DOCUMENT_PERM.read);
@@ -453,13 +442,18 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
     </Link>
   );
 
+  const crumbs = [
+    { label: tn("home"), href: "/" },
+    { label: t("title"), href: "/documents" },
+  ];
+
   if (meQuery.isPending || (allowed && state.status === "loading")) {
     return <LoadingState label={tc("loading")} />;
   }
   if (!allowed) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("title")} />
+        <PageHeader title={t("title")} breadcrumb={[crumbs[0]!, { label: t("title") }]} />
         <Alert tone="warning" title={t("noAccessTitle")}>
           {t("noAccessBody")}
         </Alert>
@@ -470,7 +464,7 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
     const missing = state.status === "error" && state.reason === "not_found";
     return (
       <div className="space-y-6">
-        <PageHeader title={td("title")} />
+        <PageHeader title={td("title")} breadcrumb={[...crumbs, { label: td("title") }]} />
         <Alert
           tone={missing ? "warning" : "danger"}
           title={td(missing ? "notFoundTitle" : "loadErrorTitle")}
@@ -498,19 +492,22 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
     <div className="space-y-6">
       <PageHeader
         title={doc.title}
+        breadcrumb={[...crumbs, { label: doc.title }]}
+        eyebrow={ttype(doc.doc_type)}
         badge={doc.current_version ? <VersionStatusBadge version={doc.current_version} /> : null}
-        actions={back}
       />
       {/* Announces status changes while polling; the buttons stay outside the live region. */}
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {doc.current_version && busy ? td("stillChecking") : ""}
       </p>
-      <Card title={td("fileTitle")} actions={canUpload ? <NewVersion doc={doc} /> : null}>
-        <FileSection doc={doc} />
-      </Card>
-      <Card title={td("versionsTitle")} description={td("versionsHint")}>
-        <VersionsSection doc={doc} />
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-[2fr_3fr]">
+        <Card title={td("fileTitle")} actions={canUpload ? <NewVersion doc={doc} /> : null}>
+          <FileSection doc={doc} />
+        </Card>
+        <Card title={td("versionsTitle")} description={td("versionsHint")}>
+          <VersionsSection doc={doc} />
+        </Card>
+      </div>
       {archived ? (
         <Alert tone="info" title={td("archivedTitle")}>
           {td("archivedBody")}

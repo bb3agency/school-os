@@ -207,3 +207,17 @@ export function acceptFor(purpose: Purpose): string {
 export const MAX_TITLE = 200;
 export const MAX_ISSUER = 200;
 export const MAX_ACL = 50;
+
+/** Short file-type names for chips ("PDF", "XLSX"); null for anything else. */
+const FILE_KINDS: Readonly<Record<string, string>> = {
+  "application/pdf": "PDF",
+  "image/jpeg": "JPG",
+  "image/png": "PNG",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
+  "text/csv": "CSV",
+};
+
+export function fileKind(mimeType: string | null | undefined): string | null {
+  return (mimeType && FILE_KINDS[mimeType]) || null;
+}
