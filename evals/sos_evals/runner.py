@@ -9,7 +9,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import metrics
+from sos_evals import circulars, metrics
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
@@ -59,6 +59,15 @@ class Metrics(_Model):
     latency_p95_ms: float | None
     latency_p99_ms: float | None
     retrieval_latency_p95_ms: float | None
+    # M4 circular reading (sos_evals.circulars; FR-CIR-008). None when no reading was measured,
+    # which fails their gates (missing evidence is not a pass).
+    circular_items: int = 0
+    circular_deadline_recall: float | None = None
+    circular_deadline_precision: float | None = None
+    circular_citation_validity: float | None = None
+    circular_hallucinated_deadlines: int | None = None
+    circular_complete_rate: float | None = None
+    circular_metadata_accuracy: float | None = None
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -183,6 +192,7 @@ class RunResult(_Model):
     metrics: Metrics
     by_category: dict[str, Metrics]
     outcomes: tuple[ItemOutcome, ...]
+    circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
 
 
 def run(
@@ -190,6 +200,9 @@ def run(
     corpus: Mapping[str, CorpusItem],
     retrieval: RetrievalAdapter,
     ask: AskAdapter,
+    *,
+    circular: circulars.CircularAdapter | None = None,
+    circular_cases: Sequence[circulars.CircularCase] = (),
 ) -> RunResult:
     outcomes = []
     for item in items:
@@ -203,4 +216,14 @@ def run(
         for category in CATEGORIES
         if any(o.category == category for o in outcomes)
     }
-    return RunResult(metrics=aggregate(outcomes), by_category=by_category, outcomes=tuple(outcomes))
+    overall = aggregate(outcomes)
+    circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
+    if circular is not None and circular_cases:
+        reading, circular_outcomes = circulars.run(circular_cases, circular)
+        overall = overall.model_copy(update=reading.model_dump())
+    return RunResult(
+        metrics=overall,
+        by_category=by_category,
+        outcomes=tuple(outcomes),
+        circular_outcomes=circular_outcomes,
+    )

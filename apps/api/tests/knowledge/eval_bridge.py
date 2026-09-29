@@ -44,6 +44,13 @@ What is fake (offline, deterministic; SOS_KB_PROVIDER_MODE=fake):
 - ``retrieve`` (Recall@10/MRR): the same deterministic record lookup through the real record
   tools (when the question names a student and a field), then ``search_documents``.
 
+Circular reading (M4, ``sos_evals.circulars``): each synthetic circular is stored in the first
+school as a C1 ``circular`` document, indexed by the real pipeline (whose hook queues the
+reading), read by ``circulars.service.run_reading`` through the real gateway with the product's
+offline stand-in (``knowledge.gateway.fake_circulars``: sentences that write a date and an action
+word), and scored from the stored suggestions. Recall and precision therefore measure that
+stand-in plus the application's grounding checks, never Claude.
+
 Mapping: record sources carry the application's student ids; the bridge rewrites them to the
 corpus ids (``sos://student/<corpus id>/...``). Document ids are the corpus ids. Corpus doc
 types outside the documents module's list (``note``, ``checklist``, ``timetable``) are stored as
@@ -349,6 +356,12 @@ class EvalFakeTransport:
     def send(self, request: Any) -> Mapping[str, Any]:
         body = request.body
         self.sent.append(body)
+        if isinstance((body.get("output_config") or {}).get("format"), Mapping):
+            # Structured output (M4 circular reading, notice drafts): the product's offline
+            # stand-in (app.knowledge.gateway.fake_circulars), unchanged.
+            from app.knowledge.gateway.fake import FakeTransport
+
+            return FakeTransport().send(request)
         messages = list(body.get("messages") or ())
         question = self._question(messages)
         telugu = bool(re.search(r"[\u0c00-\u0c7f]", question))
@@ -436,7 +449,8 @@ class ParityError(ValueError):
 
 
 class AppFakeAdapter:
-    """``RetrievalAdapter`` + ``AskAdapter`` over ``knowledge.service`` (see the docstring)."""
+    """``RetrievalAdapter`` + ``AskAdapter`` over ``knowledge.service``, and the M4
+    ``CircularAdapter`` over ``circulars.service`` (see the docstring)."""
 
     name = "app-fake"
 
@@ -905,6 +919,79 @@ class AppFakeAdapter:
             refused=answer.refused,
             provided_sources=tuple(self.corpus_source(p) for p in answer.provided),
             latency_ms=(time.perf_counter() - started) * 1000,
+        )
+
+    # --- M4 circular reading (sos_evals.circulars; FR-CIR-008) ------------------------------
+
+    def read_circular(self, case: Any) -> Any:
+        """Store the synthetic circular in school A like the documents module does, index it
+        through the real pipeline (whose hook queues the reading), run the reading job and
+        return the suggestions the application kept."""
+        import app.circulars.service as circulars
+        from app.knowledge.ingestion.extract import DOCX_MIME
+        from sos_evals.circulars import CircularResult, SuggestedDeadline
+
+        support = self.K
+        school = self._schools[sorted(self._schools)[0]]
+        doc_id, version_id = uuid.uuid4(), uuid.uuid4()
+        data = support.S.docx("".join(support.S.p(line) for line in case.lines))
+        key = f"t/{school.tenant_id}/docs/{doc_id}/v1/original.docx"
+        owner = school.people["owner"].user_id
+        with self._admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, "
+                    "sensitivity, current_version_id, created_by) VALUES (:d, :t, 'circular', "
+                    "'circular', :ti, 'C1', :v, :u)"
+                ),
+                {"d": doc_id, "t": school.tenant_id, "ti": case.title, "v": version_id, "u": owner},
+            )
+            c.execute(
+                text(
+                    "INSERT INTO kb.document_versions (id, tenant_id, document_id, version_no, "
+                    "object_key, sha256, mime_type, size_bytes, status, created_by) VALUES "
+                    "(:v, :t, :d, 1, :k, :h, :m, :s, 'ready', :u)"
+                ),
+                {
+                    "v": version_id,
+                    "t": school.tenant_id,
+                    "d": doc_id,
+                    "k": key,
+                    "h": hashlib.sha256(data).digest(),
+                    "m": DOCX_MIME,
+                    "s": len(data),
+                    "u": owner,
+                },
+            )
+        support.D.memory_store().put(key, data, DOCX_MIME)
+        if support.pipeline().ingest(school.tenant_id, doc_id, version_id) != "indexed":
+            return CircularResult(failed=True)
+        with self._admin.connect() as c:
+            reading_id = c.execute(
+                text("SELECT id FROM kb.circular_readings WHERE version_id = :v"),
+                {"v": version_id},
+            ).scalar_one()
+        if circulars.run_reading(school.tenant_id, reading_id) != "ready":
+            return CircularResult(failed=True)
+        with self._admin.connect() as c:
+            row = c.execute(
+                text("SELECT reference_no, issued_on FROM kb.circular_readings WHERE id = :r"),
+                {"r": reading_id},
+            ).one()
+            found = c.execute(
+                text(
+                    "SELECT due_on, title, citation FROM kb.circular_suggestions "
+                    "WHERE reading_id = :r ORDER BY position"
+                ),
+                {"r": reading_id},
+            ).all()
+        return CircularResult(
+            deadlines=tuple(
+                SuggestedDeadline(due_on=f.due_on, quote=f.citation["quote"], title=f.title)
+                for f in found
+            ),
+            reference_no=row.reference_no,
+            issued_on=row.issued_on,
         )
 
 

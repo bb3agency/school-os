@@ -18,6 +18,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from sos_evals.acl import retrievable, visible
 from sos_evals.adapters import AnswerSegment, AskResult, Citation, Retrieved
+from sos_evals.circulars import CircularCase, CircularResult, SuggestedDeadline, dates_in
 from sos_evals.schema import Asker, CorpusItem, EvalItem, Locale
 
 REFUSALS: Mapping[Locale, str] = {
@@ -86,6 +87,16 @@ class PerfectStub:
             refused=False,
             provided_sources=tuple(provided),
             latency_ms=latency,
+        )
+
+    def read_circular(self, case: CircularCase) -> CircularResult:
+        """The answer key: each expected deadline quoting the line that writes it."""
+        found = []
+        for due in case.expected_deadlines:
+            line = next(line for line in case.lines if due in dates_in(line))
+            found.append(SuggestedDeadline(due_on=due, quote=line, title=line[:80]))
+        return CircularResult(
+            deadlines=tuple(found), reference_no=case.reference_no, issued_on=case.issued_on
         )
 
 

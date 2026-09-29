@@ -538,6 +538,33 @@
         "title": "AskIn",
         "type": "object"
       },
+      "AssigneeOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name",
+          "roles"
+        ],
+        "title": "AssigneeOut",
+        "type": "object"
+      },
       "AttributeOut": {
         "properties": {
           "allowed_sources": {
@@ -1860,6 +1887,269 @@
           "can_cancel"
         ],
         "title": "ChangeRequestOut",
+        "type": "object"
+      },
+      "CircularDetail": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version No"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As entered by the office when uploading.",
+            "title": "Issuer"
+          },
+          "open_suggestions": {
+            "title": "Open Suggestions",
+            "type": "integer"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reading_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading Error"
+          },
+          "reading_status": {
+            "enum": [
+              "not_read",
+              "queued",
+              "running",
+              "ready",
+              "needs_review"
+            ],
+            "title": "Reading Status",
+            "type": "string"
+          },
+          "reviewed": {
+            "title": "Reviewed",
+            "type": "boolean"
+          },
+          "sensitivity": {
+            "enum": [
+              "C1",
+              "C2",
+              "C3"
+            ],
+            "title": "Sensitivity",
+            "type": "string"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "issuer",
+          "issued_on",
+          "current_version_no",
+          "reading_status",
+          "reading_error",
+          "reviewed",
+          "open_suggestions",
+          "tasks",
+          "created_at",
+          "sensitivity",
+          "reading"
+        ],
+        "title": "CircularDetail",
+        "type": "object"
+      },
+      "CircularOut": {
+        "description": "A circular (document of type ``circular``) and where its reading stands.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version No"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As entered by the office when uploading.",
+            "title": "Issuer"
+          },
+          "open_suggestions": {
+            "title": "Open Suggestions",
+            "type": "integer"
+          },
+          "reading_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading Error"
+          },
+          "reading_status": {
+            "enum": [
+              "not_read",
+              "queued",
+              "running",
+              "ready",
+              "needs_review"
+            ],
+            "title": "Reading Status",
+            "type": "string"
+          },
+          "reviewed": {
+            "title": "Reviewed",
+            "type": "boolean"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "issuer",
+          "issued_on",
+          "current_version_no",
+          "reading_status",
+          "reading_error",
+          "reviewed",
+          "open_suggestions",
+          "tasks",
+          "created_at"
+        ],
+        "title": "CircularOut",
+        "type": "object"
+      },
+      "CitationOut": {
+        "description": "Where a suggestion or summary comes from: a page of one circular version (docs/06 \u00a78).\n``quote`` is the exact sentence of the circular (for a summary: the start of the passage).",
+        "properties": {
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "passage": {
+            "title": "Passage",
+            "type": "integer"
+          },
+          "quote": {
+            "title": "Quote",
+            "type": "string"
+          },
+          "source": {
+            "description": "sos://doc/{document_id}/v{n}#p{page}",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "passage",
+          "page",
+          "quote"
+        ],
+        "title": "CitationOut",
         "type": "object"
       },
       "ClassCreate": {
@@ -7007,10 +7297,150 @@
         "title": "MarkedReadOut",
         "type": "object"
       },
-      "MemberOut": {
-        "description": "A staff member shown next to a record: membership id and display name only (``null``\nwhen the account is no longer visible).",
+      "NoticeApproveIn": {
+        "additionalProperties": false,
+        "description": "Approve the notice as it is now (both languages filled, no personal numbers).",
+        "properties": {},
+        "title": "NoticeApproveIn",
+        "type": "object"
+      },
+      "NoticeCreate": {
+        "additionalProperties": false,
+        "description": "Start a notice: drafted by AI from a circular (``document_id``) or from your text\n(``text``), or ``blank`` to write it yourself.",
         "properties": {
-          "display_name": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "source": {
+            "enum": [
+              "circular",
+              "staff_text",
+              "blank"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "NoticeCreate",
+        "type": "object"
+      },
+      "NoticeDownloadOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "filename",
+          "mime_type"
+        ],
+        "title": "NoticeDownloadOut",
+        "type": "object"
+      },
+      "NoticeOut": {
+        "properties": {
+          "ai_drafted": {
+            "title": "Ai Drafted",
+            "type": "boolean"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__circulars__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body_en": {
+            "title": "Body En",
+            "type": "string"
+          },
+          "body_te": {
+            "title": "Body Te",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__circulars__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "draft_error": {
             "anyOf": [
               {
                 "type": "string"
@@ -7019,19 +7449,164 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "description": "Why the AI did not draft it (ai_disabled, ai_unavailable, ...): write it.",
+            "title": "Draft Error"
           },
-          "membership_id": {
+          "files_available": {
+            "title": "Files Available",
+            "type": "boolean"
+          },
+          "id": {
             "format": "uuid",
-            "title": "Membership Id",
+            "title": "Id",
             "type": "string"
+          },
+          "render_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Render Error"
+          },
+          "render_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "queued",
+                  "ready",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Render Status"
+          },
+          "source": {
+            "enum": [
+              "circular",
+              "staff_text",
+              "blank"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "approved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title_en": {
+            "title": "Title En",
+            "type": "string"
+          },
+          "title_te": {
+            "title": "Title Te",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
           }
         },
         "required": [
-          "membership_id",
-          "display_name"
+          "id",
+          "source",
+          "document_id",
+          "status",
+          "ai_drafted",
+          "draft_error",
+          "title_en",
+          "body_en",
+          "title_te",
+          "body_te",
+          "created_by",
+          "approved_by",
+          "approved_at",
+          "render_status",
+          "render_error",
+          "files_available",
+          "created_at",
+          "updated_at",
+          "version"
         ],
-        "title": "MemberOut",
+        "title": "NoticeOut",
+        "type": "object"
+      },
+      "NoticeRenderIn": {
+        "additionalProperties": false,
+        "description": "Render the A4 PDF and the image again (files are kept for a few days only).",
+        "properties": {},
+        "title": "NoticeRenderIn",
+        "type": "object"
+      },
+      "NoticeUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "body_en": {
+            "anyOf": [
+              {
+                "maxLength": 1500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body En"
+          },
+          "body_te": {
+            "anyOf": [
+              {
+                "maxLength": 1500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Te"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En"
+          },
+          "title_te": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Te"
+          }
+        },
+        "title": "NoticeUpdate",
         "type": "object"
       },
       "NotificationOut": {
@@ -7967,6 +8542,34 @@
         "title": "Page[ChangeRequestOut]",
         "type": "object"
       },
+      "Page_CircularOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CircularOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[CircularOut]",
+        "type": "object"
+      },
       "Page_ClassOut_": {
         "properties": {
           "data": {
@@ -8272,6 +8875,34 @@
         "title": "Page[ItemOut]",
         "type": "object"
       },
+      "Page_NoticeOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/NoticeOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[NoticeOut]",
+        "type": "object"
+      },
       "Page_NotificationOut_": {
         "properties": {
           "data": {
@@ -8546,6 +9177,34 @@
           "data"
         ],
         "title": "Page[SubscriptionOut]",
+        "type": "object"
+      },
+      "Page_TaskOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TaskOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[TaskOut]",
         "type": "object"
       },
       "Page_TenantExportOut_": {
@@ -10274,6 +10933,227 @@
         "title": "ProvisioningOut",
         "type": "object"
       },
+      "ReadingOut": {
+        "description": "The AI reading of one circular version: suggestions only, until a person confirms.",
+        "properties": {
+          "ai_generated": {
+            "const": true,
+            "default": true,
+            "title": "Ai Generated",
+            "type": "boolean"
+          },
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "can_retry": {
+            "title": "Can Retry",
+            "type": "boolean"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it needs manual review: ai_disabled, ai_budget_exhausted, ai_rate_limited, ai_unavailable, ai_request_rejected, ai_invalid_output, no_text, document_gone.",
+            "title": "Error Code"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "passages_sent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passages Sent"
+          },
+          "passages_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passages Total"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__circulars__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "needs_review"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionOut"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "suggestions_dropped": {
+            "description": "Suggestions the checks refused (date or quote not in the circular).",
+            "title": "Suggestions Dropped",
+            "type": "integer"
+          },
+          "summary_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary En"
+          },
+          "summary_sources": {
+            "items": {
+              "$ref": "#/components/schemas/CitationOut"
+            },
+            "title": "Summary Sources",
+            "type": "array"
+          },
+          "summary_te": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Te"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version_no",
+          "status",
+          "error_code",
+          "issuer",
+          "reference_no",
+          "issued_on",
+          "subject",
+          "summary_en",
+          "summary_te",
+          "summary_sources",
+          "suggestions",
+          "suggestions_dropped",
+          "passages_sent",
+          "passages_total",
+          "attempts",
+          "can_retry",
+          "reviewed_at",
+          "reviewed_by",
+          "completed_at",
+          "version"
+        ],
+        "title": "ReadingOut",
+        "type": "object"
+      },
       "ReadyOut": {
         "additionalProperties": false,
         "properties": {
@@ -10443,7 +11323,7 @@
           "updated_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MemberOut"
+                "$ref": "#/components/schemas/app__admin__schemas__MemberOut"
               },
               {
                 "type": "null"
@@ -10594,6 +11474,13 @@
           "guardian_id"
         ],
         "title": "RevealOut",
+        "type": "object"
+      },
+      "ReviewIn": {
+        "additionalProperties": false,
+        "description": "Mark the current reading reviewed (every suggestion decided, or none were right).",
+        "properties": {},
+        "title": "ReviewIn",
         "type": "object"
       },
       "RoleOut": {
@@ -12526,6 +13413,153 @@
         "title": "SubscriptionOut",
         "type": "object"
       },
+      "SuggestionConfirmIn": {
+        "additionalProperties": false,
+        "description": "Turn a suggestion into a task. Unset fields keep the suggestion's values.",
+        "properties": {
+          "details": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "owner_membership_id": {
+            "format": "uuid",
+            "title": "Owner Membership Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "owner_membership_id"
+        ],
+        "title": "SuggestionConfirmIn",
+        "type": "object"
+      },
+      "SuggestionDismissIn": {
+        "additionalProperties": false,
+        "description": "Dismiss a suggestion (no task is created).",
+        "properties": {},
+        "title": "SuggestionDismissIn",
+        "type": "object"
+      },
+      "SuggestionOut": {
+        "properties": {
+          "citation": {
+            "$ref": "#/components/schemas/CitationOut"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "suggested",
+              "confirmed",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "title",
+          "details",
+          "due_on",
+          "citation",
+          "status",
+          "task_id",
+          "decided_at",
+          "version"
+        ],
+        "title": "SuggestionOut",
+        "type": "object"
+      },
       "SummaryOut": {
         "description": "Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).",
         "properties": {
@@ -12663,6 +13697,274 @@
           "reason"
         ],
         "title": "SuspendSubscriptionIn",
+        "type": "object"
+      },
+      "TaskCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Link the task to a circular you can see (optional).",
+            "title": "Document Id"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "owner_membership_id": {
+            "format": "uuid",
+            "title": "Owner Membership Id",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "owner_membership_id",
+          "due_on"
+        ],
+        "title": "TaskCreate",
+        "type": "object"
+      },
+      "TaskOut": {
+        "properties": {
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CitationOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the task comes from; hidden when you cannot see that circular."
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__circulars__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/app__circulars__schemas__MemberOut"
+          },
+          "source": {
+            "enum": [
+              "manual",
+              "circular"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "done",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "details",
+          "owner",
+          "due_on",
+          "status",
+          "overdue",
+          "source",
+          "document_id",
+          "citation",
+          "created_by",
+          "created_at",
+          "completed_at",
+          "cancelled_at",
+          "version"
+        ],
+        "title": "TaskOut",
+        "type": "object"
+      },
+      "TaskStatusIn": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "done",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "TaskStatusIn",
+        "type": "object"
+      },
+      "TaskUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "owner_membership_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Membership Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "TaskUpdate",
         "type": "object"
       },
       "TemplateCreate": {
@@ -13301,7 +14603,7 @@
             "type": "boolean"
           },
           "requested_by": {
-            "$ref": "#/components/schemas/MemberOut"
+            "$ref": "#/components/schemas/app__admin__schemas__MemberOut"
           },
           "size_bytes": {
             "anyOf": [
@@ -15332,6 +16634,33 @@
         "title": "WaiveIn",
         "type": "object"
       },
+      "app__admin__schemas__MemberOut": {
+        "description": "A staff member shown next to a record: membership id and display name only (``null``\nwhen the account is no longer visible).",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "MemberOut",
+        "type": "object"
+      },
       "app__audit__viewer__AuditVerifyOut": {
         "properties": {
           "checked": {
@@ -15400,6 +16729,33 @@
           "next_cursor"
         ],
         "title": "Page[TicketOut]",
+        "type": "object"
+      },
+      "app__circulars__schemas__MemberOut": {
+        "description": "A staff member next to a record: membership id and display name only.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "MemberOut",
         "type": "object"
       },
       "app__identity__schemas__MeOut": {
@@ -17510,6 +18866,323 @@
         "summary": "Reject Change Request",
         "tags": [
           "change-requests"
+        ]
+      }
+    },
+    "/api/v1/circular-suggestions/{suggestion_id}/confirm": {
+      "post": {
+        "description": "Create a task from a suggested deadline, optionally changing its title, details or due\ndate, with an owner (``circular.review``; ``If-Match`` = the suggestion's version). 409\n``suggestion_decided``; 422 ``owner_not_active``.",
+        "operationId": "confirm_suggestion_api_v1_circular_suggestions__suggestion_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Suggestion",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/circular-suggestions/{suggestion_id}/dismiss": {
+      "post": {
+        "description": "Dismiss a suggested deadline; no task is created (``circular.review``).",
+        "operationId": "dismiss_suggestion_api_v1_circular_suggestions__suggestion_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionDismissIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Suggestion",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/circulars": {
+      "get": {
+        "description": "Circulars you can see, newest first, with where their AI reading stands (``not_read``,\n``queued``, ``running``, ``ready``, ``needs_review``), open suggestions and tasks\n(``document.read``; document visibility applies).",
+        "operationId": "list_circulars_api_v1_circulars_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CircularOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Circulars",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/circulars/{document_id}": {
+      "get": {
+        "description": "One circular with the reading of its current version: issuer, reference, date,\nsubject, English and Telugu summary with source chips, and suggested deadlines, each\nciting the sentence it comes from. Suggestions are not tasks until confirmed. The ETag is\nthe reading's version (for ``/review``). 404 when you cannot see the document.",
+        "operationId": "get_circular_api_v1_circulars__document_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircularDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Circular",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/circulars/{document_id}/read": {
+      "post": {
+        "description": "Read the circular's current version with AI now, or try again after \"needs manual\nreview\" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,\n``reading_done`` or ``reading_attempts_used``.",
+        "operationId": "request_reading_api_v1_circulars__document_id__read_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircularDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Reading",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/circulars/{document_id}/review": {
+      "post": {
+        "description": "Mark the circular reviewed once every suggestion is confirmed or dismissed\n(``circular.review``; ``If-Match`` = the reading's ETag). 409 ``suggestions_open``.",
+        "operationId": "mark_reviewed_api_v1_circulars__document_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircularDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Reviewed",
+        "tags": [
+          "circulars"
         ]
       }
     },
@@ -21218,6 +22891,397 @@
         "summary": "List My Schools",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/api/v1/notices": {
+      "get": {
+        "description": "Parent notices, newest first (``notice.draft``).",
+        "operationId": "list_notices_api_v1_notices_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "draft",
+                    "approved"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_NoticeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notices",
+        "tags": [
+          "circulars"
+        ]
+      },
+      "post": {
+        "description": "Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. Only the circular's text is sent to the AI, never student records. If AI is not\navailable the notice starts empty and ``draft_error`` says why. Accepts\n``Idempotency-Key``.",
+        "operationId": "create_notice_api_v1_notices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Notice",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}": {
+      "get": {
+        "description": "One notice (``notice.draft``).",
+        "operationId": "get_notice_api_v1_notices__notice_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Notice",
+        "tags": [
+          "circulars"
+        ]
+      },
+      "patch": {
+        "description": "Edit a draft notice (``notice.draft``; ``If-Match``). 409 ``notice_approved``.",
+        "operationId": "update_notice_api_v1_notices__notice_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Notice",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}/approve": {
+      "post": {
+        "description": "Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and\nbodies filled (422 ``notice_incomplete``) and no personal numbers (422\n``notice_personal_data``). The A4 PDF and the image are made next.",
+        "operationId": "approve_notice_api_v1_notices__notice_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeApproveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Notice",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}/download-url": {
+      "get": {
+        "description": "A download link valid at most 5 minutes (``notice.draft``; audited). 409\n``notice_files_not_ready`` or ``notice_files_expired``.",
+        "operationId": "notice_download_url_api_v1_notices__notice_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "pdf (A4) or png (image)",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "pdf",
+              "description": "pdf (A4) or png (image)",
+              "enum": [
+                "pdf",
+                "png"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeDownloadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Notice Download Url",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}/render": {
+      "post": {
+        "description": "Make the approved notice's A4 PDF and image again (``notice.draft``; files are kept for\na few days). 409 ``notice_not_approved`` or ``render_in_progress``.",
+        "operationId": "render_notice_api_v1_notices__notice_id__render_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeRenderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Render Notice",
+        "tags": [
+          "circulars"
         ]
       }
     },
@@ -27280,6 +29344,382 @@
         "summary": "Reply To Ticket",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/task-assignees": {
+      "get": {
+        "description": "Active staff a task can be given to (``task.manage`` or ``circular.review``).",
+        "operationId": "list_assignees_api_v1_task_assignees_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssigneeOut"
+                  },
+                  "title": "Response List Assignees Api V1 Task Assignees Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Assignees",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/tasks": {
+      "get": {
+        "description": "Your tasks (``task.read``), or with ``view=all`` every task of the school\n(``task.read_all``, else 403 ``tasks_not_all``). Without ``status``: open and in progress.\nSoonest due first; ``due=overdue``, ``week`` or ``later``.",
+        "operationId": "list_tasks_api_v1_tasks_get",
+        "parameters": [
+          {
+            "description": "mine (default) or all (task.read_all)",
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "mine",
+              "description": "mine (default) or all (task.read_all)",
+              "enum": [
+                "mine",
+                "all"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "in_progress",
+                    "done",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "overdue",
+                    "week",
+                    "later"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner"
+            }
+          },
+          {
+            "in": "query",
+            "name": "document_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Id"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TaskOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tasks",
+        "tags": [
+          "circulars"
+        ]
+      },
+      "post": {
+        "description": "Add a task by hand with an owner and due date, optionally linked to a circular\n(``task.manage``). The owner is told in the app. Accepts ``Idempotency-Key``.",
+        "operationId": "create_task_api_v1_tasks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Task",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/tasks/{task_id}": {
+      "get": {
+        "description": "One task: yours, or any with ``task.read_all`` / ``task.manage`` (404 otherwise). The\ncircular's citation is shown only if you can see that circular.",
+        "operationId": "get_task_api_v1_tasks__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Task",
+        "tags": [
+          "circulars"
+        ]
+      },
+      "patch": {
+        "description": "Change a task's title, details, due date or owner (``task.manage``; ``If-Match``).\n409 ``task_closed`` for done or cancelled tasks.",
+        "operationId": "update_task_api_v1_tasks__task_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Task",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/tasks/{task_id}/status": {
+      "post": {
+        "description": "Mark your task in progress, done or open again (``task.read``); ``task.manage`` holders\nmay do this for any task and cancel it. 409 ``task_status_not_allowed``.",
+        "operationId": "set_task_status_api_v1_tasks__task_id__status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Task Status",
+        "tags": [
+          "circulars"
         ]
       }
     },

@@ -690,6 +690,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/circular-suggestions/{suggestion_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Suggestion
+         * @description Create a task from a suggested deadline, optionally changing its title, details or due
+         *     date, with an owner (``circular.review``; ``If-Match`` = the suggestion's version). 409
+         *     ``suggestion_decided``; 422 ``owner_not_active``.
+         */
+        post: operations["confirm_suggestion_api_v1_circular_suggestions__suggestion_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/circular-suggestions/{suggestion_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Suggestion
+         * @description Dismiss a suggested deadline; no task is created (``circular.review``).
+         */
+        post: operations["dismiss_suggestion_api_v1_circular_suggestions__suggestion_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/circulars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Circulars
+         * @description Circulars you can see, newest first, with where their AI reading stands (``not_read``,
+         *     ``queued``, ``running``, ``ready``, ``needs_review``), open suggestions and tasks
+         *     (``document.read``; document visibility applies).
+         */
+        get: operations["list_circulars_api_v1_circulars_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/circulars/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Circular
+         * @description One circular with the reading of its current version: issuer, reference, date,
+         *     subject, English and Telugu summary with source chips, and suggested deadlines, each
+         *     citing the sentence it comes from. Suggestions are not tasks until confirmed. The ETag is
+         *     the reading's version (for ``/review``). 404 when you cannot see the document.
+         */
+        get: operations["get_circular_api_v1_circulars__document_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/circulars/{document_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Reading
+         * @description Read the circular's current version with AI now, or try again after "needs manual
+         *     review" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,
+         *     ``reading_done`` or ``reading_attempts_used``.
+         */
+        post: operations["request_reading_api_v1_circulars__document_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/circulars/{document_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Reviewed
+         * @description Mark the circular reviewed once every suggestion is confirmed or dismissed
+         *     (``circular.review``; ``If-Match`` = the reading's ETag). 409 ``suggestions_open``.
+         */
+        post: operations["mark_reviewed_api_v1_circulars__document_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/classes": {
         parameters: {
             query?: never;
@@ -2064,6 +2194,123 @@ export interface paths {
         get: operations["list_my_schools_api_v1_me_schools_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notices
+         * @description Parent notices, newest first (``notice.draft``).
+         */
+        get: operations["list_notices_api_v1_notices_get"];
+        put?: never;
+        /**
+         * Create Notice
+         * @description Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a
+         *     circular (only C1, else 422 ``notice_source_personal``) or from your text (422
+         *     ``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or
+         *     ``blank``. Only the circular's text is sent to the AI, never student records. If AI is not
+         *     available the notice starts empty and ``draft_error`` says why. Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["create_notice_api_v1_notices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices/{notice_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notice
+         * @description One notice (``notice.draft``).
+         */
+        get: operations["get_notice_api_v1_notices__notice_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Notice
+         * @description Edit a draft notice (``notice.draft``; ``If-Match``). 409 ``notice_approved``.
+         */
+        patch: operations["update_notice_api_v1_notices__notice_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/notices/{notice_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Notice
+         * @description Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and
+         *     bodies filled (422 ``notice_incomplete``) and no personal numbers (422
+         *     ``notice_personal_data``). The A4 PDF and the image are made next.
+         */
+        post: operations["approve_notice_api_v1_notices__notice_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices/{notice_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notice Download Url
+         * @description A download link valid at most 5 minutes (``notice.draft``; audited). 409
+         *     ``notice_files_not_ready`` or ``notice_files_expired``.
+         */
+        get: operations["notice_download_url_api_v1_notices__notice_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices/{notice_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Render Notice
+         * @description Make the approved notice's A4 PDF and image again (``notice.draft``; files are kept for
+         *     a few days). 409 ``notice_not_approved`` or ``render_in_progress``.
+         */
+        post: operations["render_notice_api_v1_notices__notice_id__render_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3763,6 +4010,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/task-assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Assignees
+         * @description Active staff a task can be given to (``task.manage`` or ``circular.review``).
+         */
+        get: operations["list_assignees_api_v1_task_assignees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tasks
+         * @description Your tasks (``task.read``), or with ``view=all`` every task of the school
+         *     (``task.read_all``, else 403 ``tasks_not_all``). Without ``status``: open and in progress.
+         *     Soonest due first; ``due=overdue``, ``week`` or ``later``.
+         */
+        get: operations["list_tasks_api_v1_tasks_get"];
+        put?: never;
+        /**
+         * Create Task
+         * @description Add a task by hand with an owner and due date, optionally linked to a circular
+         *     (``task.manage``). The owner is told in the app. Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_task_api_v1_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task
+         * @description One task: yours, or any with ``task.read_all`` / ``task.manage`` (404 otherwise). The
+         *     circular's citation is shown only if you can see that circular.
+         */
+        get: operations["get_task_api_v1_tasks__task_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Task
+         * @description Change a task's title, details, due date or owner (``task.manage``; ``If-Match``).
+         *     409 ``task_closed`` for done or cancelled tasks.
+         */
+        patch: operations["update_task_api_v1_tasks__task_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Task Status
+         * @description Mark your task in progress, done or open again (``task.read``); ``task.manage`` holders
+         *     may do this for any task and cancel it. 409 ``task_status_not_allowed``.
+         */
+        post: operations["set_task_status_api_v1_tasks__task_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant": {
         parameters: {
             query?: never;
@@ -4217,6 +4558,20 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * MemberOut
+         * @description A staff member shown next to a record: membership id and display name only (``null``
+         *     when the account is no longer visible).
+         */
+        app__admin__schemas__MemberOut: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+        };
         /** AuditVerifyOut */
         app__audit__viewer__AuditVerifyOut: {
             /** Checked */
@@ -4234,6 +4589,19 @@ export interface components {
             data: components["schemas"]["TicketOut"][];
             /** Next Cursor */
             next_cursor: string | null;
+        };
+        /**
+         * MemberOut
+         * @description A staff member next to a record: membership id and display name only.
+         */
+        app__circulars__schemas__MemberOut: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
         };
         /** MeOut */
         app__identity__schemas__MeOut: {
@@ -4336,6 +4704,18 @@ export interface components {
              * @description The browser's Ask session: context never crosses users (FR-KB-012).
              */
             session_id: string;
+        };
+        /** AssigneeOut */
+        AssigneeOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /** Roles */
+            roles: string[];
         };
         /** AttributeOut */
         AttributeOut: {
@@ -4821,6 +5201,107 @@ export interface components {
             target_source: string;
             /** Version */
             version: number;
+        };
+        /** CircularDetail */
+        CircularDetail: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Version No */
+            current_version_no: number | null;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Issued On */
+            issued_on: string | null;
+            /**
+             * Issuer
+             * @description As entered by the office when uploading.
+             */
+            issuer: string | null;
+            /** Open Suggestions */
+            open_suggestions: number;
+            reading: components["schemas"]["ReadingOut"] | null;
+            /** Reading Error */
+            reading_error: string | null;
+            /**
+             * Reading Status
+             * @enum {string}
+             */
+            reading_status: "not_read" | "queued" | "running" | "ready" | "needs_review";
+            /** Reviewed */
+            reviewed: boolean;
+            /**
+             * Sensitivity
+             * @enum {string}
+             */
+            sensitivity: "C1" | "C2" | "C3";
+            /** Tasks */
+            tasks: number;
+            /** Title */
+            title: string;
+        };
+        /**
+         * CircularOut
+         * @description A circular (document of type ``circular``) and where its reading stands.
+         */
+        CircularOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Version No */
+            current_version_no: number | null;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Issued On */
+            issued_on: string | null;
+            /**
+             * Issuer
+             * @description As entered by the office when uploading.
+             */
+            issuer: string | null;
+            /** Open Suggestions */
+            open_suggestions: number;
+            /** Reading Error */
+            reading_error: string | null;
+            /**
+             * Reading Status
+             * @enum {string}
+             */
+            reading_status: "not_read" | "queued" | "running" | "ready" | "needs_review";
+            /** Reviewed */
+            reviewed: boolean;
+            /** Tasks */
+            tasks: number;
+            /** Title */
+            title: string;
+        };
+        /**
+         * CitationOut
+         * @description Where a suggestion or summary comes from: a page of one circular version (docs/06 §8).
+         *     ``quote`` is the exact sentence of the circular (for a summary: the start of the passage).
+         */
+        CitationOut: {
+            /** Page */
+            page: number | null;
+            /** Passage */
+            passage: number;
+            /** Quote */
+            quote: string;
+            /**
+             * Source
+             * @description sos://doc/{document_id}/v{n}#p{page}
+             */
+            source: string;
         };
         /** ClassCreate */
         ClassCreate: {
@@ -6572,18 +7053,112 @@ export interface components {
             updated: number;
         };
         /**
-         * MemberOut
-         * @description A staff member shown next to a record: membership id and display name only (``null``
-         *     when the account is no longer visible).
+         * NoticeApproveIn
+         * @description Approve the notice as it is now (both languages filled, no personal numbers).
          */
-        MemberOut: {
-            /** Display Name */
-            display_name: string | null;
+        NoticeApproveIn: Record<string, never>;
+        /**
+         * NoticeCreate
+         * @description Start a notice: drafted by AI from a circular (``document_id``) or from your text
+         *     (``text``), or ``blank`` to write it yourself.
+         */
+        NoticeCreate: {
+            /** Document Id */
+            document_id?: string | null;
             /**
-             * Membership Id
+             * Source
+             * @enum {string}
+             */
+            source: "circular" | "staff_text" | "blank";
+            /** Text */
+            text?: string | null;
+        };
+        /** NoticeDownloadOut */
+        NoticeDownloadOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Url */
+            url: string;
+        };
+        /** NoticeOut */
+        NoticeOut: {
+            /** Ai Drafted */
+            ai_drafted: boolean;
+            /** Approved At */
+            approved_at: string | null;
+            approved_by: components["schemas"]["app__circulars__schemas__MemberOut"] | null;
+            /** Body En */
+            body_en: string;
+            /** Body Te */
+            body_te: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["app__circulars__schemas__MemberOut"] | null;
+            /** Document Id */
+            document_id: string | null;
+            /**
+             * Draft Error
+             * @description Why the AI did not draft it (ai_disabled, ai_unavailable, ...): write it.
+             */
+            draft_error: string | null;
+            /** Files Available */
+            files_available: boolean;
+            /**
+             * Id
              * Format: uuid
              */
-            membership_id: string;
+            id: string;
+            /** Render Error */
+            render_error: string | null;
+            /** Render Status */
+            render_status: ("queued" | "ready" | "failed") | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "circular" | "staff_text" | "blank";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "approved";
+            /** Title En */
+            title_en: string;
+            /** Title Te */
+            title_te: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * NoticeRenderIn
+         * @description Render the A4 PDF and the image again (files are kept for a few days only).
+         */
+        NoticeRenderIn: Record<string, never>;
+        /** NoticeUpdate */
+        NoticeUpdate: {
+            /** Body En */
+            body_en?: string | null;
+            /** Body Te */
+            body_te?: string | null;
+            /** Title En */
+            title_en?: string | null;
+            /** Title Te */
+            title_te?: string | null;
         };
         /**
          * NotificationOut
@@ -6813,6 +7388,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[CircularOut] */
+        Page_CircularOut_: {
+            /** Data */
+            data: components["schemas"]["CircularOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[ClassOut] */
         Page_ClassOut_: {
             /** Data */
@@ -6890,6 +7472,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[NoticeOut] */
+        Page_NoticeOut_: {
+            /** Data */
+            data: components["schemas"]["NoticeOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[NotificationOut] */
         Page_NotificationOut_: {
             /** Data */
@@ -6959,6 +7548,13 @@ export interface components {
             data: components["schemas"]["SubscriptionOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** Page[TaskOut] */
+        Page_TaskOut_: {
+            /** Data */
+            data: components["schemas"]["TaskOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** Page[TenantExportOut] */
         Page_TenantExportOut_: {
@@ -7647,6 +8243,71 @@ export interface components {
              */
             tier: "shared" | "dedicated";
         };
+        /**
+         * ReadingOut
+         * @description The AI reading of one circular version: suggestions only, until a person confirms.
+         */
+        ReadingOut: {
+            /**
+             * Ai Generated
+             * @default true
+             * @constant
+             */
+            ai_generated: true;
+            /** Attempts */
+            attempts: number;
+            /** Can Retry */
+            can_retry: boolean;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Error Code
+             * @description Why it needs manual review: ai_disabled, ai_budget_exhausted, ai_rate_limited, ai_unavailable, ai_request_rejected, ai_invalid_output, no_text, document_gone.
+             */
+            error_code: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issued On */
+            issued_on: string | null;
+            /** Issuer */
+            issuer: string | null;
+            /** Passages Sent */
+            passages_sent: number | null;
+            /** Passages Total */
+            passages_total: number | null;
+            /** Reference No */
+            reference_no: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            reviewed_by: components["schemas"]["app__circulars__schemas__MemberOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "ready" | "needs_review";
+            /** Subject */
+            subject: string | null;
+            /** Suggestions */
+            suggestions: components["schemas"]["SuggestionOut"][];
+            /**
+             * Suggestions Dropped
+             * @description Suggestions the checks refused (date or quote not in the circular).
+             */
+            suggestions_dropped: number;
+            /** Summary En */
+            summary_en: string | null;
+            /** Summary Sources */
+            summary_sources: components["schemas"]["CitationOut"][];
+            /** Summary Te */
+            summary_te: string | null;
+            /** Version */
+            version: number;
+            /** Version No */
+            version_no: number;
+        };
         /** ReadyOut */
         ReadyOut: {
             /** Checks */
@@ -7713,7 +8374,7 @@ export interface components {
             categories: components["schemas"]["RetentionCategoryOut"][];
             /** Updated At */
             updated_at: string | null;
-            updated_by: components["schemas"]["MemberOut"] | null;
+            updated_by: components["schemas"]["app__admin__schemas__MemberOut"] | null;
             /**
              * Version
              * @description Send as If-Match when changing (0: never changed).
@@ -7759,6 +8420,11 @@ export interface components {
             /** Value Id */
             value_id: string | null;
         };
+        /**
+         * ReviewIn
+         * @description Mark the current reading reviewed (every suggestion decided, or none were right).
+         */
+        ReviewIn: Record<string, never>;
         /** RoleOut */
         RoleOut: {
             /**
@@ -8488,6 +9154,59 @@ export interface components {
             version: number;
         };
         /**
+         * SuggestionConfirmIn
+         * @description Turn a suggestion into a task. Unset fields keep the suggestion's values.
+         */
+        SuggestionConfirmIn: {
+            /** Details */
+            details?: string | null;
+            /** Due On */
+            due_on?: string | null;
+            /**
+             * Owner Membership Id
+             * Format: uuid
+             */
+            owner_membership_id: string;
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * SuggestionDismissIn
+         * @description Dismiss a suggestion (no task is created).
+         */
+        SuggestionDismissIn: Record<string, never>;
+        /** SuggestionOut */
+        SuggestionOut: {
+            citation: components["schemas"]["CitationOut"];
+            /** Decided At */
+            decided_at: string | null;
+            /** Details */
+            details: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "suggested" | "confirmed" | "dismissed";
+            /** Task Id */
+            task_id: string | null;
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
+        };
+        /**
          * SummaryOut
          * @description Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).
          */
@@ -8558,6 +9277,93 @@ export interface components {
             exam_window_override: boolean;
             /** Reason */
             reason: string;
+        };
+        /** TaskCreate */
+        TaskCreate: {
+            /** Details */
+            details?: string | null;
+            /**
+             * Document Id
+             * @description Link the task to a circular you can see (optional).
+             */
+            document_id?: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /**
+             * Owner Membership Id
+             * Format: uuid
+             */
+            owner_membership_id: string;
+            /** Title */
+            title: string;
+        };
+        /** TaskOut */
+        TaskOut: {
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /** @description Where the task comes from; hidden when you cannot see that circular. */
+            citation: components["schemas"]["CitationOut"] | null;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["app__circulars__schemas__MemberOut"] | null;
+            /** Details */
+            details: string | null;
+            /** Document Id */
+            document_id: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Overdue */
+            overdue: boolean;
+            owner: components["schemas"]["app__circulars__schemas__MemberOut"];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "manual" | "circular";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "done" | "cancelled";
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
+        };
+        /** TaskStatusIn */
+        TaskStatusIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "done" | "cancelled";
+        };
+        /** TaskUpdate */
+        TaskUpdate: {
+            /** Details */
+            details?: string | null;
+            /** Due On */
+            due_on?: string | null;
+            /** Owner Membership Id */
+            owner_membership_id?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /**
          * TemplateCreate
@@ -8790,7 +9596,7 @@ export interface components {
              * @description You requested this export.
              */
             own: boolean;
-            requested_by: components["schemas"]["MemberOut"];
+            requested_by: components["schemas"]["app__admin__schemas__MemberOut"];
             /** Size Bytes */
             size_bytes: number | null;
             /** Started At */
@@ -10634,6 +11440,207 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChangeRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_suggestion_api_v1_circular_suggestions__suggestion_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_suggestion_api_v1_circular_suggestions__suggestion_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionDismissIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_circulars_api_v1_circulars_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CircularOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_circular_api_v1_circulars__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircularDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_reading_api_v1_circulars__document_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircularDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_reviewed_api_v1_circulars__document_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircularDetail"];
                 };
             };
             /** @description Validation Error */
@@ -12848,6 +13855,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchoolChoicesOut"];
+                };
+            };
+        };
+    };
+    list_notices_api_v1_notices_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("draft" | "approved") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_NoticeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_notice_api_v1_notices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notice_api_v1_notices__notice_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_notice_api_v1_notices__notice_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_notice_api_v1_notices__notice_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    notice_download_url_api_v1_notices__notice_id__download_url_get: {
+        parameters: {
+            query?: {
+                /** @description pdf (A4) or png (image) */
+                format?: "pdf" | "png";
+            };
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeDownloadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    render_notice_api_v1_notices__notice_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeRenderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -16426,6 +17671,200 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assignees_api_v1_task_assignees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssigneeOut"][];
+                };
+            };
+        };
+    };
+    list_tasks_api_v1_tasks_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                document_id?: string | null;
+                due?: ("overdue" | "week" | "later") | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                owner?: string | null;
+                status?: ("open" | "in_progress" | "done" | "cancelled") | null;
+                /** @description mine (default) or all (task.read_all) */
+                view?: "mine" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_task_api_v1_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_api_v1_tasks__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_task_api_v1_tasks__task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_task_status_api_v1_tasks__task_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
                 };
             };
             /** @description Validation Error */

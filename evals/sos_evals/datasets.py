@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import Literal
 
 from sos_evals.acl import CLASSES, SECTIONS, can_ask, retrievable, visible
+from sos_evals.circulars import CircularCase, validate_cases
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
 EVALS_DIR = Path(__file__).resolve().parents[1]
 DATASETS_DIR = EVALS_DIR / "datasets"
 CORPUS_FILE = "corpus.jsonl"
+CIRCULARS_FILE = "circulars.jsonl"
 
 Suite = Literal["fast", "full"]
 
@@ -29,6 +31,8 @@ class Dataset:
     items: tuple[EvalItem, ...]
     sha256: str
     """Digest of every dataset file, so reports say which data they measured."""
+    circulars: tuple[CircularCase, ...] = ()
+    """Synthetic circulars for the M4 reading eval (every suite runs all of them)."""
 
     def select(self, suite: Suite) -> tuple[EvalItem, ...]:
         if suite == "full":
@@ -52,7 +56,11 @@ def _read_jsonl(path: Path) -> list[dict[str, object]]:
 
 
 def dataset_files(directory: Path) -> list[Path]:
-    return [directory / CORPUS_FILE, *(directory / f"{c}.jsonl" for c in CATEGORIES)]
+    return [
+        directory / CORPUS_FILE,
+        *(directory / f"{c}.jsonl" for c in CATEGORIES),
+        directory / CIRCULARS_FILE,
+    ]
 
 
 def load(directory: Path = DATASETS_DIR) -> Dataset:
@@ -73,14 +81,21 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
         corpus[item.source] = item
 
     items: list[EvalItem] = []
-    for category, path in zip(CATEGORIES, files[1:], strict=True):
+    for category, path in zip(CATEGORIES, files[1 : 1 + len(CATEGORIES)], strict=True):
         for row in _read_jsonl(path):
             question = EvalItem.model_validate(row)
             if question.category != category:
                 raise DatasetError(f"{question.id} is in {path.name} but has {question.category}")
             items.append(question)
     validate(corpus, items)
-    return Dataset(corpus=corpus, items=tuple(items), sha256=digest.hexdigest())
+    circulars = tuple(CircularCase.model_validate(row) for row in _read_jsonl(files[-1]))
+    try:
+        validate_cases(circulars)
+    except ValueError as exc:
+        raise DatasetError(str(exc)) from exc
+    return Dataset(
+        corpus=corpus, items=tuple(items), sha256=digest.hexdigest(), circulars=circulars
+    )
 
 
 def _check_structure(where: str, sections: Sequence[str], classes: Sequence[str]) -> None:

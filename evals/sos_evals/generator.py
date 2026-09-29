@@ -17,6 +17,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from sos_evals.circular_cases import CASES as CIRCULAR_CASES
+from sos_evals.circulars import CircularCase
 from sos_evals.schema import CATEGORIES, Asker, Category, CorpusItem, EvalItem, Locale, Role
 from sos_evals.synthetic import (
     B_DOCS,
@@ -781,7 +783,7 @@ def build_questions() -> list[EvalItem]:
     return q.items
 
 
-def _jsonl(rows: Sequence[CorpusItem] | Sequence[EvalItem]) -> str:
+def _jsonl(rows: Sequence[CorpusItem] | Sequence[EvalItem] | Sequence[CircularCase]) -> str:
     return "".join(
         json.dumps(row.model_dump(mode="json"), ensure_ascii=False, sort_keys=True) + "\n"
         for row in rows
@@ -794,6 +796,7 @@ def render() -> dict[str, str]:
     files = {"corpus.jsonl": _jsonl(build_corpus())}
     for category in CATEGORIES:
         files[f"{category}.jsonl"] = _jsonl([i for i in items if i.category == category])
+    files["circulars.jsonl"] = _jsonl(CIRCULAR_CASES)
     return files
 
 

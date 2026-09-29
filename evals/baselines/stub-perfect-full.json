@@ -1,7 +1,14 @@
 {
   "adapter": "stub-perfect",
-  "dataset_sha256": "acfcabf3a683c81de27b6b55f328161f9cf60888254b99e896e04c9e9fbe8af2",
+  "dataset_sha256": "41a428ee29b47dbd7a0bc670e74486ff3208ecdc7bb62c65a99906ec59f03fcf",
   "metrics": {
+    "circular_citation_validity": 1.0,
+    "circular_complete_rate": 1.0,
+    "circular_deadline_precision": 1.0,
+    "circular_deadline_recall": 1.0,
+    "circular_hallucinated_deadlines": 0,
+    "circular_items": 24,
+    "circular_metadata_accuracy": 1.0,
     "citation_coverage": 1.0,
     "citation_precision": 1.0,
     "false_refusal_rate": 0.0,
