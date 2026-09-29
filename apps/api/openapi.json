@@ -26058,7 +26058,7 @@
     },
     "/api/v1/edge/tally/syncs": {
       "post": {
-        "description": "One complete snapshot of the party ledgers under the selected groups. Idempotent by\n``batch_id`` (a repeat returns the first result with ``repeat: true``). 409\n``no_groups_selected`` / ``agent_outdated``; 422 ``group_not_selected``.",
+        "description": "One complete snapshot of the party ledgers under the selected groups. Idempotent by\n``batch_id`` (a repeat returns the first result with ``repeat: true``). 409\n``no_groups_selected`` / ``agent_outdated``; 422 ``group_not_selected`` or\n``total_too_large`` (the positive balances add up to more than \u20b9999,999,999,999.99).",
         "operationId": "post_sync_api_v1_edge_tally_syncs_post",
         "requestBody": {
           "content": {
