@@ -6,7 +6,7 @@ import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, Pill, type PillVariant } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, cardClasses } from "@/components/ui/Card";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Icon } from "@/components/ui/Icon";
@@ -64,10 +64,39 @@ const HAS_ROWS: ReadonlySet<ImportBatch["status"]> = new Set([
   "reverted",
 ]);
 
+/** The uploaded file can be shown as a sheet once it was read (FR-IMP-008). */
+const HAS_SHEET: ReadonlySet<ImportBatch["status"]> = new Set([
+  "parsed",
+  "validating",
+  "validated",
+  "committing",
+  "committed",
+  "reverting",
+  "reverted",
+]);
+
+/** US-401 AC5: between checking and adding, open the file as a sheet to correct cells. */
+function SheetLink({ importId, editable }: { importId: string; editable: boolean }) {
+  const t = useTranslations("sheets.import");
+  return (
+    <Card
+      title={t("openTitle")}
+      description={editable ? t("openDescriptionEdit") : t("openDescriptionRead")}
+    >
+      <div data-print="hide">
+        <ButtonLink href={`/imports/${importId}/sheet`} variant="secondary">
+          <Icon name="layers" className="size-4" />
+          {t("open")}
+        </ButtonLink>
+      </div>
+    </Card>
+  );
+}
+
 /* ------------------------------------------------------------------ labels */
 
 /** Field name for an issue or a mapping target: attribute label, special target, or column. */
-function useTargetLabel(attributes: Loadable<readonly Attribute[]>) {
+export function useTargetLabel(attributes: Loadable<readonly Attribute[]>) {
   const t = useTranslations("imports.targets");
   const index = useAttributeIndex(attributes);
   return (key: string): string => {
@@ -80,7 +109,7 @@ function useTargetLabel(attributes: Loadable<readonly Attribute[]>) {
 }
 
 /** One row error or warning in plain language: "Date of birth: write the date as DD/MM/YYYY". */
-function IssueText({ issue, label }: { issue: RowIssue; label: (key: string) => string }) {
+export function IssueText({ issue, label }: { issue: RowIssue; label: (key: string) => string }) {
   const t = useTranslations("imports.issues");
   return (
     <>
@@ -746,6 +775,10 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
       ) : null}
 
       <Stats batch={data} />
+
+      {canRun && HAS_SHEET.has(data.status) && !data.raw_file_deleted_at ? (
+        <SheetLink importId={data.id} editable={MAPPING_EDITABLE.has(data.status)} />
+      ) : null}
 
       {data.status === "validated" ? (
         <Card title={t("readyTitle")} description={t("readyDescription")}>

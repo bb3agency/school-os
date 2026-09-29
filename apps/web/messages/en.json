@@ -4103,6 +4103,202 @@
       "unConfirm": "Unarchive"
     }
   },
+  "sheets": {
+    "grid": {
+      "keyboardHelpEdit": "Use the arrow keys to move between cells. Press Enter to change a cell, Enter again to save it, or Escape to cancel.",
+      "keyboardHelpRead": "Use the arrow keys to move between cells. This sheet can't be changed here.",
+      "scrollLabel": "{caption}. Scroll sideways to see all columns.",
+      "rowNumber": "Row",
+      "noHeader": "(no heading)",
+      "restrictedColumn": "Hidden: restricted details",
+      "restricted": "Hidden",
+      "restrictedSr": "Restricted details, not shown",
+      "empty": "Empty",
+      "formula": "Formula, not run",
+      "edited": "Changed",
+      "editLabel": "Change {column}, row {row}",
+      "editHint": "Enter saves, Escape cancels",
+      "problem": {
+        "aadhaar": "Don't enter a full Aadhaar number. Enter only its last 4 digits.",
+        "tooLong": "Use at most 1,000 characters.",
+        "control": "Keep the value on one line."
+      }
+    },
+    "import": {
+      "title": "Check the sheet",
+      "backCrumb": "Import",
+      "back": "Back to the import",
+      "descriptionEdit": "Every row of your file with its check result. Correct a cell here before you add the rows: the row is checked again at once. Your uploaded file stays as it was.",
+      "descriptionRead": "Every row of your file with its check result. It can't be changed here.",
+      "gridTitle": "Rows in your file",
+      "summary": "{rows, plural, one {# row} other {# rows}} · {edited, plural, =0 {no cells changed} one {# cell changed} other {# cells changed}}",
+      "checkColumn": "Check",
+      "fills": "Fills: {field}",
+      "notImported": "Not imported",
+      "notChecked": "Not checked yet",
+      "saving": "Saving row {row}…",
+      "savedValid": "Row {row} saved. It has no problems now.",
+      "savedErrors": "Row {row} saved. {count, plural, one {It still has # problem to fix.} other {It still has # problems to fix.}}",
+      "savedUnchecked": "Row {row} saved. Check the file again to see if it is right.",
+      "otherRows": "{count, plural, one {# other row changed too.} other {# other rows changed too.}}",
+      "readOnlyTitle": "This sheet can't be changed",
+      "readOnly": {
+        "committed": "These rows were added to the student records. Correct a record on the student's profile or with a change request.",
+        "reverted": "This import was undone. Upload the file again to import it.",
+        "in_progress": "The file is being checked or added right now. Try again in a minute.",
+        "failed": "This import stopped with an error. Upload the file again."
+      },
+      "restrictedNote": "{count, plural, one {# column holds} other {# columns hold}} restricted details (such as religion or caste). They are hidden here and can't be changed in the sheet.",
+      "download": {
+        "csv": "Download CSV",
+        "xlsx": "Download Excel"
+      },
+      "downloading": "Preparing the file…",
+      "downloaded": "Downloaded {name}.",
+      "downloadNote": "Downloads include your changes. You'll be asked to confirm it's you. Aadhaar-like numbers are masked and formulas are turned into plain text.",
+      "pagesLabel": "Pages of the sheet",
+      "openTitle": "Check the sheet",
+      "openDescriptionEdit": "See every row as it is in your file and correct cells before you add the rows. You can also download it.",
+      "openDescriptionRead": "See every row as it was in your file, or download it.",
+      "open": "Open the sheet"
+    },
+    "document": {
+      "title": "Sheet",
+      "backCrumb": "Document",
+      "back": "Back to the document",
+      "description": "Version {version}, first worksheet. Row 1 gives the column names.",
+      "gridTitle": "Rows",
+      "summary": "{rows, plural, one {# row} other {# rows}}",
+      "cannotOpenTitle": "This file can't be opened as a sheet",
+      "cannotOpenBody": "It may be too large, damaged, still being checked, or uploaded for an import. Download the file from the document page instead.",
+      "readOnlyTitle": "You can look, but not save changes",
+      "readOnly": {
+        "no_permission": "You can't upload new versions of documents.",
+        "not_versionable": "CSV files can't be saved here. Download the sheet, change it and upload it as a new version.",
+        "archived": "This document is archived. Ask for it to be brought back first.",
+        "several_sheets": "This workbook has more than one sheet. Change it in a spreadsheet program and upload a new version, so the other sheets are kept.",
+        "formulas": "This sheet has formulas. Change it in a spreadsheet program and upload a new version, so the formulas are kept.",
+        "newer_version": "A newer version is being checked. Open the sheet again when it is ready."
+      },
+      "otherSheets": "{count, plural, one {The workbook has # more sheet that is not shown here.} other {The workbook has # more sheets that are not shown here.}}",
+      "pending": "{count, plural, =0 {No unsaved changes} one {# unsaved change} other {# unsaved changes}}",
+      "kept": "Change to row {row} kept. Save as a new version to keep it for everyone.",
+      "discard": "Discard changes",
+      "discarded": "Changes discarded.",
+      "save": "Save as new version",
+      "savingShort": "Saving…",
+      "saving": "Saving your changes as a new version…",
+      "saved": "Saved as version {version}. It is being checked and will be ready shortly.",
+      "download": {
+        "csv": "Download CSV",
+        "xlsx": "Download Excel"
+      },
+      "downloading": "Preparing the file…",
+      "downloaded": "Downloaded {name}.",
+      "note": "The saved version keeps values only, not formatting. Downloads include unsaved changes; for personal data you'll be asked to confirm it's you.",
+      "pagesLabel": "Pages of the sheet",
+      "open": "Open as a sheet",
+      "openHint": "See the rows in a table, correct cells or download the sheet."
+    },
+    "errors": {
+      "aadhaar_full_number_rejected": {
+        "title": "A full Aadhaar number can't be saved",
+        "body": "Enter only the last 4 digits of the Aadhaar number."
+      },
+      "control_characters": {
+        "title": "The value has a line break",
+        "body": "Keep the value on one line and save it again."
+      },
+      "too_long": {
+        "title": "The value is too long",
+        "body": "Use at most 1,000 characters."
+      },
+      "column_restricted": {
+        "title": "This column can't be changed here",
+        "body": "It holds restricted details. Correct them on the student's profile after adding the rows."
+      },
+      "unknown_column": {
+        "title": "That column is not in the file",
+        "body": "Reload the sheet and try again."
+      },
+      "duplicate_column": {
+        "title": "The same cell was changed twice",
+        "body": "Reload the sheet and try again."
+      },
+      "duplicate_cell": {
+        "title": "The same cell was changed twice",
+        "body": "Reload the sheet and try again."
+      },
+      "unknown_row": {
+        "title": "That row is not in the sheet",
+        "body": "Reload the sheet and try again."
+      },
+      "too_many_edits": {
+        "title": "Too many changes at once",
+        "body": "Save up to 5,000 changed cells at a time."
+      },
+      "import_not_editable": {
+        "title": "The sheet can't be changed any more",
+        "body": "The rows were added, the import was undone, or a check is running. Reload the page to see why."
+      },
+      "import_not_ready": {
+        "title": "The file is still being read",
+        "body": "Try again in a minute."
+      },
+      "file_missing": {
+        "title": "The uploaded file is no longer kept",
+        "body": "Files are deleted 90 days after the import. Upload the file again if you need it."
+      },
+      "precondition_failed": {
+        "title": "Someone else changed this meanwhile",
+        "body": "The sheet was reloaded. Make your change again."
+      },
+      "version_unchanged": {
+        "title": "Nothing to save",
+        "body": "The changed cells have the same values as the current version."
+      },
+      "version_conflict": {
+        "title": "A newer version exists",
+        "body": "Reload the sheet and make your changes on the newest version."
+      },
+      "workbook_has_formulas": {
+        "title": "This sheet has formulas",
+        "body": "Change it in a spreadsheet program and upload a new version, so the formulas are kept."
+      },
+      "workbook_has_several_sheets": {
+        "title": "This workbook has more than one sheet",
+        "body": "Change it in a spreadsheet program and upload a new version, so the other sheets are kept."
+      },
+      "not_versionable": {
+        "title": "This file can't be saved here",
+        "body": "Download the sheet, change it and upload it as a new version."
+      },
+      "document_archived": {
+        "title": "This document is archived",
+        "body": "Ask for it to be brought back before saving changes."
+      },
+      "import_file_sheet": {
+        "title": "Open this file from its import",
+        "body": "Files uploaded for an import are shown on the import's sheet, where restricted details stay hidden."
+      },
+      "not_a_sheet": {
+        "title": "This file is not a spreadsheet",
+        "body": "Only XLSX and CSV files open as a sheet. Download the file instead."
+      },
+      "sensitive_document": {
+        "title": "This file has restricted details",
+        "body": "Only staff allowed to see sensitive data can open it."
+      },
+      "step_up_cancelled": {
+        "title": "The download was not started",
+        "body": "You need to confirm it's you to download this sheet. Try again when you are ready."
+      },
+      "storage_unavailable": {
+        "title": "File storage is not responding",
+        "body": "Nothing was saved. Try again in a few minutes."
+      }
+    }
+  },
   "ask": {
     "nav": "Ask the school",
     "title": "Ask the school",

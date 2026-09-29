@@ -363,6 +363,28 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
     expect(screen.queryByRole("button", { name: /Download/ })).toBeNull();
   });
 
+  it("opens spreadsheets as a sheet, but not import files (FR-DOC-009)", async () => {
+    setMe([READ]);
+    const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () =>
+      Response.json(detail({ versions: [version({ mime_type: xlsx })] }));
+    const { unmount } = renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    const link = await screen.findByRole("link", { name: messages.en.sheets.document.open });
+    expect(link).toHaveAttribute("href", `/en/documents/${DOC}/sheet`);
+    unmount();
+    stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () =>
+      Response.json(
+        detail({
+          purpose: "import_file",
+          doc_type: "import_file",
+          versions: [version({ mime_type: xlsx })],
+        }),
+      );
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    expect((await screen.findAllByRole("button", { name: /Download/ })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: messages.en.sheets.document.open })).toBeNull();
+  });
+
   it("polls while the virus check runs and shows the file once it is ready", async () => {
     setMe([READ]);
     let calls = 0;

@@ -7,7 +7,8 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { ApiError } from "@/lib/bff/query";
 
 /** Message namespaces that hold `<code>.title` / `<code>.body` for feature-specific codes. */
-export type ProblemNamespace = "students.errors" | "imports.errors" | "extraction.errors";
+export type ProblemNamespace =
+  "students.errors" | "imports.errors" | "extraction.errors" | "sheets.errors";
 
 type Loose = ((key: string, values?: Record<string, string | number>) => string) & {
   has: (key: string) => boolean;
@@ -47,6 +48,7 @@ export function ProblemAlert({
   const ts = useTranslations("students.errors") as unknown as Loose;
   const ti = useTranslations("imports.errors") as unknown as Loose;
   const tx = useTranslations("extraction.errors") as unknown as Loose;
+  const tsh = useTranslations("sheets.errors") as unknown as Loose;
   const tapi = useTranslations("errors.api");
   if (error === undefined || error === null) return null;
   const code = codeOf(error);
@@ -54,6 +56,7 @@ export function ProblemAlert({
     "students.errors": ts,
     "imports.errors": ti,
     "extraction.errors": tx,
+    "sheets.errors": tsh,
   };
   const namespaces: readonly ProblemNamespace[] =
     typeof namespace === "string" ? [namespace] : namespace;

@@ -187,6 +187,28 @@ describe("US-401: the imports list", () => {
 describe("US-401 AC1..AC3: one import", () => {
   const perms = permissionsFrom(ALL_RECORD_PERMISSIONS);
 
+  it("links to the sheet between checking and adding, not before the file was read (AC5)", () => {
+    const view = renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch({ status: "validated" }))}
+        attributes={ready(ATTRIBUTES)}
+        permissions={perms}
+      />,
+    );
+    const link = screen.getByRole("link", { name: messages.en.sheets.import.open });
+    expect(link).toHaveAttribute("href", `/en/imports/${ID.import}/sheet`);
+    expect(screen.getByText(messages.en.sheets.import.openDescriptionEdit)).toBeInTheDocument();
+    view.unmount();
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch({ status: "parsing" }))}
+        attributes={ready(ATTRIBUTES)}
+        permissions={perms}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: messages.en.sheets.import.open })).toBeNull();
+  });
+
   it("suggests columns from English and Telugu headings, checks duplicates, then maps and checks", async () => {
     expect(
       initialTarget({ index: 0, header: "A", suggested: "dob", score: 90, target: null }),
