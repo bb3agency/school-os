@@ -335,3 +335,43 @@ def world_exam(w: Any) -> uuid.UUID:
         w.a.ids["insights_exam"] = out.id
     value: uuid.UUID = w.a.ids["insights_exam"]
     return value
+
+
+def _b_principal(w: Any) -> UserContext:
+    """School B's owner account acting with principal permissions (setup only)."""
+    return ctx(w.b, "principal", w.b.people["owner"])
+
+
+def b_exam(w: Any) -> uuid.UUID:
+    if "insights_exam" not in w.b.ids:
+        actor = _b_principal(w)
+        day = min(academics.today_ist(), YEAR_END)
+        with tenant_session(w.b.tenant_id, actor.user_id) as db:
+            out = academics.create_exam(db, actor, ExamCreate(name="Synthetic B test", held_on=day))
+        w.b.ids["insights_exam"] = out.id
+    value: uuid.UUID = w.b.ids["insights_exam"]
+    return value
+
+
+def b_flag(w: Any) -> uuid.UUID:
+    if "insights_flag" not in w.b.ids:
+        ids = SW.ensure_students(w)
+        actor = _b_principal(w)
+        with tenant_session(w.b.tenant_id, actor.user_id) as db:
+            out = insights.raise_flag(db, actor, ids["b_sb"], ManualFlagIn(indicator="course"))
+        w.b.ids["insights_flag"] = out.id
+    value: uuid.UUID = w.b.ids["insights_flag"]
+    return value
+
+
+def b_note(w: Any) -> uuid.UUID:
+    if "insights_note" not in w.b.ids:
+        ids = SW.ensure_students(w)
+        actor = _b_principal(w)
+        with tenant_session(w.b.tenant_id, actor.user_id) as db:
+            out = insights.add_note(
+                db, actor, ids["b_sb"], NoteIn(category="positive", text="Synthetic B note.")
+            )
+        w.b.ids["insights_note"] = out.id
+    value: uuid.UUID = w.b.ids["insights_note"]
+    return value

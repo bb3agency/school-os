@@ -168,6 +168,44 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/notices/{notice_id}"): {"title_en": "Synthetic"},
     ("POST", "/api/v1/notices/{notice_id}/approve"): {},
     ("POST", "/api/v1/notices/{notice_id}/render"): {},
+    # M5: sections, exams, students, flags and notes of school B are 404.
+    ("POST", "/api/v1/sections/{section_id}/attendance"): {
+        "entries": [
+            {
+                "student_id": "01920000-0000-7000-8000-000000000001",
+                "on_date": "2026-09-01",
+                "status": "present",
+            }
+        ]
+    },
+    ("POST", "/api/v1/sections/{section_id}/attendance/sheet"): {
+        "document_id": "01920000-0000-7000-8000-000000000001"
+    },
+    ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"): {
+        "entries": [
+            {
+                "student_id": "01920000-0000-7000-8000-000000000001",
+                "subject": "Maths",
+                "max_marks": "50",
+                "marks": "1",
+            }
+        ]
+    },
+    ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet"): {
+        "document_id": "01920000-0000-7000-8000-000000000001"
+    },
+    ("POST", "/api/v1/students/{student_id}/flags"): {"indicator": "attendance"},
+    ("POST", "/api/v1/insights/flags/{flag_id}/actions"): {"kind": "other"},
+    ("POST", "/api/v1/insights/flags/{flag_id}/close"): {"reason": "improved"},
+    ("POST", "/api/v1/insights/flags/{flag_id}/assign"): {
+        "owner_membership_id": "01920000-0000-7000-8000-000000000001"
+    },
+    ("POST", "/api/v1/insights/flags/{flag_id}/erase"): {"reason": "parent_request"},
+    ("POST", "/api/v1/students/{student_id}/behaviour-notes"): {
+        "category": "positive",
+        "text": "Synthetic BOLA note",
+    },
+    ("POST", "/api/v1/behaviour-notes/{note_id}/erase"): {"reason": "parent_request"},
 }
 
 
@@ -222,6 +260,25 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/certificates/{certificate_id}/duplicates"),
         ("POST", "/api/v1/certificates/{certificate_id}/withdraw"),
         ("POST", "/api/v1/certificates/{certificate_id}/render"),
+        # M5: attendance, marks and insights are not owner permissions (08 PRV-004).
+        ("GET", "/api/v1/sections/{section_id}/attendance"),
+        ("GET", "/api/v1/sections/{section_id}/attendance/month"),
+        ("POST", "/api/v1/sections/{section_id}/attendance"),
+        ("POST", "/api/v1/sections/{section_id}/attendance/sheet"),
+        ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"),
+        ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"),
+        ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet"),
+        ("GET", "/api/v1/insights/flags/{flag_id}"),
+        ("POST", "/api/v1/students/{student_id}/flags"),
+        ("POST", "/api/v1/insights/flags/{flag_id}/actions"),
+        ("POST", "/api/v1/insights/flags/{flag_id}/close"),
+        ("GET", "/api/v1/insights/flags/{flag_id}/owners"),
+        ("POST", "/api/v1/insights/flags/{flag_id}/assign"),
+        ("POST", "/api/v1/insights/flags/{flag_id}/erase"),
+        ("GET", "/api/v1/students/{student_id}/behaviour-notes"),
+        ("POST", "/api/v1/students/{student_id}/behaviour-notes"),
+        ("POST", "/api/v1/behaviour-notes/{note_id}/erase"),
+        ("GET", "/api/v1/students/{student_id}/timeline"),
     ),
     "principal",
 )
@@ -543,6 +600,20 @@ def _b_notice(w: Any) -> uuid.UUID:
     return value
 
 
+def _m5() -> ModuleType:
+    """tests/insights/support.py (M5 exams, flags and notes through the real services)."""
+    name = "sos_test_insights_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "insights" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -582,6 +653,10 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "suggestion_id": _b_suggestion,
     "task_id": _b_task,
     "notice_id": _b_notice,
+    # M5: an exam, a flag and a behaviour note of school B.
+    "exam_id": lambda w: _m5().b_exam(w),
+    "flag_id": lambda w: _m5().b_flag(w),
+    "note_id": lambda w: _m5().b_note(w),
 }
 
 
@@ -602,6 +677,7 @@ ID_ROUTES = _id_routes()
 # Required query parameters of ID routes, so the request reaches the object lookup.
 QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/students/{student_id}/certificates/preview"): {"certificate_type": "bonafide"},
+    ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
 }
 
 
@@ -1039,3 +1115,63 @@ def test_SEC_001_knowledge_never_shows_or_cites_another_school(
         assert res.status_code == 422, res.text
         codes.append(res.json()["errors"][0]["code"])
     assert codes == ["citation_not_found", "citation_not_found"]
+
+
+# --- M5: class teachers reach only their section's records and insights (FR-EW-011, SEC-015) ---
+
+
+@pytest.mark.parametrize("section", ["section_9c", "section_10a"])
+def test_SEC_015_attendance_and_marks_outside_scope_are_404(
+    world: Any, api: Any, section: str
+) -> None:
+    ct = world.person("class_teacher")
+    exam_id = _m5().world_exam(world)
+    base = f"/api/v1/sections/{world.a.ids[section]}"
+    rnd = f"/api/v1/sections/{uuid.uuid4()}"
+    for suffix in ("/attendance", f"/exams/{exam_id}/marks"):
+        hidden = api.call(ct, "GET", base + suffix)
+        random = api.call(ct, "GET", rnd + suffix)
+        assert hidden.status_code == random.status_code == 404, (suffix, hidden.text)
+        assert hidden.json()["detail"] == random.json()["detail"]
+
+
+@pytest.mark.parametrize("student", ["s9c", "s10a"])
+def test_SEC_015_insights_of_students_outside_scope_are_404(
+    world: Any, api: Any, admin_engine: Engine, student: str
+) -> None:
+    """A 9A class teacher cannot read, flag or note a 9C/10A student, nor open their flag."""
+    ids = SW.ensure_students(world)
+    ct = world.person("class_teacher")
+    flag = _m5().world_manual_flag(world, student)
+    before = W.audit_events(admin_engine, world.a.tenant_id, "insights.viewed")
+    for method, path, body in (
+        ("GET", f"/api/v1/students/{ids[student]}/timeline", None),
+        ("GET", f"/api/v1/students/{ids[student]}/behaviour-notes", None),
+        (
+            "POST",
+            f"/api/v1/students/{ids[student]}/behaviour-notes",
+            {"category": "concern", "text": "Synthetic"},
+        ),
+        ("POST", f"/api/v1/students/{ids[student]}/flags", {"indicator": "behaviour"}),
+        ("GET", f"/api/v1/insights/flags/{flag.id}", None),
+        ("POST", f"/api/v1/insights/flags/{flag.id}/actions", {"kind": "other"}),
+    ):
+        res = api.call(ct, method, path, json=body)
+        assert res.status_code == 404, (path, res.text)
+    listed = api.call(ct, "GET", "/api/v1/insights/flags", params={"view": "all", "limit": 200})
+    assert str(flag.id) not in {f["id"] for f in listed.json()["data"]}
+    after = W.audit_events(admin_engine, world.a.tenant_id, "insights.viewed")
+    # Only the (empty-of-that-flag) list view was recorded; nothing of the hidden student.
+    assert len(after) == len(before) + 1
+
+
+def test_SEC_001_flag_lists_never_show_other_school(world: Any, api: Any) -> None:
+    b_flag = _m5().b_flag(world)
+    res = api.call(
+        world.person("principal"),
+        "GET",
+        "/api/v1/insights/flags",
+        params={"view": "all", "limit": 200},
+    )
+    assert res.status_code == 200
+    assert str(b_flag) not in {f["id"] for f in res.json()["data"]}

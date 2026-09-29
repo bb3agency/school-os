@@ -282,6 +282,103 @@ def _notice(state: str) -> Builder:
     return build
 
 
+def _load_insights_support() -> ModuleType:
+    """tests/insights/support.py (M5 attendance, marks, notes and flags via the services)."""
+    name = "sos_test_insights_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "insights" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+IN = _load_insights_support()
+
+
+def _m5_day() -> str:
+    day: str = IN.school_days(1)[0].isoformat()
+    return day
+
+
+def _m5_s9a(w: Any) -> uuid.UUID:
+    value: uuid.UUID = SW.ensure_students(w)["s9a"]
+    return value
+
+
+def _m5_section(w: Any, suffix: str = "") -> str:
+    return f"/api/v1/sections/{w.a.ids['section_9a']}{suffix}"
+
+
+def _m5_marks(w: Any, suffix: str = "") -> str:
+    return _m5_section(w, f"/exams/{IN.world_exam(w)}/marks{suffix}")
+
+
+def _m5_sheet(kind: str) -> Builder:
+    """A fresh scanned import file visible to 9A's staff (the preview deletes it)."""
+
+    def build(w: Any, r: str, a: Engine) -> Request:
+        if kind == "attendance":
+            data = f"Adm No,{IN.school_days(1)[0].strftime('%d/%m/%Y')}\n".encode()
+            path = _m5_section(w, "/attendance/sheet")
+        else:
+            data = b"Adm No,Maths\nMax marks,50\n"
+            path = _m5_marks(w, "/sheet")
+        doc = D.make_document(
+            a,
+            w.a.tenant_id,
+            w.a.people["owner"].user_id,
+            acl=[("section", str(w.a.ids["section_9a"]))],
+            purpose="import_file",
+            doc_type="import_file",
+            data=data,
+            mime_type="text/csv",
+            ext="csv",
+        )
+        return path, {"document_id": str(doc)}, {}
+
+    return build
+
+
+def _m5_shared_flag(w: Any) -> uuid.UUID:
+    """One open manual flag on s9a (for reads and actions; created once)."""
+    if "m5_flag" not in w.a.ids:
+        w.a.ids["m5_flag"] = IN.world_manual_flag(w).id
+    value: uuid.UUID = w.a.ids["m5_flag"]
+    return value
+
+
+def _m5_fresh_flag(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        flag = IN.world_manual_flag(w)
+        path = f"/api/v1/insights/flags/{flag.id}/{action}"
+        if action == "close":
+            return path, {"reason": "no_concern"}, _if_match(flag.version)
+        if action == "assign":
+            owner = str(w.a.people["class_teacher"].membership_id)
+            return path, {"owner_membership_id": owner}, _if_match(flag.version)
+        return path, {"reason": "entered_in_error"}, {}
+
+    return build
+
+
+def _m5_settings(w: Any, r: str, a: Engine) -> Request:
+    with a.connect() as c:
+        version = c.execute(
+            text("SELECT version FROM sis.insight_settings WHERE tenant_id = :t"),
+            {"t": w.a.tenant_id},
+        ).scalar_one_or_none()
+    return "/api/v1/insights/settings", {"rules": {}}, _if_match(int(version or 0))
+
+
+def _m5_note_erase(w: Any, r: str, a: Engine) -> Request:
+    note = IN.world_note(w)
+    return f"/api/v1/behaviour-notes/{note.id}/erase", {"reason": "parent_request"}, {}
+
+
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 Builder = Callable[[Any, str, Engine], Request]
 _years = itertools.count(2100)
@@ -1487,6 +1584,93 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/notices/{notice_id}/approve"): _notice("approve"),
     ("POST", "/api/v1/notices/{notice_id}/render"): _notice("render"),
     ("GET", "/api/v1/notices/{notice_id}/download-url"): _notice("download"),
+    # M5 student timeline and early warning (FR-ATT-*, FR-MRK-*, FR-EW-*): school A's section
+    # 9A and student s9a (the class teacher's scope).
+    ("GET", "/api/v1/sections/{section_id}/attendance"): lambda w, r, a: (
+        _m5_section(w, "/attendance"),
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/sections/{section_id}/attendance/month"): lambda w, r, a: (
+        _m5_section(w, f"/attendance/month?month={_m5_day()[:7]}"),
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/sections/{section_id}/attendance"): lambda w, r, a: (
+        _m5_section(w, "/attendance"),
+        {"entries": [{"student_id": str(_m5_s9a(w)), "on_date": _m5_day(), "status": "present"}]},
+        {},
+    ),
+    ("POST", "/api/v1/sections/{section_id}/attendance/sheet"): _m5_sheet("attendance"),
+    ("GET", "/api/v1/exams"): lambda w, r, a: ("/api/v1/exams", None, {}),
+    ("POST", "/api/v1/exams"): lambda w, r, a: (
+        "/api/v1/exams",
+        {"name": f"Matrix exam {uuid.uuid4().hex[:8]}", "held_on": _m5_day()},
+        {},
+    ),
+    ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"): lambda w, r, a: (
+        _m5_marks(w),
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"): lambda w, r, a: (
+        _m5_marks(w),
+        {
+            "entries": [
+                {
+                    "student_id": str(_m5_s9a(w)),
+                    "subject": "Maths",
+                    "max_marks": "50",
+                    "marks": "20",
+                }
+            ]
+        },
+        {},
+    ),
+    ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet"): _m5_sheet("marks"),
+    ("GET", "/api/v1/insights/flags"): lambda w, r, a: ("/api/v1/insights/flags", None, {}),
+    ("GET", "/api/v1/insights/summary"): lambda w, r, a: ("/api/v1/insights/summary", None, {}),
+    ("GET", "/api/v1/insights/flags/{flag_id}"): lambda w, r, a: (
+        f"/api/v1/insights/flags/{_m5_shared_flag(w)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/students/{student_id}/flags"): lambda w, r, a: (
+        f"/api/v1/students/{_m5_s9a(w)}/flags",
+        {"indicator": "attendance"},
+        {},
+    ),
+    ("POST", "/api/v1/insights/flags/{flag_id}/actions"): lambda w, r, a: (
+        f"/api/v1/insights/flags/{_m5_shared_flag(w)}/actions",
+        {"kind": "talked_with_student"},
+        {},
+    ),
+    ("POST", "/api/v1/insights/flags/{flag_id}/close"): _m5_fresh_flag("close"),
+    ("GET", "/api/v1/insights/flags/{flag_id}/owners"): lambda w, r, a: (
+        f"/api/v1/insights/flags/{_m5_shared_flag(w)}/owners",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/insights/flags/{flag_id}/assign"): _m5_fresh_flag("assign"),
+    ("POST", "/api/v1/insights/flags/{flag_id}/erase"): _m5_fresh_flag("erase"),
+    ("GET", "/api/v1/insights/settings"): lambda w, r, a: ("/api/v1/insights/settings", None, {}),
+    ("PUT", "/api/v1/insights/settings"): _m5_settings,
+    ("GET", "/api/v1/students/{student_id}/behaviour-notes"): lambda w, r, a: (
+        f"/api/v1/students/{_m5_s9a(w)}/behaviour-notes",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/students/{student_id}/behaviour-notes"): lambda w, r, a: (
+        f"/api/v1/students/{_m5_s9a(w)}/behaviour-notes",
+        {"category": "positive", "text": "Synthetic matrix note."},
+        {},
+    ),
+    ("POST", "/api/v1/behaviour-notes/{note_id}/erase"): _m5_note_erase,
+    ("GET", "/api/v1/students/{student_id}/timeline"): lambda w, r, a: (
+        f"/api/v1/students/{_m5_s9a(w)}/timeline",
+        None,
+        {},
+    ),
 }
 
 
@@ -1586,6 +1770,10 @@ def _success(method: str, path: str) -> int:
         "/api/v1/tasks",
         "/api/v1/notices",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
+        "/api/v1/exams",
+        "/api/v1/students/{student_id}/flags",
+        "/api/v1/insights/flags/{flag_id}/actions",
+        "/api/v1/students/{student_id}/behaviour-notes",
     }
     accepted = {
         "/api/v1/documents",
