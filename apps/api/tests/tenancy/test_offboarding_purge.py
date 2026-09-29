@@ -65,7 +65,9 @@ def store() -> Iterator[Any]:
 
 
 @pytest.fixture
-def wrapper() -> Iterator[LocalDevKeyWrapper]:
+def wrapper(monkeypatch: pytest.MonkeyPatch) -> LocalDevKeyWrapper:
+    """A process keyring for this test only; the previous one is restored afterwards (other
+    suites configure the process keyring once per session)."""
     w = LocalDevKeyWrapper(
         Settings(
             env=Environment.CI,
@@ -73,9 +75,8 @@ def wrapper() -> Iterator[LocalDevKeyWrapper]:
             local_dev_master_key=SecretStr("synthetic-ci-master-key-0123456789abcdef"),
         )
     )
-    crypto.set_key_wrapper(w)
-    yield w
-    crypto.set_key_wrapper(None)
+    monkeypatch.setattr(crypto, "_keyring", crypto.TenantKeyring(w))
+    return w
 
 
 def _status(admin_engine: Engine, tenant_id: uuid.UUID, status: str) -> None:
