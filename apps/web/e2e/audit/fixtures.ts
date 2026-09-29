@@ -77,7 +77,8 @@ const studentId = (i: number) => (i === 0 ? STUDENT_MAIN : uid("00000000e5", i +
 const STUDENTS: Schemas["StudentSummary"][] = STUDENT_NAMES.map((name, i) => ({
   id: studentId(i),
   display_name: i === 9 ? null : name,
-  admission_no: i === 4 ? null : i === 6 ? `SYN-${LONG_TOKEN}` : `SYN-2026-${String(i + 14).padStart(3, "0")}`,
+  admission_no:
+    i === 4 ? null : i === 6 ? `SYN-${LONG_TOKEN}` : `SYN-2026-${String(i + 14).padStart(3, "0")}`,
   status: pick(STUDENT_STATUSES, i),
   class_section: i === 5 ? null : i % 2 === 0 ? "Class 6 · A" : "Class 10 · B (Telugu medium)",
   section_id: i === 5 ? null : i % 2 === 0 ? SECTION_A : SECTION_B,
@@ -114,11 +115,17 @@ function valueOut(
 function studentValues(name: string): Schemas["ValueOut"][] {
   return [
     valueOut(1, "full_name", "admission_register", name),
-    valueOut(2, "full_name", "udise_plus", "SYNTHETICA VENKATA NAGA SAI LAKSHMI PRASANNA KUMARI B", {
-      verification_status: "unverified",
-      verified_by: null,
-      verified_at: null,
-    }),
+    valueOut(
+      2,
+      "full_name",
+      "udise_plus",
+      "SYNTHETICA VENKATA NAGA SAI LAKSHMI PRASANNA KUMARI B",
+      {
+        verification_status: "unverified",
+        verified_by: null,
+        verified_at: null,
+      },
+    ),
     valueOut(3, "full_name", "board_registration", TE_STUDENT, {
       verification_status: "rejected",
     }),
@@ -161,7 +168,15 @@ function canonical(
   source: string | null,
   extra: Partial<Schemas["CanonicalOut"]> = {},
 ): Schemas["CanonicalOut"] {
-  return { value, source, verified: true, provisional: false, masked: false, conflicts: [], ...extra };
+  return {
+    value,
+    source,
+    verified: true,
+    provisional: false,
+    masked: false,
+    conflicts: [],
+    ...extra,
+  };
 }
 
 function studentDetail(id: string): Schemas["StudentOut"] {
@@ -185,7 +200,9 @@ function studentDetail(id: string): Schemas["StudentOut"] {
       roll_no: "14",
     },
     canonical: {
-      full_name: canonical(name, "admission_register", { conflicts: ["udise_plus", "board_registration"] }),
+      full_name: canonical(name, "admission_register", {
+        conflicts: ["udise_plus", "board_registration"],
+      }),
       dob: canonical("2014-06-12", "admission_register", { conflicts: ["birth_certificate"] }),
       gender: canonical("female", "admission_register"),
       father_name: canonical("Synthetica Venkata Subrahmanyeswara Rao", "admission_register", {
@@ -306,7 +323,11 @@ const RULE_TEXT: Array<[string, string, Schemas["Bilingual"]]> = [
   [
     "DQ-003",
     "gender",
-    { code: "DQ-003", en: "Gender differs between records.", te: "రికార్డులలో లింగం (జెండర్) వేర్వేరుగా ఉంది." },
+    {
+      code: "DQ-003",
+      en: "Gender differs between records.",
+      te: "రికార్డులలో లింగం (జెండర్) వేర్వేరుగా ఉంది.",
+    },
   ],
   [
     "DQ-004",
@@ -318,8 +339,22 @@ const RULE_TEXT: Array<[string, string, Schemas["Bilingual"]]> = [
     },
   ],
 ];
-const SEVERITIES: Schemas["FindingOut"]["severity"][] = ["blocker", "high", "medium", "low", "blocker", "info"];
-const FINDING_STATUSES: Schemas["FindingOut"]["status"][] = ["open", "open", "reopened", "open", "resolved", "waived"];
+const SEVERITIES: Schemas["FindingOut"]["severity"][] = [
+  "blocker",
+  "high",
+  "medium",
+  "low",
+  "blocker",
+  "info",
+];
+const FINDING_STATUSES: Schemas["FindingOut"]["status"][] = [
+  "open",
+  "open",
+  "reopened",
+  "open",
+  "resolved",
+  "waived",
+];
 
 const FINDINGS: Schemas["FindingOut"][] = Array.from({ length: 10 }, (_, i) => {
   const [rule_id, attribute_key, explanation] = pick(RULE_TEXT, i);
@@ -329,17 +364,59 @@ const FINDINGS: Schemas["FindingOut"][] = Array.from({ length: 10 }, (_, i) => {
   const values: Schemas["FindingOut"]["values"] =
     attribute_key === "dob"
       ? [
-          { attribute_key: "dob", source: "admission_register", value_id: uid("0000000f3b", i * 2), masked: "2014-06-12", value: "2014-06-12", sensitive: false },
-          { attribute_key: "aadhaar_dob_as_printed", source: "aadhaar_as_printed", value_id: uid("0000000f3b", i * 2 + 1), masked: "••/••/2014", value: null, sensitive: true },
+          {
+            attribute_key: "dob",
+            source: "admission_register",
+            value_id: uid("0000000f3b", i * 2),
+            masked: "2014-06-12",
+            value: "2014-06-12",
+            sensitive: false,
+          },
+          {
+            attribute_key: "aadhaar_dob_as_printed",
+            source: "aadhaar_as_printed",
+            value_id: uid("0000000f3b", i * 2 + 1),
+            masked: "••/••/2014",
+            value: null,
+            sensitive: true,
+          },
         ]
       : attribute_key === "gender"
         ? [
-            { attribute_key: "gender", source: "admission_register", value_id: uid("0000000f3b", i * 2), masked: "male", value: "male", sensitive: false },
-            { attribute_key: "gender", source: "udise_plus", value_id: uid("0000000f3b", i * 2 + 1), masked: "female", value: "female", sensitive: false },
+            {
+              attribute_key: "gender",
+              source: "admission_register",
+              value_id: uid("0000000f3b", i * 2),
+              masked: "male",
+              value: "male",
+              sensitive: false,
+            },
+            {
+              attribute_key: "gender",
+              source: "udise_plus",
+              value_id: uid("0000000f3b", i * 2 + 1),
+              masked: "female",
+              value: "female",
+              sensitive: false,
+            },
           ]
         : [
-            { attribute_key: "father_name", source: "admission_register", value_id: uid("0000000f3b", i * 2), masked: "Synthetica Venkata Subrahmanyeswara Rao Bommireddy", value: "Synthetica Venkata Subrahmanyeswara Rao Bommireddy", sensitive: false },
-            { attribute_key: "father_name", source: "parent_form", value_id: uid("0000000f3b", i * 2 + 1), masked: TE_GUARDIAN, value: TE_GUARDIAN, sensitive: false },
+            {
+              attribute_key: "father_name",
+              source: "admission_register",
+              value_id: uid("0000000f3b", i * 2),
+              masked: "Synthetica Venkata Subrahmanyeswara Rao Bommireddy",
+              value: "Synthetica Venkata Subrahmanyeswara Rao Bommireddy",
+              sensitive: false,
+            },
+            {
+              attribute_key: "father_name",
+              source: "parent_form",
+              value_id: uid("0000000f3b", i * 2 + 1),
+              masked: TE_GUARDIAN,
+              value: TE_GUARDIAN,
+              sensitive: false,
+            },
           ];
   return {
     id: uid("0000000f10", i + 1),
@@ -408,7 +485,16 @@ const DQ_SUMMARY: Schemas["SummaryOut"] = {
 
 /* ------------------------------------------------------------------ change requests, exports */
 
-const CR_STATUSES: Schemas["ChangeRequestOut"]["status"][] = ["pending", "pending", "approved", "rejected", "pending", "expired", "cancelled", "pending"];
+const CR_STATUSES: Schemas["ChangeRequestOut"]["status"][] = [
+  "pending",
+  "pending",
+  "approved",
+  "rejected",
+  "pending",
+  "expired",
+  "cancelled",
+  "pending",
+];
 const CHANGE_REQUESTS: Schemas["ChangeRequestOut"][] = CR_STATUSES.map((status, i) => {
   const pending = status === "pending";
   const mine = i % 2 === 1;
@@ -421,8 +507,13 @@ const CHANGE_REQUESTS: Schemas["ChangeRequestOut"][] = CR_STATUSES.map((status, 
     attribute_label_te: dob ? "పుట్టిన తేదీ" : "పూర్తి పేరు",
     target_source: "admission_register",
     old_value_id: i === 4 ? null : uid("0000000f3a", i + 1),
-    old_value: i === 4 ? null : dob ? "2014-06-12" : "Synthetica Venkata Naga Sai Lakshmi Prasana Kumari",
-    new_value: dob ? "2014-06-21" : i === 2 ? TE_STUDENT : "Synthetica Venkata Naga Sai Lakshmi Prasanna Kumari Bommireddy",
+    old_value:
+      i === 4 ? null : dob ? "2014-06-12" : "Synthetica Venkata Naga Sai Lakshmi Prasana Kumari",
+    new_value: dob
+      ? "2014-06-21"
+      : i === 2
+        ? TE_STUDENT
+        : "Synthetica Venkata Naga Sai Lakshmi Prasanna Kumari Bommireddy",
     masked: i === 7,
     reason: i % 2 === 0 ? LONG_TEXT : "Spelling differs from the birth certificate.",
     evidence_document_id: uid("00000000d0", 20 + i),
@@ -440,27 +531,52 @@ const CHANGE_REQUESTS: Schemas["ChangeRequestOut"][] = CR_STATUSES.map((status, 
   };
 });
 
-const EXPORT_STATUSES: Schemas["ExportOut"]["status"][] = ["ready", "running", "queued", "failed", "expired", "ready", "ready", "failed"];
+const EXPORT_STATUSES: Schemas["ExportOut"]["status"][] = [
+  "ready",
+  "running",
+  "queued",
+  "failed",
+  "expired",
+  "ready",
+  "ready",
+  "failed",
+];
 const EXPORTS: Schemas["ExportOut"][] = EXPORT_STATUSES.map((status, i) => {
-  const kind: Schemas["ExportOut"]["kind"] = pick(["board_precheck", "portal_precheck", "student_list"] as const, i);
-  const formats: Schemas["ExportOut"]["formats"] = i % 2 === 0 ? ["xlsx", "pdf"] : kind === "student_list" ? ["csv"] : ["xlsx"];
+  const kind: Schemas["ExportOut"]["kind"] = pick(
+    ["board_precheck", "portal_precheck", "student_list"] as const,
+    i,
+  );
+  const formats: Schemas["ExportOut"]["formats"] =
+    i % 2 === 0 ? ["xlsx", "pdf"] : kind === "student_list" ? ["csv"] : ["xlsx"];
   return {
     id: uid("0000000e70", i + 1),
     kind,
-    profile_key: kind === "board_precheck" ? "cisce-registration-2026" : kind === "portal_precheck" ? "udise-plus" : null,
+    profile_key:
+      kind === "board_precheck"
+        ? "cisce-registration-2026"
+        : kind === "portal_precheck"
+          ? "udise-plus"
+          : null,
     profile_version: kind === "student_list" ? null : 1,
     layout_version: 1,
     formats,
     language: i % 3 === 1 ? "te" : "en",
     scope: i % 2 === 0 ? { section_ids: [SECTION_A, SECTION_B] } : {},
-    columns: kind === "student_list" ? ["admission_no", "full_name", "dob", "father_name", "mother_name", "category"] : null,
+    columns:
+      kind === "student_list"
+        ? ["admission_no", "full_name", "dob", "father_name", "mother_name", "category"]
+        : null,
     include_sensitive: i === 5,
     student_count: [214, 1487, 36, 0, 120, 9, 1210, 57][i] ?? 1,
     status,
-    error_code: status === "failed" ? (i === 3 ? "profile_missing_required_fields" : LONG_TOKEN) : null,
+    error_code:
+      status === "failed" ? (i === 3 ? "profile_missing_required_fields" : LONG_TOKEN) : null,
     created_at: at(20 + (i % 8)),
     started_at: status === "queued" ? null : at(20 + (i % 8), 5, 31),
-    finished_at: status === "ready" || status === "failed" || status === "expired" ? at(20 + (i % 8), 5, 33) : null,
+    finished_at:
+      status === "ready" || status === "failed" || status === "expired"
+        ? at(20 + (i % 8), 5, 33)
+        : null,
     expires_at: status === "ready" ? "2026-10-05T05:33:00Z" : null,
     files:
       status === "ready"
@@ -477,7 +593,12 @@ const EXPORTS: Schemas["ExportOut"][] = EXPORT_STATUSES.map((status, i) => {
         : [],
     requested_by: {
       membership_id: i % 2 === 0 ? ME_MEMBERSHIP : OTHER_MEMBERSHIP,
-      display_name: i === 6 ? null : i % 2 === 0 ? "Synthetica Office Clerk" : "సింథటిక్ ప్రధానోపాధ్యాయులు శ్రీనివాస రావు",
+      display_name:
+        i === 6
+          ? null
+          : i % 2 === 0
+            ? "Synthetica Office Clerk"
+            : "సింథటిక్ ప్రధానోపాధ్యాయులు శ్రీనివాస రావు",
     },
     own: i % 2 === 0,
     can_download: status === "ready",
@@ -486,7 +607,15 @@ const EXPORTS: Schemas["ExportOut"][] = EXPORT_STATUSES.map((status, i) => {
 
 /* ------------------------------------------------------------------ extraction */
 
-const BATCH_STATUSES: Schemas["BatchOut"]["status"][] = ["review", "processing", "queued", "completed", "failed", "review", "completed"];
+const BATCH_STATUSES: Schemas["BatchOut"]["status"][] = [
+  "review",
+  "processing",
+  "queued",
+  "completed",
+  "failed",
+  "review",
+  "completed",
+];
 const BATCHES: Schemas["BatchOut"][] = BATCH_STATUSES.map((status, i) => ({
   id: uid("0000000ba7", i + 1),
   source: i === 3 ? "tc_incoming" : "admission_register",
@@ -494,7 +623,8 @@ const BATCHES: Schemas["BatchOut"][] = BATCH_STATUSES.map((status, i) => ({
   provider: i === 5 ? "synthetic-provider-with-a-very-long-identifier-v2" : "synthetic",
   error_code: status === "failed" ? "provider_timeout" : null,
   page_count: [12, 4, 50, 2, 3, 27, 1][i] ?? 1,
-  pages_done: status === "queued" ? 0 : status === "processing" ? 2 : ([12, 4, 50, 2, 1, 25, 1][i] ?? 1),
+  pages_done:
+    status === "queued" ? 0 : status === "processing" ? 2 : ([12, 4, 50, 2, 1, 25, 1][i] ?? 1),
   pages_failed: status === "failed" ? 2 : i === 5 ? 1 : 0,
   pages_withheld: i === 5 ? 1 : 0,
   items_total: [340, 0, 0, 48, 0, 812, 30][i] ?? 0,
@@ -510,9 +640,27 @@ const BATCHES: Schemas["BatchOut"][] = BATCH_STATUSES.map((status, i) => ({
 }));
 
 function field(value: string, extra: Partial<Schemas["FieldOut"]> = {}): Schemas["FieldOut"] {
-  return { value, confidence: 0.96, bbox: [0.1, 0.2, 0.3, 0.05], masked: false, low_confidence: false, ...extra };
+  return {
+    value,
+    confidence: 0.96,
+    bbox: [0.1, 0.2, 0.3, 0.05],
+    masked: false,
+    low_confidence: false,
+    ...extra,
+  };
 }
-const ITEM_STATUSES: Schemas["ItemOut"]["status"][] = ["pending_review", "pending_review", "pending_review", "confirmed", "pending_review", "rejected", "pending_review", "pending_review", "confirmed", "pending_review"];
+const ITEM_STATUSES: Schemas["ItemOut"]["status"][] = [
+  "pending_review",
+  "pending_review",
+  "pending_review",
+  "confirmed",
+  "pending_review",
+  "rejected",
+  "pending_review",
+  "pending_review",
+  "confirmed",
+  "pending_review",
+];
 const ITEMS: Schemas["ItemOut"][] = ITEM_STATUSES.map((status, i) => {
   const low = i % 3 === 0;
   return {
@@ -524,8 +672,13 @@ const ITEMS: Schemas["ItemOut"][] = ITEM_STATUSES.map((status, i) => {
     row_index: i % 4,
     status,
     fields: {
-      admission_no: field(i === 2 ? `SYN-${LONG_TOKEN}` : `SYN/1987/${String(12 + i).padStart(4, "0")}`),
-      full_name: field(pick(STUDENT_NAMES, i), low ? { confidence: 0.38, low_confidence: true } : {}),
+      admission_no: field(
+        i === 2 ? `SYN-${LONG_TOKEN}` : `SYN/1987/${String(12 + i).padStart(4, "0")}`,
+      ),
+      full_name: field(
+        pick(STUDENT_NAMES, i),
+        low ? { confidence: 0.38, low_confidence: true } : {},
+      ),
       dob: field("2011-07-09", i % 2 === 0 ? { confidence: 0.41, low_confidence: true } : {}),
       gender: field(i % 2 === 0 ? "F" : "M"),
       father_name: field("XXXX XXXX", { masked: true, confidence: null, bbox: null }),
@@ -547,15 +700,63 @@ const ITEMS: Schemas["ItemOut"][] = ITEM_STATUSES.map((status, i) => {
 /* ------------------------------------------------------------------ notifications, audit */
 
 const NOTIFICATIONS: Schemas["NotificationOut"][] = [
-  ["change_request.submitted", "change_request", "A correction request is waiting for you", "Open it to approve or reject it.", CHANGE_REQUESTS[0]?.id],
-  ["export.ready", "export", "Export ready", `Your CISCE registration 2026 pre-check for 1,487 students is ready to download. The link works for 7 days: ${LONG_URL}`, EXPORTS[0]?.id],
-  ["document.quarantined", "document", "File blocked", "The file “admission-register-classes-6-to-10-final-scanned-copy-2026.pdf” was blocked by the virus check.", uid("00000000d0", 70)],
-  ["announcement.new", "announcement", "కొత్త సందేశం: ఆదివారం నిర్వహణ", TE_TEXT, uid("00000000a5", 1)],
-  ["extraction.batch.ready", "extraction_batch", "Register photos are ready to review", "340 rows were read from 12 photos. 38 rows need a closer look.", BATCHES[0]?.id],
+  [
+    "change_request.submitted",
+    "change_request",
+    "A correction request is waiting for you",
+    "Open it to approve or reject it.",
+    CHANGE_REQUESTS[0]?.id,
+  ],
+  [
+    "export.ready",
+    "export",
+    "Export ready",
+    `Your CISCE registration 2026 pre-check for 1,487 students is ready to download. The link works for 7 days: ${LONG_URL}`,
+    EXPORTS[0]?.id,
+  ],
+  [
+    "document.quarantined",
+    "document",
+    "File blocked",
+    "The file “admission-register-classes-6-to-10-final-scanned-copy-2026.pdf” was blocked by the virus check.",
+    uid("00000000d0", 70),
+  ],
+  [
+    "announcement.new",
+    "announcement",
+    "కొత్త సందేశం: ఆదివారం నిర్వహణ",
+    TE_TEXT,
+    uid("00000000a5", 1),
+  ],
+  [
+    "extraction.batch.ready",
+    "extraction_batch",
+    "Register photos are ready to review",
+    "340 rows were read from 12 photos. 38 rows need a closer look.",
+    BATCHES[0]?.id,
+  ],
   ["dq.run.completed", "dq_run", "Data checks finished", LONG_TEXT, uid("0000000f20", 2)],
-  ["breakglass.requested", "breakglass_grant", "Support asked to see your school's records", "Synthetica Support Person asked for 2 hours of access to help with a failed import.", uid("00000000b6", 1)],
-  ["import.committed", "import_batch", "Import finished", "42 students were added. You can undo this for 24 hours.", uid("0000000f00", 1)],
-  ["export.failed", "export", "Export failed", `Error code ${LONG_TOKEN}. Try again, or contact support with this code.`, EXPORTS[3]?.id],
+  [
+    "breakglass.requested",
+    "breakglass_grant",
+    "Support asked to see your school's records",
+    "Synthetica Support Person asked for 2 hours of access to help with a failed import.",
+    uid("00000000b6", 1),
+  ],
+  [
+    "import.committed",
+    "import_batch",
+    "Import finished",
+    "42 students were added. You can undo this for 24 hours.",
+    uid("0000000f00", 1),
+  ],
+  [
+    "export.failed",
+    "export",
+    "Export failed",
+    `Error code ${LONG_TOKEN}. Try again, or contact support with this code.`,
+    EXPORTS[3]?.id,
+  ],
 ].map(([template_key, resource_type, title, body, resource_id], i) => ({
   id: uid("00000000c0", 0xe1 + i),
   template_key: template_key ?? "",
@@ -570,38 +771,83 @@ const NOTIFICATIONS: Schemas["NotificationOut"][] = [
 }));
 
 const AUDIT_ACTIONS: Array<[string, string, Record<string, unknown>]> = [
-  ["student.update", "student", { attribute_key: "father_name", source: "admission_register", fields: 3 }],
+  [
+    "student.update",
+    "student",
+    { attribute_key: "father_name", source: "admission_register", fields: 3 },
+  ],
   ["change_request.approve", "change_request", { attribute_key: "dob", note: TE_TEXT }],
-  ["export.created", "export", { profile_key: "cisce-registration-2026", student_count: 1487, formats: ["xlsx", "pdf"] }],
+  [
+    "export.created",
+    "export",
+    { profile_key: "cisce-registration-2026", student_count: 1487, formats: ["xlsx", "pdf"] },
+  ],
   ["kb.query", "knowledge_query", { mode: "full", cited_sources: 3, latency_ms: 4210 }],
   ["breakglass.access", "breakglass_grant", { reason_code: "support_request", token: LONG_TOKEN }],
   ["auth.login", "user", { method: "oidc", mfa: true }],
   ["role.assign", "membership", { role: "class_teacher", scope: `section:${SECTION_A}` }],
   ["import.commit", "import_batch", { rows: 42, created: 40, updated: 2, skipped: 0 }],
-  ["document.upload", "document", { title: "admission-register-classes-6-to-10-final-scanned-copy-2026.pdf", size_bytes: 8806400 }],
+  [
+    "document.upload",
+    "document",
+    {
+      title: "admission-register-classes-6-to-10-final-scanned-copy-2026.pdf",
+      size_bytes: 8806400,
+    },
+  ],
   ["student.sensitive_reveal", "student", {}],
 ];
-const AUDIT_EVENTS: Schemas["AuditEventOut"][] = AUDIT_ACTIONS.map(([action, resource_type, summary], i) => ({
-  id: uid("00000000ad", i + 1),
-  seq: 12_345 - i,
-  action,
-  actor_type: i === 4 ? "operator" : i === 3 ? "system" : "user",
-  actor_id: i === 3 ? null : i % 2 === 0 ? ME_MEMBERSHIP : OTHER_MEMBERSHIP,
-  resource_type,
-  resource_id: i === 5 ? null : uid("00000000ae", i + 1),
-  request_id: i % 3 === 0 ? null : `req_${LONG_TOKEN}`,
-  occurred_at: at(28 - Math.floor(i / 2), 11 - (i % 5)),
-  summary,
-}));
+const AUDIT_EVENTS: Schemas["AuditEventOut"][] = AUDIT_ACTIONS.map(
+  ([action, resource_type, summary], i) => ({
+    id: uid("00000000ad", i + 1),
+    seq: 12_345 - i,
+    action,
+    actor_type: i === 4 ? "operator" : i === 3 ? "system" : "user",
+    actor_id: i === 3 ? null : i % 2 === 0 ? ME_MEMBERSHIP : OTHER_MEMBERSHIP,
+    resource_type,
+    resource_id: i === 5 ? null : uid("00000000ae", i + 1),
+    request_id: i % 3 === 0 ? null : `req_${LONG_TOKEN}`,
+    occurred_at: at(28 - Math.floor(i / 2), 11 - (i % 5)),
+    summary,
+  }),
+);
 
 /* ------------------------------------------------------------------ support, break-glass, billing */
 
 function messages(n: number): Schemas["TicketMessageOut"][] {
   const all: Schemas["TicketMessageOut"][] = [
-    { id: uid("00000000a8", 1), author_type: "school_user", author_id: ME_MEMBERSHIP, body: LONG_TEXT, internal_note: false, created_at: at(24, 5) },
-    { id: uid("00000000a8", 2), author_type: "operator", author_id: OPERATOR_ID, body: `Thanks. We found the row: the date column has a value we could not read. Reference ${LONG_TOKEN}. See ${LONG_URL}`, internal_note: false, created_at: at(24, 7) },
-    { id: uid("00000000a8", 3), author_type: "operator", author_id: OPERATOR_ID, body: "Internal: check the parser for DD.MM.YY dates before replying again.", internal_note: true, created_at: at(24, 8) },
-    { id: uid("00000000a8", 4), author_type: "school_user", author_id: OTHER_MEMBERSHIP, body: TE_TEXT, internal_note: false, created_at: at(25, 4) },
+    {
+      id: uid("00000000a8", 1),
+      author_type: "school_user",
+      author_id: ME_MEMBERSHIP,
+      body: LONG_TEXT,
+      internal_note: false,
+      created_at: at(24, 5),
+    },
+    {
+      id: uid("00000000a8", 2),
+      author_type: "operator",
+      author_id: OPERATOR_ID,
+      body: `Thanks. We found the row: the date column has a value we could not read. Reference ${LONG_TOKEN}. See ${LONG_URL}`,
+      internal_note: false,
+      created_at: at(24, 7),
+    },
+    {
+      id: uid("00000000a8", 3),
+      author_type: "operator",
+      author_id: OPERATOR_ID,
+      body: "Internal: check the parser for DD.MM.YY dates before replying again.",
+      internal_note: true,
+      created_at: at(24, 8),
+    },
+    {
+      id: uid("00000000a8", 4),
+      author_type: "school_user",
+      author_id: OTHER_MEMBERSHIP,
+      body: TE_TEXT,
+      internal_note: false,
+      created_at: at(25, 4),
+    },
   ];
   return all.slice(0, n);
 }
@@ -616,8 +862,26 @@ const TICKET_SUBJECTS = [
   "Board registration pre-check shows students who left last year",
   "Billing address has the wrong district on the September invoice",
 ];
-const TICKET_STATUSES: Schemas["TicketOut"]["status"][] = ["open", "waiting_on_school", "in_progress", "resolved", "closed", "open", "in_progress", "waiting_on_school"];
-const CATEGORIES = ["import", "exports", "billing", "access", "ask", "other", "data_quality", "billing"];
+const TICKET_STATUSES: Schemas["TicketOut"]["status"][] = [
+  "open",
+  "waiting_on_school",
+  "in_progress",
+  "resolved",
+  "closed",
+  "open",
+  "in_progress",
+  "waiting_on_school",
+];
+const CATEGORIES = [
+  "import",
+  "exports",
+  "billing",
+  "access",
+  "ask",
+  "other",
+  "data_quality",
+  "billing",
+];
 
 function ticket(i: number, tenant_id: string, withMessages: boolean): Schemas["TicketOut"] {
   const status = pick(TICKET_STATUSES, i);
@@ -646,23 +910,45 @@ function ticket(i: number, tenant_id: string, withMessages: boolean): Schemas["T
   };
 }
 
-const GRANT_STATUSES: Schemas["GrantOut"]["status"][] = ["requested", "active", "approved", "expired", "revoked", "denied", "requested"];
+const GRANT_STATUSES: Schemas["GrantOut"]["status"][] = [
+  "requested",
+  "active",
+  "approved",
+  "expired",
+  "revoked",
+  "denied",
+  "requested",
+];
 const GRANTS: Schemas["GrantOut"][] = GRANT_STATUSES.map((status, i) => ({
   id: uid("00000000b6", 0xa1 + i),
   platform_request_id: uid("00000000b6", 0xb1 + i),
   status,
   emergency: i === 1,
   reason_code: pick(["support_request", "security_incident", "legal_obligation", "other"], i),
-  reason: i % 2 === 0 ? LONG_TEXT : i === 3 ? TE_TEXT : "The school asked for help with an import that failed.",
+  reason:
+    i % 2 === 0
+      ? LONG_TEXT
+      : i === 3
+        ? TE_TEXT
+        : "The school asked for help with an import that failed.",
   scope: i % 2 === 0 ? { section_id: SECTION_A } : { resource: "students", ref: LONG_TOKEN },
-  duration_minutes: i === 6 ? null : [120, 30, 240, 60, 120, 480][i % 6] ?? 120,
-  operator_display_name: i === 5 ? null : i === 2 ? "Synthetica Platform Support Engineer With A Long Name" : "Synthetica Support Person",
+  duration_minutes: i === 6 ? null : ([120, 30, 240, 60, 120, 480][i % 6] ?? 120),
+  operator_display_name:
+    i === 5
+      ? null
+      : i === 2
+        ? "Synthetica Platform Support Engineer With A Long Name"
+        : "Synthetica Support Person",
   requested_at: at(20 + i),
-  starts_at: status === "active" || status === "expired" || status === "revoked" ? at(20 + i, 6) : null,
-  expires_at: status === "active" ? "2026-09-29T09:00:00Z" : status === "expired" ? at(20 + i, 8) : null,
+  starts_at:
+    status === "active" || status === "expired" || status === "revoked" ? at(20 + i, 6) : null,
+  expires_at:
+    status === "active" ? "2026-09-29T09:00:00Z" : status === "expired" ? at(20 + i, 8) : null,
   decided_at: status === "requested" ? null : at(20 + i, 5, 45),
   revoked_at: status === "revoked" ? at(20 + i, 7) : null,
-  approved_by_membership: ["active", "approved", "expired", "revoked"].includes(status) ? ME_MEMBERSHIP : null,
+  approved_by_membership: ["active", "approved", "expired", "revoked"].includes(status)
+    ? ME_MEMBERSHIP
+    : null,
   denied_by_membership: status === "denied" ? ME_MEMBERSHIP : null,
   revoked_by_membership: status === "revoked" ? OTHER_MEMBERSHIP : null,
   membership_id: status === "active" ? uid("00000000e9", 1) : null,
@@ -674,7 +960,12 @@ const TENANT_INVOICES: Schemas["TenantInvoice"][] = Array.from({ length: 8 }, (_
   const status = pick(["draft", "issued", "paid", "paid", "void", "paid", "issued", "paid"], i);
   return {
     invoice_id: uid("0000000c1", i + 1),
-    invoice_number: status === "draft" ? null : i === 6 ? `SOS/2026-27/${LONG_TOKEN}` : `SOS/2026-27/${String(123 - i).padStart(6, "0")}`,
+    invoice_number:
+      status === "draft"
+        ? null
+        : i === 6
+          ? `SOS/2026-27/${LONG_TOKEN}`
+          : `SOS/2026-27/${String(123 - i).padStart(6, "0")}`,
     status,
     period_start: date(month, 1),
     period_end: date(month, 28),
@@ -686,24 +977,55 @@ const TENANT_INVOICES: Schemas["TenantInvoice"][] = Array.from({ length: 8 }, (_
 });
 
 const VERIFIED_ANSWERS: Schemas["VerifiedAnswerOut"][] = [
-  ["When are the Dasara holidays?", "en", "From 02/10/2026 to 12/10/2026. School reopens on 13/10/2026.", "active"],
-  ["దసరా సెలవులు ఎప్పుడు?", "te", "02/10/2026 నుండి 12/10/2026 వరకు. పాఠశాల 13/10/2026న తిరిగి తెరుచుకుంటుంది.", "active"],
-  ["What documents does a parent need to bring for a transfer certificate request, and how many days does the office take?", "en", LONG_TEXT, "needs_review"],
+  [
+    "When are the Dasara holidays?",
+    "en",
+    "From 02/10/2026 to 12/10/2026. School reopens on 13/10/2026.",
+    "active",
+  ],
+  [
+    "దసరా సెలవులు ఎప్పుడు?",
+    "te",
+    "02/10/2026 నుండి 12/10/2026 వరకు. పాఠశాల 13/10/2026న తిరిగి తెరుచుకుంటుంది.",
+    "active",
+  ],
+  [
+    "What documents does a parent need to bring for a transfer certificate request, and how many days does the office take?",
+    "en",
+    LONG_TEXT,
+    "needs_review",
+  ],
   ["Fee due date?", "mixed", "15th of every month. ఆలస్య రుసుము లేదు.", "retired"],
-  ["What is the uniform policy for the junior college section on Saturdays and during exam weeks?", "en", "Coloured dress is allowed on Saturdays. During exam weeks the full uniform with ID card is required.", "active"],
-  ["Who signs bonafide certificates?", "en", "The principal signs bonafide certificates. The office prints them the same day.", "needs_review"],
+  [
+    "What is the uniform policy for the junior college section on Saturdays and during exam weeks?",
+    "en",
+    "Coloured dress is allowed on Saturdays. During exam weeks the full uniform with ID card is required.",
+    "active",
+  ],
+  [
+    "Who signs bonafide certificates?",
+    "en",
+    "The principal signs bonafide certificates. The office prints them the same day.",
+    "needs_review",
+  ],
 ].map(([question, language, answer_text, status], i) => ({
   id: uid("00000000e1", i + 1),
   question: question ?? "",
   language: (language ?? "en") as Schemas["VerifiedAnswerOut"]["language"],
   answer_text: answer_text ?? "",
   citations: [
-    { source: `sos://doc/${uid("00000000d0", 1)}/v1#p1`, cited_text: "Holidays from 02/10/2026 to 12/10/2026" },
-    ...(i === 2 ? [{ source: `sos://doc/${uid("00000000d0", 2)}/v3#p14`, cited_text: TE_TEXT }] : []),
+    {
+      source: `sos://doc/${uid("00000000d0", 1)}/v1#p1`,
+      cited_text: "Holidays from 02/10/2026 to 12/10/2026",
+    },
+    ...(i === 2
+      ? [{ source: `sos://doc/${uid("00000000d0", 2)}/v3#p14`, cited_text: TE_TEXT }]
+      : []),
   ],
   status: (status ?? "active") as Schemas["VerifiedAnswerOut"]["status"],
   verified_by: ME_MEMBERSHIP,
-  verified_by_name: i === 4 ? null : i === 1 ? "సింథటిక్ ప్రధానోపాధ్యాయులు" : "Synthetica Principal",
+  verified_by_name:
+    i === 4 ? null : i === 1 ? "సింథటిక్ ప్రధానోపాధ్యాయులు" : "Synthetica Principal",
   verified_at: at(20 + i),
   review_due: status === "needs_review" ? "2026-09-30" : null,
   version: 1 + i,
@@ -724,9 +1046,42 @@ const SCHOOLS: Array<[string, string, string]> = [
   [uid("00000000ab", 9), "Synthetica Montessori and High School (English Medium)", "smhs"],
   [uid("00000000ab", 10), "Synthetica Academy", "sa"],
 ];
-const TENANT_STATUS: Schemas["TenantSummaryOut"]["tenant_status"][] = ["active", "suspended", "provisioning", "active", "active", "offboarding", "active", "deleted", "active", "active"];
-const SUB_STATUS: Schemas["TenantSummaryOut"]["subscription_status"][] = ["active", "suspended", "trial", "past_due", "trial", "cancelled", "active", null, "active", "past_due"];
-const DEPLOY_STATUS = ["healthy", "unreachable", "provisioning", "degraded", "healthy", "healthy", "healthy", "decommissioned", "healthy", "degraded"];
+const TENANT_STATUS: Schemas["TenantSummaryOut"]["tenant_status"][] = [
+  "active",
+  "suspended",
+  "provisioning",
+  "active",
+  "active",
+  "offboarding",
+  "active",
+  "deleted",
+  "active",
+  "active",
+];
+const SUB_STATUS: Schemas["TenantSummaryOut"]["subscription_status"][] = [
+  "active",
+  "suspended",
+  "trial",
+  "past_due",
+  "trial",
+  "cancelled",
+  "active",
+  null,
+  "active",
+  "past_due",
+];
+const DEPLOY_STATUS = [
+  "healthy",
+  "unreachable",
+  "provisioning",
+  "degraded",
+  "healthy",
+  "healthy",
+  "healthy",
+  "decommissioned",
+  "healthy",
+  "degraded",
+];
 
 const TENANTS: Schemas["TenantSummaryOut"][] = SCHOOLS.map(([tenant_id, school_name, code], i) => ({
   tenant_id,
@@ -737,13 +1092,21 @@ const TENANTS: Schemas["TenantSummaryOut"][] = SCHOOLS.map(([tenant_id, school_n
   subscription_status: pick(SUB_STATUS, i),
   plan_code: i === 7 ? null : i === 3 ? "dedicated-premium-with-ai-and-custom-domain" : "standard",
   deployment_status: pick(DEPLOY_STATUS, i),
-  app_version: i === 2 || i === 7 ? null : i === 3 ? "2026.09.1-hotfix.3+build.20260928.abcdef0" : pick(["2026.09.1", "2026.08.4"], i),
+  app_version:
+    i === 2 || i === 7
+      ? null
+      : i === 3
+        ? "2026.09.1-hotfix.3+build.20260928.abcdef0"
+        : pick(["2026.09.1", "2026.08.4"], i),
   last_heartbeat_at: i === 2 || i === 7 ? null : at(28, 4, 30 - i),
   created_at: `2026-0${6 + (i % 3)}-0${1 + (i % 9)}T04:30:00Z`,
 }));
 
 function subscription(i: number, tenant_id: string): Schemas["SubscriptionOut"] {
-  const status = pick(["active", "trial", "past_due", "suspended", "cancelled", "active", "trial", "active"] as const, i);
+  const status = pick(
+    ["active", "trial", "past_due", "suspended", "cancelled", "active", "trial", "active"] as const,
+    i,
+  );
   return {
     id: i === 0 ? SUB_ID : uid("00000000b0", 0x10 + i),
     tenant_id,
@@ -764,14 +1127,22 @@ function subscription(i: number, tenant_id: string): Schemas["SubscriptionOut"] 
 }
 
 function invoice(i: number, tenant_id: string): Schemas["InvoiceOut"] {
-  const status = pick(["issued", "paid", "draft", "void", "paid", "issued", "paid", "issued"] as const, i);
+  const status = pick(
+    ["issued", "paid", "draft", "void", "paid", "issued", "paid", "issued"] as const,
+    i,
+  );
   const big = i === 5;
   const month = 9 - (i % 4);
   return {
     id: uid("0000000c2", i + 1),
     tenant_id,
     subscription_id: SUB_ID,
-    invoice_number: status === "draft" ? null : i === 7 ? `SOS/2026-27/${LONG_TOKEN}` : `SOS/2026-27/${String(123 + i).padStart(6, "0")}`,
+    invoice_number:
+      status === "draft"
+        ? null
+        : i === 7
+          ? `SOS/2026-27/${LONG_TOKEN}`
+          : `SOS/2026-27/${String(123 + i).padStart(6, "0")}`,
     financial_year: status === "draft" ? null : "2026-27",
     status,
     period_start: date(month, 1),
@@ -781,7 +1152,10 @@ function invoice(i: number, tenant_id: string): Schemas["InvoiceOut"] {
     supplier_legal_name: "SchoolOS Synthetic Supplier Private Limited",
     supplier_gstin: "37AAAAA0000A1Z5",
     supplier_state_code: "37",
-    recipient_legal_name: i === 1 ? "Sri Venkateswara Zilla Parishad Educational Society and Charitable Trust" : "Sample Education Society",
+    recipient_legal_name:
+      i === 1
+        ? "Sri Venkateswara Zilla Parishad Educational Society and Charitable Trust"
+        : "Sample Education Society",
     recipient_gstin: i % 2 === 0 ? null : "37BBBBB1111B1Z6",
     place_of_supply_state_code: i === 4 ? "36" : "37",
     tax_type: i === 4 ? "igst" : "cgst_sgst",
@@ -794,7 +1168,10 @@ function invoice(i: number, tenant_id: string): Schemas["InvoiceOut"] {
     tds_inr: status === "paid" && i === 1 ? "99.98" : "0.00",
     balance_due_inr: status === "issued" ? (big ? "1234567.88" : "5898.82") : "0.00",
     notes: i === 1 ? LONG_TEXT : null,
-    void_reason: status === "void" ? "Raised against the wrong billing account; replaced by a corrected invoice." : null,
+    void_reason:
+      status === "void"
+        ? "Raised against the wrong billing account; replaced by a corrected invoice."
+        : null,
     version: 1 + i,
   };
 }
@@ -804,13 +1181,20 @@ const PLATFORM_INVOICES: Schemas["InvoiceOut"][] = Array.from({ length: 8 }, (_,
 );
 
 function tenantDetail(tenant_id: string): Schemas["TenantDetailOut"] {
-  const index = Math.max(0, TENANTS.findIndex((row) => row.tenant_id === tenant_id));
+  const index = Math.max(
+    0,
+    TENANTS.findIndex((row) => row.tenant_id === tenant_id),
+  );
   const summary = TENANTS[index] as Schemas["TenantSummaryOut"];
   return {
     ...summary,
     tenant_id,
     ...(tenant_id === T1
-      ? { tenant_status: "active" as const, subscription_status: "active" as const, deployment_status: "healthy" }
+      ? {
+          tenant_status: "active" as const,
+          subscription_status: "active" as const,
+          deployment_status: "healthy",
+        }
       : {}),
     boards: ["STATE_AP", "CBSE", "CISCE"],
     tenant_status_reason: summary.tenant_status === "suspended" ? LONG_TEXT : null,
@@ -820,7 +1204,11 @@ function tenantDetail(tenant_id: string): Schemas["TenantDetailOut"] {
     counts: { users: 48, active_memberships: 45, academic_years: 3, sections: 36 },
     open_tickets: 3,
     invoices: Array.from({ length: 6 }, (_, i) => invoice(i, tenant_id)),
-    flag_overrides: { "ask.citations_v2": true, "extraction.register_photos": false, "exports.udise_plus_2026_layout": true },
+    flag_overrides: {
+      "ask.citations_v2": true,
+      "extraction.register_photos": false,
+      "exports.udise_plus_2026_layout": true,
+    },
     provisioning: null,
   };
 }
@@ -855,7 +1243,8 @@ function usageRow(tenant_id: string, day: number, i: number): Schemas["UsageDail
     staff_users: [48, 61, 3, 212, 0, 19][i % 6] ?? 0,
     active_users: [31, 44, 1, 187, 0, 12][i % 6] ?? 0,
     documents: [320, 1045, 2, 18230, 0, 77][i % 6] ?? 0,
-    storage_bytes: [3_489_660_928, 52_613_349_376, 1_048_576, 98_765_432_100, 0, 734_003_200][i % 6] ?? 0,
+    storage_bytes:
+      [3_489_660_928, 52_613_349_376, 1_048_576, 98_765_432_100, 0, 734_003_200][i % 6] ?? 0,
     ai_queries: [140, 902, 0, 12_455, 0, 33][i % 6] ?? 0,
     ai_input_tokens: [420_000, 2_706_000, 0, 37_365_000, 0, 99_000][i % 6] ?? 0,
     ai_output_tokens: [70_000, 451_000, 0, 6_227_500, 0, 16_500][i % 6] ?? 0,
@@ -870,49 +1259,123 @@ const FLEET_VERSIONS: Schemas["FleetVersionOut"][] = [
   { version: "2026.07.2", deployments: 1 },
 ];
 
-const DEPLOYMENTS: Schemas["DeploymentOut"][] = SCHOOLS.slice(0, 8).map(([tenant_id, school_name, tenant_code], i) => {
-  const dedicated = i === 3 || i === 6 || i === 1;
-  return {
-    id: uid("00000000de", i + 1),
-    tenant_id,
-    school_name,
-    tenant_code,
-    tenant_status: pick(TENANT_STATUS, i),
-    mode: dedicated ? "dedicated" : "shared",
-    region: "ap-south-1",
-    backup_region: "ap-south-2",
-    status: pick(DEPLOY_STATUS, i),
-    hostname: dedicated ? `${tenant_code}.dedicated.very-long-school-domain.example` : null,
-    custom_domain: i === 3 ? "records.sri-venkateswara-zilla-parishad-high-school.example" : null,
-    host_ref: dedicated ? `i-${LONG_TOKEN.toLowerCase()}` : null,
-    app_version: i === 2 || i === 7 ? null : pick(FLEET_VERSIONS, i).version,
-    target_version: i === 3 ? "2026.09.1" : null,
-    heartbeat_key_id: dedicated ? `hbk_${LONG_TOKEN}` : null,
-    heartbeat_next_key_id: i === 3 ? `hbk_next_${LONG_TOKEN}` : null,
-    last_heartbeat_at: i === 2 || i === 7 ? null : at(28, 4, 30 - i),
-    version: 1 + i,
-  };
-});
+const DEPLOYMENTS: Schemas["DeploymentOut"][] = SCHOOLS.slice(0, 8).map(
+  ([tenant_id, school_name, tenant_code], i) => {
+    const dedicated = i === 3 || i === 6 || i === 1;
+    return {
+      id: uid("00000000de", i + 1),
+      tenant_id,
+      school_name,
+      tenant_code,
+      tenant_status: pick(TENANT_STATUS, i),
+      mode: dedicated ? "dedicated" : "shared",
+      region: "ap-south-1",
+      backup_region: "ap-south-2",
+      status: pick(DEPLOY_STATUS, i),
+      hostname: dedicated ? `${tenant_code}.dedicated.very-long-school-domain.example` : null,
+      custom_domain: i === 3 ? "records.sri-venkateswara-zilla-parishad-high-school.example" : null,
+      host_ref: dedicated ? `i-${LONG_TOKEN.toLowerCase()}` : null,
+      app_version: i === 2 || i === 7 ? null : pick(FLEET_VERSIONS, i).version,
+      target_version: i === 3 ? "2026.09.1" : null,
+      heartbeat_key_id: dedicated ? `hbk_${LONG_TOKEN}` : null,
+      heartbeat_next_key_id: i === 3 ? `hbk_next_${LONG_TOKEN}` : null,
+      last_heartbeat_at: i === 2 || i === 7 ? null : at(28, 4, 30 - i),
+      version: 1 + i,
+    };
+  },
+);
 
 const FLAGS: Schemas["FlagOut"][] = [
-  { key: "ask.citations_v2", enabled: true, rollout_percent: 100, description: "Show source chips under every AI answer with page numbers.", tenant_id: null },
-  { key: "extraction.register_photos", enabled: true, rollout_percent: 25, description: LONG_TEXT, tenant_id: null },
-  { key: "exports.udise_plus_2026_layout_with_new_columns_for_apaar", enabled: false, rollout_percent: null, description: null, tenant_id: null },
-  { key: "notifications.whatsapp", enabled: false, rollout_percent: 0, description: "తల్లిదండ్రులకు వాట్సాప్ ద్వారా సందేశాలు పంపడం (ప్రయోగాత్మకం).", tenant_id: null },
-  { key: "promotions.bulk", enabled: true, rollout_percent: null, description: "Year-end promotions in bulk.", tenant_id: null },
-  { key: "dq.fuzzy_names_te", enabled: true, rollout_percent: 50, description: "Telugu-aware name matching.", tenant_id: null },
-  { key: "ask.citations_v2", enabled: false, rollout_percent: null, description: null, tenant_id: T2 },
-  { key: "extraction.register_photos", enabled: true, rollout_percent: null, description: null, tenant_id: T1 },
-  { key: "extraction.register_photos", enabled: true, rollout_percent: null, description: null, tenant_id: uid("00000000ab", 4) },
+  {
+    key: "ask.citations_v2",
+    enabled: true,
+    rollout_percent: 100,
+    description: "Show source chips under every AI answer with page numbers.",
+    tenant_id: null,
+  },
+  {
+    key: "extraction.register_photos",
+    enabled: true,
+    rollout_percent: 25,
+    description: LONG_TEXT,
+    tenant_id: null,
+  },
+  {
+    key: "exports.udise_plus_2026_layout_with_new_columns_for_apaar",
+    enabled: false,
+    rollout_percent: null,
+    description: null,
+    tenant_id: null,
+  },
+  {
+    key: "notifications.whatsapp",
+    enabled: false,
+    rollout_percent: 0,
+    description: "తల్లిదండ్రులకు వాట్సాప్ ద్వారా సందేశాలు పంపడం (ప్రయోగాత్మకం).",
+    tenant_id: null,
+  },
+  {
+    key: "promotions.bulk",
+    enabled: true,
+    rollout_percent: null,
+    description: "Year-end promotions in bulk.",
+    tenant_id: null,
+  },
+  {
+    key: "dq.fuzzy_names_te",
+    enabled: true,
+    rollout_percent: 50,
+    description: "Telugu-aware name matching.",
+    tenant_id: null,
+  },
+  {
+    key: "ask.citations_v2",
+    enabled: false,
+    rollout_percent: null,
+    description: null,
+    tenant_id: T2,
+  },
+  {
+    key: "extraction.register_photos",
+    enabled: true,
+    rollout_percent: null,
+    description: null,
+    tenant_id: T1,
+  },
+  {
+    key: "extraction.register_photos",
+    enabled: true,
+    rollout_percent: null,
+    description: null,
+    tenant_id: uid("00000000ab", 4),
+  },
 ].map((flag, i) => ({ ...flag, updated_at: i === 4 ? null : at(20 + (i % 8)), version: 1 + i }));
 
 const OPERATORS: Schemas["OperatorOut"][] = [
   ["Synthetica Platform Owner", "owner@schoolos.example", ["platform_owner"], "active", true],
-  ["Synthetica Platform Engineer With A Long Name", LONG_EMAIL, ["platform_engineer", "support_agent", "billing_admin"], "active", true],
-  ["సింథటిక్ సపోర్ట్ ఏజెంట్ శ్రీలక్ష్మి", "support.te@schoolos.example", ["support_agent"], "active", false],
+  [
+    "Synthetica Platform Engineer With A Long Name",
+    LONG_EMAIL,
+    ["platform_engineer", "support_agent", "billing_admin"],
+    "active",
+    true,
+  ],
+  [
+    "సింథటిక్ సపోర్ట్ ఏజెంట్ శ్రీలక్ష్మి",
+    "support.te@schoolos.example",
+    ["support_agent"],
+    "active",
+    false,
+  ],
   ["Synthetica Billing", "billing@schoolos.example", ["billing_admin"], "invited", false],
   ["Synthetica Viewer", "viewer@schoolos.example", ["platform_viewer"], "deactivated", true],
-  ["Synthetica On-call", "oncall.rotation.primary.synthetic@schoolos.example", ["platform_engineer", "platform_viewer"], "active", true],
+  [
+    "Synthetica On-call",
+    "oncall.rotation.primary.synthetic@schoolos.example",
+    ["platform_engineer", "platform_viewer"],
+    "active",
+    true,
+  ],
   ["Synthetica Trainee", "trainee@schoolos.example", [], "invited", false],
 ].map(([display_name, email, roles, status, mfa], i) => ({
   id: i === 0 ? OPERATOR_ID : uid("00000000f1", i + 1),
@@ -926,12 +1389,60 @@ const OPERATORS: Schemas["OperatorOut"][] = [
 }));
 
 const ANNOUNCEMENTS: Schemas["AnnouncementOut"][] = [
-  ["Maintenance on Sunday", "ఆదివారం నిర్వహణ", "SchoolOS is unavailable from 06:00 to 07:00.", "06:00 నుండి 07:00 వరకు SchoolOS అందుబాటులో ఉండదు.", "maintenance", "scheduled", "all"],
-  ["New: register photos can now be read in Telugu and English, with a review queue for rows the reader was unsure about", "కొత్తది: రిజిస్టర్ ఫోటోలు", LONG_TEXT, TE_TEXT, "info", "scheduled", "tier"],
-  ["UDISE+ deadline", "UDISE+ గడువు", "Submit before 15 October.", "అక్టోబర్ 15 లోపు సమర్పించండి.", "warning", "draft", "tenants"],
-  ["Security update", "భద్రతా నవీకరణ", `Rotate heartbeat keys. Ref ${LONG_TOKEN}.`, "హార్ట్‌బీట్ కీలను మార్చండి.", "critical", "cancelled", "tier"],
-  ["Diwali greetings", "దీపావళి శుభాకాంక్షలు", "Support hours are shorter on 20 October.", "అక్టోబర్ 20న సపోర్ట్ సమయం తక్కువ.", "info", "scheduled", "all"],
-  ["Billing change", "బిల్లింగ్ మార్పు", "Invoices now show the SAC code.", "ఇన్‌వాయిస్‌లలో SAC కోడ్ ఉంటుంది.", "celebration", "scheduled", "all"],
+  [
+    "Maintenance on Sunday",
+    "ఆదివారం నిర్వహణ",
+    "SchoolOS is unavailable from 06:00 to 07:00.",
+    "06:00 నుండి 07:00 వరకు SchoolOS అందుబాటులో ఉండదు.",
+    "maintenance",
+    "scheduled",
+    "all",
+  ],
+  [
+    "New: register photos can now be read in Telugu and English, with a review queue for rows the reader was unsure about",
+    "కొత్తది: రిజిస్టర్ ఫోటోలు",
+    LONG_TEXT,
+    TE_TEXT,
+    "info",
+    "scheduled",
+    "tier",
+  ],
+  [
+    "UDISE+ deadline",
+    "UDISE+ గడువు",
+    "Submit before 15 October.",
+    "అక్టోబర్ 15 లోపు సమర్పించండి.",
+    "warning",
+    "draft",
+    "tenants",
+  ],
+  [
+    "Security update",
+    "భద్రతా నవీకరణ",
+    `Rotate heartbeat keys. Ref ${LONG_TOKEN}.`,
+    "హార్ట్‌బీట్ కీలను మార్చండి.",
+    "critical",
+    "cancelled",
+    "tier",
+  ],
+  [
+    "Diwali greetings",
+    "దీపావళి శుభాకాంక్షలు",
+    "Support hours are shorter on 20 October.",
+    "అక్టోబర్ 20న సపోర్ట్ సమయం తక్కువ.",
+    "info",
+    "scheduled",
+    "all",
+  ],
+  [
+    "Billing change",
+    "బిల్లింగ్ మార్పు",
+    "Invoices now show the SAC code.",
+    "ఇన్‌వాయిస్‌లలో SAC కోడ్ ఉంటుంది.",
+    "celebration",
+    "scheduled",
+    "all",
+  ],
 ].map(([title_en, title_te, body_en, body_te, severity, status, audience], i) => ({
   id: uid("00000000a5", i + 1),
   title_en: title_en ?? "",
@@ -949,14 +1460,34 @@ const ANNOUNCEMENTS: Schemas["AnnouncementOut"][] = [
 }));
 
 const PLATFORM_AUDIT: Schemas["PlatformAuditEventOut"][] = [
-  ["tenant.provisioned", "tenant", { code: "svzphs-and-junior-college-guntur-district", tier: "dedicated" }],
+  [
+    "tenant.provisioned",
+    "tenant",
+    { code: "svzphs-and-junior-college-guntur-district", tier: "dedicated" },
+  ],
   ["tenant.suspended", "tenant", { reason: LONG_TEXT }],
-  ["invoice.issued", "invoice", { invoice_number: `SOS/2026-27/${LONG_TOKEN}`, total_inr: "1234567.88" }],
-  ["flag.updated", "feature_flag", { key: "exports.udise_plus_2026_layout_with_new_columns_for_apaar", enabled: false }],
-  ["operator.roles_changed", "operator", { roles: ["platform_engineer", "support_agent", "billing_admin"] }],
+  [
+    "invoice.issued",
+    "invoice",
+    { invoice_number: `SOS/2026-27/${LONG_TOKEN}`, total_inr: "1234567.88" },
+  ],
+  [
+    "flag.updated",
+    "feature_flag",
+    { key: "exports.udise_plus_2026_layout_with_new_columns_for_apaar", enabled: false },
+  ],
+  [
+    "operator.roles_changed",
+    "operator",
+    { roles: ["platform_engineer", "support_agent", "billing_admin"] },
+  ],
   ["deployment.heartbeat_key_rotated", "deployment", { key_id: `hbk_next_${LONG_TOKEN}` }],
   ["announcement.created", "announcement", { title_te: "ఆదివారం నిర్వహణ" }],
-  ["breakglass.requested", "break_glass_request", { reason_code: "support_request", duration_minutes: 120 }],
+  [
+    "breakglass.requested",
+    "break_glass_request",
+    { reason_code: "support_request", duration_minutes: 120 },
+  ],
   ["auth.login", "operator", {}],
 ].map(([action, resource_type, summary], i) => ({
   id: uid("00000000fa", i + 1),
@@ -1027,26 +1558,51 @@ const ROUTES: Array<[RegExp, Handler]> = [
   [re("/dq/summary"), () => DQ_SUMMARY],
   [
     re("/change-requests"),
-    (_, q) => page(by(by(CHANGE_REQUESTS, q, "status", (r) => r.status), q, "student_id", (r) => r.student_id)),
+    (_, q) =>
+      page(
+        by(
+          by(CHANGE_REQUESTS, q, "status", (r) => r.status),
+          q,
+          "student_id",
+          (r) => r.student_id,
+        ),
+      ),
   ],
   [re("/exports"), () => page(EXPORTS)],
   // Register photos.
   [re("/extraction-batches"), () => page(BATCHES)],
-  [
-    re("/extraction-items"),
-    (_, q) => page(by(ITEMS, q, "status", (r) => r.status)),
-  ],
+  [re("/extraction-items"), (_, q) => page(by(ITEMS, q, "status", (r) => r.status))],
   // Notifications, audit.
-  [re("/notifications"), (_, q) => page(q.get("unread") === "true" ? NOTIFICATIONS.filter((n) => n.read_at === null) : NOTIFICATIONS)],
-  [re("/notifications/unread-count"), () => ({ count: NOTIFICATIONS.filter((n) => n.read_at === null).length })],
+  [
+    re("/notifications"),
+    (_, q) =>
+      page(
+        q.get("unread") === "true"
+          ? NOTIFICATIONS.filter((n) => n.read_at === null)
+          : NOTIFICATIONS,
+      ),
+  ],
+  [
+    re("/notifications/unread-count"),
+    () => ({ count: NOTIFICATIONS.filter((n) => n.read_at === null).length }),
+  ],
   [re("/audit/events"), () => page(AUDIT_EVENTS)],
   // Support, break-glass, billing, verified answers.
   [re("/support/tickets"), () => page(Array.from({ length: 8 }, (_, i) => ticket(i, T1, false)))],
-  [re("/support/tickets/{id}"), ([, id = ""]) => ({ ...ticket(Math.max(0, parseInt(id.slice(-2), 16) - 1), T1, true), id })],
+  [
+    re("/support/tickets/{id}"),
+    ([, id = ""]) => ({ ...ticket(Math.max(0, parseInt(id.slice(-2), 16) - 1), T1, true), id }),
+  ],
   [re("/breakglass/requests"), (_, q) => page(by(GRANTS, q, "status", (r) => r.status))],
-  [re("/breakglass/requests/{id}"), ([, id = ""]) => ({ ...(GRANTS.find((g) => g.id === id) ?? GRANTS[1]), id })],
+  [
+    re("/breakglass/requests/{id}"),
+    ([, id = ""]) => ({ ...(GRANTS.find((g) => g.id === id) ?? GRANTS[1]), id }),
+  ],
   [re("/tenant/billing/invoices"), () => page(TENANT_INVOICES)],
-  [re("/knowledge/verified-answers"), (_, q) => page(by(VERIFIED_ANSWERS, q, "status", (r) => r.status))],
+  [
+    re("/knowledge/verified-answers"),
+    (_, q) => page(by(VERIFIED_ANSWERS, q, "status", (r) => r.status)),
+  ],
   // Platform.
   [
     re("/platform/usage"),
@@ -1055,7 +1611,10 @@ const ROUTES: Array<[RegExp, Handler]> = [
   [re("/platform/fleet/versions"), () => FLEET_VERSIONS],
   [re("/platform/deployments"), (_, q) => page(by(DEPLOYMENTS, q, "status", (r) => r.status))],
   [re("/platform/tenants/{id}/billing-account"), ([, id = T1]) => billingAccount(id)],
-  [re("/platform/tenants/{id}/usage"), ([, id = T1]) => Array.from({ length: 10 }, (_, i) => usageRow(id, 28 - i, i))],
+  [
+    re("/platform/tenants/{id}/usage"),
+    ([, id = T1]) => Array.from({ length: 10 }, (_, i) => usageRow(id, 28 - i, i)),
+  ],
   // The provisioning-stopped school keeps the stand-in's detail (undefined → fallback).
   [re("/platform/tenants/{id}"), ([, id = T1]) => (id === T3 ? undefined : tenantDetail(id))],
   [
@@ -1064,13 +1623,22 @@ const ROUTES: Array<[RegExp, Handler]> = [
       let rows = by(TENANTS, q, "status", (r) => r.tenant_status);
       rows = by(rows, q, "tier", (r) => r.tier);
       const text = (q.get("q") ?? "").toLowerCase();
-      if (text) rows = rows.filter((r) => `${r.school_name} ${r.code}`.toLowerCase().includes(text));
+      if (text)
+        rows = rows.filter((r) => `${r.school_name} ${r.code}`.toLowerCase().includes(text));
       return page(rows);
     },
   ],
   [
     re("/platform/subscriptions"),
-    (_, q) => page(by(SCHOOLS.slice(0, 8).map(([id], i) => subscription(i, id)), q, "status", (r) => r.status)),
+    (_, q) =>
+      page(
+        by(
+          SCHOOLS.slice(0, 8).map(([id], i) => subscription(i, id)),
+          q,
+          "status",
+          (r) => r.status,
+        ),
+      ),
   ],
   [re("/platform/flags"), () => page(FLAGS)],
   [re("/platform/operators"), () => page(OPERATORS)],
@@ -1079,7 +1647,14 @@ const ROUTES: Array<[RegExp, Handler]> = [
     re("/platform/support/tickets"),
     (_, q) => {
       const rows = Array.from({ length: 8 }, (_, i) => ticket(i, pick(SCHOOLS, i)[0], false));
-      return page(by(by(rows, q, "status", (r) => r.status), q, "tenant_id", (r) => r.tenant_id));
+      return page(
+        by(
+          by(rows, q, "status", (r) => r.status),
+          q,
+          "tenant_id",
+          (r) => r.tenant_id,
+        ),
+      );
     },
   ],
   [
@@ -1090,10 +1665,21 @@ const ROUTES: Array<[RegExp, Handler]> = [
     },
   ],
   [re("/platform/audit/events"), () => page(PLATFORM_AUDIT)],
-  [re("/platform/break-glass-requests"), (_, q) => page(by(PLATFORM_BREAK_GLASS, q, "tenant_id", (r) => r.tenant_id))],
+  [
+    re("/platform/break-glass-requests"),
+    (_, q) => page(by(PLATFORM_BREAK_GLASS, q, "tenant_id", (r) => r.tenant_id)),
+  ],
   [
     re("/platform/invoices"),
-    (_, q) => page(by(by(PLATFORM_INVOICES, q, "status", (r) => r.status), q, "tenant_id", (r) => r.tenant_id)),
+    (_, q) =>
+      page(
+        by(
+          by(PLATFORM_INVOICES, q, "status", (r) => r.status),
+          q,
+          "tenant_id",
+          (r) => r.tenant_id,
+        ),
+      ),
   ],
 ];
 
@@ -1107,7 +1693,11 @@ async function answer(route: Route): Promise<void> {
     if (!match) continue;
     const body = handler(match, url.searchParams);
     if (body === undefined) return route.fallback();
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
   }
   return route.fallback();
 }

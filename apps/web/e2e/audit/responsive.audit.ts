@@ -70,15 +70,9 @@ const GROUPS: Record<string, Group> = {
     pages: [
       "/platform",
       "/platform/schools",
-      ...[
-        "overview",
-        "subscription",
-        "invoices",
-        "usage",
-        "deployment",
-        "flags",
-        "tickets",
-      ].map((tab) => `/platform/schools/${T1}?tab=${tab}`),
+      ...["overview", "subscription", "invoices", "usage", "deployment", "flags", "tickets"].map(
+        (tab) => `/platform/schools/${T1}?tab=${tab}`,
+      ),
       `/platform/schools/${T3}`,
       "/platform/provision",
       "/platform/plans",
@@ -185,8 +179,12 @@ function detect({ vw, vh }: { vw: number; vh: number }) {
       "a[href], button, select, textarea, input:not([type=hidden]):not(.sr-only), summary, [role=button], [role=tab], [role=switch], label:has(> input.sr-only)",
     );
     if (interactive && (r.width < 24 || r.height < 24)) {
-      const inline = s.display === "inline" && (el.parentElement?.textContent ?? "").trim().length > (el.textContent ?? "").trim().length + 5;
-      if (!inline) out.smallTargets.push(`${Math.round(r.width)}x${Math.round(r.height)} ${desc(el)}`);
+      const inline =
+        s.display === "inline" &&
+        (el.parentElement?.textContent ?? "").trim().length >
+          (el.textContent ?? "").trim().length + 5;
+      if (!inline)
+        out.smallTargets.push(`${Math.round(r.width)}x${Math.round(r.height)} ${desc(el)}`);
     }
     if (vw < 768 && isCard(el) && (r.left < 12 || r.right > vw - 12) && !el.closest("dialog"))
       out.edge.push(`${Math.round(r.left)}..${Math.round(r.right)} ${desc(el)}`);
