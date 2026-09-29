@@ -26,6 +26,8 @@ import secrets
 import sys
 import time
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -303,3 +305,99 @@ def audit_actions(
                 {"t": tenant_id, "p": prefix + "%"},
             )
         ]
+
+
+@contextmanager
+def flag_on(admin: Engine, tenant_id: uuid.UUID) -> Iterator[None]:
+    """The connector flag on for one block (security suites share schools with other tests)."""
+    set_flag(admin, tenant_id, enabled=True)
+    try:
+        yield
+    finally:
+        set_flag(admin, tenant_id, enabled=False)
+
+
+# --- rows written as the test superuser (setup for the security suites) ---------------------------
+
+
+def seed_device(admin: Engine, tenant_id: uuid.UUID, user_id: uuid.UUID) -> uuid.UUID:
+    """An active agent (and its used code); the key is a placeholder, never verified."""
+    code, device = uuid.uuid4(), uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_enrolment_codes (id, tenant_id, code_hash, device_name, "
+                "created_by, expires_at, used_at) VALUES (:i, :t, :h, 'Office PC', :u, "
+                "now() + interval '30 minutes', now())"
+            ),
+            {"i": code, "t": tenant_id, "h": hashlib.sha256(code.bytes).digest(), "u": user_id},
+        )
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_devices (id, tenant_id, name, enrolment_code_id, key_id, "
+                "key_ciphertext, enrolled_by) VALUES (:i, :t, 'Office PC', :c, :k, :w, :u)"
+            ),
+            {
+                "i": device,
+                "t": tenant_id,
+                "c": code,
+                "k": "tdk-" + "".join(chr(97 + b % 26) for b in (device.bytes * 2)[:20]),
+                "w": b"\x09" * 40,
+                "u": user_id,
+            },
+        )
+    return device
+
+
+def seed_party(
+    admin: Engine,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    ledger: str = "Synthetic Other School Ledger",
+) -> uuid.UUID:
+    """One synced ledger (with the agent and sync record it came from)."""
+    device = seed_device(admin, tenant_id, user_id)
+    sync, party = uuid.uuid4(), uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_syncs (id, tenant_id, device_id, batch_id, company, as_of, "
+                "groups, parties, created, updated, missing, total_due) VALUES (:i, :t, :d, :b, "
+                ":co, '2026-09-28', 1, 1, 1, 0, 0, 900.00)"
+            ),
+            {"i": sync, "t": tenant_id, "d": device, "b": uuid.uuid4(), "co": COMPANY},
+        )
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_parties (id, tenant_id, company, ledger_name, group_name, "
+                "closing_balance, as_of, last_sync_id) VALUES (:i, :t, :co, :n, "
+                "'Sundry Debtors', 900.00, '2026-09-28', :s)"
+            ),
+            {"i": party, "t": tenant_id, "co": COMPANY, "n": ledger, "s": sync},
+        )
+    return party
+
+
+def seed_link(
+    admin: Engine,
+    tenant_id: uuid.UUID,
+    party_id: uuid.UUID,
+    student_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> None:
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_party_links (id, tenant_id, party_id, student_id, "
+                "linked_by) VALUES (:i, :t, :p, :s, :u) "
+                "ON CONFLICT ON CONSTRAINT tally_party_links_pair_key DO NOTHING"
+            ),
+            {"i": uuid.uuid4(), "t": tenant_id, "p": party_id, "s": student_id, "u": user_id},
+        )
+
+
+def seed_objects(admin: Engine, tenant_id: uuid.UUID, user_id: uuid.UUID) -> dict[str, uuid.UUID]:
+    """An active agent and a synced ledger of a school (cross-school tests)."""
+    party = seed_party(admin, tenant_id, user_id)
+    return {"device": seed_device(admin, tenant_id, user_id), "party": party}

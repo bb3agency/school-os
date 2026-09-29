@@ -9,6 +9,7 @@ invariant 3, docs/12 §4.3-4.4).
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import sys
 import uuid
@@ -168,6 +169,13 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/notices/{notice_id}"): {"title_en": "Synthetic"},
     ("POST", "/api/v1/notices/{notice_id}/approve"): {},
     ("POST", "/api/v1/notices/{notice_id}/render"): {},
+    # M6 Tally connector (ADR-0032; flag on for school A during the call): school B's agent and
+    # ledger are 404 like a random id.
+    ("POST", "/api/v1/tally/devices/{device_id}/revoke"): None,
+    ("POST", "/api/v1/tally/parties/{party_id}/links"): {
+        "student_id": "01920000-0000-7000-8000-000000000001"
+    },
+    ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): None,
 }
 
 
@@ -543,6 +551,38 @@ def _b_notice(w: Any) -> uuid.UUID:
     return value
 
 
+def _tally() -> ModuleType:
+    """tests/tally/support.py (Tally connector rows of a school, the connector flag)."""
+    name = "sos_test_tally_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "tally" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_tally(w: Any, key: str) -> uuid.UUID:
+    """An enrolled agent and a synced ledger of school B (M6, FR-TALLY-002, FR-TALLY-006)."""
+    if "bola_tally_party" not in w.b.ids:
+        ids = _tally().seed_objects(_ADMIN[0], w.b.tenant_id, w.b.people["owner"].user_id)
+        w.b.ids["bola_tally_device"] = ids["device"]
+        w.b.ids["bola_tally_party"] = ids["party"]
+    value: uuid.UUID = w.b.ids[key]
+    return value
+
+
+def _tally_flag(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
+    """Tally routes reach the object lookup only with school A's connector flag on."""
+    if path.startswith("/api/v1/tally/"):
+        flag: contextlib.AbstractContextManager[None] = _tally().flag_on(_ADMIN[0], w.a.tenant_id)
+        return flag
+    return contextlib.nullcontext()
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -582,6 +622,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "suggestion_id": _b_suggestion,
     "task_id": _b_task,
     "notice_id": _b_notice,
+    # Tally connector (M6): an agent and a ledger of school B.
+    "device_id": lambda w: _b_tally(w, "bola_tally_device"),
+    "party_id": lambda w: _b_tally(w, "bola_tally_party"),
 }
 
 
@@ -638,14 +681,15 @@ def test_SEC_001_other_school_ids_are_404(
     before = W.audit_events(admin_engine, world.b.tenant_id)
     bodies = []
     for target in (b_id, uuid.uuid4()):
-        res = api.call(
-            world.person(ACTOR.get(key, "owner")),
-            method,
-            _fill(template, target),
-            json=BODIES.get(key),
-            params=QUERY.get(key),
-            headers={"If-Match": 'W/"1"'},
-        )
+        with _tally_flag(template, world):
+            res = api.call(
+                world.person(ACTOR.get(key, "owner")),
+                method,
+                _fill(template, target),
+                json=BODIES.get(key),
+                params=QUERY.get(key),
+                headers={"If-Match": 'W/"1"'},
+            )
         assert res.status_code == 404, (key, res.text)
         body = res.json()
         bodies.append({k: body.get(k) for k in ("status", "code", "title", "detail")})
@@ -1039,3 +1083,24 @@ def test_SEC_001_knowledge_never_shows_or_cites_another_school(
         assert res.status_code == 422, res.text
         codes.append(res.json()["errors"][0]["code"])
     assert codes == ["citation_not_found", "citation_not_found"]
+
+
+def test_SEC_001_tally_lists_never_show_other_school(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """M6 (ADR-0032): school B's agent, ledger and dues never appear in school A's lists."""
+    b_party = str(_b_tally(world, "bola_tally_party"))
+    b_device = str(_b_tally(world, "bola_tally_device"))
+    owner = world.person("owner")
+    with _tally().flag_on(admin_engine, world.a.tenant_id):
+        devices = api.call(owner, "GET", "/api/v1/tally/devices")
+        parties = api.call(owner, "GET", "/api/v1/tally/parties", params={"limit": 200})
+        dues = api.call(owner, "GET", "/api/v1/tally/dues", params={"limit": 200})
+        status = api.call(owner, "GET", "/api/v1/tally/status")
+    assert devices.status_code == 200
+    assert parties.status_code == 200
+    assert dues.status_code == 200
+    assert b_device not in {d["id"] for d in devices.json()}
+    assert b_party not in {p["id"] for p in parties.json()["data"]}
+    assert "Synthetic Other School Ledger" not in parties.text + dues.text
+    assert status.json()["parties"] == 0

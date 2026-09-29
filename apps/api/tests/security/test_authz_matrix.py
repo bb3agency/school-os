@@ -1552,6 +1552,8 @@ def _route_table() -> dict[tuple[str, str], Any]:
             continue  # public health checks
         if str(rc.path).startswith(("/api/v1/platform/", "/api/v1/fleet/")):
             continue  # control plane: tests/platform/test_authz_matrix.py (operator roles)
+        if str(rc.path).startswith("/api/v1/edge/"):
+            continue  # Tally edge agent, device-signed (ADR-0032): tests/tally/test_api.py
         for method in rc.methods or ():
             table[(method, str(rc.path))] = guard[0]
     return table
@@ -1563,6 +1565,97 @@ ROLES = tuple(system_roles())
 # principal (ADR-0023): 403 ``breakglass_only`` for every school role.
 SUPPORT_ONLY = frozenset({("POST", "/api/v1/breakglass/support-session")})
 STEP_UP_ROUTES = sorted(k for k, g in ROUTES.items() if g.sos_step_up)
+
+
+# --- Tally connector (M6; ADR-0032 Proposed): school A flag on around each call -------------------
+
+
+def _tally() -> ModuleType:
+    """tests/tally/support.py (connector rows written as the test superuser, the flag)."""
+    name = "sos_test_tally_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "tally" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _tally_party(w: Any, a: Engine) -> uuid.UUID:
+    if "matrix_tally_party" not in w.a.ids:
+        w.a.ids["matrix_tally_party"] = _tally().seed_party(
+            a, w.a.tenant_id, w.person("owner").user_id, ledger="Synthetic Matrix Ledger"
+        )
+    value: uuid.UUID = w.a.ids["matrix_tally_party"]
+    return value
+
+
+def _tally_code(w: Any, r: str, a: Engine) -> Request:
+    """A new code needs a free device slot: earlier matrix rows may have left agents active."""
+    with a.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.tally_devices SET status = 'revoked', key_id = NULL, "
+                "key_ciphertext = NULL, next_key_id = NULL, next_key_ciphertext = NULL, "
+                "rotation_started_at = NULL, revoked_at = now() "
+                "WHERE tenant_id = :t AND status = 'active'"
+            ),
+            {"t": w.a.tenant_id},
+        )
+    return "/api/v1/tally/enrolment-codes", {"device_name": "Matrix PC"}, {}
+
+
+def _tally_revoke(w: Any, r: str, a: Engine) -> Request:
+    device = _tally().seed_device(a, w.a.tenant_id, w.person("owner").user_id)
+    return f"/api/v1/tally/devices/{device}/revoke", None, {"If-Match": 'W/"1"'}
+
+
+def _tally_link(w: Any, r: str, a: Engine) -> Request:
+    student = SW.ensure_students(w)["s9a"]
+    return (
+        f"/api/v1/tally/parties/{_tally_party(w, a)}/links",
+        {"student_id": str(student)},
+        {},
+    )
+
+
+def _tally_unlink(w: Any, r: str, a: Engine) -> Request:
+    party, student = _tally_party(w, a), SW.ensure_students(w)["s9a"]
+    _tally().seed_link(a, w.a.tenant_id, party, student, w.person("owner").user_id)
+    return f"/api/v1/tally/parties/{party}/links/{student}", None, {}
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/tally/status"): lambda w, r, a: ("/api/v1/tally/status", None, {}),
+        ("GET", "/api/v1/tally/devices"): lambda w, r, a: ("/api/v1/tally/devices", None, {}),
+        ("POST", "/api/v1/tally/enrolment-codes"): _tally_code,
+        ("POST", "/api/v1/tally/devices/{device_id}/revoke"): _tally_revoke,
+        ("GET", "/api/v1/tally/groups"): lambda w, r, a: ("/api/v1/tally/groups", None, {}),
+        ("PUT", "/api/v1/tally/groups/selection"): lambda w, r, a: (
+            "/api/v1/tally/groups/selection",
+            {"company": "Synthetic Matrix Company", "group_ids": []},
+            {},
+        ),
+        ("GET", "/api/v1/tally/parties"): lambda w, r, a: ("/api/v1/tally/parties", None, {}),
+        ("POST", "/api/v1/tally/parties/search"): lambda w, r, a: (
+            "/api/v1/tally/parties/search",
+            {"query": "Synthetic"},
+            {},
+        ),
+        ("GET", "/api/v1/tally/parties/{party_id}"): lambda w, r, a: (
+            f"/api/v1/tally/parties/{_tally_party(w, a)}",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/tally/parties/{party_id}/links"): _tally_link,
+        ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): _tally_unlink,
+        ("GET", "/api/v1/tally/dues"): lambda w, r, a: ("/api/v1/tally/dues", None, {}),
+    }
+)
 
 
 def _success(method: str, path: str) -> int:
@@ -1586,6 +1679,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/tasks",
         "/api/v1/notices",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
+        "/api/v1/tally/enrolment-codes",
+        "/api/v1/tally/parties/{party_id}/links",
     }
     accepted = {
         "/api/v1/documents",
@@ -1609,6 +1704,7 @@ def _success(method: str, path: str) -> int:
     if method == "DELETE" and path in (
         "/api/v1/documents/{document_id}",
         "/api/v1/students/{student_id}/guardians/{guardian_id}",
+        "/api/v1/tally/parties/{party_id}/links/{student_id}",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200
@@ -1616,6 +1712,10 @@ def _success(method: str, path: str) -> int:
 
 def _call(api: Any, w: Any, admin: Engine, role: str, key: tuple[str, str], **kw: Any) -> Any:
     path, body, headers = SPECS[key](w, role, admin)
+    if key[1].startswith("/api/v1/tally/"):
+        # The Tally connector is behind a per-school flag (default off, ADR-0032): on for the call.
+        with _tally().flag_on(admin, w.a.tenant_id):
+            return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
     return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
 
 
