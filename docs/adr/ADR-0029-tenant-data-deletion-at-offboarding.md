@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed |
+| Status | Accepted (2026-09-29) |
 | Date | 2026-09-29 |
-| Deciders | Product owner (security review required: new database role) |
-| Amends / supersedes | Would amend [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (role set §1, A1/A2 grants) and [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) (the lifecycle calls `platform` may make into `tenancy.service`) |
+| Deciders | Product owner (approved 2026-09-29 through the lead: "approved exactly as proposed"; decisions on the open questions recorded below) |
+| Amends / supersedes | Amends [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (role set §1, A1/A2 grants) and [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) (the lifecycle calls `platform` may make into `tenancy.service`) |
 
 ## Context
 
@@ -55,14 +55,14 @@ Facts checked on 2026-09-29 against a database migrated to `0030_import_cell_edi
    `SET ROLE`.
 7. Adding a database role needs an ADR (docs/adr/README.md "When to write an ADR").
 
-A spike on the scratch database confirmed the mechanism below: with `sos_purger` granted to
+A spike on a scratch database (before the decision) confirmed the mechanism below: with `sos_purger` granted to
 `sos_app` `WITH INHERIT FALSE, SET TRUE`, `has_table_privilege('sos_app','sis.dq_runs','DELETE')`
 stays `false`; a `DELETE` as `sos_app` still fails with `permission denied`; after
 `SET LOCAL ROLE sos_purger` a `DELETE` removes nothing for an `active` school or without the
 purge flag, removes only the current school's rows when the school is `offboarding` and the flag
 names it, and nothing of another school (the flag and tenant context must match).
 
-## Decision (proposed)
+## Decision
 
 ### 1. Where the deletion runs
 
@@ -71,15 +71,18 @@ names it, and nothing of another school (the flag and tenant context must match)
   `BYPASSRLS`, and with no new `SECURITY DEFINER` function or `definer_access` policy.
 - The control plane (`app.platform`) starts each step through new **lifecycle** functions of
   `app.tenancy.service` (ADR-0020 "offboard" family): `tenant_data_inventory(tenant_id)` (counts
-  per category), `purge_tenant_data(tenant_id)`, `verify_tenant_purged(tenant_id)` (remaining
-  counts) and `destroy_tenant_keys(tenant_id)`. They return counts and codes only. The four names
-  are added to `TENANCY_ALLOWED` in `tests/platform/test_boundaries.py` with this ADR as the
-  reference; `platform` gets no new tenant-side import and opens no `tenant_session`.
+  per category), `purge_tenant(tenant_id)`, `verify_tenant_purged(tenant_id)` (remaining
+  counts), `destroy_tenant_keys(tenant_id)` and, a year later, `purge_expired_audit_chain(tenant_id)`.
+  They return counts and codes only. The five names are added to `TENANCY_ALLOWED` in
+  `tests/platform/test_boundaries.py` (ADR-0020 amendment of facts, 2026-09-29, approved);
+  `platform` gets no new tenant-side import and opens no `tenant_session`.
 - Each tenant module owns the deletion of its own tables through an additive public
   `purge_tenant_data(session) -> dict[str, int]` in its `service.py` (children before parents),
   registered with `tenancy` at import time. `tenancy` runs them in the fixed order of a versioned
   file `app/tenancy/offboarding.yaml` and **fails closed** when any listed owner is not
-  registered. Order: knowledge, extraction, dq, changes, students, imports, documents, exports,
+  registered. Counting runs as `sos_app`; each module's optional `prepare` step (identity clears
+  sole profiles, tenancy resets the settings) runs as `sos_app` before the role switch. The
+  shared helpers are in `app/core/purge.py` (`PurgeTables`, `purge_role`, `remaining_rows`). Order: knowledge, extraction, dq, changes, students, imports, documents, exports,
   notifications, breakglass, ops, identity, tenancy.
 
 ### 2. New role `sos_purger` for the protected tables
@@ -90,9 +93,11 @@ names it, and nothing of another school (the flag and tenant context must match)
   passes unchanged) and gains only the ability to `SET LOCAL ROLE sos_purger` inside a
   transaction.
 - Migration `0032_offboarding` grants `sos_purger` `SELECT, DELETE` on the tenant tables the purge
-  deletes (and `EXECUTE` on `core.current_tenant()` and a new plain, non-definer function
-  `core.tenant_purge_allowed()`), never on `audit.*`, `core.tenants`, `core.users` or
-  `core.permissions`, and adds to each of those tables a **restrictive** policy
+  deletes (and `EXECUTE` on `core.current_tenant()` and the new plain, non-definer functions
+  `core.tenant_purge_allowed()` and `core.tenant_audit_purge_allowed()`, and `SELECT (id, status)`
+  on `core.tenants`), never on `core.tenants` rows, `core.users`, `core.permissions` or any
+  `platform` table; `audit.events` and `audit.chain_heads` only under decision 3. It adds to each
+  of those tables a **restrictive** policy
   `offboarding_purge ... TO sos_purger USING (core.tenant_purge_allowed())`. The standard
   `tenant_isolation` policy still applies to `sos_purger` (it is not the owner; `FORCE` RLS).
 - `core.tenant_purge_allowed()` (`LANGUAGE sql STABLE`, `SECURITY INVOKER`, `search_path`
@@ -114,7 +119,7 @@ names it, and nothing of another school (the flag and tenant context must match)
   `last_login_at`) of each person whose **only** membership is this school
   (`core.user_membership_count`, ADR-0028), using the update `sos_app` already has. A person
   who also works at another school keeps the profile (ADR-0028). The `core.users` row and its
-  opaque OIDC subject stay (no `DELETE` on `core.users`; see open question 3). The school's
+  opaque OIDC subject stay (no `DELETE` on `core.users`; decision 4 below). The school's
   `core.tenants.settings` is reset to `{}`; the row stays with status `deleted` (code and
   registered name are business records).
 
@@ -122,7 +127,7 @@ names it, and nothing of another school (the flag and tenant context must match)
 
 | Data | Retained? | Reason |
 |---|---|---|
-| `audit.events`, `audit.chain_heads` of the school | **Yes**, until the normal audit retention removes them with their monthly partitions | Append-only by DB grant and trigger (invariant 7); summaries hold IDs, codes and counts only (no personal data by validation); DPDP ≥ 1 year and CERT-In 180 days of logs (08 §6–7, 05 §13); the signed daily archives are under S3 Object Lock and cannot be deleted anyway. Listed as "retained" on the certificate. See open question 1 |
+| `audit.events`, `audit.chain_heads` of the school | **Yes**, until the audit retention ends (`offboarding.audit_chain_retention_days`, 366 days after the certificate), **then deleted** (decision 2 below) | Append-only by DB grant and trigger (invariant 7); summaries hold IDs, codes and counts only (no personal data by validation); DPDP ≥ 1 year and CERT-In 180 days of logs (08 §6–7, 05 §13). Listed on the certificate as retained with its deletion date. The signed daily archives are under S3 Object Lock and expire after 3 years (date on the certificate) |
 | `core.tenants` row (status `deleted`, settings `{}`) | Yes | Status, code and registered name; needed so the code is never reused and the certificate refers to it |
 | `platform.*` (invoices, billing account, subscription, deployment, platform audit) | Yes | Business records, 8 years (08 §14) |
 | Everything else in `core`, `sis`, `kb`, `ops` | **No** | Deleted by the purge; verified by a catalog-driven count of every table with `tenant_id` |
@@ -133,7 +138,7 @@ names it, and nothing of another school (the flag and tenant context must match)
   `sos-lifecycle=discarded`, delete; idempotent and resumable), so the versioned bucket expires
   the remaining noncurrent versions after one day (`discarded-1d`) instead of the 90-day recovery
   window. Verification lists the prefix again (zero objects). Versions deleted **before**
-  offboarding keep their 90-day expiry: see open question 2.
+  offboarding keep their 90-day expiry: an open infra item (decision 5 below, 14 · roadmap).
 
 ### 5. Crypto-shredding
 
@@ -166,7 +171,8 @@ names it, and nothing of another school (the flag and tenant context must match)
   categories, object key, SHA-256 of the canonical content and of the PDF, template version.
   No student data, no personal data of school staff.
 - The PDF is rendered by `app.core.pdf` on the `pdf` queue, bilingual labels (English and
-  Telugu; the recipient is the school's management), stored under the control-plane prefix
+  Telugu, the Telugu wording marked for review; the recipient is the school's management), stored
+  under the control-plane prefix
   `platform/deletion-certificates/` (never under `t/`; the Terraform policy of the invoice prefix
   gains this prefix), and downloaded through a presigned GET (≤ 5 minutes) by operators with
   `platform.tenants.read`, audited as `tenant.deletion_certificate_downloaded`.
@@ -175,8 +181,10 @@ names it, and nothing of another school (the flag and tenant context must match)
   copy (ADR-0020).
 - Platform audit events: `tenant.export_confirmed`, `tenant.deletion_started`,
   `tenant.data_deleted`, `tenant.keys_destroyed`, `tenant.teardown_confirmed` (dedicated),
-  `tenant.deletion_certified`, `tenant.deleted`, `tenant.deletion_overdue`,
-  `tenant.deletion_certificate_downloaded`.
+  `tenant.deletion_certified`, `tenant.deleted` (+ school chain), `tenant.deletion_failed`,
+  `tenant.deletion_overdue`, `tenant.deletion_certificate_downloaded`,
+  `tenant.audit_chain_deleted`. School chain (written by the purge itself): `tenant.data_purged`,
+  `tenant.keys_destroyed`; copies of `tenant.export_confirmed` and `tenant.deleted`.
 - Routes (all `require_platform`): `GET /platform/tenants/{id}/offboarding`
   (`platform.tenants.read`), `POST …/offboarding:confirm-export` and
   `POST …/offboarding:confirm-teardown` (`platform.tenants.offboard` ᴿ),
@@ -195,9 +203,11 @@ names it, and nothing of another school (the flag and tenant context must match)
   clear error if the role is missing). `sos_app` can now become `sos_purger`, so a compromised
   API process could attempt a purge, but only of a school already in `offboarding` (two-person
   approved), and it would be visible in the audit chain.
-- Follow-up: ADR-0013 status line "Amended by ADR-0029"; docs 05 §3 (roles, grants, policies),
-  07 §8 (crypto-shredding), 08 §7 (retention at offboarding), 10 (bootstrap order), 16 §5.5, §7,
-  §8, §16, §17; 14 status row FR-PLT-005.
+- Existing tests that pinned the exact policy set of the extraction and knowledge tables now
+  expect `{tenant_isolation, offboarding_purge}`; the purge policy's shape (restrictive, `TO
+  sos_purger` only) is pinned by `tests/tenancy/test_offboarding_purge.py`.
+- Done with this ADR: ADR-0013 status line "Amended by ADR-0029"; ADR-0020 amendment; docs 05 §3
+  and §13, 07 §8, 08 §7, 09 §4, 10 §9, 14, 16 §5.5, §7, §8.1, §16–§19.
 
 ## Alternatives considered
 
@@ -209,32 +219,49 @@ names it, and nothing of another school (the flag and tenant context must match)
 | Run the purge as the migrator/owner (operator command) | A superuser-like path outside the audited worker; RLS does not apply to the owner's cascades and FORCE RLS alone would not scope a manual command; no per-school guard |
 | Crypto-shred only (leave rows, destroy keys) | Only C3 fields are encrypted with the school key; names, admission numbers, documents and change requests are plaintext or SSE with the bucket key |
 
-## Open questions for the product owner
+## Product owner decisions (2026-09-29, through the lead)
 
-1. **School audit chain at offboarding.** Proposed: keep it until the normal audit retention
-   (IDs, codes and counts only; DPDP/CERT-In log retention; Object Lock archives cannot be deleted
-   before 3 years anyway) and name it as retained on the certificate. Alternative: delete the
-   school's rows early, which needs an exception to the append-only triggers (invariant 7).
-2. **Old object versions.** The files bucket keeps noncurrent versions for 90 days. Objects the
-   school deleted in the 90 days before offboarding keep that expiry. Removing them within 30
-   days needs `s3:ListBucketVersions` and `s3:DeleteObjectVersion` on `t/*` for the worker role
-   (Terraform `shared_platform`), or a lifecycle rule change. Which one?
-3. **Staff identities.** Profiles used only by this school are cleared, but the `core.users` row
-   (opaque OIDC subject) and the account in the staff user pool (Cognito) remain. Delete the
-   Cognito accounts as a runbook step (R8)? Delete the rows (needs a definer function, another
-   ADR)?
-4. **Backups in the shared tier.** The school's DEK is wrapped by the shared CMK, and database
-   backups (PITR ≥ 14 days, snapshots) still contain the wrapped DEK, so until they age out a
-   restored backup is readable. "Crypto-shredding makes backups unreadable" (08 §7) holds only
-   for dedicated hosts (own CMK). Accept "backups age out on their normal schedule" (08 §7) and
-   state the maximum age on the certificate, or add per-school KMS deny rules (encryption
-   context) as a Terraform action?
-5. **Export gate.** The full data export (FR-ADM-001) is not built. Proposed: an operator records
-   `school_confirmed` or `delivered_by_us` with a reference before deletion may start; the
-   deadline alert fires if that has not happened in time. Deletion never starts without it.
-6. **Certificate language.** Proposed: English and Telugu labels; Telugu wording needs review.
-7. Status `deleting`: not added. The school stays `offboarding` until the certificate exists;
-   progress is on the run. Confirm.
+1. **Approach:** approved exactly as proposed: `sos_purger` (NOLOGIN, NOBYPASSRLS) granted to
+   `sos_app` `WITH INHERIT FALSE, SET TRUE`, the restrictive `offboarding_purge` policy using
+   `core.tenant_purge_allowed()`. Extending `TENANCY_ALLOWED` in the boundary test is an
+   ADR-0020 amendment of facts (recorded there).
+2. **School audit chain:** kept until the normal audit retention ends, **then deleted**. The
+   certificate lists it as retained with the date it will be deleted. Mechanism (migration
+   `0032`): `audit.block_mutation()` lets `sos_purger` delete a row of `audit.events` only when
+   `core.tenant_audit_purge_allowed()` (school status `deleted`, transaction flag
+   `app.purge_audit`) and the event is older than 365 days; UPDATE and TRUNCATE stay refused for
+   every role, and nothing else may delete. The control-plane beat deletes the chain (and its
+   head) on `offboarding_runs.audit_delete_after` (certificate + 366 days) and records
+   `tenant.audit_chain_deleted`; a younger event makes the whole transaction fail and it retries.
+3. **Shared-tier backups:** accepted. The certificate states when the last backup that can hold
+   the school's data expires (`offboarding.shared_backup_max_age_days`, 365: the monthly
+   snapshot kept 12 months, docs/10 §9). Dedicated hosts are fully crypto-shredded: operators
+   confirm the KMS key deletion and the host teardown (references on the run and certificate).
+4. **Staff logins (`core.users` and external identities):** out of scope for this job. The owner
+   decided to replace Cognito with an in-house sign-up, login and account-management system,
+   with its own ADR (being drafted). This job deletes the school's memberships and clears the
+   profiles only this school used; `core.users` rows stay. The certificate names "staff sign-in
+   accounts" as pending removal under the identity work (docs/16 §5.5 TODO).
+5. **Lead's decisions on the other items:**
+   - Export confirmation: an operator records `school_confirmed` or `delivered_by_us` with a
+     reference before deletion can start. FR-ADM-001 (the full export, built in parallel) is
+     linked from the docs only; no code dependency.
+   - Certificate language: English and Telugu; the Telugu wording is marked for review
+     (`billing.yaml` → `offboarding.certificate.telugu_review: pending`; docs/16 §19 Q14).
+   - Status: no `deleting` status; the school stays `offboarding` until the certificate, and
+     progress lives on the run.
+   - Deploy order: `infra/db/bootstrap.sql` is re-run before `0032` (docs/10 §9; the dedicated
+     `upgrade.sh` already runs `db-bootstrap` before `migrate`; locally `make migrate` runs
+     `make db-bootstrap` first). `0032` fails with a clear message when `sos_purger` is missing.
+   - **Open infra item:** noncurrent object versions deleted before offboarding keep their 90-day
+     expiry. Removing them within 30 days needs `s3:ListBucketVersions` and
+     `s3:DeleteObjectVersion` on `t/*` for the worker role, or a lifecycle change (docs/14). No
+     Terraform change for it here. (The only Terraform change in this work adds the
+     `platform/deletion-certificates/` prefix to the invoice-PDF statement so the worker can store
+     certificates.)
+   - ADR number: 0029 kept.
+6. **Migration:** `0032_offboarding` with `down_revision = "0030_import_cell_edits"`; the lead
+   relinks it after `0031_admin`.
 
 ## Related requirements
 

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · implementation amendment 2026-09-29 (ADR-0029) |
 | Date | 2026-09-27 |
 | Deciders | Founder (product owner decisions of 2026-09-27 on the M0 "decisions needed" list, [14 · M0 status](../14-roadmap.md#m0-status-2026-09-26)) |
 | Amends / supersedes | Amends [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (settles Amendments A6 and A10) and [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) (what `platform` may call on the tenant side) |
@@ -77,3 +77,17 @@ The school-side routes in `platform/tenant_api.py` use the request's `TenantDB` 
 ## Related requirements
 
 FR-AUD-001, FR-PLT-002, FR-PLT-004, FR-PLT-005, SEC-007, SEC-026; CLAUDE.md §4 and invariant 7; docs/16 §5.4, §16, §17; 14 · M0 status.
+
+## Amendments (2026-09-29)
+
+Implementation facts only; the decision stands (policy in docs/adr/README.md).
+
+**B1 · Offboarding lifecycle calls (ADR-0029, approved by the product owner 2026-09-29).** The
+"offboard" lifecycle family now includes the deletion job's calls, which `platform` makes through
+`app.tenancy.service`: `tenant_data_inventory`, `purge_tenant`, `verify_tenant_purged`,
+`destroy_tenant_keys` and `purge_expired_audit_chain`. Each opens the school's own
+`tenant_session` inside `tenancy` and returns counts and codes only; `platform` still opens no
+`tenant_session`, imports no new tenant-side module and names no new tenant relation in SQL.
+`TENANCY_ALLOWED` in `apps/api/tests/platform/test_boundaries.py` lists the five names. The
+`tenant.deleted` school-chain copy goes through `tenant_audit.enqueue` in the certificate
+transaction (the follow-up above).

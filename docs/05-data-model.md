@@ -100,6 +100,7 @@ Effective table privileges after migrations `0002`–`0007` (default privileges,
 | `sos_readonly` | SELECT on `core`, `sis`, `kb`, `audit` (RLS applies); nothing on `core.tenant_keys`, `ops` or `platform` |
 | `sos_definer` | Only what its functions need (§3.4); NOLOGIN; only `sos_migrator` and the bootstrap admin can `SET ROLE` to it (never a runtime role) |
 | `sos_migrator` | Nothing directly (`INHERIT FALSE`); acts as `sos_owner` (and, inside migrations, `sos_definer`) via `SET ROLE` |
+| `sos_purger` | ADR-0029 (migration `0032_offboarding`). NOLOGIN, NOBYPASSRLS; granted to `sos_app` `WITH INHERIT FALSE, SET TRUE` (so `sos_app` gains nothing unless it runs `SET LOCAL ROLE sos_purger`, which only the offboarding purge does). `SELECT, DELETE` on the tables the purge deletes (`kb.document_chunks`, `kb.verified_answers`, `kb.queries`, `kb.llm_calls`, `kb.embedding_cache`, `kb.upload_intents`, `kb.documents`, `sis.extraction_*`, `sis.dq_findings`, `sis.dq_runs`, `sis.change_requests`, `sis.promotion_runs`, `sis.student_guardians`, `sis.guardians`, `sis.enrollments`, `sis.students`, `sis.attribute_definitions`, `sis.import_batches`, `sis.import_mapping_templates`, `ops.exports`, `ops.notifications`, `ops.break_glass_grants`, `ops.job_runs`, `ops.idempotency_keys`, `ops.outbox`, `core.membership_scopes`, `core.membership_roles`, `core.memberships`, `core.role_permissions`, `core.roles`, `core.sections`, `core.classes`, `core.academic_years`, `core.tenant_keys`) and on `audit.events`/`audit.chain_heads`; `SELECT (id, status)` on `core.tenants`. Nothing on `core.users`, `core.permissions` or `platform`. Each of those tables has the **restrictive** policy `offboarding_purge TO sos_purger USING (core.tenant_purge_allowed())` (audit tables: `core.tenant_audit_purge_allowed()`); `tenant_isolation` applies as well. `core.tenant_purge_allowed()`: tenant context set, transaction flag `app.purge_tenant` = the tenant, school `offboarding`. `core.tenant_audit_purge_allowed()`: flag `app.purge_audit`, school `deleted`; `audit.block_mutation()` additionally requires the event to be older than 365 days. Both are plain SQL, SECURITY INVOKER, `search_path` pinned (docs/16 §5.5.1) |
 
 ### 3.2 Tenant context
 
@@ -1175,7 +1176,7 @@ Aadhaar numbers are **not** in any class because they are never stored (ADR-0007
 - Ciphertext format: `version(1) | key_version(2) | nonce(12) | ciphertext | tag(16)`; associated data = `tenant_id|table|column|row_id` to prevent row swapping.
 - Blind index (HMAC-SHA256 with tenant HMAC key) only where equality search is needed (e.g., guardian phone lookup).
 - Key rotation: new `key_version` (newest unretired = current for writes); background re-encryption in place (same AAD; `app.students.rotation`, census by ciphertext header over the columns in `CIPHERTEXT_COLUMNS`); old versions retired (`retired_at`) only when no ciphertext uses them and the key cache has expired; wrapped keys are never deleted by rotation (07 §8, runbook 10 §9.1). `0026_dek_rotation` lets superseded `attribute_values` rows and decided `change_requests` change only by re-encryption to a newer key version.
-- Tenant deletion: destroy wrapped keys → remaining ciphertext (incl. in backups) becomes unreadable (crypto-shredding).
+- Tenant deletion: destroy wrapped keys → remaining ciphertext becomes unreadable (crypto-shredding). Built in `tenancy.service.destroy_tenant_keys` (ADR-0029), after the purge is verified. Shared tier: database backups still hold the wrapped DEK (wrapped by the shared CMK) until they expire; the certificate states that date. Dedicated: the host key is scheduled for deletion, which also covers backups.
 
 ## 10. Canonical value resolution
 
@@ -1213,7 +1214,7 @@ Identity attributes resolve to the verified admission-register value (BR-01). If
 | `kb.queries` (encrypted Q/A) | 180 days | Metadata aggregates kept longer, de-identified |
 | Audit events | ≥ 1 year online; archive 3 years (Object Lock) | DPDP ≥ 1 year; CERT-In 180 days in India |
 | Security/ICT logs | ≥ 1 year, stored in India | See 08 §6 |
-| Tenant offboarding | Export → delete within 30 days → crypto-shred | Certificate of deletion issued |
+| Tenant offboarding | Export confirmed → delete within 30 days (one transaction as `sos_purger`, then files) → verify → crypto-shred (delete `core.tenant_keys`) | Certificate of deletion issued (docs/16 §5.5.1, ADR-0029). The school's audit chain (IDs, codes, counts) is kept 366 days after the certificate, then deleted; staff `core.users` rows stay until the identity rework (docs/16 §5.5 TODO) |
 | `ops.idempotency_keys` | 24 hours | Purged daily |
 | `ops.notifications` | 90 days after being read | Purged daily (`notifications.purge_read`); unread ones are kept |
 | Invoices, invoice lines, payments, billing accounts (`platform`) | 8 years after the financial year ends | Tax and accounting records; kept after offboarding (no student data); confirm period with a CA |

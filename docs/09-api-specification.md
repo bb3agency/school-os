@@ -314,7 +314,7 @@ Full catalog with permissions: [16 §8](16-platform-admin-panel.md#8-api-endpoin
 | Area | Paths (under `/api/v1`) | Protection |
 |---|---|---|
 | Operator session, dashboard | `/platform/me`, `/platform/dashboard` | `require_platform(...)` |
-| Schools and provisioning | `/platform/tenants…` (list, detail, provision `201`, activate, owner-invite resend, suspend, reactivate, `offboarding` + `offboarding:approve`) | `platform.tenants.*` |
+| Schools and provisioning | `/platform/tenants…` (list, detail, provision `201`, activate, owner-invite resend, suspend, reactivate, `offboarding` + `offboarding:approve`; offboarding progress `GET …/offboarding`, `offboarding:confirm-export`, `offboarding:confirm-teardown`, `GET …/deletion-certificate/download-url`; docs/16 §5.5.1) | `platform.tenants.*` |
 | Plans, subscriptions, billing accounts | `/platform/plans…`, `/platform/subscriptions…`, `/platform/tenants/{id}/billing-account` | `platform.plans.manage`, `platform.subscriptions.*` |
 | Invoices and payments | `/platform/invoices…`, `/platform/payments/{id}/reverse`, `/platform/invoice-runs` | `platform.invoices.*` |
 | Usage, flags, fleet | `/platform/usage`, `/platform/tenants/{id}/usage`, `/platform/flags…`, `/platform/deployments…`, `/platform/fleet/versions` | `platform.usage.read`, `platform.flags.*`, `platform.fleet.*` |

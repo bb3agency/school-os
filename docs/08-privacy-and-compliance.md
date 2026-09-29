@@ -87,7 +87,16 @@ The April 2022 CERT-In directions apply to service providers and body corporates
 
 See 05-Data model §13. Principles: keep official school records per the school's legal obligations; delete working data (imports, exports, AI query logs) quickly; keep security and audit logs at least 1 year (in India); support **legal holds** that suspend deletion for specific records when the school instructs.
 
-Offboarding: school exports data → SchoolOS deletes tenant data within 30 days → destroys tenant keys (crypto-shredding, which also makes backup copies unreadable) → issues a certificate of deletion. Backups age out on their normal schedule.
+Offboarding: school exports data → SchoolOS deletes tenant data within 30 days → destroys tenant keys (crypto-shredding) → issues a certificate of deletion. Backups age out on their normal schedule.
+
+How it works (built; ADR-0029, docs/16 §5.5.1; decisions of 2026-09-29):
+
+- Deletion starts only after an operator records that the school confirmed it has its export, or that we delivered it (the full export is FR-ADM-001).
+- Every row of the school in every tenant table is deleted in one transaction, then every file; verification checks the whole catalog before keys are destroyed. People who worked only at this school have their profile (name, email, phone) cleared; people who also work at another school keep their shared profile.
+- **Kept, then deleted:** the school's audit log (IDs, codes and counts only; the legal log retention of §6) for 366 days after the certificate, then deleted; the signed audit archives expire under Object Lock after 3 years. Invoices and the billing account stay as business records (§14).
+- **Backups:** shared tier: the certificate states when the last backup that can hold the school's data expires (12 months after deletion); until then a restore would still need the wrapped key, which the backup contains. Dedicated hosts: crypto-shredded (host KMS key scheduled for deletion, host destroyed).
+- **Pending:** staff sign-in accounts (the global user rows and identity-provider accounts) are removed by the identity rework that replaces Cognito (its own ADR, being drafted); the certificate lists them as pending.
+- The certificate (English and Telugu) names categories, counts, dates and operator IDs only: no student or staff personal data.
 
 ## 8. AI-specific transparency
 

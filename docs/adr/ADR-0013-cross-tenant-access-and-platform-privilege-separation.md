@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028 · implementation amendments 2026-09-26, 2026-09-27 (see [Amendments](#amendments-2026-09-26)) |
+| Status | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028, ADR-0029 · implementation amendments 2026-09-26, 2026-09-27 (see [Amendments](#amendments-2026-09-26)) |
 | Date | 2026-09-26 |
 | Deciders | Founder (product owner approval of build proposals B1–B25) |
 | Amends / supersedes | Amends [ADR-0003](ADR-0003-pool-tenancy-rls.md), [ADR-0011](ADR-0011-hash-chained-audit.md), [ADR-0012](ADR-0012-managed-oidc-identity.md) |
@@ -235,3 +235,10 @@ Reference only (implementation facts; the decisions are in the ADR named).
 **A12 · A6 and A10 settled by [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md).** They are no longer open deviations. School-chain copies of platform actions are queued in `platform.tenant_audit_outbox` (migration `0015_platform_decisions`) inside the platform transaction and delivered exactly once, in order per school, by the task `platform.deliver_tenant_audit`; the post-commit `tenant_session` write described in A6 no longer exists. What `platform` may call in `app.tenancy.service`, which files may open `tenant_session()`, and which tenant relations its raw SQL may name are pinned by `apps/api/tests/platform/test_boundaries.py`. No definer function, `definer_access` policy or tenant-table grant was added.
 
 **A13 · Definer allowlist after ADR-0023 and ADR-0028.** Decided by those ADRs; recorded here as facts. Migration `0027_identity_issuer` replaced `core.resolve_login(text)`, `core.find_user_id_by_subject(text)` and `core.create_user_for_invite(text, text, citext, text)` by `core.resolve_login(text, text DEFAULT NULL, boolean DEFAULT false)`, `core.find_user_id_by_subject(text, text DEFAULT NULL)` and `core.create_user_for_invite(text, text, citext, text, text)` (the issuer; NULL defaults only for API images older than 0027), kept `core.create_user_for_invite(text, text, citext, text)` as an expand-phase wrapper calling the new function with the staff issuer (dropped by the contract migration) and granted `sos_definer` `SELECT` on `core.membership_roles` (already a `definer_access` table). Migration `0028_profile_scope` added `core.user_membership_count(uuid)` (EXECUTE `sos_app`). Pinned by `tests/security/test_definer_functions.py` and `tests/security/rls_allowlist.yaml`.
+
+## Amendments (2026-09-29)
+
+Reference only (implementation facts; the decision is in [ADR-0029](ADR-0029-tenant-data-deletion-at-offboarding.md)).
+
+**A14 · Role `sos_purger` (ADR-0029).** `infra/db/bootstrap.sql` creates `sos_purger` (NOLOGIN, NOSUPERUSER, NOBYPASSRLS, NOCREATEDB, NOCREATEROLE) and grants it to `sos_app` `WITH INHERIT FALSE, SET TRUE`: `sos_app` gains no privilege (A2 holds unchanged, including "no DELETE on `core.tenant_keys`"), only the ability to `SET LOCAL ROLE sos_purger` inside the offboarding purge. Migration `0032_offboarding` grants `sos_purger` `SELECT, DELETE` on the purged tenant tables and on `audit.events`/`audit.chain_heads`, `SELECT (id, status)` on `core.tenants`, and adds the restrictive policy `offboarding_purge` (`TO sos_purger`) on each: `core.tenant_purge_allowed()` (school `offboarding`, flag `app.purge_tenant`) or, for the audit tables, `core.tenant_audit_purge_allowed()` (school `deleted`, flag `app.purge_audit`; `audit.block_mutation()` also requires events older than 365 days). Both functions are SECURITY INVOKER; no definer function or `definer_access` policy was added. Pinned by `tests/tenancy/test_offboarding_purge.py`.
+
