@@ -6,6 +6,7 @@ requires-python = "==3.12.*"
 members = [
     "schoolos",
     "sos-api",
+    "sos-edge-agent",
     "sos-evals",
     "sos-worker",
 ]
@@ -2000,6 +2001,29 @@ requires-dist = [
     { name = "structlog", specifier = "==26.1.0" },
     { name = "uuid-utils", specifier = "==1.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.54.0" },
+]
+
+[[package]]
+name = "sos-edge-agent"
+version = "0.1.0"
+source = { editable = "apps/edge-agent" }
+dependencies = [
+    { name = "defusedxml" },
+]
+
+[package.dev-dependencies]
+test = [
+    { name = "pytest" },
+    { name = "pytest-timeout" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "defusedxml", specifier = "==0.7.1" }]
+
+[package.metadata.requires-dev]
+test = [
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pytest-timeout", specifier = "==2.4.0" },
 ]
 
 [[package]]

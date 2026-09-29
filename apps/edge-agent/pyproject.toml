@@ -1,0 +1,27 @@
+[project]
+name = "sos-edge-agent"
+version = "0.1.0"
+description = "SchoolOS Tally edge agent: reads configured Tally ledger groups on the office PC and sends them to SchoolOS (ADR-0032, Proposed)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  # XXE-safe XML parsing of TallyPrime's responses (no DTDs, entities or external references).
+  # Licence PSF-2.0; pure Python, no dependencies; already pinned by the API (apps/api); no known
+  # vulnerabilities (PyPI/OSV, 2026-09-29). Everything else is the standard library: urllib (HTTP),
+  # tomllib (configuration), ctypes (Windows DPAPI), logging.
+  "defusedxml==0.7.1",
+]
+
+[dependency-groups]
+# The agent's own test run (CI job "edge-agent" on Linux and Windows): the same pins as the
+# workspace's dev group.
+test = ["pytest==9.1.1", "pytest-timeout==2.4.0"]
+
+[project.scripts]
+sos-tally-agent = "sos_edge_agent.cli:main"
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sos_edge_agent"]

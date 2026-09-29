@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+ <BODY>
+  <DATA>
+   <COLLECTION>
+    <GROUP NAME="Current Assets" RESERVEDNAME="Current Assets">
+     <PARENT TYPE="String"></PARENT>
+    </GROUP>
+    <GROUP NAME="Sundry Debtors" RESERVEDNAME="Sundry Debtors">
+     <PARENT TYPE="String">Current Assets</PARENT>
+    </GROUP>
+    <GROUP NAME="Class IX Fees">
+     <PARENT TYPE="String">Sundry Debtors</PARENT>
+    </GROUP>
+    <GROUP NAME="Staff Advances">
+     <PARENT TYPE="String">Loans &amp; Advances (Asset)</PARENT>
+    </GROUP>
+    <GROUP NAME="Indirect&#4; Expenses">
+     <PARENT TYPE="String"></PARENT>
+    </GROUP>
+   </COLLECTION>
+  </DATA>
+ </BODY>
+</ENVELOPE>

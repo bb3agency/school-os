@@ -1,0 +1,41 @@
+<!--
+  SchoolOS Tally agent as a Windows service (ADR-0032 §7), with WinSW (MIT licence,
+  https://github.com/winsw/winsw). Put WinSW's exe next to this file as sos-tally-agent.exe, with
+  the agent's Python runtime in .\python (the installer bundles both), then:
+
+    sos-tally-agent.exe install
+    sos-tally-agent.exe start
+
+  The service runs under a dedicated local account (not LocalSystem and not the accountant's
+  account) so its DPAPI-protected device key is readable by that account only. Enrol AS that
+  account before starting it:
+
+    runas /user:.\SchoolOSAgent "python\python.exe -m sos_edge_agent.cli enrol --server https://<school>.schoolos.in --school <school id> --code XXXX-XXXX-XXXX"
+
+  The agent opens no port. It needs outbound HTTPS to the SchoolOS address and Tally's XML
+  server on 127.0.0.1 (TallyPrime: Help > Settings > Connectivity > TallyPrime acts as Server,
+  port 9000). Block port 9000 for other machines in Windows Defender Firewall.
+-->
+<service>
+  <id>SchoolOSTallyAgent</id>
+  <name>SchoolOS Tally agent</name>
+  <description>Reads the Tally ledger groups the school chose and sends fee balances to SchoolOS over HTTPS. Opens no port.</description>
+  <executable>%BASE%\python\python.exe</executable>
+  <arguments>-m sos_edge_agent.cli run</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <serviceaccount>
+    <username>.\SchoolOSAgent</username>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <onfailure action="restart" delay="60 sec"/>
+  <onfailure action="restart" delay="5 min"/>
+  <resetfailure>1 hour</resetfailure>
+  <stopparentprocessfirst>true</stopparentprocessfirst>
+  <stoptimeout>30 sec</stoptimeout>
+  <log mode="roll-by-size">
+    <sizeThreshold>1024</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>
