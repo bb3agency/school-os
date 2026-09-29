@@ -225,6 +225,19 @@ Not done: a live-model eval of `circular_reading` and `parent_notice` (the offli
 **Scope:** edge agent (Windows service) reading TallyPrime via XML over HTTP on localhost · configured ledgers only · sync to SchoolOS · `get_fee_dues` tool for accountant/management.
 **Exit:** fee-due questions answered from synced Tally data; accountant confirms figures match Tally.
 
+### M6 status (2026-09-29)
+
+Built on the M6 branch, **behind flag; ADR Proposed** (not yet merged; migration `0036_tally` revises `0034_circulars` and must be relinked after M5's `0035` before merge). Stories US-1801..US-1805 and FR-TALLY-001..010 are written in 02-PRD C18 and 03-TRD §3.16, each *proposed from the roadmap scope; PO to confirm*. The per-school flag `tally.connector.enabled` defaults off and must not be switched on anywhere before ADR-0032 is accepted.
+
+- **Edge agent** (`apps/edge-agent`, 10 §13): Windows service (WinSW) that sends only `Export` requests to Tally on localhost, parses XML safely, keeps its credential in DPAPI and syncs complete snapshots with a stable batch id; CI on Linux and Windows.
+- **Server** (`app/tally`, 05 §7.4, 09 Tally connector): one-time enrolment codes (owner, step-up), signed agent requests with replay and rate limits (07 §3 TB9), key rotation and revocation, group selection enforced on sync, idempotent snapshots, person-made ledger ↔ student links, fee dues, silent-agent notices, full export and offboarding purge. Two permissions (07 §6.2).
+- **Ask**: `get_fee_dues` (06 §7), school-wide `finance.read` only, linked ledgers only; eval gates in 06 §13.4 all pass on `app-fake`.
+- **Web**: `/settings/tally` (status, agents, groups), `/settings/tally/ledgers` (linking), `/fees` (dues), EN and TE; menu items only while the connector answers.
+
+Not built: the MSI installer and code signing; signed auto-update; exposure of `/api/v1/edge/tally/*` in the ALB and the dedicated Caddyfile (10 §13); bill-wise (term-wise) dues; a live-model fee eval; an e2e run of the new screens (listed in the responsive suite, not run in this change); the human exit criterion (the accountant confirms the figures match Tally at the design partner).
+
+**Questions for the PO and security review**: the ten questions of ADR-0032 (Tally version and ledger layout at the design partner, HMAC vs Ed25519, C2 vs C3 for fee data, who enrols, updates, an Excel fallback, bill-wise dues, the 48-hour silence window, class-teacher access).
+
 ### M7 · Multi-school readiness
 **Scope:** self-serve onboarding wizard · import templates library · online payment collection if ADR-0016 is accepted (basic billing already shipped in M0) · tenant admin improvements · support tooling beyond tickets · first dedicated-tier schools at scale (SEC-030 before the first one) · Stage 1 infrastructure (Multi-AZ, replicas, cross-account backups) · external pen test · published security overview for schools.
 **Exit:** 5 schools live with < 1 week onboarding effort each; SLOs met for 2 consecutive months.

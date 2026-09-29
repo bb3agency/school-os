@@ -291,6 +291,7 @@ Free-form text-to-SQL is **not** used: it is hard to secure and hard to get righ
 | `list_findings` | DQ findings by class/section/severity/rule | `dq.findings.read` | |
 | `list_documents` | Document metadata by type/date/issuer | `document.read` | No content; use `search_documents` for content |
 | `search_documents` | Hybrid retrieval (§6) | `document.read` | Returns search results |
+| `get_fee_dues` (M6; behind flag; ADR Proposed) | Fee dues from Tally for one student, or the school totals | `finance.read` school-wide | Offered only while the school's `tally.connector.enabled` is on; linked ledgers only |
 
 Example tool definition (Messages API tool format):
 
@@ -334,6 +335,8 @@ Search result blocks are part of the standard Messages API and are supported by 
 - `list_documents` (`document.read`; `documents.service.list_documents`: the documents list's ACL and scope): active documents, newest first, optional `doc_type`, at most 20; metadata only (title, type, issuer, date, current version, upload date), never content; never identity evidence or import files; C3 documents only for `student.read_sensitive` holders. Source: the current version's `#p1` page.
 - `search_documents` also returns verified answers first (§5 as built).
 
+**As built (M6; behind flag; ADR Proposed, ADR-0032 would amend ADR-0008).** `get_fee_dues` (`knowledge/tools/fees.py`, description in `tools.yaml`) is in the whitelist but `registry.offered()` asks each tool whether it is *available* for the school: this one only while `tally.connector.enabled` is on, and only for callers holding `finance.read` school-wide. With a `student_id` (from `find_students`) it asks `tally.service` for that student's dues; the students service first checks the student is in the caller's scope (404 → error result), then SQL selects **only the ledgers a person linked to that student**. One block: the total, each linked ledger's closing balance (rupees, Indian grouping), the Tally as-of date and the sync time; a student with no linked ledger gets "no linked Tally ledger", never a guess by name. Without a student: numbers only (students with dues, total due, unlinked ledgers). No other ledger name or amount can reach the model. Source `sos://fee/{id}` (§8).
+
 ## 8. Source URI scheme
 
 | Kind | URI | Opens in UI |
@@ -344,6 +347,7 @@ Search result blocks are part of the standard Messages API and are supported by 
 | Change request | `sos://change/{change_request_id}` | Change request |
 | Verified answer | `sos://verified/{id}` | Verified answer card |
 | Student count (M2 wave 5) | `sos://count/{id}` (id derived from school, breakdown and day) | No page: the chip shows the title and snippet |
+| Fee dues (M6; behind flag; ADR Proposed) | `sos://fee/{id}` (UUIDv5 of school, student or "school", and snapshot) | Fee dues screen (`/fees`); the chip says "From Tally" |
 
 URIs never contain names or values.
 
@@ -527,6 +531,20 @@ A reading that fails (`needs_review`) counts as nothing found. Adapters: `stub-p
 
 Run of 2026-09-29 (`app-fake`, fast and full, baselines `evals/baselines/app-fake-{fast,full}.json`): recall **0.944** (34 / 36), precision **1.00**, citation validity **1.00**, hallucinated deadlines **0**, complete rate 0.917 (22 / 24), metadata accuracy 1.00. The two misses are sentences whose action word the fake's list does not know ("visit", "collect"); the gates are not relaxed for them. These numbers measure the application's controls with a heuristic stand-in, **not Claude**: a live run with the real gateway (`circular` role) is needed before release and is a PO/engineering follow-up (14 · M4 status). Notice drafting is covered by unit and API tests (personal-number refusal, Telugu-script check, redaction, approval), not yet by an eval set.
 
+### 13.4 Fee dues evaluation (M6; FR-TALLY-008; behind flag; ADR Proposed)
+
+`evals/datasets/fees.jsonl` (generated from `sos_evals/fee_cases.py`, checked by `generate --check`): **22 synthetic cases** in tiny made-up schools with Tally ledgers and person-made links (13 English, 5 Telugu, 4 code-mixed; 3 school summaries; 10 where the right answer is a refusal: teachers, class teachers, office admins and office staff without `finance.read`, a connector that is off, and ledgers that carry a student's name but were never linked). Cases include two ledgers adding up, an advance (credit), a zero balance, lakh grouping and a family ledger linked to two siblings. The harness reads amounts with its own parser (`sos_evals.fees.amounts_in`).
+
+| Metric | Definition | Gate |
+|---|---|---|
+| `fee_figure_accuracy` | Answerable cases whose answer states the expected total / answerable cases (14 · M6 exit: figures match Tally) | **= 1.0 (hard)** |
+| `fee_leakage_count` | Answers carrying an amount or ledger name the asker may not see (another student's, an unlinked ledger's, anyone's for a non-finance reader) | **= 0 (hard)** |
+| `fee_guessed_link_count` | Answers giving a figure for a student whose ledger was never linked | **= 0 (hard)** |
+| `fee_citation_validity` | Fee answers citing a valid `sos://fee/` source that the application returned | **= 1.0 (hard)** |
+| `fee_refusal_correctness` | Refusal cases answered with "not found in school records" and no figure | **≥ 0.95 (hard)** |
+
+Adapters: `stub-perfect` answers from the key (passes every gate); `stub-leaky` states another ledger's amount (must fail); `app-fake` (`eval_bridge.AppFakeAdapter.ask_fees`) builds each school in the database, links ledgers as a person would, switches the flag and runs the real `find_students` → `get_fee_dues` path. Run of 2026-09-29 (`app-fake`): figure accuracy **1.00**, leakage **0**, guessed links **0**, citation validity **1.00**, refusal correctness **1.00**. As in §13.3 this measures the application's controls with a deterministic stand-in, not Claude.
+
 ## 14. Observability for RAG
 
 Trace spans: `kb.ask` → `llm.call` (model, tokens, latency, stop reason) → `tool.<name>` (rows, latency) → `retrieval.hybrid` (candidates per list, fused count, ef_search) → `citations.validate` (valid/dropped). Metrics: answers/min, refusal rate, fallback rate, citation drop rate, token spend per tenant, p95 per step. Never log question or answer text in plaintext.
@@ -547,7 +565,7 @@ Trace spans: `kb.ask` → `llm.call` (model, tokens, latency, stop reason) → `
 - **M3:** `get_certificate` / `list_certificates` tools; certificate PDFs indexed as documents.
 - **M4 (built, §4.10, §13.3):** circular reading → cited deadline suggestions → tasks confirmed by a person; bilingual parent notice drafts approved by a person. *Not built:* a "What's due this week?" tool for Ask (tasks are shown on the Tasks screen instead).
 - **M5:** `get_attendance_summary`, `get_marks_trend` tools with educational-purpose limits; flags visible only to assigned staff.
-- **M6:** `get_fee_dues` tool over Tally-synced data (accountant/management only).
+- **M6 (built behind flag; ADR Proposed, §7, §13.4):** `get_fee_dues` over Tally-synced data, `finance.read` school-wide only, linked ledgers only. *Not built:* bill-wise (term-wise) dues with due dates (ADR-0032 PO question 8).
 - **Assistive drafting** (e.g., correction memo, notice text): model drafts, human edits and submits through normal endpoints; never auto-send.
 
 ## 17. References

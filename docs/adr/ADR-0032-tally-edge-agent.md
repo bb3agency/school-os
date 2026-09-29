@@ -112,7 +112,7 @@ Why this needs a decision:
 - `require_edge_agent_signature()` (FastAPI dependency in `app/tally/agent_auth.py`) checks, in
   this order, storing nothing on failure: feature flag on for the school (else 404) → device and
   key known, active and not revoked, school active (else 401) → timestamp within ±300 s (401) →
-  body ≤ 2 MB (422) → signature in constant time (401) → nonce unseen for 10 minutes (409
+  body ≤ 1 MB (the API's request limit; 413) → signature in constant time (401) → nonce unseen for 10 minutes (409
   `replay`) → per-device rate limit (429). It resolves the school from the header and reads the
   device **inside that school's `tenant_session`** (RLS), so no new `SECURITY DEFINER` function or
   `definer_access` policy is needed (invariant 1).
@@ -261,6 +261,6 @@ the model. The flag is not to be switched on anywhere until this ADR is accepted
 
 ## Related requirements
 
-docs/14 M6; docs/03 §5 (Tally interface), SEC-003, SEC-005, SEC-008, SEC-018, SEC-020, SEC-022,
+FR-TALLY-001..010 and US-1801..US-1805 (docs/03 §3.16, docs/02 C18; proposed, PO to confirm); docs/14 M6; docs/03 §5 (Tally interface), SEC-003, SEC-005, SEC-008, SEC-018, SEC-020, SEC-022,
 FR-KB-004, FR-KB-005, FR-ADM-001, FR-PLT-005, BR-13; docs/04 §2, docs/05 §7.4, docs/06 §7, §13.4,
 docs/07 §3 (TB9), §6.2, docs/08 §11, docs/09 §4, docs/10 §13.

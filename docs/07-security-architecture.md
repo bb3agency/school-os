@@ -80,6 +80,7 @@ flowchart LR
 | TB6 Operator browser → control plane (`admin.<domain>`) | Separate OIDC client, MFA for every operator, step-up for ᴿ permissions, own `__Host-` session cookie, WAF, CSP; control plane connects to the DB as `sos_platform` only |
 | TB7 Dedicated host → control plane (heartbeat) | Outbound only; HMAC-SHA256 per deployment, ±5 min timestamp window, nonce replay cache, strict schema without free text, rate limit; the control plane never connects into a host |
 | TB8 Internet → dedicated host | Caddy TLS (ACME), security headers, only 80/443 open, no SSH (SSM), same app controls as the shared tier |
+| TB9 Office PC edge agent → API (M6; behind flag; ADR Proposed, ADR-0032) | Outbound only; the agent sends only Tally `Export` requests to `localhost` and SchoolOS never connects to the PC. Enrolment by a one-time code (owner, step-up; hash stored, 30 minutes, once, 10 attempts per school per hour). Every later request HMAC-SHA256 signed (`require_edge_agent_signature()`): flag, active device and key read inside the school's `tenant_session` (no definer function), ±300 s, body ≤ 1 MB, constant-time compare, nonce replay cache (10 minutes), per-device rate limits; secret wrapped by the school's key wrapper, rotation with ≤ 7 days overlap, revocation erases keys. Server enforces the accountant's group selection; ≤ 5,000 ledgers per snapshot. The BFF refuses `/api/v1/edge/*`. The credential on the PC is DPAPI-protected (service-account scope); nothing personal is written to disk or logs |
 
 ## 4. Threat model (STRIDE)
 

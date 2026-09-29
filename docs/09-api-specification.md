@@ -342,6 +342,35 @@ All **built** (module `app/circulars`, docs/05 §6.3, docs/06 §4.10). The AI re
 
 Reading failures are not HTTP errors: the reading becomes `needs_review` with `reading_error` = `no_text`, `document_gone` or a Knowledge error code below (`ai_disabled`, `ai_budget_exhausted`, `ai_rate_limited`, `ai_unavailable`, `ai_request_rejected`, `ai_invalid_output`), and the office is told in the bell. Task reminders (`task.due_soon`, `task.overdue`) are in-app notifications only (FR-TASK-007, FR-TASK-008). SchoolOS never sends a notice to parents (FR-NOTICE-008).
 
+### Tally connector (M6; US-1801..US-1805, FR-TALLY-001..010; behind flag; ADR Proposed)
+
+**Built behind the per-school flag `tally.connector.enabled` (default off)**: while it is off every route below answers 404. Module `app/tally` (docs/05 §7.4, ADR-0032). Ledger names and balances are C2 financial data: searches take names in POST bodies only (SEC-008). Every write is audited in the same transaction with IDs and counts only.
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/tally/status` | `finance.read`, `tally.device.manage` or `tally.configure` (`require_any`, school-wide); active agents, silence, last sync, as-of date, company, groups selected, ledger counts; totals only for `finance.read` holders (FR-TALLY-009) |
+| GET | `/tally/devices` | `tally.device.manage` (school); agents with status, last seen, last sync, version, Tally product, `silent`, `outdated`, `version` (ETag source) (FR-TALLY-002) |
+| POST | `/tally/enrolment-codes` (`device_name`) | `tally.device.manage` (school, **step-up**); 201 with the one-time `code` (shown once) and `expires_at`; 409 `too_many_devices` (FR-TALLY-001) |
+| POST | `/tally/devices/{device_id}/revoke` (`If-Match`) | `tally.device.manage` (school, **step-up**); erases the keys; 409 `already_revoked`; 412 when stale (FR-TALLY-002) |
+| GET | `/tally/groups` | `tally.configure` (school); groups the agent reported, with `selected` (FR-TALLY-004) |
+| PUT | `/tally/groups/selection` (`company`, `group_ids`) | `tally.configure` (school); replaces the selection; 422 `unknown_group` (FR-TALLY-004) |
+| GET | `/tally/parties` (`link` `all`/`linked`/`unlinked`, cursor, `limit`) | `tally.configure` (school); ledgers of the last snapshot with their links (FR-TALLY-006) |
+| POST | `/tally/parties/search` (`query`, `link`; cursor, `limit` in the query string) | `tally.configure` (school); the same list filtered by ledger name (FR-TALLY-006) |
+| GET | `/tally/parties/{party_id}` | `tally.configure` (school); one ledger with its links and up to 5 suggested students in the caller's scope (suggestions only) (FR-TALLY-006) |
+| POST | `/tally/parties/{party_id}/links` (`student_id`) | `tally.configure` (school); 201; idempotent; 409 `party_gone`; 422 `student_id` `not_found` (FR-TALLY-006) |
+| DELETE | `/tally/parties/{party_id}/links/{student_id}` | `tally.configure` (school); 204 (FR-TALLY-006) |
+| GET | `/tally/dues` (cursor, `limit`) | `finance.read` (school); students with dues from linked ledgers, highest first, only students the caller can see, with totals (FR-TALLY-007) |
+
+**Edge agent routes** (`/api/v1/edge/tally/*`; no user session; not reachable through the BFF). Guards `require_edge_agent_enrolment()` (enrol) and `require_edge_agent_signature()` (the rest; headers `X-SOS-Tenant`, `X-SOS-Device`, `X-SOS-Key-Id`, `X-SOS-Timestamp`, `X-SOS-Nonce`, `X-SOS-Signature: v1=<hex>`; canonical string in ADR-0032 §3). The route-enumeration test allows these guards on exactly these five routes. Failures: 401 (unknown, revoked or bad signature: no detail), 404 (flag off), 409 `replay`, 413, 429.
+
+| Method | Path | What |
+|---|---|---|
+| POST | `/edge/tally/enrol` (`code`, `device` facts) | 201: `device_id`, `key_id`, `secret` (once) (FR-TALLY-001) |
+| GET | `/edge/tally/config` | Selected company and groups, sync interval, `min_agent_version`, rotate-after days (FR-TALLY-004) |
+| PUT | `/edge/tally/catalog` | Company, Tally product/version, groups (names, parents); ≤ 500 groups (FR-TALLY-004) |
+| POST | `/edge/tally/syncs` | One snapshot (`batch_id`, company, `as_of`, parties under selected groups, ≤ 5,000); a repeated `batch_id` gets the first result; 409 `no_groups_selected`, `agent_outdated`; 422 `group_not_selected`, `company_not_selected`, `duplicate_party`, `too_many` (FR-TALLY-005) |
+| POST | `/edge/tally/key-rotation` | New `key_id` and `secret` once; the old key works until the new one is used or 7 days (FR-TALLY-002) |
+
 ### Exports, audit, admin, jobs
 | Method | Path | Permission |
 |---|---|---|

@@ -291,6 +291,25 @@ Every row below is proposed from the roadmap scope (14 · M4; stories US-1601..U
 
 ---
 
+### 3.16 Tally read connector (FR-TALLY) (M6; ADR-0032 Proposed; details in 05 §7.4, 06 §7, §13.4, 07 §3 TB9)
+
+Every row below is proposed from the roadmap scope (14 · M6; stories US-1801..US-1805) and waits for the product owner to confirm it. **Built behind flag; ADR Proposed**: the flag `tally.connector.enabled` defaults off and must not be switched on anywhere before ADR-0032 is accepted.
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-TALLY-001 | Only holders of `tally.device.manage` (owner; step-up MFA) MAY create a one-time enrolment code (12 characters, shown once, valid 30 minutes, stored as its SHA-256). `POST /edge/tally/enrol` MUST exchange a valid code once for a device id, key id and 256-bit secret returned once; a wrong, used or expired code is a plain 401; at most 10 attempts per school per hour (429) and 2 active devices (409 `too_many_devices`). Code creation and enrolment are audited. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-002 | Every later agent request MUST be HMAC-SHA256 signed over `SOS-EDGE-HMAC-SHA256`, method, path, timestamp, nonce and the body's SHA-256, and checked by `require_edge_agent_signature()` in this order: flag (404), device and key active in the school's `tenant_session` (401), timestamp ±300 s (401), body ≤ 1 MB (413), signature in constant time (401), nonce unseen for 10 minutes (409 `replay`), per-device rate limit (429). The secret MUST be stored only wrapped by the school's key wrapper; rotation keeps the old key at most 7 days; revocation (owner, step-up, `If-Match`) erases both keys at once. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-003 | The agent MUST send only Tally `Export` requests to `127.0.0.1`/`localhost`, parse responses with `defusedxml` and amounts as decimals, send to SchoolOS only over verified HTTPS, keep its credential with Windows DPAPI (service-account scope) and write nothing personal to disk or logs. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-004 | Holders of `tally.configure` MUST choose the ledger groups (names reported by the agent's catalog) whose party ledgers the agent may send; a snapshot naming any other group MUST be refused (422 `group_not_selected`). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-005 | A sync MUST be one complete snapshot (≤ 5,000 parties) applied idempotently by `batch_id` (a repeat is answered from the first result); ledgers missing from it become `present = false`, never deleted while linked; each accepted sync is audited with counts only. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-006 | Only a person holding `tally.configure` MAY link or unlink a ledger to a student (many-to-many); SchoolOS MAY suggest candidates but MUST NOT link by itself, and the AI never links (invariant 9). Links and unlinks are audited with ids only; searches take names in POST bodies only (SEC-008). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-007 | `GET /tally/dues` (school-wide `finance.read`) MUST list students with dues from linked ledgers only, limited to students the caller can see, with totals, unlinked ledgers and the Tally as-of date. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-008 | The read-only knowledge tool `get_fee_dues` MUST be offered only when the flag is on and the caller holds `finance.read` school-wide; it MUST check the student is in scope, select only ledgers linked to that student in SQL and cite `sos://fee/{id}` (no names in the URI). Eval hard gates: fee figure accuracy 1.00, leakage 0, guessed links 0, citation validity 1.00, refusal correctness ≥ 0.95. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-009 | A job every 30 minutes MUST notify holders of `tally.device.manage` and `finance.read` in the app (EN/TE) once per silence when an active agent has not called for 48 hours, and delete sync records older than 400 days. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-010 | Everything MUST sit behind the per-school flag `tally.connector.enabled` (default off, unknown = off): every staff and agent route answers 404, the menu items are hidden and `get_fee_dues` is not offered. The BFF MUST refuse `/api/v1/edge/*`. The connector's tables MUST be in the school's full data export (without wrapped keys or code hashes) and deleted by the offboarding purge (ADR-0029). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+
+---
+
 ## 4. Non-functional requirements
 
 ### 4.1 Security (NFR-SEC), summary; controls in 07
@@ -388,7 +407,7 @@ Every row below is proposed from the roadmap scope (14 · M4; stories US-1601..U
 | Embeddings provider (e.g., Voyage) | Out | HTTPS JSON | Behind interface; chosen by eval |
 | OCR/extraction provider(s) | Out | HTTPS | Behind interface; Telugu support required |
 | AWS S3, KMS, Secrets Manager, SSM Parameter Store | Out | AWS SDK | VPC endpoints where cost-justified |
-| Tally (M6) | In (via edge agent) | TallyPrime XML over HTTP on the office PC → agent → HTTPS to SchoolOS | Tally is not internet-reachable; agent initiates outbound only |
+| Tally (M6) | In (via edge agent) | TallyPrime XML over HTTP on the office PC → agent → HTTPS to SchoolOS | Tally is not internet-reachable; agent initiates outbound only. As built (behind flag; ADR-0032 Proposed): agent `apps/edge-agent` (Export requests to localhost only), five signed routes under `/api/v1/edge/tally/` (FR-TALLY-001..005) |
 | Government/board portals | — | None | No integration; exports + checklists only |
 
 ## 6. Data requirements
