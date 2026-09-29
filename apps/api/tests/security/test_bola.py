@@ -682,7 +682,7 @@ def test_SEC_001_certificate_lists_and_registers_never_show_other_school(
     assert b_student.status_code == 200
     assert b_student.json()["data"] == []
     with admin_engine.connect() as c:
-        b_name = c.execute(
+        b_name: str | None = c.execute(
             text("SELECT content ->> 'student_name' FROM sis.certificates WHERE id = :i"),
             {"i": b_certificate},
         ).scalar_one()

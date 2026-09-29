@@ -208,7 +208,7 @@ def _seed_certificates(admin: Engine) -> None:
                 "WHERE m.status = 'active' ORDER BY m.created_at LIMIT 1"
             )
         ).one()
-        year = c.execute(
+        year: uuid.UUID = c.execute(
             text("SELECT id FROM core.academic_years WHERE tenant_id = :t LIMIT 1"),
             {"t": tenant_id},
         ).scalar_one()

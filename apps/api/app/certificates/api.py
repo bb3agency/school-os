@@ -11,7 +11,7 @@ reader, the maker and the checker share. The service applies the student scope t
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import HTMLResponse
@@ -36,9 +36,7 @@ from app.certificates.templates import STYLE_CSP
 
 router = APIRouter(prefix="/api/v1", tags=["certificates"])
 
-Reader = Annotated[
-    UserContext, Depends(require_any(service.READ, service.ISSUE, service.APPROVE))
-]
+Reader = Annotated[UserContext, Depends(require_any(service.READ, service.ISSUE, service.APPROVE))]
 Downloader = Annotated[UserContext, Depends(require(service.READ))]
 Issuer = Annotated[UserContext, Depends(require(service.ISSUE))]
 Approver = Annotated[UserContext, Depends(require(service.APPROVE, step_up=True))]
@@ -68,7 +66,9 @@ def _with_etag(response: Response, item: CertificateOut) -> CertificateOut:
     return item
 
 
-_PAGE_RESPONSES = {200: {"content": {"text/html": {}}, "description": "Print-ready A4 page"}}
+_PAGE_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {"content": {"text/html": {}}, "description": "Print-ready A4 page"}
+}
 
 
 @router.get("/certificates/types", response_model=list[CertificateTypeOut])
@@ -78,9 +78,7 @@ def list_certificate_types(ctx: Reader) -> list[CertificateTypeOut]:
     return service.types_catalog()
 
 
-@router.get(
-    "/students/{student_id}/certificates/preview", response_model=CertificatePreview
-)
+@router.get("/students/{student_id}/certificates/preview", response_model=CertificatePreview)
 def preview_certificate(
     ctx: Issuer,
     db: TenantDB,
@@ -93,9 +91,7 @@ def preview_certificate(
     return service.preview(db, ctx, student_id, certificate_type)
 
 
-@router.post(
-    "/students/{student_id}/certificates", response_model=CertificateOut, status_code=201
-)
+@router.post("/students/{student_id}/certificates", response_model=CertificateOut, status_code=201)
 def request_certificate(
     ctx: Issuer,
     db: TenantDB,
@@ -165,9 +161,7 @@ def approve_certificate(
     within 5 minutes, not the person who prepared it, ``If-Match``). Errors:
     ``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``
     / ``certificate_blocked`` (409)."""
-    out = service.approve(
-        db, ctx, certificate_id, body or ApproveIn(), expected_version=expected
-    )
+    out = service.approve(db, ctx, certificate_id, body or ApproveIn(), expected_version=expected)
     return _with_etag(response, out)
 
 
@@ -285,9 +279,7 @@ def transfer_certificate_register(
     return _html(page, "tc-register.html")
 
 
-@router.get(
-    "/registers/certificates", response_class=HTMLResponse, responses=_PAGE_RESPONSES
-)
+@router.get("/registers/certificates", response_class=HTMLResponse, responses=_PAGE_RESPONSES)
 def certificate_register(
     ctx: RegisterReader,
     db: TenantDB,

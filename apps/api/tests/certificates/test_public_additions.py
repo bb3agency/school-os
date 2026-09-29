@@ -41,7 +41,7 @@ def test_FR_CERT_005_withdrawal_ends_active_enrolments_and_audits(
     assert len(out.enrollment_ids) == 1
     assert [e["status"] for e in C.enrolments(admin_engine, sid)] == ["transferred"]
     with admin_engine.connect() as c:
-        summary = c.execute(
+        summary: dict[str, Any] = c.execute(
             text(
                 "SELECT summary FROM audit.events WHERE tenant_id = :t "
                 "AND action = 'student.withdrawn' AND resource_id = :s"
@@ -144,7 +144,7 @@ def test_FR_CERT_010_certificate_purpose_is_never_uploadable() -> None:
             filename="certificate.pdf",
             content_type="application/pdf",
             size_bytes=10,
-            purpose="certificate",  # type: ignore[arg-type]
+            purpose="certificate",
         )
 
 
