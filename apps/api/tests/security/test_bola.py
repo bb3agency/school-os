@@ -1103,4 +1103,5 @@ def test_SEC_001_tally_lists_never_show_other_school(
     assert b_device not in {d["id"] for d in devices.json()}
     assert b_party not in {p["id"] for p in parties.json()["data"]}
     assert "Synthetic Other School Ledger" not in parties.text + dues.text
-    assert status.json()["parties"] == 0
+    # The status counts exactly the ledgers school A can list (none of school B).
+    assert status.json()["parties"] == len(parties.json()["data"])

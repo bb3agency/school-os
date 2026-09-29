@@ -41,6 +41,7 @@ def test_FR_KB_005_student_field_uri_round_trips() -> None:
         (sources.finding, "finding"),
         (sources.change_request, "change"),
         (sources.verified_answer, "verified"),
+        (sources.fee_dues, "fee"),  # M6 get_fee_dues (ADR-0032)
     ],
 )
 def test_FR_KB_005_simple_uris_round_trip(builder: object, kind: str) -> None:
