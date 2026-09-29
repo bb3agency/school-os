@@ -2,14 +2,15 @@
 
 import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Badge, Pill, type BadgeTone } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -20,6 +21,7 @@ import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { ApiError, useApiMutation, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
+import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
 import { classLabel, useStructureLists, useYearSections } from "@/features/academic-structure/data";
@@ -73,6 +75,14 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
   const year = useSourceYear(yearId, manage);
   const runs = usePromotionRuns(yearId, manage);
   const lists = useStructureLists(false);
+  const tn = useTranslations("school.nav");
+  // Where the plan is: nothing previewed, a preview that matches the plan, or a stale one.
+  const [planStage, setPlanStage] = useState<PlanStage>("plan");
+  const crumbs = (label: string) => [
+    { label: tn("home"), href: "/" },
+    { label: tn("structure"), href: STRUCTURE_HREF },
+    { label },
+  ];
 
   const back = (
     <ButtonLink href={STRUCTURE_HREF} variant="secondary">
@@ -82,7 +92,7 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
   if (me === undefined) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("titlePlain")} actions={back} />
+        <PageHeader title={t("titlePlain")} breadcrumb={crumbs(t("titlePlain"))} actions={back} />
         <LoadingState label={t("loading")} />
       </div>
     );
@@ -90,7 +100,7 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
   if (!manage) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("titlePlain")} actions={back} />
+        <PageHeader title={t("titlePlain")} breadcrumb={crumbs(t("titlePlain"))} actions={back} />
         <Alert tone="info" title={t("noAccessTitle")}>
           {t("noAccessBody")}
         </Alert>
@@ -100,25 +110,89 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
   if (year.status !== "ready") {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("titlePlain")} actions={back} />
+        <PageHeader title={t("titlePlain")} breadcrumb={crumbs(t("titlePlain"))} actions={back} />
         <LoadableNote state={year} />
       </div>
     );
   }
   const from = year.data;
+  const committed = runs.status === "ready" ? committedRun(runs.data) : undefined;
+  const step: StepId | "finished" = committed
+    ? committed.can_undo
+      ? "undo"
+      : "finished"
+    : planStage === "previewed"
+      ? "commit"
+      : planStage === "stale"
+        ? "preview"
+        : "plan";
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("title", { label: from.label })}
         description={t("description")}
+        breadcrumb={crumbs(t("title", { label: from.label }))}
         actions={back}
       />
+      {runs.status === "ready" ? <Steps current={step} /> : null}
       {from.archived_at ? <Alert tone="warning">{t("archivedYear")}</Alert> : null}
       <StatusCard from={from} runs={runs} years={lists.years} />
-      {runs.status === "ready" && committedRun(runs.data) === undefined ? (
-        <PlanCard from={from} years={lists.years} classes={lists.classes} />
+      {runs.status === "ready" && committed === undefined ? (
+        <PlanCard from={from} years={lists.years} classes={lists.classes} onStage={setPlanStage} />
       ) : null}
     </div>
+  );
+}
+
+type PlanStage = "plan" | "previewed" | "stale";
+const STEPS = ["plan", "preview", "commit", "undo"] as const;
+type StepId = (typeof STEPS)[number];
+
+/**
+ * Where the promotion is: plan → preview → promote → undo within 24 hours. An ordered list;
+ * the current step has aria-current="step" and finished steps say "Done" to screen readers
+ * (the check mark is decorative). "finished" marks every step done (undo time is over).
+ */
+function Steps({ current }: { current: StepId | "finished" }) {
+  const t = useTranslations("academicStructure.promotions.steps");
+  const index = current === "finished" ? STEPS.length : STEPS.indexOf(current);
+  return (
+    <nav
+      aria-label={t("label")}
+      className="rounded-xl border border-border bg-surface px-5 py-4 shadow-card"
+    >
+      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {STEPS.map((step, position) => {
+          const done = position < index;
+          const now = position === index;
+          return (
+            <li
+              key={step}
+              aria-current={now ? "step" : undefined}
+              className="flex items-center gap-3"
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold",
+                  done
+                    ? "border-success bg-success text-white"
+                    : now
+                      ? "border-action bg-action text-on-action"
+                      : "border-border-control bg-surface text-ink-muted",
+                )}
+              >
+                {done ? <Icon name="check" className="size-4" /> : position + 1}
+              </span>
+              <span className={cn("text-sm", now ? "font-semibold text-ink" : "text-ink-muted")}>
+                {done ? <span className="sr-only">{t("done")}: </span> : null}
+                {t(step)}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
@@ -293,10 +367,13 @@ function PlanCard({
   from,
   years,
   classes,
+  onStage,
 }: {
   from: AcademicYear;
   years: Loadable<readonly AcademicYear[]>;
   classes: Loadable<readonly SchoolClass[]>;
+  /** Tells the step indicator whether a preview matches the plan. */
+  onStage: (stage: PlanStage) => void;
 }) {
   const t = useTranslations("academicStructure.promotions");
   const api = useBffClient("staff");
@@ -336,6 +413,15 @@ function PlanCard({
       });
     },
   });
+
+  // A preview with problems sends the office back to the plan (choose sections, preview again).
+  const stage: PlanStage =
+    preview === null || !preview.can_commit
+      ? "plan"
+      : stale || run.isPending
+        ? "stale"
+        : "previewed";
+  useEffect(() => onStage(stage), [onStage, stage]);
 
   const onTarget = (id: string) => {
     // Sections belong to one year: choices for another target year no longer apply.
@@ -696,7 +782,11 @@ function PreviewCard({
       header: t("colOutcome"),
       cell: (row) => <Badge tone={OUTCOME_TONE[row.outcome]}>{t(`outcome.${row.outcome}`)}</Badge>,
     },
-    { key: "to", header: t("colToSection"), cell: (row) => <Value>{row.to_label}</Value> },
+    {
+      key: "to",
+      header: t("colToSection"),
+      cell: (row) => (row.to_label ? <TargetChip label={row.to_label} /> : <Value>{null}</Value>),
+    },
     { key: "count", header: t("colStudents"), cell: (row) => row.count },
   ];
   const problemCount = preview.problems.reduce((sum, row) => sum + row.count, 0);
@@ -786,6 +876,16 @@ function PreviewCard({
   );
 }
 
+/** The section a student or group moves to, as a light-blue chip. */
+function TargetChip({ label }: { label: string }) {
+  return (
+    <Pill variant="date">
+      <Icon name="arrowRight" className="size-3" />
+      {label}
+    </Pill>
+  );
+}
+
 const MUST_PREVIEW_AGAIN = new Set(["promotion_plan_changed", "no_target_section"]);
 
 /**
@@ -852,9 +952,10 @@ function StudentOutcomes({
     {
       key: "to",
       header: t("colToSection"),
-      cell: (row) => (
-        <Value>{row.to_section_id ? (toLabels.get(row.to_section_id) ?? null) : null}</Value>
-      ),
+      cell: (row) => {
+        const label = row.to_section_id ? toLabels.get(row.to_section_id) : undefined;
+        return label ? <TargetChip label={label} /> : <Value>{null}</Value>;
+      },
     },
     { key: "note", header: t("colNote"), cell: (row) => <ReasonText student={row} /> },
     ...(canRead

@@ -3488,7 +3488,15 @@
       "byName": "by {name}",
       "indexTitle": "Academic years",
       "indexDescription": "At the end of a year, move its students to the next class. Choose the year whose students you are promoting; you see a preview before anything changes.",
-      "indexColAction": "Promotion"
+      "indexColAction": "Promotion",
+      "steps": {
+        "label": "Promotion steps",
+        "plan": "Plan",
+        "preview": "Preview",
+        "commit": "Promote",
+        "undo": "Undo within 24 hours",
+        "done": "Done"
+      }
     }
   },
   "schoolSettings": {

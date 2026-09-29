@@ -3,7 +3,7 @@
 import type { AcademicYear } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
+import { Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -28,11 +28,17 @@ export function PromotionsIndexScreen() {
   const can = useStaffCan();
   const manage = can(PROMOTE);
   const { years } = useStructureLists(false);
+  const tn = useTranslations("school.nav");
+  const breadcrumb = [
+    { label: tn("home"), href: "/" },
+    { label: tn("structure"), href: "/settings/structure" },
+    { label: t("titlePlain") },
+  ];
 
   if (me === undefined) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("titlePlain")} />
+        <PageHeader title={t("titlePlain")} breadcrumb={breadcrumb} />
         <LoadingState label={t("loading")} />
       </div>
     );
@@ -40,7 +46,7 @@ export function PromotionsIndexScreen() {
   if (!manage) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("titlePlain")} />
+        <PageHeader title={t("titlePlain")} breadcrumb={breadcrumb} />
         <Alert tone="info" title={t("noAccessTitle")}>
           {t("noAccessBody")}
         </Alert>
@@ -62,7 +68,7 @@ export function PromotionsIndexScreen() {
       cell: (row) => (
         <span className="inline-flex flex-wrap items-center gap-2">
           <span>{row.label}</span>
-          {row.is_current ? <Badge tone="success">{ts("currentBadge")}</Badge> : null}
+          {row.is_current ? <Pill variant="done">{ts("currentBadge")}</Pill> : null}
         </span>
       ),
     },
@@ -87,7 +93,11 @@ export function PromotionsIndexScreen() {
   ];
   return (
     <div className="space-y-6">
-      <PageHeader title={t("titlePlain")} description={t("indexDescription")} />
+      <PageHeader
+        title={t("titlePlain")}
+        description={t("indexDescription")}
+        breadcrumb={breadcrumb}
+      />
       <Card title={t("indexTitle")}>
         <DataTable
           caption={t("indexTitle")}
