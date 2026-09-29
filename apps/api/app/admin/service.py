@@ -76,6 +76,7 @@ from app.admin.schemas import (
 from app.audit import export as audit_export
 from app.audit import service as audit
 from app.audit.viewer import AuditFilters
+from app.authz.catalog import BREAKGLASS_ROLE
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
@@ -516,6 +517,9 @@ def _school_tables(session: Session) -> tuple[list[RecordTable], dict[str, Any]]
 
 def _staff_tables(session: Session) -> list[RecordTable]:
     users, _ = identity.list_users(session, limit=1_000_000)
+    # Temporary break-glass memberships belong to SchoolOS support staff, not to the school's
+    # staff: their names and emails are not school records (07 §6.4).
+    users = [u for u in users if BREAKGLASS_ROLE not in u.roles]
     roles = identity.list_roles(session)
     out: list[RecordTable] = []
     if users:

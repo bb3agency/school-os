@@ -468,3 +468,28 @@ def test_FR_ADM_001_transient_errors_abort_the_upload_and_retry(
     assert AD.row(admin_engine, out.id)["status"] == "running"
     monkeypatch.undo()
     assert AD.run(school, out.id) == "ready"  # the retry starts again from nothing
+
+
+def test_FR_ADM_001_staff_table_leaves_out_break_glass_support_memberships(
+    school: Any, admin_engine: Engine
+) -> None:
+    """07 §6.4: a temporary platform_support membership is SchoolOS support staff, not the
+    school's staff; its operator's name and email never go into the school's archive."""
+    bg = AD._load("sos_test_breakglass_objects", AD._HERE.parents[1] / "breakglass" / "objects.py")
+    bg.active_grant(school.tenant_id, school.people["owner"])
+    with admin_engine.connect() as c:
+        support: set[object] = set(
+            c.execute(
+                text(
+                    "SELECT mr.membership_id FROM core.membership_roles mr "
+                    "JOIN core.roles r ON r.id = mr.role_id "
+                    "WHERE mr.tenant_id = :t AND r.key = 'platform_support'"
+                ),
+                {"t": school.tenant_id},
+            ).scalars()
+        )
+    assert support
+    export_id = AD.ready_export(admin_engine, school)
+    staff = AD.records_csv(AD.archive(school, export_id), "staff")
+    assert {r["membership_id"] for r in staff}.isdisjoint({str(m) for m in support})
+    assert str(school.people["owner"].membership_id) in {r["membership_id"] for r in staff}
