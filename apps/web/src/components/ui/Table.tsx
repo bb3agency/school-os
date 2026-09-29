@@ -14,17 +14,66 @@ export type TableDensity = "comfortable" | "compact";
 
 export interface TableProps extends ComponentProps<"table"> {
   density?: TableDensity;
+  /**
+   * Keep the first column (the row's name: student, school, invoice number) in view while
+   * a wide table scrolls sideways below md. Use it when the first cell identifies the row.
+   */
+  stickyFirstColumn?: boolean;
 }
+
+/** Sticky first column below md: header cell on the header tint, body cells on white. */
+const stickyFirst =
+  "max-md:[&_tr>:first-child]:sticky max-md:[&_tr>:first-child]:left-0 max-md:[&_tr>:first-child]:z-[1] " +
+  "max-md:[&_tbody_tr>:first-child]:bg-surface max-md:[&_thead_tr>:first-child]:bg-surface-muted " +
+  "max-md:[&_tr>:first-child]:shadow-[1px_0_0_var(--color-border)]";
 
 /**
  * Plain table: light header row, thin row dividers, row hover, no heavy grid. Cells read
  * the density from `data-density` (no React context, so it works in server components).
+ * Put it in `TableScroll` (or use `DataTable`) so a wide table scrolls inside its card.
  */
-export function Table({ className, density = "comfortable", ...props }: TableProps) {
+export function Table({
+  className,
+  density = "comfortable",
+  stickyFirstColumn = false,
+  ...props
+}: TableProps) {
   return (
     <table
       data-density={density}
-      className={cn("group/table w-full border-collapse text-left text-sm", className)}
+      className={cn(
+        "group/table w-full border-collapse text-left text-sm",
+        stickyFirstColumn && stickyFirst,
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export interface TableScrollProps extends Omit<ComponentProps<"div">, "role" | "tabIndex"> {
+  /** Accessible name of the scroll region ("Students, table, scrolls sideways"). */
+  label: string;
+  /** Draw the white card frame (hairline border, radius, shadow) around the table. */
+  framed?: boolean;
+}
+
+/**
+ * Horizontal scroll box for a wide table: the table never widens the card or the page, and
+ * keyboard users can focus the region and scroll it with the arrow keys (WCAG 2.1.1).
+ * `position: relative` (`.table-scroll`) keeps sr-only text inside the box.
+ */
+export function TableScroll({ label, framed = false, className, ...props }: TableScrollProps) {
+  return (
+    <div
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+      className={cn(
+        "table-scroll rounded-xl border border-border print:overflow-visible print:border-0",
+        framed && "bg-surface shadow-card print:shadow-none",
+        className,
+      )}
       {...props}
     />
   );
@@ -101,11 +150,13 @@ export interface DataTableProps<T> {
   /** Hide the caption visually when a heading right above already says the same. */
   captionHidden?: boolean;
   density?: TableDensity;
+  /** Keep the first column in view while the table scrolls sideways below md. */
+  stickyFirstColumn?: boolean;
 }
 
 /**
- * Table with loading, error and empty states. Wide tables scroll inside a focusable
- * region so keyboard users can scroll them at 1366×768.
+ * Table with loading, error and empty states. Wide tables scroll inside a focusable,
+ * named region (`TableScroll`), so they never widen the page at any width.
  */
 export function DataTable<T>({
   caption,
@@ -117,6 +168,7 @@ export function DataTable<T>({
   emptyAction,
   captionHidden = false,
   density = "comfortable",
+  stickyFirstColumn = false,
 }: DataTableProps<T>) {
   const t = useTranslations("common");
   const te = useTranslations("errors");
@@ -137,13 +189,8 @@ export function DataTable<T>({
   }
 
   return (
-    <div
-      role="region"
-      aria-label={t("scrollableTable", { caption })}
-      tabIndex={0}
-      className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card print:overflow-visible print:border-0 print:shadow-none"
-    >
-      <Table density={density}>
+    <TableScroll label={t("scrollableTable", { caption })} framed>
+      <Table density={density} stickyFirstColumn={stickyFirstColumn}>
         <caption
           className={cn("px-4 py-3 text-left font-medium text-ink", captionHidden && "sr-only")}
         >
@@ -170,6 +217,6 @@ export function DataTable<T>({
           ))}
         </TBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }

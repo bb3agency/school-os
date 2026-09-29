@@ -60,7 +60,7 @@ export function Dialog({
           className,
         )}
       >
-        <div className="flex items-start justify-between gap-4 p-6 pb-2">
+        <div className="flex items-start justify-between gap-4 p-4 pb-2 sm:p-6 sm:pb-2">
           <div className="space-y-1">
             <h2 id={titleId} className="text-lg font-medium">
               {title}
@@ -89,9 +89,9 @@ export function Dialog({
             </svg>
           </button>
         </div>
-        {children ? <div className="space-y-4 px-6 py-4">{children}</div> : null}
+        {children ? <div className="space-y-4 px-4 py-4 sm:px-6">{children}</div> : null}
         {footer ? (
-          <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-6 py-4">
+          <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
             {footer}
           </div>
         ) : null}

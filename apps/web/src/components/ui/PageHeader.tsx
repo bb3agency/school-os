@@ -23,11 +23,11 @@ export function Breadcrumb({ items, label }: { items: readonly Crumb[]; label?: 
         {items.map((item, index) => {
           const last = index === items.length - 1;
           return (
-            <li key={index} className="inline-flex items-center gap-1">
+            <li key={index} className="inline-flex min-w-0 items-center gap-1 break-anywhere">
               {item.href && !last ? (
                 <Link
                   href={item.href}
-                  className="rounded-sm underline-offset-4 hover:text-ink hover:underline"
+                  className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:text-ink hover:underline"
                 >
                   {item.label}
                 </Link>
@@ -73,23 +73,26 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "mb-6 flex flex-wrap items-start justify-between gap-4",
+        "mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 md:mb-6",
         !plain &&
-          "rounded-xl border border-border bg-surface px-5 py-4 shadow-card md:px-6 md:py-5 print:border-0 print:p-0 print:shadow-none",
+          "rounded-xl border border-border bg-surface px-4 py-4 shadow-card sm:px-5 md:px-6 md:py-5 print:border-0 print:p-0 print:shadow-none",
         className,
       )}
     >
-      <div className="min-w-0 max-w-3xl space-y-1.5">
+      {/* Title block takes the row; actions sit on its right when they fit, else below. */}
+      <div className="min-w-0 max-w-3xl flex-[1_1_18rem] space-y-1.5">
         {breadcrumb && breadcrumb.length > 0 ? <Breadcrumb items={breadcrumb} /> : null}
         {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold text-ink">{title}</h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="min-w-0 text-xl font-semibold break-anywhere text-ink sm:text-2xl">
+            {title}
+          </h1>
           {badge}
         </div>
         {description ? <p className="text-ink-muted">{description}</p> : null}
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2" data-print="hide">
+        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2" data-print="hide">
           {actions}
         </div>
       ) : null}

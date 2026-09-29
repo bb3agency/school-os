@@ -137,10 +137,86 @@
   }
 }
 
+/*
+ * Responsive layout (docs/17 §5.1). One spacing scale for every page:
+ *   --page-gutter   space between the viewport edge and the content: 16px phones,
+ *                   24px from md (768px), 32px from lg (1024px) outside the consoles;
+ *   --shell-gutter  the same inside the consoles (16px, 24px from md), where the rail and
+ *                   the list panel already use width;
+ *   --content-max   the widest the console content gets (1920px screens keep centred lines);
+ *   --sticky-offset room kept above focused or scrolled-to elements (WCAG 2.4.11).
+ * Safe-area insets (notches, rounded corners) are added on top via env(); they are 0 on
+ * desktops, and env() is Baseline widely available.
+ */
+:root {
+  --page-gutter: 1rem;
+  --shell-gutter: 1rem;
+  --content-max: 108rem;
+  --sticky-offset: 1rem;
+}
+
+@media (width >= 48rem) {
+  :root {
+    --page-gutter: 1.5rem;
+    --shell-gutter: 1.5rem;
+  }
+}
+
+@media (width >= 64rem) {
+  :root {
+    --page-gutter: 2rem;
+  }
+}
+
+/* Full-height layouts: 100vh first as the fallback, then the dynamic viewport height, so the
+   mobile address bar never hides the bottom of the rail or the page. */
+@utility min-h-viewport {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@utility h-viewport {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Page gutter outside the consoles (welcome, picker, signed-out), plus safe areas. */
+@utility px-page {
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+}
+
+/* Console gutter (AppShell), plus safe areas. */
+@utility shell-gutter {
+  padding-left: max(var(--shell-gutter), env(safe-area-inset-left));
+  padding-right: max(var(--shell-gutter), env(safe-area-inset-right));
+}
+
+/* Console content frame: centred with a sensible maximum on very wide screens. */
+@utility shell-frame {
+  margin-inline: auto;
+  max-width: var(--content-max);
+  width: 100%;
+}
+
+/* Long unbroken strings (emails, IDs, URLs, Telugu compounds) wrap instead of widening the
+   page. `anywhere` also lowers the min-content width, so use it on text, not table cells. */
+@utility break-anywhere {
+  overflow-wrap: anywhere;
+}
+
 @layer base {
   html {
     color-scheme: light;
     -webkit-text-size-adjust: 100%;
+    /* Anchors and focused elements never end up under the edge (WCAG 2.4.11). */
+    scroll-padding-block: var(--sticky-offset);
+  }
+
+  /* The page behind the open menu drawer does not scroll (:has and :modal are Baseline
+     widely available). */
+  html:has(dialog.drawer:modal) {
+    overflow: hidden;
   }
 
   body {
@@ -157,7 +233,15 @@
     font-feature-settings: "cv11", "ss01";
     line-height: 1.5;
     min-height: 100vh;
+    min-height: 100dvh;
     accent-color: var(--color-primary);
+    /* A word longer than its line breaks instead of overflowing (does not change how wide
+       tables and flex items want to be; use `break-anywhere` for that). */
+    overflow-wrap: break-word;
+    /* viewport-fit=cover: keep content clear of the status bar and the home indicator
+       (0 on desktops); the gutters add the left and right insets. */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   /* Telugu has tall vowel signs and conjuncts: give lines room so glyphs never clip. */
@@ -277,6 +361,46 @@
     background-image:
       radial-gradient(circle at 0% 0%, rgb(96 165 250 / 0.25), transparent 45%),
       linear-gradient(135deg, var(--color-ai-from) 0%, var(--color-ai-to) 100%);
+  }
+
+  /* Menu drawer (AppShell, below lg): a native modal <dialog> pinned to the left edge, full
+     height, leaving a strip of the dimmed page visible to tap. Safe-area insets pad the
+     sheet. The dialog box is only the sheet, so a click on the dialog itself is the
+     backdrop. */
+  .drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    margin: 0;
+    padding: 0;
+    width: min(20rem, calc(100% - 3rem));
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-popover);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .drawer-sheet {
+    min-height: 100%;
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    padding-right: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+  }
+
+  /* Wide tables scroll inside their card (DataTable, TableScroll). `relative` keeps the
+     visually hidden caption and sr-only cell text inside the scroll box (an absolutely
+     positioned sr-only element would otherwise widen the page). */
+  .table-scroll {
+    position: relative;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 
   /* Pale green quote block (copilot suggestions). */
