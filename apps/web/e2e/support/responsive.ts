@@ -73,6 +73,10 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/circulars",
       "/tasks",
       "/notices",
+      // M6 (ADR-0032 Proposed): Tally screens; with the flag off they say the connector is off.
+      "/fees",
+      "/settings/tally",
+      "/settings/tally/ledgers",
       "/notifications",
       "/audit",
       "/audit/verify",

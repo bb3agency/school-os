@@ -5575,5 +5575,190 @@
         "body": "Someone else changed this notice. The page shows the latest; try again."
       }
     }
+  },
+  "tally": {
+    "nav": {
+      "dues": "Fee dues",
+      "connector": "Tally connector"
+    },
+    "off": {
+      "title": "The Tally connector is not switched on",
+      "body": "SchoolOS support switches it on for your school when you are ready. Until then, fee dues are not shown here."
+    },
+    "previous": "Previous page",
+    "next": "Next page",
+    "sourceNote": "From Tally",
+    "sourceOpen": "opens fee dues",
+    "balance": {
+      "due": "Due",
+      "advance": "Advance",
+      "settled": "Settled"
+    },
+    "dues": {
+      "title": "Fee dues",
+      "description": "Dues from Tally for students whose ledgers are linked. Compare the figures with Tally before you act on them.",
+      "noAccessTitle": "You cannot see fee dues",
+      "noAccessBody": "Ask the principal or accountant if you need fee figures.",
+      "studentsWithDues": "Students with dues",
+      "totalDue": "Total due",
+      "unlinked": "Ledgers not linked",
+      "unlinkedHint": "{amount} due on ledgers not linked to a student",
+      "asOf": "Tally figures as of",
+      "asOfHint": "The date of the last sync from the office PC",
+      "unlinkedTitle": "Some ledgers are not linked to a student",
+      "unlinkedBody": "Their dues are not counted for any student. Link them so the totals match Tally.",
+      "linkLedgers": "Link ledgers",
+      "listTitle": "Students with dues",
+      "listDescription": "Highest due first. Only students you can see are listed.",
+      "emptyTitle": "No dues to show",
+      "emptyBody": "No linked ledger has a due, or no sync has arrived yet.",
+      "noName": "Name not recorded",
+      "columns": {
+        "student": "Student",
+        "admissionNo": "Admission no.",
+        "class": "Class",
+        "due": "Due",
+        "ledgers": "Ledgers",
+        "asOf": "As of"
+      }
+    },
+    "connector": {
+      "title": "Tally connector",
+      "description": "A small program on the office PC reads fee ledgers from Tally and sends them to SchoolOS. It only reads; it never changes Tally.",
+      "noAccessTitle": "You cannot manage the Tally connector",
+      "noAccessBody": "The owner, principal or accountant can manage it.",
+      "linksLabel": "Tally pages",
+      "toLedgers": "Link ledgers to students",
+      "toDues": "See fee dues"
+    },
+    "status": {
+      "title": "Status",
+      "none": "Not yet",
+      "silentTitle": "No sync for a while",
+      "silentBody": "The office PC has not sent Tally figures recently. Check that the PC is on, Tally is open and the SchoolOS Tally agent service is running.",
+      "agents": "Active agents",
+      "lastSync": "Last sync",
+      "asOf": "Tally figures as of",
+      "company": "Tally company",
+      "groups": "Groups selected",
+      "ledgers": "Ledgers linked",
+      "ledgersValue": "{linked} of {total}",
+      "totalDue": "Total due (linked ledgers)"
+    },
+    "devices": {
+      "title": "Office PC agents",
+      "description": "Each agent has its own key. Revoke an agent when the PC is replaced, lost or given to someone else.",
+      "emptyTitle": "No agent yet",
+      "emptyBody": "Add an agent, then run the command on the office PC where Tally is installed.",
+      "silent": "Not syncing",
+      "outdated": "Update needed",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke this agent?",
+      "revokeBody": "The agent stops working at once. Figures already synced stay. To sync again, add a new agent.",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "lastSeen": "Last seen",
+        "lastSync": "Last sync",
+        "version": "Agent version",
+        "tally": "Tally",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "Active",
+        "revoked": "Revoked"
+      }
+    },
+    "enrol": {
+      "add": "Add an agent",
+      "title": "Add an office PC agent",
+      "description": "SchoolOS makes a one-time code. Whoever installs the agent on the office PC uses it once.",
+      "create": "Make code",
+      "deviceName": "Name of the PC",
+      "deviceNameHint": "For example: Accounts PC. Do not use a person's name.",
+      "onceTitle": "This code is shown only once",
+      "onceBody": "It works once and expires at {time}. Do not send it by WhatsApp or email; read it out or type it on the office PC.",
+      "codeLabel": "One-time code",
+      "commandLabel": "Command to run on the office PC",
+      "commandHint": "Run it in a command window opened as administrator, after installing the SchoolOS Tally agent.",
+      "handedOver": "I have used or written down the code",
+      "done": "Done"
+    },
+    "groups": {
+      "title": "Ledger groups to send",
+      "description": "The agent sends only the ledgers under the groups you choose here, such as Sundry Debtors or Students.",
+      "emptyTitle": "No groups yet",
+      "emptyBody": "The group list appears after the agent first connects with Tally open.",
+      "privacyTitle": "Choose only fee groups",
+      "privacyBody": "Do not choose staff salary, supplier or bank groups. SchoolOS needs only students' fee ledgers.",
+      "legend": "Groups in {company}",
+      "under": "Under {parent}",
+      "save": "Save groups",
+      "saved": "{count, plural, =0 {Saved. No groups are selected.} one {Saved. 1 group is selected.} other {Saved. # groups are selected.}}"
+    },
+    "ledgers": {
+      "title": "Link ledgers to students",
+      "description": "A ledger's dues count for a student only after a person links them. SchoolOS suggests; it never links by itself.",
+      "noAccessTitle": "You cannot link ledgers",
+      "noAccessBody": "The owner, principal or accountant can link Tally ledgers.",
+      "filter": "Show",
+      "filters": {
+        "unlinked": "Not linked",
+        "linked": "Linked",
+        "all": "All"
+      },
+      "searchLabel": "Ledger name",
+      "search": "Search",
+      "listTitle": "Ledgers from Tally",
+      "emptyTitle": "No ledgers to show",
+      "emptyBody": "Change the filter, or wait for the next sync from the office PC.",
+      "asOf": "As of {date}",
+      "notLinked": "Not linked",
+      "unlink": "Unlink",
+      "unlinkTitle": "Unlink this student?",
+      "unlinkBody": "{ledger} will no longer count for {student}. Tally is not changed.",
+      "link": "Link",
+      "linkLedger": "Link {ledger}",
+      "columns": {
+        "ledger": "Ledger",
+        "group": "Group",
+        "balance": "Balance",
+        "students": "Linked students",
+        "actions": "Actions"
+      }
+    },
+    "link": {
+      "title": "Link a ledger",
+      "personDecides": "Check the admission number and class before you link. One ledger can be linked to brothers and sisters.",
+      "linkedTitle": "Linked",
+      "linkedBody": "The ledger now counts for {student}.",
+      "candidates": "Suggested students",
+      "noCandidates": "No close match by name. Search for the student below.",
+      "searchLabel": "Search students by name or admission number",
+      "search": "Search",
+      "noResults": "No student found. Check the spelling or the admission number.",
+      "results": "Search results",
+      "close": "Close",
+      "link": "Link",
+      "linkTo": "Link to {student}"
+    },
+    "errors": {
+      "too_many_devices": {
+        "title": "Too many agents",
+        "body": "Revoke an agent you no longer use, then add the new one."
+      },
+      "already_revoked": {
+        "title": "Already revoked",
+        "body": "Someone revoked this agent already. The list is now up to date."
+      },
+      "party_gone": {
+        "title": "Ledger no longer in Tally",
+        "body": "This ledger was not in the last sync. Refresh the list and link a current ledger."
+      },
+      "precondition_failed": {
+        "title": "The agent changed",
+        "body": "Someone changed this agent while you were looking. The list is now up to date; try again."
+      }
+    }
   }
 }

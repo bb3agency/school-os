@@ -45,6 +45,8 @@ const LINKS: Record<string, (id: string) => string> = {
   // M4: a circular's reading is ready or needs manual review; a task was given or is due.
   circular: (id) => `/circulars/${id}`,
   task: () => "/tasks",
+  // M6 (FR-TALLY-009): a Tally agent went silent; the connector screen shows its status.
+  tally_device: () => "/settings/tally",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

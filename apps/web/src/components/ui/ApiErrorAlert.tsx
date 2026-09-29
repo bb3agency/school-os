@@ -27,7 +27,8 @@ export type ErrorNamespace =
   | "school.audit"
   | "circulars"
   | "tasks"
-  | "notices";
+  | "notices"
+  | "tally";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

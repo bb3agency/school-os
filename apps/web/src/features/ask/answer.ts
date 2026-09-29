@@ -279,14 +279,16 @@ const DOC = new RegExp(`^sos://doc/(${UUID})/v(\\d{1,6})(?:#p(\\d{1,6}))?$`);
 const STUDENT = new RegExp(
   `^sos://student/(${UUID})(?:/field/([a-z0-9_]{1,64}))?(?:\\?[a-z0-9_=&-]*)?$`,
 );
-const OTHER = new RegExp(`^sos://(finding|change|verified|count)/(${UUID})$`);
+const OTHER = new RegExp(`^sos://(finding|change|verified|count|fee)/(${UUID})$`);
 
 export type SourceRef =
   | { kind: "doc"; id: string; version: number; page: number | null }
   | { kind: "student"; id: string; field: string | null }
   | { kind: "finding" | "change" | "verified"; id: string }
   /** A student count the `count_students` tool computed: numbers only, no screen to open. */
-  | { kind: "count"; id: string };
+  | { kind: "count"; id: string }
+  /** A student's fee dues synced from Tally (`get_fee_dues`, M6): opens the fee dues screen. */
+  | { kind: "fee"; id: string };
 
 /** Parse a `sos://` source URI; anything else (or malformed) is null and gets no link. */
 export function parseSource(source: string): SourceRef | null {
@@ -304,7 +306,7 @@ export function parseSource(source: string): SourceRef | null {
   const other = OTHER.exec(source);
   if (other) {
     return {
-      kind: other[1] as "finding" | "change" | "verified" | "count",
+      kind: other[1] as "finding" | "change" | "verified" | "count" | "fee",
       id: other[2] as string,
     };
   }
@@ -329,6 +331,8 @@ export function sourceHref(ref: SourceRef): string | null {
       return "/ask/verified";
     case "count":
       return null;
+    case "fee":
+      return "/fees";
   }
 }
 

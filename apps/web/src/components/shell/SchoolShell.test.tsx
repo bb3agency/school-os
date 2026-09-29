@@ -40,4 +40,31 @@ describe("school navigation (UX only; the API checks every call)", () => {
     expect(links).not.toContain("Check before submitting");
     expect(links).not.toContain("Support access");
   });
+
+  it("shows the Tally items only while the school's connector is on (M6, ADR-0032)", () => {
+    const { unmount } = renderWithIntl(
+      <SchoolShell permissions={["finance.read", "tally.configure"]}>
+        <p>x</p>
+      </SchoolShell>,
+    );
+    expect(navLinks()).not.toContain("Fee dues");
+    expect(navLinks()).not.toContain("Tally connector");
+    unmount();
+    renderWithIntl(
+      <SchoolShell permissions={["finance.read", "tally.configure"]} features={{ tally: true }}>
+        <p>x</p>
+      </SchoolShell>,
+    );
+    expect(navLinks()).toEqual(expect.arrayContaining(["Fee dues", "Tally connector"]));
+  });
+
+  it("hides the Tally items without a Tally permission even when the connector is on", () => {
+    renderWithIntl(
+      <SchoolShell permissions={["student.read_basic"]} features={{ tally: true }}>
+        <p>x</p>
+      </SchoolShell>,
+    );
+    expect(navLinks()).not.toContain("Fee dues");
+    expect(navLinks()).not.toContain("Tally connector");
+  });
 });

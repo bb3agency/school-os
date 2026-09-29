@@ -9,6 +9,14 @@ import { AppShell } from "./AppShell";
 interface SchoolNavItem extends NavItem {
   /** Effective permission (or any of several) needed to see the item (UX only: the API checks every call). */
   permission?: string | readonly string[];
+  /** A per-school feature the item belongs to: shown only while it is on for the school. */
+  feature?: keyof SchoolFeatures;
+}
+
+/** Per-school features switched on by SchoolOS (UX only: their API routes answer 404 while off). */
+export interface SchoolFeatures {
+  /** M6 Tally connector (`tally.connector.enabled`, ADR-0032 Proposed). */
+  tally?: boolean;
 }
 
 interface SchoolNavSection {
@@ -30,6 +38,7 @@ export function SchoolShell({
   permissions = null,
   canSwitchSchool = false,
   languages = null,
+  features = {},
   banner,
 }: {
   children: ReactNode;
@@ -38,6 +47,8 @@ export function SchoolShell({
   canSwitchSchool?: boolean;
   /** The school's languages from GET /me `settings` (first is the default; FR-TEN-012). */
   languages?: readonly string[] | null;
+  /** Features switched on for this school; items of a feature that is off are hidden. */
+  features?: SchoolFeatures;
   /** Platform announcements (FR-PLT-026), shown above the page. */
   banner?: ReactNode;
 }) {
@@ -134,6 +145,14 @@ export function SchoolShell({
           permission: "notice.draft",
           icon: "megaphone",
         },
+        {
+          // M6 (US-1804, FR-TALLY-007): fee dues synced from Tally; behind the school's flag.
+          href: "/fees",
+          label: t("tally.nav.dues"),
+          permission: "finance.read",
+          feature: "tally",
+          icon: "chart",
+        },
       ],
     },
     {
@@ -177,6 +196,14 @@ export function SchoolShell({
           icon: "inbox",
         },
         {
+          // M6 (US-1801..US-1803): the Tally connector; behind the school's flag.
+          href: "/settings/tally",
+          label: t("tally.nav.connector"),
+          permission: ["tally.device.manage", "tally.configure", "finance.read"],
+          feature: "tally",
+          icon: "server",
+        },
+        {
           href: "/break-glass",
           label: t("breakGlass.nav"),
           permission: "breakglass.approve",
@@ -198,11 +225,12 @@ export function SchoolShell({
     },
   ];
   const allowed = (item: SchoolNavItem) =>
-    !item.permission ||
-    permissions === null ||
-    (typeof item.permission === "string" ? [item.permission] : item.permission).some((key) =>
-      permissions.includes(key),
-    );
+    (!item.feature || features[item.feature] === true) &&
+    (!item.permission ||
+      permissions === null ||
+      (typeof item.permission === "string" ? [item.permission] : item.permission).some((key) =>
+        permissions.includes(key),
+      ));
   const sections: NavSection[] = groups.map((group) => ({
     id: group.id,
     icon: group.icon,

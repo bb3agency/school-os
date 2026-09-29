@@ -11,6 +11,9 @@ import { SuspendedBanner, type SchoolStatus } from "@/features/school-status/Sus
 import { SupportAccessBanner } from "@/features/support-access/SupportAccessBanner";
 import { apiGetAsSession, PATH_HEADER, requireStaff } from "@/server/session/rsc";
 
+/** Permissions that use the Tally connector screens (M6); nobody else needs its status. */
+const TALLY_PERMISSIONS = ["finance.read", "tally.device.manage", "tally.configure"];
+
 /** Codes that mean "this session has no usable school right now: pick one". */
 const CHOOSE_AGAIN = new Set(["active_tenant_required", "no_membership", "invalid_active_tenant"]);
 
@@ -47,6 +50,13 @@ export default async function SchoolLayout({
   // BR-08 / 16 §5.5: while the school is paused, /me works only for the owner and principal.
   const suspended = me?.code === "tenant_suspended";
   const schoolStatus: SchoolStatus = profile?.tenant_status ?? (suspended ? "suspended" : "active");
+  // M6 (ADR-0032 Proposed): the Tally menu items show only while the school's connector flag is
+  // on; its status route answers 404 while it is off. Asked only for people who could use it.
+  const tallyUser =
+    !suspended && (profile?.permissions ?? []).some((key) => TALLY_PERMISSIONS.includes(key));
+  const tally = tallyUser
+    ? (await apiGetAsSession<unknown>("staff", "/api/v1/tally/status"))?.status === 200
+    : false;
 
   return (
     <SchoolShell
@@ -62,6 +72,7 @@ export default async function SchoolLayout({
       permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
       languages={settings?.languages ?? null}
+      features={{ tally }}
       banner={
         <>
           {support ? <SupportAccessBanner /> : null}
