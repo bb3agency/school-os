@@ -92,7 +92,7 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
       header: tl("colFormats"),
       cell: (row) => (
         <span className="flex flex-wrap gap-1">
-          {row.formats.map((format) => (
+          {(row.formats ?? []).map((format) => (
             <Pill key={format} variant="tag">
               {tf(format)}
             </Pill>
