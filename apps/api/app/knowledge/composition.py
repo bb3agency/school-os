@@ -47,7 +47,7 @@ from app.knowledge.gateway.metering import MeteringSink
 from app.knowledge.gateway.transport import Transport
 from app.knowledge.ingestion import runtime as ingestion_runtime
 from app.knowledge.ingestion.documents_source import DocumentsServiceSource
-from app.knowledge.ingestion.pipeline import DocumentIngestionPipeline
+from app.knowledge.ingestion.pipeline import INDEXED_HOOKS, DocumentIngestionPipeline
 from app.knowledge.interfaces import EmbeddingsProvider, LlmGateway, TenantEmbedder
 from app.knowledge.policy import LedgerMeteringSink, SchoolAiPolicy
 from app.knowledge.prompts.registry import load_prompt
@@ -169,7 +169,10 @@ def set_runtime(value: Runtime | None) -> None:
 
 def _pipeline() -> DocumentIngestionPipeline:
     return DocumentIngestionPipeline(
-        source=DocumentsServiceSource(), store=SqlChunkStore(), embedder=runtime().embedder
+        source=DocumentsServiceSource(),
+        store=SqlChunkStore(),
+        embedder=runtime().embedder,
+        indexed_hooks=INDEXED_HOOKS,
     )
 
 

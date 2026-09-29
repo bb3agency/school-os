@@ -137,3 +137,17 @@ def test_tasks_route_to_the_ingest_queue() -> None:
     for task in (tasks.ingest_version, tasks.refresh_acl, tasks.remove_document):
         assert getattr(task, "queue", None) == "ingest"
         assert task.name.startswith("knowledge.")
+
+
+def test_FR_CIR_001_the_composed_pipeline_runs_the_registered_indexed_hooks() -> None:
+    """The composition root hands the worker's pipeline the process-wide ``INDEXED_HOOKS``
+    registry itself (so a module registering later, like circulars on import, is included)."""
+    from app.knowledge import composition
+    from app.knowledge.ingestion import pipeline as pipeline_module
+
+    composition.configure_ingestion()
+    try:
+        built = runtime.pipeline()
+        assert built._indexed_hooks is pipeline_module.INDEXED_HOOKS
+    finally:
+        runtime.configure(None)

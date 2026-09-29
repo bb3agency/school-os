@@ -65,7 +65,11 @@ INDEXED_HOOKS: list[IndexedHook] = []
 """Called in the write transaction when a document's current version was (re)indexed, with
 ``(session, document_id, version_id, doc_type)``; an extension point for later modules (M4
 circular reading enqueues its job here, so it is queued exactly when the index commits). Also
-called when the version has no readable text (no chunks), so the caller can say so."""
+called when the version has no readable text (no chunks), so the caller can say so.
+
+Modules register here on import; the composition root hands this list to the production
+pipeline (``indexed_hooks``). A pipeline built over other stores (tests, tools) runs only the
+hooks it is given, so a registered module never reaches a session it cannot use."""
 RETIRED_STATUSES: Final = ("quarantined", "failed")
 
 INDEXED: Final = "indexed"
@@ -104,8 +108,12 @@ class DocumentIngestionPipeline:
         chunker: Chunker | None = None,
         config: ChunkingConfig | None = None,
         session_factory: SessionFactory = _session,
+        indexed_hooks: Sequence[IndexedHook] = (),
     ) -> None:
         self._config = config or load_chunking_config()
+        # Kept by reference: the composition root passes INDEXED_HOOKS itself, so modules that
+        # register after the pipeline is built are still called.
+        self._indexed_hooks = indexed_hooks
         self._source = source
         self._store = store
         self._embedder = embedder
@@ -230,7 +238,7 @@ class DocumentIngestionPipeline:
             )
             if is_latest:
                 self._store.set_latest(s, document_id, version_id)
-                for hook in INDEXED_HOOKS:
+                for hook in self._indexed_hooks:
                     hook(s, document_id, version_id, fresh.doc_type)
             elif archived:
                 self._store.hide_document(s, document_id)

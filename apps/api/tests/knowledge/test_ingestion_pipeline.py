@@ -23,10 +23,11 @@ import pytest
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.redaction import contains_full_aadhaar
+from app.knowledge.ingestion import pipeline as pipeline_module
 from app.knowledge.ingestion.documents_source import DocumentsServiceSource, system_context
 from app.knowledge.ingestion.extract import TEXT_MIME
 from app.knowledge.ingestion.memory import InMemoryChunkStore
-from app.knowledge.ingestion.pipeline import embedding_text
+from app.knowledge.ingestion.pipeline import DocumentIngestionPipeline, embedding_text
 from app.knowledge.ingestion.ports import ChunkAcl, ChunkStore, DocumentSource
 from app.knowledge.interfaces import IngestionPipeline
 
@@ -91,6 +92,37 @@ def test_FR_KB_002_ready_docx_is_indexed_with_acl_copies_and_filters() -> None:
     assert all(len(r.item.embedding) == 4 for r in stored)
     # Every transaction was the tenant's own (invariant 1).
     assert set(w.sessions.opened) == {S.TENANT_A}
+
+
+def test_FR_CIR_001_indexed_hooks_are_injected_not_taken_from_the_process_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pipeline calls only the indexed hooks it was built with: modules registering in the
+    process-wide ``INDEXED_HOOKS`` (the circulars module on import) reach the production
+    pipeline through the composition root, never a pipeline built over other stores."""
+    calls: list[tuple[uuid.UUID, uuid.UUID, str]] = []
+
+    def hook(_session: Any, document_id: uuid.UUID, version_id: uuid.UUID, doc_type: str) -> None:
+        calls.append((document_id, version_id, doc_type))
+
+    def exploding(*_: Any) -> None:
+        raise AssertionError("a registered hook ran in a pipeline that was not given it")
+
+    monkeypatch.setattr(pipeline_module, "INDEXED_HOOKS", [exploding])
+    w = S.world()
+    seeded(w)
+    assert w.pipeline.ingest(S.TENANT_A, DOC, V1.id) == "indexed"
+
+    hooked = DocumentIngestionPipeline(
+        source=w.source,
+        store=InMemoryChunkStore(),
+        embedder=w.embedder,
+        config=S.CONFIG,
+        session_factory=w.pipeline._session,
+        indexed_hooks=[hook],
+    )
+    assert hooked.ingest(S.TENANT_A, DOC, V1.id) == "indexed"
+    assert calls == [(DOC, V1.id, "circular")]
 
 
 def test_PRV_013_synthetic_aadhaar_is_masked_before_chunking_and_embedding() -> None:

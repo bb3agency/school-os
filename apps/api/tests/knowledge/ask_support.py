@@ -32,7 +32,7 @@ from app.knowledge import composition
 from app.knowledge.gateway.fake import FakeTransport
 from app.knowledge.ingestion.documents_source import DocumentsServiceSource
 from app.knowledge.ingestion.extract import DOCX_MIME
-from app.knowledge.ingestion.pipeline import DocumentIngestionPipeline
+from app.knowledge.ingestion.pipeline import INDEXED_HOOKS, DocumentIngestionPipeline
 from app.knowledge.store import SqlChunkStore
 
 TESTS = Path(__file__).resolve().parents[1]
@@ -146,10 +146,13 @@ def text_document(
 
 
 def pipeline() -> DocumentIngestionPipeline:
+    """The worker's pipeline, wired like ``composition`` (with the registered indexed hooks:
+    circular reading is queued when a circular is indexed)."""
     return DocumentIngestionPipeline(
         source=DocumentsServiceSource(),
         store=SqlChunkStore(),
         embedder=composition.runtime().embedder,
+        indexed_hooks=INDEXED_HOOKS,
     )
 
 
