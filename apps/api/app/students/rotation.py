@@ -106,6 +106,11 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
 # Ciphertext-looking columns that are NOT under a tenant DEK, with the reason.
 NOT_TENANT_DEK: Final[Mapping[tuple[str, str], str]] = {
     ("core.users", "phone_ciphertext"): "global user row (no tenant); nothing writes it yet",
+    # M6 (ADR-0032 §2): Tally edge-agent HMAC secrets are wrapped by the key wrapper (KMS,
+    # encryption context bound to the school), like the fleet heartbeat keys, not by a tenant
+    # DEK; the agent rotates them itself every 90 days and offboarding deletes them.
+    ("ops.tally_devices", "key_ciphertext"): "KMS key wrapper bound to the school (ADR-0032)",
+    ("ops.tally_devices", "next_key_ciphertext"): "KMS key wrapper bound to the school (ADR-0032)",
 }
 
 

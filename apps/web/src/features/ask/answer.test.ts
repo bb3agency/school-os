@@ -292,6 +292,14 @@ describe("sos:// sources (docs/06 §8)", () => {
     expect(parseSource("sos://count/not-a-uuid")).toBeNull();
   });
 
+  it("a fee dues source from Tally opens the fee dues screen, never a ledger URL (FR-TALLY-008)", () => {
+    const fee = parseSource(`sos://fee/${DOC}`);
+    expect(fee).toEqual({ kind: "fee", id: DOC });
+    expect(sourceHref(fee!)).toBe("/fees");
+    expect(parseSource("sos://fee/not-a-uuid")).toBeNull();
+    expect(parseSource(`sos://fee/${DOC}/ledger`)).toBeNull();
+  });
+
   it("refuses anything that is not a well-formed sos:// URI", () => {
     for (const bad of [
       "https://evil.example/",

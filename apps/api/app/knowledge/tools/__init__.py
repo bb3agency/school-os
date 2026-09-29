@@ -15,6 +15,8 @@ As built (M2 waves 4-5): ``access`` (the caller's ``AclKeys``, same rule as the 
 service), ``documents`` (:class:`DocumentSearch`, ``search_documents`` and ``list_documents``
 over ``documents.service``), ``students`` (``find_students``, ``get_student_facts`` over
 ``students.service``), ``history`` (``get_value_history``), ``counts`` (``count_students``),
-``findings`` (``list_findings`` over ``dq.service``) and ``registry`` (the tools described in
-``tools.yaml``, offered per caller permission). The whole ADR-0008 whitelist is built.
+``findings`` (``list_findings`` over ``dq.service``), ``fees`` (``get_fee_dues`` over
+``tally.service``, M6, behind the school's Tally connector flag; ADR-0032 Proposed) and
+``registry`` (the tools described in ``tools.yaml``, offered per caller permission). The whole
+whitelist is built.
 """

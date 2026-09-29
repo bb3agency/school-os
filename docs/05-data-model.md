@@ -1250,13 +1250,27 @@ Two tenant-owned tables in `ops` (`tenant_id` first, `UNIQUE (tenant_id, id)`, R
 - **Audit** (same transaction, IDs/codes/counts only): `admin.export.requested` (`include_sensitive`, `sensitive_columns` = restricted field names, `layout_version`, `link_valid_hours`), `admin.export.completed` (row counts per table, documents, `document_kib`, `audit_events`, `archive_kib`), `admin.export.failed` (`error_code`), `admin.export.downloaded` (`own_export`, `requested_by_membership`), `admin.export.expired` (system actor), `admin.retention.updated` (`changes`: category, from/to days).
 - **Downgrade** drops both tables (lossy: exports are kept a day; retention falls back to the defaults). Round trip on a populated database: `tests/admin/test_migration.py`.
 
+### 7.4 Tally read connector as built (migration `0036_tally`; M6, US-1801..US-1805, FR-TALLY-001..010; behind flag; ADR Proposed)
+
+Six tenant-owned tables in `ops` (`tenant_id` first, `UNIQUE (tenant_id, id)`, RLS ENABLE + FORCE with `tenant_isolation`, composite FKs, `offboarding_purge` policy and `sos_purger` grants like 0032, ADR-0029; module `app/tally`). No `SECURITY DEFINER` function and no `definer_access` policy: the agent guard resolves the school from the `X-SOS-Tenant` header and reads the device inside that school's `tenant_session`.
+
+- **`ops.tally_enrolment_codes`**: `code_hash` (SHA-256, 32 bytes; the code itself is never stored), `device_name`, `created_by`, `expires_at` (30 minutes), `used_at` (CHECK: not after expiry). `sos_app` may UPDATE `used_at` only.
+- **`ops.tally_devices`**: `name`, `status` `active`/`revoked` (+ `revoked_at`, `revoked_by`), `key_id` (CHECK `^tdk-[a-z]{20}$`, letters only so audit summaries never carry long digit runs) and `key_ciphertext` (the 256-bit HMAC secret wrapped by the school's key wrapper; an HMAC verifier needs the secret, so it cannot be a one-way hash), `next_key_id`/`next_key_ciphertext` during a rotation (CHECKs: both or neither; none once revoked), `agent_version`, `platform`, `tally_product`, `last_seen_at`, `last_sync_at`, `silent_notified_at`, `version`. Column UPDATE grants only.
+- **`ops.tally_groups`**: the groups the agent reported (`company`, `name`, `parent`; names only), `present`, `selected` (+ `selected_by`, `selected_at`), `UNIQUE (tenant_id, company, name)`.
+- **`ops.tally_syncs`**: one row per accepted snapshot, `UNIQUE (tenant_id, device_id, batch_id)` (a repeat is answered from it): `company`, `as_of`, counts (`groups`, `parties`, `created`, `updated`, `missing`) and the total due; no names.
+- **`ops.tally_parties`**: the latest closing balance of each party ledger under a selected group: `guid`, `ledger_name`, `group_name`, `closing_balance` (numeric; positive = the party owes the school), `as_of`, `present` (false when the last snapshot no longer had it), `last_sync_id`. **C2 personal financial data** (ledger names are usually student or parent names): readable only with `finance.read`, never in URLs, logs, notifications or audit summaries.
+- **`ops.tally_party_links`**: `(party_id, student_id)` pairs made by a person with `tally.configure` (`UNIQUE (tenant_id, party_id, student_id)`; composite FKs to the party and `sis.students`, deleted with either). The AI never links (invariant 9).
+- **Permissions** `tally.device.manage` and `tally.configure` are written into `core.permissions` by the migration; existing schools' system roles get them from the post-migration system-role sync (ADR-0022), which the release must run.
+- **Export and offboarding**: all six tables are in the full data export (`tally_*` records; wrapped keys and code hashes left out) and deleted by the offboarding purge. Sync records are deleted after 400 days (§13).
+- **Downgrade** drops the six tables (lossy: synced Tally data) and removes the two catalog keys when no role holds them. Round trip with rows: `tests/tally/test_migration.py`.
+
 ## 8. Data classification
 
 | Class | Meaning | Examples | Controls |
 |---|---|---|---|
 | **C0 Public** | Publishable | School name, public address | None beyond integrity |
 | **C1 Internal** | School-internal, not personal | Class structure, non-personal circulars | Tenant isolation, authz |
-| **C2 Confidential (personal)** | Identifies a person | Student/guardian names, DOB, gender, admission no., class, marks (M5) | + scoped access, audit on export, masking in logs |
+| **C2 Confidential (personal)** | Identifies a person | Student/guardian names, DOB, gender, admission no., class, marks (M5), Tally party ledger names and fee balances (M6, `finance.read` only; §7.4; C3 is PO question 4 of ADR-0032) | + scoped access, audit on export, masking in logs |
 | **C3 Restricted (sensitive / child-risk)** | Harm if exposed | Health/disability, caste/category, income, Aadhaar last4 + as-printed fields, guardian phone/address, disciplinary notes, early-warning flags (M5), identity evidence scans | + app-layer encryption, `student.read_sensitive`, masked in AI context unless required and permitted, never in logs |
 
 Aadhaar numbers are **not** in any class because they are never stored (ADR-0007).
@@ -1314,6 +1328,8 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Early-warning flags and their action logs (§5.8, C3) | Open: until closed. Closed: 365 days after closing | Fixed (`closed_flags`); daily `insights.purge_expired`; erasable earlier by the principal with a reason |
 | Full data export (`ops.tenant_exports` archive, FR-ADM-001) | 24 hours after it is ready | Hourly `admin.purge_tenant_exports` deletes the archive; bucket rule `tenant-export-2d` (noncurrent 1 day) is the backstop; the row stays |
 | Retention settings (`ops.retention_settings`) | Life of the school | Configuration, no personal data |
+| Tally party ledgers and links (§7.4; behind flag; ADR Proposed) | While the connector is on: the latest snapshot per ledger | Revoking an agent keeps them; offboarding deletes them |
+| Tally sync records (`ops.tally_syncs`, counts only) | 400 days | Deleted by the 30-minute `tally.check_silent_agents` job (`retention.sync_days` in `app/tally/config.yaml`) |
 | `kb.queries` (encrypted Q/A) | 180 days | Rows deleted by the daily `knowledge.purge_queries` job (`query_log.retention_days` in `app/knowledge/config/models.yaml`); metadata aggregates (the `kb.llm_calls` metering ledger, audit events: ids and counts only) kept longer |
 | Audit events | ≥ 1 year online; archive 3 years (Object Lock) | DPDP ≥ 1 year; CERT-In 180 days in India |
 | Security/ICT logs | ≥ 1 year, stored in India | See 08 §6 |

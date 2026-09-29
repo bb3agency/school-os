@@ -34,7 +34,7 @@ flowchart LR
   staff -. manual submission .-> portals[Govt/board portals<br/>UDISE+, CAREERS, ...]
 ```
 
-SchoolOS never logs into government portals. It produces checked data and formatted sheets; staff submit. Operators use the control plane (§16); it has no access to school data.
+SchoolOS never logs into government portals. It produces checked data and formatted sheets; staff submit. The edge agent (M6, built behind flag; ADR Proposed, ADR-0032) only sends `Export` requests to Tally on `localhost` and calls SchoolOS outbound over HTTPS with HMAC-signed requests (07 §3 TB9); SchoolOS never connects to the office PC. Operators use the control plane (§16); it has no access to school data.
 
 ## 3. Containers (C4 level 2)
 
@@ -96,6 +96,7 @@ flowchart TB
 | `circulars` | circular readings and deadline suggestions (storage and workflow; the AI call is `knowledge`'s), tasks and reminders, parent notices and their PDF/PNG (M4, 05 §6.3) | `on_version_indexed()`, `run_reading()`, `confirm_suggestion()`, `create_task()`, `send_reminders()`, `create_notice()`, `render_notice()` | core, authz, audit, identity, tenancy, documents, knowledge, notifications, ops (via service) |
 | `academics` | attendance marks, exams and marks per subject, register/marks sheet previews (M5; 05 §5.8) | `record_attendance()`, `attendance_month()`, `record_marks()`, `attendance_history()`, `exam_results()` | core, authz, audit, students, tenancy, documents, ops (via service); never `insights` |
 | `insights` | early-warning rules engine (pure, no AI), flags, owners and action log, behaviour notes (C3), student timeline, reminders, retention (M5; 05 §5.8, 08 §4) | `evaluate()`, `list_flags()`, `add_action()`, `close_flag()`, `timeline()`, `purge_expired()` | core, authz, audit, students, tenancy, academics, certificates (timeline only), identity, notifications, ops (via service); never `knowledge` (import-linter) |
+| `tally` | Tally read connector (M6; behind flag; ADR Proposed, ADR-0032): enrolment codes, edge-agent devices and their signed requests (`agent_auth.py`), ledger groups, synced party ledgers, person-made ledger ↔ student links, fee dues; the `/api/v1/edge/tally/*` routes (05 §7.4) | `create_enrolment_code()`, `enrol()`, `accept_sync()`, `link_party()`, `list_dues()`, `student_fee_dues()`, `fee_summary()`, `notify_silent_devices()`, `export_records()` | core, authz, audit, tenancy, students, notifications (via service); `knowledge.tools.fees` reads it through `tally.service` |
 | `notifications` | in-app notifications, templates; email (provider interface: fake, Amazon SES) | `notify()`, `request_email()` | core, identity, tenancy, ops (via service) |
 | `admin` | tenant admin, retention, full export | `export_tenant()` | all services (read) |
 | `ops` | job runs, outbox, idempotency keys, break-glass grants (tenant-side) | `grant_break_glass()`, `claim_outbox()` | tenancy, audit |
@@ -297,6 +298,7 @@ Never cache AI answers across users. Never build cache keys without `tenant_id`.
 - 12-factor config via environment; secrets from Secrets Manager at startup; no secrets in images.
 - `platform.feature_flags` (global with % rollout, and per-tenant overrides) for gradual rollout: e.g., `kb.ask.enabled`, `imports.photo_extraction`. Managed in the platform admin panel; the tenant app has SELECT only (16 §5.11).
 - `SOS_DEPLOYMENT_MODE` (`shared` | `dedicated`) decides whether control-plane routes and schedules exist.
+- `tally.connector.enabled` (M6, per school, default off; behind flag; ADR Proposed): while off every `/tally/*` and `/edge/tally/*` route answers 404, the menu items are hidden and `get_fee_dues` is not offered. It must not be switched on before ADR-0032 is accepted.
 - Model IDs, prompt versions, DQ thresholds and export profiles are versioned config files in the repo, loaded at startup, with tenant overrides where allowed.
 
 ## 14. Technology choices

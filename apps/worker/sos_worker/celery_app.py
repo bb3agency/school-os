@@ -29,6 +29,7 @@ from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
+from app.tally.tasks import beat_schedule as tally_beat_schedule
 
 # Importing identity.service registers the system-role cloning hook in
 # tenancy.POST_PROVISION_HOOKS so provisioning behaves the same in workers as in the API.
@@ -50,7 +51,8 @@ import app.insights.service  # isort: skip
 import app.knowledge.service  # isort: skip
 import app.notifications.service  # isort: skip
 import app.ops.service  # isort: skip
-import app.students.service  # noqa: F401  isort: skip
+import app.students.service  # isort: skip
+import app.tally.service  # noqa: F401  isort: skip
 
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
 
@@ -74,6 +76,7 @@ TASK_MODULES: list[str] = [
     "app.certificates.tasks",
     "app.circulars.tasks",
     "app.insights.tasks",
+    "app.tally.tasks",
 ]
 
 
@@ -146,6 +149,8 @@ def create_celery() -> Celery:
             "insights.evaluate_all": {"queue": "maintenance"},
             "insights.send_flag_reminders": {"queue": "maintenance"},
             "insights.purge_expired": {"queue": "maintenance"},
+            # M6 (FR-TALLY-009): silent Tally agents and sync-record retention.
+            "tally.check_silent_agents": {"queue": "maintenance"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
@@ -180,6 +185,8 @@ def create_celery() -> Celery:
             # FR-EW-005, FR-EW-006, FR-EW-017: early-warning rules (17:40 IST), overdue flag
             # reminders (07:20 IST) and the retention purge of notes and closed flags.
             **insights_beat_schedule(),
+            # FR-TALLY-009: silent Tally agents notified; old sync records deleted (30 min).
+            **tally_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

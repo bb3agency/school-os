@@ -1,0 +1,27 @@
+<ENVELOPE>
+ <BODY>
+  <DATA>
+   <COLLECTION>
+    <LEDGER NAME="Synthetica Venkata Sai 9A" RESERVEDNAME="">
+     <GUID TYPE="String">a1b2c3d4-0000-4000-8000-000000000001-00000101</GUID>
+     <PARENT TYPE="String">Sundry Debtors</PARENT>
+     <CLOSINGBALANCE TYPE="Amount">-15000.00</CLOSINGBALANCE>
+    </LEDGER>
+    <LEDGER NAME="Synthetica Advance&#4; Paid">
+     <GUID TYPE="String">a1b2c3d4-0000-4000-8000-000000000001-00000102</GUID>
+     <PARENT TYPE="String">Sundry Debtors</PARENT>
+     <CLOSINGBALANCE TYPE="Amount">2000.00</CLOSINGBALANCE>
+    </LEDGER>
+    <LEDGER NAME="Synthetica Lakshmi Devi 9B">
+     <GUID TYPE="String">a1b2c3d4-0000-4000-8000-000000000001-00000103</GUID>
+     <PARENT TYPE="String">Class IX Fees</PARENT>
+     <CLOSINGBALANCE TYPE="Amount">-4,500.25</CLOSINGBALANCE>
+    </LEDGER>
+    <LEDGER NAME="Synthetica No Guid Ledger">
+     <PARENT TYPE="String">Sundry Debtors</PARENT>
+     <CLOSINGBALANCE TYPE="Amount"></CLOSINGBALANCE>
+    </LEDGER>
+   </COLLECTION>
+  </DATA>
+ </BODY>
+</ENVELOPE>

@@ -165,6 +165,13 @@ EXPECTED_TABLES = {
     "insight_flags",
     "flag_actions",
     "insight_settings",
+    # M6 Tally connector (0036_tally, ADR-0032): empty tables are still in the archive.
+    "tally_devices",
+    "tally_enrolment_codes",
+    "tally_groups",
+    "tally_syncs",
+    "tally_parties",
+    "tally_party_links",
     "retention_settings",
 }
 
@@ -288,6 +295,68 @@ def test_FR_ADM_001_archive_holds_tasks_and_parent_notices(
     notices = {n["id"]: n for n in AD.records_csv(zf, "parent_notices")}
     assert notices[str(notice_id)]["title_en"] == "Synthetic sports day"
     for table in ("circular_readings", "circular_suggestions"):
+        assert f"records/{table}.csv" in zf.namelist(), table
+
+
+def test_FR_ADM_001_archive_holds_the_tally_connector_records(
+    school: Any, admin_engine: Engine
+) -> None:
+    """M6 (0036_tally, ADR-0032): the synced ledgers and their links are school records and are
+    in the archive; wrapped device keys and enrolment-code hashes never are."""
+    owner = school.people["owner"]
+    code_id, device_id, sync_id, party_id = (uuid.uuid4() for _ in range(4))
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_enrolment_codes (id, tenant_id, code_hash, device_name, "
+                "created_by, expires_at) VALUES (:i, :t, :h, 'Office PC', :u, "
+                "now() + interval '30 minutes')"
+            ),
+            {"i": code_id, "t": school.tenant_id, "h": b"\x07" * 32, "u": owner.user_id},
+        )
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_devices (id, tenant_id, name, enrolment_code_id, key_id, "
+                "key_ciphertext, enrolled_by) VALUES (:i, :t, 'Office PC', :c, "
+                "'tdk-abcdefghijklmnopqrst', :k, :u)"
+            ),
+            {
+                "i": device_id,
+                "t": school.tenant_id,
+                "c": code_id,
+                "k": b"\x09" * 40,
+                "u": owner.user_id,
+            },
+        )
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_syncs (id, tenant_id, device_id, batch_id, company, as_of, "
+                "groups, parties, created, updated, missing, total_due) VALUES (:i, :t, :d, :b, "
+                "'Synthetic School', '2026-09-28', 1, 1, 1, 0, 0, 1500.00)"
+            ),
+            {"i": sync_id, "t": school.tenant_id, "d": device_id, "b": uuid.uuid4()},
+        )
+        c.execute(
+            text(
+                "INSERT INTO ops.tally_parties (id, tenant_id, company, ledger_name, group_name, "
+                "closing_balance, as_of, last_sync_id) VALUES (:i, :t, 'Synthetic School', "
+                "'Synthetic Export Ledger', 'Sundry Debtors', 1500.00, '2026-09-28', :s)"
+            ),
+            {"i": party_id, "t": school.tenant_id, "s": sync_id},
+        )
+    export_id = AD.ready_export(admin_engine, school)
+    zf = AD.archive(school, export_id)
+    parties = {p["id"]: p for p in AD.records_csv(zf, "tally_parties")}
+    assert parties[str(party_id)]["ledger_name"] == "Synthetic Export Ledger"
+    assert parties[str(party_id)]["closing_balance"] == "1500.00"
+    devices = AD.records_csv(zf, "tally_devices")
+    assert devices
+    assert "key_ciphertext" not in devices[0]
+    assert "next_key_ciphertext" not in devices[0]
+    codes = AD.records_csv(zf, "tally_enrolment_codes")
+    assert codes
+    assert "code_hash" not in codes[0]
+    for table in ("tally_groups", "tally_syncs", "tally_party_links"):
         assert f"records/{table}.csv" in zf.namelist(), table
 
 

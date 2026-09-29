@@ -126,6 +126,28 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  edge-agent:
+    # The Tally edge agent (apps/edge-agent; ADR-0032, Proposed): unit tests with synthetic Tally
+    # XML and a fake SchoolOS, on Linux and on Windows (the PC it runs on; DPAPI is only tested
+    # there). Windows runners have no make, so both run the same uv command.
+    name: edge-agent (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.19"
+          enable-cache: false
+      - name: agent tests
+        run: uv run --locked --package sos-edge-agent --group test pytest apps/edge-agent/tests -q
+
   migrations:
     # Alembic upgrade -> downgrade -> upgrade on a seeded synthetic DB + RLS catalog test
     # (docs/12 §4.5, CLAUDE.md §6 invariant 12).
@@ -356,7 +378,7 @@ jobs:
     # The only check to mark as required in branch protection / rulesets.
     name: ci-ok
     if: always()
-    needs: [lint, typecheck, test, e2e, migrations, authz-suite, security, ci-config, terraform, images]
+    needs: [lint, typecheck, test, e2e, edge-agent, migrations, authz-suite, security, ci-config, terraform, images]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

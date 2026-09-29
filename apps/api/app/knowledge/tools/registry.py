@@ -17,6 +17,8 @@ from app.knowledge.tools.counts import CountStudentsTool
 from app.knowledge.tools.documents import LIST_NAME as LIST_DOCUMENTS
 from app.knowledge.tools.documents import NAME as SEARCH
 from app.knowledge.tools.documents import DocumentSearch, ListDocumentsTool, SearchDocumentsTool
+from app.knowledge.tools.fees import NAME as FEES
+from app.knowledge.tools.fees import GetFeeDuesTool
 from app.knowledge.tools.findings import NAME as FINDINGS
 from app.knowledge.tools.findings import ListFindingsTool
 from app.knowledge.tools.history import NAME as HISTORY
@@ -24,6 +26,8 @@ from app.knowledge.tools.history import GetValueHistoryTool
 from app.knowledge.tools.students import FACTS, FIND, FindStudentsTool, GetStudentFactsTool
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from app.authz.context import UserContext
 
 
@@ -51,12 +55,27 @@ def build_tools(config: ToolsConfig, search: DocumentSearch) -> dict[str, Offere
         tools[FINDINGS] = ListFindingsTool(specs[FINDINGS])
     if specs[LIST_DOCUMENTS].description:
         tools[LIST_DOCUMENTS] = ListDocumentsTool(specs[LIST_DOCUMENTS])
+    if specs[FEES].description:
+        tools[FEES] = GetFeeDuesTool(specs[FEES])
     return tools
 
 
-def offered(tools: dict[str, OfferedTool], ctx: UserContext) -> list[OfferedTool]:
+def _available(tool: OfferedTool, ctx: UserContext, session: Session | None) -> bool:
+    """``allowed``, and for a tool behind a school flag (``get_fee_dues``, ADR-0032) its
+    ``available`` check too; without a session such a tool is never offered (fail closed)."""
+    if not tool.allowed(ctx):
+        return False
+    check = getattr(tool, "available", None)
+    if check is None:
+        return True
+    return session is not None and bool(check(session, ctx))
+
+
+def offered(
+    tools: dict[str, OfferedTool], ctx: UserContext, session: Session | None = None
+) -> list[OfferedTool]:
     """The caller's tools, in a stable order (prompt caching: same order every request)."""
-    return [tools[name] for name in sorted(tools) if tools[name].allowed(ctx)]
+    return [tools[name] for name in sorted(tools) if _available(tools[name], ctx, session)]
 
 
 __all__ = ["OfferedTool", "build_tools", "offered"]

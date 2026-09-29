@@ -1652,6 +1652,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/edge/tally/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Catalog
+         * @description The ledger groups of the company open in Tally (names only), so the accountant can choose.
+         */
+        put: operations["put_catalog_api_v1_edge_tally_catalog_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/edge/tally/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Config
+         * @description The company and ledger groups to read, the sync interval and the minimum agent version.
+         */
+        get: operations["agent_config_api_v1_edge_tally_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/edge/tally/enrol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrol
+         * @description Exchange the owner's one-time code for a device credential (returned once). Headers:
+         *     ``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired
+         *     code; 429 after 10 attempts per school per hour.
+         */
+        post: operations["enrol_api_v1_edge_tally_enrol_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/edge/tally/key-rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Key
+         * @description A new device key, returned once; the old one works until the new one is first used.
+         */
+        post: operations["rotate_key_api_v1_edge_tally_key_rotation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/edge/tally/syncs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Sync
+         * @description One complete snapshot of the party ledgers under the selected groups. Idempotent by
+         *     ``batch_id`` (a repeat returns the first result with ``repeat: true``). 409
+         *     ``no_groups_selected`` / ``agent_outdated``; 422 ``group_not_selected``.
+         */
+        post: operations["post_sync_api_v1_edge_tally_syncs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exams": {
         parameters: {
             query?: never;
@@ -4790,6 +4894,262 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tally/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Devices
+         * @description Enrolled Tally agents, active first, with last call, last sync and version
+         *     (``tally.device.manage``). The ETag of each is ``W/"<version>"`` for revocation.
+         */
+        get: operations["list_devices_api_v1_tally_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/devices/{device_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Device
+         * @description Revoke a Tally agent at once (``tally.device.manage``, recent MFA sign-in; ``If-Match``).
+         *     Its keys are erased; synced data stays until offboarding. 409 ``already_revoked``.
+         */
+        post: operations["revoke_device_api_v1_tally_devices__device_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/dues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Dues
+         * @description Students with fee dues from the linked Tally ledgers, highest first, with the school
+         *     totals and the Tally as-of date (``finance.read``, school-wide). Unlinked ledgers count only
+         *     in the totals.
+         */
+        get: operations["list_dues_api_v1_tally_dues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/enrolment-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Enrolment Code
+         * @description A one-time code for enrolling the Tally agent on the office PC (``tally.device.manage``,
+         *     recent MFA sign-in). Shown once; SchoolOS keeps only its hash; valid 30 minutes. 409
+         *     ``too_many_devices``.
+         */
+        post: operations["create_enrolment_code_api_v1_tally_enrolment_codes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Groups
+         * @description Ledger groups the agent reported (names only), selected ones marked
+         *     (``tally.configure``).
+         */
+        get: operations["list_groups_api_v1_tally_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/groups/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Select Groups
+         * @description Choose the groups whose party ledgers the agent may send; replaces the selection
+         *     (``tally.configure``). The server refuses snapshots with any other group. 422
+         *     ``unknown_group``.
+         */
+        put: operations["select_groups_api_v1_tally_groups_selection_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/parties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Parties
+         * @description Ledgers of the last snapshot by name, with the students they are linked to
+         *     (``tally.configure``). Filter by name with ``POST /tally/parties/search`` (no names in
+         *     URLs).
+         */
+        get: operations["list_parties_api_v1_tally_parties_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/parties/{party_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Party
+         * @description One ledger with its links and up to five suggested students whose name, admission number
+         *     or class appears in the ledger name (suggestions only; a person links).
+         */
+        get: operations["get_party_api_v1_tally_parties__party_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/parties/{party_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link Party
+         * @description Link the ledger to a student (``tally.configure``); idempotent. 409 ``party_gone``; 422
+         *     ``student_id`` ``not_found``.
+         */
+        post: operations["link_party_api_v1_tally_parties__party_id__links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/parties/{party_id}/links/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink Party
+         * @description Remove a ledger's link to a student (``tally.configure``).
+         */
+        delete: operations["unlink_party_api_v1_tally_parties__party_id__links__student_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/parties/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Parties
+         * @description Ledgers whose name contains ``query`` (case-insensitive), optionally only linked or
+         *     unlinked (``tally.configure``). A POST so ledger names never appear in URLs.
+         */
+        post: operations["search_parties_api_v1_tally_parties_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tally/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Status
+         * @description The connector at a glance: active agents (and whether one is silent), last sync, Tally
+         *     as-of date, company, selected groups, ledgers linked and unlinked; the totals due only for
+         *     school-wide ``finance.read`` holders. 404 when the connector is off for the school.
+         */
+        get: operations["get_status_api_v1_tally_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/task-assignees": {
         parameters: {
             query?: never;
@@ -5272,6 +5632,32 @@ export interface components {
              * Format: uuid
              */
             tenant_id: string;
+        };
+        /** AgentConfigOut */
+        AgentConfigOut: {
+            /**
+             * Company
+             * @description The Tally company to read; null until chosen
+             */
+            company: string | null;
+            /**
+             * Groups
+             * @description Selected ledger groups: send parties under these only
+             */
+            groups: string[];
+            /** Max Parties */
+            max_parties: number;
+            /** Min Agent Version */
+            min_agent_version: string;
+            /** Rotate After Days */
+            rotate_after_days: number;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Sync Interval Minutes */
+            sync_interval_minutes: number;
         };
         /** AnnouncementBrief */
         AnnouncementBrief: {
@@ -6091,6 +6477,32 @@ export interface components {
             /** Verified */
             verified: boolean;
         };
+        /** CatalogGroupIn */
+        CatalogGroupIn: {
+            /** Name */
+            name: string;
+            /** Parent */
+            parent?: string | null;
+        };
+        /**
+         * CatalogIn
+         * @description The ledger groups of the company open in Tally (names only; no ledgers, no people).
+         */
+        CatalogIn: {
+            /** Company */
+            company: string;
+            /** Groups */
+            groups: components["schemas"]["CatalogGroupIn"][];
+            /** Tally Product */
+            tally_product?: string | null;
+        };
+        /** CatalogOut */
+        CatalogOut: {
+            /** Groups */
+            groups: number;
+            /** Selected */
+            selected: number;
+        };
         /**
          * CellEditIn
          * @description One cell of a staged row: ``column`` is the 0-based column index, ``value`` the new text
@@ -6774,6 +7186,34 @@ export interface components {
             /** Kms Deletion Reference */
             kms_deletion_reference: string;
         };
+        /**
+         * ConnectorStatus
+         * @description The connector at a glance. Money totals only for school-wide ``finance.read`` holders.
+         */
+        ConnectorStatus: {
+            /** As Of */
+            as_of: string | null;
+            /** Company */
+            company: string | null;
+            /** Devices Active */
+            devices_active: number;
+            /** Groups Selected */
+            groups_selected: number;
+            /** Last Sync At */
+            last_sync_at: string | null;
+            /** Parties */
+            parties: number;
+            /** Parties Linked */
+            parties_linked: number;
+            /** Parties Unlinked */
+            parties_unlinked: number;
+            /** Silent */
+            silent: boolean;
+            /** Total Due */
+            total_due: string | null;
+            /** Unlinked Due */
+            unlinked_due: string | null;
+        };
         /** ContentLine */
         ContentLine: {
             /** Key */
@@ -6925,6 +7365,50 @@ export interface components {
             hostname?: string | null;
             /** Target Version */
             target_version?: string | null;
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /** Agent Version */
+            agent_version: string | null;
+            /**
+             * Enrolled At
+             * Format: date-time
+             */
+            enrolled_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Last Sync At */
+            last_sync_at: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Outdated
+             * @description Older than the minimum agent version; it stops syncing
+             */
+            outdated: boolean;
+            /** Platform */
+            platform: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /**
+             * Silent
+             * @description Active, and no call for longer than the silence limit
+             */
+            silent: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /** Tally Product */
+            tally_product: string | null;
+            /** Version */
+            version: number;
         };
         /**
          * DocSheetCellOut
@@ -7178,6 +7662,27 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** DuesPage */
+        DuesPage: {
+            /** Data */
+            data: components["schemas"]["StudentDuesOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            totals: components["schemas"]["DuesTotals"];
+        };
+        /** DuesTotals */
+        DuesTotals: {
+            /** As Of */
+            as_of: string | null;
+            /** Students With Dues */
+            students_with_dues: number;
+            /** Total Due */
+            total_due: string;
+            /** Unlinked Due */
+            unlinked_due: string;
+            /** Unlinked Parties */
+            unlinked_parties: number;
+        };
         /**
          * DuplicateRequest
          * @description Why a duplicate is needed (10..1000 characters), e.g. the original was lost.
@@ -7185,6 +7690,15 @@ export interface components {
         DuplicateRequest: {
             /** Reason */
             reason: string;
+        };
+        /** EnrolIn */
+        EnrolIn: {
+            /** Agent Version */
+            agent_version: string;
+            /** Code */
+            code: string;
+            /** Platform */
+            platform: string;
         };
         /**
          * EnrollmentEnd
@@ -7261,6 +7775,37 @@ export interface components {
             /** Section Id */
             section_id?: string | null;
         };
+        /** EnrolmentCodeCreate */
+        EnrolmentCodeCreate: {
+            /**
+             * Device Name
+             * @default Office PC
+             */
+            device_name: string;
+        };
+        /**
+         * EnrolmentCodeOut
+         * @description Shown ONCE: SchoolOS keeps only a hash of the code (ADR-0032 §2).
+         */
+        EnrolmentCodeOut: {
+            /**
+             * Code
+             * @description 12 characters, grouped XXXX-XXXX-XXXX; valid once
+             */
+            code: string;
+            /** Device Name */
+            device_name: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** EnrolmentEvent */
         EnrolmentEvent: {
             /** Ended On */
@@ -7271,6 +7816,25 @@ export interface components {
             started_on: string | null;
             /** Status */
             status: string;
+        };
+        /**
+         * EnrolOut
+         * @description Returned ONCE: the agent stores the secret with Windows DPAPI (ADR-0032 §7).
+         */
+        EnrolOut: {
+            config: components["schemas"]["AgentConfigOut"];
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Key Id */
+            key_id: string;
+            /**
+             * Secret
+             * @description base64url, 32 bytes; the HMAC key
+             */
+            secret: string;
         };
         /**
          * ErasedOut
@@ -7739,6 +8303,37 @@ export interface components {
              * @enum {string}
              */
             status: "requested" | "approved" | "active" | "expired" | "revoked" | "denied";
+        };
+        /** GroupOut */
+        GroupOut: {
+            /** Company */
+            company: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Parent */
+            parent: string | null;
+            /** Present */
+            present: boolean;
+            /** Selected */
+            selected: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * GroupSelectionIn
+         * @description The groups whose party ledgers the agent may send (all of one company). Replaces the
+         *     current selection; an empty list stops the sync of parties.
+         */
+        GroupSelectionIn: {
+            /** Company */
+            company: string;
+            /** Group Ids */
+            group_ids: string[];
         };
         /**
          * GuardianCreate
@@ -8657,6 +9252,39 @@ export interface components {
             /** Task Name */
             task_name: string;
         };
+        /**
+         * KeyRotationOut
+         * @description The new key, returned ONCE. The old key works until the new one is first used, or for
+         *     the rotation overlap at most.
+         */
+        KeyRotationOut: {
+            /** Key Id */
+            key_id: string;
+            /** Secret */
+            secret: string;
+        };
+        /** LinkedStudentOut */
+        LinkedStudentOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Class Section */
+            class_section: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** LinkIn */
+        LinkIn: {
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /** LoginEventOut */
         LoginEventOut: {
             /** Recorded */
@@ -9296,6 +9924,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[PartyOut] */
+        Page_PartyOut_: {
+            /** Data */
+            data: components["schemas"]["PartyOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[PermissionOut] */
         Page_PermissionOut_: {
             /** Data */
@@ -9449,6 +10084,85 @@ export interface components {
              * @enum {string}
              */
             status: "queued" | "done" | "failed";
+        };
+        /** PartyDetail */
+        PartyDetail: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Candidates
+             * @description Students whose name, admission number or class appears in the ledger name. Suggestions only: a person links (ADR-0032 §6).
+             */
+            candidates: components["schemas"]["LinkedStudentOut"][];
+            /**
+             * Closing Balance
+             * @description Positive: the party owes the school
+             */
+            closing_balance: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ledger Name */
+            ledger_name: string;
+            /** Links */
+            links: components["schemas"]["LinkedStudentOut"][];
+            /** Present */
+            present: boolean;
+        };
+        /** PartyIn */
+        PartyIn: {
+            /** Closing Balance */
+            closing_balance: number | string;
+            /** Group */
+            group: string;
+            /** Guid */
+            guid?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** PartyOut */
+        PartyOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Closing Balance
+             * @description Positive: the party owes the school
+             */
+            closing_balance: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ledger Name */
+            ledger_name: string;
+            /** Links */
+            links: components["schemas"]["LinkedStudentOut"][];
+            /** Present */
+            present: boolean;
+        };
+        /** PartySearchIn */
+        PartySearchIn: {
+            /**
+             * Link
+             * @default all
+             * @enum {string}
+             */
+            link: "all" | "linked" | "unlinked";
+            /** Query */
+            query: string;
         };
         /** PaymentIn */
         PaymentIn: {
@@ -10928,6 +11642,29 @@ export interface components {
             /** Values */
             values: components["schemas"]["ValueIn"][];
         };
+        /** StudentDuesOut */
+        StudentDuesOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Class Section */
+            class_section: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /** Ledgers */
+            ledgers: number;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Total Due */
+            total_due: string;
+        };
         /**
          * StudentListCreate
          * @description A student list with chosen columns (``student.export``, step-up).
@@ -11248,6 +11985,59 @@ export interface components {
             exam_window_override: boolean;
             /** Reason */
             reason: string;
+        };
+        /**
+         * SyncIn
+         * @description One complete snapshot of the parties under the selected groups (FR-TALLY-004/005).
+         */
+        SyncIn: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Company */
+            company: string;
+            /** Groups */
+            groups: string[];
+            /** Parties */
+            parties: components["schemas"]["PartyIn"][];
+        };
+        /** SyncOut */
+        SyncOut: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Created */
+            created: number;
+            /** Missing */
+            missing: number;
+            /** Parties */
+            parties: number;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /**
+             * Repeat
+             * @description True when this batch was already accepted (nothing applied)
+             */
+            repeat: boolean;
+            /**
+             * Sync Id
+             * Format: uuid
+             */
+            sync_id: string;
+            /** Updated */
+            updated: number;
         };
         /** TaskCreate */
         TaskCreate: {
@@ -15009,6 +15799,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_catalog_api_v1_edge_tally_catalog_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_config_api_v1_edge_tally_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentConfigOut"];
+                };
+            };
+        };
+    };
+    enrol_api_v1_edge_tally_enrol_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_key_api_v1_edge_tally_key_rotation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyRotationOut"];
+                };
+            };
+        };
+    };
+    post_sync_api_v1_edge_tally_syncs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncOut"];
                 };
             };
             /** @description Validation Error */
@@ -21011,6 +21940,367 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_devices_api_v1_tally_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+        };
+    };
+    revoke_device_api_v1_tally_devices__device_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dues_api_v1_tally_dues_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuesPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_enrolment_code_api_v1_tally_enrolment_codes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolmentCodeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentCodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_groups_api_v1_tally_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"][];
+                };
+            };
+        };
+    };
+    select_groups_api_v1_tally_groups_selection_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupSelectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_parties_api_v1_tally_parties_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                /** @description all, linked or unlinked */
+                link?: "all" | "linked" | "unlinked";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PartyOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_party_api_v1_tally_parties__party_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                party_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_party_api_v1_tally_parties__party_id__links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                party_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_party_api_v1_tally_parties__party_id__links__student_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                party_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_parties_api_v1_tally_parties_search_post: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartySearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PartyOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_api_v1_tally_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorStatus"];
                 };
             };
         };

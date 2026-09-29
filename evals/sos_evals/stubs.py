@@ -14,11 +14,13 @@ Latencies are derived from a hash of the question so reports are reproducible.
 from __future__ import annotations
 
 import hashlib
+import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from sos_evals.acl import retrievable, visible
 from sos_evals.adapters import AnswerSegment, AskResult, Citation, Retrieved
 from sos_evals.circulars import CircularCase, CircularResult, SuggestedDeadline, dates_in
+from sos_evals.fees import FeeCase, FeeCitation, FeeResult, inr
 from sos_evals.schema import Asker, CorpusItem, EvalItem, Locale
 
 REFUSALS: Mapping[Locale, str] = {
@@ -99,6 +101,24 @@ class PerfectStub:
             deadlines=tuple(found), reference_no=case.reference_no, issued_on=case.issued_on
         )
 
+    @staticmethod
+    def _fee_answer(case: FeeCase, lines: list[str]) -> FeeResult:
+        source = f"sos://fee/{uuid.uuid5(uuid.NAMESPACE_URL, case.id)}"
+        said = [f"{_TE_PREFIX}{line}" if case.locale == "te" else line for line in lines]
+        return FeeResult(
+            text=" ".join(said),
+            citations=tuple(FeeCitation(source=source, cited_text=line) for line in lines),
+            provided_sources=(source,),
+        )
+
+    def ask_fees(self, case: FeeCase) -> FeeResult:
+        """The answer key: the exact figure from the linked ledgers, or no figure at all."""
+        if case.expect_refusal or case.expected_total is None:
+            return FeeResult(text=REFUSALS[case.locale])
+        return self._fee_answer(
+            case, [f"Fee due from Tally: {inr(case.expected_total)} (linked ledgers only)."]
+        )
+
 
 class LeakyStub(PerfectStub):
     """Ranks without the ACL filter and answers leakage probes from the forbidden sources."""
@@ -124,6 +144,16 @@ class LeakyStub(PerfectStub):
             provided_sources=tuple(self._ranked(question, asker, 10)),
             latency_ms=_hash_ms(question, 900, 2500),
         )
+
+    def ask_fees(self, case: FeeCase) -> FeeResult:
+        """Maps ledgers by name and ignores who may see fees: states a figure every time."""
+        target = next((s for s in case.students if s.key == case.student), None)
+        first = target.name.split()[0].casefold() if target else ""
+        guessed = [
+            ledger for ledger in case.ledgers if first and first in ledger.name.casefold()
+        ] or list(case.ledgers)
+        lines = [f"Fee due: {inr(ledger.balance)}." for ledger in guessed]
+        return self._fee_answer(case, lines)
 
 
 class InjectableStub(PerfectStub):

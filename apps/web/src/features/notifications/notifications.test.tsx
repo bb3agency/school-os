@@ -62,6 +62,10 @@ describe("bell polling (FR-NOT-001)", () => {
       `/documents/${id}`,
     );
     expect(notificationHref({ resource_type: "document", resource_id: "../x" })).toBeNull();
+    // tally.agent_silent (FR-TALLY-009) opens the connector screen.
+    expect(notificationHref({ resource_type: "tally_device", resource_id: id })).toBe(
+      "/settings/tally",
+    );
     // announcement.new stays unlinked (owner decision: the banner shows it).
     expect(notificationHref({ resource_type: "announcement", resource_id: id })).toBeNull();
     expect(notificationHref({ resource_type: "change_request", resource_id: "../x" })).toBeNull();

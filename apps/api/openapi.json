@@ -370,6 +370,62 @@
         "title": "ActiveTenantIn",
         "type": "object"
       },
+      "AgentConfigOut": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Tally company to read; null until chosen",
+            "title": "Company"
+          },
+          "groups": {
+            "description": "Selected ledger groups: send parties under these only",
+            "items": {
+              "type": "string"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "max_parties": {
+            "title": "Max Parties",
+            "type": "integer"
+          },
+          "min_agent_version": {
+            "title": "Min Agent Version",
+            "type": "string"
+          },
+          "rotate_after_days": {
+            "title": "Rotate After Days",
+            "type": "integer"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "sync_interval_minutes": {
+            "title": "Sync Interval Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "company",
+          "groups",
+          "sync_interval_minutes",
+          "max_parties",
+          "min_agent_version",
+          "rotate_after_days",
+          "server_time"
+        ],
+        "title": "AgentConfigOut",
+        "type": "object"
+      },
       "AnnouncementBrief": {
         "properties": {
           "body_en": {
@@ -2100,6 +2156,92 @@
         "title": "CanonicalOut",
         "type": "object"
       },
+      "CatalogGroupIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CatalogGroupIn",
+        "type": "object"
+      },
+      "CatalogIn": {
+        "additionalProperties": false,
+        "description": "The ledger groups of the company open in Tally (names only; no ledgers, no people).",
+        "properties": {
+          "company": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Company",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogGroupIn"
+            },
+            "maxItems": 2000,
+            "title": "Groups",
+            "type": "array"
+          },
+          "tally_product": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tally Product"
+          }
+        },
+        "required": [
+          "company",
+          "groups"
+        ],
+        "title": "CatalogIn",
+        "type": "object"
+      },
+      "CatalogOut": {
+        "properties": {
+          "groups": {
+            "title": "Groups",
+            "type": "integer"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "groups",
+          "selected"
+        ],
+        "title": "CatalogOut",
+        "type": "object"
+      },
       "CellEditIn": {
         "additionalProperties": false,
         "description": "One cell of a staged row: ``column`` is the 0-based column index, ``value`` the new text\n(``null`` or blank clears the cell). Up to 1,000 characters, no line breaks or control\ncharacters, never a full Aadhaar number.",
@@ -3821,6 +3963,109 @@
         "title": "ConfirmTeardownIn",
         "type": "object"
       },
+      "ConnectorStatus": {
+        "description": "The connector at a glance. Money totals only for school-wide ``finance.read`` holders.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "devices_active": {
+            "title": "Devices Active",
+            "type": "integer"
+          },
+          "groups_selected": {
+            "title": "Groups Selected",
+            "type": "integer"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "parties": {
+            "title": "Parties",
+            "type": "integer"
+          },
+          "parties_linked": {
+            "title": "Parties Linked",
+            "type": "integer"
+          },
+          "parties_unlinked": {
+            "title": "Parties Unlinked",
+            "type": "integer"
+          },
+          "silent": {
+            "title": "Silent",
+            "type": "boolean"
+          },
+          "total_due": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Due"
+          },
+          "unlinked_due": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unlinked Due"
+          }
+        },
+        "required": [
+          "devices_active",
+          "silent",
+          "last_sync_at",
+          "as_of",
+          "company",
+          "groups_selected",
+          "parties",
+          "parties_linked",
+          "parties_unlinked",
+          "total_due",
+          "unlinked_due"
+        ],
+        "title": "ConnectorStatus",
+        "type": "object"
+      },
       "ContentLine": {
         "properties": {
           "key": {
@@ -4376,6 +4621,132 @@
           }
         },
         "title": "DeploymentPatch",
+        "type": "object"
+      },
+      "DeviceOut": {
+        "properties": {
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Version"
+          },
+          "enrolled_at": {
+            "format": "date-time",
+            "title": "Enrolled At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "outdated": {
+            "description": "Older than the minimum agent version; it stops syncing",
+            "title": "Outdated",
+            "type": "boolean"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "silent": {
+            "description": "Active, and no call for longer than the silence limit",
+            "title": "Silent",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tally_product": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tally Product"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "agent_version",
+          "platform",
+          "tally_product",
+          "enrolled_at",
+          "revoked_at",
+          "last_seen_at",
+          "last_sync_at",
+          "silent",
+          "outdated",
+          "version"
+        ],
+        "title": "DeviceOut",
         "type": "object"
       },
       "DocSheetCellOut": {
@@ -5169,6 +5540,81 @@
         "title": "DocumentUpdate",
         "type": "object"
       },
+      "DuesPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StudentDuesOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DuesTotals"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor",
+          "totals"
+        ],
+        "title": "DuesPage",
+        "type": "object"
+      },
+      "DuesTotals": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "students_with_dues": {
+            "title": "Students With Dues",
+            "type": "integer"
+          },
+          "total_due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Due",
+            "type": "string"
+          },
+          "unlinked_due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Unlinked Due",
+            "type": "string"
+          },
+          "unlinked_parties": {
+            "title": "Unlinked Parties",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "students_with_dues",
+          "total_due",
+          "unlinked_parties",
+          "unlinked_due",
+          "as_of"
+        ],
+        "title": "DuesTotals",
+        "type": "object"
+      },
       "DuplicateRequest": {
         "additionalProperties": false,
         "description": "Why a duplicate is needed (10..1000 characters), e.g. the original was lost.",
@@ -5183,6 +5629,65 @@
           "reason"
         ],
         "title": "DuplicateRequest",
+        "type": "object"
+      },
+      "EnrolIn": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_version": {
+            "pattern": "^[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$",
+            "title": "Agent Version",
+            "type": "string"
+          },
+          "code": {
+            "maxLength": 20,
+            "minLength": 12,
+            "pattern": "^[A-Za-z0-9 -]+$",
+            "title": "Code",
+            "type": "string"
+          },
+          "platform": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$",
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "agent_version",
+          "platform"
+        ],
+        "title": "EnrolIn",
+        "type": "object"
+      },
+      "EnrolOut": {
+        "description": "Returned ONCE: the agent stores the secret with Windows DPAPI (ADR-0032 \u00a77).",
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/AgentConfigOut"
+          },
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "key_id": {
+            "title": "Key Id",
+            "type": "string"
+          },
+          "secret": {
+            "description": "base64url, 32 bytes; the HMAC key",
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "key_id",
+          "secret",
+          "config"
+        ],
+        "title": "EnrolOut",
         "type": "object"
       },
       "EnrollmentEnd": {
@@ -5366,6 +5871,52 @@
           }
         },
         "title": "EnrollmentPatch",
+        "type": "object"
+      },
+      "EnrolmentCodeCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "device_name": {
+            "default": "Office PC",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Device Name",
+            "type": "string"
+          }
+        },
+        "title": "EnrolmentCodeCreate",
+        "type": "object"
+      },
+      "EnrolmentCodeOut": {
+        "description": "Shown ONCE: SchoolOS keeps only a hash of the code (ADR-0032 \u00a72).",
+        "properties": {
+          "code": {
+            "description": "12 characters, grouped XXXX-XXXX-XXXX; valid once",
+            "title": "Code",
+            "type": "string"
+          },
+          "device_name": {
+            "title": "Device Name",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "device_name",
+          "expires_at"
+        ],
+        "title": "EnrolmentCodeOut",
         "type": "object"
       },
       "EnrolmentEvent": {
@@ -6822,6 +7373,84 @@
           "created_at"
         ],
         "title": "GrantOut",
+        "type": "object"
+      },
+      "GroupOut": {
+        "properties": {
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "company",
+          "name",
+          "parent",
+          "present",
+          "selected",
+          "version"
+        ],
+        "title": "GroupOut",
+        "type": "object"
+      },
+      "GroupSelectionIn": {
+        "additionalProperties": false,
+        "description": "The groups whose party ledgers the agent may send (all of one company). Replaces the\ncurrent selection; an empty list stops the sync of parties.",
+        "properties": {
+          "company": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Company",
+            "type": "string"
+          },
+          "group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Group Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "company",
+          "group_ids"
+        ],
+        "title": "GroupSelectionIn",
         "type": "object"
       },
       "GuardianCreate": {
@@ -9370,6 +9999,90 @@
         "title": "JobOut",
         "type": "object"
       },
+      "KeyRotationOut": {
+        "description": "The new key, returned ONCE. The old key works until the new one is first used, or for\nthe rotation overlap at most.",
+        "properties": {
+          "key_id": {
+            "title": "Key Id",
+            "type": "string"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key_id",
+          "secret"
+        ],
+        "title": "KeyRotationOut",
+        "type": "object"
+      },
+      "LinkIn": {
+        "additionalProperties": false,
+        "properties": {
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id"
+        ],
+        "title": "LinkIn",
+        "type": "object"
+      },
+      "LinkedStudentOut": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "admission_no",
+          "class_section"
+        ],
+        "title": "LinkedStudentOut",
+        "type": "object"
+      },
       "LoginEventOut": {
         "properties": {
           "recorded": {
@@ -11568,6 +12281,34 @@
         "title": "Page[OperatorOut]",
         "type": "object"
       },
+      "Page_PartyOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PartyOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[PartyOut]",
+        "type": "object"
+      },
       "Page_PermissionOut_": {
         "properties": {
           "data": {
@@ -11954,6 +12695,191 @@
           "next_cursor"
         ],
         "title": "Page[VerifiedAnswerOut]",
+        "type": "object"
+      },
+      "PartyDetail": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "candidates": {
+            "description": "Students whose name, admission number or class appears in the ledger name. Suggestions only: a person links (ADR-0032 \u00a76).",
+            "items": {
+              "$ref": "#/components/schemas/LinkedStudentOut"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "closing_balance": {
+            "description": "Positive: the party owes the school",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Closing Balance",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ledger_name": {
+            "title": "Ledger Name",
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedStudentOut"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "ledger_name",
+          "group_name",
+          "closing_balance",
+          "as_of",
+          "present",
+          "links",
+          "candidates"
+        ],
+        "title": "PartyDetail",
+        "type": "object"
+      },
+      "PartyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "closing_balance": {
+            "anyOf": [
+              {
+                "maximum": 999999999999.99,
+                "minimum": -999999999999.99,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Closing Balance"
+          },
+          "group": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Group",
+            "type": "string"
+          },
+          "guid": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9A-Za-z-]{1,80}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guid"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "group",
+          "closing_balance"
+        ],
+        "title": "PartyIn",
+        "type": "object"
+      },
+      "PartyOut": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "closing_balance": {
+            "description": "Positive: the party owes the school",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Closing Balance",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ledger_name": {
+            "title": "Ledger Name",
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedStudentOut"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "ledger_name",
+          "group_name",
+          "closing_balance",
+          "as_of",
+          "present",
+          "links"
+        ],
+        "title": "PartyOut",
+        "type": "object"
+      },
+      "PartySearchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "link": {
+            "default": "all",
+            "enum": [
+              "all",
+              "linked",
+              "unlinked"
+            ],
+            "title": "Link",
+            "type": "string"
+          },
+          "query": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "PartySearchIn",
         "type": "object"
       },
       "PaymentIn": {
@@ -15905,6 +16831,73 @@
         "title": "StudentCreate",
         "type": "object"
       },
+      "StudentDuesOut": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "ledgers": {
+            "title": "Ledgers",
+            "type": "integer"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "total_due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Due",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "admission_no",
+          "class_section",
+          "total_due",
+          "ledgers",
+          "as_of"
+        ],
+        "title": "StudentDuesOut",
+        "type": "object"
+      },
       "StudentListCreate": {
         "additionalProperties": false,
         "description": "A student list with chosen columns (``student.export``, step-up).",
@@ -16728,6 +17721,107 @@
           "reason"
         ],
         "title": "SuspendSubscriptionIn",
+        "type": "object"
+      },
+      "SyncIn": {
+        "additionalProperties": false,
+        "description": "One complete snapshot of the parties under the selected groups (FR-TALLY-004/005).",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "company": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Company",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Groups",
+            "type": "array"
+          },
+          "parties": {
+            "items": {
+              "$ref": "#/components/schemas/PartyIn"
+            },
+            "maxItems": 20000,
+            "title": "Parties",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "company",
+          "as_of",
+          "groups",
+          "parties"
+        ],
+        "title": "SyncIn",
+        "type": "object"
+      },
+      "SyncOut": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "parties": {
+            "title": "Parties",
+            "type": "integer"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "repeat": {
+            "description": "True when this batch was already accepted (nothing applied)",
+            "title": "Repeat",
+            "type": "boolean"
+          },
+          "sync_id": {
+            "format": "uuid",
+            "title": "Sync Id",
+            "type": "string"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sync_id",
+          "batch_id",
+          "repeat",
+          "parties",
+          "created",
+          "updated",
+          "missing",
+          "received_at"
+        ],
+        "title": "SyncOut",
         "type": "object"
       },
       "TaskCreate": {
@@ -24821,6 +25915,176 @@
         "summary": "Get Summary",
         "tags": [
           "data-quality"
+        ]
+      }
+    },
+    "/api/v1/edge/tally/catalog": {
+      "put": {
+        "description": "The ledger groups of the company open in Tally (names only), so the accountant can choose.",
+        "operationId": "put_catalog_api_v1_edge_tally_catalog_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Catalog",
+        "tags": [
+          "tally-agent"
+        ]
+      }
+    },
+    "/api/v1/edge/tally/config": {
+      "get": {
+        "description": "The company and ledger groups to read, the sync interval and the minimum agent version.",
+        "operationId": "agent_config_api_v1_edge_tally_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Agent Config",
+        "tags": [
+          "tally-agent"
+        ]
+      }
+    },
+    "/api/v1/edge/tally/enrol": {
+      "post": {
+        "description": "Exchange the owner's one-time code for a device credential (returned once). Headers:\n``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired\ncode; 429 after 10 attempts per school per hour.",
+        "operationId": "enrol_api_v1_edge_tally_enrol_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrolIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enrol",
+        "tags": [
+          "tally-agent"
+        ]
+      }
+    },
+    "/api/v1/edge/tally/key-rotation": {
+      "post": {
+        "description": "A new device key, returned once; the old one works until the new one is first used.",
+        "operationId": "rotate_key_api_v1_edge_tally_key_rotation_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyRotationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rotate Key",
+        "tags": [
+          "tally-agent"
+        ]
+      }
+    },
+    "/api/v1/edge/tally/syncs": {
+      "post": {
+        "description": "One complete snapshot of the party ledgers under the selected groups. Idempotent by\n``batch_id`` (a repeat returns the first result with ``repeat: true``). 409\n``no_groups_selected`` / ``agent_outdated``; 422 ``group_not_selected``.",
+        "operationId": "post_sync_api_v1_edge_tally_syncs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Sync",
+        "tags": [
+          "tally-agent"
         ]
       }
     },
@@ -34846,6 +36110,585 @@
         "summary": "Reply To Ticket",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/tally/devices": {
+      "get": {
+        "description": "Enrolled Tally agents, active first, with last call, last sync and version\n(``tally.device.manage``). The ETag of each is ``W/\"<version>\"`` for revocation.",
+        "operationId": "list_devices_api_v1_tally_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceOut"
+                  },
+                  "title": "Response List Devices Api V1 Tally Devices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Devices",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/devices/{device_id}/revoke": {
+      "post": {
+        "description": "Revoke a Tally agent at once (``tally.device.manage``, recent MFA sign-in; ``If-Match``).\nIts keys are erased; synced data stays until offboarding. 409 ``already_revoked``.",
+        "operationId": "revoke_device_api_v1_tally_devices__device_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Device",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/dues": {
+      "get": {
+        "description": "Students with fee dues from the linked Tally ledgers, highest first, with the school\ntotals and the Tally as-of date (``finance.read``, school-wide). Unlinked ledgers count only\nin the totals.",
+        "operationId": "list_dues_api_v1_tally_dues_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuesPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Dues",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/enrolment-codes": {
+      "post": {
+        "description": "A one-time code for enrolling the Tally agent on the office PC (``tally.device.manage``,\nrecent MFA sign-in). Shown once; SchoolOS keeps only its hash; valid 30 minutes. 409\n``too_many_devices``.",
+        "operationId": "create_enrolment_code_api_v1_tally_enrolment_codes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrolmentCodeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolmentCodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Enrolment Code",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/groups": {
+      "get": {
+        "description": "Ledger groups the agent reported (names only), selected ones marked\n(``tally.configure``).",
+        "operationId": "list_groups_api_v1_tally_groups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroupOut"
+                  },
+                  "title": "Response List Groups Api V1 Tally Groups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Groups",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/groups/selection": {
+      "put": {
+        "description": "Choose the groups whose party ledgers the agent may send; replaces the selection\n(``tally.configure``). The server refuses snapshots with any other group. 422\n``unknown_group``.",
+        "operationId": "select_groups_api_v1_tally_groups_selection_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupSelectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroupOut"
+                  },
+                  "title": "Response Select Groups Api V1 Tally Groups Selection Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Groups",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/parties": {
+      "get": {
+        "description": "Ledgers of the last snapshot by name, with the students they are linked to\n(``tally.configure``). Filter by name with ``POST /tally/parties/search`` (no names in\nURLs).",
+        "operationId": "list_parties_api_v1_tally_parties_get",
+        "parameters": [
+          {
+            "description": "all, linked or unlinked",
+            "in": "query",
+            "name": "link",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "description": "all, linked or unlinked",
+              "enum": [
+                "all",
+                "linked",
+                "unlinked"
+              ],
+              "title": "Link",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PartyOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Parties",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/parties/search": {
+      "post": {
+        "description": "Ledgers whose name contains ``query`` (case-insensitive), optionally only linked or\nunlinked (``tally.configure``). A POST so ledger names never appear in URLs.",
+        "operationId": "search_parties_api_v1_tally_parties_search_post",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartySearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PartyOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Parties",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/parties/{party_id}": {
+      "get": {
+        "description": "One ledger with its links and up to five suggested students whose name, admission number\nor class appears in the ledger name (suggestions only; a person links).",
+        "operationId": "get_party_api_v1_tally_parties__party_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "party_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Party Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartyDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Party",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/parties/{party_id}/links": {
+      "post": {
+        "description": "Link the ledger to a student (``tally.configure``); idempotent. 409 ``party_gone``; 422\n``student_id`` ``not_found``.",
+        "operationId": "link_party_api_v1_tally_parties__party_id__links_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "party_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Party Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Party",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/parties/{party_id}/links/{student_id}": {
+      "delete": {
+        "description": "Remove a ledger's link to a student (``tally.configure``).",
+        "operationId": "unlink_party_api_v1_tally_parties__party_id__links__student_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "party_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Party Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlink Party",
+        "tags": [
+          "tally"
+        ]
+      }
+    },
+    "/api/v1/tally/status": {
+      "get": {
+        "description": "The connector at a glance: active agents (and whether one is silent), last sync, Tally\nas-of date, company, selected groups, ledgers linked and unlinked; the totals due only for\nschool-wide ``finance.read`` holders. 404 when the connector is off for the school.",
+        "operationId": "get_status_api_v1_tally_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Status",
+        "tags": [
+          "tally"
         ]
       }
     },

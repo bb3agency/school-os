@@ -123,6 +123,37 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
     expect(element.props.canSwitchSchool).toBe(true);
   });
 
+  it("shows the Tally menu only while the school's connector answers (M6, ADR-0032)", async () => {
+    await signInDirect("staff", HARNESS_TENANT);
+    const tallyUser = { ...HARNESS_ME, permissions: ["finance.read"] };
+    let connector = 404;
+    h.setApi((request) => {
+      const path = new URL(request.url).pathname;
+      if (path === "/api/v1/me") return json(tallyUser);
+      if (path === "/api/v1/tally/status") {
+        return connector === 200
+          ? json({ devices_active: 1, silent: false })
+          : json({ status: 404, code: "not_found" }, 404);
+      }
+      return defaultApi(request);
+    });
+    type Features = ShellProps & { features: { tally?: boolean } };
+    const off = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Features>;
+    expect(off.props.features).toEqual({ tally: false });
+    connector = 200;
+    const on = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Features>;
+    expect(on.props.features).toEqual({ tally: true });
+  });
+
+  it("does not ask for the Tally status for people without a Tally permission", async () => {
+    await signInDirect("staff", HARNESS_TENANT);
+    const element = (await SchoolLayout({ children: "x", params: en })) as ReactElement<
+      ShellProps & { features: { tally?: boolean } }
+    >;
+    expect(element.props.features).toEqual({ tally: false });
+    expect(h.apiCalls.some((r) => new URL(r.url).pathname === "/api/v1/tally/status")).toBe(false);
+  });
+
   it("goes back to the picker when the API says the school must be chosen again", async () => {
     requestPath = "/te/audit";
     await signInDirect("staff", HARNESS_TENANT);

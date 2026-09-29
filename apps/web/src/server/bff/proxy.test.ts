@@ -195,6 +195,16 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       expect(h.apiCalls).toHaveLength(1);
     });
 
+    it("edge-agent routes are machine-only: 404 and never proxied (ADR-0032)", async () => {
+      await h.signIn("staff", clerk);
+      h.apiCalls.length = 0;
+      for (const path of ["/bff/api/v1/edge/tally/config", "/bff/api/v1/edge/tally/syncs"]) {
+        const response = await call(path, { method: "GET" });
+        expect(response.status).toBe(404);
+      }
+      expect(h.apiCalls).toHaveLength(0);
+    });
+
     it("platform routes are 404 on dedicated hosts", async () => {
       const dedicated = await createHarness({ SOS_DEPLOYMENT_MODE: "dedicated" });
       const response = await proxyToApi(

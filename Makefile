@@ -92,6 +92,9 @@ test-api: ## Python tests (real Postgres via testcontainers) with coverage
 test-order: ## Python tests in a shuffled order (pytest-random-order); reproduce with ORDER_SEED=<printed seed>
 	$(UV) run pytest -q -p no:cacheprovider --random-order-bucket=$(ORDER_BUCKET) $(if $(ORDER_SEED),--random-order-seed=$(ORDER_SEED),)
 
+test-edge-agent: ## Tally edge agent unit tests (synthetic Tally XML; ADR-0032)
+	$(UV) run pytest apps/edge-agent/tests -q
+
 test-security: ## Security suites: RLS catalog, tenant isolation, authz, BOLA
 	$(UV) run pytest apps/api/tests/security -q
 
@@ -136,6 +139,8 @@ endif
 
 typecheck: ## mypy --strict + tsc
 	$(UV) run mypy apps/api apps/worker evals
+	# The edge agent separately: its tests/conftest.py would clash with apps/api's as `tests.conftest`.
+	$(UV) run mypy apps/edge-agent
 ifneq ($(HAS_WEB),)
 	npm run typecheck
 endif

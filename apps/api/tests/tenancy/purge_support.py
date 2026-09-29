@@ -6,7 +6,7 @@ role cannot delete in normal operation (append-only and frozen tables). The dele
 (ADR-0029; ``tests/tenancy/test_offboarding_purge.py``) prove the purge leaves
 none of them, whatever new table a migration adds, and assert ``tables_without_rows`` lists
 only the retained audit tables, so this helper grows with the schema. Checked on 2026-09-29
-against ``0035_student_insights``: every tenant table except ``audit.events`` gets a row.
+against ``0036_tally``: every tenant table except ``audit.events`` gets a row.
 
 Synthetic values only (CLAUDE.md §6.11): names like "Synthetic Student", no real identifiers.
 """
@@ -751,6 +751,65 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             "INSERT INTO sis.insight_settings (id, tenant_id, rules) VALUES (:i, :t, '{}')",
             i=uuid.uuid4(),
             t=t,
+        )
+        # --- Tally connector (M6, 0036_tally; ADR-0032) -------------------------------------
+        code, device, sync, tparty = (uuid.uuid4() for _ in range(4))
+        _run(
+            c,
+            "INSERT INTO ops.tally_enrolment_codes (id, tenant_id, code_hash, device_name, "
+            "created_by, expires_at, used_at) VALUES (:i, :t, :h, 'Office PC', :u, "
+            "now() + interval '30 minutes', now())",
+            i=code,
+            t=t,
+            h=hashlib.sha256(f"code-{t}".encode()).digest(),
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_devices (id, tenant_id, name, enrolment_code_id, key_id, "
+            "key_ciphertext, enrolled_by) VALUES (:i, :t, 'Office PC', :c, "
+            "'tdk-abcdefghijklmnopqrst', :k, :u)",
+            i=device,
+            t=t,
+            c=code,
+            k=b"\x09" * 40,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_groups (id, tenant_id, company, name) "
+            "VALUES (:i, :t, 'Synthetic School', 'Sundry Debtors')",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_syncs (id, tenant_id, device_id, batch_id, company, as_of, "
+            "groups, parties, created, updated, missing, total_due) VALUES (:i, :t, :d, :b, "
+            "'Synthetic School', '2026-09-28', 1, 1, 1, 0, 0, 10.00)",
+            i=sync,
+            t=t,
+            d=device,
+            b=uuid.uuid4(),
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_parties (id, tenant_id, company, ledger_name, group_name, "
+            "closing_balance, as_of, last_sync_id) VALUES (:i, :t, 'Synthetic School', "
+            "'Synthetic Ledger', 'Sundry Debtors', 10.00, '2026-09-28', :s)",
+            i=tparty,
+            t=t,
+            s=sync,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_party_links (id, tenant_id, party_id, student_id, linked_by) "
+            "VALUES (:i, :t, :p, :s, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            p=tparty,
+            s=ids["student"],
+            u=u["user"],
         )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(

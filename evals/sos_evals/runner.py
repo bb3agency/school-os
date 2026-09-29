@@ -9,7 +9,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import circulars, metrics
+from sos_evals import circulars, fees, metrics
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
@@ -68,6 +68,13 @@ class Metrics(_Model):
     circular_hallucinated_deadlines: int | None = None
     circular_complete_rate: float | None = None
     circular_metadata_accuracy: float | None = None
+    # M6 fee dues from Tally (sos_evals.fees; FR-TALLY-008). None when not measured (gate fails).
+    fee_items: int = 0
+    fee_figure_accuracy: float | None = None
+    fee_leakage_count: int | None = None
+    fee_guessed_link_count: int | None = None
+    fee_citation_validity: float | None = None
+    fee_refusal_correctness: float | None = None
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -193,6 +200,7 @@ class RunResult(_Model):
     by_category: dict[str, Metrics]
     outcomes: tuple[ItemOutcome, ...]
     circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
+    fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
 
 
 def run(
@@ -203,6 +211,8 @@ def run(
     *,
     circular: circulars.CircularAdapter | None = None,
     circular_cases: Sequence[circulars.CircularCase] = (),
+    fee: fees.FeeAdapter | None = None,
+    fee_cases: Sequence[fees.FeeCase] = (),
 ) -> RunResult:
     outcomes = []
     for item in items:
@@ -221,9 +231,14 @@ def run(
     if circular is not None and circular_cases:
         reading, circular_outcomes = circulars.run(circular_cases, circular)
         overall = overall.model_copy(update=reading.model_dump())
+    fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
+    if fee is not None and fee_cases:
+        dues, fee_outcomes = fees.run(fee_cases, fee)
+        overall = overall.model_copy(update=dues.model_dump())
     return RunResult(
         metrics=overall,
         by_category=by_category,
         outcomes=tuple(outcomes),
         circular_outcomes=circular_outcomes,
+        fee_outcomes=fee_outcomes,
     )

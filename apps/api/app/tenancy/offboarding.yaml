@@ -5,6 +5,7 @@ version: 1
 # tenant_data_counts / purge_tenant_data with app.tenancy.service at import time. The purge
 # refuses to start when any of them is not registered (fail closed).
 purge_order:
+  - tally
   - circulars
   - insights
   - academics

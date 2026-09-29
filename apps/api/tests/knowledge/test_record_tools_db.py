@@ -138,7 +138,10 @@ def test_ADR_0008_every_whitelisted_tool_is_built_and_offered_by_permission(
     built = build_tools(load_tools_config(), composition.build_runtime().search)
     assert sorted(built) == sorted(load_tools_config().tools)
     transport, _ = ask_with(api, world.person("principal"), "count_students", {})
-    assert sorted(t["name"] for t in transport.sent[0]["tools"]) == sorted(built)
+    # get_fee_dues is also behind the school's Tally connector flag (off here; ADR-0032):
+    # tests/knowledge/test_fee_tool_db.py offers it with the flag on.
+    flagged = {"get_fee_dues"}
+    assert sorted(t["name"] for t in transport.sent[0]["tools"]) == sorted(set(built) - flagged)
     transport, _ = ask_with(api, world.person("accountant"), "count_students", {})
     offered = {t["name"] for t in transport.sent[0]["tools"]}
     assert "list_findings" not in offered  # accountant has no dq.findings.read

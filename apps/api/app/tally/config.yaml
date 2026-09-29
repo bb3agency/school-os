@@ -1,0 +1,32 @@
+# Tally read connector rules (M6; ADR-0032 Proposed; docs/05 §7.4, docs/07 §3 TB9). Versioned
+# configuration shipped inside the package (invariant 13). Read by app/tally/config.py.
+version: 1
+# Per-school feature flag (platform.feature_flags). Unknown flag = off: every Tally route answers
+# 404 and get_fee_dues is not offered until an operator switches it on for a school, which must
+# not happen before ADR-0032 is accepted.
+flag: tally.connector.enabled
+enrolment:
+  code_ttl_minutes: 30          # one-time code shown once to the owner
+  max_attempts_per_hour: 10     # per school, successful or not
+  max_active_devices: 2         # replace an office PC without a gap
+signing:
+  skew_seconds: 300             # |now - X-SOS-Timestamp|
+  nonce_ttl_seconds: 600        # a nonce is accepted once in this window
+  key_rotation_overlap_days: 7  # the old key stops working after this, or at first use of the new
+  rotate_after_days: 90         # the agent asks for a new key after this many days
+rate_limits_seconds:            # at most one accepted request per device and window
+  config: 30
+  catalog: 60
+  sync: 240
+  key_rotation: 3600
+sync:
+  interval_minutes: 30          # told to the agent in /config
+  max_parties: 5000
+  max_groups: 500
+  min_agent_version: 0.1.0      # older agents stop syncing and say so
+silence:
+  notify_after_hours: 48        # in-app notification when an active agent has not called since
+retention:
+  sync_days: 400                # sync records (counts only) older than this are deleted
+mapping:
+  max_candidates: 5             # students suggested for an unlinked ledger (a person links)

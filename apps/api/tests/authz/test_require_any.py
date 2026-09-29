@@ -251,6 +251,13 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # Exams (FR-MRK-001): the current year's exam list (C1: names and dates) for whoever
         # reads or records marks or manages exams; marks themselves stay section-scoped.
         ("GET", "/api/v1/exams"): ("marks.read", ("marks.record", "exam.manage"), False),
+        # Tally connector status (ADR-0032, FR-TALLY-007): finance readers, the owner (agents) and
+        # the accountant (mapping) share it; money totals only for school-wide finance.read.
+        ("GET", "/api/v1/tally/status"): (
+            "finance.read",
+            ("tally.device.manage", "tally.configure"),
+            False,
+        ),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

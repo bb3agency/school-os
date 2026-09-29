@@ -78,7 +78,7 @@ export function AnswerText({
   );
 }
 
-type LinkedRef = Exclude<SourceRef, { kind: "count" }>;
+type LinkedRef = Exclude<SourceRef, { kind: "count" | "fee" }>;
 
 function openLabel(ref: LinkedRef, t: ReturnType<typeof useTranslations<"ask.answer">>): string {
   switch (ref.kind) {
@@ -119,6 +119,8 @@ export function SourceChip({
   meta?: string;
 }) {
   const t = useTranslations("ask.answer");
+  // Fee dues from Tally (M6) carry their labels in the tally namespace.
+  const tt = useTranslations("tally");
   const ref = parseSource(source);
   const href = ref ? sourceHref(ref) : null;
   const name = title?.trim() || t("untitled");
@@ -148,7 +150,7 @@ export function SourceChip({
                 href={href}
                 className="font-medium text-primary underline underline-offset-4 hover:no-underline"
                 // The visible title starts the name (WCAG 2.5.3); the rest says what opens.
-                aria-label={`${name} (${openLabel(ref, t)})`}
+                aria-label={`${name} (${ref.kind === "fee" ? tt("sourceOpen") : openLabel(ref, t)})`}
               >
                 {name}
               </Link>
@@ -159,6 +161,7 @@ export function SourceChip({
               <Pill variant="tag">{t("page", { page: ref.page })}</Pill>
             ) : null}
             {ref?.kind === "count" ? <Pill variant="tag">{t("countNote")}</Pill> : null}
+            {ref?.kind === "fee" ? <Pill variant="tag">{tt("sourceNote")}</Pill> : null}
           </p>
           {ref === null ? <p className="text-xs text-ink-muted">{t("noLink")}</p> : null}
           {meta ? <p className="text-xs text-ink-muted">{meta}</p> : null}

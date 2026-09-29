@@ -20,6 +20,8 @@ import { callApi } from "./upstream";
 /**
  * BFF proxy: browser → /bff/api/v1/* → API /api/v1/* (docs/09 §1; SEC-004).
  *
+ * - Machine-only API paths (the Tally edge agent, /api/v1/edge/*, ADR-0032) are never proxied:
+ *   404 before any session work; the agent calls the API directly with its device signature.
  * - Needs a session of the right kind: operators may call only /platform/*, school staff
  *   never /platform/* (403 wrong_session). No session: 401. A SchoolOS support session
  *   (break-glass, ADR-0023) counts as a school session when there is no staff session; the
@@ -204,6 +206,9 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
     return problem(requestId, 400, "bad_request", "Bad request");
   }
   const apiPath = rawPath.slice(BFF_PREFIX.length);
+  if (apiPath === "/api/v1/edge" || apiPath.startsWith("/api/v1/edge/")) {
+    return problem(requestId, 404, "not_found", "Not found");
+  }
   const isPlatform = apiPath === "/api/v1/platform" || apiPath.startsWith("/api/v1/platform/");
   const kind: SessionKind = isPlatform ? "operator" : "staff";
   if (isPlatform && !runtime.config.platformEnabled) {

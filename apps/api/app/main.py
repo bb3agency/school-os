@@ -31,6 +31,8 @@ from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
 from app.platform.tenant_api import router as platform_tenant_router
 from app.students.api import router as students_router
+from app.tally.api import agent_router as tally_agent_router
+from app.tally.api import router as tally_router
 from app.tenancy.api import router as tenancy_router
 
 API_PREFIX = "/api/v1"
@@ -71,6 +73,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(circulars_router)
     app.include_router(academics_router)
     app.include_router(insights_router)
+    # M6 Tally connector (ADR-0032 Proposed): behind the per-school flag
+    # tally.connector.enabled (default off, 404). The agent routes are device-signed.
+    app.include_router(tally_router)
+    app.include_router(tally_agent_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

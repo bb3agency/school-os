@@ -34,6 +34,12 @@ PERFECT = Metrics(
     circular_hallucinated_deadlines=0,
     circular_complete_rate=1.0,
     circular_metadata_accuracy=1.0,
+    fee_items=22,
+    fee_figure_accuracy=1.0,
+    fee_leakage_count=0,
+    fee_guessed_link_count=0,
+    fee_citation_validity=1.0,
+    fee_refusal_correctness=1.0,
 )
 
 
@@ -50,6 +56,12 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         ("circular_deadline_precision", ">=", 0.90),
         ("circular_citation_validity", ">=", 1.0),
         ("circular_hallucinated_deadlines", "==", 0),
+        # M6 fee dues from Tally (FR-TALLY-008; 14 · M6 exit: figures match Tally).
+        ("fee_figure_accuracy", ">=", 1.0),
+        ("fee_leakage_count", "==", 0),
+        ("fee_guessed_link_count", "==", 0),
+        ("fee_citation_validity", ">=", 1.0),
+        ("fee_refusal_correctness", ">=", 0.95),
     }
 
 
@@ -86,6 +98,12 @@ def test_perfect_metrics_pass_every_gate() -> None:
         ({"citation_precision": None}, "citation_precision"),
         ({"refusal_correctness": None}, "refusal_correctness"),
         ({"circular_deadline_recall": 0.89}, "circular_deadline_recall"),
+        ({"fee_figure_accuracy": 0.99}, "fee_figure_accuracy"),
+        ({"fee_leakage_count": 1}, "fee_leakage_count"),
+        ({"fee_guessed_link_count": 1}, "fee_guessed_link_count"),
+        ({"fee_citation_validity": 0.99}, "fee_citation_validity"),
+        ({"fee_refusal_correctness": 0.94}, "fee_refusal_correctness"),
+        ({"fee_figure_accuracy": None}, "fee_figure_accuracy"),
         ({"circular_deadline_precision": 0.89}, "circular_deadline_precision"),
         ({"circular_citation_validity": 0.99}, "circular_citation_validity"),
         ({"circular_hallucinated_deadlines": 1}, "circular_hallucinated_deadlines"),

@@ -390,6 +390,36 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 
 ---
 
+### C18 · Tally read connector (M6)
+
+*Proposed from the roadmap scope (14 · M6); PO to confirm. **Built behind the per-school flag `tally.connector.enabled` (default off); ADR-0032 Proposed.*** A small agent on the office PC reads fee ledgers from TallyPrime and sends them to SchoolOS; it only reads, and SchoolOS never connects into the school network. Ledger names are usually student or parent names: C2 personal financial data, readable with `finance.read` only. Exit (14 · M6): fee-due questions answered from synced Tally data; the accountant confirms the figures match Tally.
+
+**US-1801** · As the owner, I want to connect the office PC that runs Tally with a one-time code, so that only that PC can send our Tally figures. [FR-TALLY-001, FR-TALLY-002, FR-TALLY-003] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I signed in with MFA recently, when I choose "Add an agent" and name the PC, then SchoolOS shows a one-time code once, with the command to run on the PC and the time it expires (30 minutes); only a hash of the code is kept.
+- AC2: When the agent is enrolled with the code, then the code cannot be used again, the PC appears in the agent list with its version and Tally product, and the event is in the audit log.
+- AC3: A wrong, used or expired code is refused without saying which; after 10 attempts in an hour further attempts are refused; a school has at most 2 active agents.
+- AC4: The agent only reads from Tally on the same PC and only sends to SchoolOS over HTTPS; nothing personal is written to the PC's disk.
+
+**US-1802** · As the owner, I want to see whether the agent is syncing and revoke it when the PC is replaced or lost. [FR-TALLY-002, FR-TALLY-009] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: The connector screen shows active agents, last sync, the Tally as-of date, the company, the groups selected and how many ledgers are linked.
+- AC2: When an active agent has not called for 48 hours, the owner and finance readers get one in-app notice (EN/TE) and the screen marks it "Not syncing".
+- AC3: Revoking (recent MFA sign-in) stops the agent at once; figures already synced stay and are marked with their date.
+
+**US-1803** · As the accountant, I want to choose which Tally ledger groups are sent and link each ledger to the right student, so that only fee ledgers leave the PC and dues are counted for the right child. [FR-TALLY-004, FR-TALLY-005, FR-TALLY-006] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: I see the groups of the open Tally company (names only) and choose the fee groups; the screen tells me not to choose salary, supplier or bank groups; the server refuses ledgers from any other group.
+- AC2: On the linking screen I see the ledgers not linked yet, with up to 5 suggested students found by searching the ledger name among the students I can see; I link or unlink each one myself (one family ledger may be linked to several siblings). SchoolOS and the AI never link on their own.
+- AC3: Ledger and student searches never put names in the URL.
+
+**US-1804** · As the accountant or principal, I want a list of students with dues and the school totals, with the Tally date, so that I can follow up and compare with Tally. [FR-TALLY-007] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: The fee dues screen lists students with dues from their linked ledgers, highest first, with admission number, class, the number of ledgers and the as-of date; totals show the students with dues, the total due and what sits on unlinked ledgers.
+- AC2: Only school-wide `finance.read` holders see it; others see a plain explanation (403/404 from the API).
+
+**US-1805** · As the accountant or management, I want to ask "What does this student owe?" or "What are the total fee dues?" in Ask the school and get the Tally figure with a source chip. [FR-TALLY-008] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: The answer gives the figure from the student's linked ledgers only, with the Tally as-of date and a source chip that opens the fee dues screen; with no linked ledger it says so and never guesses.
+- AC2: Without school-wide `finance.read`, or while the connector is off, the fee tool is not offered and the answer says the records do not show it.
+
+---
+
 ## 5. Data-quality rules catalog (initial)
 
 | Rule | Checks | Default severity | Explanation template (EN) |

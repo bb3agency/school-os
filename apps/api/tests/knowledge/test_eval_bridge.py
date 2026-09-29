@@ -216,6 +216,48 @@ def test_record_questions_find_the_student_then_read_one_field_and_cite_it() -> 
     assert nobody == [{"type": "text", "text": "ఇది కనబడలేదు."}]
 
 
+def test_FR_TALLY_008_fee_questions_find_the_student_by_number_then_read_fee_dues() -> None:
+    """The stand-in never maps by name: the admission number, then get_fee_dues; no number,
+    the school totals; without the tool offered it does not try (documents instead)."""
+    question = "How much fee does student AB-2026-0101 still owe?"
+    tools = [{"name": "find_students"}, {"name": "get_fee_dues"}, {"name": "search_documents"}]
+    first: list[dict[str, Any]] = [
+        {"role": "user", "content": [{"type": "text", "text": question}]}
+    ]
+    t = B.EvalFakeTransport()
+
+    def send(messages: list[dict[str, Any]], offered: list[dict[str, str]] = tools) -> Any:
+        return t.send(MessagesRequest({"model": "m", "messages": messages, "tools": offered}, 1))
+
+    call = send(first)["content"][0]
+    assert (call["name"], call["input"]) == ("find_students", {"query": "AB-2026-0101"})
+    found = first + _turn("find_students", [_find_block("AB-2026-0101")], "t1")
+    call = send(found)["content"][0]
+    assert (call["name"], call["input"]) == ("get_fee_dues", {"student_id": STUDENT})
+    text = "Fee due for Synthetica Pupil (admission number AB-2026-0101): ₹15,000.00 in total."
+    dues = _result(text, "sos://fee/0190c0de-0000-7000-8000-00000000fee1", "Fee dues")
+    reply = send(found + _turn("get_fee_dues", [dues], "t2"))["content"]
+    assert reply[0]["text"] == text
+    assert reply[0]["citations"][0]["cited_text"] == text
+    school = [{"role": "user", "content": [{"type": "text", "text": "Total fee dues now?"}]}]
+    call = send(school)["content"][0]
+    assert (call["name"], call["input"]) == ("get_fee_dues", {})
+    call = send(first, [{"name": "search_documents"}])["content"][0]
+    assert call["name"] == "search_documents"
+
+
+def test_FR_TALLY_008_fee_readers_are_roles_yaml() -> None:
+    """``sos_evals.fees.FEE_READERS``: school-wide finance.read AND kb.ask (roles.yaml)."""
+    from sos_evals.fees import FEE_READERS
+
+    readers = set()
+    for key, role in system_roles().items():
+        finance, ask = role.grant("finance.read"), role.grant("kb.ask")
+        if finance is not None and not finance.scoped and ask is not None:
+            readers.add(key)
+    assert readers == FEE_READERS
+
+
 # --- oracle parity (pure) ----------------------------------------------------------------------
 
 DATA = datasets.load()
@@ -322,3 +364,21 @@ def test_record_sources_map_to_corpus_ids(bridge: Any) -> None:
     assert bridge.corpus_source(f"sos://student/{real}/field/dob?src=admission_register") == (
         f"sos://student/{corpus_id}/field/dob?src=admission_register"
     )
+
+
+@pytest.mark.db
+def test_FR_TALLY_008_fee_cases_pass_the_hard_gates_through_the_application(bridge: Any) -> None:
+    """Every synthetic fee case through the real ask pipeline and get_fee_dues (app-fake)."""
+    from sos_evals import fees, gates
+
+    metrics, outcomes = fees.run(DATA.fees, bridge)
+    problems = [o for o in outcomes if o.leaks or o.guessed or o.figure_correct is False]
+    problems += [o for o in outcomes if o.refusal_correct is False]
+    assert problems == []
+    assert metrics.fee_figure_accuracy == 1.0
+    assert metrics.fee_leakage_count == 0
+    assert metrics.fee_guessed_link_count == 0
+    assert metrics.fee_citation_validity == 1.0
+    assert metrics.fee_refusal_correctness == 1.0
+    fee_gates = [g for g in gates.load_gates() if g.metric.startswith("fee_")]
+    assert len(fee_gates) == 5

@@ -3,7 +3,9 @@
 Every API route (except the public health checks) declares exactly one guard from ``require()``
 or ``require_principal()`` whose permission exists in the catalog (``permissions.yaml`` and
 ``core.permissions``); step-up flags agree with the catalog; platform permissions never guard
-tenant routes; dedicated deployments mount no control-plane routes.
+tenant routes; dedicated deployments mount no control-plane routes. Machine routes carry their
+own guard instead: the fleet heartbeat ``require_fleet_signature()`` and the Tally edge agent
+``require_edge_agent_enrolment()`` / ``require_edge_agent_signature()`` (ADR-0032, Proposed).
 """
 
 from __future__ import annotations
@@ -30,6 +32,17 @@ TENANTLESS = {
 }
 # Machine-authenticated route (HMAC, require_fleet_signature(); CLAUDE.md §6.2, docs/16 §12).
 FLEET_HEARTBEAT = ("POST", "/api/v1/fleet/heartbeat")
+# Machine-authenticated Tally edge-agent routes (ADR-0032 §3, Proposed; behind the per-school
+# flag tally.connector.enabled): the enrolment guard on /enrol, the device-signature guard on the
+# other four. Neither guard may appear anywhere else, and no other guard may appear here.
+EDGE_AGENT = {
+    ("POST", "/api/v1/edge/tally/enrol"): "enrolment",
+    ("GET", "/api/v1/edge/tally/config"): "signature",
+    ("PUT", "/api/v1/edge/tally/catalog"): "signature",
+    ("POST", "/api/v1/edge/tally/syncs"): "signature",
+    ("POST", "/api/v1/edge/tally/key-rotation"): "signature",
+}
+EDGE_AGENT_PSEUDO_PERMISSION = "tally.agent"
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -69,6 +82,13 @@ def test_SEC_003_every_route_has_exactly_one_known_guard(app: FastAPI) -> None:
             problems.append(f"{method} {path}: fleet signature guard only on the heartbeat")
         if (method, path) == FLEET_HEARTBEAT:
             continue
+        if getattr(found[0], "sos_edge_agent", None) != EDGE_AGENT.get((method, path)):
+            problems.append(f"{method} {path}: edge-agent guards only on the edge-agent routes")
+            continue
+        if (method, path) in EDGE_AGENT:
+            if found[0].sos_permission != EDGE_AGENT_PSEUDO_PERMISSION:
+                problems.append(f"{method} {path}: unexpected edge-agent pseudo-permission")
+            continue
         perm = found[0].sos_permission
         pdef = catalog.get(perm)
         if pdef is None:
@@ -86,7 +106,7 @@ def test_SEC_005_step_up_flags_match_catalog(app: FastAPI) -> None:
     problems: list[str] = []
     for method, path, route in api_routes(app):
         for guard in guards(route):
-            if getattr(guard, "sos_fleet_signature", False):
+            if getattr(guard, "sos_fleet_signature", False) or hasattr(guard, "sos_edge_agent"):
                 continue
             pdef = catalog[guard.sos_permission]
             if guard.sos_step_up and not pdef.step_up:
@@ -116,10 +136,23 @@ def test_SEC_003_route_permissions_exist_in_core_permissions(
         g.sos_permission
         for _, _, r in api_routes(app)
         for g in guards(r)
-        if not getattr(g, "sos_fleet_signature", False)
+        if not getattr(g, "sos_fleet_signature", False) and not hasattr(g, "sos_edge_agent")
     }
     assert used
     assert used <= keys
+
+
+def test_ADR_0032_edge_agent_routes_are_exactly_the_listed_ones(app: FastAPI) -> None:
+    edge = {(m, p) for m, p, _ in api_routes(app) if p.startswith("/api/v1/edge/")}
+    assert edge == set(EDGE_AGENT)
+
+
+def test_ADR_0032_edge_agent_pseudo_permission_is_not_grantable() -> None:
+    """The edge-agent guards carry a pseudo-permission no role can hold: it is not in the
+    catalog, so require() refuses it and no role grant can name it."""
+    assert EDGE_AGENT_PSEUDO_PERMISSION not in permission_catalog()
+    with pytest.raises(CatalogError):
+        require(EDGE_AGENT_PSEUDO_PERMISSION)
 
 
 def test_SEC_003_require_rejects_unknown_platform_and_bad_step_up() -> None:

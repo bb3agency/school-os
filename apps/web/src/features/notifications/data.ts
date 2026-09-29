@@ -47,6 +47,8 @@ const LINKS: Record<string, (id: string) => string> = {
   task: () => "/tasks",
   // M5 (FR-EW-006): a flag was raised, given to you or is overdue.
   insight_flag: (id) => `/flags/${id}`,
+  // M6 (FR-TALLY-009): a Tally agent went silent; the connector screen shows its status.
+  tally_device: () => "/settings/tally",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

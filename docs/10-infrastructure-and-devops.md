@@ -378,6 +378,10 @@ In staging/prod `SOS_S3_ENDPOINT_URL` and `SOS_S3_PRESIGN_ENDPOINT_URL` stay uns
 - Outbound HTTPS only to SchoolOS; per-device credential bound to the tenant; revocable from admin console.
 - Sends only configured data (e.g., outstanding fee ledgers), queues offline, retries; signed auto-updates; logs locally without personal data.
 
+**As built (behind flag; ADR Proposed, ADR-0032).** Package `apps/edge-agent` (`sos_edge_agent`, Python 3.12, one runtime dependency `defusedxml`; uv workspace member): commands `enrol`, `run` (the service loop), `sync-once`, `status`, `rotate-key` and `check-tally`; Windows service wrapper WinSW (`windows/sos-tally-agent.xml`, dedicated local account); credential in DPAPI (service-account scope, entropy bound to the school); `--insecure-file-store` only for development and CI. The newest snapshot is kept in memory only (no disk queue: a fresh snapshot supersedes it) and retried with the same `batch_id` and backoff with jitter up to 30 minutes. CI job `edge-agent` runs its tests on `ubuntu-24.04` and `windows-2025` (the DPAPI round trip runs on Windows only); `make test-edge-agent`; mypy covers the package.
+
+*Not built yet* (release blockers for any school, besides accepting ADR-0032): the MSI installer and Authenticode code-signing certificate; signed auto-update (manual MSI update; the server stops outdated agents via `min_agent_version`); **exposure of `/api/v1/edge/tally/*`**: the shared tier's ALB listener must route that path to the API (the web/BFF refuses it) with the WAF rate rule (SEC-022) covering `/api/v1/edge/`, and the dedicated `Caddyfile` needs the same `handle` rule; neither is in Terraform or `deploy/dedicated/` yet. Release note: after migration `0036_tally` run the post-migration system-role sync so existing schools' owner, principal and accountant roles receive `tally.device.manage` / `tally.configure` (ADR-0022).
+
 ## 14. Production readiness checklist (per release of a new module)
 
 - [ ] Runbook entries and alerts exist for new components
