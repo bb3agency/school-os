@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
-import { Link } from "@/i18n/navigation";
+import { ButtonLink } from "@/components/ui/Button";
 import { TENANT_SUSPENDED_EVENT } from "@/lib/bff/fetch";
 import { ApiError } from "@/lib/bff/query";
 import { STAFF_ME_KEY, useStaffMeQuery } from "@/lib/bff/staff-me";
@@ -53,14 +53,15 @@ export function SuspendedBanner({ initialStatus = "active" }: { initialStatus?: 
 
   return (
     <section aria-label={t("label")} className="mb-6" data-print="hide">
-      <Alert tone={kind === "offboarding" ? "warning" : "danger"} title={t(`${kind}.title`)}>
+      {/* Calm warning tone: nothing is broken or lost, access is paused (the text says so). */}
+      <Alert tone="warning" title={t(`${kind}.title`)}>
         <p>{keepsAccess ? t(`${kind}.leaderBody`) : t(`${kind}.staffBody`)}</p>
         <p className="mt-1">{t("nothingDeleted")}</p>
         {keepsAccess && canSeeBilling ? (
-          <p className="mt-2">
-            <Link href="/settings/billing" className="font-semibold underline">
+          <p className="mt-3">
+            <ButtonLink href="/settings/billing" variant="secondary" size="sm">
               {t("billingLink")}
-            </Link>
+            </ButtonLink>
           </p>
         ) : null}
       </Alert>
