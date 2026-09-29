@@ -5,7 +5,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useState } from "react";
 import { z } from "zod";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, Pill } from "@/components/ui/Badge";
+import { Icon } from "@/components/ui/Icon";
 import { Button, type ButtonVariant } from "@/components/ui/Button";
 import { useSectionOptions } from "@/features/findings/data";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
@@ -183,15 +184,24 @@ export function useAclLabel(): (entry: AclEntry) => string {
 export function AclSummary({ acl }: { acl: readonly AclEntry[] }) {
   const t = useTranslations("documents.acl");
   const label = useAclLabel();
-  if (acl.length === 0) return <p>{t("wholeSchool")}</p>;
+  if (acl.length === 0) {
+    return (
+      <p className="inline-flex items-center gap-2">
+        <Icon name="users" className="size-4 text-ink-muted" />
+        {t("wholeSchool")}
+      </p>
+    );
+  }
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <p>{t("limitedTo")}</p>
-      <ul className="list-disc space-y-1 pl-5">
+      <ul className="flex flex-wrap gap-2">
         {acl.map((entry) => (
           <li key={aclValue(entry)}>
-            <span className="text-ink-muted">{t(`kind.${entry.principal_type}`)}: </span>
-            <span className="font-semibold">{label(entry)}</span>
+            <Pill variant="tag" size="md">
+              <span className="text-ink-subtle">{t(`kind.${entry.principal_type}`)}:</span>
+              <span className="font-medium text-ink">{label(entry)}</span>
+            </Pill>
           </li>
         ))}
       </ul>

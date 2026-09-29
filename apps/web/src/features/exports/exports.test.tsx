@@ -97,6 +97,12 @@ describe("exports list (FR-EXP-003, ADR-0021)", () => {
     expect(row && within(row).getByText("03/10/2026 10:31")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New pre-check" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New student list" })).not.toBeInTheDocument();
+    // One card per export type the member may make; the history sits in its own card.
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Pre-check before you submit" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Student list" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Earlier exports" })).toBeInTheDocument();
   });
 
   it("offers the whole-school view to export.read_all holders and asks for requested_by=all", async () => {
@@ -504,7 +510,15 @@ describe("export detail and download (FR-EXP-003..004, SEC-005, ADR-0021)", () =
     renderWithIntl(<ExportDetailScreen exportId={EXPORT_ID} />);
     expect(await screen.findByText("This export could not be made")).toBeInTheDocument();
     expect(screen.getByText(/No students matched/)).toBeInTheDocument();
-    expect(await screen.findByText("Class, Full name")).toBeInTheDocument();
+    // The columns are listed as chips, in the order of the file.
+    expect(await screen.findByText("Full name")).toBeInTheDocument();
+    const chips = screen.getByText("Full name").closest("ul");
+    expect(
+      chips &&
+        within(chips)
+          .getAllByRole("listitem")
+          .map((li) => li.textContent),
+    ).toEqual(["Class", "Full name"]);
   });
 
   it("someone else's id without export.read_all is simply not found (404)", async () => {

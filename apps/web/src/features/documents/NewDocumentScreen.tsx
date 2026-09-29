@@ -4,12 +4,13 @@ import { useTranslations } from "next-intl";
 import { useRef } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
+import { FileDropZone, fileInputClasses } from "@/features/imports/parts";
 import { Link, useRouter } from "@/i18n/navigation";
 import { newIdempotencyKey, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
@@ -41,6 +42,12 @@ export function NewDocumentScreen() {
   const tsens = useTranslations("documents.sensitivity");
   const tlang = useTranslations("documents.language");
   const tc = useTranslations("common");
+  const tn = useTranslations("school.nav");
+  const crumbs = [
+    { label: tn("home"), href: "/" },
+    { label: td("title"), href: "/documents" },
+    { label: t("title") },
+  ];
   const me = useStaffMeQuery();
   const can = useStaffCan();
   const api = useBffClient("staff");
@@ -82,7 +89,7 @@ export function NewDocumentScreen() {
   if (!can(DOCUMENT_PERM.upload)) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("title")} />
+        <PageHeader title={t("title")} breadcrumb={crumbs} />
         <Alert tone="warning" title={t("noPermissionTitle")}>
           {t("noPermissionBody")}
         </Alert>
@@ -96,28 +103,22 @@ export function NewDocumentScreen() {
   const errors = form.errors;
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t("title")}
-        description={t("description")}
-        actions={
-          <Link href="/documents" className="text-primary underline">
-            {t("back")}
-          </Link>
-        }
-      />
+      <PageHeader title={t("title")} description={t("description")} breadcrumb={crumbs} />
       <form noValidate onSubmit={form.onSubmit} className="space-y-6">
         <Card title={t("fileTitle")}>
           <Field label={t("file")} hint={t("fileHint")} error={errors.file}>
             {({ id, describedBy, invalid }) => (
-              <input
-                id={id}
-                name="file"
-                type="file"
-                accept={acceptFor("other")}
-                aria-describedby={describedBy}
-                aria-invalid={invalid || undefined}
-                className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-border-strong file:bg-surface file:px-3 file:py-2 file:font-semibold"
-              />
+              <FileDropZone title={t("dropTitle")}>
+                <input
+                  id={id}
+                  name="file"
+                  type="file"
+                  accept={acceptFor("other")}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid || undefined}
+                  className={fileInputClasses}
+                />
+              </FileDropZone>
             )}
           </Field>
         </Card>
@@ -169,7 +170,10 @@ export function NewDocumentScreen() {
             <legend className="text-sm font-semibold text-ink">{t("sensitivity")}</legend>
             <p className="text-sm text-ink-muted">{t("sensitivityHint")}</p>
             {SENSITIVITIES.map((value) => (
-              <label key={value} className="flex items-start gap-2 text-sm">
+              <label
+                key={value}
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-border-soft p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft"
+              >
                 <input
                   type="radio"
                   name="sensitivity"
@@ -178,7 +182,7 @@ export function NewDocumentScreen() {
                   className="mt-0.5 size-4"
                 />
                 <span>
-                  <span className="font-semibold">{tsens(`${value}.short`)}</span>
+                  <span className="font-medium text-ink">{tsens(`${value}.short`)}</span>
                   {" · "}
                   {tsens(`${value}.hint`)}
                 </span>
@@ -192,9 +196,12 @@ export function NewDocumentScreen() {
         <Card title={t("aclTitle")}>
           <AclFields errors={errors} />
         </Card>
-        <p className="text-sm text-ink-muted">{t("scanNote")}</p>
         <ApiErrorAlert error={form.error} namespace="documents" />
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <p className="mr-auto max-w-prose text-sm text-ink-muted">{t("scanNote")}</p>
+          <Link href="/documents" className={buttonClasses("ghost", "md")}>
+            {tc("cancel")}
+          </Link>
           <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
             {form.pending ? t("uploading") : td("upload")}
           </Button>

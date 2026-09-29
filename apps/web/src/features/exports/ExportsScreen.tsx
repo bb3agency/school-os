@@ -2,7 +2,10 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TabNav } from "@/components/ui/TabNav";
@@ -30,6 +33,7 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
   const tk = useTranslations("exports.kind");
   const tf = useTranslations("exports.format");
   const tc = useTranslations("common");
+  const tn = useTranslations("school.nav");
   const locale = useLocale() as Locale;
   const me = useStaffMeQuery();
   const can = useStaffCan();
@@ -65,7 +69,10 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
       key: "what",
       header: tl("colWhat"),
       cell: (row) => (
-        <Link href={`/exports/${row.id}`} className="font-semibold text-primary underline">
+        <Link
+          href={`/exports/${row.id}`}
+          className="font-medium text-primary underline underline-offset-4"
+        >
           {title(row)}
           <span className="sr-only">
             {", "}
@@ -75,11 +82,23 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
       ),
     },
     { key: "by", header: tl("colBy"), cell: (row) => <RequesterName row={row} /> },
-    { key: "students", header: tl("colStudents"), cell: (row) => count(row.student_count) },
+    {
+      key: "students",
+      header: tl("colStudents"),
+      cell: (row) => <span className="tabular-nums">{count(row.student_count)}</span>,
+    },
     {
       key: "formats",
       header: tl("colFormats"),
-      cell: (row) => row.formats.map((format) => tf(format)).join(", "),
+      cell: (row) => (
+        <span className="flex flex-wrap gap-1">
+          {row.formats.map((format) => (
+            <Pill key={format} variant="tag">
+              {tf(format)}
+            </Pill>
+          ))}
+        </span>
+      ),
     },
     {
       key: "status",
@@ -109,55 +128,88 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
   const canPrecheck = can([EXPORT_PERM.board, EXPORT_PERM.portal]);
   const canList = can(EXPORT_PERM.studentList);
 
+  const types: { key: string; href: string; action: string; primary: boolean }[] = [
+    ...(canPrecheck
+      ? [
+          {
+            key: "precheck",
+            href: "/exports/new/precheck",
+            action: t("newPrecheck"),
+            primary: true,
+          },
+        ]
+      : []),
+    ...(canList
+      ? [
+          {
+            key: "studentList",
+            href: "/exports/new/student-list",
+            action: t("newStudentList"),
+            primary: !canPrecheck,
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("title")}
         description={t("description")}
-        actions={
-          <>
-            {canPrecheck ? (
-              <ButtonLink href="/exports/new/precheck">{t("newPrecheck")}</ButtonLink>
-            ) : null}
-            {canList ? (
-              <ButtonLink href="/exports/new/student-list" variant="secondary">
-                {t("newStudentList")}
+        breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+      />
+      {types.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {types.map((type) => (
+            <Card
+              key={type.key}
+              eyebrow={tl(`types.${type.key as "precheck"}.eyebrow`)}
+              title={tl(`types.${type.key as "precheck"}.title`)}
+              description={tl(`types.${type.key as "precheck"}.body`)}
+            >
+              <ButtonLink href={type.href} variant={type.primary ? "primary" : "secondary"}>
+                <Icon name="plus" className="size-4" />
+                {type.action}
               </ButtonLink>
-            ) : null}
-          </>
-        }
-      />
-      {canSeeAll ? (
-        <TabNav
-          label={tl("viewsLabel")}
-          activeId={view}
-          items={[
-            { id: "me", href: "/exports", label: tl("mine") },
-            { id: "all", href: "/exports?view=all", label: tl("wholeSchool") },
-          ]}
-        />
+            </Card>
+          ))}
+        </div>
       ) : null}
-      <p className="text-sm text-ink-muted">
-        {view === "all" ? tl("wholeSchoolHint") : tl("mineHint")}
-      </p>
-      <div role="status" aria-live="polite" className="text-sm">
-        {busy ? tl("updating") : null}
-      </div>
-      <DataTable
-        caption={view === "all" ? tl("wholeSchool") : tl("mine")}
-        captionHidden
-        columns={columns}
-        state={rows}
-        rowKey={(row) => row.id}
-        emptyTitle={tl("emptyTitle")}
-        emptyBody={canPrecheck || canList ? tl("emptyBodyMaker") : tl("emptyBody")}
-      />
-      <Pager
-        label={tl("pagesLabel")}
-        page={pages.page}
-        onPrevious={pages.hasPrevious ? pages.previous : undefined}
-        onNext={next ? () => pages.next(next) : undefined}
-      />
+      <Card
+        title={tl("historyTitle")}
+        description={view === "all" ? tl("wholeSchoolHint") : tl("mineHint")}
+      >
+        <div className="space-y-4">
+          {canSeeAll ? (
+            <TabNav
+              label={tl("viewsLabel")}
+              activeId={view}
+              items={[
+                { id: "me", href: "/exports", label: tl("mine") },
+                { id: "all", href: "/exports?view=all", label: tl("wholeSchool") },
+              ]}
+            />
+          ) : null}
+          <div role="status" aria-live="polite" className="text-sm text-ink-muted">
+            {busy ? tl("updating") : null}
+          </div>
+          <DataTable
+            caption={view === "all" ? tl("wholeSchool") : tl("mine")}
+            captionHidden
+            columns={columns}
+            state={rows}
+            rowKey={(row) => row.id}
+            emptyTitle={tl("emptyTitle")}
+            emptyBody={canPrecheck || canList ? tl("emptyBodyMaker") : tl("emptyBody")}
+          />
+          <Pager
+            label={tl("pagesLabel")}
+            page={pages.page}
+            onPrevious={pages.hasPrevious ? pages.previous : undefined}
+            onNext={next ? () => pages.next(next) : undefined}
+          />
+        </div>
+      </Card>
     </div>
   );
 }

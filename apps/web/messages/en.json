@@ -1923,7 +1923,8 @@
         "registering": "Saving the file…",
         "scanning": "Checking the file for viruses…",
         "ready": "File ready."
-      }
+      },
+      "dropTitle": "Choose the spreadsheet, or drag it here"
     },
     "list": {
       "title": "Imports",
@@ -1987,7 +1988,10 @@
         "reverting": "The import is being undone.",
         "reverted": "This import was undone. The records it added were removed.",
         "failed": "The file could not be read. See the reason below."
-      }
+      },
+      "undoEyebrow": "24-hour undo",
+      "hoursLeft": "{hours, plural, one {About # hour left to undo} other {About # hours left to undo}}",
+      "underAnHour": "Less than an hour left to undo"
     },
     "failure": {
       "generic": "Something went wrong with this file. Upload it again, or contact support with the time of the import.",
@@ -2020,7 +2024,9 @@
       "committed": "Rows added",
       "created": "Students created",
       "updated": "Students updated",
-      "skipped": "Rows skipped"
+      "skipped": "Rows skipped",
+      "title": "Summary",
+      "description": "Counts from the last check of this file."
     },
     "targets": {
       "ignore": "Don't import this column",
@@ -2118,7 +2124,9 @@
       },
       "emptyTitle": "No rows to show",
       "emptyBody": "Choose another option under Show.",
-      "pagesLabel": "Pages of rows"
+      "pagesLabel": "Pages of rows",
+      "errorTag": "Error",
+      "warningTag": "Warning"
     },
     "commit": {
       "open": "Add to student records",
@@ -2223,6 +2231,16 @@
         "title": "Only an added import can be undone",
         "body": "Reload the page to see this import's status."
       }
+    },
+    "steps": {
+      "label": "Import steps",
+      "step": "Step {number}",
+      "upload": "Upload",
+      "map": "Map columns",
+      "check": "Check rows",
+      "add": "Add",
+      "done": "Done:",
+      "stopped": "Stopped:"
     }
   },
   "extraction": {
@@ -2260,7 +2278,8 @@
         "scanning": "checking for viruses",
         "ready": "done"
       },
-      "photoOf": "Photo {current} of {total}: {stage}"
+      "photoOf": "Photo {current} of {total}: {stage}",
+      "dropTitle": "Choose the photos, or drag them here"
     },
     "list": {
       "title": "Register photos",
@@ -2336,7 +2355,8 @@
       "emptyPendingTitle": "No rows left to check",
       "emptyPendingBody": "Every row found so far has been checked. Pages still being read add rows here.",
       "emptyTitle": "No rows to show",
-      "pagesLabel": "Pages of rows"
+      "pagesLabel": "Pages of rows",
+      "lowestLabel": "Lowest reading certainty, {where}"
     },
     "batch": {
       "loadingTitle": "Register photos",
@@ -3078,7 +3098,20 @@
       "emptyTitle": "No exports yet",
       "emptyBody": "Exports made in this school will be listed here.",
       "emptyBodyMaker": "Make a pre-check or a student list with the buttons above.",
-      "pagesLabel": "Pages of exports"
+      "pagesLabel": "Pages of exports",
+      "historyTitle": "Earlier exports",
+      "types": {
+        "precheck": {
+          "eyebrow": "Boards and portals",
+          "title": "Pre-check before you submit",
+          "body": "Check students against a board registration or portal format. You get the problems to fix first and a sheet in the portal's field order."
+        },
+        "studentList": {
+          "eyebrow": "Spreadsheet",
+          "title": "Student list",
+          "body": "Choose the columns and students for an Excel or CSV file of student details."
+        }
+      }
     },
     "scope": {
       "legend": "Which students",
@@ -3696,7 +3729,12 @@
       "deletedTitle": "Document deleted",
       "deletedBody": "The document and all its versions were deleted. Its files are removed from storage shortly.",
       "statusInUse": "In use",
-      "statusArchived": "Archived"
+      "statusArchived": "Archived",
+      "libraryTitle": "Library",
+      "libraryHint": "Newest first. Choose a type, group or archived documents, then press Apply filters.",
+      "colFile": "File",
+      "otherKind": "Other",
+      "versionShort": "v{version}"
     },
     "detail": {
       "title": "Document",
@@ -3747,7 +3785,8 @@
       "deleteHint": "Deleting removes every version and its files. It cannot be undone.",
       "formerMember": "A staff member who is no longer in this school",
       "archivedTitle": "This document is archived",
-      "archivedBody": "It is kept with all its versions and can still be opened, but it is listed only under \"Archived\". To change its details or add a version, unarchive it first."
+      "archivedBody": "It is kept with all its versions and can still be opened, but it is listed only under \"Archived\". To change its details or add a version, unarchive it first.",
+      "versionTitle": "Version {version}"
     },
     "acl": {
       "legend": "Who can see it",
@@ -3823,7 +3862,8 @@
       "sensitivityHint": "Choose the highest that applies. It decides who may open the file.",
       "aclTitle": "Who can see it",
       "scanNote": "After you upload, SchoolOS checks the file for viruses. You can open it once the check has passed, usually within a few minutes.",
-      "uploading": "Uploading…"
+      "uploading": "Uploading…",
+      "dropTitle": "Choose the file, or drag it here"
     },
     "errors": {
       "document_in_use": {

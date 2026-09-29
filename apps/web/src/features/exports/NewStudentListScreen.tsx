@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -92,6 +92,8 @@ export function NewStudentListScreen() {
   const tcol = useTranslations("exports.columns");
   const tf = useTranslations("exports.format");
   const tc = useTranslations("common");
+  const tn = useTranslations("school.nav");
+  const te = useTranslations("exports");
   const locale = useLocale();
   const router = useRouter();
   const api = useBffClient("staff");
@@ -131,7 +133,14 @@ export function NewStudentListScreen() {
   if (!mayExport) {
     return (
       <div className="space-y-6">
-        <PageHeader title={tl("title")} />
+        <PageHeader
+          title={tl("title")}
+          breadcrumb={[
+            { label: tn("home"), href: "/" },
+            { label: te("title"), href: "/exports" },
+            { label: tl("title") },
+          ]}
+        />
         <Alert tone="warning" title={tl("noPermissionTitle")}>
           {tl("noPermissionBody")}
         </Alert>
@@ -153,7 +162,15 @@ export function NewStudentListScreen() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tl("title")} description={tl("description")} />
+      <PageHeader
+        title={tl("title")}
+        description={tl("description")}
+        breadcrumb={[
+          { label: tn("home"), href: "/" },
+          { label: te("title"), href: "/exports" },
+          { label: tl("title") },
+        ]}
+      />
       <StepUpNotice />
       <form noValidate onSubmit={form.onSubmit} className="space-y-6">
         <Card title={tl("columnsTitle")}>
@@ -232,7 +249,7 @@ export function NewStudentListScreen() {
 
         <ApiErrorAlert error={form.error} namespace="exports" />
         <div className="flex flex-wrap justify-end gap-3">
-          <Link href="/exports" className="self-center text-primary underline">
+          <Link href="/exports" className={buttonClasses("ghost", "md")}>
             {tc("cancel")}
           </Link>
           <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
