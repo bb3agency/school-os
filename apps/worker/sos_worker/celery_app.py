@@ -14,6 +14,7 @@ from celery import Celery, Task, signals
 from celery.schedules import crontab
 from kombu import Queue
 
+from app.admin.tasks import beat_schedule as admin_beat_schedule
 from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
 from app.changes.tasks import beat_schedule as changes_beat_schedule
 from app.core.config import get_settings
@@ -62,6 +63,7 @@ TASK_MODULES: list[str] = [
     "app.exports.tasks",
     "app.knowledge.tasks",
     "app.students.tasks",
+    "app.admin.tasks",
 ]
 
 
@@ -110,6 +112,10 @@ def create_celery() -> Celery:
             "offboarding.process": {"queue": "maintenance"},
             "offboarding.certify": {"queue": "pdf"},
             "exports.purge_expired": {"queue": "maintenance"},
+            # FR-ADM-001: the school's full data export on "exports"; the hourly purge of
+            # archives past their 24 hours on "maintenance".
+            "admin.tenant_export": {"queue": "exports"},
+            "admin.purge_tenant_exports": {"queue": "maintenance"},
             # docs/06 §4: document ingestion (extract, redact, chunk, embed, index), ACL
             # refresh and chunk removal (outbox consumers of the kb.* events).
             "knowledge.*": {"queue": "ingest"},
@@ -138,6 +144,8 @@ def create_celery() -> Celery:
             **changes_beat_schedule(),
             # docs/05 §13: export files deleted 7 days after they were ready (daily).
             **exports_beat_schedule(),
+            # FR-ADM-001: full export archives deleted 24 hours after they were ready (hourly).
+            **admin_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

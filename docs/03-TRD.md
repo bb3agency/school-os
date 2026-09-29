@@ -229,7 +229,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-OPS-004 | Partial | `ops.break_glass_grants` and `platform.breakglass_requests` with the 8-hour and two-person rules in the database; workflow M1 |
 | FR-PLT-001, FR-PLT-003, FR-PLT-005, FR-PLT-010..018, FR-PLT-020, FR-PLT-022..030 | Built | 16 §8 route catalog. FR-PLT-005: two-person request/approval built; data deletion, key destruction and certificate are M1. FR-PLT-020: students, storage, documents and AI meters are 0 until `sis`/`kb` exist |
 | FR-PLT-002 | Built | Resumable provisioning (ADR-0024, migration `0020_provisioning_runs`): each step atomic and idempotent, state visible to operators, resume route, go-live blocked until complete |
-| FR-PLT-004 | Partial | Suspend/reactivate built; while suspended the owner and principal keep `/me` and Plan & billing (pinned allowlist, 16 §5.5); the full export joins the allowlist when FR-ADM-001 is built |
+| FR-PLT-004 | Partial | Suspend/reactivate built; while suspended the owner and principal keep `/me`, Plan & billing and the full data export (FR-ADM-001; pinned allowlist, 16 §5.5) |
 | FR-PLT-019, FR-PLT-021 | Partial | Void built; reminder and threshold emails not built (no email delivery in M0); threshold crossings recorded and audited |
 
 ---

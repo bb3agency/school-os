@@ -720,6 +720,48 @@ def _list_body(w: Any) -> dict[str, Any]:
     }
 
 
+# --- admin console (US-1201, FR-ADM-001/002): tenant.export_all (owner, step-up), settings ------
+
+
+def _ad() -> ModuleType:
+    """tests/admin/support.py (full exports through the real services; in-memory store)."""
+    name = "sos_test_admin_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "admin" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _tenant_export_id(w: Any, role: str, a: Engine) -> uuid.UUID:
+    """A ready full export of school A (made by its owner); a random id for roles without
+    tenant.export_all (403 at the guard first)."""
+    if "tenant.export_all" not in system_roles()[role].permission_keys:
+        return uuid.uuid4()
+    if "matrix_tenant_export" not in w.a.ids:
+        w.a.ids["matrix_tenant_export"] = _ad().ready_export(a, w.a)
+    value: uuid.UUID = w.a.ids["matrix_tenant_export"]
+    return value
+
+
+def _tenant_export_request(w: Any, r: str, a: Engine) -> Request:
+    _ad().settle(a, w.a)  # one full export at a time per school
+    return "/api/v1/admin/tenant-export", {}, {}
+
+
+def _retention_put(w: Any, r: str, a: Engine) -> Request:
+    with a.connect() as c:
+        version = c.execute(
+            text("SELECT version FROM ops.retention_settings WHERE tenant_id = :t"),
+            {"t": w.a.tenant_id},
+        ).scalar_one_or_none()
+    return "/api/v1/admin/retention", {"rules": {}}, {"If-Match": f'W/"{version or 0}"'}
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -1172,6 +1214,25 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # Admin console (app/admin/api.py; docs/09 Exports, audit, admin; US-1201).
+    ("POST", "/api/v1/admin/tenant-export"): _tenant_export_request,
+    ("GET", "/api/v1/admin/tenant-export"): lambda w, r, a: (
+        "/api/v1/admin/tenant-export",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/admin/tenant-export/{tenant_export_id}"): lambda w, r, a: (
+        f"/api/v1/admin/tenant-export/{_tenant_export_id(w, r, a)}",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/admin/tenant-export/{tenant_export_id}/download-url"): lambda w, r, a: (
+        f"/api/v1/admin/tenant-export/{_tenant_export_id(w, r, a)}/download-url",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/admin/retention"): lambda w, r, a: ("/api/v1/admin/retention", None, {}),
+    ("PUT", "/api/v1/admin/retention"): _retention_put,
     # Knowledge ("Ask the school"; docs/09 Knowledge, FR-KB-*, FR-KB-030).
     ("POST", "/api/v1/knowledge/ask"): _kb_ask,
     ("POST", "/api/v1/knowledge/search"): lambda w, r, a: (
@@ -1294,6 +1355,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/extraction-batches",
         "/api/v1/exports",
         "/api/v1/exports/student-list",
+        "/api/v1/admin/tenant-export",
     }
     if method == "POST" and path in accepted:
         return 202

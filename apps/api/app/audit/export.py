@@ -135,10 +135,16 @@ def start(
     user_id: uuid.UUID | None,
     filters: AuditFilters,
     request_id: str | None = None,
+    max_rows: int | None = None,
 ) -> ExportPlan:
     """Check the size, fix the snapshot and audit ``audit.exported`` in the caller's
-    ``tenant_session`` (must commit before :func:`stream_csv` runs)."""
+    ``tenant_session`` (must commit before :func:`stream_csv` runs).
+
+    ``max_rows`` replaces the configured limit for callers that stream to storage rather than
+    to a browser (the school's full data export, FR-ADM-001, whose own limit is in
+    ``app/admin/config.yaml``)."""
     cfg = limits()
+    maximum = cfg.max_rows if max_rows is None else max_rows
     newest: int | None = session.execute(
         select(func.max(events.c.seq)).where(events.c.tenant_id == tenant_id)
     ).scalar_one()
@@ -147,8 +153,8 @@ def start(
         events.c.seq <= up_to
     )
     rows = int(session.execute(count_stmt).scalar_one())
-    if rows > cfg.max_rows:
-        raise _too_many(cfg.max_rows)
+    if rows > maximum:
+        raise _too_many(maximum)
     service.record(
         session,
         action="audit.exported",

@@ -64,6 +64,7 @@ from app.core.errors import (
 )
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.core.spreadsheet import (
     CSV_MIME,
@@ -104,9 +105,11 @@ from app.documents.schemas import (
 )
 from app.documents.storage import (
     LIFECYCLE_EXPORT,
+    LIFECYCLE_TENANT_EXPORT,
     ObjectChanged,
     ObjectStore,
     ObjectStoreError,
+    ObjectWriter,
     derived_key,
     document_key,
     document_prefix,
@@ -115,6 +118,7 @@ from app.documents.storage import (
     get_object_store,
     import_key,
     key_in_tenant,
+    tenant_export_key,
     tenant_prefix,
     upload_key,
 )
@@ -2067,6 +2071,104 @@ def delete_export_files(
     return (store or get_object_store()).delete_prefix(prefix)
 
 
+# --- the school's full data export (app.admin; FR-ADM-001, US-1201) -------------------------------
+
+TENANT_EXPORT_MIME: Final = "application/zip"
+
+
+def export_records(session: Session) -> list[RecordTable]:
+    """Worker only (``app.admin`` full export, ``tenant.export_all`` checked by the caller):
+    every document, version and ACL entry of the current school as record tables (metadata;
+    the files come from :func:`export_files`). Titles and issuers are C2 at most."""
+    return repo.export_record_tables(session)
+
+
+def export_files(session: Session) -> list[StoredObject]:
+    """Worker only (as :func:`export_records`): every version of every document that passed the
+    malware scan, oldest first. Quarantined, failed and discarded versions (PRV-016) are never
+    exported."""
+    out: list[StoredObject] = []
+    for v, purpose in repo.ready_versions(session):
+        out.append(
+            StoredObject(
+                document_id=v.document_id,
+                version_id=v.id,
+                version_no=v.version_no,
+                purpose=purpose,
+                object_key=v.object_key,
+                mime_type=v.mime_type,
+                size_bytes=v.size_bytes,
+                sha256_hex=v.sha256.hex(),
+                status=v.status,
+            )
+        )
+    return out
+
+
+def iter_export_file(
+    tenant_id: uuid.UUID, obj: StoredObject, *, store: ObjectStore | None = None
+) -> Iterator[bytes]:
+    """The bytes of one stored version of ``tenant_id``'s documents, in chunks, for the full
+    export (no transaction held while streaming). The SHA-256 recorded at upload is checked when
+    the last chunk has been read: a changed object raises ``Conflict`` (``integrity_mismatch``)
+    and the export fails instead of shipping it."""
+    if not key_in_tenant(obj.object_key, tenant_id):
+        raise _not_found()
+    digest = hashlib.sha256()
+    for chunk in (store or get_object_store()).iter_chunks(obj.object_key):
+        digest.update(chunk)
+        yield chunk
+    if digest.hexdigest() != obj.sha256_hex:
+        raise Conflict("The stored file changed after upload.", code="integrity_mismatch")
+
+
+def open_tenant_export(
+    session: Session, export_id: uuid.UUID, *, store: ObjectStore | None = None
+) -> tuple[str, ObjectWriter]:
+    """A streamed upload for the school's full export archive (worker): the key
+    ``t/<tenant_id>/tenant-export/<export_id>.zip`` in the private bucket (SSE-KMS), tagged for
+    the bucket's ``tenant-export-2d`` rule. Nothing exists until the writer is closed."""
+    key = tenant_export_key(repo.current_tenant_id(session), export_id)
+    writer = (store or get_object_store()).open_writer(
+        key, TENANT_EXPORT_MIME, lifecycle=LIFECYCLE_TENANT_EXPORT
+    )
+    return key, writer
+
+
+def _tenant_export_key_checked(session: Session, export_id: uuid.UUID, object_key: str) -> str:
+    expected = tenant_export_key(repo.current_tenant_id(session), export_id)
+    if object_key != expected:
+        raise _not_found()
+    return expected
+
+
+def tenant_export_download_url(
+    session: Session,
+    export_id: uuid.UUID,
+    object_key: str,
+    *,
+    filename: str,
+    ttl_s: int,
+    store: ObjectStore | None = None,
+) -> tuple[str, dt.datetime]:
+    """A presigned GET (at most 5 minutes, ``attachment``) for the full export archive of the
+    current school. The caller (``app.admin``) has checked who may download it and audits it."""
+    key = _tenant_export_key_checked(session, export_id, object_key)
+    ttl = min(ttl_s, get_settings().documents_download_url_ttl_s)
+    return (store or get_object_store()).presigned_get(
+        key=key, content_type=TENANT_EXPORT_MIME, filename=filename, expires_s=ttl
+    )
+
+
+def delete_tenant_export(
+    session: Session, export_id: uuid.UUID, object_key: str, *, store: ObjectStore | None = None
+) -> None:
+    """Delete the full export archive of the current school (retention: 24 hours after it was
+    ready; the bucket rule expires the noncurrent copy after a day)."""
+    key = _tenant_export_key_checked(session, export_id, object_key)
+    (store or get_object_store()).delete(key)
+
+
 __all__ = [
     "ACL_CHANGED_HOOKS",
     "DELETED_HOOKS",
@@ -2078,7 +2180,10 @@ __all__ = [
     "READY_HOOKS",
     "RETENTION_REASONS",
     "STATUS_CHANGED_HOOKS",
+    "TENANT_EXPORT_MIME",
     "FileTooLarge",
+    "ObjectStore",
+    "ObjectWriter",
     "SheetFile",
     "StoredObject",
     "UnsupportedFileType",
@@ -2088,18 +2193,23 @@ __all__ = [
     "delete_document",
     "delete_export_files",
     "delete_for_retention",
+    "delete_tenant_export",
     "discard_object",
     "discard_version",
     "document_object",
     "evidence_exists",
     "export_download_url",
+    "export_files",
+    "export_records",
     "export_sheet",
     "get_document",
     "get_download_url",
     "get_sheet",
     "is_visible",
+    "iter_export_file",
     "list_documents",
     "mark_scan_failed",
+    "open_tenant_export",
     "purge_document_objects",
     "purge_expired_uploads",
     "purge_tenant_data",
@@ -2115,6 +2225,7 @@ __all__ = [
     "store_page_image",
     "sweep_discarded_objects",
     "tenant_data_counts",
+    "tenant_export_download_url",
     "update_document",
     "validate_acl",
 ]

@@ -18,6 +18,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, DomainError
+from app.core.record_tables import dump_table
+from app.core.records import RecordTable
 from app.imports.models import ImportBatch, ImportCellEdit, ImportMappingTemplate, ImportRow
 
 LIVE_STATUSES = ("parsing", "validating", "committing", "reverting")
@@ -340,3 +342,19 @@ def touch_template(session: Session, template_id: uuid.UUID) -> None:
         .values(last_used_at=func.now())
         .execution_options(synchronize_session=False)
     )
+
+
+def export_record_tables(session: Session) -> list[RecordTable]:
+    """Import batches and mapping templates of the current school (metadata only; the values
+    a batch recorded are in the student values, FR-ADM-001)."""
+    return [
+        dump_table(
+            session, ImportBatch.__table__, name="import_batches", order_by=("created_at", "id")
+        ),
+        dump_table(
+            session,
+            ImportMappingTemplate.__table__,
+            name="import_mapping_templates",
+            order_by=("created_at", "id"),
+        ),
+    ]

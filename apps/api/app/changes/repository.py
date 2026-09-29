@@ -137,3 +137,9 @@ def lock_due_for_expiry(
         .with_for_update(skip_locked=True)
     )
     return session.scalars(stmt).all()
+
+
+def all_requests(session: Session) -> Sequence[ChangeRequest]:
+    """Every change request of the current school, oldest first (FR-ADM-001 full export)."""
+    stmt = select(ChangeRequest).order_by(ChangeRequest.requested_at, ChangeRequest.id)
+    return session.scalars(stmt).all()

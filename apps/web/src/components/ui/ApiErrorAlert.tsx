@@ -16,12 +16,14 @@ export type ErrorNamespace =
   | "breakGlass"
   | "notifications"
   | "exports"
+  | "admin"
   | "school.users"
   | "academicStructure"
   | "schoolSettings"
   | "documents"
   | "ask"
-  | "ask.verified";
+  | "ask.verified"
+  | "school.audit";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

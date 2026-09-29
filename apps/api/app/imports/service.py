@@ -44,10 +44,12 @@ from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
 from app.core import purge as purging
+from app.core import retention
 from app.core.db import tenant_session
 from app.core.errors import Conflict, DomainError, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.records import RecordTable
 from app.core.redaction import mask_aadhaar
 from app.core.spreadsheet import (
     CSV_MIME,
@@ -876,7 +878,8 @@ def _staged_sheet(
     except SheetError as exc:
         if exc.code == "file_missing":
             raise Conflict(
-                "The uploaded file is no longer kept (it is deleted 90 days after the import).",
+                "The uploaded file is no longer kept (it is deleted after the school's "
+                "retention period, 90 days unless changed).",
                 code="file_missing",
             ) from exc
         raise Conflict(
@@ -1833,14 +1836,25 @@ def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut
 # --- retention (FR-IMP-007) -----------------------------------------------------------------------
 
 
+RAW_FILE_RETENTION_CATEGORY: Final = "import_raw_files"
+
+
+def raw_file_retention_days(session: Session) -> int:
+    """How long this school keeps raw import files after commit: its retention setting
+    (FR-ADM-002, ``/admin/retention``) or the default (docs/05 §13: 90 days)."""
+    return retention.days(
+        session, RAW_FILE_RETENTION_CATEGORY, default=import_config().raw_file_retention_days
+    )
+
+
 def _retention_guard(session: Session, document_id: uuid.UUID) -> str | None:
     """documents.DELETE_GUARDS: keep an import's raw file while a job uses it, and for the
-    retention period after commit (docs/05 §13: 90 days)."""
+    retention period after commit (docs/05 §13: 90 days unless the school set a shorter one)."""
     batches = repo.batches_for_document(session, document_id)
     if not batches:
         return None
     now = repo.now(session)
-    keep = dt.timedelta(days=import_config().raw_file_retention_days)
+    keep = dt.timedelta(days=raw_file_retention_days(session))
     for batch in batches:
         if batch.status in repo.LIVE_STATUSES:
             return "import_in_progress"
@@ -1861,12 +1875,13 @@ key_rotation.register_reencryptor("import_cell_edits", cells.reencrypt_batch)
 
 
 def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> int:
-    """Delete raw import files kept past the retention period (daily job, FR-IMP-007); the
-    parsed rows stay. Returns the number of documents deleted."""
+    """Delete raw import files kept past the school's retention period (daily job, FR-IMP-007;
+    the period is the school's setting, FR-ADM-002, else 90 days); the parsed rows stay.
+    Returns the number of documents deleted."""
     moment = now or dt.datetime.now(dt.UTC)
-    cutoff = moment - dt.timedelta(days=import_config().raw_file_retention_days)
     deleted = 0
     with tenant_session(tenant_id) as s:
+        cutoff = moment - dt.timedelta(days=raw_file_retention_days(s))
         due = repo.batches_due_for_file_deletion(s, cutoff)
         by_document: dict[uuid.UUID, list[ImportBatch]] = {}
         for batch in due:
@@ -1905,12 +1920,21 @@ def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> 
     return deleted
 
 
+def export_records(session: Session) -> list[RecordTable]:
+    """Worker only: the school's import batches (status, counts, column mapping, who and when)
+    and mapping templates for its full data export (``app.admin``; the caller checked
+    ``tenant.export_all`` and audits the export). Parsed rows and staged cell edits are not
+    exported: the values an import recorded are in the student values."""
+    return repo.export_record_tables(session)
+
+
 __all__ = [
     "COMMIT",
     "COMMITTED_EVENT",
     "COMMIT_TASK",
     "PARSE_TASK",
     "PURGE_TASK",
+    "RAW_FILE_RETENTION_CATEGORY",
     "REVERTED_EVENT",
     "RUN",
     "VALIDATE_TASK",
@@ -1919,6 +1943,7 @@ __all__ = [
     "create_import",
     "create_template",
     "edit_row",
+    "export_records",
     "export_sheet",
     "get_import",
     "get_sheet",
@@ -1928,6 +1953,7 @@ __all__ = [
     "member_context",
     "purge_raw_files",
     "purge_tenant_data",
+    "raw_file_retention_days",
     "request_commit",
     "request_validation",
     "revert",

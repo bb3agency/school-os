@@ -146,7 +146,8 @@ Result for **dedicated**: the deployment row (`status = provisioning`), billing 
   | POST | `/api/v1/me/active-tenant` | Choose the suspended school (users with several schools) |
   | POST | `/api/v1/me/login-event` | Sign-in event (`auth.login.succeeded`); other roles get `auth.login.denied` with reason `tenant_suspended` |
   | GET | `/api/v1/tenant/billing`, `/api/v1/tenant/billing/invoices` | Plan & billing (FR-PLT-030) |
-  | — | full data export (FR-ADM-001, not built yet) | Added to the allowlist with one line when the route exists |
+  | POST | `/api/v1/admin/tenant-export` | Request the full data export (FR-ADM-001; `tenant.export_all` + step-up, so the owner by default) |
+  | GET | `/api/v1/admin/tenant-export`, `/api/v1/admin/tenant-export/{tenant_export_id}`, `…/{tenant_export_id}/download-url` | Follow it and download the archive while it exists (24 h; download always step-up). The worker builds exports of suspended and offboarding schools too |
 
   `GET /me/schools` and `POST /me/accept-invitations` never resolve a school and are not affected; `/me/schools` reports the school's `status`, which the web app uses to show the suspended banner. No data is deleted. Scheduled tenant jobs pause, except audit verification and retention purges.
 - **Offboard** — `platform.tenants.offboard` (ᴿ, **two-person**): operator A records the request (reason, reference to the school's written request); operator B (a different operator holding the permission) approves with step-up. Then: tenant status `offboarding` → school confirms it has its export (or the export is delivered by us per R8) → access disabled → deletion job removes tenant data **within 30 days** → wrapped keys destroyed (crypto-shredding; for dedicated, the host's KMS key is scheduled for deletion and the host destroyed) → certificate of deletion issued → status `deleted`. Invoices and the billing account stay in `platform` as business records (retention in 08 §14).

@@ -107,10 +107,10 @@ templates:
     resource_type: export
     en:
       title: Your export is ready
-      body: "Your export of {students, plural, one {# student} other {# students}} is ready to download. The file is deleted after 7 days; you can make a new one at any time."
+      body: "Your export of {students, plural, one {# student} other {# students}} is ready to download. The file is kept for up to 7 days; you can make a new one at any time."
     te:
       title: మీ ఎగుమతి సిద్ధంగా ఉంది
-      body: "{students, plural, one {# విద్యార్థి} other {# మంది విద్యార్థుల}} వివరాలతో మీ ఎగుమతి డౌన్‌లోడ్‌కు సిద్ధంగా ఉంది. 7 రోజుల తర్వాత ఫైల్ తొలగించబడుతుంది; ఎప్పుడైనా కొత్తది తయారు చేయవచ్చు."
+      body: "{students, plural, one {# విద్యార్థి} other {# మంది విద్యార్థుల}} వివరాలతో మీ ఎగుమతి డౌన్‌లోడ్‌కు సిద్ధంగా ఉంది. ఫైల్ గరిష్టంగా 7 రోజులు ఉంచబడుతుంది; ఎప్పుడైనా కొత్తది తయారు చేయవచ్చు."
 
   export.failed:
     params: [export_id]
@@ -121,6 +121,26 @@ templates:
     te:
       title: మీ ఎగుమతిని తయారు చేయలేకపోయాము
       body: మీ ఎగుమతిని తయారు చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి. మళ్లీ ఇలాగే జరిగితే SchoolOS సపోర్ట్‌ను సంప్రదించండి.
+
+  admin.tenant_export.ready:
+    params: [tenant_export_id, hours]
+    resource_type: tenant_export
+    en:
+      title: Your school's data export is ready
+      body: "The full export of your school's records, documents and audit log is ready. Download it within {hours, plural, one {# hour} other {# hours}}; after that it is deleted and you can make a new one. You will be asked to sign in again with your second factor."
+    te:
+      title: మీ పాఠశాల డేటా ఎగుమతి సిద్ధంగా ఉంది
+      body: "మీ పాఠశాల రికార్డులు, పత్రాలు మరియు ఆడిట్ లాగ్ పూర్తి ఎగుమతి సిద్ధంగా ఉంది. {hours, plural, one {# గంటలోపు} other {# గంటలలోపు}} డౌన్‌లోడ్ చేసుకోండి; ఆ తర్వాత అది తొలగించబడుతుంది, మీరు కొత్తది తయారు చేయవచ్చు. మీ రెండవ ధృవీకరణతో మళ్లీ సైన్ ఇన్ చేయమని అడుగుతాము."
+
+  admin.tenant_export.failed:
+    params: [tenant_export_id]
+    resource_type: tenant_export
+    en:
+      title: Your school's data export could not be made
+      body: The full export of your school's data could not be made. Try again. If it happens again, contact SchoolOS support.
+    te:
+      title: మీ పాఠశాల డేటా ఎగుమతిని తయారు చేయలేకపోయాము
+      body: మీ పాఠశాల డేటా పూర్తి ఎగుమతిని తయారు చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి. మళ్లీ ఇలాగే జరిగితే SchoolOS సపోర్ట్‌ను సంప్రదించండి.
 
   extraction.batch.ready:
     params: [batch_id, rows, low_confidence_rows]

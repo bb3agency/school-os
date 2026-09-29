@@ -7,11 +7,17 @@ per school)::
     t/<tenant_id>/docs/<document_id>/v<n>/derived/...        (M2: text layer, page renders)
     t/<tenant_id>/imports/<batch_id>/raw.<ext>
     t/<tenant_id>/exports/<export_id>/<file>                  (exports; deleted after 7 days)
+    t/<tenant_id>/tenant-export/<export_id>.zip               (full export; deleted after 24 h)
 
 - Lifecycle rules (infra/terraform, files bucket) can only filter on a literal prefix, and every
   key starts with the tenant, so expiring categories are selected by the object tag
   ``sos-lifecycle``, set in the same PUT (``put(..., lifecycle=...)``): export files carry
-  ``export-7d`` (rule ``exports-7d``: current and noncurrent versions expire after 7 days / 1 day).
+  ``export-7d`` (rule ``exports-7d``: current and noncurrent versions expire after 7 days / 1 day);
+  the school's full data export (FR-ADM-001) carries ``tenant-export-2d`` (rule
+  ``tenant-export-2d``: 2 days / noncurrent 1 day), a backstop to the 24-hour purge job.
+- Large objects (the full export archive) are streamed with :meth:`ObjectStore.open_writer`: an
+  S3 multipart upload with the same SSE-KMS and tagging arguments, so the archive is never
+  written to the worker's disk nor held in memory at once.
 
 - Browsers upload with a presigned POST that pins the exact key, the exact Content-Type and a
   content-length-range, and expires in at most 10 minutes. With ``SOS_S3_KMS_KEY_ID`` set the
@@ -57,7 +63,13 @@ DISCARDED: Final = "discarded"
 # ``sos-lifecycle`` values a PUT may set; each has a rule of the same tag in infra/terraform
 # (modules/s3 and modules/dedicated_host). ``discarded`` is set only by :meth:`discard`.
 LIFECYCLE_EXPORT: Final = "export-7d"
-LIFECYCLE_TAG_VALUES: Final = frozenset({LIFECYCLE_EXPORT, "tenant-export-2d", "import-raw-90d"})
+LIFECYCLE_TENANT_EXPORT: Final = "tenant-export-2d"
+LIFECYCLE_TAG_VALUES: Final = frozenset(
+    {LIFECYCLE_EXPORT, LIFECYCLE_TENANT_EXPORT, "import-raw-90d"}
+)
+# Multipart upload part size for streamed objects (S3 minimum 5 MiB except the last part).
+MULTIPART_PART_BYTES: Final = 8 * 1024 * 1024
+MAX_MULTIPART_PARTS: Final = 10_000
 
 
 class ObjectStoreError(RuntimeError):
@@ -131,6 +143,12 @@ def export_key(tenant_id: uuid.UUID, export_id: uuid.UUID, filename: str) -> str
     return f"{export_prefix(tenant_id, export_id)}{filename}"
 
 
+def tenant_export_key(tenant_id: uuid.UUID, export_id: uuid.UUID) -> str:
+    """``t/<tenant_id>/tenant-export/<export_id>.zip`` (docs/04 §8.2; FR-ADM-001: the school's
+    full data export, lifecycle tag ``tenant-export-2d``)."""
+    return f"{tenant_prefix(tenant_id)}tenant-export/{export_id}.zip"
+
+
 def upload_key(tenant_id: uuid.UUID, intent_id: uuid.UUID, ext: str) -> str:
     """Staging key a presigned POST writes to. Verified bytes are then copied (If-Match on the
     verified ETag) to the final key, which no presigned POST ever targets, so an uploader
@@ -146,6 +164,23 @@ def attachment_disposition(filename: str) -> str:
     """``attachment`` with an ASCII-only generated filename (no titles or names in URLs)."""
     safe = "".join(c for c in filename if c.isascii() and (c.isalnum() or c in "._-"))
     return f'attachment; filename="{safe or "download"}"'
+
+
+class ObjectWriter(Protocol):
+    """A streamed upload (:meth:`ObjectStore.open_writer`). ``write`` appends bytes; ``close``
+    completes the object (nothing is visible before); ``abort`` discards everything written.
+    Not seekable, so ``zipfile`` writes a streamed archive (data descriptors)."""
+
+    def write(self, data: bytes, /) -> int: ...
+
+    def flush(self) -> None: ...
+
+    def close(self) -> None: ...
+
+    def abort(self) -> None: ...
+
+    @property
+    def size(self) -> int: ...
 
 
 class ObjectStore(Protocol):
@@ -172,6 +207,13 @@ class ObjectStore(Protocol):
     ) -> None:
         """Write an object; ``lifecycle`` (one of :data:`LIFECYCLE_TAG_VALUES`) tags it
         ``sos-lifecycle=<value>`` in the same request so the bucket's lifecycle rule expires it."""
+        ...
+
+    def open_writer(
+        self, key: str, content_type: str, *, lifecycle: str | None = None
+    ) -> ObjectWriter:
+        """Stream a large object (multipart upload, SSE-KMS, ``lifecycle`` tag as in
+        :meth:`put`); see :class:`ObjectWriter`."""
         ...
 
     def delete(self, key: str) -> None: ...
@@ -369,6 +411,25 @@ class S3ObjectStore:
         except ClientError as exc:
             raise ObjectStoreError("put_failed") from exc
 
+    def open_writer(
+        self, key: str, content_type: str, *, lifecycle: str | None = None
+    ) -> ObjectWriter:
+        extra: dict[str, str] = dict(self._sse_args())
+        if lifecycle is not None:
+            if lifecycle not in LIFECYCLE_TAG_VALUES:
+                raise ValueError("unknown lifecycle tag value")
+            extra["Tagging"] = f"{LIFECYCLE_TAG}={lifecycle}"
+        try:
+            res = self._client.create_multipart_upload(
+                Bucket=self._bucket,
+                Key=key,
+                ContentType=content_type,
+                **extra,  # type: ignore[arg-type]
+            )
+        except ClientError as exc:
+            raise ObjectStoreError("put_failed") from exc
+        return _S3MultipartWriter(self._client, self._bucket, key, str(res["UploadId"]))
+
     def delete(self, key: str) -> None:
         try:
             self._client.delete_object(Bucket=self._bucket, Key=key)
@@ -434,6 +495,88 @@ class S3ObjectStore:
         for key in keys:
             self.discard(key)
         return len(keys)
+
+
+class _S3MultipartWriter:
+    """:class:`ObjectWriter` over an S3 multipart upload: buffers up to
+    :data:`MULTIPART_PART_BYTES`, uploads each full part, completes on :meth:`close` and aborts
+    the upload (no partial object, no stored parts) on :meth:`abort` or any failure."""
+
+    def __init__(self, client: S3Client, bucket: str, key: str, upload_id: str) -> None:
+        self._client = client
+        self._bucket = bucket
+        self._key = key
+        self._upload_id = upload_id
+        self._buffer = bytearray()
+        self._parts: list[dict[str, Any]] = []
+        self._size = 0
+        self._done = False
+
+    @property
+    def size(self) -> int:
+        return self._size
+
+    def write(self, data: bytes, /) -> int:
+        if self._done:
+            raise ValueError("writer is closed")
+        self._buffer += data
+        self._size += len(data)
+        while len(self._buffer) >= MULTIPART_PART_BYTES:
+            self._upload(bytes(self._buffer[:MULTIPART_PART_BYTES]))
+            del self._buffer[:MULTIPART_PART_BYTES]
+        return len(data)
+
+    def flush(self) -> None:
+        """Parts are uploaded when full; nothing to do."""
+
+    def _upload(self, chunk: bytes) -> None:
+        number = len(self._parts) + 1
+        if number > MAX_MULTIPART_PARTS:
+            self.abort()
+            raise ObjectStoreError("too_large")
+        try:
+            res = self._client.upload_part(
+                Bucket=self._bucket,
+                Key=self._key,
+                UploadId=self._upload_id,
+                PartNumber=number,
+                Body=chunk,
+            )
+        except ClientError as exc:
+            self.abort()
+            raise ObjectStoreError("put_failed") from exc
+        self._parts.append({"ETag": res["ETag"], "PartNumber": number})
+
+    def close(self) -> None:
+        if self._done:
+            return
+        if self._buffer or not self._parts:
+            self._upload(bytes(self._buffer))
+            self._buffer.clear()
+        try:
+            self._client.complete_multipart_upload(
+                Bucket=self._bucket,
+                Key=self._key,
+                UploadId=self._upload_id,
+                MultipartUpload={"Parts": self._parts},  # type: ignore[typeddict-item]
+            )
+        except ClientError as exc:
+            self.abort()
+            raise ObjectStoreError("put_failed") from exc
+        self._done = True
+
+    def abort(self) -> None:
+        if self._done:
+            return
+        self._done = True
+        self._buffer.clear()
+        try:
+            self._client.abort_multipart_upload(
+                Bucket=self._bucket, Key=self._key, UploadId=self._upload_id
+            )
+        except ClientError:
+            # The bucket's abort-incomplete-multipart lifecycle rule removes leftover parts.
+            return
 
 
 def _client(settings: Settings, endpoint: str | None) -> S3Client:

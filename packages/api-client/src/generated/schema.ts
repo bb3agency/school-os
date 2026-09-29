@@ -209,6 +209,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Retention
+         * @description How long the school keeps each kind of data (permission ``tenant.settings.manage``):
+         *     the school's period, the default and the allowed range per category, and whether a daily
+         *     job deletes it. The ETag is the settings version (0 until first changed).
+         */
+        get: operations["get_retention_api_v1_admin_retention_get"];
+        /**
+         * Update Retention
+         * @description Set the retention period in days of the categories a school may change (permission
+         *     ``tenant.settings.manage``, recent sign-in with MFA; ``If-Match`` required, 412 when someone
+         *     else changed them). A category left out goes back to its default. 422 per category:
+         *     ``unknown_category``, ``not_configurable``, ``out_of_bounds``. Recorded in the audit log.
+         */
+        put: operations["update_retention_api_v1_admin_retention_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenant-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tenant Exports
+         * @description The school's full exports, newest first (``tenant.export_all``): status, who asked,
+         *     row counts and when the archive is deleted.
+         */
+        get: operations["list_tenant_exports_api_v1_admin_tenant_export_get"];
+        put?: never;
+        /**
+         * Request Tenant Export
+         * @description Export all of the school's data (permission ``tenant.export_all``, the owner; recent
+         *     sign-in with MFA, else 428 ``step_up_required``). The archive holds every record table as
+         *     CSV and JSON, every document that passed the virus check and the audit log as CSV; it is
+         *     made in the background (202) and you are notified when it is ready. Restricted (C3) values
+         *     are masked unless ``include_sensitive`` is true (needs ``student.read_sensitive``, else 403
+         *     ``sensitive_not_allowed``); full Aadhaar numbers are never stored or exported. One export
+         *     at a time per school: 409 ``tenant_export_in_progress``. Accepts ``Idempotency-Key``.
+         */
+        post: operations["request_tenant_export_api_v1_admin_tenant_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenant-export/{tenant_export_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tenant Export
+         * @description One full export: status (``queued``, ``running``, ``ready``, ``failed``, ``expired``),
+         *     counts and expiry (``tenant.export_all``; 404 for unknown ids).
+         */
+        get: operations["get_tenant_export_api_v1_admin_tenant_export__tenant_export_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenant-export/{tenant_export_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tenant Export Download Url
+         * @description A download link for the archive, valid at most 5 minutes (``tenant.export_all`` and a
+         *     recent sign-in with MFA, 428). The archive itself is deleted 24 hours after it is ready.
+         *     Errors: 409 ``export_not_ready``, ``export_failed``, ``export_expired``; 403
+         *     ``sensitive_not_allowed`` for an export with restricted values if you may not see them.
+         *     Every download is recorded in the audit log.
+         */
+        get: operations["get_tenant_export_download_url_api_v1_admin_tenant_export__tenant_export_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/announcements": {
         parameters: {
             query?: never;
@@ -6467,6 +6572,20 @@ export interface components {
             updated: number;
         };
         /**
+         * MemberOut
+         * @description A staff member shown next to a record: membership id and display name only (``null``
+         *     when the account is no longer visible).
+         */
+        MemberOut: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+        };
+        /**
          * NotificationOut
          * @description One notification, rendered in the reader's language (``Accept-Language``: en or te).
          */
@@ -6840,6 +6959,13 @@ export interface components {
             data: components["schemas"]["SubscriptionOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** Page[TenantExportOut] */
+        Page_TenantExportOut_: {
+            /** Data */
+            data: components["schemas"]["TenantExportOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** Page[TenantInvoice] */
         Page_TenantInvoice_: {
@@ -7552,6 +7678,58 @@ export interface components {
             change_request_id?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /** RetentionCategoryOut */
+        RetentionCategoryOut: {
+            /**
+             * Configurable
+             * @description False: fixed by SchoolOS (law, security, feature).
+             */
+            configurable: boolean;
+            /**
+             * Days
+             * @description Days this school keeps the data (its setting or the default).
+             */
+            days: number;
+            /** Default Days */
+            default_days: number;
+            /**
+             * Enforced
+             * @description A daily job deletes the data after ``days``.
+             */
+            enforced: boolean;
+            /** Is Default */
+            is_default: boolean;
+            /** Key */
+            key: string;
+            /** Max Days */
+            max_days: number;
+            /** Min Days */
+            min_days: number;
+        };
+        /** RetentionOut */
+        RetentionOut: {
+            /** Categories */
+            categories: components["schemas"]["RetentionCategoryOut"][];
+            /** Updated At */
+            updated_at: string | null;
+            updated_by: components["schemas"]["MemberOut"] | null;
+            /**
+             * Version
+             * @description Send as If-Match when changing (0: never changed).
+             */
+            version: number;
+        };
+        /**
+         * RetentionUpdate
+         * @description The retention period in days per configurable category. A category left out goes back
+         *     to its default.
+         */
+        RetentionUpdate: {
+            /** Rules */
+            rules?: {
+                [key: string]: number;
+            };
         };
         /**
          * RevealIn
@@ -8522,6 +8700,106 @@ export interface components {
              * @enum {string}
              */
             tier: "shared" | "dedicated";
+        };
+        /**
+         * TenantExportCounts
+         * @description Row counts per table, stored documents copied, and audit events in the archive.
+         */
+        TenantExportCounts: {
+            /**
+             * Audit Events
+             * @default 0
+             */
+            audit_events: number;
+            /**
+             * Document Bytes
+             * @default 0
+             */
+            document_bytes: number;
+            /**
+             * Documents
+             * @default 0
+             */
+            documents: number;
+            /** Tables */
+            tables?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * TenantExportCreate
+         * @description Request a full export of the school's data. Restricted (C3) values (health notes,
+         *     category, guardian phone and address, the last four Aadhaar digits) are masked unless
+         *     ``include_sensitive`` is true, which needs ``student.read_sensitive`` for the whole
+         *     school.
+         */
+        TenantExportCreate: {
+            /**
+             * Include Sensitive
+             * @default false
+             */
+            include_sensitive: boolean;
+        };
+        /** TenantExportDownloadOut */
+        TenantExportDownloadOut: {
+            /** Content Type */
+            content_type: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Url */
+            url: string;
+        };
+        /** TenantExportOut */
+        TenantExportOut: {
+            /**
+             * Can Download
+             * @description The archive is ready, not expired, and your permissions allow a download link now (a 428 asking you to sign in again with MFA can still follow).
+             */
+            can_download: boolean;
+            counts: components["schemas"]["TenantExportCounts"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error Code */
+            error_code: string | null;
+            /**
+             * Expires At
+             * @description When the archive is deleted (24 hours after it is ready).
+             */
+            expires_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Include Sensitive */
+            include_sensitive: boolean;
+            /**
+             * Own
+             * @description You requested this export.
+             */
+            own: boolean;
+            requested_by: components["schemas"]["MemberOut"];
+            /** Size Bytes */
+            size_bytes: number | null;
+            /** Started At */
+            started_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "ready" | "failed" | "expired";
         };
         /** TenantInvoice */
         TenantInvoice: {
@@ -9607,6 +9885,188 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AcademicYearOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_retention_api_v1_admin_retention_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionOut"];
+                };
+            };
+        };
+    };
+    update_retention_api_v1_admin_retention_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetentionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tenant_exports_api_v1_admin_tenant_export_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TenantExportOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_tenant_export_api_v1_admin_tenant_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantExportCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tenant_export_api_v1_admin_tenant_export__tenant_export_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tenant_export_download_url_api_v1_admin_tenant_export__tenant_export_id__download_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantExportDownloadOut"];
                 };
             };
             /** @description Validation Error */

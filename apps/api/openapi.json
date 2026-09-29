@@ -7007,6 +7007,33 @@
         "title": "MarkedReadOut",
         "type": "object"
       },
+      "MemberOut": {
+        "description": "A staff member shown next to a record: membership id and display name only (``null``\nwhen the account is no longer visible).",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "MemberOut",
+        "type": "object"
+      },
       "NotificationOut": {
         "description": "One notification, rendered in the reader's language (``Accept-Language``: en or te).",
         "properties": {
@@ -8519,6 +8546,34 @@
           "data"
         ],
         "title": "Page[SubscriptionOut]",
+        "type": "object"
+      },
+      "Page_TenantExportOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TenantExportOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[TenantExportOut]",
         "type": "object"
       },
       "Page_TenantInvoice_": {
@@ -10311,6 +10366,119 @@
           }
         },
         "title": "ResolveIn",
+        "type": "object"
+      },
+      "RetentionCategoryOut": {
+        "properties": {
+          "configurable": {
+            "description": "False: fixed by SchoolOS (law, security, feature).",
+            "title": "Configurable",
+            "type": "boolean"
+          },
+          "days": {
+            "description": "Days this school keeps the data (its setting or the default).",
+            "title": "Days",
+            "type": "integer"
+          },
+          "default_days": {
+            "title": "Default Days",
+            "type": "integer"
+          },
+          "enforced": {
+            "description": "A daily job deletes the data after ``days``.",
+            "title": "Enforced",
+            "type": "boolean"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "max_days": {
+            "title": "Max Days",
+            "type": "integer"
+          },
+          "min_days": {
+            "title": "Min Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "days",
+          "default_days",
+          "min_days",
+          "max_days",
+          "configurable",
+          "enforced",
+          "is_default"
+        ],
+        "title": "RetentionCategoryOut",
+        "type": "object"
+      },
+      "RetentionOut": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/RetentionCategoryOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "description": "Send as If-Match when changing (0: never changed).",
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "categories",
+          "version",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "RetentionOut",
+        "type": "object"
+      },
+      "RetentionUpdate": {
+        "additionalProperties": false,
+        "description": "The retention period in days per configurable category. A category left out goes back\nto its default.",
+        "properties": {
+          "rules": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "maxProperties": 50,
+            "title": "Rules",
+            "type": "object"
+          }
+        },
+        "title": "RetentionUpdate",
         "type": "object"
       },
       "RevealIn": {
@@ -12982,6 +13150,210 @@
           "flag_overrides"
         ],
         "title": "TenantDetailOut",
+        "type": "object"
+      },
+      "TenantExportCounts": {
+        "description": "Row counts per table, stored documents copied, and audit events in the archive.",
+        "properties": {
+          "audit_events": {
+            "default": 0,
+            "title": "Audit Events",
+            "type": "integer"
+          },
+          "document_bytes": {
+            "default": 0,
+            "title": "Document Bytes",
+            "type": "integer"
+          },
+          "documents": {
+            "default": 0,
+            "title": "Documents",
+            "type": "integer"
+          },
+          "tables": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Tables",
+            "type": "object"
+          }
+        },
+        "title": "TenantExportCounts",
+        "type": "object"
+      },
+      "TenantExportCreate": {
+        "additionalProperties": false,
+        "description": "Request a full export of the school's data. Restricted (C3) values (health notes,\ncategory, guardian phone and address, the last four Aadhaar digits) are masked unless\n``include_sensitive`` is true, which needs ``student.read_sensitive`` for the whole\nschool.",
+        "properties": {
+          "include_sensitive": {
+            "default": false,
+            "title": "Include Sensitive",
+            "type": "boolean"
+          }
+        },
+        "title": "TenantExportCreate",
+        "type": "object"
+      },
+      "TenantExportDownloadOut": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "filename",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "TenantExportDownloadOut",
+        "type": "object"
+      },
+      "TenantExportOut": {
+        "properties": {
+          "can_download": {
+            "description": "The archive is ready, not expired, and your permissions allow a download link now (a 428 asking you to sign in again with MFA can still follow).",
+            "title": "Can Download",
+            "type": "boolean"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenantExportCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the archive is deleted (24 hours after it is ready).",
+            "title": "Expires At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "include_sensitive": {
+            "title": "Include Sensitive",
+            "type": "boolean"
+          },
+          "own": {
+            "description": "You requested this export.",
+            "title": "Own",
+            "type": "boolean"
+          },
+          "requested_by": {
+            "$ref": "#/components/schemas/MemberOut"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "failed",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "include_sensitive",
+          "error_code",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "expires_at",
+          "size_bytes",
+          "counts",
+          "requested_by",
+          "own",
+          "can_download"
+        ],
+        "title": "TenantExportOut",
         "type": "object"
       },
       "TenantInvoice": {
@@ -15790,6 +16162,263 @@
         "summary": "Unarchive Academic Year",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/admin/retention": {
+      "get": {
+        "description": "How long the school keeps each kind of data (permission ``tenant.settings.manage``):\nthe school's period, the default and the allowed range per category, and whether a daily\njob deletes it. The ETag is the settings version (0 until first changed).",
+        "operationId": "get_retention_api_v1_admin_retention_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Retention",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "description": "Set the retention period in days of the categories a school may change (permission\n``tenant.settings.manage``, recent sign-in with MFA; ``If-Match`` required, 412 when someone\nelse changed them). A category left out goes back to its default. 422 per category:\n``unknown_category``, ``not_configurable``, ``out_of_bounds``. Recorded in the audit log.",
+        "operationId": "update_retention_api_v1_admin_retention_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Retention",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/tenant-export": {
+      "get": {
+        "description": "The school's full exports, newest first (``tenant.export_all``): status, who asked,\nrow counts and when the archive is deleted.",
+        "operationId": "list_tenant_exports_api_v1_admin_tenant_export_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TenantExportOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tenant Exports",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Export all of the school's data (permission ``tenant.export_all``, the owner; recent\nsign-in with MFA, else 428 ``step_up_required``). The archive holds every record table as\nCSV and JSON, every document that passed the virus check and the audit log as CSV; it is\nmade in the background (202) and you are notified when it is ready. Restricted (C3) values\nare masked unless ``include_sensitive`` is true (needs ``student.read_sensitive``, else 403\n``sensitive_not_allowed``); full Aadhaar numbers are never stored or exported. One export\nat a time per school: 409 ``tenant_export_in_progress``. Accepts ``Idempotency-Key``.",
+        "operationId": "request_tenant_export_api_v1_admin_tenant_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantExportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Tenant Export",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/tenant-export/{tenant_export_id}": {
+      "get": {
+        "description": "One full export: status (``queued``, ``running``, ``ready``, ``failed``, ``expired``),\ncounts and expiry (``tenant.export_all``; 404 for unknown ids).",
+        "operationId": "get_tenant_export_api_v1_admin_tenant_export__tenant_export_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tenant Export",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/tenant-export/{tenant_export_id}/download-url": {
+      "get": {
+        "description": "A download link for the archive, valid at most 5 minutes (``tenant.export_all`` and a\nrecent sign-in with MFA, 428). The archive itself is deleted 24 hours after it is ready.\nErrors: 409 ``export_not_ready``, ``export_failed``, ``export_expired``; 403\n``sensitive_not_allowed`` for an export with restricted values if you may not see them.\nEvery download is recorded in the audit log.",
+        "operationId": "get_tenant_export_download_url_api_v1_admin_tenant_export__tenant_export_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantExportDownloadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tenant Export Download Url",
+        "tags": [
+          "admin"
         ]
       }
     },

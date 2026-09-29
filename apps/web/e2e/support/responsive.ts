@@ -74,6 +74,8 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/settings/users/new",
       `/settings/users/${USER}`,
       "/settings/billing",
+      "/settings/retention",
+      "/settings/data-export",
       "/support",
       "/break-glass",
     ],

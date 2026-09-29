@@ -87,15 +87,19 @@ The April 2022 CERT-In directions apply to service providers and body corporates
 
 See 05-Data model §13. Principles: keep official school records per the school's legal obligations; delete working data (imports, exports, AI query logs) quickly; keep security and audit logs at least 1 year (in India); support **legal holds** that suspend deletion for specific records when the school instructs.
 
+**Retention settings (FR-ADM-002, as built):** the owner or principal may shorten the retention of working data (raw import files 7–90 days, export files 1–7, read notifications 30–90) on the Data retention screen; SchoolOS never keeps working data longer than the defaults, and audit/security logs (≥ 13 months) and the full-export archive (24 hours) are fixed. Every change is audited (`admin.retention.updated`). Official student records and uploaded documents are never deleted automatically. The minimums are engineering choices pending legal review.
+
+**Full data export (FR-ADM-001, as built):** the owner (`tenant.export_all`, fresh MFA sign-in) exports every record table as CSV and JSON, every document that passed the virus scan and the audit log as CSV in one archive, downloadable for 24 hours. Restricted (C3) values are masked unless the owner explicitly includes them (needs `student.read_sensitive`; the audit event lists the restricted fields included); the Aadhaar-as-printed name, date of birth and gender are never exported and full Aadhaar numbers are never stored. This is the export the school takes before offboarding, and it stays available while a school is suspended (16 §5.5).
+
 Offboarding: school exports data → SchoolOS deletes tenant data within 30 days → destroys tenant keys (crypto-shredding) → issues a certificate of deletion. Backups age out on their normal schedule.
 
 How it works (built; ADR-0029, docs/16 §5.5.1; decisions of 2026-09-29):
 
-- Deletion starts only after an operator records that the school confirmed it has its export, or that we delivered it (the full export is FR-ADM-001).
+- Deletion starts only after an operator records that the school confirmed it has its export (the full data export above, FR-ADM-001), or that we delivered it.
 - Every row of the school in every tenant table is deleted in one transaction, then every file; verification checks the whole catalog before keys are destroyed. People who worked only at this school have their profile (name, email, phone) cleared; people who also work at another school keep their shared profile.
 - **Kept, then deleted:** the school's audit log (IDs, codes and counts only; the legal log retention of §6) for 366 days after the certificate, then deleted; the signed audit archives expire under Object Lock after 3 years. Invoices and the billing account stay as business records (§14).
 - **Backups:** shared tier: the certificate states when the last backup that can hold the school's data expires (12 months after deletion); until then a restore would still need the wrapped key, which the backup contains. Dedicated hosts: crypto-shredded (host KMS key scheduled for deletion, host destroyed).
-- **Pending:** staff sign-in accounts (the global user rows and identity-provider accounts) are removed by the identity rework that replaces Cognito (its own ADR, being drafted); the certificate lists them as pending.
+- **Pending:** staff sign-in accounts (the global user rows and identity-provider accounts) are removed by the identity rework that replaces Cognito (ADR-0030, Proposed); the certificate lists them as pending.
 - The certificate (English and Telugu) names categories, counts, dates and operator IDs only: no student or staff personal data.
 
 ## 8. AI-specific transparency

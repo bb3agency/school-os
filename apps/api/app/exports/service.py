@@ -18,6 +18,8 @@ Flow (docs/04 §6, §8.2)::
     GET  /exports/{id}/download-url  download_url()     presigned GET <= 5 min, audit
                                                         ``export.downloaded`` (own or not)
     beat exports.purge_expired  purge_expired()         files deleted 7 days after completion
+                                                        (or the school's shorter retention
+                                                        setting, FR-ADM-002)
 
 Rules:
 
@@ -61,6 +63,7 @@ from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
 from app.core import purge as purging
+from app.core import retention
 from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, ValidationFailed
@@ -122,6 +125,8 @@ RENDER_EVENT: Final = "export.render_requested"
 GENERATE_TASK: Final = "exports.generate"
 RENDER_TASK: Final = "exports.render"
 PURGE_TASK: Final = "exports.purge_expired"
+# FR-ADM-002: the school may keep export files for a shorter time than config retention_days.
+RETENTION_CATEGORY: Final = "exports"
 ops.register_outbox_route(GENERATE_EVENT, GENERATE_TASK)
 ops.register_outbox_route(RENDER_EVENT, RENDER_TASK)
 
@@ -653,7 +658,8 @@ def download_url(
         _require_step_up(ctx)
     if row.status == "expired" or row.files_deleted_at is not None:
         raise Conflict(
-            "This export was deleted after 7 days. Make a new one.", code="export_expired"
+            "This export's files were deleted (exports are kept for a few days). Make a new one.",
+            code="export_expired",
         )
     if row.status == "failed":
         raise Conflict("This export could not be made. Make a new one.", code="export_failed")
@@ -662,7 +668,8 @@ def download_url(
     now = repo.now(session)
     if row.expires_at is not None and row.expires_at <= now:
         raise Conflict(
-            "This export was deleted after 7 days. Make a new one.", code="export_expired"
+            "This export's files were deleted (exports are kept for a few days). Make a new one.",
+            code="export_expired",
         )
     files = {f.format: f for f in repo.files_of(session, [row.id]).get(row.id, [])}
     wanted = file_format or row.formats[0]
@@ -1195,13 +1202,14 @@ def _complete(tenant_id: uuid.UUID, snap: _Snapshot, built: _Built) -> str:
             )
         repo.insert_files(session, rows)
         now = repo.now(session)
+        keep = retention.days(session, RETENTION_CATEGORY, default=cfg.retention_days)
         repo.update_export(
             session,
             snap.id,
             {
                 "status": "ready",
                 "finished_at": now,
-                "expires_at": now + dt.timedelta(days=cfg.retention_days),
+                "expires_at": now + dt.timedelta(days=keep),
             },
         )
         counts = {
@@ -1287,6 +1295,7 @@ __all__ = [
     "READ_ALL",
     "RENDER_EVENT",
     "RENDER_TASK",
+    "RETENTION_CATEGORY",
     "STUDENT_EXPORT",
     "abandon",
     "download_url",

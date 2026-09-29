@@ -531,7 +531,15 @@
       "filterUserPlaceholder": "The person's user ID",
       "filterByUser": "Show only events by {who}",
       "clearFilters": "Clear filters",
-      "exportLater": "Downloading the audit log as a CSV file is not available on this screen yet."
+      "exporting": "Preparing the file…",
+      "exportNote": "The file holds the events the filters select, oldest first. You may be asked to sign in again to confirm it's you. Every download is recorded in this audit log.",
+      "exported": "Downloaded {name}.",
+      "errors": {
+        "too_many_events": {
+          "title": "Too many events for one file",
+          "body": "Choose a shorter date range with the From and To dates, then download again."
+        }
+      }
     },
     "switchSchool": "Switch school",
     "announcements": {
@@ -4803,6 +4811,171 @@
       "dialog": "Dialog",
       "icons": "Icons",
       "telugu": "Telugu"
+    }
+  },
+  "admin": {
+    "nav": {
+      "dataExport": "Data export",
+      "retention": "Data retention"
+    },
+    "suspended": {
+      "exportLink": "Download the school's data"
+    },
+    "dataExport": {
+      "title": "Data export",
+      "description": "Download all of your school's records, documents and audit log in one file. Only the owner can do this.",
+      "ownerOnlyTitle": "Only the owner can export all data",
+      "ownerOnlyBody": "Exporting everything the school holds is kept for the school's owner. Ask the owner if you need a copy of the school's data.",
+      "requestTitle": "Make a full export",
+      "requestDescription": "SchoolOS prepares one ZIP file in the background. You will get a notification when it is ready.",
+      "includes": {
+        "records": "Every record table as a CSV file (opens in Excel) and a JSON file: students with the values from every source, guardians, enrolments, corrections, data checks, imports, staff and school structure.",
+        "documents": "Every uploaded document that passed the virus check.",
+        "audit": "The school's audit log as a CSV file, and a list of what is in the file.",
+        "never": "Full Aadhaar numbers are never stored, so they are never in the file. The name, date of birth and gender as printed on Aadhaar are never exported."
+      },
+      "sensitiveLabel": "Include restricted details",
+      "sensitiveHint": "Health notes, category, caste, religion, guardian phone numbers and addresses and the last four Aadhaar digits. Without this they show as ••••. The audit log records that they were included.",
+      "sensitiveNotAllowed": "Restricted details (health notes, category, guardian phone numbers) will show as ••••. Only staff allowed to see them for the whole school can include them.",
+      "careTitle": "This file holds children's personal data",
+      "careBody": "Keep it on a secure computer, do not email it, and delete copies you no longer need. The file is deleted from SchoolOS 24 hours after it is ready.",
+      "requestButton": "Make full export",
+      "busyNote": "An export is being made. Wait for it to finish.",
+      "requested": "Your export has been requested. This page updates while it is being made.",
+      "latestTitle": "Latest export",
+      "statusNow": "Export status: {status}",
+      "queuedTitle": "Waiting to start",
+      "runningTitle": "Being made",
+      "busyBody": "Large schools can take several minutes. You can leave this page; you will be notified when it is ready.",
+      "readyTitle": "Ready to download",
+      "readyBody": "You can download the file until {expires}. After that it is deleted and you can make a new one.",
+      "failedTitle": "The export could not be made",
+      "expiredTitle": "This file has been deleted",
+      "expiredBody": "Full exports are deleted 24 hours after they are ready. Make a new export to get up-to-date data.",
+      "download": "Download ZIP",
+      "downloadSized": "Download ZIP ({size})",
+      "linkNote": "The download link works for 5 minutes. Press the button again for a new link.",
+      "counts": {
+        "students": "Students",
+        "tables": "Tables",
+        "documents": "Documents",
+        "auditEvents": "Audit events"
+      },
+      "historyTitle": "Export history",
+      "historyDescription": "Every full export of the school: who asked for it and when. The record stays after the file is deleted.",
+      "historyTable": "Export history, table, scrolls sideways",
+      "columns": {
+        "requested": "Requested",
+        "by": "By",
+        "status": "Status",
+        "restricted": "Restricted details",
+        "size": "Size",
+        "until": "Deleted on",
+        "actions": "Actions"
+      },
+      "restrictedYes": "Included",
+      "restrictedNo": "Masked",
+      "you": "You",
+      "formerStaff": "A former staff member",
+      "status": {
+        "queued": "Waiting",
+        "running": "Being made",
+        "ready": "Ready",
+        "failed": "Failed",
+        "expired": "Deleted"
+      },
+      "failure": {
+        "permission_revoked": "The person who asked for it is no longer allowed to export all data. The owner can make a new export.",
+        "too_large": "The school's documents are too large for one file. Contact SchoolOS support: they can prepare the export in parts.",
+        "too_many_audit_events": "The audit log is too long for one file. Contact SchoolOS support.",
+        "integrity_mismatch": "A stored document did not match its check, so the file was not made. Contact SchoolOS support.",
+        "worker_error": "Something went wrong on our side. Make a new export; if it fails again, contact support.",
+        "other": "Something went wrong. Make a new export; if it fails again, contact support."
+      }
+    },
+    "retention": {
+      "title": "Data retention",
+      "description": "How long SchoolOS keeps working data before deleting it. You can shorten these periods; SchoolOS never keeps data longer than the limits shown.",
+      "notAllowedTitle": "Only the owner and principal can see this",
+      "notAllowedBody": "Retention settings are part of the school settings. Ask your owner or principal.",
+      "editableTitle": "Periods you can change",
+      "editableDescription": "A daily job deletes this data when the period is over.",
+      "fixedTitle": "Periods SchoolOS sets",
+      "fixedDescription": "These periods are set by law, for security, or by how the feature works, and cannot be changed here.",
+      "recordsNote": "Student records, admission registers and documents you upload are never deleted automatically. They are kept as your school's records.",
+      "range": "Between {min} and {max} days (default {default}).",
+      "days": "{count, plural, one {# day} other {# days}}",
+      "fixed": "Fixed",
+      "changed": "Changed from default",
+      "notEnforced": "No automatic deletion yet.",
+      "saveTitle": "Save retention settings",
+      "saveBody": "Shorter periods apply from the next daily clean-up. The change is recorded in the audit log.",
+      "save": "Save settings",
+      "restoreDefaults": "Use the defaults",
+      "reload": "Load the latest settings",
+      "lastChanged": "Last changed {when} by {who}.",
+      "formerStaff": "a former staff member",
+      "outcome": {
+        "saved": "Retention settings saved.",
+        "unchanged": "Nothing changed, so nothing was saved.",
+        "defaults": "The default periods apply again."
+      },
+      "categories": {
+        "import_raw_files": {
+          "name": "Uploaded import files",
+          "about": "Spreadsheets uploaded to add students. The values added to student records stay."
+        },
+        "exports": {
+          "name": "Export files",
+          "about": "Pre-check reports and student lists made on the Exports screen. The record of who exported what stays."
+        },
+        "notifications_read": {
+          "name": "Read notifications",
+          "about": "Notifications you have already opened. Unread ones are kept."
+        },
+        "tenant_exports": {
+          "name": "Full data export file",
+          "about": "The file made on the Data export screen. It can be downloaded for 24 hours."
+        },
+        "kb_queries": {
+          "name": "Ask the school questions and answers",
+          "about": "Questions asked in Ask the school and their answers, kept encrypted."
+        },
+        "audit_events": {
+          "name": "Audit log",
+          "about": "Who did what and when. Kept at least 13 months as the law requires, then archived."
+        },
+        "other": {
+          "name": "Other data",
+          "about": "Kept as SchoolOS sets it."
+        }
+      }
+    },
+    "errors": {
+      "tenant_export_in_progress": {
+        "title": "An export is already being made",
+        "body": "Wait until it is ready, then download it or make a new one."
+      },
+      "sensitive_not_allowed": {
+        "title": "You can't include restricted details",
+        "body": "Only staff allowed to see restricted details for the whole school can include them. Make the export without them."
+      },
+      "export_not_ready": {
+        "title": "The export is not ready yet",
+        "body": "Wait a moment and try again. This page updates on its own."
+      },
+      "export_failed": {
+        "title": "The export could not be made",
+        "body": "Make a new export. If it fails again, contact SchoolOS support."
+      },
+      "export_expired": {
+        "title": "This file has been deleted",
+        "body": "Full exports are deleted 24 hours after they are ready. Make a new export."
+      },
+      "precondition_failed": {
+        "title": "Someone else changed these settings first",
+        "body": "Select “Load the latest settings” to see their change, then make yours again."
+      }
     }
   }
 }

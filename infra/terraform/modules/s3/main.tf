@@ -5,7 +5,8 @@
 # categories are therefore selected by object tag, which the app sets on upload:
 #   sos-lifecycle=export-7d         -> t/<tenant_id>/exports/<export_id>/<file> (set on upload by
 #                                      app/documents/storage.py put(lifecycle=...))
-#   sos-lifecycle=tenant-export-2d  -> t/<tenant_id>/tenant-export/<job_id>.zip
+#   sos-lifecycle=tenant-export-2d  -> t/<tenant_id>/tenant-export/<export_id>.zip (FR-ADM-001; set
+#                                      on upload by app/documents/storage.py open_writer)
 #   sos-lifecycle=import-raw-90d    -> t/<tenant_id>/imports/<batch_id>/raw.<ext> (optional, retention setting)
 # Documents (t/<tenant_id>/docs/...) are never expired by lifecycle; retention purges are app jobs.
 
@@ -109,9 +110,13 @@ module "files" {
       noncurrent_version_expiration_days = 1
     },
     {
-      id              = "tenant-export-2d"
-      tags            = { "sos-lifecycle" = "tenant-export-2d" }
-      expiration_days = 2
+      # FR-ADM-001: the school's full data export (link valid 24 h; the purge job deletes it
+      # then). The tag is set on upload; this rule is the backstop, and the noncurrent copy
+      # left by the purge's delete goes after 1 day instead of the 90-day recovery window.
+      id                                 = "tenant-export-2d"
+      tags                               = { "sos-lifecycle" = "tenant-export-2d" }
+      expiration_days                    = 2
+      noncurrent_version_expiration_days = 1
     },
     {
       id              = "import-raw-90d"
