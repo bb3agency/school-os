@@ -148,7 +148,6 @@ function ArchiveOrInUse(props: {
 
 function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }) {
   const ts = useTranslations("school.structure");
-  const t = useTranslations("academicStructure");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
   let body: ReactNode;
