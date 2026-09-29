@@ -141,6 +141,7 @@ Checked against the code and tests on the session branch up to the Ask screen me
 5. **Usage meters:** ADR extending `core.tenant_usage_summary()` (and `definer_access`) to `sis.students`, `kb.document_versions` sizes and document counts, or defer to M2.
 6. **Break-glass on dedicated hosts:** deliver requests with the heartbeat response, or support shared tier only in M1.
 7. **Emergency break-glass for an operator never approved anywhere** (ADR-0023 item 5, recorded as a deviation in its Amendments): the emergency path finds the operator's identity but cannot create it, because `core.create_user_for_invite` requires an inviter. Relax that definer guard for operator-issuer identities (new ADR), or keep failing closed.
+8. **In-house identity (Proposed: [ADR-0030](adr/ADR-0030-in-house-identity-and-sessions.md)).** Owner decision 2026-09-29: build our own sign-in, MFA and account management instead of Cognito. ADR-0030 proposes passwords (Argon2id), TOTP and passkeys, API-owned server-side sessions in a separate `auth` schema and role, invite-only staff accounts, and removal of the Cognito Terraform; it lists 17 open questions. Nothing else in the docs changes, and the Cognito Terraform should not be applied, until it is accepted. Recommended to land before the first staging deployment.
 
 **Pilot-ready gate (§3), items checkable in code** (none ticked; each still needs verification in staging):
 - SEC-001..017: implemented in code and tests (SEC-011 only as unapplied Terraform; SEC-016 needs ClamAV and SSE-KMS deployed).
