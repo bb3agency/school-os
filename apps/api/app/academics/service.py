@@ -578,8 +578,9 @@ def record_marks(
 ) -> WriteResultOut:
     """Store a section's marks for one exam, all or nothing (``marks.record``; FR-MRK-002). 422
     when a student is not in the roster, marks exceed the maximum, absent papers carry marks,
-    a subject is too long or holds an Aadhaar-like number, or an entry repeats. Audit
-    ``marks.recorded``."""
+    a subject is too long or holds an Aadhaar-like number, or an entry repeats. Subjects match
+    whatever their case: a paper already stored corrects in place under its first spelling.
+    Audit ``marks.recorded``."""
     cfg = load_config().marks
     sec = _section(session, ctx, section_id, MARKS_RECORD)
     exam = _exam(session, exam_id)
@@ -612,6 +613,21 @@ def record_marks(
     if len(subjects) > cfg.max_subjects:
         errors.append(_error("entries", "too_many_subjects"))
     _refuse(errors)
+    # A paper is one per exam, student and subject whatever its case ("MATHS" from a sheet
+    # corrects "Maths" typed earlier): keep the spelling already stored for the student, else
+    # the exam's first spelling (one column per subject in the grid).
+    spelling: dict[str, str] = {}
+    for subject in repo.exam_subjects(session, exam.id):
+        spelling.setdefault(subject.casefold(), subject)
+    stored = {
+        (m.student_id, m.subject.casefold()): m.subject
+        for m in repo.exam_marks(session, exam.id, {e.student_id for e in data.entries})
+    }
+
+    def _subject(entry: MarkIn) -> str:
+        folded = entry.subject.casefold()
+        return stored.get((entry.student_id, folded)) or spelling.get(folded, entry.subject)
+
     inserted, updated = repo.upsert_marks(
         session,
         [
@@ -620,7 +636,7 @@ def record_marks(
                 "exam_id": exam.id,
                 "student_id": e.student_id,
                 "section_id": sec.section.id,
-                "subject": e.subject,
+                "subject": _subject(e),
                 "max_marks": e.max_marks,
                 "marks": e.marks,
                 "absent": e.absent,
