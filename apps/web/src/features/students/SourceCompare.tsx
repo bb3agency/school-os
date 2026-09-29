@@ -223,7 +223,7 @@ export function ValuesBySourceView({
         <p className="text-sm text-ink-muted">{t("empty")}</p>
       ) : (
         <TableScroll label={t("table")}>
-          <Table>
+          <Table stickyFirstColumn>
             <caption className="sr-only">{t("table")}</caption>
             <THead>
               <Tr>

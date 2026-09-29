@@ -199,6 +199,12 @@
   width: 100%;
 }
 
+/* Label/value lists (<dl>): the label column takes what it needs up to 40% and then wraps,
+   so a long (Telugu) label never squeezes the values into a narrow strip on a phone. */
+@utility grid-cols-label-value {
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+}
+
 /* Long unbroken strings (emails, IDs, URLs, Telugu compounds) wrap instead of widening the
    page. `anywhere` also lowers the min-content width, so use it on text, not table cells. */
 @utility break-anywhere {

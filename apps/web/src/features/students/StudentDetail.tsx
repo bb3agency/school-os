@@ -634,7 +634,7 @@ export function StudentDetailView({
           <p className="text-sm text-ink-muted">{t("noValues")}</p>
         ) : (
           <TableScroll label={t("valuesTable")}>
-            <Table>
+            <Table stickyFirstColumn>
               <caption className="sr-only">{t("valuesTable")}</caption>
               <THead>
                 <Tr>

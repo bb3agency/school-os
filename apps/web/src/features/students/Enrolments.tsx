@@ -379,7 +379,7 @@ export function EnrolmentsCard({
     >
       <div className="space-y-4">
         {student.enrollment ? (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+          <dl className="grid grid-cols-label-value gap-x-4 gap-y-2 text-sm">
             <dt className="text-ink-muted">{td("classSection")}</dt>
             <dd className="font-semibold">{student.enrollment.label}</dd>
             <dt className="text-ink-muted">{td("rollNo")}</dt>

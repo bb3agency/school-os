@@ -431,7 +431,7 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
           ) : null}
         </Card>
         <Card title={t("details")}>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
+          <dl className="grid grid-cols-label-value gap-x-4 gap-y-3 text-sm">
             <dt className="text-ink-muted">{t("colPriority")}</dt>
             <dd>
               <PriorityBadge priority={data.priority} />

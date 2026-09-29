@@ -545,7 +545,7 @@ function Reviewed({ item }: { item: ExtractionItemDetail }) {
   const tr = useTranslations("extraction.reject.reasons");
   return (
     <Card title={t("reviewedTitle")}>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dl className="grid grid-cols-label-value gap-x-4 gap-y-2 text-sm">
         <dt className="text-ink-muted">{t("status")}</dt>
         <dd>
           <ItemStatusBadge status={item.status} />
@@ -709,7 +709,7 @@ export function ItemReviewView({
             </Card>
           )}
           {!pending || !canDecide ? (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dl className="grid grid-cols-label-value gap-x-4 gap-y-2 text-sm">
               {REGISTER_FIELDS.filter((key) => data.fields[key]).map((key) => (
                 <div key={key} className="contents">
                   <dt className="text-ink-muted">{index.label(key)}</dt>
