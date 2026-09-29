@@ -1,20 +1,23 @@
 """Fixtures for the Tally connector tests (M6; ADR-0032; synthetic data only).
 
-Schools A and B of ``tests/api/world.py`` (one member per role). The connector flag
-``tally.connector.enabled`` is switched on for both by :func:`tally_on` (session scope); tests
-that check the flag-off behaviour use their own school or switch it off and back.
+Schools A and B of ``tests/api/world.py`` (one member per role); most tests make their own
+school with ``T.fresh_school`` (flag ``tally.connector.enabled`` on unless asked otherwise).
+The API client wraps device secrets with the synthetic CI key wrapper.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
 from sqlalchemy import Engine
+
+from app.tally import agent_auth
 
 
 def _load(name: str, path: Path) -> ModuleType:
@@ -31,11 +34,11 @@ def _load(name: str, path: Path) -> ModuleType:
 T = _load("sos_test_tally_support", Path(__file__).with_name("support.py"))
 W = T.W
 world = W.world
-api = W.api
 
 
-@pytest.fixture(scope="session")
-def tally_on(world: Any, admin_engine: Engine) -> Any:
-    for school in (world.a, world.b):
-        T.set_flag(admin_engine, school.tenant_id, enabled=True)
-    return world
+@pytest.fixture
+def api(app_engine: Engine, platform_engine: Engine) -> Iterator[Any]:
+    """The world's API client; device secrets are wrapped with the synthetic CI key wrapper."""
+    for client in W.make_client():
+        client.client.app.dependency_overrides[agent_auth.get_agent_key_wrapper] = W.wrapper
+        yield client

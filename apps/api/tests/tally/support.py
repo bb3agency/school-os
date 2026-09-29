@@ -67,7 +67,7 @@ def set_flag(admin: Engine, tenant_id: uuid.UUID, *, enabled: bool) -> None:
         )
 
 
-# --- signing (the agent's side, written out independently of app.tally.agent_auth) -----------------
+# --- signing (the agent's side, written out independently of app.tally.agent_auth) ----------------
 
 
 def canonical(method: str, path: str, timestamp: str, nonce: str, body: bytes) -> bytes:
@@ -82,7 +82,9 @@ def canonical(method: str, path: str, timestamp: str, nonce: str, body: bytes) -
     return "\n".join(lines).encode("utf-8")
 
 
-def signature(secret: bytes, method: str, path: str, timestamp: str, nonce: str, body: bytes) -> str:
+def signature(
+    secret: bytes, method: str, path: str, *, timestamp: str, nonce: str, body: bytes
+) -> str:
     mac = hmac.new(secret, canonical(method, path, timestamp, nonce, body), hashlib.sha256)
     return "v1=" + mac.hexdigest()
 
@@ -121,7 +123,9 @@ class Agent:
             "X-SOS-Timestamp": ts,
             "X-SOS-Nonce": n,
             "X-SOS-Agent-Version": self.version,
-            "X-SOS-Signature": signature(secret or self.secret, method, path, ts, n, body),
+            "X-SOS-Signature": signature(
+                secret or self.secret, method, path, timestamp=ts, nonce=n, body=body
+            ),
             "Content-Type": "application/json",
         }
 
@@ -234,7 +238,9 @@ def select(
     return out
 
 
-def party(name: str, balance: str, *, group: str = "Sundry Debtors", guid: str | None = None) -> dict[str, Any]:
+def party(
+    name: str, balance: str, *, group: str = "Sundry Debtors", guid: str | None = None
+) -> dict[str, Any]:
     return {"guid": guid, "name": name, "group": group, "closing_balance": balance}
 
 
@@ -283,7 +289,9 @@ def fresh_school(admin: Engine, *, flag: bool = True) -> Any:
     return school
 
 
-def audit_actions(admin: Engine, tenant_id: uuid.UUID, prefix: str = "tally.") -> list[dict[str, Any]]:
+def audit_actions(
+    admin: Engine, tenant_id: uuid.UUID, prefix: str = "tally."
+) -> list[dict[str, Any]]:
     with admin.connect() as c:
         return [
             dict(r._mapping)

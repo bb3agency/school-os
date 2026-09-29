@@ -248,6 +248,13 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # Task assignees (FR-TASK-002, FR-CIR-004): whoever creates tasks or confirms suggested
         # deadlines picks an owner; the service requires a school-wide grant of either.
         ("GET", "/api/v1/task-assignees"): ("task.manage", ("circular.review",), False),
+        # Tally connector status (ADR-0032, FR-TALLY-007): finance readers, the owner (agents) and
+        # the accountant (mapping) share it; money totals only for school-wide finance.read.
+        ("GET", "/api/v1/tally/status"): (
+            "finance.read",
+            ("tally.device.manage", "tally.configure"),
+            False,
+        ),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards
