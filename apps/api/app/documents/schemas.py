@@ -228,3 +228,88 @@ class DownloadUrlOut(_Out):
     version_no: int
     mime_type: str
     filename: str
+
+
+# --- sheets (FR-DOC-009..011) ----------------------------------------------------------------
+
+SheetFormat = Literal["csv", "xlsx"]
+SheetReadOnly = Literal[
+    "no_permission", "not_versionable", "archived", "several_sheets", "formulas", "newer_version"
+]
+
+
+def _cell_value(value: Any) -> Any:
+    """NFC; surrounding spaces trimmed; blank means "clear the cell"."""
+    if isinstance(value, str):
+        text = unicodedata.normalize("NFC", value).strip()
+        return text or None
+    return value
+
+
+SheetCellValue = Annotated[str | None, BeforeValidator(_cell_value), Field(max_length=1000)]
+
+
+class SheetCellEdit(_In):
+    """One edited cell: ``row_no`` as the sheet shows it (data rows start at 2; row 1 is the
+    header row), 0-based ``column``, the new text (``null`` or blank clears it). No line breaks
+    or control characters, never a full Aadhaar number."""
+
+    row_no: int = Field(ge=2, le=1_000_000)
+    column: int = Field(ge=0, le=255)
+    value: SheetCellValue = None
+
+
+class SheetSaveIn(_In):
+    """Save edited cells as the document's next version. ``base_version_no`` is the version
+    the edits were made on; it must still be the current version."""
+
+    base_version_no: int = Field(ge=1, le=999_999)
+    edits: list[SheetCellEdit] = Field(min_length=1, max_length=5000)
+
+
+class SheetExportIn(_In):
+    """Download the sheet of ``base_version_no`` (default: the one shown) with ``edits``
+    applied (unsaved edits may be included)."""
+
+    format: SheetFormat = "csv"
+    base_version_no: int | None = Field(default=None, ge=1, le=999_999)
+    edits: list[SheetCellEdit] = Field(default_factory=list, max_length=5000)
+
+
+class DocSheetColumnOut(_Out):
+    index: int
+    letter: str
+    header: str | None
+
+
+class DocSheetCellOut(_Out):
+    """Display text (Aadhaar-like numbers masked; null when empty); ``formula`` marks a cell
+    kept as inert formula text (never evaluated)."""
+
+    value: str | None
+    formula: bool
+
+
+class DocSheetRowOut(_Out):
+    row_no: int
+    cells: list[DocSheetCellOut]
+
+
+class DocumentSheetOut(_Out):
+    """A page of the first worksheet of the newest checked version (row 1 is the header).
+    ``sheet_count`` > 1 means the workbook has more sheets that are not shown. ``editable``
+    says whether you can save edits as a new version; ``read_only_reason`` says why not.
+    ``version`` is the document's ETag version (send it in ``If-Match`` to save)."""
+
+    document_id: uuid.UUID
+    version_no: int
+    version: int
+    kind: SheetFormat
+    sheet_count: int
+    editable: bool
+    read_only_reason: SheetReadOnly | None
+    total_rows: int
+    offset: int
+    columns: list[DocSheetColumnOut]
+    data: list[DocSheetRowOut]
+    next_cursor: str | None

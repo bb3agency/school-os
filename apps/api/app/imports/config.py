@@ -40,6 +40,7 @@ class ImportConfig:
     enum_synonyms: Mapping[str, Mapping[str, tuple[str, ...]]]
     class_aliases: Mapping[str, tuple[str, ...]]
     class_noise_words: tuple[str, ...]
+    sheet_watermark: str = ""
 
     def max_length(self, key: str) -> int:
         return int(self.text_max_length.get(key, self.text_max_length["default"]))
@@ -71,6 +72,9 @@ def parse_config(raw: Mapping[str, Any]) -> ImportConfig:
         },
         class_aliases={str(k): _strs(v) for k, v in raw["class_aliases"].items()},
         class_noise_words=_strs(raw["class_noise_words"]),
+        sheet_watermark=" · ".join(
+            str(v) for v in ((raw.get("sheet") or {}).get("export_watermark") or {}).values()
+        ),
     )
 
 

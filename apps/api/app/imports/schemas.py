@@ -165,6 +165,105 @@ class ImportRowOut(_Out):
     warnings: list[Issue]
 
 
+# --- staged sheet (FR-IMP-008, FR-IMP-009) -------------------------------------------------------
+
+SheetFormat = Literal["csv", "xlsx"]
+SheetReadOnly = Literal["committed", "reverted", "in_progress", "failed"]
+
+
+def _cell_value(value: Any) -> Any:
+    """NFC; surrounding spaces trimmed; blank means "clear the cell"."""
+    if isinstance(value, str):
+        text = unicodedata.normalize("NFC", value).strip()
+        return text or None
+    return value
+
+
+CellValueIn = Annotated[str | None, BeforeValidator(_cell_value), Field(max_length=1000)]
+
+
+class CellEditIn(_In):
+    """One cell of a staged row: ``column`` is the 0-based column index, ``value`` the new text
+    (``null`` or blank clears the cell). Up to 1,000 characters, no line breaks or control
+    characters, never a full Aadhaar number."""
+
+    column: int = Field(ge=0, le=255)
+    value: CellValueIn = None
+
+
+class RowEditIn(_In):
+    """Cells to change in one staged row (each column at most once)."""
+
+    cells: list[CellEditIn] = Field(min_length=1, max_length=60)
+
+
+class SheetColumnOut(_Out):
+    """A column as uploaded: its letter and header, the field it fills (``target``, null when
+    not imported), and whether its cells may be shown and edited. ``restricted`` columns fill a
+    restricted (C3) field: their values are never shown or edited here."""
+
+    index: int
+    letter: str
+    header: str
+    target: str | None
+    restricted: bool
+    editable: bool
+
+
+class SheetCellOut(_Out):
+    """``value`` is the display text (Aadhaar-like numbers masked; null when empty or
+    restricted); ``edited`` marks a value changed in SchoolOS; ``formula`` a cell kept as inert
+    text."""
+
+    value: str | None
+    edited: bool
+    restricted: bool
+    formula: bool
+
+
+class SheetRowOut(_Out):
+    """One data row as the spreadsheet numbers it, with its check result (``status`` null when
+    the file was not checked with the current mapping yet)."""
+
+    row_no: int
+    cells: list[SheetCellOut]
+    status: RowStatus | None
+    errors: list[Issue]
+    warnings: list[Issue]
+
+
+class ImportSheetOut(_Out):
+    """A page of the staged sheet (file order). ``editable`` is false once the import was added
+    or reverted, while a check or commit is running, and for callers who cannot edit;
+    ``read_only_reason`` says why. ``version`` is the import's ETag version (send it in
+    ``If-Match`` to edit)."""
+
+    import_id: uuid.UUID
+    status: BatchStatus
+    version: int
+    editable: bool
+    read_only_reason: SheetReadOnly | None
+    header_row: int
+    total_rows: int
+    offset: int
+    edited_cells: int
+    columns: list[SheetColumnOut]
+    data: list[SheetRowOut]
+    next_cursor: str | None
+
+
+class SheetEditOut(_Out):
+    """The edited row after its re-check, the import's new version (ETag), its counts, and the
+    other rows whose check result changed (e.g. a duplicate admission number resolved)."""
+
+    row: SheetRowOut
+    version: int
+    status: BatchStatus
+    row_count: int
+    error_count: int
+    changed_rows: list[int]
+
+
 class TemplateOut(_Out):
     id: uuid.UUID
     name: str

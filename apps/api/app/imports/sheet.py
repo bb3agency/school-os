@@ -12,47 +12,25 @@
   (``formula_not_evaluated``); they never become values.
 - The header is the first of the first rows with at least three text cells. Limits: rows,
   columns, cell length and physical rows scanned (config.yaml).
+
+The low-level readers live in :mod:`app.core.spreadsheet` (shared with the documents sheet
+viewer, FR-DOC-009); :class:`SheetError` is its ``SpreadsheetError``.
 """
 
 from __future__ import annotations
 
-import csv
-import datetime as dt
-import io
-import re
-import unicodedata
-import zipfile
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Final, Literal
 
-from openpyxl import load_workbook
-
+from app.core.spreadsheet import (
+    Cell,
+    CellValue,
+    FileKind,
+    looks_like_formula,
+)
+from app.core.spreadsheet import SpreadsheetError as SheetError
+from app.core.spreadsheet import raw_rows as read_raw_rows
 from app.imports.config import Limits
-
-FileKind = Literal["xlsx", "csv"]
-CellValue = str | int | float | bool | dt.date | dt.datetime | None
-
-_NUMERIC_RE: Final = re.compile(r"^[+-]?[\d\s().,-]*$")
-_CSV_DELIMITERS: Final = ",;\t|"
-
-
-class SheetError(Exception):
-    """The file cannot be imported as a whole (``code`` is shown to the user)."""
-
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-@dataclass(frozen=True, slots=True)
-class Cell:
-    value: CellValue
-    formula: bool = False
-
-    @property
-    def empty(self) -> bool:
-        return self.value is None or (isinstance(self.value, str) and not self.value.strip())
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,117 +49,6 @@ class Sheet:
     headers: tuple[str, ...]
     rows: tuple[SheetRow, ...]
     formula_cells: int
-
-
-def looks_like_formula(text: str) -> bool:
-    """Text a spreadsheet program would treat as a formula or DDE payload."""
-    stripped = text.lstrip()
-    if not stripped:
-        return False
-    if stripped[0] in "=@":
-        return True
-    return stripped[0] in "+-" and _NUMERIC_RE.match(stripped) is None
-
-
-def _normalise_text(value: str) -> str:
-    return unicodedata.normalize("NFC", value)
-
-
-# --- XLSX ---------------------------------------------------------------------------------------
-
-
-def _check_zip(data: bytes, limits: Limits) -> None:
-    try:
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            members = archive.infolist()
-    except (zipfile.BadZipFile, ValueError) as exc:
-        raise SheetError("file_unreadable") from exc
-    if len(members) > limits.xlsx_max_members:
-        raise SheetError("file_too_complex")
-    total = 0
-    for info in members:
-        total += info.file_size
-        if total > limits.xlsx_max_uncompressed_bytes:
-            raise SheetError("file_too_complex")
-        ratio = info.file_size / max(info.compress_size, 1)
-        if info.file_size > 1_000_000 and ratio > limits.xlsx_max_compression_ratio:
-            raise SheetError("file_too_complex")
-
-
-def _xlsx_rows(data: bytes, limits: Limits) -> Iterator[tuple[int, list[Cell]]]:
-    _check_zip(data, limits)
-    try:
-        workbook = load_workbook(
-            io.BytesIO(data), read_only=True, data_only=False, keep_links=False
-        )
-    except Exception as exc:  # openpyxl raises many types for damaged/hostile files
-        raise SheetError("file_unreadable") from exc
-    try:
-        sheets = [
-            ws for ws in workbook.worksheets if getattr(ws, "sheet_state", "visible") == "visible"
-        ]
-        if not sheets:
-            raise SheetError("no_worksheet")
-        ws = sheets[0]
-        reset = getattr(ws, "reset_dimensions", None)
-        if callable(reset):
-            reset()  # do not trust the stored dimension; read to the real end
-        try:
-            for row_no, row in enumerate(ws.iter_rows(), start=1):
-                if row_no > limits.max_scanned_rows:
-                    raise SheetError("too_many_rows")
-                cells: list[Cell] = []
-                for cell in row:
-                    value = getattr(cell, "value", None)
-                    is_formula = getattr(cell, "data_type", None) == "f"
-                    if isinstance(value, str):
-                        value = _normalise_text(value)
-                        is_formula = is_formula or looks_like_formula(value)
-                    elif isinstance(value, dt.time | dt.timedelta):
-                        value = str(value)
-                    elif value is not None and not isinstance(
-                        value, int | float | bool | dt.date | dt.datetime
-                    ):
-                        value = str(value)  # e.g. rich text / array formula objects: inert text
-                    cells.append(Cell(value, is_formula))
-                yield row_no, cells
-        except SheetError:
-            raise
-        except Exception as exc:  # damaged XML, forbidden entities (defusedxml), bad values
-            raise SheetError("file_unreadable") from exc
-    finally:
-        workbook.close()
-
-
-# --- CSV ----------------------------------------------------------------------------------------
-
-
-def _csv_rows(data: bytes, limits: Limits) -> Iterator[tuple[int, list[Cell]]]:
-    try:
-        text = data.decode("utf-8-sig")
-    except UnicodeDecodeError as exc:
-        raise SheetError("not_utf8") from exc
-    if "\x00" in text:
-        raise SheetError("file_unreadable")
-    sample = text[:65536]
-    try:
-        dialect: type[csv.Dialect] | csv.Dialect = csv.Sniffer().sniff(
-            sample, delimiters=_CSV_DELIMITERS
-        )
-    except csv.Error:
-        dialect = csv.excel
-    reader = csv.reader(io.StringIO(text, newline=""), dialect)
-    try:
-        for row_no, raw in enumerate(reader, start=1):
-            if row_no > limits.max_scanned_rows:
-                raise SheetError("too_many_rows")
-            cells = []
-            for value in raw:
-                clean = _normalise_text(value)
-                cells.append(Cell(clean if clean.strip() else None, looks_like_formula(clean)))
-            yield row_no, cells
-    except csv.Error as exc:
-        raise SheetError("file_unreadable") from exc
 
 
 # --- common ---------------------------------------------------------------------------------------
@@ -249,8 +116,40 @@ def read_sheet(data: bytes, kind: FileKind, limits: Limits) -> Sheet:
         raise SheetError("file_too_large")
     if not data:
         raise SheetError("empty_file")
-    rows = _xlsx_rows(data, limits) if kind == "xlsx" else _csv_rows(data, limits)
-    return build_sheet(kind, rows, limits)
+    return build_sheet(kind, read_raw_rows(data, kind, limits), limits)
+
+
+def edited_cell(value: str | None) -> Cell:
+    """The cell a staged edit puts in place (FR-IMP-008): text is inert, formula-looking text
+    is flagged exactly as in an uploaded file; ``None`` clears the cell."""
+    if value is None or not value.strip():
+        return Cell(None)
+    return Cell(value, looks_like_formula(value))
+
+
+def with_edits(sheet: Sheet, edits: Mapping[tuple[int, int], str | None]) -> Sheet:
+    """``sheet`` with staged cell edits applied (``(row_no, column index) -> value``). The raw
+    file is never changed; edits for rows or columns the sheet does not have are ignored."""
+    if not edits:
+        return sheet
+    width = len(sheet.headers)
+    by_row: dict[int, dict[int, str | None]] = {}
+    for (row_no, column), value in edits.items():
+        if 0 <= column < width:
+            by_row.setdefault(row_no, {})[column] = value
+    rows: list[SheetRow] = []
+    formulas = 0
+    for original in sheet.rows:
+        row = original
+        changes = by_row.get(original.row_no)
+        if changes:
+            cells = list(original.cells) + [Cell(None)] * (max(changes) + 1 - len(original.cells))
+            for column, value in changes.items():
+                cells[column] = edited_cell(value)
+            row = SheetRow(original.row_no, tuple(cells))
+        formulas += sum(1 for c in row.cells if c.formula)
+        rows.append(row)
+    return Sheet(sheet.kind, sheet.header_row, sheet.headers, tuple(rows), formulas)
 
 
 __all__ = [
@@ -260,6 +159,8 @@ __all__ = [
     "Sheet",
     "SheetError",
     "SheetRow",
+    "edited_cell",
     "looks_like_formula",
     "read_sheet",
+    "with_edits",
 ]

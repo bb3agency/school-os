@@ -10,13 +10,14 @@ answers 404.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Path, Query, Response
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag
+from app.identity.principal import Principal, get_principal, require_recent_auth
 from app.imports import service
 from app.imports.schemas import (
     BatchStatus,
@@ -24,9 +25,13 @@ from app.imports.schemas import (
     ImportCreate,
     ImportOut,
     ImportRowOut,
+    ImportSheetOut,
     ImportSummary,
     MappingIn,
+    RowEditIn,
     RowFilter,
+    SheetEditOut,
+    SheetFormat,
     TemplateCreate,
     TemplateOut,
 )
@@ -35,6 +40,27 @@ router = APIRouter(prefix="/api/v1", tags=["imports"])
 
 Runner = Annotated[UserContext, Depends(require(service.RUN))]
 Committer = Annotated[UserContext, Depends(require(service.COMMIT))]
+SheetLimit = Annotated[int, Query(ge=1, le=200, description="Rows per page (max 200).")]
+RowNo = Annotated[int, Path(ge=1, le=1_000_000, description="Row number as the file shows it")]
+
+
+def recent_sign_in(principal: Annotated[Principal, Depends(get_principal)]) -> None:
+    """Step-up for downloads of personal data (FR-EXP-004, docs/07 §5.2: MFA within 5
+    minutes, 428 ``step_up_required``); ``import.run`` itself is not a step-up permission."""
+    require_recent_auth(principal)
+
+
+_SHEET_FILE_DOC: dict[int | str, dict[str, Any]] = {
+    200: {
+        "description": "The staged sheet as a file (CSV: UTF-8 with BOM; XLSX: text cells)",
+        "content": {
+            "text/csv": {"schema": {"type": "string"}},
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {"type": "string", "format": "binary"}
+            },
+        },
+    }
+}
 
 
 def _headers(batch: ImportOut) -> dict[str, str]:
@@ -92,6 +118,75 @@ def list_rows(
     ``import.run``); ``status=error`` lists the rows to fix. Restricted (C3) values are never
     shown, only which of them a row has."""
     return service.list_rows(db, ctx, import_id, status=status, limit=limit, cursor=cursor)
+
+
+@router.get("/imports/{import_id}/sheet", response_model=ImportSheetOut)
+def get_sheet(
+    *,
+    ctx: Runner,
+    db: TenantDB,
+    import_id: uuid.UUID,
+    response: Response,
+    limit: SheetLimit = 100,
+    cursor: Cursor = None,
+) -> ImportSheetOut:
+    """The uploaded file as a sheet (permission ``import.run``; FR-IMP-008): every column with
+    the field it fills, the rows in file order with staged edits applied and marked, and each
+    row's check result. Restricted (C3) columns show no values and Aadhaar-like numbers are
+    masked. ``editable`` says whether cells can still be changed (not after the import was
+    added). ``ETag`` is the import's version, needed to edit. 409 ``import_not_ready`` while the
+    file is being read, ``file_missing`` after the raw file was deleted (90 days after import)."""
+    out = service.get_sheet(db, ctx, import_id, limit=limit, cursor=cursor)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.patch("/imports/{import_id}/sheet/rows/{row_no}", response_model=SheetEditOut)
+def edit_sheet_row(
+    *,
+    ctx: Runner,
+    db: TenantDB,
+    import_id: uuid.UUID,
+    row_no: RowNo,
+    body: RowEditIn,
+    version: IfMatch,
+    response: Response,
+) -> SheetEditOut:
+    """Change cells of one row before the import is added (permission ``import.run``;
+    ``If-Match``; FR-IMP-008). The uploaded file is kept as it was; the edit is recorded with
+    who and when, and a checked file re-checks the row at once. 412 when the import changed
+    meanwhile (reload), 409 ``import_not_editable`` once it was added or reverted (correct
+    records on the student profile or with a change request), 422 for a full Aadhaar number
+    (``aadhaar_full_number_rejected``: enter only the last 4 digits), line breaks, text over
+    1,000 characters or a restricted column."""
+    out = service.edit_row(db, ctx, import_id, row_no, body, expected_version=version)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.get("/imports/{import_id}/sheet/export", response_class=Response, responses=_SHEET_FILE_DOC)
+def export_sheet(
+    *,
+    ctx: Runner,
+    _step_up: Annotated[None, Depends(recent_sign_in)],
+    db: TenantDB,
+    import_id: uuid.UUID,
+    format: Annotated[SheetFormat, Query(description="csv or xlsx")] = "csv",
+) -> Response:
+    """Download the staged sheet with its edits as CSV or XLSX (permission ``import.run`` and
+    a recent sign-in with MFA, 428 ``step_up_required``; FR-IMP-009, FR-EXP-004). One header
+    row and the data rows; Aadhaar-like numbers masked, formulas neutralised; restricted (C3)
+    columns are empty unless you may see sensitive fields. Every download is audited."""
+    file = service.export_sheet(db, ctx, import_id, format)
+    return Response(
+        content=file.content,
+        media_type=file.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{file.filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.put("/imports/{import_id}/mapping", response_model=ImportOut)

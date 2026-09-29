@@ -13,11 +13,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import delete, func, insert, select, text, update
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, DomainError
-from app.imports.models import ImportBatch, ImportMappingTemplate, ImportRow
+from app.imports.models import ImportBatch, ImportCellEdit, ImportMappingTemplate, ImportRow
 
 LIVE_STATUSES = ("parsing", "validating", "committing", "reverting")
 
@@ -189,11 +190,97 @@ def committed_rows(session: Session, batch_id: uuid.UUID) -> list[ImportRow]:
     )
 
 
+def rows_by_no(session: Session, batch_id: uuid.UUID, row_nos: Sequence[int]) -> list[ImportRow]:
+    if not row_nos:
+        return []
+    return list(
+        session.execute(
+            select(ImportRow)
+            .where(ImportRow.batch_id == batch_id, ImportRow.row_no.in_(list(row_nos)))
+            .order_by(ImportRow.row_no)
+        ).scalars()
+    )
+
+
+def all_rows(session: Session, batch_id: uuid.UUID) -> list[ImportRow]:
+    return list(
+        session.execute(
+            select(ImportRow).where(ImportRow.batch_id == batch_id).order_by(ImportRow.row_no)
+        ).scalars()
+    )
+
+
+def update_row(session: Session, batch_id: uuid.UUID, row_no: int, **values: Any) -> None:
+    """Replace one staged row's validation result (FR-IMP-008: an edit re-checks rows)."""
+    session.execute(
+        update(ImportRow)
+        .where(ImportRow.batch_id == batch_id, ImportRow.row_no == row_no)
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+
+
 def mark_rows_reverted(session: Session, batch_id: uuid.UUID) -> None:
     session.execute(
         update(ImportRow)
         .where(ImportRow.batch_id == batch_id, ImportRow.status == "committed")
         .values(status="reverted")
+        .execution_options(synchronize_session=False)
+    )
+
+
+# --- staged cell edits (FR-IMP-008) ---------------------------------------------------------------
+
+
+def insert_cell_edits(session: Session, rows: Sequence[Mapping[str, Any]]) -> None:
+    if rows:
+        session.execute(insert(ImportCellEdit), list(rows))
+
+
+def current_cell_edits(session: Session, batch_id: uuid.UUID) -> list[ImportCellEdit]:
+    """The newest edit of every edited cell of a batch (the values that replace the file's)."""
+    stmt = (
+        select(ImportCellEdit)
+        .where(ImportCellEdit.batch_id == batch_id)
+        .ext(distinct_on(ImportCellEdit.row_no, ImportCellEdit.column_index))
+        .order_by(
+            ImportCellEdit.row_no,
+            ImportCellEdit.column_index,
+            ImportCellEdit.batch_version.desc(),
+        )
+    )
+    return list(session.execute(stmt).scalars())
+
+
+def count_cell_edits(session: Session, batch_id: uuid.UUID) -> int:
+    value: int = session.execute(
+        select(func.count()).select_from(ImportCellEdit).where(ImportCellEdit.batch_id == batch_id)
+    ).scalar_one()
+    return value
+
+
+def stale_cell_edits(session: Session, key_version: int, limit: int) -> list[ImportCellEdit]:
+    """Edits with ciphertext under another key version (DEK rotation, SEC-012), locked."""
+    stmt = (
+        select(ImportCellEdit)
+        .where(
+            ImportCellEdit.key_version.is_not(None),
+            ImportCellEdit.key_version != key_version,
+        )
+        .order_by(ImportCellEdit.id)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    )
+    return list(session.execute(stmt).scalars())
+
+
+def set_cell_edit_ciphertext(
+    session: Session, edit_id: uuid.UUID, *, old: bytes | None, new: bytes | None, key_version: int
+) -> None:
+    session.execute(
+        update(ImportCellEdit)
+        .where(ImportCellEdit.id == edit_id)
+        .values(old_value_ciphertext=old, new_value_ciphertext=new, key_version=key_version)
         .execution_options(synchronize_session=False)
     )
 
