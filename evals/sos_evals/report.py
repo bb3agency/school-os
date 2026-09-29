@@ -24,6 +24,8 @@ LOWER_IS_BETTER = frozenset(
         "latency_p99_ms",
         "retrieval_latency_p95_ms",
         "circular_hallucinated_deadlines",
+        "fee_leakage_count",
+        "fee_guessed_link_count",
     }
 )
 _MAX_LISTED = 20
@@ -126,7 +128,9 @@ def to_markdown(report: Report) -> str:
             f"{fmt(gate.threshold)} | {'pass' if result.passed else '**FAIL**'} | "
             f"{', '.join(gate.requirements)} |"
         )
-    names = [n for n in Metrics.model_fields if n != "items" and not n.startswith("circular_")]
+    names = [
+        n for n in Metrics.model_fields if n != "items" and not n.startswith(("circular_", "fee_"))
+    ]
     lines += [
         "",
         "## By category",
@@ -154,6 +158,8 @@ def to_markdown(report: Report) -> str:
     lines += _failures(report.run.outcomes) or ["None."]
     lines += ["", "## Circular reading (M4)", ""]
     lines += _circular_lines(report.run) or ["Not measured."]
+    lines += ["", "## Fee dues from Tally (M6)", ""]
+    lines += _fee_lines(report.run) or ["Not measured."]
     return "\n".join(lines) + "\n"
 
 
@@ -207,6 +213,33 @@ def _circular_lines(run: RunResult) -> list[str]:
             problems.append(f"{o.hallucinated} date(s) not in the circular")
         if o.metadata_right < o.metadata_checked:
             problems.append("metadata wrong")
+        if problems:
+            lines.append(f"- `{o.id}` ({o.locale}): " + "; ".join(problems))
+    return lines
+
+
+def _fee_lines(run: RunResult) -> list[str]:
+    if not run.fee_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- Cases: {m.fee_items} · figure accuracy {fmt(m.fee_figure_accuracy)} · leakage "
+        f"{fmt(m.fee_leakage_count)} · guessed links {fmt(m.fee_guessed_link_count)} · "
+        f"citation validity {fmt(m.fee_citation_validity)} · refusal correctness "
+        f"{fmt(m.fee_refusal_correctness)}",
+    ]
+    for o in run.fee_outcomes:
+        problems = []
+        if o.figure_correct is False:
+            problems.append("figure missing or wrong")
+        if o.refusal_correct is False:
+            problems.append("stated a figure it must not")
+        if o.leaks:
+            problems.append("leak: " + ", ".join(o.leaks[:3]))
+        if o.guessed:
+            problems.append("mapped an unlinked ledger by name")
+        if o.valid_amounts < o.stated:
+            problems.append(f"{o.stated - o.valid_amounts} uncited amount(s)")
         if problems:
             lines.append(f"- `{o.id}` ({o.locale}): " + "; ".join(problems))
     return lines

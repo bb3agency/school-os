@@ -36,7 +36,14 @@ def build_report(
     data = datasets.load(datasets_dir)
     stub = STUBS[adapter](data.corpus, data.items)
     result = runner.run(
-        data.select(suite), data.corpus, stub, stub, circular=stub, circular_cases=data.circulars
+        data.select(suite),
+        data.corpus,
+        stub,
+        stub,
+        circular=stub,
+        circular_cases=data.circulars,
+        fee=stub,
+        fee_cases=data.fees,
     )
     gate_results = gates.evaluate(gates.load_gates(gates_file), result.metrics)
     code = gates.exit_code(gate_results, fail_on_soft=fail_on_soft)
