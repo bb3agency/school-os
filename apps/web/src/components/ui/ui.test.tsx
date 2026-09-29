@@ -9,7 +9,7 @@ import { Dialog } from "./Dialog";
 import { TextAreaField, TextField } from "./Input";
 import { SelectField } from "./Select";
 import { StatCard } from "./StatCard";
-import { DataTable } from "./Table";
+import { DataTable, Table, TableScroll, TBody, Td, Th, THead, Tr } from "./Table";
 import { Tabs } from "./Tabs";
 
 describe("form controls: labels and descriptions are associated (NFR-A11Y-001)", () => {
@@ -92,6 +92,36 @@ describe("Dialog (native <dialog>)", () => {
     expect(dialog).not.toHaveAttribute("open");
     expect(trigger).toHaveFocus();
   });
+
+  it("fits a phone: never wider than the screen less 1rem a side; footer buttons share the row (NFR-A11Y-001)", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <Dialog
+        title="Invite operator"
+        triggerLabel="Invite"
+        closeLabel="Close"
+        footer={
+          <>
+            <Button variant="secondary">Cancel</Button>
+            <Button>Send invite</Button>
+          </>
+        }
+      >
+        <p>Body</p>
+      </Dialog>,
+    );
+    await user.click(screen.getByRole("button", { name: "Invite" }));
+    const dialog = screen.getByRole("dialog", { name: "Invite operator" });
+    expect(dialog).toHaveClass("m-auto", "w-[min(32rem,calc(100vw-2rem))]");
+    const footer = within(dialog).getByRole("button", { name: "Send invite" }).parentElement;
+    expect(footer).toHaveClass("flex-wrap", "max-sm:[&>*]:flex-1");
+    // Tighter padding on phones, the roomier one from sm.
+    expect(within(dialog).getByText("Body").parentElement).toHaveClass("px-4", "sm:px-6");
+    // Escape closes it (native close request) and focus returns to the trigger.
+    await user.keyboard("{Escape}");
+    expect(dialog).not.toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: "Invite" })).toHaveFocus();
+  });
 });
 
 describe("Tabs (WAI-ARIA tabs pattern)", () => {
@@ -161,6 +191,58 @@ describe("DataTable states", () => {
       "col",
     );
     expect(within(table).getByRole("cell", { name: "Sample school" })).toBeInTheDocument();
+  });
+});
+
+describe("TableScroll: wide tables scroll inside a named region (NFR-A11Y-001)", () => {
+  it("is a focusable region named by its label that keeps sr-only text inside the scroll box", () => {
+    renderWithIntl(
+      <TableScroll label="Students. Scroll sideways to see all columns.">
+        <Table stickyFirstColumn>
+          <caption className="sr-only">Students</caption>
+          <THead>
+            <Tr>
+              <Th>Name</Th>
+            </Tr>
+          </THead>
+          <TBody>
+            <Tr>
+              <Td>Synthetica Ravi</Td>
+            </Tr>
+          </TBody>
+        </Table>
+      </TableScroll>,
+    );
+    const region = screen.getByRole("region", {
+      name: "Students. Scroll sideways to see all columns.",
+    });
+    expect(region).toHaveAttribute("tabindex", "0");
+    // `.table-scroll` is position: relative + overflow-x: auto (globals.css): an sr-only
+    // caption stays inside the box instead of widening the page.
+    expect(region).toHaveClass("table-scroll", "print:overflow-visible");
+    expect(region).not.toHaveClass("bg-surface");
+    const table = within(region).getByRole("table", { name: "Students" });
+    expect(table.className).toContain("max-md:[&_tr>:first-child]:sticky");
+  });
+
+  it("framed draws the card; DataTable uses it with the caption in the region's name", () => {
+    renderWithIntl(
+      <DataTable
+        caption="Schools"
+        columns={[{ key: "n", header: "Name", cell: (row: { id: string }) => row.id }]}
+        state={ready([{ id: "Sample school" }])}
+        rowKey={(row) => row.id}
+        emptyTitle="None"
+        captionHidden
+      />,
+    );
+    const region = screen.getByRole("region", {
+      name: "Schools. Scroll sideways to see all columns.",
+    });
+    expect(region).toHaveClass("table-scroll", "bg-surface", "shadow-card");
+    expect(within(region).getByRole("table", { name: "Schools" }).className).not.toContain(
+      "sticky",
+    );
   });
 });
 

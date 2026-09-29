@@ -12,7 +12,7 @@ import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
-import { DataTable, Table, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
+import { DataTable, Table, TableScroll, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { classLabel as classDisplay } from "@/lib/school-class";
 import { Link } from "@/i18n/navigation";
@@ -390,12 +390,7 @@ function StudentRows({
   const t = useTranslations("students.list");
   const tc = useTranslations("common");
   return (
-    <div
-      role="region"
-      aria-label={tc("scrollableTable", { caption: t("resultsTitle") })}
-      tabIndex={0}
-      className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card print:overflow-visible print:border-0 print:shadow-none"
-    >
+    <TableScroll label={tc("scrollableTable", { caption: t("resultsTitle") })} framed>
       <Table>
         <caption className="sr-only">{t("resultsTitle")}</caption>
         <THead>
@@ -451,7 +446,7 @@ function StudentRows({
           })}
         </TBody>
       </Table>
-    </div>
+    </TableScroll>
   );
 }
 

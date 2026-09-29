@@ -11,7 +11,16 @@ import { Button, ButtonLink, type ButtonSize, type ButtonVariant } from "@/compo
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, Table, TBody, THead, Th, Tr, type Column } from "@/components/ui/Table";
+import {
+  DataTable,
+  Table,
+  TableScroll,
+  TBody,
+  THead,
+  Th,
+  Tr,
+  type Column,
+} from "@/components/ui/Table";
 import { Tabs } from "@/components/ui/Tabs";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
@@ -624,12 +633,7 @@ export function StudentDetailView({
         {keys.length === 0 ? (
           <p className="text-sm text-ink-muted">{t("noValues")}</p>
         ) : (
-          <div
-            role="region"
-            aria-label={t("valuesTable")}
-            tabIndex={0}
-            className="overflow-x-auto rounded-xl border border-border print:overflow-visible print:border-0"
-          >
+          <TableScroll label={t("valuesTable")}>
             <Table>
               <caption className="sr-only">{t("valuesTable")}</caption>
               <THead>
@@ -655,7 +659,7 @@ export function StudentDetailView({
                 ))}
               </TBody>
             </Table>
-          </div>
+          </TableScroll>
         )}
       </div>
     </Card>
