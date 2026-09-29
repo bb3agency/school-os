@@ -78,6 +78,7 @@ from app.core.errors import (
 )
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.records import RecordTable
 from app.documents import service as documents
 from app.documents.schemas import DocumentDetail, DocumentOut
 from app.identity import service as identity
@@ -1395,6 +1396,14 @@ def abandon_render(tenant_id: uuid.UUID, notice_id: uuid.UUID, code: str) -> Non
 if on_version_indexed not in knowledge.INDEXED_HOOKS:
     knowledge.INDEXED_HOOKS.append(on_version_indexed)
 
+
+def export_records(session: Session) -> list[RecordTable]:
+    """Worker only: circular readings and suggestions, tasks and parent notices of the current
+    school for its full data export (``app.admin``; the caller checked ``tenant.export_all``
+    and audits the export). No student data lives in these tables."""
+    return repo.export_tables(session)
+
+
 # Offboarding purge (FR-PLT-005, ADR-0029): children before parents.
 _PURGE = purging.PurgeTables(
     deleted=(
@@ -1442,6 +1451,7 @@ __all__ = [
     "create_task",
     "dismiss_suggestion",
     "download_url",
+    "export_records",
     "get_circular",
     "get_notice",
     "get_task",

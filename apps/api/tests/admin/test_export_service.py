@@ -153,6 +153,10 @@ EXPECTED_TABLES = {
     "document_acl",
     "certificates",
     "certificate_counters",
+    "circular_readings",
+    "circular_suggestions",
+    "tasks",
+    "parent_notices",
     "retention_settings",
 }
 
@@ -242,6 +246,41 @@ def test_US_1201_AC1_archive_holds_the_audit_log_a_manifest_and_a_bilingual_read
     assert counts["tables"]["students"] >= 1
     assert counts["documents"] >= 1
     assert counts["audit_events"] >= 1
+
+
+def test_FR_ADM_001_archive_holds_tasks_and_parent_notices(
+    school: Any, admin_engine: Engine
+) -> None:
+    """US-1201 "export all our data": the school's tasks and the parent notices it approved
+    (M4, 0034_circulars) are school records and are in the archive."""
+    owner = school.people["owner"]
+    task_id, notice_id = uuid.uuid4(), uuid.uuid4()
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.tasks (id, tenant_id, title, owner_membership_id, due_on, "
+                "source, created_by, created_by_membership) VALUES (:i, :t, "
+                "'Synthetic export task', :m, '2026-10-15', 'manual', :u, :m)"
+            ),
+            {"i": task_id, "t": school.tenant_id, "m": owner.membership_id, "u": owner.user_id},
+        )
+        c.execute(
+            text(
+                "INSERT INTO ops.parent_notices (id, tenant_id, source, title_en, body_en, "
+                "created_by) VALUES (:i, :t, 'blank', 'Synthetic sports day', "
+                "'Synthetic notice body', :u)"
+            ),
+            {"i": notice_id, "t": school.tenant_id, "u": owner.user_id},
+        )
+    export_id = AD.ready_export(admin_engine, school)
+    zf = AD.archive(school, export_id)
+    tasks = {t["id"]: t for t in AD.records_csv(zf, "tasks")}
+    assert tasks[str(task_id)]["title"] == "Synthetic export task"
+    assert "tenant_id" not in tasks[str(task_id)]
+    notices = {n["id"]: n for n in AD.records_csv(zf, "parent_notices")}
+    assert notices[str(notice_id)]["title_en"] == "Synthetic sports day"
+    for table in ("circular_readings", "circular_suggestions"):
+        assert f"records/{table}.csv" in zf.namelist(), table
 
 
 def test_FR_ADM_001_completion_is_audited_notified_and_the_job_finished(

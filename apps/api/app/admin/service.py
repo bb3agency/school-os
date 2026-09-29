@@ -82,6 +82,7 @@ from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
 from app.certificates import service as certificates
 from app.changes import service as changes
+from app.circulars import service as circulars
 from app.core import purge as purging
 from app.core import retention
 from app.core.config import get_settings
@@ -550,6 +551,7 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *imports.export_records(session),
         *documents.export_records(session),
         *certificates.export_records(session),
+        *circulars.export_records(session),
         repo.retention_record_table(session),
     ]
     names = [t.name for t in tables]

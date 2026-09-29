@@ -16,6 +16,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.circulars.models import CircularReading, CircularSuggestion, ParentNotice, Task
+from app.core.record_tables import dump_table
+from app.core.records import RecordTable
 
 
 def current_tenant_id(session: Session) -> uuid.UUID:
@@ -276,8 +278,34 @@ def list_notices(
     return list(session.execute(stmt).scalars())
 
 
+# --- full data export (FR-ADM-001) ---------------------------------------------------------------
+
+
+def export_tables(session: Session) -> list[RecordTable]:
+    """The module's tables of the current school for its full data export (FR-ADM-001)."""
+    return [
+        dump_table(
+            session,
+            CircularReading.__table__,
+            name="circular_readings",
+            order_by=("created_at", "id"),
+        ),
+        dump_table(
+            session,
+            CircularSuggestion.__table__,
+            name="circular_suggestions",
+            order_by=("reading_id", "position", "id"),
+        ),
+        dump_table(session, Task.__table__, name="tasks", order_by=("created_at", "id")),
+        dump_table(
+            session, ParentNotice.__table__, name="parent_notices", order_by=("created_at", "id")
+        ),
+    ]
+
+
 __all__ = [
     "current_tenant_id",
+    "export_tables",
     "get_notice",
     "get_task",
     "insert_notice",
