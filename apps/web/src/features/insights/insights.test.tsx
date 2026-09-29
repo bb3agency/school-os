@@ -7,7 +7,7 @@ import { notificationHref } from "@/features/notifications/data";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { SECTION, me, structureRoutes } from "@/test/school-fixtures";
-import { AttendanceScreen } from "./AttendanceScreen";
+import { AttendanceScreen, recentMonths } from "./AttendanceScreen";
 import {
   columnLetter,
   looksLikeAadhaar,
@@ -542,6 +542,44 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
     expect(JSON.parse(preview?.body ?? "{}")).toEqual({ document_id: uploads.next });
   });
 
+  it("shows the month register with register codes, printable on A4 landscape", async () => {
+    signedIn(["attendance.read"]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance`] = () => Response.json(day());
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance/month`] = () =>
+      Response.json({
+        section: section(),
+        month: todayIst().slice(0, 7),
+        school_days: ["2026-09-01", "2026-09-02"],
+        students: [
+          {
+            student: day().students[0]?.student,
+            days: { "2026-09-01": "present", "2026-09-02": "absent" },
+            counts: { present: 1, absent: 1 },
+          },
+        ],
+      });
+    const { container } = renderWithIntl(<AttendanceScreen />);
+    const picker = await screen.findByLabelText(en.attendance.section);
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(picker, SECTION);
+    // Read only: no save button and the import is not offered.
+    expect(await screen.findByText(en.attendance.notMarkedYet)).toBeVisible();
+    expect(screen.queryByRole("button", { name: en.attendance.save })).toBeNull();
+    expect(screen.queryByLabelText(en.insights.sheet.file)).toBeNull();
+    await userEvent.click(screen.getByRole("radio", { name: en.attendance.view.month }));
+    const table = await screen.findByRole("table");
+    expect(within(table).getByText("A")).toBeVisible();
+    // The code is read out in words too (header "Absent" + the cell).
+    expect(within(table).getAllByText(en.attendance.status.absent)).toHaveLength(2);
+    expect(container.querySelector('[data-print="landscape"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: en.attendance.print })).toBeVisible();
+    expect(
+      stub
+        .callsTo(`GET /bff/api/v1/sections/${SECTION}/attendance/month`)[0]
+        ?.url.searchParams.get("month"),
+    ).toBe(todayIst().slice(0, 7));
+  });
+
   it("refuses a file that is not a sheet before uploading", async () => {
     signedIn(["attendance.read", "attendance.record"]);
     stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance`] = () => Response.json(day());
@@ -730,6 +768,11 @@ describe("helpers, messages and links", () => {
     expect(
       noteSchema.safeParse({ category: "concern", noted_on: "2026-09-20", text: " " }).success,
     ).toBe(false);
+  });
+
+  it("offers the last twelve months for the register", () => {
+    expect(recentMonths("2026-01-15", 3)).toEqual(["2026-01", "2025-12", "2025-11"]);
+    expect(recentMonths("2026-09-29")).toHaveLength(12);
   });
 
   it("dates attendance in India time", () => {

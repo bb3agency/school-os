@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -228,6 +229,25 @@ function MonthRegister({ section, month }: { section: string; month: string }) {
   );
 }
 
+/** The current month and the 11 before it, as `YYYY-MM` (a select: `<input type="month">` is not Baseline). */
+export function recentMonths(today: string, count = 12): string[] {
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  return Array.from({ length: count }, (_, back) => {
+    const index = year * 12 + (month - 1) - back;
+    return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, "0")}`;
+  });
+}
+
+function monthLabel(value: string, locale: string): string {
+  const date = new Date(`${value}-01T00:00:00Z`);
+  return new Intl.DateTimeFormat(locale, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 /**
  * Attendance (US-1701, US-1702): mark a section's day, see the month register and print it, or
  * import a month from the paper register's sheet. Class teachers see only their sections.
@@ -235,6 +255,7 @@ function MonthRegister({ section, month }: { section: string; month: string }) {
 export function AttendanceScreen() {
   const t = useTranslations("attendance");
   const tn = useTranslations("school.nav");
+  const locale = useLocale();
   const can = useStaffCan();
   const meLoaded = useStaffMe() !== undefined;
   const allowed = can(PERM.attendanceRead);
@@ -248,7 +269,7 @@ export function AttendanceScreen() {
   const day = useAttendanceDay(section, date, allowed && view === "day");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-print={view === "month" ? "landscape" : undefined}>
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -267,38 +288,43 @@ export function AttendanceScreen() {
         </Alert>
       ) : (
         <>
-          <Card>
-            <div className="flex flex-wrap items-end gap-4" data-print="hide">
-              <SectionPicker label={t("section")} value={section} onChange={setSection} />
-              <SegmentedControl
-                legend={t("viewLabel")}
-                legendVisible
-                size="sm"
-                value={view}
-                onValueChange={(value) => setView(value as "day" | "month")}
-                options={[
-                  { value: "day", label: t("view.day") },
-                  { value: "month", label: t("view.month") },
-                ]}
-              />
-              {view === "day" ? (
-                <TextField
-                  type="date"
-                  label={t("date")}
-                  value={date}
-                  max={todayIst()}
-                  onChange={(event) => setDate(event.target.value)}
+          <div data-print="hide">
+            <Card>
+              <div className="flex flex-wrap items-end gap-4">
+                <SectionPicker label={t("section")} value={section} onChange={setSection} />
+                <SegmentedControl
+                  legend={t("viewLabel")}
+                  legendVisible
+                  size="sm"
+                  value={view}
+                  onValueChange={(value) => setView(value as "day" | "month")}
+                  options={[
+                    { value: "day", label: t("view.day") },
+                    { value: "month", label: t("view.month") },
+                  ]}
                 />
-              ) : (
-                <TextField
-                  type="month"
-                  label={t("month")}
-                  value={month}
-                  onChange={(event) => setMonth(event.target.value)}
-                />
-              )}
-            </div>
-          </Card>
+                {view === "day" ? (
+                  <TextField
+                    type="date"
+                    label={t("date")}
+                    value={date}
+                    max={todayIst()}
+                    onChange={(event) => setDate(event.target.value)}
+                  />
+                ) : (
+                  <SelectField
+                    label={t("month")}
+                    value={month}
+                    onChange={(event) => setMonth(event.target.value)}
+                    options={recentMonths(todayIst()).map((value) => ({
+                      value,
+                      label: monthLabel(value, locale),
+                    }))}
+                  />
+                )}
+              </div>
+            </Card>
+          </div>
           {!section ? (
             <EmptyState icon="calendar" title={t("pickTitle")} body={t("pickBody")} />
           ) : view === "day" ? (
@@ -319,57 +345,59 @@ export function AttendanceScreen() {
             </Card>
           )}
           {canRecord && section ? (
-            <SheetImport<AttendanceEntry, AttendanceSheet>
-              section={section}
-              title={t("import.title")}
-              description={t("import.description")}
-              sample={
-                <TableScroll label={t("import.sampleLabel")}>
-                  <Table density="compact">
-                    <THead>
-                      <Tr>
-                        <Th>{t("import.admissionNo")}</Th>
-                        <Th>{t("import.name")}</Th>
-                        <Th>01/09/2026</Th>
-                        <Th>02/09/2026</Th>
-                      </Tr>
-                    </THead>
-                    <TBody>
-                      <Tr>
-                        <Td>SYN-101</Td>
-                        <Td>{t("import.sampleName")}</Td>
-                        <Td>P</Td>
-                        <Td>A</Td>
-                      </Tr>
-                    </TBody>
-                  </Table>
-                </TableScroll>
-              }
-              preview={(documentId) =>
-                unwrap(
-                  api.POST("/api/v1/sections/{section_id}/attendance/sheet", {
-                    params: { path: { section_id: section } },
-                    body: { document_id: documentId },
-                  }),
-                )
-              }
-              commit={(entries) =>
-                unwrap(
-                  api.POST("/api/v1/sections/{section_id}/attendance", {
-                    params: { path: { section_id: section } },
-                    body: { entries, source: "import" },
-                  }),
-                )
-              }
-              summary={(sheet) =>
-                t("import.summary", {
-                  entries: sheet.entries.length,
-                  students: sheet.students,
-                  days: sheet.dates.length,
-                })
-              }
-              onSaved={() => queryClient.invalidateQueries({ queryKey: KEYS.attendance })}
-            />
+            <div data-print="hide">
+              <SheetImport<AttendanceEntry, AttendanceSheet>
+                section={section}
+                title={t("import.title")}
+                description={t("import.description")}
+                sample={
+                  <TableScroll label={t("import.sampleLabel")}>
+                    <Table density="compact">
+                      <THead>
+                        <Tr>
+                          <Th>{t("import.admissionNo")}</Th>
+                          <Th>{t("import.name")}</Th>
+                          <Th>01/09/2026</Th>
+                          <Th>02/09/2026</Th>
+                        </Tr>
+                      </THead>
+                      <TBody>
+                        <Tr>
+                          <Td>SYN-101</Td>
+                          <Td>{t("import.sampleName")}</Td>
+                          <Td>P</Td>
+                          <Td>A</Td>
+                        </Tr>
+                      </TBody>
+                    </Table>
+                  </TableScroll>
+                }
+                preview={(documentId) =>
+                  unwrap(
+                    api.POST("/api/v1/sections/{section_id}/attendance/sheet", {
+                      params: { path: { section_id: section } },
+                      body: { document_id: documentId },
+                    }),
+                  )
+                }
+                commit={(entries) =>
+                  unwrap(
+                    api.POST("/api/v1/sections/{section_id}/attendance", {
+                      params: { path: { section_id: section } },
+                      body: { entries, source: "import" },
+                    }),
+                  )
+                }
+                summary={(sheet) =>
+                  t("import.summary", {
+                    entries: sheet.entries.length,
+                    students: sheet.students,
+                    days: sheet.dates.length,
+                  })
+                }
+                onSaved={() => queryClient.invalidateQueries({ queryKey: KEYS.attendance })}
+              />
+            </div>
           ) : null}
         </>
       )}

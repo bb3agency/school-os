@@ -485,6 +485,16 @@
     display: none !important;
   }
 
+  /* Registers (students × days) print on A4 landscape through a named page. Browsers without
+     named pages print portrait: the table wraps as below and stays inside the page. */
+  @page register-landscape {
+    size: A4 landscape;
+  }
+
+  [data-print="landscape"] {
+    page: register-landscape;
+  }
+
   [data-print="card"] {
     background: #ffffff !important;
     border: 1px solid #000000 !important;
