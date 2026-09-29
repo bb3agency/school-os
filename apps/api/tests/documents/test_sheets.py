@@ -343,7 +343,9 @@ def test_FR_DOC_011_download_with_unsaved_edits(world: Any, api: Any, admin_engi
     assert ws.cell(row=2, column=2).value == TELUGU
     assert ws.cell(row=3, column=4).data_type == "s"
     assert str(ws.cell(row=3, column=4).value).startswith("'=")
-    assert ws.oddHeader.center.text  # FR-EXP-003 watermark
+    page_header = ws.oddHeader
+    assert page_header is not None
+    assert page_header.center.text  # FR-EXP-003 watermark
     events = _events(admin_engine, world, doc, "document.sheet_exported")
     assert [e["summary"]["format"] for e in events] == ["csv", "xlsx"]
     assert events[0]["summary"]["edited_cells"] == 1
