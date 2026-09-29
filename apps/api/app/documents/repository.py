@@ -32,6 +32,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, DomainError, ValidationFailed
+from app.core.record_tables import dump_table
+from app.core.records import RecordTable
 from app.documents.models import Document, DocumentAcl, DocumentVersion, UploadIntent
 
 _CONSTRAINT_FIELDS: dict[str, str] = {
@@ -402,3 +404,43 @@ def replace_acl(
     ]
     if rows:
         session.execute(insert(DocumentAcl), rows)
+
+
+# --- full data export (FR-ADM-001) ------------------------------------------------------------
+
+
+def export_record_tables(session: Session) -> list[RecordTable]:
+    """Every document, version and ACL entry of the current school (metadata only)."""
+    return [
+        dump_table(session, Document.__table__, name="documents", order_by=("created_at", "id")),
+        dump_table(
+            session,
+            DocumentVersion.__table__,
+            name="document_versions",
+            order_by=("document_id", "version_no"),
+        ),
+        dump_table(
+            session,
+            DocumentAcl.__table__,
+            name="document_acl",
+            order_by=("document_id", "principal_type", "principal_ref"),
+        ),
+    ]
+
+
+def ready_versions(session: Session) -> list[tuple[DocumentVersion, str]]:
+    """Every version that passed the malware scan (``ready``) with its document's purpose,
+    ordered by document and version."""
+    stmt = (
+        select(DocumentVersion, Document.purpose)
+        .join(
+            Document,
+            and_(
+                Document.tenant_id == DocumentVersion.tenant_id,
+                Document.id == DocumentVersion.document_id,
+            ),
+        )
+        .where(DocumentVersion.status == "ready")
+        .order_by(DocumentVersion.document_id, DocumentVersion.version_no)
+    )
+    return [(row[0], row[1]) for row in session.execute(stmt).all()]

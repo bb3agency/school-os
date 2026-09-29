@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
@@ -56,6 +56,7 @@ from app.core.errors import (
 )
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.documents import service as documents
 from app.identity import service as identity
@@ -812,6 +813,76 @@ def memo(session: Session, ctx: UserContext, request_id: uuid.UUID) -> str:
     return page
 
 
+EXPORT_COLUMNS: Final = (
+    "id",
+    "student_id",
+    "attribute_key",
+    "target_source",
+    "old_value_id",
+    "old_value",
+    "new_value",
+    "value_state",
+    "reason",
+    "evidence_document_id",
+    "status",
+    "requested_by_membership",
+    "requested_at",
+    "decided_by_membership",
+    "decided_at",
+    "decision_note",
+    "applied_value_id",
+    "expires_at",
+    "updated_at",
+    "version",
+)
+
+
+def export_records(
+    session: Session, *, include_sensitive: bool, withheld: Collection[str]
+) -> list[RecordTable]:
+    """Worker only: every change request of the current school for its full data export
+    (``app.admin``; the caller checked ``tenant.export_all`` and, for ``include_sensitive``,
+    school-wide ``student.read_sensitive``, and audits the export). Restricted (C3) old and new
+    values are ``••••`` (``value_state`` ``masked``) unless ``include_sensitive``; attributes in
+    ``withheld`` never carry a value (``withheld``)."""
+    rows: list[tuple[object, ...]] = []
+    for row in repo.all_requests(session):
+        old: str | None
+        new: str | None
+        if row.attribute_key in withheld:
+            old, new, state = None, None, "withheld"
+        elif _is_sensitive(row) and not include_sensitive:
+            old, new, state = (MASK if row.old_value_id else None), MASK, "masked"
+        else:
+            old, new, state = _plain_old(session, row), _plain_new(session, row), "value"
+        rows.append(
+            (
+                row.id,
+                row.student_id,
+                row.attribute_key,
+                row.target_source,
+                row.old_value_id,
+                old,
+                new,
+                state,
+                row.reason,
+                row.evidence_document_id,
+                row.status,
+                row.requested_by,
+                row.requested_at,
+                row.decided_by,
+                row.decided_at,
+                row.decision_note,
+                row.applied_value_id,
+                row.expires_at,
+                row.updated_at,
+                row.version,
+            )
+        )
+    notes = () if include_sensitive else ("c3_masked",)
+    return [RecordTable(name="change_requests", columns=EXPORT_COLUMNS, rows=rows, notes=notes)]
+
+
 __all__ = [
     "APPROVE",
     "REQUEST",
@@ -826,6 +897,7 @@ __all__ = [
     "approve",
     "cancel",
     "expire_due",
+    "export_records",
     "get_request",
     "list_requests",
     "memo",

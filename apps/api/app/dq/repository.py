@@ -24,6 +24,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from app.core.record_tables import dump_table
+from app.core.records import RecordTable
 from app.dq import models as m
 from app.dq.rules import Severity
 
@@ -306,3 +308,12 @@ def students_with_severity(session: Session, flt: FindingFilter, severity: str) 
         and_(*_where(flt)), F.c.severity == severity
     )
     return int(session.execute(stmt).scalar_one())
+
+
+def export_record_tables(session: Session) -> list[RecordTable]:
+    """Every run and finding of the current school (FR-ADM-001). Findings hold masked values
+    only (FR-DQ-006), so they are exported as stored."""
+    return [
+        dump_table(session, R, name="dq_runs", order_by=("created_at", "id")),
+        dump_table(session, F, name="dq_findings", order_by=("created_at", "id")),
+    ]

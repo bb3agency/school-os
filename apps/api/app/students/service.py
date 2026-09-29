@@ -65,6 +65,7 @@ from app.core.errors import (
 )
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.records import RecordTable
 from app.core.textnorm import comparison_key
 from app.identity import service as identity
 from app.ops import service as ops
@@ -2580,3 +2581,164 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
     )
     log.info("promotion.undone", resource_type="promotion", resource_id=run.id)
     return _run_out(run, repo.now(session), _run_names(session, [run]))
+
+
+# --- full data export (app.admin; FR-ADM-001, US-1201) -----------------------------------------
+
+VALUE_STATE_VALUE: Final = "value"
+VALUE_STATE_MASKED: Final = "masked"
+VALUE_STATE_WITHHELD: Final = "withheld"
+VALUE_COLUMNS: Final = (
+    "id",
+    "student_id",
+    "attribute_key",
+    "classification",
+    "source",
+    "value",
+    "value_state",
+    "current",
+    "superseded_by",
+    "verification_status",
+    "verified_by",
+    "verified_at",
+    "confidence",
+    "evidence_document_id",
+    "import_batch_id",
+    "change_request_id",
+    "recorded_by",
+    "recorded_at",
+)
+GUARDIAN_COLUMNS: Final = (
+    "id",
+    "full_name",
+    "phone",
+    "phone_state",
+    "address",
+    "address_state",
+    "created_at",
+    "updated_at",
+    "version",
+)
+
+
+def _export_value(
+    session: Session,
+    row: AttributeValue,
+    definition: AttributeDef | None,
+    *,
+    include_sensitive: bool,
+    withheld: Collection[str],
+) -> tuple[str | None, str]:
+    """(value, state) of one recorded value for the full export."""
+    if row.attribute_key in withheld:
+        return None, VALUE_STATE_WITHHELD
+    sensitive = definition is None or definition.sensitive or row.value_ciphertext is not None
+    if sensitive and not include_sensitive:
+        return MASK, VALUE_STATE_MASKED
+    value = _plain(session, row)
+    if value is not None and definition is not None and definition.data_type == "digits4":
+        value = aadhaar_display(value)  # PRV-014: the only way an Aadhaar reference is shown
+    return value, VALUE_STATE_VALUE
+
+
+def _export_guardian_field(
+    session: Session, guardian: Guardian, column: str, *, include_sensitive: bool
+) -> tuple[str | None, str | None]:
+    blob: bytes | None = getattr(guardian, column)
+    if blob is None:
+        return None, None
+    if not include_sensitive:
+        return MASK, VALUE_STATE_MASKED
+    value = crypto.decrypt_value(
+        session, blob, table=GUARDIANS_TABLE, column=column, row_id=guardian.id
+    )
+    return value, VALUE_STATE_VALUE
+
+
+def export_records(
+    session: Session, *, include_sensitive: bool, withheld: Collection[str]
+) -> list[RecordTable]:
+    """Worker only: every student record table of the current school for its full data export
+    (``app.admin``; the caller checked ``tenant.export_all`` and, for ``include_sensitive``,
+    school-wide ``student.read_sensitive``, and audits the export).
+
+    Tables: ``students``, ``student_values`` (every recorded value from every source, history
+    included, with ``value_state``), ``enrollments``, ``guardians``, ``student_guardians``,
+    ``promotion_runs``, ``promotion_items``. Restricted (C3) values, guardian phone numbers and
+    addresses are ``••••`` (state ``masked``) unless ``include_sensitive``; attributes in
+    ``withheld`` (the Aadhaar-as-printed fields) never carry a value (state ``withheld``);
+    ``aadhaar_last4`` is shown only as ``XXXX XXXX 1234`` (PRV-014). Full Aadhaar numbers are
+    never stored, so none can be exported (the archive writer masks any Aadhaar-like number
+    anyway). Nothing is logged or audited here."""
+    defs = _definitions(session)
+    students, enrollments, links, runs, items = repo.export_plain_tables(session)
+    values: list[tuple[object, ...]] = []
+    for row in repo.all_values(session):
+        definition = defs.get(row.attribute_key)
+        value, state = _export_value(
+            session, row, definition, include_sensitive=include_sensitive, withheld=withheld
+        )
+        values.append(
+            (
+                row.id,
+                row.student_id,
+                row.attribute_key,
+                definition.classification if definition is not None else "C3",
+                row.source,
+                value,
+                state,
+                row.superseded_by is None,
+                row.superseded_by,
+                row.verification_status,
+                row.verified_by,
+                row.verified_at,
+                row.confidence,
+                row.evidence_document_id,
+                row.import_batch_id,
+                row.change_request_id,
+                row.recorded_by,
+                row.recorded_at,
+            )
+        )
+    guardians: list[tuple[object, ...]] = []
+    for g in repo.all_guardians(session):
+        phone, phone_state = _export_guardian_field(
+            session, g, "phone_ciphertext", include_sensitive=include_sensitive
+        )
+        address, address_state = _export_guardian_field(
+            session, g, "address_ciphertext", include_sensitive=include_sensitive
+        )
+        guardians.append(
+            (
+                g.id,
+                g.full_name,
+                phone,
+                phone_state,
+                address,
+                address_state,
+                g.created_at,
+                g.updated_at,
+                g.version,
+            )
+        )
+    masked = () if include_sensitive else ("c3_masked",)
+    withheld_note = ("aadhaar_as_printed_withheld",) if withheld else ()
+    return [
+        students,
+        RecordTable(
+            name="student_values", columns=VALUE_COLUMNS, rows=values, notes=masked + withheld_note
+        ),
+        enrollments,
+        RecordTable(name="guardians", columns=GUARDIAN_COLUMNS, rows=guardians, notes=masked),
+        links,
+        runs,
+        items,
+    ]
+
+
+def sensitive_export_fields(session: Session, *, withheld: Collection[str]) -> list[str]:
+    """The restricted (C3) fields a full export with ``include_sensitive`` shows in clear: the
+    school's C3 attribute keys (minus ``withheld``) and the guardian phone and address. Names
+    only, for the audit event (docs/07 §8, ADR-0021)."""
+    keys = [k for k, d in _definitions(session).items() if d.sensitive and k not in withheld]
+    return [*keys, *GUARDIAN_FIELDS]
