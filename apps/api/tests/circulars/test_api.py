@@ -85,6 +85,53 @@ def test_FR_CIR_006_reading_follows_document_visibility(
     assert res.status_code == 404
 
 
+def _told(admin: Engine, membership_id: uuid.UUID, template: str, document_id: uuid.UUID) -> int:
+    with admin.connect() as c:
+        return int(
+            c.execute(
+                text(
+                    "SELECT count(*) FROM ops.notifications WHERE recipient_membership_id = :m "
+                    "AND template_key = :k AND resource_id = :d"
+                ),
+                {"m": membership_id, "k": template, "d": document_id},
+            ).scalar_one()
+        )
+
+
+def test_FR_CIR_006_reading_notifications_go_only_to_reviewers_who_can_see_the_circular(
+    ai_on: Any, admin_engine: Engine
+) -> None:
+    """``circular.read_ready`` and ``circular.needs_review`` name the circular: only
+    ``circular.review`` holders whose document visibility reaches it are told (a restrictive
+    ACL keeps it from the others, like the inbox does)."""
+    school = ai_on.a
+    principal = school.people["principal"]  # in the ACL
+    office_admin = school.people["office_admin"]  # document.manage_acl: sees every document
+    office_staff = school.people["office_staff"]  # circular.review, outside the ACL
+    teacher = school.people["teacher"]  # in the ACL, but no circular.review
+    acl = [("role", "principal"), ("role", "teacher")]
+    hidden = C.read_circular(admin_engine, school, acl=acl)
+    ready = "circular.read_ready"
+    assert _told(admin_engine, principal.membership_id, ready, hidden) == 1
+    assert _told(admin_engine, office_admin.membership_id, ready, hidden) == 1
+    assert _told(admin_engine, office_staff.membership_id, ready, hidden) == 0
+    assert _told(admin_engine, teacher.membership_id, ready, hidden) == 0
+    # A circular every role may see still reaches every reviewer.
+    open_to_all = C.read_circular(admin_engine, school)
+    assert _told(admin_engine, office_staff.membership_id, ready, open_to_all) == 1
+
+    C.KB.enable_ai(admin_engine, school.tenant_id, enabled=False)
+    try:
+        failed = C.circular(admin_engine, school, acl=acl)
+        assert C.read_now(admin_engine, school, failed) == "ai_disabled"
+    finally:
+        C.KB.enable_ai(admin_engine, school.tenant_id)
+    review = "circular.needs_review"
+    assert _told(admin_engine, principal.membership_id, review, failed) == 1
+    assert _told(admin_engine, office_staff.membership_id, review, failed) == 0
+    assert _told(admin_engine, teacher.membership_id, review, failed) == 0
+
+
 def test_FR_CIR_004_confirm_creates_one_task_with_the_citation(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:

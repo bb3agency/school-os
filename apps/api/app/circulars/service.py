@@ -41,6 +41,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import Scopes, UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
+from app.authz.resolver import build_snapshot
 from app.circulars import repository as repo
 from app.circulars.config import rules
 from app.circulars.models import CircularReading, CircularSuggestion, ParentNotice, Task
@@ -84,6 +85,7 @@ from app.core.redaction import contains_full_aadhaar
 from app.documents import service as documents
 from app.documents.schemas import DocumentDetail, DocumentOut
 from app.identity import service as identity
+from app.identity.schemas import MembershipAccess, RoleAccess, RoleOut, UserOut
 from app.knowledge import service as knowledge
 from app.notifications import service as notifications
 from app.ops import service as ops
@@ -110,6 +112,7 @@ IST: Final = ZoneInfo("Asia/Kolkata")
 SYSTEM_ID: Final = uuid.UUID(int=0)
 NOTICE_MIME: Final[dict[str, str]] = {"pdf": "application/pdf", "png": "image/png"}
 DOWNLOAD_TTL_S: Final = 300
+_USER_PAGE: Final = 200
 
 ops.register_outbox_route(READ_EVENT, READ_TASK)
 ops.register_outbox_route(RENDER_EVENT, RENDER_TASK)
@@ -226,6 +229,65 @@ def _user_members(
         user: MemberOut(membership_id=membership, display_name=name)
         for user, (membership, name) in found.items()
     }
+
+
+def _member_context(
+    tenant_id: uuid.UUID, user: UserOut, roles: Mapping[str, RoleOut]
+) -> UserContext:
+    """A member's current permissions and scopes, read in the caller's transaction (what their
+    next request would get), for checks made on their behalf: who may be told about a circular,
+    and what a notice drafted in the worker may read."""
+    access = MembershipAccess(
+        roles=tuple(
+            RoleAccess(
+                key=key,
+                is_system=roles[key].is_system,
+                permissions=frozenset(roles[key].permissions),
+            )
+            for key in user.roles
+            if key in roles
+        ),
+        scopes=tuple((s.type, s.ref) for s in user.scopes),
+        mfa_required=False,
+    )
+    snap = build_snapshot(access)
+    return UserContext(
+        user_id=user.id,
+        tenant_id=tenant_id,
+        membership_id=user.membership_id,
+        roles=snap.roles,
+        permissions=snap.permissions,
+        scopes=snap.scopes,
+        mfa=False,
+        auth_time=None,
+        scoped_permissions=snap.scoped_permissions,
+    )
+
+
+def _active(user: UserOut, now: dt.datetime) -> bool:
+    return user.status == "active" and (user.expires_at is None or user.expires_at > now)
+
+
+def _reviewers_who_see(
+    session: Session, tenant_id: uuid.UUID, document_id: uuid.UUID
+) -> list[uuid.UUID]:
+    """Active ``circular.review`` holders whose document visibility reaches the circular (its
+    ACL, their role, sections and classes; FR-CIR-006): a notification names the circular, so
+    nobody outside a restrictive ACL is told about it."""
+    roles = {r.key: r for r in identity.list_roles(session)}
+    now = _now()
+    out: list[uuid.UUID] = []
+    after: uuid.UUID | None = None
+    while True:
+        users, after = identity.list_users(session, limit=_USER_PAGE, after=after)
+        for user in users:
+            if not _active(user, now):
+                continue
+            member = _member_context(tenant_id, user, roles)
+            if member.has(REVIEW) and documents.is_visible(session, member, document_id):
+                out.append(user.membership_id)
+        if after is None:
+            return out
 
 
 # --- circulars: the reading -----------------------------------------------------------------------
@@ -394,7 +456,7 @@ def _store_reading(
     notifications.notify(
         session,
         tenant_id=tenant_id,
-        recipients=notifications.PermissionSelector(REVIEW),
+        recipients=_reviewers_who_see(session, tenant_id, row.document_id),
         template_key="circular.read_ready",
         params={"document_id": str(row.document_id), "suggestions": len(result.deadlines)},
         resource_id=row.document_id,
@@ -418,7 +480,7 @@ def _needs_review(session: Session, tenant_id: uuid.UUID, row: CircularReading, 
     notifications.notify(
         session,
         tenant_id=tenant_id,
-        recipients=notifications.PermissionSelector(REVIEW),
+        recipients=_reviewers_who_see(session, tenant_id, row.document_id),
         template_key="circular.needs_review",
         params={"document_id": str(row.document_id), "code": code},
         resource_id=row.document_id,
