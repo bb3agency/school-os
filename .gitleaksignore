@@ -1,3 +1,17 @@
 # Reviewed false positives only (fingerprint = commit:file:rule:line). Keep a reason per entry.
 # Synthetic UUID used as a service-token jti in a unit test; not a secret.
 9f3c4e08d7ec4924ec79f052e3cd3d964e462262:apps/api/tests/identity/test_service_token.py:generic-api-key:78
+# Synthetic 40-character layout-test token (SYNREF...) in the responsive audit fixtures; not a secret.
+4f48842b4e03ed0de457a962b2ad61e19e6523e1:apps/web/e2e/audit/fixtures.ts:generic-api-key:24
+# BFF proxy test asserts the upstream URL http://api.internal:8000/...; host:port, not a secret.
+2412d2d61ef617ca98157382063efada32088ca8:apps/web/src/server/bff/proxy.test.ts:generic-api-key:365
+# Synthetic knowledge corpus document keys (key="minutes-smc-2026-08", "fee-policy-2026-27-*"); not secrets.
+04cd2129909d8a8541ea5924497e526a10783554:apps/api/app/devtools/corpus.py:generic-api-key:144
+04cd2129909d8a8541ea5924497e526a10783554:apps/api/app/devtools/corpus.py:generic-api-key:165
+04cd2129909d8a8541ea5924497e526a10783554:apps/api/app/devtools/corpus.py:generic-api-key:185
+# Python argument list "canonical_keys, include_sensitive=True" in the DQ engine; not a secret.
+1f3d85cc30fdd3d19974d82a1bb612ea1f573983:apps/api/app/dq/engine.py:generic-api-key:202
+# Synthetic heartbeat key "hb-secret-synthetic-0001" in a provisioning screen unit test; never a real key.
+0358ad6b213bb42710cf4e80c54d67940b87a299:apps/web/src/features/platform/provision.test.tsx:generic-api-key:249
+# Same synthetic UUID jti as the entry above, after ruff format moved it to line 80.
+6605e5151e1ac7a630c417695d056b632b1b89dc:apps/api/tests/identity/test_service_token.py:generic-api-key:80
