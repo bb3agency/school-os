@@ -66,6 +66,7 @@ export function InviteUserScreen() {
   const tu = useTranslations("school.users");
   const tl = useTranslations("language");
   const tc = useTranslations("common");
+  const tn = useTranslations("school.nav");
   const locale = useLocale();
   const router = useRouter();
   const api = useBffClient("staff");
@@ -97,11 +98,16 @@ export function InviteUserScreen() {
     onSuccess: (created) => router.push(`/settings/users/${created.id}`),
   });
 
+  const breadcrumb = [
+    { label: tn("home"), href: "/" },
+    { label: tu("title"), href: "/settings/users" },
+    { label: t("title") },
+  ];
   if (meQuery.isPending) return <LoadingState label={tc("loading")} />;
   if (!allowed) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("title")} />
+        <PageHeader title={t("title")} breadcrumb={breadcrumb} />
         <Alert tone="warning" title={tu("noAccessTitle")}>
           {tu("noAccessBody")}
         </Alert>
@@ -116,8 +122,8 @@ export function InviteUserScreen() {
   const initialLanguage = locale === "te" ? "te" : "en";
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+    <div className="mx-auto max-w-4xl space-y-6">
+      <PageHeader title={t("title")} description={t("description")} breadcrumb={breadcrumb} />
       <Alert tone="info" title={t("stepUpTitle")}>
         {t("stepUpBody")}
       </Alert>
@@ -153,17 +159,20 @@ export function InviteUserScreen() {
               className="space-y-1"
               aria-describedby={errors.preferred_language ? languageErrorId : undefined}
             >
-              <legend className="text-sm font-semibold text-ink">{t("language")}</legend>
+              <legend className="text-sm font-medium text-ink">{t("language")}</legend>
               <p className="text-sm text-ink-muted">{t("languageHint")}</p>
-              <div className="flex flex-wrap gap-x-6">
+              <div className="flex flex-wrap gap-2">
                 {USER_LANGUAGES.map((value) => (
-                  <label key={value} className="inline-flex min-h-8 items-center gap-2 text-sm">
+                  <label
+                    key={value}
+                    className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm has-checked:border-primary has-checked:bg-primary-soft"
+                  >
                     <input
                       type="radio"
                       name="preferred_language"
                       value={value}
                       defaultChecked={value === initialLanguage}
-                      className="size-4"
+                      className="size-4 accent-primary"
                     />
                     {tl(value)}
                   </label>
@@ -197,12 +206,16 @@ export function InviteUserScreen() {
         </Card>
 
         <ApiErrorAlert error={form.error} namespace="school.users" />
-        <div className="flex flex-wrap justify-end gap-3">
-          <Link href="/settings/users" className="self-center text-primary underline">
+        <div className="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-border bg-surface px-5 py-4 shadow-card">
+          <Link
+            href="/settings/users"
+            className="text-sm text-primary underline underline-offset-4"
+          >
             {tc("cancel")}
           </Link>
           <Button
             type="submit"
+            size="lg"
             disabled={form.pending || !roles.data}
             aria-disabled={form.pending || !roles.data || undefined}
           >

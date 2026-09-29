@@ -1,11 +1,12 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -15,10 +16,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
-import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { STAFF_ME_KEY, useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
-import { formatDateTime, formatList } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { formList, useApiForm } from "@/lib/forms";
 import { optionalEmail, text } from "@/lib/validation";
@@ -27,6 +27,7 @@ import {
   refineScopes,
   RoleCheckboxes,
   rolesField,
+  RoleTags,
   ScopeEditor,
   scopeExtra,
   scopeFields,
@@ -54,9 +55,9 @@ const scopesSchema = z.object(scopeFields).superRefine(refineScopes);
 
 function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="space-y-0.5">
+    <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-semibold text-ink">{children}</dd>
+      <dd className="font-medium break-words text-ink">{children}</dd>
     </div>
   );
 }
@@ -331,7 +332,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
   const td = useTranslations("school.users.detail");
   const tl = useTranslations("language");
   const tc = useTranslations("common");
-  const locale = useLocale() as Locale;
+  const tn = useTranslations("school.nav");
   const me = useStaffMe();
   const can = useStaffCan();
   const state = useUser(userId);
@@ -340,7 +341,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
   const scopeSummary = useScopeSummary();
 
   const back = (
-    <Link href="/settings/users" className="text-primary underline">
+    <Link href="/settings/users" className="text-sm text-primary underline underline-offset-4">
       {td("back")}
     </Link>
   );
@@ -351,7 +352,10 @@ export function UserDetailScreen({ userId }: { userId: string }) {
     const forbidden = state.status === "error" && state.reason === "forbidden";
     return (
       <div className="space-y-6">
-        <PageHeader title={t("title")} />
+        <PageHeader
+          title={t("title")}
+          breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+        />
         <Alert
           tone={missing || forbidden ? "warning" : "danger"}
           title={td(missing ? "notFoundTitle" : forbidden ? "noAccessTitle" : "loadErrorTitle")}
@@ -376,8 +380,14 @@ export function UserDetailScreen({ userId }: { userId: string }) {
     <div className="space-y-6">
       <PageHeader
         title={user.display_name}
+        breadcrumb={[
+          { label: tn("home"), href: "/" },
+          { label: t("title"), href: "/settings/users" },
+          { label: user.display_name },
+        ]}
         badge={
-          <span className="inline-flex flex-wrap gap-2">
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <Avatar name={user.display_name} size="sm" decorative />
             <UserStatusBadge status={user.status} />
             {isSelf ? <Badge tone="info">{td("you")}</Badge> : null}
           </span>
@@ -423,7 +433,9 @@ export function UserDetailScreen({ userId }: { userId: string }) {
       >
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Item label={t("colEmail")}>
-            <Value>{user.email}</Value>
+            <span className="font-mono text-sm break-all">
+              <Value>{user.email}</Value>
+            </span>
           </Item>
           <Item label={td("language")}>{tl(user.preferred_language)}</Item>
           <Item label={t("colStatus")}>
@@ -454,9 +466,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
         {canAssign ? (
           <RolesForm user={user} isSelf={isSelf} />
         ) : (
-          <p className="font-semibold">
-            {user.roles.length > 0 ? formatList(user.roles.map(roleLabel), locale) : t("noRoles")}
-          </p>
+          <RoleTags roles={user.roles} label={roleLabel} />
         )}
         {!canAssign && !breakGlass && !removed ? (
           <p className="mt-2 text-sm text-ink-muted">{td("assignNeeded")}</p>

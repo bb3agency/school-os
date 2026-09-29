@@ -1,8 +1,9 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -10,12 +11,11 @@ import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { Pager, useCursorStack } from "@/features/students/paging";
 import { Link } from "@/i18n/navigation";
-import type { Locale } from "@/i18n/routing";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
-import { formatDateTime, formatList } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import { useRoles, useUserList } from "./data";
-import { useRoleLabel, UserStatusBadge, useScopeSummary } from "./parts";
+import { RoleTags, useRoleLabel, UserStatusBadge, useScopeSummary } from "./parts";
 import { USER_PERM, type StaffRole, type StaffUser } from "./types";
 
 /**
@@ -26,7 +26,7 @@ import { USER_PERM, type StaffRole, type StaffUser } from "./types";
  */
 export function UsersScreen() {
   const t = useTranslations("school.users");
-  const locale = useLocale() as Locale;
+  const tn = useTranslations("school.nav");
   const me = useStaffMeQuery();
   const can = useStaffCan();
   const pages = useCursorStack();
@@ -56,24 +56,35 @@ export function UsersScreen() {
     {
       key: "name",
       header: t("colName"),
+      className: "min-w-64",
       cell: (row) => (
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <Link href={`/settings/users/${row.id}`} className="font-semibold text-primary underline">
-            {row.display_name}
-          </Link>
-          {/* Hints before any request: own account (no status change, 409 own_account) and
-              a profile shared with another school (no profile edit, 409 profile_shared). */}
-          {me.data?.user_id === row.id ? <Badge tone="info">{t("youBadge")}</Badge> : null}
-          {row.profile_shared ? <Badge tone="neutral">{t("sharedBadge")}</Badge> : null}
+        <span className="flex items-center gap-3">
+          <Avatar name={row.display_name} decorative />
+          <span className="min-w-0">
+            <span className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/settings/users/${row.id}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {row.display_name}
+              </Link>
+              {/* Hints before any request: own account (no status change, 409 own_account) and
+                  a profile shared with another school (no profile edit, 409 profile_shared). */}
+              {me.data?.user_id === row.id ? <Badge tone="info">{t("youBadge")}</Badge> : null}
+              {row.profile_shared ? <Badge tone="neutral">{t("sharedBadge")}</Badge> : null}
+            </span>
+            <span className="block font-mono text-xs break-all text-ink-muted">
+              <span className="sr-only">{t("colEmail")}: </span>
+              <Value>{row.email}</Value>
+            </span>
+          </span>
         </span>
       ),
     },
-    { key: "email", header: t("colEmail"), cell: (row) => <Value>{row.email}</Value> },
     {
       key: "roles",
       header: t("colRoles"),
-      cell: (row) =>
-        row.roles.length > 0 ? formatList(row.roles.map(roleLabel), locale) : t("noRoles"),
+      cell: (row) => <RoleTags roles={row.roles} label={roleLabel} />,
     },
     { key: "scope", header: t("colScope"), cell: (row) => scopeSummary(row.scopes) },
     {
@@ -89,11 +100,20 @@ export function UsersScreen() {
   ];
 
   const roleColumns: Column<StaffRole>[] = [
-    { key: "name", header: t("colRole"), cell: (role) => roleLabel(role.key) },
+    {
+      key: "name",
+      header: t("colRole"),
+      cell: (role) => <span className="font-medium">{roleLabel(role.key)}</span>,
+    },
     {
       key: "kind",
       header: t("colRoleKind"),
-      cell: (role) => (role.is_system ? t("roleBuiltIn") : t("roleSchool")),
+      cell: (role) =>
+        role.is_system ? (
+          <Pill variant="tag">{t("roleBuiltIn")}</Pill>
+        ) : (
+          <Badge tone="violet">{t("roleSchool")}</Badge>
+        ),
     },
     {
       key: "key",
@@ -112,6 +132,7 @@ export function UsersScreen() {
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
         actions={
           can(USER_PERM.manage) ? (
             <ButtonLink href="/settings/users/new">{t("invite")}</ButtonLink>
