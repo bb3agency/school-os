@@ -25,9 +25,13 @@ SEED_ARGS ?=
 # test-order: ORDER_SEED (random by default; the run prints it) and ORDER_BUCKET (module, global).
 ORDER_SEED   ?=
 ORDER_BUCKET ?= module
+# e2e: extra Playwright flags (CI shards with E2E_ARGS="--shard=1/2").
+E2E_ARGS ?=
+# e2e-audit: report and screenshot directory, relative to apps/web.
+AUDIT_OUT ?= audit-out
 
 .PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic sync-system-roles test test-api test-web test-security \
-        migration-check e2e lint format typecheck security eval check db-shell openapi tf-validate
+        migration-check e2e e2e-audit lint format typecheck security eval check db-shell openapi tf-validate
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-16s %s\n",$$1,$$2}'
@@ -101,9 +105,16 @@ else
 	@echo "web workspace not present; skipping"
 endif
 
-e2e: ## Playwright end-to-end tests (needs `next build` or E2E_BASE_URL pointing at a running stack)
+e2e: ## Playwright end-to-end tests (needs `next build` or E2E_BASE_URL; E2E_STAND_IN=1 signs in)
 ifneq ($(HAS_WEB),)
-	npm run e2e
+	npm run e2e -w @schoolos/web -- $(E2E_ARGS)
+else
+	@echo "web workspace not present"
+endif
+
+e2e-audit: ## Responsive sweep: ten viewports, en+te, screenshots + JSON in apps/web/$(AUDIT_OUT) (nightly)
+ifneq ($(HAS_WEB),)
+	AUDIT_OUT=$(AUDIT_OUT) npm exec -w @schoolos/web -- playwright test -c e2e/audit/audit.config.ts
 else
 	@echo "web workspace not present"
 endif
