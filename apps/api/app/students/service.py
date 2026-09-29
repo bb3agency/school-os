@@ -1499,12 +1499,23 @@ def list_students_in_scope(
     *,
     section_ids: Collection[uuid.UUID] | None = None,
     class_ids: Collection[uuid.UUID] | None = None,
+    permissions: Collection[str] = (),
 ) -> list[uuid.UUID]:
     """Student ids the caller may read (``student.read_basic``), optionally limited to
     current-year sections/classes. For dq and exports: pass the result to
-    :func:`canonical_values` / :func:`source_values`."""
+    :func:`canonical_values` / :func:`source_values`.
+
+    ``permissions``: further permissions whose scope must ALSO reach the student (e.g.
+    ``insights.read`` and ``student.read_sensitive`` for restricted insights, M5); the result is
+    the intersection of every grant's current-year sections."""
     structure = _structure(session)
     allowed = _allowed_sections(ctx, READ, structure)
+    for permission in dict.fromkeys(permissions):
+        if permission == READ:
+            continue
+        extra = _allowed_sections(ctx, permission, structure)
+        if extra is not None:
+            allowed = _intersect(allowed, extra)
     wanted: frozenset[uuid.UUID] | None = None
     if section_ids is not None:
         wanted = frozenset(section_ids)
@@ -1634,6 +1645,42 @@ def active_enrolments(
             )
         )
     return out
+
+
+def ensure_in_scope(
+    session: Session, ctx: UserContext, student_id: uuid.UUID, *permissions: str
+) -> None:
+    """404 unless the caller reaches ``student_id`` with ``student.read_basic`` AND every one of
+    ``permissions`` (object-level check for other modules' student-scoped reads and writes,
+    e.g. attendance, notes and flags of M5; SEC-015)."""
+    structure = _structure(session)
+    _visible_student(session, ctx, student_id, structure=structure)
+    for permission in dict.fromkeys(permissions):
+        if not _in_scope(session, ctx, student_id, permission, structure):
+            raise NotFound("Student not found")
+
+
+def current_placements(
+    session: Session, student_ids: Collection[uuid.UUID] | None = None
+) -> dict[uuid.UUID, uuid.UUID]:
+    """Student -> section of their active enrolment in the current academic year (system reads,
+    e.g. the early-warning rules of M5). ``student_ids`` None = every such student of the
+    school; students without one (left, not enrolled) are absent from the result."""
+    structure = _structure(session)
+    if structure.year_id is None:
+        return {}
+    ids = (
+        list(student_ids)
+        if student_ids is not None
+        else repo.student_ids_in_sections(
+            session, academic_year_id=structure.year_id, section_ids=None
+        )
+    )
+    return {
+        row.student_id: row.section_id
+        for row in repo.active_enrollments_of(session, ids)
+        if row.academic_year_id == structure.year_id
+    }
 
 
 @dataclass(frozen=True, slots=True)

@@ -1150,9 +1150,11 @@ def delete_document(session: Session, ctx: UserContext, document_id: uuid.UUID) 
     _delete(session, doc, reason=None)
 
 
-RETENTION_REASONS: Final = frozenset({"import_raw_file"})
+RETENTION_REASONS: Final = frozenset({"import_raw_file", "records_sheet_read"})
 """Retention categories with a deletion job (docs/05 §13): import raw files, 90 days after
-commit (FR-IMP-007). Other categories get a code when their trigger is specified."""
+commit (FR-IMP-007); attendance and marks sheets, as soon as ``app.academics`` has read them
+(FR-ATT-004, FR-MRK-004: the entries go back to the person, who commits them). Other categories
+get a code when their trigger is specified."""
 
 
 def delete_for_retention(session: Session, document_id: uuid.UUID, *, reason: str) -> bool:
