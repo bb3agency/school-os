@@ -103,6 +103,26 @@ export function SchoolShell({
       items: [{ href: "/ask", label: t("ask.nav"), permission: "kb.ask", icon: "sparkles" }],
     },
     {
+      // M4 (US-1601..US-1606): circulars read with AI, the tasks they become, parent notices.
+      id: "work",
+      icon: "calendar",
+      items: [
+        { href: "/tasks", label: t("tasks.nav"), permission: "task.read", icon: "calendar" },
+        {
+          href: "/circulars",
+          label: t("circulars.nav"),
+          permission: "document.read",
+          icon: "inbox",
+        },
+        {
+          href: "/notices",
+          label: t("notices.nav"),
+          permission: "notice.draft",
+          icon: "megaphone",
+        },
+      ],
+    },
+    {
       id: "admin",
       icon: "settings",
       items: [

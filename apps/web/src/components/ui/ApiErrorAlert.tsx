@@ -23,7 +23,10 @@ export type ErrorNamespace =
   | "documents"
   | "ask"
   | "ask.verified"
-  | "school.audit";
+  | "school.audit"
+  | "circulars"
+  | "tasks"
+  | "notices";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 
