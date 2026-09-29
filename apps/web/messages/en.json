@@ -4068,7 +4068,12 @@
           "title": "Answer or source not found",
           "body": "You can't read a document this answer cites, or the answer is gone. Ask the office to check who can see the documents."
         }
-      }
+      },
+      "filterLabel": "Find on this page",
+      "filterPlaceholder": "Words from the question or answer",
+      "filterCount": "{count} of {total} answers on this page match.",
+      "filterEmptyTitle": "No answers on this page match",
+      "filterEmptyBody": "Try other words, clear the box, or go to the next page."
     },
     "search": {
       "title": "Search documents",

@@ -783,6 +783,24 @@ describe("verified answers (US-802, FR-KB-030)", () => {
     expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(3);
   });
 
+  it("finds answers on the loaded page by their words, without a request", async () => {
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([
+        verified(),
+        verified({ id: "0192f3a4-0000-7000-8000-00000000e102", question: "Uniform days?" }),
+      ]);
+    renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByRole("heading", { name: "Uniform days?" })).toBeVisible();
+    const before = stub.callsTo("GET /bff/api/v1/knowledge/verified-answers").length;
+    await userEvent.setup().type(screen.getByLabelText("Find on this page"), "uniform");
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "When do exams begin?" })).toBeNull(),
+    );
+    expect(screen.getByRole("heading", { name: "Uniform days?" })).toBeVisible();
+    expect(screen.getByText("1 of 2 answers on this page match.")).toBeVisible();
+    expect(stub.callsTo("GET /bff/api/v1/knowledge/verified-answers")).toHaveLength(before);
+  });
+
   it("filters by status", async () => {
     stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([]);
     renderWithIntl(<VerifiedAnswersPage />);
