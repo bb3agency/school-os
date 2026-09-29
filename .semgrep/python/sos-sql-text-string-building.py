@@ -35,8 +35,23 @@ def queries(session, conn, cur) -> None:
     # ruleid: sos-sql-text-string-building
     stmt = text(q2)
 
+    # ruleid: sos-sql-text-string-building
+    session.execute(text(f"SELECT * FROM {table} " "WHERE id = :id"), {"id": student_id})
+
+    # ruleid: sos-sql-text-string-building
+    session.execute(text("SELECT * FROM " f"{table}"))
+
+    # ruleid: sos-sql-text-string-building
+    stmt = text(
+        "SELECT id FROM sis.students "  # an f-string part after a constant one
+        f"WHERE id = '{student_id}'"
+    )
+
     # ok: sos-sql-text-string-building
     session.execute(text("SELECT * FROM sis.students WHERE id = :id"), {"id": student_id})
+
+    # ok: sos-sql-text-string-building
+    session.execute(text("SELECT id FROM sis.students " "WHERE id = :id"), {"id": student_id})
 
     # ok: sos-sql-text-string-building
     session.execute(

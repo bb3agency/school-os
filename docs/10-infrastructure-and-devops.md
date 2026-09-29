@@ -173,6 +173,7 @@ Dedicated hosts send no email yet (their compose file does not set the email set
 | `lint` | `make lint` (ruff, ruff format check, import-linter, eslint, prettier) |
 | `typecheck` | `make typecheck` (mypy strict, tsc) |
 | `test (test-api)` / `test (test-web)` | `make test-api` (pytest + testcontainers: Postgres + pgvector, Valkey, SeaweedFS) / `make test-web` (vitest) |
+| `e2e (1/2)`, `e2e (2/2)` | `next build`, then `make e2e` with `E2E_STAND_IN=1` (scripted stand-in IdP and canned API, Valkey service), sharded; report and traces uploaded on failure |
 | `migrations` | `make migration-check` (fresh and populated upgrade/downgrade round trips) |
 | `authz-suite` | `make test-security` (RLS catalog, isolation, route enumeration, authz matrix, BOLA, definer functions, composite FKs) |
 | `security` | `make security` (gitleaks full history, semgrep, pip-audit, npm audit, trivy fs + config) |
@@ -181,7 +182,7 @@ Dedicated hosts send no email yet (their compose file does not set the email set
 | `images (api, worker, web)` | docker build, SPDX SBOM (syft), trivy image scan (HIGH/CRITICAL, fixable); nothing pushed |
 | `ci-ok` | The single required check: fails if any job failed or was cancelled |
 
-`nightly.yml` (02:47 IST) runs `make test`, `make test-security`, `make migration-check`, `make e2e`, `make security`, a ZAP baseline against staging (skipped until staging is configured) and `make eval`. The RAG eval subset per PR and `terraform plan` comments arrive with the knowledge module and AWS accounts.
+`nightly.yml` (02:47 IST) runs `make test`, `make test-security`, `make migration-check`, `make test-order`, `make e2e-audit` (the wide responsive sweep; `make e2e` itself runs on every PR), `make security`, a ZAP baseline against staging (skipped until staging is configured) and `make eval`. The RAG eval subset per PR and `terraform plan` comments arrive with the knowledge module and AWS accounts.
 
 - Required check on `main`: `ci-ok` (branch protection not yet configured); squash merges; Conventional Commit titles.
 - Concurrency groups cancel superseded runs; caches for pip/npm.
@@ -283,7 +284,8 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `make test` | `test-api` (pytest with coverage; real Postgres via testcontainers, or `SOS_TEST_ADMIN_DATABASE_URL`) + `test-web` (vitest) |
 | `make test-security` | `pytest apps/api/tests/security` (RLS catalog, isolation, route enumeration, authz matrix, BOLA, definer functions, composite FKs) |
 | `make migration-check` | `pytest apps/api/tests/migrations` (fresh and populated round trips) |
-| `make e2e` | Playwright (after `next build`, or against `E2E_BASE_URL`) |
+| `make e2e` | Playwright (after `next build`, or against `E2E_BASE_URL`; `E2E_STAND_IN=1` signs in; `E2E_ARGS` for extra flags such as `--shard=1/2`) |
+| `make e2e-audit` | Responsive sweep at ten viewports in both languages (report and screenshots in `apps/web/audit-out`; nightly) |
 | `make lint` / `format` / `typecheck` | ruff (+ format check), import-linter, eslint/prettier / auto-format / mypy strict + tsc |
 | `make security` | gitleaks (full history), semgrep (`.semgrep` + p/python, p/typescript, p/owasp-top-ten), pip-audit, `npm audit --audit-level=high`, trivy fs + config (pinned container images when the tools are not installed) |
 | `make eval` | Placeholder until the knowledge module exists (M2) |

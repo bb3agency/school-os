@@ -12,6 +12,7 @@ import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
+import { useRetentionDays } from "@/features/admin/data";
 import { attributeLabel } from "@/features/findings/data";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
@@ -29,6 +30,7 @@ import {
 import { ExportStatusBadge, exportTitle, RequesterName, ScopeSummary } from "./parts";
 import {
   EXPORT_PERM,
+  exportKeptDays,
   isStructureColumn,
   PROFILE_PERMISSION,
   type Export,
@@ -222,6 +224,11 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
   const attributes = useExportAttributes(
     state.status === "ready" && state.data.kind === "student_list" && can(EXPORT_PERM.readBasic),
   );
+  // FR-ADM-002: the period this export is kept for comes from its own dates once it is ready;
+  // before that, from the school's setting (only readable with tenant.settings.manage).
+  const ownDays = state.status === "ready" ? exportKeptDays(state.data) : null;
+  const schoolDays = useRetentionDays("exports", state.status === "ready" && ownDays === null);
+  const keptDays = ownDays ?? schoolDays;
 
   const back = (
     <Link href="/exports" className="text-primary underline">
@@ -311,7 +318,11 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
             </ul>
           </div>
         ) : null}
-        <p className="mt-4 text-sm text-ink-muted">{td("retentionNote")}</p>
+        <p className="mt-4 text-sm text-ink-muted">
+          {keptDays === null
+            ? td("retentionNoteSchoolPeriod")
+            : td("retentionNote", { days: keptDays })}
+        </p>
       </Card>
     </div>
   );

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { chromiumLaunchOptions } from "./e2e/support/browser";
 
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
@@ -31,10 +32,8 @@ export default defineConfig({
     viewport: { width: 1366, height: 768 },
     locale: "en-IN",
     timezoneId: "Asia/Kolkata",
-    // A preinstalled Chromium where the Playwright browser download is blocked.
-    ...(process.env.PW_CHROMIUM_PATH
-      ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } }
-      : {}),
+    // The locked Chromium; locally a preinstalled one when the download is blocked (support/browser.ts).
+    launchOptions: chromiumLaunchOptions(),
   },
   projects: [
     {

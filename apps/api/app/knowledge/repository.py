@@ -381,6 +381,17 @@ def update_query(session: Session, query_id: uuid.UUID, values: Mapping[str, Any
     session.execute(update(Query).where(Query.id == query_id).values(**values))
 
 
+def delete_queries_before(session: Session, cutoff: dt.datetime) -> int:
+    """Delete the current school's questions asked before ``cutoff`` (retention; RLS and an
+    explicit tenant filter). Returns the number of rows deleted."""
+    result = session.execute(
+        delete(Query).where(
+            Query.tenant_id == current_tenant_id(session), Query.created_at < cutoff
+        )
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 EARLIER_STATUSES = ("answered", "not_found", "refused", "search_only")
 """Questions that count as conversation context (a cancelled or failed one does not)."""
 

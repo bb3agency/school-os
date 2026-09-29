@@ -5,6 +5,7 @@ import { useQuery, type Query } from "@tanstack/react-query";
 import { z } from "zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
+import { useStaffCan } from "@/lib/bff/staff-me";
 import { StepUpCancelledError } from "@/lib/bff/step-up";
 import type { Loadable } from "@/lib/loadable";
 
@@ -129,6 +130,19 @@ export function useRetention(enabled: boolean): Loadable<RetentionSettings> {
     retry,
   });
   return toLoadable(query);
+}
+
+/**
+ * The school's retention period in days for one category (FR-ADM-002), for screens that mention
+ * it (Exports, Imports). `null` while loading, when `enabled` is false, for members without
+ * `tenant.settings.manage` (the API would answer 403, so it is not asked) and for an unknown
+ * category: the screen then words the period without a number, never with a fixed default.
+ */
+export function useRetentionDays(category: string, enabled = true): number | null {
+  const can = useStaffCan();
+  const state = useRetention(enabled && can(SETTINGS_MANAGE));
+  if (state.status !== "ready") return null;
+  return state.data.categories.find((item) => item.key === category)?.days ?? null;
 }
 
 /**

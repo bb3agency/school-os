@@ -3312,7 +3312,8 @@
   "exports": {
     "nav": "Exports",
     "title": "Exports",
-    "description": "Pre-check reports for boards and portals, and student lists. Files are deleted 7 days after they are ready.",
+    "description": "Pre-check reports for boards and portals, and student lists. Files are deleted {days, plural, one {# day} other {# days}} after they are ready.",
+    "descriptionSchoolPeriod": "Pre-check reports for boards and portals, and student lists. Files are deleted when your school's retention period ends; each export shows the date.",
     "you": "You",
     "formerStaff": "A former staff member",
     "restrictedIncluded": "Includes restricted details",
@@ -3467,7 +3468,8 @@
       "restrictedYes": "Included",
       "restrictedNo": "Hidden",
       "columns": "Columns",
-      "retentionNote": "Files are deleted 7 days after they are ready. This record of who exported what stays.",
+      "retentionNote": "Files are deleted {days, plural, one {# day} other {# days}} after they are ready. This record of who exported what stays.",
+      "retentionNoteSchoolPeriod": "Files are deleted when your school's retention period ends. This record of who exported what stays.",
       "download": "Download {format}",
       "linkNote": "Each download uses a new link that works for a few minutes only. Every download is recorded in the audit log.",
       "makeNew": "Make a new export",
@@ -3476,7 +3478,7 @@
       "busyBody": "This can take a few minutes for a large batch. You can leave this page: you will get a notification when the files are ready.",
       "failedTitle": "This export could not be made",
       "expiredTitle": "The files have been deleted",
-      "expiredBody": "Files are deleted 7 days after they are ready. Make a new export to get up-to-date files.",
+      "expiredBody": "The files were deleted when your school's retention period ended. Make a new export to get up-to-date files.",
       "noLongerTitle": "You can no longer download this export",
       "noLongerBody": "Your permissions have changed since you made it. Ask your school's office admin if you still need it.",
       "notOwnTitle": "Only the person who made it can download this",
@@ -3505,7 +3507,7 @@
       },
       "export_expired": {
         "title": "The files have been deleted",
-        "body": "Files are deleted 7 days after they are ready. Make a new export."
+        "body": "The files were deleted when your school's retention period ended. Make a new export."
       },
       "sensitive_not_allowed": {
         "title": "Restricted details are not allowed for you",
@@ -4358,7 +4360,7 @@
       },
       "file_missing": {
         "title": "The uploaded file is no longer kept",
-        "body": "Files are deleted 90 days after the import. Upload the file again if you need it."
+        "body": "Uploaded files are deleted when your school's retention period for import files ends. Upload the file again if you need it."
       },
       "precondition_failed": {
         "title": "Someone else changed this meanwhile",

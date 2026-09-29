@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { TabNav } from "@/components/ui/TabNav";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { useRetentionDays } from "@/features/admin/data";
 import { Pager, useCursorStack } from "@/features/students/paging";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
@@ -44,6 +45,8 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
   const allowed = can([...EXPORT_SCREEN_PERMISSIONS]);
   const list = useExportList(view, pages.cursor, allowed);
   const profiles = useExportProfiles(can([EXPORT_PERM.board, EXPORT_PERM.portal]));
+  // FR-ADM-002: the school may keep export files for less than the default.
+  const keptDays = useRetentionDays("exports", allowed);
 
   if (me.isPending) return <LoadingState label={tc("loading")} />;
   if (!allowed) {
@@ -155,7 +158,9 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
     <div className="space-y-6">
       <PageHeader
         title={t("title")}
-        description={t("description")}
+        description={
+          keptDays === null ? t("descriptionSchoolPeriod") : t("description", { days: keptDays })
+        }
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
       />
       {types.length > 0 ? (

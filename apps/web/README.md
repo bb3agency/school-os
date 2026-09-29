@@ -177,9 +177,14 @@ npm run build -w @schoolos/web
 E2E_STAND_IN=1 E2E_PORT=3100 REDIS_URL=redis://localhost:6391/1 npm run e2e -w @schoolos/web
 ```
 
+CI runs exactly this on every pull request, in two shards (`make e2e E2E_ARGS=--shard=1/2`,
+after `npm run build -w @schoolos/web` and `playwright install --with-deps chromium`).
+
 If the Playwright browser download is blocked, run the same command inside
 `mcr.microsoft.com/playwright:v1.63.0-noble` with `--network host`, or point
-`PW_CHROMIUM_PATH` at a Chromium that is already installed.
+`PW_CHROMIUM_PATH` at a Chromium that is already installed. Outside CI, when the locked
+Chromium build is missing, the newest `chromium_headless_shell-*` under
+`PLAYWRIGHT_BROWSERS_PATH` is used automatically (`e2e/support/browser.ts`).
 
 The same stand-in run includes the responsive layout checks (`e2e/responsive.spec.ts`,
 docs/17 §5.1): every school and platform screen at 1366×768 and 375×812 in English and
@@ -188,14 +193,15 @@ text and no touch target under 24px; the menu drawer is driven keyboard-only on 
 form dialog must fit a phone, and four screens are checked in print at A4 width.
 `e2e/support/layout-fixtures.ts` answers the browser's API reads with long, mixed-script
 synthetic content for these checks. For a wider sweep (ten viewports, screenshots, a JSON
-report) run the audit against a running app:
+report; nightly in CI) run the audit after `npm run build`; it starts the app and the stand-ins
+itself and fails only on the two required viewports:
 
 ```bash
-E2E_BASE_URL=http://localhost:3407 AUDIT_OUT=/tmp/audit npx playwright test -c e2e/audit/audit.config.ts
+E2E_STAND_IN=1 REDIS_URL=redis://localhost:6391/1 make e2e-audit   # report in apps/web/audit-out
 ```
 
-(the app needs the stand-in settings of `playwright.config.ts`; the audit starts the
-stand-ins itself and fails only on the two required viewports).
+or against an app you started with the stand-in settings of `playwright.config.ts`:
+`E2E_BASE_URL=http://localhost:3407 AUDIT_OUT=/tmp/audit npx playwright test -c e2e/audit/audit.config.ts`.
 
 ## Manual verification with the dev OIDC stub
 

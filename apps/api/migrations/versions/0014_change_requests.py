@@ -192,7 +192,7 @@ ALTER TABLE sis.attribute_values ADD CONSTRAINT attribute_values_change_request_
 -- rows and accept anything. The block's own rollback restores FORCE when validation fails.
 DO $$
 BEGIN
-  ALTER TABLE sis.attribute_values NO FORCE ROW LEVEL SECURITY;
+  ALTER TABLE sis.attribute_values NO FORCE ROW LEVEL SECURITY;  -- nosemgrep: sos-migration-rls-bypass -- owner validates the new FK across all schools; FORCE is restored below and by the block's rollback
   ALTER TABLE sis.attribute_values VALIDATE CONSTRAINT attribute_values_change_request_fk;
   ALTER TABLE sis.attribute_values FORCE ROW LEVEL SECURITY;
 EXCEPTION WHEN foreign_key_violation THEN
@@ -209,7 +209,7 @@ ALTER TABLE sis.dq_findings ADD CONSTRAINT dq_findings_change_request_fk
   NOT VALID;
 DO $$
 BEGIN
-  ALTER TABLE sis.dq_findings NO FORCE ROW LEVEL SECURITY;
+  ALTER TABLE sis.dq_findings NO FORCE ROW LEVEL SECURITY;  -- nosemgrep: sos-migration-rls-bypass -- owner validates the new FK across all schools; FORCE is restored below and by the block's rollback
   ALTER TABLE sis.dq_findings VALIDATE CONSTRAINT dq_findings_change_request_fk;
   ALTER TABLE sis.dq_findings FORCE ROW LEVEL SECURITY;
 EXCEPTION WHEN foreign_key_violation THEN

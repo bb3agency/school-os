@@ -25,6 +25,10 @@ import {
 
 const standIn = process.env.E2E_STAND_IN === "1";
 
+// Every test signs in on its own and reads only the browser-side layout fixtures (no shared
+// stand-in state), so the tests may run in parallel and CI can split them across shards.
+test.describe.configure({ mode: "parallel" });
+
 async function checkScreens(page: Page, locale: string, pages: string[]): Promise<string[]> {
   const failures: string[] = [];
   for (const path of pages) {

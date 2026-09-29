@@ -65,7 +65,9 @@ def test_FR_ADM_002_defaults_and_bounds_are_listed_per_category(
     audit_events = by_key["audit_events"]
     assert not audit_events.configurable
     assert audit_events.days >= 395
-    assert not by_key["kb_queries"].enforced  # no purge job yet: reported, not hidden
+    # docs/05 §13: the daily knowledge.purge_queries job deletes questions after 180 days.
+    assert by_key["kb_queries"].enforced
+    assert (by_key["kb_queries"].days, by_key["kb_queries"].configurable) == (180, False)
 
 
 def test_FR_ADM_002_owner_and_principal_change_retention_audited(

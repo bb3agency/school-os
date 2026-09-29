@@ -24,12 +24,17 @@ import uuid
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
+import psycopg
+from psycopg import sql as pgsql
 from sqlalchemy import column, delete, func, select, table, text
 from sqlalchemy.orm import Session
 
 PURGE_ROLE: Final = "sos_purger"
+# A constant statement (no interpolation, SEC-001): keep the role name in step with PURGE_ROLE.
+_SET_PURGE_ROLE: Final = text("SET LOCAL ROLE sos_purger")
+_CONSTRAINT_NAME: Final = re.compile(r"(core|sis|kb|ops)\.([a-z][a-z0-9_]{0,62})")
 TENANT_SCHEMAS: Final = ("core", "sis", "kb", "audit", "ops")
 TABLE_NAME: Final = re.compile(r"^(core|sis|kb|audit|ops)\.[a-z][a-z0-9_]{0,62}$")
 
@@ -139,16 +144,27 @@ def purge_role(session: Session, tenant_id: uuid.UUID, *, flag: Flag) -> Iterato
         text("SELECT set_config(:flag, :tenant, true)"),
         {"flag": flag, "tenant": str(tenant_id)},
     )
-    session.execute(text(f"SET LOCAL ROLE {PURGE_ROLE}"))
+    session.execute(_SET_PURGE_ROLE)
     yield
     session.execute(text("RESET ROLE"))
 
 
 def defer_constraint(session: Session, name: str) -> None:
-    """``SET CONSTRAINTS <name> DEFERRED`` for a deferrable key (checked at commit)."""
-    if not re.fullmatch(r"(core|sis|kb|ops)\.[a-z][a-z0-9_]{0,62}", name):
+    """``SET CONSTRAINTS <name> DEFERRED`` for a deferrable key (checked at commit).
+
+    ``SET CONSTRAINTS`` takes no bound parameters, so the schema-qualified name is checked
+    against :data:`_CONSTRAINT_NAME` and composed as quoted identifiers by psycopg
+    (``psycopg.sql.Identifier``), never interpolated into SQL text. It runs on the session's own
+    DBAPI connection, inside the caller's transaction.
+    """
+    match = _CONSTRAINT_NAME.fullmatch(name)
+    if match is None:
         raise ValueError(f"not a constraint name: {name!r}")
-    session.execute(text(f"SET CONSTRAINTS {name} DEFERRED"))
+    statement = pgsql.SQL("SET CONSTRAINTS {} DEFERRED").format(
+        pgsql.Identifier(match.group(1), match.group(2))
+    )
+    dbapi = cast("psycopg.Connection[object]", session.connection().connection.driver_connection)
+    dbapi.execute(statement)
 
 
 __all__ = [

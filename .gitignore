@@ -21,6 +21,7 @@ out/
 next-env.d.ts
 playwright-report/
 test-results/
+audit-out/
 
 # Env and secrets (never commit)
 .env

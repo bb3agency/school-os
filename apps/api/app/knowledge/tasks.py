@@ -8,6 +8,9 @@
 - ``knowledge.refresh_acl`` (queue ``ingest``): consumer of ``kb.document.acl_changed``.
 - ``knowledge.remove_document`` (queue ``ingest``): delete a document's chunks; no producer yet
   (see :mod:`app.knowledge.ingestion.hooks`).
+- ``knowledge.purge_queries`` (daily, queue ``maintenance``): per school, delete the query log
+  (``kb.queries``) older than its retention (180 days; docs/05 §13), each school in its own
+  ``tenant_session``. Counts only in the result and the log.
 
 Every task is idempotent and retries with exponential backoff (max 5, docs/04 §6); after the
 last attempt it logs ``error_code`` and gives up (the next event for the document repairs it).
@@ -23,14 +26,20 @@ from collections.abc import Callable
 from typing import Any, Final
 
 from celery import Task, shared_task
+from celery.schedules import crontab
 
+from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
-from app.knowledge import composition
+from app.knowledge import composition, service
 from app.knowledge.ingestion import hooks, runtime
+from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
 
 MAX_RETRIES: Final = 5
+PURGE_QUERIES_TASK: Final = "knowledge.purge_queries"
+# Schools whose query log is still kept (an offboarded school's rows go with the whole purge).
+PURGE_TENANT_STATUSES: Final = ("active", "suspended", "offboarding")
 
 composition.configure_ingestion()
 
@@ -118,3 +127,30 @@ def remove_document(
         return "done"
 
     return _run(self, hooks.REMOVE_TASK, document_id, work)
+
+
+def purge_queries_all() -> dict[str, int]:
+    """Delete every school's query log past its retention (one ``tenant_session`` per school)."""
+    with context_free_session() as session:
+        tenant_ids = tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
+    purged = 0
+    for tenant_id in tenant_ids:
+        with tenant_session(tenant_id) as session:
+            purged += service.purge_old_queries(session)
+    log.info("knowledge.queries.purged", count=purged)
+    return {"tenants": len(tenant_ids), "purged": purged}
+
+
+@shared_task(name=PURGE_QUERIES_TASK, queue="maintenance", acks_late=True)
+def purge_queries() -> dict[str, int]:
+    return purge_queries_all()
+
+
+def beat_schedule() -> dict[str, dict[str, Any]]:
+    """Beat entries for knowledge (both deployment modes)."""
+    return {
+        "knowledge-purge-queries": {
+            "task": PURGE_QUERIES_TASK,
+            "schedule": crontab(minute=25, hour=21),  # 02:55 IST
+        },
+    }
