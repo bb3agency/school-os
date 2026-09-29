@@ -6,7 +6,8 @@
   consumer of ``export.render_requested``. The whole export runs there so every file of one
   export comes from the same snapshot.
 - ``exports.purge_expired`` (beat, daily, queue ``maintenance``): files deleted 7 days after an
-  export was ready, one tenant session per school (docs/05 §13).
+  export was ready, one tenant session per school (docs/05 §13); a failing school does not stop
+  the others (logged with ids only, counted in ``failed``, retried on the next run).
 
 Both builders are idempotent (the export status gates the work) and retry with backoff; after
 the last attempt the export shows ``failed`` and the requester is notified.
@@ -64,13 +65,20 @@ def render(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[st
 
 
 def purge_all() -> dict[str, int]:
+    """Purge every school's expired export files, each school on its own: a school that fails
+    is logged (ids and error type only) and counted, the others still run, and its files are
+    due again on the next run."""
     with context_free_session() as session:
         tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
-    purged = 0
+    purged = failed = 0
     for tenant_id in tenant_ids:
-        purged += service.purge_expired(tenant_id)
-    log.info("exports.purge_done", count=purged)
-    return {"tenants": len(tenant_ids), "purged": purged}
+        try:
+            purged += service.purge_expired(tenant_id)
+        except Exception as exc:  # storage or database: this school only, retried next run
+            failed += 1
+            log.warning("exports.purge_failed", tenant_id=tenant_id, error_type=type(exc).__name__)
+    log.info("exports.purge_done", count=purged, failed=failed)
+    return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
 
 
 @shared_task(name=service.PURGE_TASK, queue="maintenance", acks_late=True)

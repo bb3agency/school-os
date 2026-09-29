@@ -10,7 +10,8 @@
   (see :mod:`app.knowledge.ingestion.hooks`).
 - ``knowledge.purge_queries`` (daily, queue ``maintenance``): per school, delete the query log
   (``kb.queries``) older than its retention (180 days; docs/05 §13), each school in its own
-  ``tenant_session``. Counts only in the result and the log.
+  ``tenant_session``; a failing school does not stop the others (logged with ids only, counted
+  in ``failed``, retried on the next run). Counts only in the result and the log.
 
 Every task is idempotent and retries with exponential backoff (max 5, docs/04 §6); after the
 last attempt it logs ``error_code`` and gives up (the next event for the document repairs it).
@@ -130,15 +131,25 @@ def remove_document(
 
 
 def purge_queries_all() -> dict[str, int]:
-    """Delete every school's query log past its retention (one ``tenant_session`` per school)."""
+    """Delete every school's query log past its retention (one ``tenant_session`` per school).
+    A school that fails is rolled back, logged (ids and error type only) and counted; the others
+    still run, and its rows are due again on the next run."""
     with context_free_session() as session:
         tenant_ids = tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
-    purged = 0
+    purged = failed = 0
     for tenant_id in tenant_ids:
-        with tenant_session(tenant_id) as session:
-            purged += service.purge_old_queries(session)
-    log.info("knowledge.queries.purged", count=purged)
-    return {"tenants": len(tenant_ids), "purged": purged}
+        try:
+            with tenant_session(tenant_id) as session:
+                purged += service.purge_old_queries(session)
+        except Exception as exc:  # database: this school only, retried next run
+            failed += 1
+            log.warning(
+                "knowledge.queries.purge_failed",
+                tenant_id=tenant_id,
+                error_type=type(exc).__name__,
+            )
+    log.info("knowledge.queries.purged", count=purged, failed=failed)
+    return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
 
 
 @shared_task(name=PURGE_QUERIES_TASK, queue="maintenance", acks_late=True)
