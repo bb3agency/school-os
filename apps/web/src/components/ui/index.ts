@@ -36,6 +36,7 @@ export {
 export {
   DataTable,
   Table,
+  TableScroll,
   TBody,
   THead,
   Td,
@@ -43,6 +44,8 @@ export {
   Tr,
   type Column,
   type TableDensity,
+  type TableProps,
+  type TableScrollProps,
 } from "./Table";
 export { Dialog } from "./Dialog";
 export { EmptyState } from "./EmptyState";

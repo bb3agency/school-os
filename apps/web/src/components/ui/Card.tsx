@@ -7,9 +7,9 @@ export type CardTone = "default" | "muted" | "outline";
 
 const paddings: Record<CardPadding, string> = {
   none: "p-0",
-  sm: "p-4",
-  md: "p-5 md:p-6",
-  lg: "p-6 md:p-8",
+  sm: "p-3 sm:p-4",
+  md: "p-4 sm:p-5 lg:p-6",
+  lg: "p-5 sm:p-6 lg:p-8",
 };
 
 const cardTones: Record<CardTone, string> = {
@@ -57,7 +57,7 @@ export function CardHeader({
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-3", className)}>
-      <div className="min-w-0 space-y-1">
+      <div className="min-w-0 flex-1 basis-60 space-y-1">
         {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
         {title ? (
           <Heading id={headingId} className="text-lg font-medium text-ink">
@@ -67,7 +67,7 @@ export function CardHeader({
         {description ? <p className="text-sm text-ink-muted">{description}</p> : null}
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2" data-print="hide">
+        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2" data-print="hide">
           {actions}
         </div>
       ) : null}

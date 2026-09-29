@@ -16,9 +16,18 @@ export type ButtonVariant =
   "primary" | "primary-dark" | "brand" | "secondary" | "danger" | "ghost" | "inverse";
 export type ButtonSize = "lg" | "md" | "sm";
 
+/*
+ * Colour fades only while the pointer is over the button (`hover:transition-colors`) and
+ * only without reduced motion. A variant change (e.g. "Preview" becoming secondary when
+ * "Promote" takes over) or a keyboard press repaints at once, so there is never a
+ * half-faded, low-contrast frame (WCAG 1.4.3; axe used to catch one mid-fade).
+ * Labels stay on one line from sm; on phones a long (Telugu) label wraps inside the button
+ * instead of pushing it past the screen edge.
+ */
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-md border font-medium whitespace-nowrap " +
-  "transition-colors disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60";
+  "inline-flex max-w-full items-center justify-center gap-2 rounded-md border text-center font-medium " +
+  "whitespace-normal sm:whitespace-nowrap motion-safe:hover:transition-colors " +
+  "disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60";
 
 const dark =
   "border-action bg-action text-on-action shadow-raised hover:bg-action-hover hover:border-action-hover";
@@ -106,7 +115,7 @@ export function iconButtonClasses(
   size: IconButtonSize = "md",
 ): string {
   return cn(
-    "relative inline-flex shrink-0 items-center justify-center rounded-full border transition-colors",
+    "relative inline-flex shrink-0 items-center justify-center rounded-full border motion-safe:hover:transition-colors",
     "disabled:cursor-not-allowed disabled:opacity-60",
     iconVariants[variant],
     iconSizes[size],

@@ -35,7 +35,7 @@ export function NotificationItem({
     </>
   );
   return (
-    <div className="flex items-start gap-2" lang={item.language}>
+    <div className="flex min-w-0 items-start gap-2 break-anywhere" lang={item.language}>
       <span
         aria-hidden="true"
         className={`mt-2 size-2 shrink-0 rounded-full ${unread ? "bg-primary" : "bg-transparent"}`}
@@ -44,12 +44,12 @@ export function NotificationItem({
         <Link
           href={href}
           onClick={() => onOpen(item)}
-          className="block flex-1 rounded-md p-1 hover:bg-surface-muted"
+          className="block min-w-0 flex-1 rounded-md p-1 hover:bg-surface-muted"
         >
           {text}
         </Link>
       ) : (
-        <div className="flex-1 p-1">
+        <div className="min-w-0 flex-1 p-1">
           {text}
           {unread ? (
             <Button size="sm" variant="ghost" onClick={() => onOpen(item)} className="mt-1 px-0">
@@ -213,7 +213,7 @@ export function NotificationBell() {
         <section
           id={panelId}
           aria-label={t("panelLabel")}
-          className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-4 text-ink shadow-popover"
+          className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-4 text-ink shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:w-auto"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold">{t("title")}</h2>

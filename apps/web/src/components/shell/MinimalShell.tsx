@@ -35,12 +35,12 @@ export function MinimalShell({
 }) {
   const t = useTranslations("common");
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-viewport flex-col">
       <SkipLink label={t("skipToContent")} />
-      <div className="px-3 pt-3 md:px-6 md:pt-5" data-print="hide">
-        <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2.5 shadow-card">
+      <div className="px-page pt-3 md:pt-5" data-print="hide">
+        <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-3 py-2 shadow-card sm:px-4 sm:py-2.5">
           <Wordmark />
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
             {headerActions}
             <LanguageSwitcher />
           </div>
@@ -50,7 +50,7 @@ export function MinimalShell({
         id="main"
         tabIndex={-1}
         className={cn(
-          "mx-auto w-full flex-1 px-4 py-8 focus:outline-none md:px-6 md:py-12",
+          "px-page mx-auto w-full flex-1 py-6 focus:outline-none md:py-12",
           wide ? "max-w-5xl" : "max-w-3xl",
         )}
       >

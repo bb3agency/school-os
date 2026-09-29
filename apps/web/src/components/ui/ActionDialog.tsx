@@ -146,7 +146,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
       >
         {open ? (
           <>
-            <div className="flex items-start justify-between gap-4 p-6 pb-2">
+            <div className="flex items-start justify-between gap-4 p-4 pb-2 sm:p-6 sm:pb-2">
               <div className="space-y-1">
                 <h2 id={titleId} className="text-lg font-medium">
                   {title}
@@ -176,18 +176,18 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
               </button>
             </div>
             {renderResult !== undefined && result !== undefined ? (
-              <div className="space-y-4 px-6 py-4">
+              <div className="space-y-4 px-4 py-4 sm:px-6">
                 <ResultSlot render={renderResult} result={result} onDone={close} />
               </div>
             ) : (
               <form noValidate onSubmit={form.onSubmit}>
-                <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-4">
+                <div className="max-h-[60vh] space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
                   {note ? <Alert tone="info">{note}</Alert> : null}
                   {children?.(form.errors)}
                   {stepUp ? <p className="text-sm text-ink-muted">{t("stepUpNote")}</p> : null}
                   <ApiErrorAlert error={form.error} namespace={errorNamespace} />
                 </div>
-                <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-6 py-4">
+                <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
                   <Button variant="secondary" onClick={close}>
                     {t("cancel")}
                   </Button>

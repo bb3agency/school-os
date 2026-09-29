@@ -43,6 +43,8 @@ export async function generateMetadata({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Draw under notches and rounded corners; globals.css pads with env(safe-area-inset-*).
+  viewportFit: "cover",
   colorScheme: "light",
 };
 
