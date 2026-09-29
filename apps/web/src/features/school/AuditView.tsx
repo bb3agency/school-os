@@ -8,6 +8,7 @@ import { SearchInput, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { Link } from "@/i18n/navigation";
 import { formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 
@@ -57,7 +58,22 @@ export function AuditView({
   const actor = (row: AuditEvent) => {
     const known = KNOWN_ACTORS.find((type) => type === row.actor_type);
     const label = known ? t(`actor.${known}`) : row.actor_type;
-    return row.actor_id ? `${label} · ${row.actor_id.slice(0, 8)}` : label;
+    if (!row.actor_id) return label;
+    const text = `${label} · ${row.actor_id.slice(0, 8)}`;
+    // The filter needs the full ID but the table shows 8 characters: link to the filter.
+    const query: Record<string, string> = { actor: row.actor_id };
+    if (filters.action) query.action = filters.action;
+    if (filters.from) query.from = filters.from;
+    if (filters.to) query.to = filters.to;
+    return (
+      <Link
+        href={{ pathname: "/audit", query }}
+        aria-label={t("filterByUser", { who: text })}
+        className="underline underline-offset-2 hover:text-primary"
+      >
+        {text}
+      </Link>
+    );
   };
 
   const columns: Column<AuditEvent>[] = [
