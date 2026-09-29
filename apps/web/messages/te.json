@@ -529,6 +529,7 @@
       "home": "హోమ్",
       "filterActionPlaceholder": "ఉదాహరణకు student.update",
       "filterUserPlaceholder": "ఆ వ్యక్తి యూజర్ ID",
+      "filterByUser": "{who} చేసిన సంఘటనలు మాత్రమే చూపించు",
       "clearFilters": "ఫిల్టర్లను తీసివేయండి",
       "exportLater": "ఆడిట్ లాగ్‌ను CSV ఫైల్‌గా డౌన్‌లోడ్ చేయడం ఈ స్క్రీన్‌లో ఇంకా అందుబాటులో లేదు."
     },

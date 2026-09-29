@@ -206,6 +206,12 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     );
     expect(await screen.findByText("fields: code, display_en; count: 1")).toBeInTheDocument();
     expect(screen.getByText("Staff user · 0192f3a4")).toBeInTheDocument();
+    // FR-AUD-005: the table shows 8 characters, so the row links to the full-ID filter.
+    const who = screen.getByRole("link", { name: /Show only events by Staff user · 0192f3a4/ });
+    const href = new URL(who.getAttribute("href") ?? "", "http://x");
+    expect(href.pathname).toMatch(/\/audit$/);
+    expect(href.searchParams.get("actor")).toBe("0192f3a4-0000-7000-8000-0000000000d1");
+    expect(href.searchParams.get("from")).toBe("01/06/2026");
     const url = seen.find((u) => u.pathname === "/bff/api/v1/audit/events");
     expect(url?.searchParams.get("actor")).toBe("clerk");
     expect(url?.searchParams.get("from")).toBe("2026-06-01");

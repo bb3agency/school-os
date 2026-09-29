@@ -28,7 +28,7 @@ import { aadhaarDisplay, containsFullAadhaar, verhoeffValid } from "./aadhaar";
 import { CreateStudentForm, createBody, createStudentSchema } from "./CreateStudent";
 import { toIsoDate } from "./dates";
 import { permissionsFrom } from "./me";
-import { StudentDetailView } from "./StudentDetail";
+import { StudentDetailScreen, StudentDetailView } from "./StudentDetail";
 import { PAGE_SIZE, StudentsScreen } from "./StudentList";
 
 const push = vi.fn();
@@ -341,6 +341,32 @@ describe("US-301 / US-303: add a student", () => {
     renderWithIntl(<CreateStudentForm permissions={permissionsFrom(["student.read_basic"])} />);
     expect(screen.getByText(sm.create.noPermissionTitle)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: sm.create.submit })).toBeNull();
+  });
+});
+
+describe("US-301 / FR-STU-005: the profile survives list bodies that are not arrays", () => {
+  it("renders the page and every tab when guardians, enrolments and values are not lists", async () => {
+    const body = student() as unknown as Record<string, unknown>;
+    delete body.values;
+    stub.routes[`GET /bff/api/v1/staff/me`] = () => Response.json(me(ALL_RECORD_PERMISSIONS));
+    stub.routes[`GET /bff/api/v1/students/${ID.student}`] = () => Response.json(body);
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/guardians`] = () => Response.json({});
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/enrollments`] = () => Response.json({});
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/values`] = () => Response.json({});
+    const user = userEvent.setup();
+    renderWithIntl(<StudentDetailScreen studentId={ID.student} />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Venkata Sai K." }),
+    ).toBeInTheDocument();
+    for (const name of [
+      sm.detail.tabBySource,
+      sm.detail.tabGuardians,
+      sm.detail.tabEnrolments,
+      sm.detail.tabHistory,
+    ]) {
+      await user.click(screen.getByRole("tab", { name }));
+      expect(await screen.findByRole("tabpanel")).toBeInTheDocument();
+    }
   });
 });
 

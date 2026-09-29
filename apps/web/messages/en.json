@@ -529,6 +529,7 @@
       "home": "Home",
       "filterActionPlaceholder": "Such as student.update",
       "filterUserPlaceholder": "The person's user ID",
+      "filterByUser": "Show only events by {who}",
       "clearFilters": "Clear filters",
       "exportLater": "Downloading the audit log as a CSV file is not available on this screen yet."
     },

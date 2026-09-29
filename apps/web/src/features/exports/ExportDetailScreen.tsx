@@ -66,10 +66,12 @@ function Downloads({ row }: { row: Export }) {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<FileFormat | null>(null);
   const [error, setError] = useState<unknown>(undefined);
+  // Guard against a body without the arrays: a missing list means "no files yet", not a crash.
+  const listed = row.files ?? [];
   const files =
-    row.files.length > 0
-      ? row.files
-      : row.formats.map((format) => ({ format, content_type: "", size_bytes: -1 }));
+    listed.length > 0
+      ? listed
+      : (row.formats ?? []).map((format) => ({ format, content_type: "", size_bytes: -1 }));
 
   async function download(format: FileFormat) {
     setPending(format);
@@ -289,7 +291,9 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
           <Item label={td("scope")}>
             <ScopeSummary scope={row.scope} />
           </Item>
-          <Item label={td("formats")}>{row.formats.map((format) => tf(format)).join(", ")}</Item>
+          <Item label={td("formats")}>
+            {(row.formats ?? []).map((format) => tf(format)).join(", ")}
+          </Item>
           <Item label={td("language")}>{tl(row.language)}</Item>
           <Item label={td("restricted")}>
             {row.include_sensitive ? td("restrictedYes") : td("restrictedNo")}

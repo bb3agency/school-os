@@ -62,6 +62,11 @@ export async function unwrap<T>(pending: Promise<ClientResult<T>>): Promise<T> {
   return (data ?? ({} as T)) as T;
 }
 
+/** A list body that is not an array (absent, `{}` from a 204, a proxy error page) reads as empty. */
+export function asList<T>(body: readonly T[] | null | undefined): T[] {
+  return Array.isArray(body) ? [...body] : [];
+}
+
 let navigateOverride: Navigate | undefined;
 /** Tests only: capture sign-in/step-up navigation instead of leaving the page. */
 export function setNavigateForTesting(navigate: Navigate | undefined): void {

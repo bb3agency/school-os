@@ -521,6 +521,13 @@ describe("export detail and download (FR-EXP-003..004, SEC-005, ADR-0021)", () =
     ).toEqual(["Class", "Full name"]);
   });
 
+  it("does not crash when formats and files are missing from the body (FR-EXP-003)", async () => {
+    detail([BOARD, READ_BASIC, FINDINGS], { formats: undefined, files: undefined });
+    renderWithIntl(<ExportDetailScreen exportId={EXPORT_ID} />);
+    expect(await screen.findByText("You", { selector: "dd" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Download/ })).not.toBeInTheDocument();
+  });
+
   it("someone else's id without export.read_all is simply not found (404)", async () => {
     setMe([BOARD]);
     stub.routes[`GET /bff/api/v1/exports/${EXPORT_ID}`] = () => problem(404, "not_found");

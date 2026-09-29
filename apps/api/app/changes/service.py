@@ -516,9 +516,13 @@ def _after(cursor: str | None) -> tuple[dt.datetime, uuid.UUID] | None:
     if raw is None:
         return None
     try:
-        return dt.datetime.fromisoformat(str(raw["t"])), uuid.UUID(str(raw["i"]))
+        created = dt.datetime.fromisoformat(str(raw["t"]))
+        last = uuid.UUID(str(raw["i"]))
     except (KeyError, ValueError):
         raise ValidationFailed([_error("cursor", "invalid", "errors.invalid_cursor")]) from None
+    if created.tzinfo is None:
+        raise ValidationFailed([_error("cursor", "invalid", "errors.invalid_cursor")])
+    return created, last
 
 
 def list_requests(

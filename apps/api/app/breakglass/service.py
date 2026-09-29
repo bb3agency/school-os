@@ -649,11 +649,16 @@ def _after(cursor: str | None) -> tuple[dt.datetime, uuid.UUID] | None:
         return None
     try:
         created = dt.datetime.fromisoformat(str(value["t"]))
-        return created, uuid.UUID(str(value["i"]))
+        last = uuid.UUID(str(value["i"]))
     except (KeyError, ValueError) as exc:
         raise ValidationFailed(
             [{"field": "cursor", "code": "invalid", "message_key": "errors.invalid_cursor"}]
         ) from exc
+    if created.tzinfo is None:
+        raise ValidationFailed(
+            [{"field": "cursor", "code": "invalid", "message_key": "errors.invalid_cursor"}]
+        )
+    return created, last
 
 
 def list_grants(

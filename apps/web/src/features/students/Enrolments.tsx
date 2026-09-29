@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { asList, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useDateInput } from "@/lib/date-format";
 import { formatDate } from "@/lib/format";
 import { classLabel } from "@/lib/school-class";
@@ -298,11 +298,13 @@ export function EnrolmentsCard({
   const canEdit = permissions.has(PERM.updateNonIdentity);
   const structure = useSchoolStructure();
   const labels = useEnrolmentLabels(structure);
-  const enrolments = useApiQuery(enrolmentsKey(student.id), () =>
-    unwrap(
-      api.GET("/api/v1/students/{student_id}/enrollments", {
-        params: { path: { student_id: student.id } },
-      }),
+  const enrolments = useApiQuery(enrolmentsKey(student.id), async () =>
+    asList(
+      await unwrap(
+        api.GET("/api/v1/students/{student_id}/enrollments", {
+          params: { path: { student_id: student.id } },
+        }),
+      ),
     ),
   );
 

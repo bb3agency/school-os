@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Table, TBody, THead, Th, Tr } from "@/components/ui/Table";
 import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { asList, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatDate } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import { LoadGate, SourceChip, useValueFormatter } from "./parts";
@@ -333,11 +333,13 @@ export function ValuesBySourceView({
 /** GET /students/{id}/values (full history; 404 outside the caller's scope). */
 function useValues(studentId: string): Loadable<readonly SourceValue[]> {
   const api = useBffClient("staff");
-  return useApiQuery(valuesKey(studentId), () =>
-    unwrap(
-      api.GET("/api/v1/students/{student_id}/values", {
-        params: { path: { student_id: studentId } },
-      }),
+  return useApiQuery(valuesKey(studentId), async () =>
+    asList(
+      await unwrap(
+        api.GET("/api/v1/students/{student_id}/values", {
+          params: { path: { student_id: studentId } },
+        }),
+      ),
     ),
   );
 }
