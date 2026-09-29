@@ -30,7 +30,7 @@ def _sheet(api: Any, who: Any, batch_id: uuid.UUID, **params: Any) -> Any:
 
 
 def _edit(
-    api: Any, who: Any, batch_id: uuid.UUID, row_no: int, cells: list[dict[str, Any]], etag: str
+    api: Any, who: Any, batch_id: uuid.UUID, row_no: int, cells: list[dict[str, Any]], *, etag: str
 ) -> Any:
     return api.call(
         who,
@@ -118,7 +118,7 @@ def test_FR_IMP_008_edit_rechecks_the_row_and_commit_adds_the_edited_values(
         batch_id,
         4,
         [{"column": 0, "value": fixed_number}, {"column": 1, "value": f"  {TELUGU}  "}],
-        etag,
+        etag=etag,
     )
     assert res.status_code == 200, res.text
     out = res.json()
@@ -171,14 +171,16 @@ def test_FR_IMP_008_edit_rechecks_the_row_and_commit_adds_the_edited_values(
     student = S.student_by_adm(admin_engine, world.a.tenant_id, fixed_number)
     assert student is not None
     with admin_engine.connect() as c:
-        names = c.execute(
-            text(
-                "SELECT value_text FROM sis.attribute_values WHERE student_id = :s "
-                "AND attribute_key = 'full_name'"
-            ),
-            {"s": student},
-        ).scalars()
-        assert list(names) == [TELUGU]
+        names: list[str | None] = list(
+            c.execute(
+                text(
+                    "SELECT value_text FROM sis.attribute_values WHERE student_id = :s "
+                    "AND attribute_key = 'full_name'"
+                ),
+                {"s": student},
+            ).scalars()
+        )
+    assert names == [TELUGU]
 
 
 def test_FR_IMP_008_duplicate_fixed_in_one_row_clears_the_other(
@@ -191,7 +193,12 @@ def test_FR_IMP_008_duplicate_fixed_in_one_row_clears_the_other(
     sheet = _sheet(api, admin, batch_id).json()
     assert [r["status"] for r in sheet["data"]] == ["error", "error"]
     res = _edit(
-        api, admin, batch_id, 3, [{"column": 0, "value": S.adm("DUP")}], f'W/"{sheet["version"]}"'
+        api,
+        admin,
+        batch_id,
+        3,
+        [{"column": 0, "value": S.adm("DUP")}],
+        etag=f'W/"{sheet["version"]}"',
     )
     assert res.status_code == 200, res.text
     assert res.json()["row"]["status"] == "valid"
@@ -210,7 +217,7 @@ def test_FR_IMP_008_edits_are_refused_safely(world: Any, api: Any, admin_engine:
         admin_engine, "SELECT count(*) FROM sis.import_cell_edits WHERE batch_id = :b", b=batch_id
     )
     aadhaar = S.valid_aadhaar()
-    res = _edit(api, admin, batch_id, 2, [{"column": 2, "value": aadhaar}], etag)
+    res = _edit(api, admin, batch_id, 2, [{"column": 2, "value": aadhaar}], etag=etag)
     assert res.status_code == 422
     assert res.json()["errors"] == [
         {
@@ -221,17 +228,20 @@ def test_FR_IMP_008_edits_are_refused_safely(world: Any, api: Any, admin_engine:
     ]
     assert aadhaar not in res.text
     spaced = f"{aadhaar[:4]} {aadhaar[4:8]} {aadhaar[8:]}"
-    assert _edit(api, admin, batch_id, 2, [{"column": 2, "value": spaced}], etag).status_code == 422
-    bad = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "Line\nbreak"}], etag)
+    assert (
+        _edit(api, admin, batch_id, 2, [{"column": 2, "value": spaced}], etag=etag).status_code
+        == 422
+    )
+    bad = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "Line\nbreak"}], etag=etag)
     assert bad.json()["errors"][0]["code"] == "control_characters"
-    restricted = _edit(api, admin, batch_id, 2, [{"column": 7, "value": "Other"}], etag)
+    restricted = _edit(api, admin, batch_id, 2, [{"column": 7, "value": "Other"}], etag=etag)
     assert restricted.status_code == 422
     assert restricted.json()["errors"][0]["code"] == "column_restricted"
-    unknown = _edit(api, admin, batch_id, 2, [{"column": 40, "value": "x"}], etag)
+    unknown = _edit(api, admin, batch_id, 2, [{"column": 40, "value": "x"}], etag=etag)
     assert unknown.json()["errors"][0]["code"] == "unknown_column"
-    too_long = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "x" * 1001}], etag)
+    too_long = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "x" * 1001}], etag=etag)
     assert too_long.status_code == 422
-    missing_row = _edit(api, admin, batch_id, 99, [{"column": 2, "value": "x"}], etag)
+    missing_row = _edit(api, admin, batch_id, 99, [{"column": 2, "value": "x"}], etag=etag)
     assert missing_row.status_code == 404
     no_etag = api.call(
         admin,
@@ -249,13 +259,18 @@ def test_FR_IMP_008_edits_are_refused_safely(world: Any, api: Any, admin_engine:
         == before
     )
     # Optimistic concurrency: the second edit with the same ETag answers 412.
-    ok = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "Synthetic Father"}], etag)
+    ok = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "Synthetic Father"}], etag=etag)
     assert ok.status_code == 200, ok.text
-    stale = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "Other"}], etag)
+    stale = _edit(api, admin, batch_id, 2, [{"column": 2, "value": "Other"}], etag=etag)
     assert stale.status_code == 412
     # Same value again: nothing new is stored, the version stays.
     same = _edit(
-        api, admin, batch_id, 2, [{"column": 2, "value": "Synthetic Father"}], ok.headers["ETag"]
+        api,
+        admin,
+        batch_id,
+        2,
+        [{"column": 2, "value": "Synthetic Father"}],
+        etag=ok.headers["ETag"],
     )
     assert same.status_code == 200
     assert same.headers["ETag"] == ok.headers["ETag"]
@@ -271,7 +286,7 @@ def test_FR_IMP_008_invariant_6_no_edits_after_the_rows_were_added(
     assert sheet["read_only_reason"] == "committed"
     assert all(not c["editable"] for c in sheet["columns"])
     res = _edit(
-        api, admin, batch_id, 2, [{"column": 1, "value": "Changed"}], f'W/"{sheet["version"]}"'
+        api, admin, batch_id, 2, [{"column": 1, "value": "Changed"}], etag=f'W/"{sheet["version"]}"'
     )
     assert res.status_code == 409
     assert res.json()["code"] == "import_not_editable"
@@ -281,7 +296,7 @@ def test_FR_IMP_008_invariant_6_no_edits_after_the_rows_were_added(
     again = _sheet(api, admin, batch_id).json()
     assert again["read_only_reason"] == "reverted"
     res = _edit(
-        api, admin, batch_id, 2, [{"column": 1, "value": "Changed"}], f'W/"{again["version"]}"'
+        api, admin, batch_id, 2, [{"column": 1, "value": "Changed"}], etag=f'W/"{again["version"]}"'
     )
     assert res.status_code == 409
 
@@ -310,7 +325,10 @@ def test_FR_IMP_009_export_csv_and_xlsx(world: Any, api: Any, admin_engine: Engi
     rows[1] += [f'=HYPERLINK("x") {aadhaar}', "Synthetic faith"]
     batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
     etag = _sheet(api, admin, batch_id).headers["ETag"]
-    assert _edit(api, admin, batch_id, 2, [{"column": 1, "value": TELUGU}], etag).status_code == 200
+    assert (
+        _edit(api, admin, batch_id, 2, [{"column": 1, "value": TELUGU}], etag=etag).status_code
+        == 200
+    )
 
     res = api.call(admin, "GET", f"/api/v1/imports/{batch_id}/sheet/export")
     assert res.status_code == 200, res.text
@@ -334,7 +352,9 @@ def test_FR_IMP_009_export_csv_and_xlsx(world: Any, api: Any, admin_engine: Engi
     assert ws is not None
     values = [[c.value for c in row] for row in ws.iter_rows()]
     assert values[1][1] == TELUGU
-    assert values[1][7].startswith("'=HYPERLINK")
+    formula_cell = values[1][7]
+    assert isinstance(formula_cell, str)
+    assert formula_cell.startswith("'=HYPERLINK")
     assert ws.cell(row=2, column=8).data_type == "s"
     assert aadhaar not in repr(values)
 
@@ -432,8 +452,11 @@ def test_CLAUDE_6_5_no_cell_values_in_logs(
     etag = _sheet(api, admin, batch_id).headers["ETag"]
     secret = "Synthetica Logcheck Name"
     aadhaar = S.valid_aadhaar("56789012345")
-    assert _edit(api, admin, batch_id, 2, [{"column": 1, "value": secret}], etag).status_code == 200
-    _edit(api, admin, batch_id, 2, [{"column": 2, "value": aadhaar}], etag)
+    assert (
+        _edit(api, admin, batch_id, 2, [{"column": 1, "value": secret}], etag=etag).status_code
+        == 200
+    )
+    _edit(api, admin, batch_id, 2, [{"column": 2, "value": aadhaar}], etag=etag)
     api.call(admin, "GET", f"/api/v1/imports/{batch_id}/sheet/export")
     captured = capsys.readouterr()
     logs = captured.out + captured.err + caplog.text
