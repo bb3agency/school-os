@@ -129,6 +129,20 @@ export function SchoolShell({
           icon: "creditCard",
         },
         {
+          // FR-ADM-002: how long working data is kept (owner, principal).
+          href: "/settings/retention",
+          label: t("admin.nav.retention"),
+          permission: "tenant.settings.manage",
+          icon: "clock",
+        },
+        {
+          // FR-ADM-001: the school's full data export (owner).
+          href: "/settings/data-export",
+          label: t("admin.nav.dataExport"),
+          permission: "tenant.export_all",
+          icon: "inbox",
+        },
+        {
           href: "/break-glass",
           label: t("breakGlass.nav"),
           permission: "breakglass.approve",

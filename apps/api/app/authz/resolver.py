@@ -9,7 +9,7 @@
 3. Refuse schools that are not active: 403 ``tenant_unavailable`` (e.g. still provisioning);
    a suspended or offboarding school answers 403 ``tenant_suspended`` unless the matched route
    and one of the member's roles are on :data:`SUSPENDED_SCHOOL_ALLOWLIST` (BR-08: the owner and
-   principal keep "who am I", Plan & billing and, once built, the full data export).
+   principal keep "who am I", Plan & billing and the full data export).
 4. Load the permission snapshot (cached 60 s per tenant + membership, invalidated on change).
 5. FR-IAM-002: a membership holding a privileged role (roles.yaml ``mfa_required``) or flagged
    ``mfa_required`` needs the MFA claim, else 403 ``mfa_required``.
@@ -75,8 +75,14 @@ SUSPENDED_SCHOOL_ALLOWLIST: Final[tuple[SuspendedAccess, ...]] = (
     # Plan & billing (FR-PLT-030): what is owed, so the school can pay and be reactivated.
     SuspendedAccess("GET", "/api/v1/tenant/billing", SUSPENDED_ROLES),
     SuspendedAccess("GET", "/api/v1/tenant/billing/invoices", SUSPENDED_ROLES),
-    # FR-ADM-001 full data export (not built yet): add its route here when it lands, e.g.
-    # SuspendedAccess("POST", "/api/v1/admin/tenant-export", SUSPENDED_ROLES),
+    # FR-ADM-001 full data export: request it, follow it and download it while the archive
+    # exists (the route permission tenant.export_all still applies: the owner by default).
+    SuspendedAccess("POST", "/api/v1/admin/tenant-export", SUSPENDED_ROLES),
+    SuspendedAccess("GET", "/api/v1/admin/tenant-export", SUSPENDED_ROLES),
+    SuspendedAccess("GET", "/api/v1/admin/tenant-export/{tenant_export_id}", SUSPENDED_ROLES),
+    SuspendedAccess(
+        "GET", "/api/v1/admin/tenant-export/{tenant_export_id}/download-url", SUSPENDED_ROLES
+    ),
 )
 """The only (method, route template, roles) a suspended or offboarding school may still use.
 

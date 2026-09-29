@@ -35,6 +35,26 @@ PINNED = {
     ("POST", "/api/v1/me/login-event", frozenset({"owner", "principal"})),
     ("GET", "/api/v1/tenant/billing", frozenset({"owner", "principal"})),
     ("GET", "/api/v1/tenant/billing/invoices", frozenset({"owner", "principal"})),
+    # FR-ADM-001 full data export (docs/16 §5.5): request, follow and download it.
+    ("POST", "/api/v1/admin/tenant-export", frozenset({"owner", "principal"})),
+    ("GET", "/api/v1/admin/tenant-export", frozenset({"owner", "principal"})),
+    (
+        "GET",
+        "/api/v1/admin/tenant-export/{tenant_export_id}",
+        frozenset({"owner", "principal"}),
+    ),
+    (
+        "GET",
+        "/api/v1/admin/tenant-export/{tenant_export_id}/download-url",
+        frozenset({"owner", "principal"}),
+    ),
+}
+# The only non-GET routes a suspended school keeps: the session flow, and requesting the full
+# export (FR-ADM-001: the archive is made from the school's data; nothing else changes).
+STATE_CHANGING = {
+    ME_ACTIVE_TENANT,
+    ME_LOGIN_EVENT,
+    RouteKey("POST", "/api/v1/admin/tenant-export"),
 }
 
 
@@ -74,7 +94,29 @@ def test_BR_08_every_allowlisted_route_exists_and_is_guarded(app: FastAPI) -> No
         guards = [d.call for d in route.dependant.dependencies if hasattr(d.call, "sos_permission")]
         assert len(guards) == 1, f"{entry.method} {entry.path} needs its route guard"
         # The allowlist never bypasses the permission: GET routes are read-only views.
-        assert entry.method in {"GET"} or entry.key in {ME_ACTIVE_TENANT, ME_LOGIN_EVENT}
+        assert entry.method in {"GET"} or entry.key in STATE_CHANGING
+
+
+def test_BR_08_full_export_routes_keep_their_owner_only_guard(app: FastAPI) -> None:
+    """FR-ADM-001: the allowlist lets the owner and principal reach the export routes, but the
+    route guard still needs tenant.export_all for the whole school (the owner by default), and
+    requesting or downloading needs step-up."""
+    routes = _routes(app)
+    export_entries = [
+        e for e in SUSPENDED_SCHOOL_ALLOWLIST if e.path.startswith("/api/v1/admin/tenant-export")
+    ]
+    assert len(export_entries) == 4
+    for entry in export_entries:
+        route = routes[(entry.method, entry.path)]
+        guard: Any = next(
+            d.call for d in route.dependant.dependencies if hasattr(d.call, "sos_permission")
+        )
+        assert guard.sos_permission == "tenant.export_all"
+        assert guard.sos_scope == "school"
+        step_up = entry.method == "POST" or entry.path.endswith("/download-url")
+        assert guard.sos_step_up is step_up
+    holders = {k for k, r in system_roles().items() if "tenant.export_all" in r.permission_keys}
+    assert holders == {"owner"}
 
 
 def test_BR_08_route_matching_is_exact_and_fails_closed() -> None:

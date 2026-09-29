@@ -25,6 +25,8 @@ REQUIRED = {
     "announcement.new",
     "export.ready",
     "export.failed",
+    "admin.tenant_export.ready",
+    "admin.tenant_export.failed",
 }
 NUMERIC = {
     "blockers",
@@ -35,6 +37,7 @@ NUMERIC = {
     "minutes",
     "low_confidence_rows",
     "students",
+    "hours",
 }
 
 

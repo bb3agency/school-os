@@ -96,6 +96,50 @@ class StoredObj:
     lifecycle: str | None = None
 
 
+class MemoryWriter:
+    """Implements ``app.documents.storage.ObjectWriter``: the object appears on ``close``
+    (like a completed multipart upload); ``abort`` leaves nothing. Not seekable."""
+
+    def __init__(
+        self, store: MemoryStore, key: str, content_type: str, lifecycle: str | None
+    ) -> None:
+        self._store = store
+        self._key = key
+        self._content_type = content_type
+        self._lifecycle = lifecycle
+        self._buffer = bytearray()
+        self._done = False
+        store.writers.append(self)
+
+    @property
+    def size(self) -> int:
+        return len(self._buffer)
+
+    @property
+    def aborted(self) -> bool:
+        return self._done and self._key not in self._store.objects
+
+    def write(self, data: bytes, /) -> int:
+        if self._done:
+            raise ValueError("writer is closed")
+        self._buffer += data
+        return len(data)
+
+    def flush(self) -> None:
+        return None
+
+    def close(self) -> None:
+        if not self._done:
+            self._done = True
+            self._store.objects[self._key] = StoredObj(
+                bytes(self._buffer), self._content_type, self._lifecycle
+            )
+
+    def abort(self) -> None:
+        self._done = True
+        self._buffer.clear()
+
+
 @dataclass
 class MemoryStore:
     """Implements ``app.documents.storage.ObjectStore`` and records presign calls."""
@@ -104,6 +148,7 @@ class MemoryStore:
     posts: list[dict[str, Any]] = field(default_factory=list)
     gets: list[dict[str, Any]] = field(default_factory=list)
     discarded: list[str] = field(default_factory=list)
+    writers: list[MemoryWriter] = field(default_factory=list)
     kms_key_id: str | None = None
     # Test hook: runs right before a conditional copy (simulates a concurrent re-upload).
     before_copy: Any = None
@@ -186,6 +231,13 @@ class MemoryStore:
         if lifecycle is not None and lifecycle not in storage.LIFECYCLE_TAG_VALUES:
             raise ValueError("unknown lifecycle tag value")
         self.objects[key] = StoredObj(data, content_type, lifecycle)
+
+    def open_writer(
+        self, key: str, content_type: str, *, lifecycle: str | None = None
+    ) -> MemoryWriter:
+        if lifecycle is not None and lifecycle not in storage.LIFECYCLE_TAG_VALUES:
+            raise ValueError("unknown lifecycle tag value")
+        return MemoryWriter(self, key, content_type, lifecycle)
 
     def delete(self, key: str) -> None:
         self.objects.pop(key, None)

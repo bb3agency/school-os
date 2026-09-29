@@ -37,6 +37,7 @@ from app.audit.schemas import SummaryError, sanitize_summary
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.kv import KVUnavailable, kv_store
+from app.core import retention
 from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import Conflict, NotFound, RateLimited, ValidationFailed
@@ -225,9 +226,14 @@ def mark_all_read(session: Session, ctx: UserContext) -> int:
     return repo.mark_all_read(session, ctx.membership_id)
 
 
+READ_RETENTION_CATEGORY: Final = "notifications_read"
+
+
 def purge_read(session: Session, *, now: dt.datetime | None = None) -> int:
-    """Delete this school's notifications read more than the retention period ago (90 days)."""
-    cutoff = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(days=templates.read_retention_days())
+    """Delete this school's notifications read more than the retention period ago (the
+    school's setting, FR-ADM-002, else ``retention.read_days`` in templates.yaml: 90 days)."""
+    keep = retention.days(session, READ_RETENTION_CATEGORY, default=templates.read_retention_days())
+    cutoff = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(days=keep)
     return repo.purge_read_before(session, cutoff)
 
 
@@ -433,6 +439,7 @@ __all__ = [
     "EMAIL_EVENT",
     "EMAIL_TASK",
     "INVITATION_TEMPLATE",
+    "READ_RETENTION_CATEGORY",
     "PermissionSelector",
     "Recipients",
     "SummaryError",

@@ -87,6 +87,10 @@ The April 2022 CERT-In directions apply to service providers and body corporates
 
 See 05-Data model §13. Principles: keep official school records per the school's legal obligations; delete working data (imports, exports, AI query logs) quickly; keep security and audit logs at least 1 year (in India); support **legal holds** that suspend deletion for specific records when the school instructs.
 
+**Retention settings (FR-ADM-002, as built):** the owner or principal may shorten the retention of working data (raw import files 7–90 days, export files 1–7, read notifications 30–90) on the Data retention screen; SchoolOS never keeps working data longer than the defaults, and audit/security logs (≥ 13 months) and the full-export archive (24 hours) are fixed. Every change is audited (`admin.retention.updated`). Official student records and uploaded documents are never deleted automatically. The minimums are engineering choices pending legal review.
+
+**Full data export (FR-ADM-001, as built):** the owner (`tenant.export_all`, fresh MFA sign-in) exports every record table as CSV and JSON, every document that passed the virus scan and the audit log as CSV in one archive, downloadable for 24 hours. Restricted (C3) values are masked unless the owner explicitly includes them (needs `student.read_sensitive`; the audit event lists the restricted fields included); the Aadhaar-as-printed name, date of birth and gender are never exported and full Aadhaar numbers are never stored. This is the export the school takes before offboarding, and it stays available while a school is suspended (16 §5.5).
+
 Offboarding: school exports data → SchoolOS deletes tenant data within 30 days → destroys tenant keys (crypto-shredding, which also makes backup copies unreadable) → issues a certificate of deletion. Backups age out on their normal schedule.
 
 ## 8. AI-specific transparency

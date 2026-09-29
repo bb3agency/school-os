@@ -2,7 +2,7 @@
 
 While a school is suspended the owner and principal may still use only the routes in
 ``app.authz.resolver.SUSPENDED_SCHOOL_ALLOWLIST`` (who am I, school choice, sign-in event and
-Plan & billing; the full export once FR-ADM-001 exists). Every other school route answers
+Plan & billing and the full data export, FR-ADM-001). Every other school route answers
 403 ``tenant_suspended`` for every role; the enumeration test walks every tenant route.
 """
 
@@ -70,14 +70,24 @@ def test_BR_08_enumeration_covers_the_school_routes() -> None:
     assert tenant_allowed <= set(TENANT_ROUTES)
 
 
+# Allowlisted routes answer exactly as in an active school (random ids: 404; the full export
+# request: 202). Only these statuses; never 403 tenant_suspended.
+ALLOWED_STATUS = {
+    ("POST", "/api/v1/admin/tenant-export"): 202,
+    ("GET", "/api/v1/admin/tenant-export/{tenant_export_id}"): 404,
+    ("GET", "/api/v1/admin/tenant-export/{tenant_export_id}/download-url"): 404,
+}
+
+
 @pytest.mark.parametrize(("method", "path"), TENANT_ROUTES)
 def test_BR_08_every_other_route_is_403_tenant_suspended_for_the_owner(
     suspended: Any, api: Any, method: str, path: str
 ) -> None:
     _tid, people = suspended
-    res = api.call(people["owner"], method, _concrete(path))
+    body: dict[str, Any] | None = {} if (method, path) in ALLOWED and method == "POST" else None
+    res = api.call(people["owner"], method, _concrete(path), json=body)
     if (method, path) in ALLOWED:
-        assert res.status_code == 200, res.text
+        assert res.status_code == ALLOWED_STATUS.get((method, path), 200), res.text
     else:
         assert res.status_code == 403, f"{method} {path}: {res.status_code} {res.text}"
         body = res.json()
@@ -106,6 +116,54 @@ def test_BR_08_owner_and_principal_keep_me_and_billing(suspended: Any, api: Any,
     users = api.call(person, "GET", "/api/v1/users")
     assert users.status_code == 403
     assert users.json()["code"] == "tenant_suspended"
+
+
+def test_BR_08_owner_can_still_export_all_data_while_suspended(
+    suspended: Any, api: Any, admin_engine: Engine
+) -> None:
+    """FR-ADM-001, docs/16 §5.5: the owner requests the full export, the worker builds it for
+    the suspended school, and the owner downloads it. The principal reaches the route but lacks
+    tenant.export_all (403 forbidden, not tenant_suspended); other roles stay suspended."""
+    tid, people = suspended
+    ad = _admin_support()
+    ad.install()
+    school = W.School(tid, people=dict(people))
+    ad.settle(admin_engine, school)
+    res = api.call(people["owner"], "POST", "/api/v1/admin/tenant-export", json={})
+    assert res.status_code == 202, res.text
+    export_id = uuid.UUID(res.json()["id"])
+    assert ad.run(school, export_id) == "ready"
+    listed = api.call(people["owner"], "GET", "/api/v1/admin/tenant-export")
+    assert export_id in {uuid.UUID(e["id"]) for e in listed.json()["data"]}
+    link = api.call(people["owner"], "GET", f"/api/v1/admin/tenant-export/{export_id}/download-url")
+    assert link.status_code == 200, link.text
+    principal = api.call(people["principal"], "GET", "/api/v1/admin/tenant-export")
+    assert principal.status_code == 403
+    assert principal.json()["code"] != "tenant_suspended"
+    for role in ("accountant", "office_admin"):
+        res = api.call(people[role], "GET", "/api/v1/admin/tenant-export")
+        assert res.status_code == 403
+        assert res.json()["code"] == "tenant_suspended"
+    # Retention settings are not on the allowlist, not even for the owner.
+    retention = api.call(people["owner"], "GET", "/api/v1/admin/retention")
+    assert retention.status_code == 403
+    assert retention.json()["code"] == "tenant_suspended"
+
+
+def _admin_support() -> Any:
+    import importlib.util
+    from pathlib import Path
+
+    name = "sos_test_admin_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "admin" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
 
 
 @pytest.mark.parametrize("role", ["accountant", "office_admin", "office_staff"])

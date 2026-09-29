@@ -37,6 +37,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, aliased
 
 from app.core.errors import Conflict, DomainError, NotFound, ValidationFailed
+from app.core.record_tables import dump_table
+from app.core.records import RecordTable
 from app.students.models import (
     AttributeDefinition,
     AttributeValue,
@@ -939,3 +941,53 @@ def ensure_found[T](value: T | None, what: str) -> T:
 
 def unique_ids(ids: Sequence[uuid.UUID]) -> list[uuid.UUID]:
     return list(dict.fromkeys(ids))
+
+
+# --- full data export (FR-ADM-001) ------------------------------------------------------------
+
+
+def export_plain_tables(session: Session) -> list[RecordTable]:
+    """The school's student tables that hold no ciphertext, every row (RLS: this school)."""
+    return [
+        dump_table(session, Student.__table__, name="students", order_by=("created_at", "id")),
+        dump_table(
+            session,
+            Enrollment.__table__,
+            name="enrollments",
+            order_by=("student_id", "created_at", "id"),
+        ),
+        dump_table(
+            session,
+            StudentGuardian.__table__,
+            name="student_guardians",
+            order_by=("student_id", "guardian_id"),
+        ),
+        dump_table(
+            session,
+            PromotionRun.__table__,
+            name="promotion_runs",
+            order_by=("committed_at", "id"),
+        ),
+        dump_table(
+            session,
+            PromotionItem.__table__,
+            name="promotion_items",
+            order_by=("run_id", "student_id"),
+        ),
+    ]
+
+
+def all_values(session: Session) -> list[AttributeValue]:
+    """Every recorded value of every student (history included), in a stable order."""
+    stmt = select(AttributeValue).order_by(
+        AttributeValue.student_id,
+        AttributeValue.attribute_key,
+        AttributeValue.source,
+        AttributeValue.recorded_at,
+        AttributeValue.id,
+    )
+    return list(session.scalars(stmt))
+
+
+def all_guardians(session: Session) -> list[Guardian]:
+    return list(session.scalars(select(Guardian).order_by(Guardian.created_at, Guardian.id)))

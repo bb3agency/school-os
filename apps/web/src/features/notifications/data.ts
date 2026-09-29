@@ -34,6 +34,8 @@ const LINKS: Record<string, (id: string) => string> = {
   dq_run: (id) => `/findings/runs/${id}`,
   breakglass_grant: (id) => `/break-glass/${id}`,
   export: (id) => `/exports/${id}`,
+  // FR-ADM-001: the full data export has one screen (status, download, history).
+  tenant_export: () => "/settings/data-export",
   import_batch: (id) => `/imports/${id}`,
   extraction_batch: (id) => `/register-photos/${id}`,
   // document.quarantined: the document screen explains why the file was blocked.

@@ -16,6 +16,7 @@ export type ErrorNamespace =
   | "breakGlass"
   | "notifications"
   | "exports"
+  | "admin"
   | "school.users"
   | "academicStructure"
   | "schoolSettings"

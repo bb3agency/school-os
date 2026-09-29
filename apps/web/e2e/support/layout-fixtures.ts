@@ -977,6 +977,30 @@ const TENANT_INVOICES: Schemas["TenantInvoice"][] = Array.from({ length: 8 }, (_
   };
 });
 
+// FR-ADM-002: retention categories (editable and fixed), as GET /admin/retention answers.
+const RETENTION: Schemas["RetentionOut"] = {
+  categories: [
+    ["import_raw_files", 45, 90, 7, 90, true, true],
+    ["exports", 7, 7, 1, 7, true, true],
+    ["notifications_read", 90, 90, 30, 90, true, true],
+    ["tenant_exports", 1, 1, 1, 1, false, true],
+    ["kb_queries", 180, 180, 180, 180, false, false],
+    ["audit_events", 395, 395, 395, 395, false, false],
+  ].map(([key, days, def, min, max, configurable, enforced]) => ({
+    key: String(key),
+    days: Number(days),
+    default_days: Number(def),
+    min_days: Number(min),
+    max_days: Number(max),
+    configurable: Boolean(configurable),
+    enforced: Boolean(enforced),
+    is_default: days === def,
+  })),
+  version: 3,
+  updated_at: at(2),
+  updated_by: { membership_id: uid("00000000e9", 1), display_name: `Synthetica ${LONG_TOKEN}` },
+};
+
 const VERIFIED_ANSWERS: Schemas["VerifiedAnswerOut"][] = [
   [
     "When are the Dasara holidays?",
@@ -1600,6 +1624,8 @@ const ROUTES: Array<[RegExp, Handler]> = [
     ([, id = ""]) => ({ ...(GRANTS.find((g) => g.id === id) ?? GRANTS[1]), id }),
   ],
   [re("/tenant/billing/invoices"), () => page(TENANT_INVOICES)],
+  // Admin console (US-1201): retention settings.
+  [re("/admin/retention"), () => RETENTION],
   [
     re("/knowledge/verified-answers"),
     (_, q) => page(by(VERIFIED_ANSWERS, q, "status", (r) => r.status)),

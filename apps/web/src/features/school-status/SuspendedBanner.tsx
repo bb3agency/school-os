@@ -23,6 +23,7 @@ const KEEPS_ACCESS = ["owner", "principal"];
  */
 export function SuspendedBanner({ initialStatus = "active" }: { initialStatus?: SchoolStatus }) {
   const t = useTranslations("suspended");
+  const ta = useTranslations("admin.suspended");
   const queryClient = useQueryClient();
   const me = useStaffMeQuery();
   const [announced, setAnnounced] = useState(false);
@@ -49,6 +50,8 @@ export function SuspendedBanner({ initialStatus = "active" }: { initialStatus?: 
 
   const keepsAccess = me.data?.roles.some((role) => KEEPS_ACCESS.includes(role)) ?? false;
   const canSeeBilling = me.data?.permissions.includes("tenant.billing.read") ?? false;
+  // FR-ADM-001: the full data export stays open to its holders (the owner) while paused.
+  const canExport = me.data?.permissions.includes("tenant.export_all") ?? false;
   const kind = status === "offboarding" ? "offboarding" : "suspended";
 
   return (
@@ -57,11 +60,18 @@ export function SuspendedBanner({ initialStatus = "active" }: { initialStatus?: 
       <Alert tone="warning" title={t(`${kind}.title`)}>
         <p>{keepsAccess ? t(`${kind}.leaderBody`) : t(`${kind}.staffBody`)}</p>
         <p className="mt-1">{t("nothingDeleted")}</p>
-        {keepsAccess && canSeeBilling ? (
-          <p className="mt-3">
-            <ButtonLink href="/settings/billing" variant="secondary" size="sm">
-              {t("billingLink")}
-            </ButtonLink>
+        {keepsAccess && (canSeeBilling || canExport) ? (
+          <p className="mt-3 flex flex-wrap gap-3">
+            {canSeeBilling ? (
+              <ButtonLink href="/settings/billing" variant="secondary" size="sm">
+                {t("billingLink")}
+              </ButtonLink>
+            ) : null}
+            {canExport ? (
+              <ButtonLink href="/settings/data-export" variant="secondary" size="sm">
+                {ta("exportLink")}
+              </ButtonLink>
+            ) : null}
           </p>
         ) : null}
       </Alert>

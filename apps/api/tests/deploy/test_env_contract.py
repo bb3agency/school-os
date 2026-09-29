@@ -624,3 +624,20 @@ def test_FR_EXP_003_export_lifecycle_rule_matches_the_tag_the_app_sets(module_di
     assert f'"{LIFECYCLE_TAG}" = "{LIFECYCLE_EXPORT}"' in rule
     assert re.search(r"\bexpiration_days\s*=\s*7\b", rule)
     assert re.search(r"\bnoncurrent_version_expiration_days\s*=\s*1\b", rule)
+
+
+@pytest.mark.parametrize("module_dir", [REPO / "infra/terraform/modules/s3", HOST])
+def test_FR_ADM_001_full_export_lifecycle_rule_matches_the_tag_the_app_sets(
+    module_dir: Path,
+) -> None:
+    """FR-ADM-001: the school's full data export is downloadable for 24 hours; the purge job
+    deletes it then and the bucket rule ``tenant-export-2d`` is the backstop. It selects the tag
+    the app sets on the archive (documents.storage open_writer) and expires the noncurrent copy
+    after one day, so the archive never outlives its link by the 90-day recovery window."""
+    from app.documents.storage import LIFECYCLE_TAG, LIFECYCLE_TENANT_EXPORT
+
+    text = (module_dir / "main.tf").read_text(encoding="utf-8")
+    rule = _lifecycle_rule(text, "tenant-export-2d")
+    assert f'"{LIFECYCLE_TAG}" = "{LIFECYCLE_TENANT_EXPORT}"' in rule
+    assert re.search(r"\bexpiration_days\s*=\s*2\b", rule)
+    assert re.search(r"\bnoncurrent_version_expiration_days\s*=\s*1\b", rule)

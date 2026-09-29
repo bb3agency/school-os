@@ -49,6 +49,7 @@ from app.core.errors import (
 )
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.dq import engine
 from app.dq import repository as repo
@@ -1066,6 +1067,13 @@ def summary(
     )
 
 
+def export_records(session: Session) -> list[RecordTable]:
+    """Worker only: every data-quality run and finding of the current school for its full data
+    export (``app.admin``; the caller checked ``tenant.export_all`` and audits the export).
+    Findings carry the masked values the engine stored (FR-DQ-006), never C3 values."""
+    return repo.export_record_tables(session)
+
+
 __all__ = [
     "EXECUTE_TASK",
     "INCREMENTAL_EVENTS",
@@ -1077,6 +1085,7 @@ __all__ = [
     "UNLINK_TASK",
     "WAIVE",
     "execute_queued_run",
+    "export_records",
     "findings_for_student",
     "findings_for_students",
     "get_finding",
