@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 · 2026-09-26 |
+| Version | 0.3 · 2026-09-29 |
 | Laws/regimes | DPDP Act 2023 + DPDP Rules 2025 · IT Act 2000 / CERT-In Directions (Apr 2022) · UIDAI Aadhaar rules |
 | Related | 05-Data model §8–13, 07-Security, 11-Operations §7 (incident response), 16-Platform admin panel, ADR-0015, ADR-0016 |
-| Changes | 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
+| Changes | 0.3: circulars and parent notices privacy rules (§8). 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
 
 > **Not legal advice.** This document records engineering and product commitments based on public sources checked in September 2026. Have a qualified lawyer review the DPA, notices and incident process before handling real data.
 
@@ -108,6 +108,7 @@ How it works (built; ADR-0029, docs/16 §5.5.1; decisions of 2026-09-29):
 - Prompts and outputs are not used to train models (commercial API terms; ZDR requested for the production organization).
 - Only the fields needed for a question are sent; C3 fields only when the user is permitted and asked for them; never Aadhaar data.
 - Parents' notices (template) mention that the school uses a software provider, including AI-assisted search, under a data processing agreement.
+- Circulars and parent notices (M4, 05 §6.3, 06 §4.10): the reading sends only one circular version's own Aadhaar-masked passages; AI deadline suggestions and notice drafts are marked as AI output and change nothing until a person confirms or approves them. A notice is drafted only from a C1 circular or staff text, never from student records; staff text or notice text with a phone number, email address or Aadhaar-like number is refused; the staff text is not stored. SchoolOS does not send notices to parents: the school posts the approved text itself.
 
 ## 9. Data Processing Agreement (key clauses)
 
