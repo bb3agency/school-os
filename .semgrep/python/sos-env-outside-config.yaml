@@ -16,6 +16,9 @@ rules:
         - "/apps/**"
       exclude:
         - "/apps/api/app/core/config.py"
+        # The Tally edge agent (ADR-0032) is a separate Windows program without app.core.config;
+        # its own config module is the one place it reads the environment (LOCALAPPDATA).
+        - "/apps/edge-agent/sos_edge_agent/config.py"
         # Tests set process env through pytest's monkeypatch.setenv, which this rule does not flag;
         # direct os.environ use in tests is still discouraged but not blocked.
         - "/apps/*/tests/**"
