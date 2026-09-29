@@ -44,6 +44,13 @@ D = C.D
 world = W.world
 api = W.api
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers", "chromium: renders with the real headless Chromium (skipped when absent)"
+    )
+
+
 SCOPED_PERMISSIONS = (
     "student.read_basic",
     "certificate.read",
