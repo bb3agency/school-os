@@ -1,8 +1,10 @@
 import type { AuditEvent } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { TextField } from "@/components/ui/Input";
+import { Pill } from "@/components/ui/Badge";
+import { cardClasses } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
+import { SearchInput, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
@@ -31,8 +33,24 @@ export function formatSummary(summary: Readonly<Record<string, unknown>>): strin
   return text.length > MAX_SUMMARY ? `${text.slice(0, MAX_SUMMARY - 1)}…` : text;
 }
 
-/** US-1001 / FR-AUD-005: audit viewer with filters, integrity check and CSV export. */
-export function AuditView({ events }: { events: Loadable<readonly AuditEvent[]> }) {
+export interface AuditFilterValues {
+  actor?: string | undefined;
+  action?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
+/**
+ * US-1001 / FR-AUD-005: audit viewer with a filter bar (a GET form: the filters live in the
+ * URL and are shown again after filtering), the integrity check and CSV export.
+ */
+export function AuditView({
+  events,
+  filters = {},
+}: {
+  events: Loadable<readonly AuditEvent[]>;
+  filters?: AuditFilterValues;
+}) {
   const t = useTranslations("school.audit");
   const tc = useTranslations("common");
 
@@ -46,72 +64,125 @@ export function AuditView({ events }: { events: Loadable<readonly AuditEvent[]> 
     {
       key: "when",
       header: t("colWhen"),
-      cell: (row) => <Value>{formatDateTime(row.occurred_at)}</Value>,
+      className: "whitespace-nowrap",
+      cell: (row) => (
+        <span className="font-mono text-xs text-ink-muted">
+          <Value>{formatDateTime(row.occurred_at)}</Value>
+        </span>
+      ),
     },
     { key: "who", header: t("colWho"), cell: (row) => actor(row) },
     {
       key: "action",
       header: t("colAction"),
-      cell: (row) => <code className="font-mono text-xs">{row.action}</code>,
+      cell: (row) => <Pill variant="command">{row.action}</Pill>,
     },
     {
       key: "record",
       header: t("colRecord"),
-      cell: (row) => `${row.resource_type}${row.resource_id ? ` · ${row.resource_id}` : ""}`,
+      cell: (row) => (
+        <span className="text-sm">
+          {row.resource_type}
+          {row.resource_id ? (
+            <span className="block font-mono text-xs break-all text-ink-subtle">
+              {row.resource_id}
+            </span>
+          ) : null}
+        </span>
+      ),
     },
     {
       key: "summary",
       header: t("colSummary"),
-      cell: (row) => <Value>{formatSummary(row.summary)}</Value>,
+      cell: (row) => (
+        <span className="text-sm break-words text-ink-muted">
+          <Value>{formatSummary(row.summary)}</Value>
+        </span>
+      ),
     },
   ];
+
+  const active = Boolean(filters.actor || filters.action || filters.from || filters.to);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: t("home"), href: "/" }, { label: t("title") }]}
         actions={
           <>
             <ButtonLink href="/audit/verify" variant="secondary">
+              <Icon name="shieldCheck" className="size-4" />
               {t("verify")}
             </ButtonLink>
-            <Button variant="secondary" disabled>
+            <Button variant="secondary" disabled aria-describedby="audit-export-note">
+              <Icon name="file" className="size-4" />
               {t("exportCsv")}
             </Button>
+            <span id="audit-export-note" className="sr-only">
+              {t("exportLater")}
+            </span>
           </>
         }
       />
-      <Card title={t("filtersTitle")}>
+      <div className={cardClasses({ padding: "sm" })}>
         {/* GET form: filters live in the URL, work without JavaScript and can be bookmarked. */}
-        <form method="get" className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <TextField name="actor" label={t("filterUser")} autoComplete="off" />
-          <TextField name="action" label={t("filterAction")} autoComplete="off" />
+        <form
+          method="get"
+          role="search"
+          aria-label={t("filtersTitle")}
+          className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem_9rem_auto]"
+        >
+          <SearchInput
+            name="action"
+            label={t("filterAction")}
+            labelVisible
+            placeholder={t("filterActionPlaceholder")}
+            defaultValue={filters.action ?? ""}
+            autoComplete="off"
+          />
+          <SearchInput
+            name="actor"
+            icon="users"
+            label={t("filterUser")}
+            labelVisible
+            placeholder={t("filterUserPlaceholder")}
+            defaultValue={filters.actor ?? ""}
+            autoComplete="off"
+          />
           <TextField
             name="from"
             label={t("filterFrom")}
-            hint={tc("dateHint")}
             inputMode="numeric"
             pattern="\d{2}/\d{2}/\d{4}"
             placeholder="DD/MM/YYYY"
+            defaultValue={filters.from ?? ""}
             autoComplete="off"
           />
           <TextField
             name="to"
             label={t("filterTo")}
-            hint={tc("dateHint")}
             inputMode="numeric"
             pattern="\d{2}/\d{2}/\d{4}"
             placeholder="DD/MM/YYYY"
+            defaultValue={filters.to ?? ""}
             autoComplete="off"
           />
-          <div>
-            <Button type="submit" variant="secondary">
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit">
+              <Icon name="filter" className="size-4" />
               {tc("applyFilters")}
             </Button>
+            {active ? (
+              <ButtonLink href="/audit" variant="ghost">
+                {t("clearFilters")}
+              </ButtonLink>
+            ) : null}
           </div>
         </form>
-      </Card>
+        <p className="mt-2 text-xs text-ink-subtle">{tc("dateHint")}</p>
+      </div>
       <DataTable
         caption={t("title")}
         captionHidden

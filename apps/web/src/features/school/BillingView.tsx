@@ -59,7 +59,11 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
     {
       key: "number",
       header: t("colNumber"),
-      cell: (row) => <Value>{row.invoice_number}</Value>,
+      cell: (row) => (
+        <span className="font-mono text-xs">
+          <Value>{row.invoice_number}</Value>
+        </span>
+      ),
     },
     {
       key: "period",
@@ -106,7 +110,11 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: t("home"), href: "/" }, { label: t("title") }]}
+      />
       {billing.status === "error" ? (
         <Alert tone="danger" title={tc("loadErrorTitle")}>
           {billing.reason ? te(`load.${billing.reason}`) : tc("loadErrorBody")}
@@ -125,43 +133,51 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
           {billing.status === "loading" ? <LoadingState label={tc("loading")} /> : null}
           {plan && !plan.available ? <Alert tone="info">{t("planUnavailable")}</Alert> : null}
           {plan && plan.available ? (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-              <dt className="text-ink-muted">{t("plan")}</dt>
-              <dd className="font-semibold">
-                <Value>{plan.plan_name}</Value>
-              </dd>
-              <dt className="text-ink-muted">{t("status")}</dt>
-              <dd>
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-2xl font-medium text-ink">
+                  <span className="sr-only">{t("plan")}: </span>
+                  <Value>{plan.plan_name}</Value>
+                </p>
                 {subStatus ? (
-                  <Badge tone={subscriptionTone[subStatus]}>{tsub(subStatus)}</Badge>
+                  <Badge tone={subscriptionTone[subStatus]}>
+                    <span className="sr-only">{t("status")}: </span>
+                    {tsub(subStatus)}
+                  </Badge>
                 ) : (
                   <Value>{plan.status}</Value>
                 )}
                 {plan.cancel_at_period_end ? (
-                  <span className="ml-2 text-ink-muted">{t("endsAtPeriodEnd")}</span>
+                  <span className="text-sm text-ink-muted">{t("endsAtPeriodEnd")}</span>
                 ) : null}
-              </dd>
-              <dt className="text-ink-muted">{t("period")}</dt>
-              <dd>
-                <Value>
-                  {plan.current_period_start && plan.current_period_end
-                    ? `${formatDate(plan.current_period_start) ?? ""} – ${formatDate(plan.current_period_end) ?? ""}`
-                    : null}
-                </Value>
-              </dd>
-              {plan.status === "trial" ? (
-                <>
-                  <dt className="text-ink-muted">{t("trialEndsOn")}</dt>
-                  <dd>
-                    <Value>{formatDate(plan.trial_ends_at)}</Value>
+              </div>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-lg bg-surface-muted p-4">
+                  <dt className="text-sm text-ink-muted">{t("amountDue")}</dt>
+                  <dd className="mt-1 font-display text-4xl text-ink tabular-nums">
+                    <Value>{formatInr(plan.amount_due_inr, locale)}</Value>
                   </dd>
-                </>
-              ) : null}
-              <dt className="text-ink-muted">{t("amountDue")}</dt>
-              <dd className="tabular-nums">
-                <Value>{formatInr(plan.amount_due_inr, locale)}</Value>
-              </dd>
-            </dl>
+                </div>
+                <div className="rounded-lg bg-surface-muted p-4">
+                  <dt className="text-sm text-ink-muted">{t("period")}</dt>
+                  <dd className="mt-2 font-mono text-sm text-ink">
+                    <Value>
+                      {plan.current_period_start && plan.current_period_end
+                        ? `${formatDate(plan.current_period_start) ?? ""} – ${formatDate(plan.current_period_end) ?? ""}`
+                        : null}
+                    </Value>
+                  </dd>
+                  {plan.status === "trial" ? (
+                    <>
+                      <dt className="mt-3 text-sm text-ink-muted">{t("trialEndsOn")}</dt>
+                      <dd className="mt-1 font-mono text-sm text-ink">
+                        <Value>{formatDate(plan.trial_ends_at)}</Value>
+                      </dd>
+                    </>
+                  ) : null}
+                </div>
+              </dl>
+            </div>
           ) : null}
         </Card>
         <Card

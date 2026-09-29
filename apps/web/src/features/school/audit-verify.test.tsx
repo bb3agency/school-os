@@ -102,6 +102,25 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
     );
   });
 
+  it("the audit log's filter bar is a GET search form that shows the URL's filters again (FR-AUD-005)", () => {
+    renderWithIntl(
+      <AuditView
+        events={{ status: "ready", data: [] }}
+        filters={{ action: "student.update", from: "01/06/2026" }}
+      />,
+    );
+    const form = screen.getByRole("search", { name: "Filters" });
+    expect(form).toHaveAttribute("method", "get");
+    expect(screen.getByRole("searchbox", { name: "Action" })).toHaveValue("student.update");
+    expect(screen.getByLabelText("From date")).toHaveValue("01/06/2026");
+    expect(screen.getByRole("link", { name: "Clear filters" })).toHaveAttribute(
+      "href",
+      "/en/audit",
+    );
+    // CSV download is not wired on this screen yet: the button says why.
+    expect(screen.getByRole("button", { name: "Download CSV" })).toBeDisabled();
+  });
+
   for (const locale of ["en", "te"] as Locale[]) {
     it(`renders the page [${locale}]`, async () => {
       renderWithIntl(SchoolAuditVerifyPage(), locale);

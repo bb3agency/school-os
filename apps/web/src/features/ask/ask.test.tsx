@@ -139,6 +139,19 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     expect(within(answer).getByText("page 1")).toBeInTheDocument();
   });
 
+  it("example questions only fill the question box; nothing is sent until Ask (US-801)", async () => {
+    renderWithIntl(<AskPage />);
+    const user = userEvent.setup();
+    const examples = await screen.findByRole("list", { name: /^Example questions/ });
+    await user.click(
+      within(examples).getByRole("button", { name: "How many students are in Class 6?" }),
+    );
+    const box = screen.getByLabelText(/^Your question/);
+    expect(box).toHaveValue("How many students are in Class 6?");
+    expect(box).toHaveFocus();
+    expect(stub.callsTo(ASK)).toHaveLength(0);
+  });
+
   it("the question stays for a second ask in the same session id (FR-KB-012)", async () => {
     stub.routes[ASK] = () => sseResponse(answered);
     renderWithIntl(<AskPage />);
@@ -768,6 +781,24 @@ describe("verified answers (US-802, FR-KB-030)", () => {
     renderWithIntl(<VerifiedAnswersPage />, "te");
     expect(await screen.findByText(/Lakshmi Devi/)).toBeVisible();
     expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("finds answers on the loaded page by their words, without a request", async () => {
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () =>
+      page([
+        verified(),
+        verified({ id: "0192f3a4-0000-7000-8000-00000000e102", question: "Uniform days?" }),
+      ]);
+    renderWithIntl(<VerifiedAnswersPage />);
+    expect(await screen.findByRole("heading", { name: "Uniform days?" })).toBeVisible();
+    const before = stub.callsTo("GET /bff/api/v1/knowledge/verified-answers").length;
+    await userEvent.setup().type(screen.getByLabelText("Find on this page"), "uniform");
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "When do exams begin?" })).toBeNull(),
+    );
+    expect(screen.getByRole("heading", { name: "Uniform days?" })).toBeVisible();
+    expect(screen.getByText("1 of 2 answers on this page match.")).toBeVisible();
+    expect(stub.callsTo("GET /bff/api/v1/knowledge/verified-answers")).toHaveLength(before);
   });
 
   it("filters by status", async () => {

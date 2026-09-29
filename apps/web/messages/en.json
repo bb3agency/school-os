@@ -158,9 +158,60 @@
       "checksToReview": "Checks to review",
       "changesWaiting": "Changes waiting for approval",
       "recentImports": "Recent imports",
-      "cardHint": "Appears once your student records are imported.",
       "gettingStartedTitle": "Getting started",
-      "gettingStartedBody": "Set up your academic years, classes and sections first. Then invite your office staff."
+      "gettingStartedBody": "Four steps to get your school ready. Each one opens the screen where you do it.",
+      "eyebrow": "Today at your school",
+      "greeting": "Hello, {name}. Here is the work waiting for you.",
+      "askAction": "Ask the school",
+      "kpi": {
+        "label": "Key numbers",
+        "blockers": "Blocking problems",
+        "blockersNote": "Must be fixed before a portal submission",
+        "warnings": "Warnings",
+        "warningsNote": "Worth checking, not blocking",
+        "studentsAffected": "Students with blocking problems",
+        "studentsAffectedNote": "From the latest checks",
+        "pendingNote": "Identity changes waiting for a second person"
+      },
+      "work": {
+        "title": "Work waiting",
+        "loadError": "This could not be loaded. Reload the page to try again.",
+        "checksAction": "Review checks",
+        "checksNone": "No open problems. Run the checks again after each import.",
+        "checksBody": "{blockers} blocking problems and {warnings} warnings are open.",
+        "lastRun": "Checks last ran on {time}.",
+        "neverRun": "The checks have not run yet.",
+        "changesAction": "Open change requests",
+        "changesNone": "No changes are waiting for approval.",
+        "changesBody": "{count, plural, one {1 change is waiting for approval.} other {{shown} changes are waiting for approval.}}",
+        "changesNote": "Someone other than the person who asked must approve each change.",
+        "importsAction": "Open imports",
+        "importsNone": "No imports yet. Start with your admission register spreadsheet.",
+        "rows": "{count, plural, one {# row} other {# rows}}"
+      },
+      "steps": {
+        "label": "Steps to get started",
+        "startHere": "Start here:",
+        "next": "Next:",
+        "structure": {
+          "title": "Set up academic years, classes and sections",
+          "body": "Records, registers and reports use this structure."
+        },
+        "users": {
+          "title": "Invite your office staff",
+          "body": "Each person signs in with their own account and gets a role."
+        },
+        "import": {
+          "title": "Import student records",
+          "body": "Upload the admission register as an Excel or CSV file. You can undo an import for 24 hours."
+        },
+        "checks": {
+          "title": "Run the checks and fix problems",
+          "body": "SchoolOS compares your records with other sources and lists what does not match."
+        }
+      },
+      "nothingTitle": "Nothing is waiting for you",
+      "nothingBody": "Use the menu to open students, documents or other screens."
     },
     "structure": {
       "title": "School structure",
@@ -417,7 +468,8 @@
       "colAmountDue": "Still to pay",
       "colStatus": "Status",
       "emptyTitle": "No invoices yet",
-      "emptyBody": "Invoices appear here each month once your subscription is active."
+      "emptyBody": "Invoices appear here each month once your subscription is active.",
+      "home": "Home"
     },
     "audit": {
       "title": "Audit log",
@@ -468,8 +520,17 @@
           "head_missing": "The record of the latest event is missing.",
           "head_mismatch": "The latest event does not match the recorded end of the log.",
           "other": "The events do not link up as expected."
-        }
-      }
+        },
+        "statusLabel": "Result of the last check",
+        "notRunTitle": "Not checked yet",
+        "notRunBody": "Run the check to see whether every event is still linked to the one before it.",
+        "eventsChecked": "Events checked"
+      },
+      "home": "Home",
+      "filterActionPlaceholder": "Such as student.update",
+      "filterUserPlaceholder": "The person's user ID",
+      "clearFilters": "Clear filters",
+      "exportLater": "Downloading the audit log as a CSV file is not available on this screen yet."
     },
     "switchSchool": "Switch school",
     "announcements": {
@@ -502,7 +563,8 @@
       "reply": "Your reply",
       "closedNote": "This ticket is closed. Open a new ticket if you still need help.",
       "backToList": "Back to all tickets",
-      "priorityLine": "Priority: {priority}"
+      "priorityLine": "Priority: {priority}",
+      "home": "Home"
     }
   },
   "platform": {
@@ -2935,9 +2997,14 @@
     "loading": "Loading…",
     "empty": "No notifications",
     "emptyBody": "You'll see messages here when a request needs you or a check finishes.",
-    "unreadOnly": "Show unread only",
     "seeAll": "See all notifications",
-    "showMore": "Show more"
+    "showMore": "Show more",
+    "filterLegend": "Show notifications",
+    "filterAll": "All",
+    "filterUnread": "Unread",
+    "today": "Today · {date}",
+    "emptyUnread": "No unread notifications",
+    "emptyUnreadBody": "You have read everything. Choose \"All\" to see older messages."
   },
   "breakGlass": {
     "nav": "Support access",
@@ -3995,7 +4062,12 @@
       "interruptedBody": "Check your internet connection and ask again.",
       "previewLabel": "Draft answer, not checked yet",
       "replacedNote": "The draft was checked against the sources and changed to what they support.",
-      "countNote": "Student count (numbers only)"
+      "countNote": "Student count (numbers only)",
+      "assistant": "SchoolOS answer",
+      "draftPill": "Draft",
+      "sourcesCount": "{count, plural, one {# source} other {# sources}}",
+      "verifiedBadge": "From a verified answer",
+      "followUp": "Ask a follow-up"
     },
     "notFound": {
       "title": "Not found in the school records you can access",
@@ -4110,7 +4182,12 @@
           "title": "Answer or source not found",
           "body": "You can't read a document this answer cites, or the answer is gone. Ask the office to check who can see the documents."
         }
-      }
+      },
+      "filterLabel": "Find on this page",
+      "filterPlaceholder": "Words from the question or answer",
+      "filterCount": "{count} of {total} answers on this page match.",
+      "filterEmptyTitle": "No answers on this page match",
+      "filterEmptyBody": "Try other words, clear the box, or go to the next page."
     },
     "search": {
       "title": "Search documents",
@@ -4134,6 +4211,19 @@
     },
     "failedAnswer": {
       "title": "Something went wrong"
+    },
+    "home": "Home",
+    "panel": {
+      "eyebrow": "Ask the school",
+      "greeting": "What would you like to know?",
+      "description": "Answers come only from the records and documents you can see, and every answer shows its sources."
+    },
+    "examples": {
+      "label": "Example questions (they only fill in the box)",
+      "exams": "When do the half-yearly exams begin?",
+      "circular": "What does the latest holidays circular say?",
+      "classCount": "How many students are in Class 6?",
+      "certificate": "What is needed for a transfer certificate?"
     }
   },
   "welcome": {

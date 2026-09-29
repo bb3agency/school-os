@@ -1,13 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
+import { Pill, type PillVariant } from "@/components/ui/Badge";
+import { Card, cardClasses } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SearchInput } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
@@ -27,11 +28,21 @@ import { AskTabs, SourceChip } from "./parts";
 import { VerifiedAnswerDialog } from "./VerifiedAnswerDialog";
 
 const STATUSES: readonly VerifiedStatus[] = ["active", "needs_review", "retired"];
-const TONE: Record<VerifiedStatus, BadgeTone> = {
-  active: "success",
-  needs_review: "warning",
-  retired: "neutral",
+const PILL: Record<VerifiedStatus, PillVariant> = {
+  active: "done",
+  needs_review: "review",
+  retired: "tag",
 };
+
+/** Case-insensitive match on the question and answer of the answers already loaded. */
+export function matchesFilter(answer: VerifiedAnswer, filter: string): boolean {
+  const wanted = filter.trim().toLocaleLowerCase();
+  if (!wanted) return true;
+  return `${answer.question}
+${answer.answer_text}`
+    .toLocaleLowerCase()
+    .includes(wanted);
+}
 
 const noInput = z.object({});
 
@@ -94,14 +105,18 @@ function VerifiedCard({
       <Card
         headingLevel={3}
         title={answer.question}
-        actions={<Badge tone={TONE[answer.status]}>{t(`status.${answer.status}`)}</Badge>}
+        actions={
+          <Pill variant={PILL[answer.status]} size="md">
+            {t(`status.${answer.status}`)}
+          </Pill>
+        }
       >
-        <div className="space-y-3">
+        <div className="space-y-4">
           {answer.status === "needs_review" ? (
             <Alert tone="warning">{t("needsReviewNote")}</Alert>
           ) : null}
           <p className="whitespace-pre-line">{displayText(answer.answer_text)}</p>
-          <p className="text-sm text-ink-muted">
+          <p className="font-mono text-xs text-ink-subtle">
             {mine
               ? t("verifiedByYou")
               : name
@@ -111,8 +126,8 @@ function VerifiedCard({
             {reviewBy ? ` · ${t("reviewDueOn", { date: reviewBy })}` : ""}
           </p>
           <div className="space-y-2">
-            <p className="text-sm font-semibold">{t("citations")}</p>
-            <ol className="space-y-2">
+            <p className="text-sm font-medium text-ink">{t("citations")}</p>
+            <ol className="grid gap-3 lg:grid-cols-2">
               {answer.citations.map((citation, i) => (
                 <SourceChip
                   key={`${citation.source}-${i}`}
@@ -145,9 +160,14 @@ export function VerifiedAnswersScreen() {
   const me = useStaffMe();
   const can = useStaffCan();
   const [status, setStatus] = useState<VerifiedStatus | null>(null);
+  const [filter, setFilter] = useState("");
+  const deferredFilter = useDeferredValue(filter);
   const pages = useCursorStack();
   const allowed = can(ASK_PERM.ask);
   const list = useVerifiedAnswers(status, pages.cursor, allowed);
+
+  const shown =
+    list.status === "ready" ? list.data.data.filter((a) => matchesFilter(a, deferredFilter)) : [];
 
   if (meQuery.isPending) return <LoadingState label={tc("loading")} />;
   if (!allowed) {
@@ -174,18 +194,29 @@ export function VerifiedAnswersScreen() {
         }
       />
       <AskTabs active="verified" />
-      <div className="max-w-xs">
-        <SelectField
-          label={t("statusFilter")}
-          placeholder={tc("all")}
-          value={status ?? ""}
-          onChange={(event) => {
-            const value = event.currentTarget.value;
-            pages.reset();
-            setStatus(STATUSES.find((s) => s === value) ?? null);
-          }}
-          options={STATUSES.map((value) => ({ value, label: t(`status.${value}`) }))}
-        />
+      <div className={cardClasses({ padding: "sm" })}>
+        <div className="grid items-end gap-4 md:grid-cols-[2fr_1fr]">
+          {/* Filters only the answers on this page (no request): the list is short and paged. */}
+          <SearchInput
+            label={t("filterLabel")}
+            labelVisible
+            placeholder={t("filterPlaceholder")}
+            value={filter}
+            onChange={(event) => setFilter(event.currentTarget.value)}
+            autoComplete="off"
+          />
+          <SelectField
+            label={t("statusFilter")}
+            placeholder={tc("all")}
+            value={status ?? ""}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              pages.reset();
+              setStatus(STATUSES.find((s) => s === value) ?? null);
+            }}
+            options={STATUSES.map((value) => ({ value, label: t(`status.${value}`) }))}
+          />
+        </div>
       </div>
       {list.status === "loading" ? <LoadingState label={tc("loading")} /> : null}
       {list.status === "error" || list.status === "unavailable" ? (
@@ -197,9 +228,17 @@ export function VerifiedAnswersScreen() {
         <EmptyState title={t("emptyTitle")} body={t("emptyBody")} />
       ) : null}
       {list.status === "ready" && list.data.data.length > 0 ? (
-        <section aria-label={t("title")}>
+        <section aria-label={t("title")} className="space-y-3">
+          <p role="status" className="text-sm text-ink-muted">
+            {deferredFilter.trim()
+              ? t("filterCount", { count: shown.length, total: list.data.data.length })
+              : ""}
+          </p>
+          {shown.length === 0 ? (
+            <EmptyState title={t("filterEmptyTitle")} body={t("filterEmptyBody")} icon="search" />
+          ) : null}
           <ul className="space-y-4">
-            {list.data.data.map((answer) => (
+            {shown.map((answer) => (
               <VerifiedCard
                 key={answer.id}
                 answer={answer}
