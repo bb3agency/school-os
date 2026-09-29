@@ -305,19 +305,32 @@ class FakeExtractionProvider:
 
     @staticmethod
     def _generated(page_image: bytes) -> PageExtraction:
+        # The pipeline checks the joined text layer too ("7035 2017-10-04": an admission number,
+        # then a date): redraw until the page holds no checksum-valid 12-digit number, so the
+        # fake never invents one (PRV-016). Deterministic: one seeded generator for all draws.
+        from app.extraction.sanitize import page_has_aadhaar  # noqa: PLC0415 - avoids a cycle
+
+        seed = int.from_bytes(hashlib.sha256(page_image).digest()[:8], "big")
+        rng = random.Random(seed)  # noqa: S311 - synthetic test data, not security
+        page = _open_page(page_image)
+        for _ in range(_MAX_FAKE_DRAWS):
+            result = FakeExtractionProvider._draw(rng, page)
+            if not page_has_aadhaar(result):
+                return result
+        raise ExtractionFailed("the fake could not draw a page without an Aadhaar-like number")
+
+    @staticmethod
+    def _draw(rng: random.Random, page: Image.Image | None) -> PageExtraction:
         # Synthetic names only (app.devtools.names); imported lazily so production code paths
         # never load the generator.
         from app.devtools.names import generate_name  # noqa: PLC0415
 
         cfg = extraction_config().fake
-        seed = int.from_bytes(hashlib.sha256(page_image).digest()[:8], "big")
-        rng = random.Random(seed)  # noqa: S311 - synthetic test data, not security
         count = rng.randint(cfg.rows_min, cfg.rows_max)
         base_no = rng.randint(1000, 8999)
         rows: list[dict[str, FieldReading]] = []
         lines: list[str] = []
         spans: list[TextSpan] = []
-        page = _open_page(page_image)
         height = 0.9 / max(count, 1)
 
         def conf() -> float:
@@ -348,6 +361,9 @@ class FakeExtractionProvider:
             rows.append(row)
             lines.append(" | ".join(cells.values()))
         return PageExtraction(rows=rows, raw_text="\n".join(lines), spans=spans)
+
+
+_MAX_FAKE_DRAWS: Final = 50
 
 
 def _open_page(page_image: bytes) -> Image.Image | None:

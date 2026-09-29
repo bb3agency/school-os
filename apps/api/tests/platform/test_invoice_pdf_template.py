@@ -275,11 +275,12 @@ def test_FR_PLT_017_real_render_text_has_number_totals_and_gstins() -> None:
     assert out.startswith(b"%PDF-")
     pdf = pdfium.PdfDocument(out)
     try:
-        text = " ".join(pdf[i].get_textpage().get_text_range() for i in range(len(pdf)))
+        pages = len(pdf)
+        text = " ".join(pdf[i].get_textpage().get_text_range() for i in range(pages))
     finally:
         pdf.close()
     text = re.sub(r"\s+", " ", text)
-    assert len(pdf) == 1
+    assert pages == 1
     for expected in (
         "SOS/26-27/000123",
         "37ABCDE1234F1Z5",

@@ -93,6 +93,25 @@ def test_FR_IMP_021_generated_rows_are_deterministic_with_confidence_and_regions
     assert other != first
 
 
+def test_PRV_016_generated_pages_never_hold_an_aadhaar_like_number_anywhere() -> None:
+    """The joined text layer ("7035 2017-10-04": admission number, then admission date) must not
+    form a checksum-valid 12-digit number either: the redaction re-check reads generated pages,
+    so an invented number would make redaction fail at random (PRV-016)."""
+    import io
+
+    from PIL import Image
+
+    from app.extraction.sanitize import page_has_aadhaar
+
+    provider = FakeExtractionProvider(_settings(Environment.CI))
+    for i in range(400):
+        out = io.BytesIO()
+        Image.new("RGB", (120, 90), (i % 256, (i * 7) % 256, 200)).save(out, "PNG")
+        page = provider.extract(out.getvalue(), language_hints=HINTS)
+        assert page.spans, "a real page image has a text layer"
+        assert not page_has_aadhaar(page), i
+
+
 def test_FR_IMP_024_scripted_png_drives_the_fake_provider() -> None:
     provider = FakeExtractionProvider(_settings(Environment.CI))
     script = {
