@@ -24,7 +24,7 @@ _FIELD: Final = re.compile(
     rf"^sos://student/(?P<id>{_UUID})/field/(?P<attr>[a-z][a-z0-9_]{{0,63}})"
     r"\?src=(?P<src>[a-z][a-z0-9_]{0,63})$"
 )
-_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified|count)/(?P<id>{_UUID})$")
+_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified|count|fee)/(?P<id>{_UUID})$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +80,13 @@ def student_count(count_id: uuid.UUID) -> str:
     return f"sos://count/{count_id}"
 
 
+def fee_dues(fee_id: uuid.UUID) -> str:
+    """Fee dues the ``get_fee_dues`` tool read from synced Tally ledgers (M6, ADR-0032). The id
+    is derived from the school, the student (or the summary) and the snapshot, so it names no
+    person and no ledger."""
+    return f"sos://fee/{fee_id}"
+
+
 def parse(uri: str) -> SourceRef:
     """Parse a URI built by this module; anything else raises ``ValueError``."""
     if m := _DOC.fullmatch(uri):
@@ -105,6 +112,7 @@ __all__ = [
     "SourceRef",
     "change_request",
     "document_page",
+    "fee_dues",
     "finding",
     "parse",
     "student_count",

@@ -412,7 +412,7 @@ class AnswerEngine:
         stream: bool,
     ) -> Generator[TextDelta, None, Answer]:
         language = detect_language(question)
-        tools = offered(self._tools, ctx)
+        tools = offered(self._tools, ctx, session)
         by_name = {t.spec.name: t for t in tools}
         specs = [t.spec for t in tools]
         limits = self._config.limits

@@ -79,3 +79,13 @@ tools:
     max_verified_answers: 2            # active verified answers first (docs/06 §2, §6 boost)
     # A question with one of these words prefers the newest documents (recency boost, §6).
     latest_terms: [latest, current, recent, newest, new, updated, revised, తాజా, ప్రస్తుత, కొత్త]
+  # M6 (ADR-0032 Proposed, amending ADR-0008): offered only when the school's
+  # tally.connector.enabled flag is on and the caller holds finance.read school-wide.
+  get_fee_dues:
+    description: >-
+      Fee dues synced from the school's Tally accounts, for ONE student the user can access (pass
+      the ID from find_students) or, without a student, the school totals. Uses only Tally
+      ledgers a staff member has linked to the student; when none is linked, say SchoolOS has no
+      fee figure for the student and never guess from names. Quote amounts exactly as given,
+      with the Tally as-of date.
+    permission: finance.read

@@ -28,9 +28,12 @@ WHITELIST: Final = frozenset(
         "list_findings",
         "list_documents",
         "search_documents",
+        # M6 Tally connector: ADR-0032 (Proposed) would amend ADR-0008 with this tool; it is
+        # offered only behind the school's tally.connector.enabled flag.
+        "get_fee_dues",
     }
 )
-"""ADR-0008 / docs/06 §7. The only tools the answer model may call."""
+"""ADR-0008 / docs/06 §7 (+ ADR-0032 for get_fee_dues). The only tools the model may call."""
 
 
 class ToolConfig(ConfigModel):
