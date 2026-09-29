@@ -3948,7 +3948,12 @@
       "interruptedBody": "Check your internet connection and ask again.",
       "previewLabel": "Draft answer, not checked yet",
       "replacedNote": "The draft was checked against the sources and changed to what they support.",
-      "countNote": "Student count (numbers only)"
+      "countNote": "Student count (numbers only)",
+      "assistant": "SchoolOS answer",
+      "draftPill": "Draft",
+      "sourcesCount": "{count, plural, one {# source} other {# sources}}",
+      "verifiedBadge": "From a verified answer",
+      "followUp": "Ask a follow-up"
     },
     "notFound": {
       "title": "Not found in the school records you can access",
@@ -4087,6 +4092,19 @@
     },
     "failedAnswer": {
       "title": "Something went wrong"
+    },
+    "home": "Home",
+    "panel": {
+      "eyebrow": "Ask the school",
+      "greeting": "What would you like to know?",
+      "description": "Answers come only from the records and documents you can see, and every answer shows its sources."
+    },
+    "examples": {
+      "label": "Example questions (they only fill in the box)",
+      "exams": "When do the half-yearly exams begin?",
+      "circular": "What does the latest holidays circular say?",
+      "classCount": "How many students are in Class 6?",
+      "certificate": "What is needed for a transfer certificate?"
     }
   },
   "welcome": {

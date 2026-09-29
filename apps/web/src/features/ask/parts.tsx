@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Pill } from "@/components/ui/Badge";
+import { Icon } from "@/components/ui/Icon";
 import { TabNav } from "@/components/ui/TabNav";
 import { DownloadButton } from "@/features/documents/parts";
 import { Link } from "@/i18n/navigation";
@@ -59,13 +61,14 @@ export function AnswerText({
               <a
                 key={j}
                 href={`#${sourceAnchor(anchorPrefix, part.index)}`}
-                className="mx-0.5 rounded-sm px-0.5 align-super text-xs font-semibold text-primary underline"
+                className="mx-0.5 inline-flex rounded-full align-text-bottom hover:opacity-80"
                 aria-label={t("sourceLink", {
                   index: part.index,
                   title: titles.get(part.index) || t("untitled"),
                 })}
               >
-                [{part.index}]
+                {/* Numbered source chip; the link's name says which source it opens. */}
+                <Pill variant="command">{part.index}</Pill>
               </a>
             ),
           )}
@@ -123,33 +126,46 @@ export function SourceChip({
     <li
       id={anchorId}
       tabIndex={anchorId ? -1 : undefined}
-      className="space-y-2 rounded-md border border-border p-3 focus:outline-2 focus:outline-primary"
+      className="space-y-3 rounded-lg border border-border bg-surface p-4 focus:outline-2 focus:outline-primary"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+      <div className="flex items-start gap-3">
         {index !== undefined ? (
-          <span className="font-semibold text-ink-muted">[{index}]</span>
-        ) : null}
-        {ref && ref.kind !== "count" && href ? (
-          <Link
-            href={href}
-            className="font-semibold text-primary underline"
-            // The visible title starts the name (WCAG 2.5.3); the rest says what opens.
-            aria-label={`${name} (${openLabel(ref, t)})`}
-          >
-            {name}
-          </Link>
+          <Pill variant="command" className="mt-0.5 shrink-0">
+            {index}
+          </Pill>
         ) : (
-          <span className="font-semibold">{name}</span>
+          <span
+            aria-hidden="true"
+            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary"
+          >
+            <Icon name="file" className="size-4" />
+          </span>
         )}
-        {ref?.kind === "doc" && ref.page !== null ? (
-          <span className="text-ink-muted">{t("page", { page: ref.page })}</span>
-        ) : null}
-        {ref?.kind === "count" ? <span className="text-ink-muted">{t("countNote")}</span> : null}
-        {ref === null ? <span className="text-ink-muted">{t("noLink")}</span> : null}
-      </p>
-      {meta ? <p className="text-xs text-ink-muted">{meta}</p> : null}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {ref && ref.kind !== "count" && href ? (
+              <Link
+                href={href}
+                className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+                // The visible title starts the name (WCAG 2.5.3); the rest says what opens.
+                aria-label={`${name} (${openLabel(ref, t)})`}
+              >
+                {name}
+              </Link>
+            ) : (
+              <span className="font-medium text-ink">{name}</span>
+            )}
+            {ref?.kind === "doc" && ref.page !== null ? (
+              <Pill variant="tag">{t("page", { page: ref.page })}</Pill>
+            ) : null}
+            {ref?.kind === "count" ? <Pill variant="tag">{t("countNote")}</Pill> : null}
+          </p>
+          {ref === null ? <p className="text-xs text-ink-muted">{t("noLink")}</p> : null}
+          {meta ? <p className="text-xs text-ink-muted">{meta}</p> : null}
+        </div>
+      </div>
       {quote ? (
-        <blockquote className="border-l-4 border-border pl-3 text-sm whitespace-pre-line text-ink">
+        <blockquote className="rounded-md border-l-4 border-border-soft bg-surface-muted px-3 py-2 text-sm whitespace-pre-line text-ink">
           {displayText(quote)}
         </blockquote>
       ) : null}

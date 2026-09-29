@@ -139,6 +139,19 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     expect(within(answer).getByText("page 1")).toBeInTheDocument();
   });
 
+  it("example questions only fill the question box; nothing is sent until Ask (US-801)", async () => {
+    renderWithIntl(<AskPage />);
+    const user = userEvent.setup();
+    const examples = await screen.findByRole("list", { name: /^Example questions/ });
+    await user.click(
+      within(examples).getByRole("button", { name: "How many students are in Class 6?" }),
+    );
+    const box = screen.getByLabelText(/^Your question/);
+    expect(box).toHaveValue("How many students are in Class 6?");
+    expect(box).toHaveFocus();
+    expect(stub.callsTo(ASK)).toHaveLength(0);
+  });
+
   it("the question stays for a second ask in the same session id (FR-KB-012)", async () => {
     stub.routes[ASK] = () => sseResponse(answered);
     renderWithIntl(<AskPage />);
