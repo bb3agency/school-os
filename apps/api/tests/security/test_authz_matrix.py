@@ -469,6 +469,38 @@ def _doc_delete(w: Any, r: str, a: Engine) -> Request:
     return f"/api/v1/documents/{doc}", None, {}
 
 
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _sheet_doc(w: Any, admin: Engine) -> uuid.UUID:
+    """A ready single-sheet XLSX document (C2) of school A that every reader role sees
+    (FR-DOC-009..011)."""
+    rows = [["Receipt", "Name", "Amount"], ["R-001", "Synthetica Matrix", 1200]]
+    doc: uuid.UUID = D.make_document(
+        admin,
+        w.a.tenant_id,
+        w.a.people["owner"].user_id,
+        acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)],
+        data=IM.xlsx_bytes(rows),
+        mime_type=_XLSX_MIME,
+        ext="xlsx",
+    )
+    return doc
+
+
+def _shared_sheet_doc(w: Any, admin: Engine) -> uuid.UUID:
+    if "matrix_sheet_doc" not in w.a.ids:
+        w.a.ids["matrix_sheet_doc"] = _sheet_doc(w, admin)
+    value: uuid.UUID = w.a.ids["matrix_sheet_doc"]
+    return value
+
+
+def _doc_sheet_save(w: Any, r: str, a: Engine) -> Request:
+    doc = _sheet_doc(w, a)  # a fresh one per call: each save adds a version
+    body = {"base_version_no": 1, "edits": [{"row_no": 2, "column": 1, "value": "Matrix edit"}]}
+    return f"/api/v1/documents/{doc}/sheet/versions", body, _if_match(D.document_version(a, doc))
+
+
 # --- imports (US-401, FR-IMP-*): office roles and the exam coordinator ----------------------
 
 
@@ -506,6 +538,16 @@ def _import_mapping(w: Any, r: str, a: Engine) -> Request:
 def _import_committed(w: Any, r: str, a: Engine) -> Request:
     batch_id = IM.imported(a, w.a, IM.xlsx_bytes(IM.class_list(1)[0]))
     return f"/api/v1/imports/{batch_id}/revert", None, {}
+
+
+def _import_sheet_edit(w: Any, r: str, a: Engine) -> Request:
+    """FR-IMP-008: edit a cell of a fresh checked batch (the father's name, column C)."""
+    batch_id = _fresh_import(w, a)
+    return (
+        f"/api/v1/imports/{batch_id}/sheet/rows/2",
+        {"cells": [{"column": 2, "value": "Synthetic Matrix Father"}]},
+        _if_match(IM.batch(a, batch_id)["version"]),
+    )
 
 
 # --- data quality (FR-DQ-*, US-501, US-502): class teacher reaches 9A findings only ---------------
@@ -827,6 +869,18 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("PATCH", "/api/v1/documents/{document_id}"): _doc_patch,
     ("POST", "/api/v1/documents/{document_id}/archive"): _doc_archive("archive"),
     ("POST", "/api/v1/documents/{document_id}/unarchive"): _doc_archive("unarchive"),
+    # Document sheets (FR-DOC-009..011): read with document.read, save with document.upload.
+    ("GET", "/api/v1/documents/{document_id}/sheet"): lambda w, r, a: (
+        f"/api/v1/documents/{_shared_sheet_doc(w, a)}/sheet",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/documents/{document_id}/sheet/versions"): _doc_sheet_save,
+    ("POST", "/api/v1/documents/{document_id}/sheet/export"): lambda w, r, a: (
+        f"/api/v1/documents/{_shared_sheet_doc(w, a)}/sheet/export",
+        {"format": "csv"},
+        {},
+    ),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
     # Invitation email (US-102): the target member is active and email is off in tests, so a
     # permitted caller reaches the service and gets 409 (see _success); others get 403.
@@ -957,6 +1011,18 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("POST", "/api/v1/imports/{import_id}/revert"): _import_committed,
+    # Staged sheet (FR-IMP-008, FR-IMP-009): import.run; the download also needs step-up.
+    ("GET", "/api/v1/imports/{import_id}/sheet"): lambda w, r, a: (
+        f"/api/v1/imports/{_shared_import(w, a)}/sheet",
+        None,
+        {},
+    ),
+    ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"): _import_sheet_edit,
+    ("GET", "/api/v1/imports/{import_id}/sheet/export"): lambda w, r, a: (
+        f"/api/v1/imports/{_shared_import(w, a)}/sheet/export",
+        None,
+        {},
+    ),
     ("GET", "/api/v1/import-templates"): lambda w, r, a: ("/api/v1/import-templates", None, {}),
     ("POST", "/api/v1/import-templates"): lambda w, r, a: (
         "/api/v1/import-templates",
@@ -1220,6 +1286,7 @@ def _success(method: str, path: str) -> int:
     accepted = {
         "/api/v1/documents",
         "/api/v1/documents/{document_id}/versions",
+        "/api/v1/documents/{document_id}/sheet/versions",
         "/api/v1/imports",
         "/api/v1/imports/{import_id}/validate",
         "/api/v1/imports/{import_id}/commit",
@@ -1274,6 +1341,28 @@ def test_SEC_005_step_up_routes_need_recent_mfa(
     # require_any(..., step_up=True) guards (POST /exports, ADR-0021): every alternative's holders.
     permissions = (guard.sos_permission, *getattr(guard, "sos_any_of", ()))
     holders = [r for r in ROLES if set(permissions) & system_roles()[r].permission_keys]
+    assert holders
+    for role in holders:
+        res = _call(api, world, admin_engine, role, key, auth_age_s=301)
+        assert res.status_code == 428, (role, res.text)
+        assert res.json()["code"] == "step_up_required"
+
+
+# Downloads of personal data whose permission is not a step-up permission itself, but which need
+# a recent MFA sign-in anyway (FR-EXP-004): the staged import sheet always; a document sheet
+# when the document is personal (C2) or restricted (C3), as the matrix's shared sheet is.
+PERSONAL_DOWNLOADS = (
+    ("GET", "/api/v1/imports/{import_id}/sheet/export"),
+    ("POST", "/api/v1/documents/{document_id}/sheet/export"),
+)
+
+
+@pytest.mark.parametrize("key", PERSONAL_DOWNLOADS, ids=lambda k: f"{k[0]} {k[1]}")
+def test_FR_EXP_004_sheet_downloads_need_recent_mfa(
+    world: Any, api: Any, admin_engine: Engine, key: tuple[str, str]
+) -> None:
+    permission = ROUTES[key].sos_permission
+    holders = [r for r in ROLES if permission in system_roles()[r].permission_keys]
     assert holders
     for role in holders:
         res = _call(api, world, admin_engine, role, key, auth_age_s=301)

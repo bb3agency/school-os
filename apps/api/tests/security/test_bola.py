@@ -116,6 +116,15 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/imports/{import_id}/validate"): None,
     ("POST", "/api/v1/imports/{import_id}/commit"): {},
     ("POST", "/api/v1/imports/{import_id}/revert"): None,
+    # Staged sheet and document sheets (FR-IMP-008, FR-DOC-010, FR-DOC-011).
+    ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"): {
+        "cells": [{"column": 1, "value": "Synthetica BOLA"}]
+    },
+    ("POST", "/api/v1/documents/{document_id}/sheet/versions"): {
+        "base_version_no": 1,
+        "edits": [{"row_no": 2, "column": 0, "value": "Synthetica BOLA"}],
+    },
+    ("POST", "/api/v1/documents/{document_id}/sheet/export"): {"format": "csv"},
     ("POST", "/api/v1/dq/findings/{finding_id}/resolve"): {"note": "Synthetic note"},
     ("POST", "/api/v1/dq/findings/{finding_id}/waive"): {"reason": "Synthetic reason"},
     ("POST", "/api/v1/change-requests/{change_request_id}/approve"): None,
@@ -172,6 +181,9 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/imports/{import_id}/validate"),
         ("POST", "/api/v1/imports/{import_id}/commit"),
         ("POST", "/api/v1/imports/{import_id}/revert"),
+        ("GET", "/api/v1/imports/{import_id}/sheet"),
+        ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"),
+        ("GET", "/api/v1/imports/{import_id}/sheet/export"),
         # Cancelling needs student.identity_change.request (the owner only approves).
         ("POST", "/api/v1/change-requests/{change_request_id}/cancel"),
     ),
@@ -453,9 +465,15 @@ def _id_routes() -> list[tuple[str, str]]:
 ID_ROUTES = _id_routes()
 
 
+# Path parameters that are not object ids (a row number inside the object in the path).
+PLAIN_PARAMS: dict[str, str] = {"row_no": "2"}
+
+
 def _fill(path: str, value: uuid.UUID) -> str:
     for param in PARAM_TO_B:
         path = path.replace("{" + param + "}", str(value))
+    for param, plain in PLAIN_PARAMS.items():
+        path = path.replace("{" + param + "}", plain)
     return path
 
 
