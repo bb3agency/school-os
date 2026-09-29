@@ -217,6 +217,9 @@ def _any_of_guards() -> list[tuple[str, str, Any]]:
     return out
 
 
+CERT_READERS = ("certificate.read", ("certificate.issue", "certificate.approve"), False)
+
+
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
     guards = _any_of_guards()
     readers = (PORTAL, STUDENT_EXPORT, READ_ALL)
@@ -236,6 +239,12 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ),
         # Staff directory (FR-TEN-010): the service requires a school-wide grant of either.
         ("GET", "/api/v1/staff"): ("tenant.structure.manage", ("user.manage",), False),
+        # Certificates (US-1101..US-1105): the reader, the maker and the checker share the
+        # reads; the service applies the student scope per certificate.
+        ("GET", "/api/v1/certificates/types"): CERT_READERS,
+        ("GET", "/api/v1/certificates"): CERT_READERS,
+        ("GET", "/api/v1/certificates/{certificate_id}"): CERT_READERS,
+        ("GET", "/api/v1/certificates/{certificate_id}/print"): CERT_READERS,
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

@@ -1307,6 +1307,62 @@
         "title": "BillingAccountOut",
         "type": "object"
       },
+      "Blocker": {
+        "description": "Why the certificate cannot be issued now (FR-CERT-002). ``finding_id`` links a DQ\nfinding; ``attribute_key`` names the field (a change request corrects it).",
+        "properties": {
+          "attribute_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribute Key"
+          },
+          "code": {
+            "enum": [
+              "dq_blocker",
+              "missing_value",
+              "no_enrolment",
+              "student_not_active",
+              "no_current_year",
+              "transfer_certificate_exists"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "Blocker",
+        "type": "object"
+      },
       "BreakGlassIn": {
         "additionalProperties": false,
         "properties": {
@@ -1550,6 +1606,140 @@
         "title": "CellEditIn",
         "type": "object"
       },
+      "CertificateContent": {
+        "description": "The printed values, frozen at issue (FR-CERT-003).",
+        "properties": {
+          "academic_year_label": {
+            "title": "Academic Year Label",
+            "type": "string"
+          },
+          "admission_no": {
+            "title": "Admission No",
+            "type": "string"
+          },
+          "blanks": {
+            "items": {
+              "$ref": "#/components/schemas/ContentLine"
+            },
+            "title": "Blanks",
+            "type": "array"
+          },
+          "certificate_type": {
+            "enum": [
+              "transfer",
+              "bonafide",
+              "study",
+              "conduct"
+            ],
+            "title": "Certificate Type",
+            "type": "string"
+          },
+          "class_label_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Label En"
+          },
+          "class_label_te": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Label Te"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ContentLine"
+            },
+            "title": "Details",
+            "type": "array"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ContentLine"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "issued_on": {
+            "format": "date",
+            "title": "Issued On",
+            "type": "string"
+          },
+          "school_address_en": {
+            "title": "School Address En",
+            "type": "string"
+          },
+          "school_address_te": {
+            "title": "School Address Te",
+            "type": "string"
+          },
+          "school_affiliation": {
+            "title": "School Affiliation",
+            "type": "string"
+          },
+          "school_name_en": {
+            "title": "School Name En",
+            "type": "string"
+          },
+          "school_name_te": {
+            "title": "School Name Te",
+            "type": "string"
+          },
+          "school_place": {
+            "title": "School Place",
+            "type": "string"
+          },
+          "serial": {
+            "title": "Serial",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "title_en": {
+            "title": "Title En",
+            "type": "string"
+          },
+          "title_te": {
+            "title": "Title Te",
+            "type": "string"
+          }
+        },
+        "required": [
+          "certificate_type",
+          "title_en",
+          "title_te",
+          "serial",
+          "academic_year_label",
+          "issued_on",
+          "school_name_en",
+          "school_name_te",
+          "school_address_en",
+          "school_address_te",
+          "school_affiliation",
+          "school_place",
+          "student_name",
+          "admission_no",
+          "class_label_en",
+          "class_label_te",
+          "fields",
+          "details",
+          "blanks"
+        ],
+        "title": "CertificateContent",
+        "type": "object"
+      },
       "CertificateDownloadOut": {
         "description": "A presigned GET (at most 5 minutes, attachment) for a certificate of deletion.",
         "properties": {
@@ -1589,6 +1779,570 @@
           "sha256"
         ],
         "title": "CertificateDownloadOut",
+        "type": "object"
+      },
+      "CertificateLetterhead-Input": {
+        "additionalProperties": false,
+        "description": "What certificates print at the top and at the signature (FR-CERT-013, US-1108). The\nEnglish school name is the school's name; empty fields are left out of the page.",
+        "properties": {
+          "address_en": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Address En",
+            "type": "string"
+          },
+          "address_te": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Address Te",
+            "type": "string"
+          },
+          "affiliation": {
+            "default": "",
+            "description": "Recognition or affiliation line, e.g. the recognition order or UDISE code.",
+            "maxLength": 300,
+            "title": "Affiliation",
+            "type": "string"
+          },
+          "place": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Place",
+            "type": "string"
+          },
+          "school_name_te": {
+            "default": "",
+            "maxLength": 300,
+            "title": "School Name Te",
+            "type": "string"
+          }
+        },
+        "title": "CertificateLetterhead",
+        "type": "object"
+      },
+      "CertificateLetterhead-Output": {
+        "additionalProperties": false,
+        "description": "What certificates print at the top and at the signature (FR-CERT-013, US-1108). The\nEnglish school name is the school's name; empty fields are left out of the page.",
+        "properties": {
+          "address_en": {
+            "default": "",
+            "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+            "title": "Address En",
+            "type": "string"
+          },
+          "address_te": {
+            "default": "",
+            "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+            "title": "Address Te",
+            "type": "string"
+          },
+          "affiliation": {
+            "default": "",
+            "description": "Recognition or affiliation line, e.g. the recognition order or UDISE code.",
+            "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+            "title": "Affiliation",
+            "type": "string"
+          },
+          "place": {
+            "default": "",
+            "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+            "title": "Place",
+            "type": "string"
+          },
+          "school_name_te": {
+            "default": "",
+            "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+            "title": "School Name Te",
+            "type": "string"
+          }
+        },
+        "title": "CertificateLetterhead",
+        "type": "object"
+      },
+      "CertificateOut": {
+        "properties": {
+          "academic_year_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year Id"
+          },
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "can_approve": {
+            "title": "Can Approve",
+            "type": "boolean"
+          },
+          "can_cancel": {
+            "title": "Can Cancel",
+            "type": "boolean"
+          },
+          "can_duplicate": {
+            "title": "Can Duplicate",
+            "type": "boolean"
+          },
+          "can_withdraw": {
+            "title": "Can Withdraw",
+            "type": "boolean"
+          },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By"
+          },
+          "certificate_type": {
+            "enum": [
+              "transfer",
+              "bonafide",
+              "study",
+              "conduct"
+            ],
+            "title": "Certificate Type",
+            "type": "string"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CertificateContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "duplicate_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate No"
+          },
+          "duplicate_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Reason"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Inputs",
+            "type": "object"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued At"
+          },
+          "issued_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued By"
+          },
+          "original_certificate_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Certificate Id"
+          },
+          "pdf_status": {
+            "enum": [
+              "none",
+              "queued",
+              "ready",
+              "failed"
+            ],
+            "title": "Pdf Status",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "requested_by": {
+            "format": "uuid",
+            "title": "Requested By",
+            "type": "string"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "issued",
+              "rejected",
+              "withdrawn",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Name"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "certificate_type",
+          "status",
+          "requires_approval",
+          "inputs",
+          "original_certificate_id",
+          "duplicate_no",
+          "duplicate_reason",
+          "academic_year_id",
+          "serial",
+          "student_name",
+          "admission_no",
+          "content",
+          "requested_by",
+          "requested_at",
+          "decided_by",
+          "decided_at",
+          "decision_note",
+          "issued_by",
+          "issued_at",
+          "cancelled_by",
+          "cancelled_at",
+          "cancel_reason",
+          "document_id",
+          "pdf_status",
+          "version",
+          "can_approve",
+          "can_withdraw",
+          "can_cancel",
+          "can_duplicate"
+        ],
+        "title": "CertificateOut",
+        "type": "object"
+      },
+      "CertificatePreview": {
+        "properties": {
+          "academic_year_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year Label"
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/Blocker"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "can_issue": {
+            "title": "Can Issue",
+            "type": "boolean"
+          },
+          "certificate_type": {
+            "enum": [
+              "transfer",
+              "bonafide",
+              "study",
+              "conduct"
+            ],
+            "title": "Certificate Type",
+            "type": "string"
+          },
+          "class_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Label"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/PrintedField"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewWarning"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "student_id",
+          "certificate_type",
+          "requires_approval",
+          "fields",
+          "class_label",
+          "academic_year_label",
+          "blockers",
+          "warnings",
+          "can_issue"
+        ],
+        "title": "CertificatePreview",
+        "type": "object"
+      },
+      "CertificateRequest": {
+        "additionalProperties": false,
+        "description": "Prepare (types that need approval) or issue a certificate for one student. ``inputs``\nare the values the type asks for (``GET /certificates/types``); dates as ``YYYY-MM-DD``.",
+        "properties": {
+          "certificate_type": {
+            "enum": [
+              "transfer",
+              "bonafide",
+              "study",
+              "conduct"
+            ],
+            "title": "Certificate Type",
+            "type": "string"
+          },
+          "inputs": {
+            "maxProperties": 20,
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,40}$": {
+                "maxLength": 1000,
+                "type": "string"
+              }
+            },
+            "title": "Inputs",
+            "type": "object"
+          }
+        },
+        "required": [
+          "certificate_type"
+        ],
+        "title": "CertificateRequest",
+        "type": "object"
+      },
+      "CertificateTypeOut": {
+        "properties": {
+          "ends_enrolment": {
+            "title": "Ends Enrolment",
+            "type": "boolean"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/InputOut"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "key": {
+            "enum": [
+              "transfer",
+              "bonafide",
+              "study",
+              "conduct"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "printed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Printed",
+            "type": "array"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label_en",
+          "label_te",
+          "requires_approval",
+          "ends_enrolment",
+          "printed",
+          "inputs"
+        ],
+        "title": "CertificateTypeOut",
         "type": "object"
       },
       "ChangePlanIn": {
@@ -1860,6 +2614,29 @@
           "can_cancel"
         ],
         "title": "ChangeRequestOut",
+        "type": "object"
+      },
+      "ChoiceOut": {
+        "properties": {
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label_en",
+          "label_te"
+        ],
+        "title": "ChoiceOut",
         "type": "object"
       },
       "ClassCreate": {
@@ -2186,6 +2963,41 @@
           "host_teardown_reference"
         ],
         "title": "ConfirmTeardownIn",
+        "type": "object"
+      },
+      "ContentLine": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label_en",
+          "label_te",
+          "value"
+        ],
+        "title": "ContentLine",
         "type": "object"
       },
       "DashboardOut": {
@@ -2982,7 +3794,8 @@
               "circular",
               "policy",
               "other",
-              "import_file"
+              "import_file",
+              "certificate"
             ],
             "title": "Purpose",
             "type": "string"
@@ -3174,7 +3987,8 @@
               "circular",
               "policy",
               "other",
-              "import_file"
+              "import_file",
+              "certificate"
             ],
             "title": "Purpose",
             "type": "string"
@@ -3437,38 +4251,20 @@
         "title": "DocumentUpdate",
         "type": "object"
       },
-      "DownloadUrlOut": {
+      "DuplicateRequest": {
+        "additionalProperties": false,
+        "description": "Why a duplicate is needed (10..1000 characters), e.g. the original was lost.",
         "properties": {
-          "expires_at": {
-            "format": "date-time",
-            "title": "Expires At",
+          "reason": {
+            "maxLength": 1000,
+            "title": "Reason",
             "type": "string"
-          },
-          "filename": {
-            "title": "Filename",
-            "type": "string"
-          },
-          "mime_type": {
-            "title": "Mime Type",
-            "type": "string"
-          },
-          "url": {
-            "title": "Url",
-            "type": "string"
-          },
-          "version_no": {
-            "title": "Version No",
-            "type": "integer"
           }
         },
         "required": [
-          "url",
-          "expires_at",
-          "version_no",
-          "mime_type",
-          "filename"
+          "reason"
         ],
-        "title": "DownloadUrlOut",
+        "title": "DuplicateRequest",
         "type": "object"
       },
       "EnrollmentEnd": {
@@ -5831,6 +6627,54 @@
         "title": "ImportSummary",
         "type": "object"
       },
+      "InputOut": {
+        "properties": {
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ChoiceOut"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "date",
+              "choice",
+              "text"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "required",
+          "max_length",
+          "choices"
+        ],
+        "title": "InputOut",
+        "type": "object"
+      },
       "InvitationEmailOut": {
         "description": "An invitation email was queued (``POST /users/{user_id}/invitation-email``).",
         "properties": {
@@ -7939,6 +8783,34 @@
         "title": "Page[BreakGlassOut]",
         "type": "object"
       },
+      "Page_CertificateOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CertificateOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[CertificateOut]",
+        "type": "object"
+      },
       "Page_ChangeRequestOut_": {
         "properties": {
           "data": {
@@ -9478,6 +10350,25 @@
         "title": "PrecheckCreate",
         "type": "object"
       },
+      "PreviewWarning": {
+        "properties": {
+          "attribute_key": {
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "code": {
+            "const": "provisional_value",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "attribute_key"
+        ],
+        "title": "PreviewWarning",
+        "type": "object"
+      },
       "PriceOverrideIn": {
         "additionalProperties": false,
         "properties": {
@@ -9506,6 +10397,64 @@
           "reason"
         ],
         "title": "PriceOverrideIn",
+        "type": "object"
+      },
+      "PrintedField": {
+        "description": "One value the certificate prints, with where it comes from (US-1101 AC1, AC4).",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label_en",
+          "label_te",
+          "value",
+          "source",
+          "verified",
+          "provisional"
+        ],
+        "title": "PrintedField",
         "type": "object"
       },
       "ProfileOut": {
@@ -10302,6 +11251,22 @@
           "checks"
         ],
         "title": "ReadyOut",
+        "type": "object"
+      },
+      "ReasonIn": {
+        "additionalProperties": false,
+        "description": "Reason for rejecting a request or cancelling an issued certificate (10..1000).",
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReasonIn",
         "type": "object"
       },
       "Reasoned": {
@@ -13529,6 +14494,9 @@
             "title": "Ai Monthly Budget Inr",
             "type": "integer"
           },
+          "certificate_letterhead": {
+            "$ref": "#/components/schemas/CertificateLetterhead-Output"
+          },
           "date_format": {
             "default": "DD/MM/YYYY",
             "enum": [
@@ -13590,6 +14558,16 @@
               }
             ],
             "title": "Ai Monthly Budget Inr"
+          },
+          "certificate_letterhead": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CertificateLetterhead-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "date_format": {
             "anyOf": [
@@ -14308,7 +15286,8 @@
               "circular",
               "policy",
               "other",
-              "import_file"
+              "import_file",
+              "certificate"
             ],
             "title": "Purpose",
             "type": "string"
@@ -15400,6 +16379,64 @@
           "next_cursor"
         ],
         "title": "Page[TicketOut]",
+        "type": "object"
+      },
+      "app__certificates__schemas__DownloadUrlOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "filename"
+        ],
+        "title": "DownloadUrlOut",
+        "type": "object"
+      },
+      "app__documents__schemas__DownloadUrlOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "version_no",
+          "mime_type",
+          "filename"
+        ],
+        "title": "DownloadUrlOut",
         "type": "object"
       },
       "app__identity__schemas__MeOut": {
@@ -17119,6 +18156,621 @@
         ]
       }
     },
+    "/api/v1/certificates": {
+      "get": {
+        "description": "Certificates and requests of students you can see, newest first (read, issue or approve\npermission).",
+        "operationId": "list_certificates_api_v1_certificates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "certificate_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "transfer",
+                    "bonafide",
+                    "study",
+                    "conduct"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Certificate Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "issued",
+                    "rejected",
+                    "withdrawn",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Academic Year Id"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CertificateOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Certificates",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/types": {
+      "get": {
+        "description": "Certificate types with the values each one asks for (read, issue or approve\npermission).",
+        "operationId": "list_certificate_types_api_v1_certificates_types_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CertificateTypeOut"
+                  },
+                  "title": "Response List Certificate Types Api V1 Certificates Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Certificate Types",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}": {
+      "get": {
+        "description": "One certificate with its printed values once issued; returns ``ETag`` for the decision\ncalls (read, issue or approve permission).",
+        "operationId": "get_certificate_api_v1_certificates__certificate_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Certificate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/approve": {
+      "post": {
+        "description": "Approve and issue a transfer certificate (or a TC duplicate): serial number, register\nentry and, for a TC, the student leaves the rolls (permission ``certificate.approve``, MFA\nwithin 5 minutes, not the person who prepared it, ``If-Match``). Errors:\n``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``\n/ ``certificate_blocked`` (409).",
+        "operationId": "approve_certificate_api_v1_certificates__certificate_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ApproveIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Certificate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/cancel": {
+      "post": {
+        "description": "Cancel an issued certificate with a reason: it keeps its number and the registers show\nit as cancelled; a TC does not re-admit the student (permission ``certificate.approve``,\nMFA within 5 minutes, ``If-Match``). Error ``certificate_not_issued`` (409).",
+        "operationId": "cancel_certificate_api_v1_certificates__certificate_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Certificate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/download-url": {
+      "get": {
+        "description": "A link to download the certificate PDF, valid for at most 5 minutes (permission\n``certificate.read``). Error ``pdf_not_ready`` / ``document_not_ready`` (409) while it is\nbeing made or checked. Audited.",
+        "operationId": "certificate_download_url_api_v1_certificates__certificate_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__certificates__schemas__DownloadUrlOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Certificate Download Url",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/duplicates": {
+      "post": {
+        "description": "Issue a duplicate of an issued certificate, marked DUPLICATE with the original serial\nnumber (a TC duplicate waits for approval; permission ``certificate.issue``). Accepts\n``Idempotency-Key``. Errors: ``certificate_not_issued``, ``duplicate_pending`` (409).",
+        "operationId": "request_duplicate_api_v1_certificates__certificate_id__duplicates_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Duplicate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/print": {
+      "get": {
+        "description": "The certificate as a print-ready A4 page in English and Telugu (a DRAFT while it waits\nfor approval; read, issue or approve permission). The view is audited.",
+        "operationId": "print_certificate_api_v1_certificates__certificate_id__print_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 page"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Print Certificate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/reject": {
+      "post": {
+        "description": "Reject a request with a reason the requester will see (permission\n``certificate.approve``, MFA within 5 minutes, ``If-Match``).",
+        "operationId": "reject_certificate_api_v1_certificates__certificate_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Certificate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/render": {
+      "post": {
+        "description": "Make the PDF again after it failed (permission ``certificate.issue``).",
+        "operationId": "retry_certificate_pdf_api_v1_certificates__certificate_id__render_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Certificate Pdf",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/certificates/{certificate_id}/withdraw": {
+      "post": {
+        "description": "Withdraw your own request while it waits for approval (permission\n``certificate.issue``, ``If-Match``). Error ``not_requester`` (403).",
+        "operationId": "withdraw_certificate_api_v1_certificates__certificate_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw Certificate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
     "/api/v1/change-requests": {
       "get": {
         "description": "Change requests of students you can see, newest first (permission\n``student.identity_change.request`` or ``student.identity_change.approve``). Values of\nsensitive (C3) fields are masked.",
@@ -17889,7 +19541,8 @@
                     "circular",
                     "policy",
                     "other",
-                    "import_file"
+                    "import_file",
+                    "certificate"
                   ],
                   "type": "string"
                 },
@@ -18346,7 +19999,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DownloadUrlOut"
+                  "$ref": "#/components/schemas/app__documents__schemas__DownloadUrlOut"
                 }
               }
             },
@@ -25559,6 +27212,181 @@
         ]
       }
     },
+    "/api/v1/registers/admission-withdrawal": {
+      "get": {
+        "description": "The admission and withdrawal register of the students enrolled in an academic year, in\nadmission-number order, as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited.",
+        "operationId": "admission_withdrawal_register_api_v1_registers_admission_withdrawal_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Academic Year Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 page"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admission Withdrawal Register",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/registers/certificates": {
+      "get": {
+        "description": "The certificate issue register (bonafide, study and conduct certificates, or one of them)\nof an academic year as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited.",
+        "operationId": "certificate_register_api_v1_registers_certificates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Academic Year Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "certificate_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "transfer",
+                    "bonafide",
+                    "study",
+                    "conduct"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Certificate Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 page"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Certificate Register",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/registers/transfer-certificates": {
+      "get": {
+        "description": "The TC register (counterfoil) of an academic year (default: the current one) as an A4\nlandscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).\nAudited.",
+        "operationId": "transfer_certificate_register_api_v1_registers_transfer_certificates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Academic Year Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 page"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Transfer Certificate Register",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "description": "Roles of this school with their permissions, whether you may give each one\n(``grantable``) and whether it is limited to classes/sections (``scoped``) (permission\n``user.manage``).",
@@ -26389,6 +28217,119 @@
         "summary": "Update Student",
         "tags": [
           "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/certificates": {
+      "post": {
+        "description": "Issue a bonafide, study or conduct certificate, or prepare a transfer certificate for the\nprincipal's approval (permission ``certificate.issue``). Accepts ``Idempotency-Key``.\nErrors: ``certificate_blocked``, ``transfer_certificate_exists``,\n``no_current_academic_year`` (409); input errors (422).",
+        "operationId": "request_certificate_api_v1_students__student_id__certificates_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CertificateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Certificate",
+        "tags": [
+          "certificates"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/certificates/preview": {
+      "get": {
+        "description": "What the certificate would print now, where each value comes from, and anything that\nstops it being issued (open blocker findings, empty required fields; permission\n``certificate.issue``). Nothing is saved.",
+        "operationId": "preview_certificate_api_v1_students__student_id__certificates_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "certificate_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "transfer",
+                "bonafide",
+                "study",
+                "conduct"
+              ],
+              "title": "Certificate Type",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificatePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Certificate",
+        "tags": [
+          "certificates"
         ]
       }
     },

@@ -551,6 +551,242 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Certificates
+         * @description Certificates and requests of students you can see, newest first (read, issue or approve
+         *     permission).
+         */
+        get: operations["list_certificates_api_v1_certificates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Certificate
+         * @description One certificate with its printed values once issued; returns ``ETag`` for the decision
+         *     calls (read, issue or approve permission).
+         */
+        get: operations["get_certificate_api_v1_certificates__certificate_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Certificate
+         * @description Approve and issue a transfer certificate (or a TC duplicate): serial number, register
+         *     entry and, for a TC, the student leaves the rolls (permission ``certificate.approve``, MFA
+         *     within 5 minutes, not the person who prepared it, ``If-Match``). Errors:
+         *     ``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``
+         *     / ``certificate_blocked`` (409).
+         */
+        post: operations["approve_certificate_api_v1_certificates__certificate_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Certificate
+         * @description Cancel an issued certificate with a reason: it keeps its number and the registers show
+         *     it as cancelled; a TC does not re-admit the student (permission ``certificate.approve``,
+         *     MFA within 5 minutes, ``If-Match``). Error ``certificate_not_issued`` (409).
+         */
+        post: operations["cancel_certificate_api_v1_certificates__certificate_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Certificate Download Url
+         * @description A link to download the certificate PDF, valid for at most 5 minutes (permission
+         *     ``certificate.read``). Error ``pdf_not_ready`` / ``document_not_ready`` (409) while it is
+         *     being made or checked. Audited.
+         */
+        get: operations["certificate_download_url_api_v1_certificates__certificate_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Duplicate
+         * @description Issue a duplicate of an issued certificate, marked DUPLICATE with the original serial
+         *     number (a TC duplicate waits for approval; permission ``certificate.issue``). Accepts
+         *     ``Idempotency-Key``. Errors: ``certificate_not_issued``, ``duplicate_pending`` (409).
+         */
+        post: operations["request_duplicate_api_v1_certificates__certificate_id__duplicates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print Certificate
+         * @description The certificate as a print-ready A4 page in English and Telugu (a DRAFT while it waits
+         *     for approval; read, issue or approve permission). The view is audited.
+         */
+        get: operations["print_certificate_api_v1_certificates__certificate_id__print_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Certificate
+         * @description Reject a request with a reason the requester will see (permission
+         *     ``certificate.approve``, MFA within 5 minutes, ``If-Match``).
+         */
+        post: operations["reject_certificate_api_v1_certificates__certificate_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Certificate Pdf
+         * @description Make the PDF again after it failed (permission ``certificate.issue``).
+         */
+        post: operations["retry_certificate_pdf_api_v1_certificates__certificate_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Certificate
+         * @description Withdraw your own request while it waits for approval (permission
+         *     ``certificate.issue``, ``If-Match``). Error ``not_requester`` (403).
+         */
+        post: operations["withdraw_certificate_api_v1_certificates__certificate_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Certificate Types
+         * @description Certificate types with the values each one asks for (read, issue or approve
+         *     permission).
+         */
+        get: operations["list_certificate_types_api_v1_certificates_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/change-requests": {
         parameters: {
             query?: never;
@@ -3279,6 +3515,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/registers/admission-withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admission Withdrawal Register
+         * @description The admission and withdrawal register of the students enrolled in an academic year, in
+         *     admission-number order, as an A4 landscape print page (permission ``register.read``,
+         *     school-wide, MFA within 5 minutes). Audited.
+         */
+        get: operations["admission_withdrawal_register_api_v1_registers_admission_withdrawal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registers/certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Certificate Register
+         * @description The certificate issue register (bonafide, study and conduct certificates, or one of them)
+         *     of an academic year as an A4 landscape print page (permission ``register.read``,
+         *     school-wide, MFA within 5 minutes). Audited.
+         */
+        get: operations["certificate_register_api_v1_registers_certificates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registers/transfer-certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Transfer Certificate Register
+         * @description The TC register (counterfoil) of an academic year (default: the current one) as an A4
+         *     landscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).
+         *     Audited.
+         */
+        get: operations["transfer_certificate_register_api_v1_registers_transfer_certificates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -3475,6 +3777,51 @@ export interface paths {
          *     ``If-Match`` required).
          */
         patch: operations["update_student_api_v1_students__student_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Certificate
+         * @description Issue a bonafide, study or conduct certificate, or prepare a transfer certificate for the
+         *     principal's approval (permission ``certificate.issue``). Accepts ``Idempotency-Key``.
+         *     Errors: ``certificate_blocked``, ``transfer_certificate_exists``,
+         *     ``no_current_academic_year`` (409); input errors (422).
+         */
+        post: operations["request_certificate_api_v1_students__student_id__certificates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/certificates/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Certificate
+         * @description What the certificate would print now, where each value comes from, and anything that
+         *     stops it being issued (open blocker findings, empty required fields; permission
+         *     ``certificate.issue``). Nothing is saved.
+         */
+        get: operations["preview_certificate_api_v1_students__student_id__certificates_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/students/{student_id}/enrollments": {
@@ -4235,6 +4582,34 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** DownloadUrlOut */
+        app__certificates__schemas__DownloadUrlOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Url */
+            url: string;
+        };
+        /** DownloadUrlOut */
+        app__documents__schemas__DownloadUrlOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Url */
+            url: string;
+            /** Version No */
+            version_no: number;
+        };
         /** MeOut */
         app__identity__schemas__MeOut: {
             /** Display Name */
@@ -4598,6 +4973,24 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * Blocker
+         * @description Why the certificate cannot be issued now (FR-CERT-002). ``finding_id`` links a DQ
+         *     finding; ``attribute_key`` names the field (a change request corrects it).
+         */
+        Blocker: {
+            /** Attribute Key */
+            attribute_key?: string | null;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "dq_blocker" | "missing_value" | "no_enrolment" | "student_not_active" | "no_current_year" | "transfer_certificate_exists";
+            /** Finding Id */
+            finding_id?: string | null;
+            /** Rule Id */
+            rule_id?: string | null;
+        };
         /** BreakGlassIn */
         BreakGlassIn: {
             /** Duration Minutes */
@@ -4690,6 +5083,56 @@ export interface components {
             value?: string | null;
         };
         /**
+         * CertificateContent
+         * @description The printed values, frozen at issue (FR-CERT-003).
+         */
+        CertificateContent: {
+            /** Academic Year Label */
+            academic_year_label: string;
+            /** Admission No */
+            admission_no: string;
+            /** Blanks */
+            blanks: components["schemas"]["ContentLine"][];
+            /**
+             * Certificate Type
+             * @enum {string}
+             */
+            certificate_type: "transfer" | "bonafide" | "study" | "conduct";
+            /** Class Label En */
+            class_label_en: string | null;
+            /** Class Label Te */
+            class_label_te: string | null;
+            /** Details */
+            details: components["schemas"]["ContentLine"][];
+            /** Fields */
+            fields: components["schemas"]["ContentLine"][];
+            /**
+             * Issued On
+             * Format: date
+             */
+            issued_on: string;
+            /** School Address En */
+            school_address_en: string;
+            /** School Address Te */
+            school_address_te: string;
+            /** School Affiliation */
+            school_affiliation: string;
+            /** School Name En */
+            school_name_en: string;
+            /** School Name Te */
+            school_name_te: string;
+            /** School Place */
+            school_place: string;
+            /** Serial */
+            serial: string;
+            /** Student Name */
+            student_name: string;
+            /** Title En */
+            title_en: string;
+            /** Title Te */
+            title_te: string;
+        };
+        /**
          * CertificateDownloadOut
          * @description A presigned GET (at most 5 minutes, attachment) for a certificate of deletion.
          */
@@ -4713,6 +5156,222 @@ export interface components {
             size_bytes: number;
             /** Url */
             url: string;
+        };
+        /**
+         * CertificateLetterhead
+         * @description What certificates print at the top and at the signature (FR-CERT-013, US-1108). The
+         *     English school name is the school's name; empty fields are left out of the page.
+         */
+        "CertificateLetterhead-Input": {
+            /**
+             * Address En
+             * @default
+             */
+            address_en: string;
+            /**
+             * Address Te
+             * @default
+             */
+            address_te: string;
+            /**
+             * Affiliation
+             * @description Recognition or affiliation line, e.g. the recognition order or UDISE code.
+             * @default
+             */
+            affiliation: string;
+            /**
+             * Place
+             * @default
+             */
+            place: string;
+            /**
+             * School Name Te
+             * @default
+             */
+            school_name_te: string;
+        };
+        /**
+         * CertificateLetterhead
+         * @description What certificates print at the top and at the signature (FR-CERT-013, US-1108). The
+         *     English school name is the school's name; empty fields are left out of the page.
+         */
+        "CertificateLetterhead-Output": {
+            /**
+             * Address En
+             * @default
+             */
+            address_en: string;
+            /**
+             * Address Te
+             * @default
+             */
+            address_te: string;
+            /**
+             * Affiliation
+             * @description Recognition or affiliation line, e.g. the recognition order or UDISE code.
+             * @default
+             */
+            affiliation: string;
+            /**
+             * Place
+             * @default
+             */
+            place: string;
+            /**
+             * School Name Te
+             * @default
+             */
+            school_name_te: string;
+        };
+        /** CertificateOut */
+        CertificateOut: {
+            /** Academic Year Id */
+            academic_year_id: string | null;
+            /** Admission No */
+            admission_no: string | null;
+            /** Can Approve */
+            can_approve: boolean;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Duplicate */
+            can_duplicate: boolean;
+            /** Can Withdraw */
+            can_withdraw: boolean;
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /** Cancelled By */
+            cancelled_by: string | null;
+            /**
+             * Certificate Type
+             * @enum {string}
+             */
+            certificate_type: "transfer" | "bonafide" | "study" | "conduct";
+            content: components["schemas"]["CertificateContent"] | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            /** Decision Note */
+            decision_note: string | null;
+            /** Document Id */
+            document_id: string | null;
+            /** Duplicate No */
+            duplicate_no: number | null;
+            /** Duplicate Reason */
+            duplicate_reason: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inputs */
+            inputs: {
+                [key: string]: string;
+            };
+            /** Issued At */
+            issued_at: string | null;
+            /** Issued By */
+            issued_by: string | null;
+            /** Original Certificate Id */
+            original_certificate_id: string | null;
+            /**
+             * Pdf Status
+             * @enum {string}
+             */
+            pdf_status: "none" | "queued" | "ready" | "failed";
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Requested By
+             * Format: uuid
+             */
+            requested_by: string;
+            /** Requires Approval */
+            requires_approval: boolean;
+            /** Serial */
+            serial: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "issued" | "rejected" | "withdrawn" | "cancelled";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string | null;
+            /** Version */
+            version: number;
+        };
+        /** CertificatePreview */
+        CertificatePreview: {
+            /** Academic Year Label */
+            academic_year_label: string | null;
+            /** Blockers */
+            blockers: components["schemas"]["Blocker"][];
+            /** Can Issue */
+            can_issue: boolean;
+            /**
+             * Certificate Type
+             * @enum {string}
+             */
+            certificate_type: "transfer" | "bonafide" | "study" | "conduct";
+            /** Class Label */
+            class_label: string | null;
+            /** Fields */
+            fields: components["schemas"]["PrintedField"][];
+            /** Requires Approval */
+            requires_approval: boolean;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Warnings */
+            warnings: components["schemas"]["PreviewWarning"][];
+        };
+        /**
+         * CertificateRequest
+         * @description Prepare (types that need approval) or issue a certificate for one student. ``inputs``
+         *     are the values the type asks for (``GET /certificates/types``); dates as ``YYYY-MM-DD``.
+         */
+        CertificateRequest: {
+            /**
+             * Certificate Type
+             * @enum {string}
+             */
+            certificate_type: "transfer" | "bonafide" | "study" | "conduct";
+            /** Inputs */
+            inputs?: {
+                [key: string]: string;
+            };
+        };
+        /** CertificateTypeOut */
+        CertificateTypeOut: {
+            /** Ends Enrolment */
+            ends_enrolment: boolean;
+            /** Inputs */
+            inputs: components["schemas"]["InputOut"][];
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "transfer" | "bonafide" | "study" | "conduct";
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Printed */
+            printed: string[];
+            /** Requires Approval */
+            requires_approval: boolean;
         };
         /** ChangePlanIn */
         ChangePlanIn: {
@@ -4821,6 +5480,15 @@ export interface components {
             target_source: string;
             /** Version */
             version: number;
+        };
+        /** ChoiceOut */
+        ChoiceOut: {
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Value */
+            value: string;
         };
         /** ClassCreate */
         ClassCreate: {
@@ -4959,6 +5627,17 @@ export interface components {
             host_teardown_reference: string;
             /** Kms Deletion Reference */
             kms_deletion_reference: string;
+        };
+        /** ContentLine */
+        ContentLine: {
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Value */
+            value: string | null;
         };
         /** DashboardOut */
         DashboardOut: {
@@ -5184,7 +5863,7 @@ export interface components {
              * Purpose
              * @enum {string}
              */
-            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file";
+            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file" | "certificate";
             /**
              * Sensitivity
              * @enum {string}
@@ -5252,7 +5931,7 @@ export interface components {
              * Purpose
              * @enum {string}
              */
-            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file";
+            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file" | "certificate";
             /**
              * Sensitivity
              * @enum {string}
@@ -5340,21 +6019,13 @@ export interface components {
             /** Title */
             title?: string | null;
         };
-        /** DownloadUrlOut */
-        DownloadUrlOut: {
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
-            /** Filename */
-            filename: string;
-            /** Mime Type */
-            mime_type: string;
-            /** Url */
-            url: string;
-            /** Version No */
-            version_no: number;
+        /**
+         * DuplicateRequest
+         * @description Why a duplicate is needed (10..1000 characters), e.g. the original was lost.
+         */
+        DuplicateRequest: {
+            /** Reason */
+            reason: string;
         };
         /**
          * EnrollmentEnd
@@ -6129,6 +6800,22 @@ export interface components {
              */
             status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
         };
+        /** InputOut */
+        InputOut: {
+            /** Choices */
+            choices: components["schemas"]["ChoiceOut"][];
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "date" | "choice" | "text";
+            /** Max Length */
+            max_length: number | null;
+            /** Required */
+            required: boolean;
+        };
         /**
          * InvitationEmailOut
          * @description An invitation email was queued (``POST /users/{user_id}/invitation-email``).
@@ -6806,6 +7493,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[CertificateOut] */
+        Page_CertificateOut_: {
+            /** Data */
+            data: components["schemas"]["CertificateOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[ChangeRequestOut] */
         Page_ChangeRequestOut_: {
             /** Data */
@@ -7316,12 +8010,42 @@ export interface components {
             profile_key: string;
             scope?: components["schemas"]["ExportScopeIn"];
         };
+        /** PreviewWarning */
+        PreviewWarning: {
+            /** Attribute Key */
+            attribute_key: string;
+            /**
+             * Code
+             * @constant
+             */
+            code: "provisional_value";
+        };
         /** PriceOverrideIn */
         PriceOverrideIn: {
             /** Price Override Inr */
             price_override_inr: number | string;
             /** Reason */
             reason: string;
+        };
+        /**
+         * PrintedField
+         * @description One value the certificate prints, with where it comes from (US-1101 AC1, AC4).
+         */
+        PrintedField: {
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Provisional */
+            provisional: boolean;
+            /** Source */
+            source: string | null;
+            /** Value */
+            value: string | null;
+            /** Verified */
+            verified: boolean;
         };
         /** ProfileOut */
         ProfileOut: {
@@ -7661,6 +8385,14 @@ export interface components {
         };
         /** Reasoned */
         Reasoned: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * ReasonIn
+         * @description Reason for rejecting a request or cancelling an issued certificate (10..1000).
+         */
+        ReasonIn: {
             /** Reason */
             reason: string;
         };
@@ -8883,6 +9615,7 @@ export interface components {
              * @default 5000
              */
             ai_monthly_budget_inr: number;
+            certificate_letterhead?: components["schemas"]["CertificateLetterhead-Output"];
             /**
              * Date Format
              * @default DD/MM/YYYY
@@ -8906,6 +9639,7 @@ export interface components {
             ai_features_enabled?: boolean | null;
             /** Ai Monthly Budget Inr */
             ai_monthly_budget_inr?: number | null;
+            certificate_letterhead?: components["schemas"]["CertificateLetterhead-Input"] | null;
             /** Date Format */
             date_format?: ("DD/MM/YYYY" | "DD-MM-YYYY" | "YYYY-MM-DD") | null;
             /** Idle Timeout Minutes */
@@ -9152,7 +9886,7 @@ export interface components {
              * Purpose
              * @enum {string}
              */
-            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file";
+            purpose: "evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file" | "certificate";
             /**
              * Upload Id
              * Format: uuid
@@ -10415,6 +11149,359 @@ export interface operations {
             };
         };
     };
+    list_certificates_api_v1_certificates_get: {
+        parameters: {
+            query?: {
+                academic_year_id?: string | null;
+                certificate_type?: ("transfer" | "bonafide" | "study" | "conduct") | null;
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("pending" | "issued" | "rejected" | "withdrawn" | "cancelled") | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CertificateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_certificate_api_v1_certificates__certificate_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_certificate_api_v1_certificates__certificate_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApproveIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_certificate_api_v1_certificates__certificate_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    certificate_download_url_api_v1_certificates__certificate_id__download_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__certificates__schemas__DownloadUrlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_duplicate_api_v1_certificates__certificate_id__duplicates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    print_certificate_api_v1_certificates__certificate_id__print_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_certificate_api_v1_certificates__certificate_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_certificate_pdf_api_v1_certificates__certificate_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_certificate_api_v1_certificates__certificate_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_certificate_types_api_v1_certificates_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateTypeOut"][];
+                };
+            };
+        };
+    };
     list_change_requests_api_v1_change_requests_get: {
         parameters: {
             query?: {
@@ -10873,7 +11960,7 @@ export interface operations {
                 doc_type?: ("circular" | "policy" | "minutes" | "register_scan" | "certificate" | "letter" | "form" | "report" | "verified_answer" | "other" | "evidence" | "import_file") | null;
                 /** @description Page size (max 200). */
                 limit?: number;
-                purpose?: ("evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file") | null;
+                purpose?: ("evidence" | "register_scan" | "circular" | "policy" | "other" | "import_file" | "certificate") | null;
                 status?: ("active" | "archived") | null;
             };
             header?: never;
@@ -11115,7 +12202,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DownloadUrlOut"];
+                    "application/json": components["schemas"]["app__documents__schemas__DownloadUrlOut"];
                 };
             };
             /** @description Validation Error */
@@ -15449,6 +16536,100 @@ export interface operations {
             };
         };
     };
+    admission_withdrawal_register_api_v1_registers_admission_withdrawal_get: {
+        parameters: {
+            query?: {
+                academic_year_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    certificate_register_api_v1_registers_certificates_get: {
+        parameters: {
+            query?: {
+                academic_year_id?: string | null;
+                certificate_type?: ("transfer" | "bonafide" | "study" | "conduct") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transfer_certificate_register_api_v1_registers_transfer_certificates_get: {
+        parameters: {
+            query?: {
+                academic_year_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_roles_api_v1_roles_get: {
         parameters: {
             query?: {
@@ -15851,6 +17032,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_certificate_api_v1_students__student_id__certificates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CertificateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_certificate_api_v1_students__student_id__certificates_preview_get: {
+        parameters: {
+            query: {
+                certificate_type: "transfer" | "bonafide" | "study" | "conduct";
+            };
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificatePreview"];
                 };
             };
             /** @description Validation Error */

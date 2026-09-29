@@ -762,6 +762,85 @@ def _retention_put(w: Any, r: str, a: Engine) -> Request:
     return "/api/v1/admin/retention", {"rules": {}}, {"If-Match": f'W/"{version or 0}"'}
 
 
+# --- certificates and registers (US-1101..US-1106): issue, approve (step-up), read, registers --
+
+
+def _cert() -> ModuleType:
+    """tests/certificates/support.py (certificates through the real services)."""
+    name = "sos_test_certificates_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "certificates" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+_CERT_ISSUERS = ("principal", "office_admin", "office_staff")
+
+
+def _cert_student(w: Any) -> uuid.UUID:
+    """A fresh school A student in 9A with an admission number (no blockers)."""
+    value: uuid.UUID = _cert().student(w.a)
+    return value
+
+
+def _cert_issued(w: Any, admin: Engine, *, fresh: bool = False) -> Any:
+    """An issued bonafide certificate of school A (shared unless ``fresh``), with its PDF stored
+    and scanned so downloads succeed."""
+    if fresh or "matrix_certificate" not in w.a.ids:
+        out = _cert().issue(w.a, _cert_student(w), "bonafide")
+        if fresh:
+            return out
+        _cert().render(w.a, out)
+        _cert().mark_document_ready(admin, _cert().row(admin, out.id)["document_id"])
+        w.a.ids["matrix_certificate"] = out
+    return w.a.ids["matrix_certificate"]
+
+
+def _cert_pending(w: Any, role: str | None = None) -> Any:
+    """A fresh pending TC prepared by ``role`` when it may issue (withdraw), otherwise by the
+    office admin (so approvers are never the requester)."""
+    maker = role if role in _CERT_ISSUERS else "office_admin"
+    return _cert().issue(w.a, _cert_student(w), "transfer", role=maker)
+
+
+def _cert_decide(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        tc = _cert_pending(w, r if action == "withdraw" else None)
+        body = (
+            None
+            if action in ("approve", "withdraw")
+            else {"reason": "Synthetic matrix reason for this decision"}
+        )
+        return (
+            f"/api/v1/certificates/{tc.id}/{action}",
+            body,
+            {"If-Match": f'W/"{tc.version}"'},
+        )
+
+    return build
+
+
+def _cert_cancel(w: Any, r: str, a: Engine) -> Request:
+    cert = _cert_issued(w, a, fresh=True)
+    return (
+        f"/api/v1/certificates/{cert.id}/cancel",
+        {"reason": "Synthetic matrix cancellation reason"},
+        {"If-Match": f'W/"{cert.version}"'},
+    )
+
+
+def _cert_path(suffix: str = "") -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        return f"/api/v1/certificates/{_cert_issued(w, a).id}{suffix}", None, {}
+
+    return build
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -1233,6 +1312,51 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/admin/retention"): lambda w, r, a: ("/api/v1/admin/retention", None, {}),
     ("PUT", "/api/v1/admin/retention"): _retention_put,
+    # Certificates and registers (app/certificates/api.py; docs/09 Certificates; US-1101..1106).
+    ("GET", "/api/v1/certificates/types"): lambda w, r, a: (
+        "/api/v1/certificates/types",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/students/{student_id}/certificates/preview"): lambda w, r, a: (
+        f"/api/v1/students/{_cert_student(w)}/certificates/preview?certificate_type=bonafide",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/students/{student_id}/certificates"): lambda w, r, a: (
+        f"/api/v1/students/{_cert_student(w)}/certificates",
+        {"certificate_type": "bonafide", "inputs": {"purpose": "bus_pass"}},
+        {},
+    ),
+    ("GET", "/api/v1/certificates"): lambda w, r, a: ("/api/v1/certificates", None, {}),
+    ("GET", "/api/v1/certificates/{certificate_id}"): _cert_path(),
+    ("GET", "/api/v1/certificates/{certificate_id}/print"): _cert_path("/print"),
+    ("GET", "/api/v1/certificates/{certificate_id}/download-url"): _cert_path("/download-url"),
+    ("POST", "/api/v1/certificates/{certificate_id}/render"): _cert_path("/render"),
+    ("POST", "/api/v1/certificates/{certificate_id}/duplicates"): lambda w, r, a: (
+        f"/api/v1/certificates/{_cert_issued(w, a).id}/duplicates",
+        {"reason": "Synthetic matrix duplicate reason"},
+        {},
+    ),
+    ("POST", "/api/v1/certificates/{certificate_id}/approve"): _cert_decide("approve"),
+    ("POST", "/api/v1/certificates/{certificate_id}/reject"): _cert_decide("reject"),
+    ("POST", "/api/v1/certificates/{certificate_id}/withdraw"): _cert_decide("withdraw"),
+    ("POST", "/api/v1/certificates/{certificate_id}/cancel"): _cert_cancel,
+    ("GET", "/api/v1/registers/transfer-certificates"): lambda w, r, a: (
+        "/api/v1/registers/transfer-certificates",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/registers/certificates"): lambda w, r, a: (
+        "/api/v1/registers/certificates",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/registers/admission-withdrawal"): lambda w, r, a: (
+        "/api/v1/registers/admission-withdrawal",
+        None,
+        {},
+    ),
     # Knowledge ("Ask the school"; docs/09 Knowledge, FR-KB-*, FR-KB-030).
     ("POST", "/api/v1/knowledge/ask"): _kb_ask,
     ("POST", "/api/v1/knowledge/search"): lambda w, r, a: (
@@ -1343,6 +1467,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/change-requests",
         "/api/v1/academic-years/{year_id}/promotions:commit",
         "/api/v1/knowledge/verified-answers",
+        "/api/v1/students/{student_id}/certificates",
+        "/api/v1/certificates/{certificate_id}/duplicates",
     }
     accepted = {
         "/api/v1/documents",

@@ -139,6 +139,23 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): {"feedback": "helpful"},
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): {},
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): None,
+    # Certificates (US-1101..US-1105): valid bodies so the request reaches the object lookup.
+    ("POST", "/api/v1/students/{student_id}/certificates"): {
+        "certificate_type": "bonafide",
+        "inputs": {"purpose": "bus_pass"},
+    },
+    ("POST", "/api/v1/certificates/{certificate_id}/approve"): None,
+    ("POST", "/api/v1/certificates/{certificate_id}/reject"): {
+        "reason": "Synthetic BOLA rejection"
+    },
+    ("POST", "/api/v1/certificates/{certificate_id}/withdraw"): None,
+    ("POST", "/api/v1/certificates/{certificate_id}/cancel"): {
+        "reason": "Synthetic BOLA cancellation"
+    },
+    ("POST", "/api/v1/certificates/{certificate_id}/duplicates"): {
+        "reason": "Synthetic BOLA duplicate reason"
+    },
+    ("POST", "/api/v1/certificates/{certificate_id}/render"): None,
 }
 
 
@@ -186,6 +203,13 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/imports/{import_id}/sheet/export"),
         # Cancelling needs student.identity_change.request (the owner only approves).
         ("POST", "/api/v1/change-requests/{change_request_id}/cancel"),
+        # Issuing, previews, duplicates, withdrawals and PDF retries need certificate.issue
+        # (the owner approves and reads only, docs/07 §6.2).
+        ("POST", "/api/v1/students/{student_id}/certificates"),
+        ("GET", "/api/v1/students/{student_id}/certificates/preview"),
+        ("POST", "/api/v1/certificates/{certificate_id}/duplicates"),
+        ("POST", "/api/v1/certificates/{certificate_id}/withdraw"),
+        ("POST", "/api/v1/certificates/{certificate_id}/render"),
     ),
     "principal",
 )
@@ -434,6 +458,38 @@ def _b_verified_answer(w: Any) -> uuid.UUID:
     return value
 
 
+def _b_certificate(w: Any) -> uuid.UUID:
+    """An issued bonafide certificate of school B (real services; the B owner acting with the
+    office admin's permissions, since school B has no office admin)."""
+    if "bola_certificate" not in w.b.ids:
+        name = "sos_test_certificates_support"
+        if name not in sys.modules:
+            path = Path(__file__).resolve().parents[1] / "certificates" / "support.py"
+            spec = importlib.util.spec_from_file_location(name, path)
+            assert spec is not None
+            assert spec.loader is not None
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+        from app.certificates import service as certificates
+        from app.certificates.schemas import CertificateRequest
+
+        cert = sys.modules[name]
+        cert.install()
+        student = cert.student(w.b)
+        out = cert.call(
+            w.b,
+            w.b.people["owner"],
+            "office_admin",
+            certificates.request_certificate,
+            student,
+            CertificateRequest(certificate_type="bonafide", inputs={"purpose": "bus_pass"}),
+        )
+        w.b.ids["bola_certificate"] = out.id
+    value: uuid.UUID = w.b.ids["bola_certificate"]
+    return value
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
     "year_id": lambda w: w.b.ids["year"],
@@ -467,6 +523,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "query_id": _b_query,
     # Knowledge (FR-KB-030): a verified answer of school B.
     "answer_id": _b_verified_answer,
+    # Certificates (US-1101): an issued certificate of school B.
+    "certificate_id": _b_certificate,
 }
 
 
@@ -482,6 +540,12 @@ def _id_routes() -> list[tuple[str, str]]:
 
 
 ID_ROUTES = _id_routes()
+
+
+# Required query parameters of ID routes, so the request reaches the object lookup.
+QUERY: dict[tuple[str, str], dict[str, str]] = {
+    ("GET", "/api/v1/students/{student_id}/certificates/preview"): {"certificate_type": "bonafide"},
+}
 
 
 # Path parameters that are not object ids (a row number inside the object in the path).
@@ -522,6 +586,7 @@ def test_SEC_001_other_school_ids_are_404(
             method,
             _fill(template, target),
             json=BODIES.get(key),
+            params=QUERY.get(key),
             headers={"If-Match": 'W/"1"'},
         )
         assert res.status_code == 404, (key, res.text)
@@ -596,6 +661,43 @@ def test_SEC_001_lists_never_show_other_school(world: Any, api: Any, path: str) 
     b_ids = {str(v) for v in world.b.ids.values()}
     b_ids |= {str(p.user_id) for p in world.b.people.values()}
     assert not {item["id"] for item in res.json()["data"]} & b_ids
+
+
+def test_SEC_001_certificate_lists_and_registers_never_show_other_school(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """US-1101, FR-REG-001: school B's certificates never appear in school A's list or
+    registers (and B's student cannot be used as a filter)."""
+    b_certificate = _b_certificate(world)
+    owner = world.person("owner")
+    res = api.call(owner, "GET", "/api/v1/certificates", params={"limit": 200})
+    assert res.status_code == 200
+    assert str(b_certificate) not in {item["id"] for item in res.json()["data"]}
+    b_student = api.call(
+        owner,
+        "GET",
+        "/api/v1/certificates",
+        params={"student_id": str(SW.ensure_students(world)["b_sb"])},
+    )
+    assert b_student.status_code == 200
+    assert b_student.json()["data"] == []
+    with admin_engine.connect() as c:
+        b_name = c.execute(
+            text("SELECT content ->> 'student_name' FROM sis.certificates WHERE id = :i"),
+            {"i": b_certificate},
+        ).scalar_one()
+    assert b_name
+    for path in ("/api/v1/registers/certificates", "/api/v1/registers/admission-withdrawal"):
+        page = api.call(owner, "GET", path)
+        assert page.status_code == 200
+        assert b_name not in page.text
+    b_year = api.call(
+        owner,
+        "GET",
+        "/api/v1/registers/certificates",
+        params={"academic_year_id": str(world.b.ids["year"])},
+    )
+    assert b_year.status_code == 404
 
 
 def test_SEC_001_bodies_cannot_reference_other_school(world: Any, api: Any) -> None:
