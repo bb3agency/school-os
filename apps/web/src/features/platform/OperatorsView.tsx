@@ -153,7 +153,7 @@ export function OperatorsScreen() {
         if (row.status === "deactivated") return null;
         if (self) return <span className="text-sm text-ink-muted">{t("you")}</span>;
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="relative flex flex-wrap gap-2">
             <ActionDialog
               triggerLabel={t("changeRoles")}
               triggerSize="sm"

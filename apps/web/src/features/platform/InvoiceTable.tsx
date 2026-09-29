@@ -90,7 +90,7 @@ export function InvoiceTable({
     const label = row.invoice_number ?? `${t("draftNumber")} ${formatDate(row.period_start) ?? ""}`;
     if (!manage) return <InvoiceDownload invoice={row} label={label} />;
     return (
-      <div className="flex flex-wrap items-start gap-2">
+      <div className="relative flex flex-wrap items-start gap-2">
         <InvoiceDownload invoice={row} label={label} />
         {row.status === "draft" ? (
           <>
@@ -242,7 +242,9 @@ export function InvoiceTable({
           {
             key: "school",
             header: t("colSchool"),
-            cell: (row: Invoice) => schoolName(row.tenant_id),
+            cell: (row: Invoice) => (
+              <span className="block min-w-44">{schoolName(row.tenant_id)}</span>
+            ),
           },
         ]
       : []),

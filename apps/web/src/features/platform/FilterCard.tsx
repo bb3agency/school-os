@@ -19,7 +19,7 @@ export function FilterCard({
     <Card padding="sm">
       <form method="get" className="flex flex-wrap items-end gap-3">
         {children}
-        <div className="flex flex-wrap gap-2">
+        <div className="relative flex flex-wrap gap-2">
           <Button type="submit" variant="secondary">
             <Icon name="filter" className="size-4" />
             {tc("applyFilters")}

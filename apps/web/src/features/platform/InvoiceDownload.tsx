@@ -49,7 +49,7 @@ export function InvoiceDownload({ invoice, label }: { invoice: Invoice; label: s
       : null;
 
   return (
-    <span className="flex flex-col items-start gap-1">
+    <span className="relative flex flex-col items-start gap-1">
       <Button
         variant="secondary"
         size="sm"

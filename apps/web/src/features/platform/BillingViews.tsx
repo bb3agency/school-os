@@ -293,7 +293,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       cell: (row) => (
         <span className="flex flex-col">
           <Mono>{`${Number(row.gst_rate)}%`}</Mono>
-          <span className="text-xs text-ink-muted">
+          <span className="text-xs whitespace-nowrap text-ink-muted">
             {t("sacCode")}: <span className="font-mono">{row.sac_code}</span>
           </span>
         </span>
@@ -323,7 +323,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
             key: "actions",
             header: tc("actions"),
             cell: (row: Plan) => (
-              <div className="flex flex-wrap gap-2">
+              <div className="relative flex flex-wrap gap-2">
                 {row.status === "draft" ? (
                   <ActionDialog
                     triggerLabel={t("publish")}

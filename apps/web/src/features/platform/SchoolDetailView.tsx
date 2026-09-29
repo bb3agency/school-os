@@ -672,7 +672,7 @@ function FlagsTab({ school }: { school: TenantDetail }) {
               const path = { key: row.key, tenant_id: school.tenant_id };
               const has = school.flag_overrides[row.key] !== undefined;
               return (
-                <div className="flex flex-wrap gap-2">
+                <div className="relative flex flex-wrap gap-2">
                   <ActionDialog
                     triggerLabel={t("setOverride")}
                     triggerSize="sm"

@@ -154,7 +154,7 @@ export function ProvisionSchoolForm() {
           <p>{done.tier === "dedicated" ? t("doneDedicated") : t("doneShared")}</p>
           <p>{t(`ownerInvite.${done.owner_invite}`)}</p>
         </Alert>
-        <div className="flex flex-wrap gap-2">
+        <div className="relative flex flex-wrap gap-2">
           <ButtonLink href={`/platform/schools/${done.tenant_id}`}>{t("openSchool")}</ButtonLink>
           <ButtonLink href="/platform/schools" variant="secondary">
             {t("backToSchools")}

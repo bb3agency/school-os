@@ -248,7 +248,7 @@ export function FlagsScreen() {
             key: "actions",
             header: tc("actions"),
             cell: (row: FeatureFlag) => (
-              <div className="flex flex-wrap gap-2">
+              <div className="relative flex flex-wrap gap-2">
                 <ActionDialog
                   triggerLabel={tc("edit")}
                   triggerSize="sm"
@@ -446,13 +446,13 @@ export function FleetScreen({ status = "" }: { status?: string }) {
     {
       key: "region",
       header: t("colRegion"),
-      cell: (row) => <span className="font-mono text-xs">{row.region}</span>,
+      cell: (row) => <span className="font-mono text-xs whitespace-nowrap">{row.region}</span>,
     },
     {
       key: "host",
       header: t("colHost"),
       cell: (row) => (
-        <span className="font-mono text-xs break-all">
+        <span className="font-mono text-xs whitespace-nowrap">
           <Value>{row.hostname ?? row.host_ref}</Value>
         </span>
       ),
@@ -461,7 +461,7 @@ export function FleetScreen({ status = "" }: { status?: string }) {
       key: "domain",
       header: t("colDomain"),
       cell: (row) => (
-        <span className="font-mono text-xs break-all">
+        <span className="font-mono text-xs whitespace-nowrap">
           <Value>{row.custom_domain}</Value>
         </span>
       ),
@@ -484,7 +484,7 @@ export function FleetScreen({ status = "" }: { status?: string }) {
       key: "heartbeat",
       header: t("colHeartbeat"),
       cell: (row) => (
-        <span className="flex flex-col items-start gap-1">
+        <span className="relative flex flex-col items-start gap-1">
           <HeartbeatPill at={row.last_heartbeat_at} status={row.status} />
           <MonoTime value={row.last_heartbeat_at} />
         </span>
@@ -1017,7 +1017,7 @@ function EmergencyConfirmations({ request }: { request: BreakGlassRequest }) {
     Boolean,
   ).length;
   return (
-    <span className="flex flex-col items-start gap-1">
+    <span className="relative flex flex-col items-start gap-1">
       <Badge tone="danger">{t("emergency")}</Badge>
       <Pill variant={confirmed >= 2 ? "done" : "review"}>
         {t("confirmations", { count: confirmed })}

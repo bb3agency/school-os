@@ -187,7 +187,7 @@ export function SchoolsView({
               {t("filterPastDue")}
             </label>
           </fieldset>
-          <div className="flex flex-wrap gap-2">
+          <div className="relative flex flex-wrap gap-2">
             <Button type="submit" variant="secondary">
               <Icon name="filter" className="size-4" />
               {tc("search")}

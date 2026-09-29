@@ -41,7 +41,7 @@ export function DeploymentActions({ deployment }: { deployment: Deployment }) {
   const dedicated = deployment.mode === "dedicated";
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="relative flex flex-wrap gap-2">
       <ActionDialog
         triggerLabel={t("edit")}
         triggerSize="sm"
