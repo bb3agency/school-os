@@ -39,5 +39,5 @@ export function AuditScreen({ filters = {} }: { filters?: AuditFilters }) {
     ["staff", "audit-events", query],
     async () => (await unwrap(api.GET("/api/v1/audit/events", { params: { query } }))).data,
   );
-  return <AuditView events={events} />;
+  return <AuditView events={events} filters={filters} />;
 }

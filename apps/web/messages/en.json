@@ -519,8 +519,17 @@
           "head_missing": "The record of the latest event is missing.",
           "head_mismatch": "The latest event does not match the recorded end of the log.",
           "other": "The events do not link up as expected."
-        }
-      }
+        },
+        "statusLabel": "Result of the last check",
+        "notRunTitle": "Not checked yet",
+        "notRunBody": "Run the check to see whether every event is still linked to the one before it.",
+        "eventsChecked": "Events checked"
+      },
+      "home": "Home",
+      "filterActionPlaceholder": "For example student.update",
+      "filterUserPlaceholder": "The person's user ID",
+      "clearFilters": "Clear filters",
+      "exportLater": "Downloading the audit log as a CSV file is not available on this screen yet."
     },
     "switchSchool": "Switch school",
     "announcements": {

@@ -7,7 +7,9 @@ import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
+import { Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "@/i18n/navigation";
@@ -75,53 +77,126 @@ export function AuditVerifyScreen() {
     else setAsked(true);
   }
 
+  const state: "idle" | "running" | "ok" | "broken" = running
+    ? "running"
+    : result?.ok
+      ? "ok"
+      : result
+        ? "broken"
+        : "idle";
+  const marks = {
+    idle: "bg-surface-sunken text-ink-muted",
+    running: "bg-primary-soft text-primary",
+    ok: "bg-success-soft text-success-ink",
+    broken: "bg-danger-soft text-danger",
+  } as const;
+
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} actions={back} />
-      <Card title={t("howTitle")}>
-        <p className="text-sm">{t("howBody")}</p>
-        <div className="mt-4">
-          <Button onClick={check} disabled={running} aria-disabled={running || undefined}>
-            {running ? t("checking") : result ? t("checkAgain") : ta("verify")}
-          </Button>
-        </div>
-      </Card>
-      <div aria-live="polite" aria-atomic="true">
-        {running ? <p className="text-sm">{t("checkingBody")}</p> : null}
-        {!running && result?.ok ? (
-          <Alert tone="success" title={t("okTitle")}>
-            <p>
-              {result.checked === 0
-                ? t("okEmpty")
-                : t("okBody", { count: result.checked, last: count(result.checked) })}
-            </p>
-            {checkedAt ? (
-              <p className="mt-1 text-xs">
-                {t("checkedAt", { time: formatDateTime(checkedAt) ?? "" })}
-              </p>
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[
+          { label: ta("home"), href: "/" },
+          { label: ta("title"), href: "/audit" },
+          { label: t("title") },
+        ]}
+        actions={back}
+      />
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+        <Card title={t("statusLabel")}>
+          <div aria-live="polite" aria-atomic="true" className="space-y-4">
+            <div className="flex items-start gap-4">
+              <span
+                aria-hidden="true"
+                className={`flex size-12 shrink-0 items-center justify-center rounded-full ${marks[state]}`}
+              >
+                <Icon
+                  name={
+                    state === "ok"
+                      ? "checkCircle"
+                      : state === "broken"
+                        ? "alert"
+                        : state === "running"
+                          ? "clock"
+                          : "shieldCheck"
+                  }
+                  className="size-6"
+                />
+              </span>
+              <div className="min-w-0 flex-1 space-y-1">
+                {state === "idle" ? (
+                  <>
+                    <p className="text-lg font-medium text-ink">{t("notRunTitle")}</p>
+                    <p className="text-sm text-ink-muted">{t("notRunBody")}</p>
+                  </>
+                ) : null}
+                {state === "running" ? (
+                  <>
+                    <Pill variant="progress">{t("checking")}</Pill>
+                    <p className="text-sm text-ink-muted">{t("checkingBody")}</p>
+                  </>
+                ) : null}
+                {state === "ok" && result ? (
+                  <>
+                    <p className="text-lg font-medium text-ink">{t("okTitle")}</p>
+                    <p className="text-sm text-ink-muted">
+                      {result.checked === 0
+                        ? t("okEmpty")
+                        : t("okBody", { count: result.checked, last: count(result.checked) })}
+                    </p>
+                  </>
+                ) : null}
+                {state === "broken" && result ? (
+                  <>
+                    <p className="text-lg font-medium text-danger">
+                      {t("brokenTitle", { seq: count(result.first_bad_seq ?? 0) })}
+                    </p>
+                    <p className="text-sm text-ink">
+                      {result.checked > 0
+                        ? t("brokenIntact", { count: result.checked, last: count(result.checked) })
+                        : t("brokenFromStart")}
+                    </p>
+                    <p className="text-sm text-ink">
+                      {translateOr(t, `reason.${result.reason ?? "other"}`, "reason.other")}
+                    </p>
+                  </>
+                ) : null}
+              </div>
+            </div>
+            {state === "ok" || state === "broken" ? (
+              <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border pt-4">
+                <dl>
+                  <dt className="text-sm text-ink-muted">{t("eventsChecked")}</dt>
+                  <dd className="font-display text-4xl text-ink tabular-nums">
+                    {result ? count(result.checked) : null}
+                  </dd>
+                </dl>
+                {checkedAt ? (
+                  <p className="font-mono text-xs text-ink-subtle">
+                    {t("checkedAt", { time: formatDateTime(checkedAt) ?? "" })}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
-          </Alert>
-        ) : null}
-        {!running && result && !result.ok ? (
-          <Alert tone="danger" title={t("brokenTitle", { seq: count(result.first_bad_seq ?? 0) })}>
-            <p>
-              {result.checked > 0
-                ? t("brokenIntact", { count: result.checked, last: count(result.checked) })
-                : t("brokenFromStart")}
-            </p>
-            <p className="mt-2">
-              {translateOr(t, `reason.${result.reason ?? "other"}`, "reason.other")}
-            </p>
-            <p className="mt-2 font-semibold">{t("brokenAction")}</p>
-            {checkedAt ? (
-              <p className="mt-1 text-xs">
-                {t("checkedAt", { time: formatDateTime(checkedAt) ?? "" })}
-              </p>
-            ) : null}
-          </Alert>
-        ) : null}
+            {state === "broken" ? <Alert tone="danger" title={t("brokenAction")} /> : null}
+          </div>
+          {!running && query.isError ? (
+            <div className="mt-4">
+              <ApiErrorAlert error={query.error} />
+            </div>
+          ) : null}
+        </Card>
+        <Card title={t("howTitle")}>
+          <p className="text-sm text-ink-muted">{t("howBody")}</p>
+          <div className="mt-5">
+            <Button onClick={check} disabled={running} aria-disabled={running || undefined}>
+              <Icon name="shieldCheck" className="size-4" />
+              {running ? t("checking") : result ? t("checkAgain") : ta("verify")}
+            </Button>
+          </div>
+        </Card>
       </div>
-      {!running && query.isError ? <ApiErrorAlert error={query.error} /> : null}
     </div>
   );
 }
