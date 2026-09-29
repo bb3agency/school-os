@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
@@ -55,7 +56,23 @@ def _flags(admin: Engine) -> dict[str, bool]:
         return {r.key: r.step_up for r in rows}
 
 
-def _catalog_matches(admin: Engine) -> bool:
+def _later_keys(cfg: Config) -> frozenset[str]:
+    """Permission keys that revisions after :data:`REVISION` write out themselves
+    (``NEW_PERMISSIONS``, like this one) and delete again on downgrade when no role holds them
+    (``0033_certificates``, ``0034_circulars``): absent at :data:`REVISION` on a fresh database."""
+    script = ScriptDirectory.from_config(cfg)
+    keys: set[str] = set()
+    for rev in script.walk_revisions(base=REVISION, head="heads"):
+        if rev.revision == REVISION:
+            continue
+        for row in getattr(rev.module, "NEW_PERMISSIONS", ()):
+            keys.add(str(row["key"]))
+    return frozenset(keys)
+
+
+def _catalog_matches(admin: Engine, *, without: frozenset[str] = frozenset()) -> bool:
+    """``core.permissions`` is exactly ``permissions.yaml`` minus ``without`` (keys owned by
+    later revisions, which must then be absent)."""
     with admin.connect() as c:
         rows = c.execute(
             text("SELECT key, description, sensitivity, step_up, is_platform FROM core.permissions")
@@ -64,6 +81,7 @@ def _catalog_matches(admin: Engine) -> bool:
     expected = {
         k: (p.description, p.sensitivity, p.step_up, p.is_platform)
         for k, p in catalog.permission_catalog().items()
+        if k not in without
     }
     return db == expected
 
@@ -100,7 +118,10 @@ def test_CLAUDE_6_12_export_access_round_trip_fresh(
         command.downgrade(cfg, PREVIOUS)
         assert _flags(admin) == {"export.board": False, "export.portal": False}
         command.upgrade(cfg, REVISION)
-        assert _catalog_matches(admin)
+        later = _later_keys(cfg)
+        assert {"certificate.approve", "task.manage"} <= later
+        assert not later & set(NEW)
+        assert _catalog_matches(admin, without=later)
         command.downgrade(cfg, PREVIOUS)
         command.upgrade(cfg, "head")
         assert _catalog_matches(admin)
