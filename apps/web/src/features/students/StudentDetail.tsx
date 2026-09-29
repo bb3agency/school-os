@@ -15,7 +15,7 @@ import { DataTable, Table, TBody, THead, Th, Tr, type Column } from "@/component
 import { Tabs } from "@/components/ui/Tabs";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { asList, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useDateInput } from "@/lib/date-format";
 import { formatDate, formatList } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
@@ -727,17 +727,21 @@ export function StudentDetailView({
 export function StudentDetailScreen({ studentId }: { studentId: string }) {
   const api = useBffClient("staff");
   const permissions = useStaffPermissions();
-  const student = useApiQuery(studentKey(studentId), () =>
-    unwrap(
+  const student = useApiQuery(studentKey(studentId), async () => {
+    const body = await unwrap(
       api.GET("/api/v1/students/{student_id}", { params: { path: { student_id: studentId } } }),
-    ),
-  );
+    );
+    // Missing maps read as "nothing recorded" rather than crashing the whole page.
+    return { ...body, canonical: body.canonical ?? {}, values: body.values ?? {} };
+  });
   const attributes = useAttributes();
-  const guardians = useApiQuery([...studentKey(studentId), "guardians"], () =>
-    unwrap(
-      api.GET("/api/v1/students/{student_id}/guardians", {
-        params: { path: { student_id: studentId } },
-      }),
+  const guardians = useApiQuery([...studentKey(studentId), "guardians"], async () =>
+    asList(
+      await unwrap(
+        api.GET("/api/v1/students/{student_id}/guardians", {
+          params: { path: { student_id: studentId } },
+        }),
+      ),
     ),
   );
   return (
