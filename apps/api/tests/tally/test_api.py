@@ -207,6 +207,22 @@ def test_FR_TALLY_002_signed_calls_are_verified(api: Any, admin_engine: Engine) 
     assert api.client.get(path).status_code == 401
 
 
+def test_FR_TALLY_002_a_signature_with_non_ascii_bytes_is_a_401_not_an_error(
+    api: Any, admin_engine: Engine
+) -> None:
+    # hmac.compare_digest refuses str with non-ASCII characters (TypeError -> 500); headers are
+    # decoded as latin-1, so any byte above 0x7f in X-SOS-Signature reached it.
+    school = T.fresh_school(admin_engine)
+    agent = T.enrol(api, school)
+    path = "/api/v1/edge/tally/config"
+    good = agent.headers("GET", path, b"")
+    signature = good["X-SOS-Signature"][:-1].encode("ascii") + b"\xe9"
+    sent: dict[str, str | bytes] = {**good, "X-SOS-Signature": signature}
+    res = api.client.get(path, headers=sent)
+    assert res.status_code == 401, res.text
+    assert res.json()["title"] == "Sign in required"
+
+
 def test_FR_TALLY_002_nonces_are_used_once_and_calls_are_rate_limited(
     api: Any, admin_engine: Engine
 ) -> None:
