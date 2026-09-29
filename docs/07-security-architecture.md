@@ -188,6 +188,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | export.download_any (download other staff's exports; ADR-0021) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | audit.read | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
 | finance.read (M6) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
+| tally.device.manage (M6: enrol the Tally edge agent with a one-time code, revoke it; ADR-0032 Proposed, behind a flag) | ✓ᴿ | — | — | — | — | — | — | — | — |
+| tally.configure (M6: choose Tally ledger groups, link Tally ledgers to students; ADR-0032 Proposed, behind a flag) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
 | insights.read (M5) | ✓ | ✓ | — | — | — | — | S | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | tenant.export_all | ✓ᴿ | — | — | — | — | — | — | — | — |

@@ -155,6 +155,17 @@ permissions:
     sensitivity: normal
     step_up: false
 
+  # --- Tally read connector (M6; 0036_tally; ADR-0032 Proposed; behind the per-school flag
+  # tally.connector.enabled, default off). finance.read (below) reads the synced fee dues.
+  tally.device.manage:
+    description: Enrol the Tally edge agent with a one-time code and revoke it (recent MFA sign-in)
+    sensitivity: critical
+    step_up: true
+  tally.configure:
+    description: Choose the Tally ledger groups to sync and link Tally ledgers to students
+    sensitivity: sensitive
+    step_up: false
+
   # --- exports, audit, finance, insights ---------------------------------------------------
   # Creating any export needs step-up (ADR-0021 decision 1).
   export.board:

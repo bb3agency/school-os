@@ -44,6 +44,8 @@ roles:
       kb.ask: school
       audit.read: school
       finance.read: school
+      tally.device.manage: school_step_up
+      tally.configure: school
       insights.read: school
       breakglass.approve: school_step_up
       tenant.export_all: school_step_up
@@ -92,6 +94,7 @@ roles:
       export.read_all: school
       audit.read: school
       finance.read: school
+      tally.configure: school
       insights.read: school
       breakglass.approve: school_step_up
       support.ticket.create: school
@@ -171,6 +174,7 @@ roles:
       document.read: school
       kb.ask: school
       finance.read: school
+      tally.configure: school
       support.ticket.create: school
 
   exam_coordinator:
