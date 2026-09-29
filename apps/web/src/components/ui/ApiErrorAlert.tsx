@@ -23,6 +23,7 @@ export type ErrorNamespace =
   | "schoolSettings"
   | "documents"
   | "ask"
+  | "insights"
   | "ask.verified"
   | "school.audit"
   | "circulars"

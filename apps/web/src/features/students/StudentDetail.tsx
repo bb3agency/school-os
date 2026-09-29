@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/Table";
 import { Tabs } from "@/components/ui/Tabs";
 import { Value } from "@/components/ui/Value";
+import { StudentInsights } from "@/features/insights/StudentInsights";
 import { Link } from "@/i18n/navigation";
 import { asList, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useDateInput } from "@/lib/date-format";
@@ -735,6 +736,16 @@ export function StudentDetailView({
             label: t("tabHistory"),
             panel: <ValuesHistory studentId={data.id} index={index} canReveal={canReveal} />,
           },
+          // M5 (US-1707): restricted, for the class teacher and the principal (FR-EW-011).
+          ...(permissions.has(PERM.insightsRead) && permissions.has(PERM.readSensitive)
+            ? [
+                {
+                  id: "timeline",
+                  label: t("tabTimeline"),
+                  panel: <StudentInsights studentId={data.id} />,
+                },
+              ]
+            : []),
         ]}
       />
     </div>

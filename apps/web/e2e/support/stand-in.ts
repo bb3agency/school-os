@@ -423,6 +423,100 @@ const VERIFIED_ANSWER = {
  * Stream a canned answer as Server-Sent Events, one event at a time (FR-KB-008). A question
  * containing "slowly" waits 1.5 s between events, so the e2e run can press Stop mid-answer.
  */
+/* M5 (US-1701..US-1709): synthetic flags, counts, rules and exams. */
+const FLAG_ID = "0192f3a4-0000-7000-8000-00000000f501";
+const STAFF_REF = {
+  membership_id: "0192f3a4-0000-7000-8000-0000000000e1",
+  display_name: "Synthetic Teacher",
+};
+const INSIGHT_FLAG = {
+  id: FLAG_ID,
+  student: {
+    id: "0192f3a4-0000-7000-8000-00000000e501",
+    full_name: "Synthetica Rao",
+    admission_no: "SYN-0001",
+    section_label: "VI-A",
+  },
+  indicator: "attendance",
+  rule: "attendance_streak",
+  evidence: { days: 3, from: "2026-09-22", to: "2026-09-24", threshold: 3 },
+  status: "in_progress",
+  owner: STAFF_REF,
+  raised_on: "2026-09-24",
+  due_on: "2026-10-01",
+  overdue: false,
+  actioned: true,
+  first_action_at: "2026-09-25T05:00:00Z",
+  closed_at: null,
+  close_reason: null,
+  raised_by: null,
+  version: 2,
+};
+const INSIGHT_FLAG_DETAIL = {
+  ...INSIGHT_FLAG,
+  actions: [
+    {
+      id: "0192f3a4-0000-7000-8000-00000000f601",
+      kind: "raised",
+      acted_on: "2026-09-24",
+      note: null,
+      by: null,
+      created_at: "2026-09-24T12:10:00Z",
+    },
+    {
+      id: "0192f3a4-0000-7000-8000-00000000f602",
+      kind: "called_parent",
+      acted_on: "2026-09-25",
+      note: "Synthetic note: fever, back on Monday.",
+      by: STAFF_REF,
+      created_at: "2026-09-25T05:00:00Z",
+    },
+  ],
+};
+const INSIGHT_SUMMARY = {
+  since: "2026-08-30",
+  raised: 4,
+  actioned_on_time: 3,
+  actioned_late: 0,
+  not_actioned: 1,
+  overdue: 1,
+  open: 2,
+};
+const rule = (key: string, indicator: string, threshold: number, min: number, max: number) => ({
+  key,
+  indicator,
+  enabled: true,
+  can_disable: key !== "attendance_streak",
+  threshold,
+  default: threshold,
+  min,
+  max,
+  window: key === "attendance_rate" || key === "behaviour_concerns" ? 30 : null,
+  min_days: key === "attendance_rate" ? 10 : null,
+});
+const INSIGHT_SETTINGS = {
+  rules: [
+    rule("attendance_streak", "attendance", 3, 2, 5),
+    rule("attendance_rate", "attendance", 75, 60, 90),
+    rule("course_low", "course", 35, 25, 50),
+    rule("course_decline", "course", 15, 10, 30),
+    rule("behaviour_concerns", "behaviour", 3, 2, 5),
+  ],
+  rules_version: 1,
+  due_days: 7,
+  version: 0,
+  updated_at: null,
+};
+const EXAMS = [
+  {
+    id: "0192f3a4-0000-7000-8000-00000000ea01",
+    academic_year_id: YEAR_ID,
+    name: "Formative assessment 1",
+    held_on: "2026-08-10",
+    version: 1,
+  },
+];
+
 function streamAnswer(
   response: ServerResponse,
   events: Array<[string, unknown]>,
@@ -544,6 +638,15 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
           "certificate.issue",
           "certificate.approve",
           "register.read",
+          "attendance.read",
+          "attendance.record",
+          "exam.manage",
+          "marks.read",
+          "marks.record",
+          "insights.read",
+          "insights.note",
+          "insights.act",
+          "insights.manage",
         ],
         scopes: [{ type: "school", ref: null }],
         mfa: true,
@@ -674,6 +777,13 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
     return [200, page([TENANT_SUMMARY, provisioningSummary()])];
   if (path === "/api/v1/platform/plans") return [200, page([PLAN])];
   if (path === "/api/v1/platform/invoices") return [200, page([INVOICE])];
+  if (path === "/api/v1/insights/flags") return [200, page([INSIGHT_FLAG])];
+  if (path === `/api/v1/insights/flags/${FLAG_ID}`) return [200, INSIGHT_FLAG_DETAIL];
+  if (path === `/api/v1/insights/flags/${FLAG_ID}/owners`)
+    return [200, [{ ...STAFF_REF, display_name: "Synthetic Teacher", roles: ["class_teacher"] }]];
+  if (path === "/api/v1/insights/summary") return [200, INSIGHT_SUMMARY];
+  if (path === "/api/v1/insights/settings") return [200, INSIGHT_SETTINGS];
+  if (path === "/api/v1/exams") return [200, EXAMS];
   if (path.startsWith("/api/v1/")) return [200, page([])];
   return [404, { type: "about:blank", title: "Not found", status: 404, code: "not_found" }];
 }

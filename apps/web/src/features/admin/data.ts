@@ -39,6 +39,8 @@ export const CATEGORY_ORDER = [
   "notifications_read",
   "tenant_exports",
   "kb_queries",
+  "behaviour_notes",
+  "closed_flags",
   "audit_events",
 ] as const;
 

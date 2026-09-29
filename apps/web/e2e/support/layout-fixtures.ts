@@ -1798,6 +1798,59 @@ function certificatePreview(type: string, studentName: string): Schemas["Certifi
   };
 }
 
+/* ------------------------------------------------------------------ M5 flags */
+
+const FLAG_RULES = [
+  [
+    "attendance",
+    "attendance_streak",
+    { days: 4, from: date(9, 21), to: date(9, 24), threshold: 3 },
+  ],
+  ["attendance", "attendance_rate", { rate: 62, days: 29, present: 18, threshold: 75 }],
+  ["course", "course_low", { percent: 28, threshold: 35 }],
+  ["course", "course_decline", { drop: 18.5, percent: 41, previous_percent: 59.5, threshold: 15 }],
+  ["behaviour", "behaviour_concerns", { concerns: 3, window_days: 30, threshold: 3 }],
+  ["behaviour", "manual", {}],
+] as const;
+const FLAG_STATUSES = ["open", "in_progress", "open", "closed"] as const;
+
+const INSIGHT_FLAGS: Schemas["InsightFlagOut"][] = STUDENT_NAMES.map((name, i) => {
+  const [indicator, rule, evidence] = pick(FLAG_RULES, i);
+  const status = pick(FLAG_STATUSES, i);
+  return {
+    id: uid("0000000f50", i + 1),
+    student: {
+      id: studentId(i),
+      full_name: i === 9 ? null : name,
+      admission_no: `SYN-2026-${String(i + 14).padStart(3, "0")}`,
+      section_label: i % 2 === 0 ? "Class 6 · A" : "Class 10 · B (Telugu medium)",
+    },
+    indicator,
+    rule,
+    evidence: { ...evidence },
+    status,
+    owner:
+      i % 5 === 4
+        ? null
+        : {
+            membership_id: ME_MEMBERSHIP,
+            display_name: "Synthetica Venkata Ramana Murthy (Class teacher)",
+          },
+    raised_on: date(9, 10 + (i % 15)),
+    due_on: date(9, 17 + (i % 12)),
+    overdue: status === "open" && i % 3 === 0,
+    actioned: status !== "open",
+    first_action_at: status === "open" ? null : at(20),
+    closed_at: status === "closed" ? at(26) : null,
+    close_reason: status === "closed" ? "support_in_place" : null,
+    raised_by:
+      rule === "manual"
+        ? { membership_id: OTHER_MEMBERSHIP, display_name: "Synthetica Principal" }
+        : null,
+    version: 1 + (i % 3),
+  };
+});
+
 /* ------------------------------------------------------------------ routing */
 
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
@@ -1886,6 +1939,8 @@ const ROUTES: Array<[RegExp, Handler]> = [
     () => ({ count: NOTIFICATIONS.filter((n) => n.read_at === null).length }),
   ],
   [re("/audit/events"), () => page(AUDIT_EVENTS)],
+  // M5: early-warning flags (long names, every rule and status).
+  [re("/insights/flags"), (_, q) => page(by(INSIGHT_FLAGS, q, "status", (r) => r.status))],
   // Support, break-glass, billing, verified answers.
   [re("/support/tickets"), () => page(Array.from({ length: 8 }, (_, i) => ticket(i, T1, false)))],
   [

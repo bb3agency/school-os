@@ -150,7 +150,8 @@
         "checks": "Checks and submissions",
         "ask": "Ask",
         "admin": "School admin",
-        "work": "Circulars and tasks"
+        "work": "Circulars and tasks",
+        "classroom": "Classroom"
       }
     },
     "home": {
@@ -1981,7 +1982,8 @@
       "historyInUse": "In use",
       "historyCorrection": "Correction request",
       "issueCertificateLink": "Issue a certificate",
-      "certificatesLink": "Certificates of this student"
+      "certificatesLink": "Certificates of this student",
+      "tabTimeline": "Timeline"
     },
     "record": {
       "open": "Record a value",
@@ -4955,6 +4957,14 @@
         "other": {
           "name": "Other data",
           "about": "Kept as SchoolOS sets it."
+        },
+        "behaviour_notes": {
+          "name": "Behaviour notes",
+          "about": "Notes teachers write about a student. Deleted a year after the note's date."
+        },
+        "closed_flags": {
+          "name": "Closed follow-up flags",
+          "about": "Early-warning flags and what was done about them. Deleted a year after the flag is closed; open flags are kept."
         }
       }
     },
@@ -5573,6 +5583,459 @@
       "version_mismatch": {
         "title": "Changed meanwhile",
         "body": "Someone else changed this notice. The page shows the latest; try again."
+      }
+    }
+  },
+  "attendance": {
+    "nav": "Attendance",
+    "title": "Attendance",
+    "description": "Mark a section's attendance for the day, see the month register or add a month from the register sheet.",
+    "print": "Print the register",
+    "noAccessTitle": "You can't see attendance",
+    "noAccessBody": "Ask your school's office admin if you need to mark or see attendance.",
+    "section": "Section",
+    "viewLabel": "Show",
+    "view": {
+      "day": "One day",
+      "month": "Month register"
+    },
+    "date": "Date",
+    "month": "Month",
+    "pickTitle": "Choose a section",
+    "pickBody": "Choose a section to mark or see its attendance.",
+    "dayTitle": "Attendance for {date}",
+    "monthTitle": "Register for {month}",
+    "emptyTitle": "No students in this section",
+    "emptyBody": "Students appear here once they are placed in the section.",
+    "notMarkedYet": "Attendance for this day is not marked yet. Everyone starts as present: change the students who are absent, late or on leave, then save.",
+    "dayTable": "Attendance of {section}",
+    "columns": {
+      "roll": "Roll no.",
+      "student": "Student",
+      "status": "Attendance",
+      "absent": "Absent"
+    },
+    "unnamed": "Name not recorded",
+    "statusFor": "Attendance of {name}",
+    "status": {
+      "present": "Present",
+      "absent": "Absent",
+      "late": "Late",
+      "leave": "Leave"
+    },
+    "save": "Save attendance",
+    "allPresent": "Mark everyone present",
+    "saved": "{count, plural, =0 {Nothing changed.} one {Saved # entry.} other {Saved # entries.}}",
+    "schoolDays": "{count, plural, =0 {No school days marked this month.} one {# school day marked.} other {# school days marked.}}",
+    "monthTable": "Register of {section} for {month}",
+    "legend": "P present · A absent · L late · LV leave. Days with no mark are left empty.",
+    "import": {
+      "title": "Add a month from the register sheet",
+      "description": "Upload the sheet (XLSX or CSV). We show what we read and any problems; nothing is saved until you confirm.",
+      "sampleLabel": "Example of an attendance sheet",
+      "admissionNo": "Admission no.",
+      "name": "Name",
+      "sampleName": "Synthetica Student",
+      "summary": "Read {entries, plural, one {# entry} other {# entries}} for {students, plural, one {# student} other {# students}} over {days, plural, one {# day} other {# days}}."
+    }
+  },
+  "marks": {
+    "nav": "Marks",
+    "title": "Marks",
+    "description": "Create exams, enter or import a section's marks and see the results.",
+    "noAccessTitle": "You can't see marks",
+    "noAccessBody": "Ask your school's office admin if you need to enter or see marks.",
+    "section": "Section",
+    "exam": "Exam",
+    "chooseExam": "Choose an exam",
+    "pickTitle": "Choose a section and an exam",
+    "pickBody": "Choose both to enter or see marks.",
+    "gridTitle": "Marks for {exam}",
+    "gridLabel": "Marks of {section} for {exam}",
+    "emptyTitle": "No students in this section",
+    "emptyBody": "Students appear here once they are placed in the section.",
+    "columns": {
+      "roll": "Roll no.",
+      "student": "Student",
+      "percent": "Overall %"
+    },
+    "unnamed": "Name not recorded",
+    "absentShort": "AB",
+    "newExam": {
+      "title": "New exam",
+      "description": "Exams belong to the current academic year. Give each one a name the teachers know, like “Formative assessment 1”.",
+      "name": "Exam name",
+      "heldOn": "Date",
+      "submit": "Create exam"
+    },
+    "entry": {
+      "title": "Enter marks for one subject",
+      "description": "Type the marks for each student. Type AB for a student who was absent. Leave a box empty to skip that student.",
+      "subject": "Subject",
+      "max": "Maximum marks",
+      "roll": "Roll no.",
+      "student": "Student",
+      "marks": "Marks",
+      "marksFor": "Marks of {name}",
+      "unnamed": "Name not recorded",
+      "hint": "Marks can have up to two decimals, for example 42.5.",
+      "save": "Save marks",
+      "saved": "{count, plural, =0 {Nothing changed.} one {Saved # mark.} other {Saved # marks.}}",
+      "problem": {
+        "subjectRequired": "Type the subject name.",
+        "maxInvalid": "Type the maximum marks as a number above 0 (at most 1000).",
+        "marksInvalid": "Some marks are not numbers between 0 and the maximum. Fix them or type AB for absent.",
+        "nothingEntered": "Type at least one student's marks."
+      }
+    },
+    "import": {
+      "title": "Add marks from a sheet",
+      "description": "Row 1: admission or roll number, then one column per subject. Row 2: the maximum marks. Then one row per student; AB means absent. Nothing is saved until you confirm.",
+      "sampleLabel": "Example of a marks sheet",
+      "admissionNo": "Admission no.",
+      "subjectA": "Telugu",
+      "subjectB": "Mathematics",
+      "maxRow": "Maximum",
+      "summary": "Read {entries, plural, one {# mark} other {# marks}} for {students, plural, one {# student} other {# students}} in {subjects, plural, one {# subject} other {# subjects}}."
+    }
+  },
+  "insights": {
+    "nav": "Students to follow up",
+    "title": "Students to follow up",
+    "description": "Flags from fixed rules on attendance, behaviour notes and marks. Each flag needs a person to act; nothing here is decided by AI.",
+    "purpose": "Use this only to support the student's learning and safety. Do not share it outside the school or use it for anything else.",
+    "noAccessTitle": "You can't see these flags",
+    "noAccessBody": "Only the class teacher of the student's section and the principal can see follow-up flags.",
+    "listTitle": "Flags",
+    "viewLabel": "Whose flags",
+    "view": {
+      "mine": "My flags",
+      "all": "All I can see"
+    },
+    "statusLabel": "Status",
+    "filter": {
+      "active": "Open and in progress",
+      "open": "Open",
+      "in_progress": "In progress",
+      "closed": "Closed",
+      "any": "Any"
+    },
+    "indicatorLabel": "Area",
+    "indicator": {
+      "attendance": "Attendance",
+      "behaviour": "Behaviour",
+      "course": "Marks"
+    },
+    "dueLabel": "Due",
+    "overdue": "Overdue",
+    "emptyTitle": "No flags here",
+    "emptyBody": "Flags appear when a rule notices a pattern, like three school days absent in a row.",
+    "columns": {
+      "student": "Student",
+      "why": "Why",
+      "due": "Act by",
+      "owner": "Owner",
+      "status": "Status"
+    },
+    "unnamed": "Name not recorded",
+    "unassigned": "Not assigned",
+    "someone": "A former staff member",
+    "chooseSection": "Choose a section",
+    "status": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "closed": "Closed"
+    },
+    "why": {
+      "attendance_streak": "Absent {days} school days in a row ({from} to {to}). The rule is {threshold} or more.",
+      "attendance_rate": "Attended {rate}% of the last {days} school days ({present} days). The rule is below {threshold}%.",
+      "course_low": "Scored {percent}% overall in the latest exam. The rule is below {threshold}%.",
+      "course_decline": "Overall result fell {drop} points, from {previous_percent}% to {percent}%. The rule is a fall of {threshold} or more.",
+      "behaviour_concerns": "{concerns} concern notes in the last {window_days} days. The rule is {threshold} or more.",
+      "manual": "Raised by a staff member."
+    },
+    "summary": {
+      "raised": "Flags raised",
+      "none": "None yet",
+      "since": "Since {date}",
+      "onTime": "Acted on in time",
+      "onTimeHint": "{count, plural, =0 {No flag acted on by its due date} one {# flag acted on by its due date} other {# flags acted on by their due date}}",
+      "overdue": "Overdue now",
+      "open": "Not closed"
+    },
+    "rules": {
+      "title": "How flags are raised",
+      "description": "Rules run every day and after attendance or marks are saved. A new flag goes to the class teacher, who has {days, plural, one {# day} other {# days}} to act.",
+      "rule": "Rule",
+      "threshold": "Threshold",
+      "enabled": "On or off",
+      "names": {
+        "attendance_streak": "Absent days in a row",
+        "attendance_rate": "Low attendance",
+        "course_low": "Low overall marks",
+        "course_decline": "Falling marks",
+        "behaviour_concerns": "Concern notes",
+        "other": "Another rule"
+      },
+      "explain": {
+        "attendance_streak": "Flags a student absent {threshold} or more school days in a row (the Andhra Pradesh follow-up).",
+        "attendance_rate": "Flags attendance below {threshold}% over the last {window} school days.",
+        "course_low": "Flags an overall result below {threshold}% in the latest exam.",
+        "course_decline": "Flags a fall of {threshold} or more points from the previous exam.",
+        "behaviour_concerns": "Flags {threshold} or more concern notes in {window} days.",
+        "other": "A rule set by SchoolOS."
+      },
+      "thresholdFor": "Threshold for {rule} ({min} to {max})",
+      "bounds": "Allowed: {min} to {max}",
+      "on": "On",
+      "off": "Off",
+      "alwaysOn": "always on",
+      "stepUp": "Saving may ask you to confirm your sign-in again.",
+      "save": "Save rules",
+      "saved": "Rules saved. They apply from the next run."
+    },
+    "detail": {
+      "title": "Follow-up flag",
+      "description": "Why this flag was raised, what has been done and what to do next.",
+      "indicator": "Area",
+      "why": "Why",
+      "raisedOn": "Raised on",
+      "dueOn": "Act by",
+      "owner": "Owner",
+      "raisedBy": "Raised by",
+      "byRule": "A rule",
+      "closeReason": "Closed because",
+      "profile": "Open the student's profile",
+      "logTitle": "What has been done",
+      "logDescription": "Oldest first. Notes are seen only by people who can act on this flag."
+    },
+    "log": {
+      "kind": {
+        "raised": "Flag raised",
+        "talked_with_student": "Talked with the student",
+        "called_parent": "Called the parent",
+        "met_parent": "Met the parent",
+        "home_visit": "Home visit",
+        "remedial_support": "Extra help in class",
+        "referred_counsellor": "Referred to the counsellor",
+        "referred_principal": "Referred to the principal",
+        "other": "Other action",
+        "closed": "Flag closed"
+      },
+      "by": "By {name} · recorded {at}",
+      "someone": "a rule or a former staff member"
+    },
+    "action": {
+      "add": "Log an action",
+      "title": "Log what you did",
+      "description": "The first action marks the flag as in progress. Write only what helps the student; no Aadhaar numbers.",
+      "save": "Save action",
+      "kind": "What did you do?",
+      "choose": "Choose one",
+      "actedOn": "When",
+      "note": "Note (optional)",
+      "noteHint": "Up to 1,000 characters. Kept encrypted and seen only by the class teacher and the principal."
+    },
+    "close": {
+      "open": "Close the flag",
+      "title": "Close this flag",
+      "description": "Close it when the student is supported or the concern has passed. The log stays for a year, then it is deleted.",
+      "save": "Close flag",
+      "reasonLabel": "Why are you closing it?",
+      "reason": {
+        "improved": "The student has improved",
+        "support_in_place": "Support is in place",
+        "parent_informed": "The parent is informed",
+        "no_concern": "No concern after checking",
+        "student_left": "The student left the school",
+        "raised_in_error": "Raised in error"
+      }
+    },
+    "assign": {
+      "open": "Give to someone else",
+      "title": "Give this flag to someone else",
+      "description": "Only staff who can act for this student are listed. They are told in the app.",
+      "save": "Give flag",
+      "owner": "New owner",
+      "nobody": "Nobody else can act for this student."
+    },
+    "erase": {
+      "open": "Erase",
+      "title": "Erase this flag",
+      "description": "The flag and its log are deleted for good. The audit log keeps only that it was erased and why.",
+      "save": "Erase for good",
+      "reasonLabel": "Why?",
+      "reason": {
+        "parent_request": "The parent asked",
+        "entered_in_error": "Entered in error"
+      }
+    },
+    "raise": {
+      "open": "Raise a flag",
+      "title": "Raise a follow-up flag",
+      "description": "For a concern the rules do not see. It goes to the class teacher, who has a week to act.",
+      "save": "Raise flag",
+      "indicator": "Area"
+    },
+    "notes": {
+      "add": "Add a behaviour note",
+      "title": "Add a behaviour note",
+      "description": "Write what you saw, not a judgement. Notes are kept encrypted, seen only by the class teacher and the principal, and deleted after a year.",
+      "save": "Save note",
+      "categoryLabel": "Kind of note",
+      "choose": "Choose one",
+      "category": {
+        "positive": "Positive",
+        "observation": "Observation",
+        "concern": "Concern"
+      },
+      "notedOn": "Date",
+      "text": "Note",
+      "textHint": "Up to 500 characters. No Aadhaar numbers.",
+      "erase": "Erase note",
+      "eraseTitle": "Erase this note",
+      "eraseDescription": "The note is deleted for good. The audit log keeps only that it was erased and why."
+    },
+    "indicators": {
+      "attendanceRate": "Attendance",
+      "attendanceDays": "{days, plural, one {# school day} other {# school days}} marked, {absent} absent",
+      "streak": "Absent in a row",
+      "streakHint": "Up to the last marked day",
+      "concerns": "Concern notes",
+      "concernsHint": "In the last {days} days",
+      "course": "Latest exam",
+      "change": "{change} points from the previous exam",
+      "noData": "No data yet"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "description": "Newest first: flags, notes, exams, attendance by month and class placements.",
+      "print": "Print",
+      "emptyTitle": "Nothing recorded yet",
+      "emptyBody": "Attendance, marks, notes and flags appear here as they are recorded.",
+      "notInScopeTitle": "Only the class teacher and the principal can see this",
+      "notInScopeBody": "The timeline is for the class teacher of the student's current section and the principal.",
+      "enrolment": "Placed in {section}",
+      "noSection": "a section",
+      "ended": "Until {date}",
+      "attendanceMonth": "Attendance in {month}",
+      "attendanceBody": "{days} days marked: {present} present, {late} late, {absent} absent, {leave} on leave.",
+      "examNoMarks": "No marks recorded.",
+      "examBody": "Overall {percent}% in {papers, plural, one {# paper} other {# papers}} ({absent} absent).",
+      "note": "Behaviour note",
+      "by": "By {name}",
+      "flag": "Follow-up flag: {indicator}",
+      "flagLog": "What has been done",
+      "enrolmentStatus": {
+        "active": "Current",
+        "completed": "Completed",
+        "transferred": "Transferred",
+        "other": "Placement"
+      },
+      "certificate": {
+        "transfer": "Transfer certificate issued",
+        "bonafide": "Bonafide certificate issued",
+        "study": "Study certificate issued",
+        "conduct": "Conduct certificate issued",
+        "other": "Certificate issued"
+      }
+    },
+    "sheet": {
+      "sampleTitle": "What the sheet should look like",
+      "aadhaarWarning": "Remove any Aadhaar numbers from the sheet first. Sheets with a full Aadhaar number are refused.",
+      "file": "Sheet (XLSX or CSV, up to 2 MB)",
+      "read": "Read the sheet",
+      "stage": {
+        "requesting": "Getting ready…",
+        "uploading": "Uploading…",
+        "registering": "Saving the file…",
+        "scanning": "Checking the file for viruses…",
+        "ready": "Reading…"
+      },
+      "fileProblem": {
+        "fileRequired": "Choose a sheet to upload.",
+        "fileType": "Upload an XLSX or CSV file.",
+        "fileTooLarge": "The file is larger than 2 MB. Remove extra sheets or rows and try again.",
+        "upload": {
+          "network": "The upload stopped. Check your internet connection and try again.",
+          "storage_rejected": "The file could not be stored. Try again.",
+          "scan_failed": "The virus check failed. Try again later.",
+          "quarantined": "The file was blocked by the virus check. Use a clean copy.",
+          "scan_timeout": "The virus check is taking too long. Try again in a few minutes."
+        }
+      },
+      "confirm": "{count, plural, one {Save # entry} other {Save # entries}}",
+      "nothingToAdd": "The sheet has nothing new to save.",
+      "fixFirst": "Fix these problems in the sheet and upload it again. Nothing was saved.",
+      "saved": "{count, plural, =0 {Nothing changed.} one {Saved # entry.} other {Saved # entries.}}",
+      "issuesTitle": "{count, plural, one {# problem in the sheet} other {# problems in the sheet}}",
+      "issuesBody": "The uploaded file has been deleted. Fix the cells below and upload the sheet again.",
+      "cell": "Cell",
+      "problem": "Problem",
+      "row": "Row {row}",
+      "codes": {
+        "aadhaar_full_number_rejected": "A full Aadhaar number. Remove it.",
+        "bad_code": "Not an attendance code. Use P, A, L or LV.",
+        "bad_date": "Not a date. Use a date like 01/09/2026.",
+        "bad_marks": "Not a mark. Use a number or AB for absent.",
+        "bad_max_marks": "The maximum marks must be a number above 0 (at most 1000).",
+        "cell_too_long": "Too long for this cell.",
+        "date_out_of_range": "This date is outside the academic year.",
+        "duplicate_date": "This date appears twice.",
+        "duplicate_student": "This student appears twice.",
+        "duplicate_subject": "This subject appears twice.",
+        "formula_not_allowed": "A formula. Type the value instead.",
+        "future_date": "This date is in the future.",
+        "marks_over_max": "More than the maximum marks.",
+        "student_missing": "No admission or roll number.",
+        "subject_too_long": "The subject name is longer than 60 characters.",
+        "unknown_student": "Not a student of this section.",
+        "other": "Check this cell."
+      }
+    },
+    "problems": {
+      "not_in_section": "Some students are not in this section. Reload the page and try again.",
+      "future_date": "A date is in the future. Choose today or an earlier date.",
+      "date_out_of_range": "A date is outside the current academic year.",
+      "duplicate_entry": "A student appears twice for the same day or subject.",
+      "too_many_entries": "Too many entries at once. Save a smaller part.",
+      "aadhaar_full_number_rejected": "Remove the Aadhaar number and try again.",
+      "marks_over_max": "Some marks are more than the maximum.",
+      "absent_has_no_marks": "A student marked absent cannot also have marks.",
+      "exam_other_year": "This exam belongs to another academic year.",
+      "exam_name_taken": "An exam with this name already exists this year. Choose another name.",
+      "too_old": "The date is too far back. Notes can go back 60 days.",
+      "not_enrolled": "The student is not in a section this year.",
+      "before_flag": "The action date is before the flag was raised.",
+      "owner_not_eligible": "That person cannot act for this student. Choose someone from the list.",
+      "threshold_out_of_bounds": "A threshold is outside the allowed range.",
+      "rule_required": "The absent-days-in-a-row rule cannot be switched off.",
+      "not_an_import_file": "Upload the sheet again.",
+      "student_column_missing": "The first column must be the admission number or roll number.",
+      "header_missing": "The first row must have the column headings.",
+      "too_many_dates": "The sheet has more than 31 dates. Upload one month at a time.",
+      "too_many_subjects": "The sheet has too many subjects. Split it.",
+      "too_many_rows": "The sheet has too many rows.",
+      "too_many_columns": "The sheet has too many columns.",
+      "max_row_missing": "Row 2 must have the maximum marks for each subject.",
+      "file_unreadable": "The file could not be read. Save it again as XLSX or CSV.",
+      "file_too_complex": "The file is too complex to read. Copy the values into a new sheet.",
+      "not_utf8": "Save the CSV file as UTF-8 and try again.",
+      "no_worksheet": "The file has no sheet with data.",
+      "other": "Check the values and try again."
+    },
+    "errors": {
+      "flag_closed": {
+        "title": "This flag is closed",
+        "body": "Reload the page to see what changed. Raise a new flag if the concern is back."
+      },
+      "flag_conflict": {
+        "title": "The flag could not be raised",
+        "body": "Try again in a moment."
+      },
+      "no_current_year": {
+        "title": "No current academic year",
+        "body": "Ask the office admin to set the current academic year in Settings, then try again."
       }
     }
   }

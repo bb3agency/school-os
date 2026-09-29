@@ -88,6 +88,26 @@ export function SchoolShell({
       ],
     },
     {
+      // M5 (US-1701..US-1709): attendance, marks and early-warning flags.
+      id: "classroom",
+      icon: "activity",
+      items: [
+        {
+          href: "/attendance",
+          label: t("attendance.nav"),
+          permission: "attendance.read",
+          icon: "check",
+        },
+        {
+          href: "/marks",
+          label: t("marks.nav"),
+          permission: ["marks.read", "marks.record", "exam.manage"],
+          icon: "chart",
+        },
+        { href: "/flags", label: t("insights.nav"), permission: "insights.read", icon: "flag" },
+      ],
+    },
+    {
       id: "checks",
       icon: "shieldCheck",
       items: [

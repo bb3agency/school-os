@@ -99,6 +99,11 @@ export function setStoragePostForTesting(post: StoragePost | undefined): void {
 
 export interface UploadOptions {
   onProgress?: (progress: UploadProgress) => void;
+  /**
+   * Who may see the uploaded file (e.g. one section, for a class teacher's attendance sheet,
+   * FR-ATT-004). Scoped uploaders must name their own section or class; empty = the default.
+   */
+  acl?: components["schemas"]["DocumentCreate"]["acl"];
   /** Poll interval while the malware scan runs. */
   pollMs?: number;
   /** Give up waiting for the scan after this long (the document stays; try again later). */
@@ -157,7 +162,11 @@ export async function uploadDocument(
   const doc = await unwrap(
     api.POST("/api/v1/documents", {
       headers: { "Idempotency-Key": newIdempotencyKey() },
-      body: { upload_id: upload.upload_id, title: titleOf(file.name) },
+      body: {
+        upload_id: upload.upload_id,
+        title: titleOf(file.name),
+        ...(options.acl?.length ? { acl: options.acl } : {}),
+      },
     }),
   );
   report({ stage: "scanning" });

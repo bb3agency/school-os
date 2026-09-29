@@ -22,6 +22,7 @@ const FINDING = "0192f3a4-0000-7000-8000-0000000f1001";
 const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
 const USER = "0192f3a4-0000-7000-8000-0000000000d1";
 const CERTIFICATE = "0192f3a4-0000-7000-8000-0000000ce001";
+const FLAG = "0192f3a4-0000-7000-8000-00000000f501";
 
 export interface ScreenGroup {
   /** Stand-in IdP subject to sign in as (null: public pages). */
@@ -73,6 +74,11 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/circulars",
       "/tasks",
       "/notices",
+      // M5: attendance, marks and early-warning flags.
+      "/attendance",
+      "/marks",
+      "/flags",
+      `/flags/${FLAG}`,
       "/notifications",
       "/audit",
       "/audit/verify",
