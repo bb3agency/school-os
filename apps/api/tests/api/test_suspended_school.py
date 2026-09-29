@@ -84,7 +84,7 @@ def test_BR_08_every_other_route_is_403_tenant_suspended_for_the_owner(
     suspended: Any, api: Any, method: str, path: str
 ) -> None:
     _tid, people = suspended
-    body = {} if (method, path) in ALLOWED and method == "POST" else None
+    body: dict[str, Any] | None = {} if (method, path) in ALLOWED and method == "POST" else None
     res = api.call(people["owner"], method, _concrete(path), json=body)
     if (method, path) in ALLOWED:
         assert res.status_code == ALLOWED_STATUS.get((method, path), 200), res.text

@@ -19,6 +19,7 @@ from app.admin.config import load_config
 from app.admin.schemas import TenantExportCreate
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, StepUpRequired
+from app.documents import service as documents_service
 from app.students.schemas import ValueIn
 
 pytestmark = pytest.mark.db
@@ -263,7 +264,7 @@ def test_FR_ADM_001_completion_is_audited_notified_and_the_job_finished(
     ]
     row = AD.row(admin_engine, export_id)
     with admin_engine.connect() as c:
-        status = c.execute(
+        status: object = c.execute(
             text("SELECT status FROM ops.job_runs WHERE id = :j"), {"j": row["job_id"]}
         ).scalar_one()
     assert status == "succeeded"
@@ -460,7 +461,7 @@ def test_FR_ADM_001_transient_errors_abort_the_upload_and_retry(
     def boom(*_: Any, **__: Any) -> list[Any]:
         raise RuntimeError("synthetic storage outage")
 
-    monkeypatch.setattr(admin.documents, "export_files", boom)
+    monkeypatch.setattr(documents_service, "export_files", boom)
     with pytest.raises(RuntimeError):
         AD.run(school, out.id)
     assert D.memory_store().writers[-1].aborted

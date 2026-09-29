@@ -82,13 +82,15 @@ def settle(admin_engine: Engine, school: Any) -> None:
     """Finish any export of ``school`` still queued or running (tests share schools: the next
     request would get 409 ``tenant_export_in_progress``)."""
     with admin_engine.connect() as c:
-        live = c.execute(
-            text(
-                "SELECT id FROM ops.tenant_exports WHERE tenant_id = :t "
-                "AND status IN ('queued','running')"
-            ),
-            {"t": school.tenant_id},
-        ).scalars()
+        live: list[object] = list(
+            c.execute(
+                text(
+                    "SELECT id FROM ops.tenant_exports WHERE tenant_id = :t "
+                    "AND status IN ('queued','running')"
+                ),
+                {"t": school.tenant_id},
+            ).scalars()
+        )
         ids = [uuid.UUID(str(i)) for i in live]
     for export_id in ids:
         run(school, export_id)

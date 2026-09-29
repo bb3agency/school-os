@@ -98,7 +98,7 @@ def test_FR_ADM_002_owner_and_principal_change_retention_audited(
         {"category": "exports", "from_days": 3, "to_days": 7},
     ]
     with admin_engine.connect() as c:
-        stored = c.execute(
+        stored: object = c.execute(
             text("SELECT rules FROM ops.retention_settings WHERE tenant_id = :t"),
             {"t": school.tenant_id},
         ).scalar_one()
@@ -226,7 +226,7 @@ def test_FR_ADM_002_notification_purge_uses_the_school_setting(
     with tenant_session(school.tenant_id) as s:
         notifications.purge_read(s)
     with admin_engine.connect() as c:
-        left = set(
+        left: set[object] = set(
             c.execute(
                 text("SELECT id FROM ops.notifications WHERE id IN (:a, :b)"),
                 {"a": kept, "b": purged},

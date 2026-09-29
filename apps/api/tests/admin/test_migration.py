@@ -127,7 +127,7 @@ def _insert_export(
     admin_engine: Engine, tenant: uuid.UUID | None = None, **overrides: Any
 ) -> uuid.UUID:
     tenant_id, user_id, membership_id = _school(admin_engine, tenant)
-    export_id = overrides.pop("id", uuid.uuid4())
+    export_id: uuid.UUID = overrides.pop("id", uuid.uuid4())
     values = {
         "i": export_id,
         "t": tenant_id,
