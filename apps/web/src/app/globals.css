@@ -244,6 +244,13 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  /* Description-list values (emails, GSTINs, addresses, IDs) wrap anywhere rather than
+     widen a label/value grid past its card; min-width: 0 lets a 1fr track shrink. */
+  dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   /* Telugu has tall vowel signs and conjuncts: give lines room so glyphs never clip. */
   :lang(te) {
     line-height: 1.75;
@@ -493,6 +500,19 @@
   td {
     border: 1px solid #000000;
     padding: 4pt 6pt;
+    overflow-wrap: anywhere;
+  }
+
+  /* The page does not scroll: headers and long values wrap to stay inside A4. */
+  th,
+  td,
+  th *,
+  td * {
+    white-space: normal !important;
+  }
+
+  .table-scroll {
+    overflow: visible !important;
   }
 
   thead {

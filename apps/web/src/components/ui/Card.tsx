@@ -18,13 +18,17 @@ const cardTones: Record<CardTone, string> = {
   outline: "border-border bg-transparent",
 };
 
-/** Classes of the white card surface, for elements that are not a `<section>`. */
+/**
+ * Classes of the white card surface, for elements that are not a `<section>`. `min-w-0`
+ * lets a card in a grid or flex row shrink to its track: a wide table inside then scrolls
+ * in its own region instead of pushing the card (and the page) past the screen edge.
+ */
 export function cardClasses({
   padding = "md",
   tone = "default",
 }: { padding?: CardPadding; tone?: CardTone } = {}): string {
   return cn(
-    "rounded-xl border print:rounded-none print:border-black print:bg-white print:p-3 print:shadow-none",
+    "min-w-0 rounded-xl border print:rounded-none print:border-black print:bg-white print:p-3 print:shadow-none",
     cardTones[tone],
     paddings[padding],
   );
