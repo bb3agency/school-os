@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
+| Version | 0.4 · 2026-09-29 |
 | Scope | Core platform (M0–M2) + platform admin panel (C14) + interfaces for M3–M6 |
 | Related | 02-PRD (stories), 04-Architecture, 05-Data model, 06-RAG, 07-Security, 16-Platform admin panel |
-| Changes | 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
+| Changes | 0.4: FR-CERT-001..014 and FR-REG-001..005 (§3.14, M3 certificates and registers), proposed from the roadmap scope (PO to confirm). 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
 
 Normative keywords: **MUST / SHOULD / MAY** (RFC 2119). Every requirement has an ID and a verification method: **T** test · **I** inspection · **D** demonstration · **A** analysis.
 
@@ -232,6 +232,32 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-PLT-004 | Partial | Suspend/reactivate built; while suspended the owner and principal keep `/me`, Plan & billing and the full data export (FR-ADM-001; pinned allowlist, 16 §5.5) |
 | FR-PLT-019, FR-PLT-021 | Partial | Void built; reminder and threshold emails not built (no email delivery in M0); threshold crossings recorded and audited |
 
+### 3.14 Certificates & registers (FR-CERT, FR-REG) (M3)
+
+*(Proposed from the roadmap scope (14 §2 M3; BRD §9, BR-11, BR-12); PO to confirm.)* Stories US-1101..US-1108 (02 §4 C15). Module `app/certificates/`, tables `sis.certificates`, `sis.certificate_counters` (05 §5.7). ᴿ = step-up MFA within 5 minutes.
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-CERT-001 | Certificate types (`transfer`, `bonafide`, `study`, `conduct`) MUST be defined in versioned configuration (`app/certificates/config.yaml`: printed attributes, required attributes, inputs with their allowed values, whether approval is needed, serial prefix and format) with versioned HTML/CSS templates in the package and bilingual (EN/TE) labels. Fields of the official AP transfer certificate that SchoolOS cannot fill yet are listed as `TODO(official format)` placeholders, never guessed. *(Proposed; PO to confirm.)* | I/T |
+| FR-CERT-002 | A certificate MUST be generated only from the canonical student record (BR-01). Issuing (and approving) MUST be refused with `409 certificate_blocked` while the student has an open or reopened **blocker** finding of a base rule on a printed attribute (or on the student as a whole), or a required printed attribute has no value; the response lists finding IDs, rule and attribute codes only. There is no override inside certificates: blockers are cleared by a change request (FR-CR-*) or waived under FR-DQ-020 (`dq.findings.waive`ᴿ). Provisional (unverified) values are printed and flagged in the preview. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-003 | Issued certificates MUST never be edited: the printed values are frozen with the register entry (content + SHA-256) at issue. A wrong value is corrected through a change request, the certificate cancelled (FR-CERT-008) and a new one issued (invariant 6). *(Proposed; PO to confirm.)* | T |
+| FR-CERT-004 | Types marked for approval (default: `transfer`) MUST follow maker-checker (07 §6.3): prepared by `certificate.issue`, approved or rejected by `certificate.approve`ᴿ with `If-Match`, approver ≠ requester (service check **and** DB `CHECK`), rejection with a reason (10..1000 characters), withdrawal by the requester. At most one pending or issued original TC per student (partial unique index). Other types are issued directly by `certificate.issue`. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-005 | Issuing a TC MUST, in the same transaction as its register entry, end the student's active enrolments (`transferred`, `ended_on` = date of leaving) and set the student's status to `left` (unless already `left`/`graduated`), audited by the students module (`student.withdrawn`). Cancelling a TC MUST NOT restore the enrolment. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-006 | Serial numbers MUST run per school, per certificate type and per academic year (the current year at issue), in the configured format (default `{prefix}/{year}/{number}`, 4 digits: `TC/2026-27/0001`), be allocated in the issuing transaction from a counter row locked by `INSERT … ON CONFLICT DO UPDATE` (gap-free under concurrency; a rolled-back issue releases its number), be unique (DB constraint) and never reused. Pending, rejected and withdrawn requests have no number. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-007 | A duplicate MUST copy the original's frozen content, be marked "DUPLICATE" with the original serial number, a copy number and a reason, need the same approval as its type, and be its own register line (audited). *(Proposed; PO to confirm.)* | T |
+| FR-CERT-008 | Cancelling an issued certificate MUST need `certificate.approve`ᴿ, `If-Match` and a reason; the certificate keeps its number and shows as cancelled in the registers; its document is archived (out of retrieval). *(Proposed; PO to confirm.)* | T |
+| FR-CERT-009 | Certificates MUST NOT carry Aadhaar data (PRV-013) or restricted (C3) attributes; free-text inputs and reasons refuse full Aadhaar numbers (`aadhaar_full_number_rejected`), and every printed value passes the Aadhaar mask as defence in depth. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-010 | The PDF MUST be rendered on queue `pdf` by the shared renderer (`app.core.pdf`, bundled Noto Sans Telugu) and stored as a document (`purpose = certificate`, `doc_type = certificate`, C2, private bucket, SSE-KMS, ACL = the roles in configuration), malware-scanned and indexed like an upload; certificate documents cannot be uploaded, versioned or deleted while the register entry refers to them (composite FK). Rendering is idempotent and can be re-queued after a failure. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-011 | Holders of `certificate.read` MUST be able to open a print view (HTML, no scripts, hash-pinned style) and a presigned PDF download (≤ 5 min, attachment); both audited. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-012 | Every certificate transition MUST be audited in its transaction (IDs, codes, serial only; never names or values) and approval requests/decisions notified in EN/TE (FR-NOT-001). *(Proposed; PO to confirm.)* | T |
+| FR-CERT-013 | The letterhead (Telugu school name, address EN/TE, recognition line, place) MUST come from the school settings (`certificate_letterhead`, FR-TEN-012, `tenant.settings.manage`ᴿ); the English name is the school's name. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-014 | Issuing MUST meet NFR-PERF-002 (write p95 ≤ 800 ms) and the PDF SHOULD be ready within 60 s p95 so the median request-to-print time stays under 5 minutes (BO-04). *(Proposed; PO to confirm.)* | T/D |
+| FR-REG-001 | A TC register (counterfoil) print view MUST list every TC serial of an academic year in order with issue date, student, admission number, class, date of leaving, reason, conduct, issued/approved by and status (issued, cancelled with reason, duplicates as their own lines). *(Proposed; PO to confirm.)* | T |
+| FR-REG-002 | A certificate issue register print view MUST list the other certificate types the same way. *(Proposed; PO to confirm.)* | T |
+| FR-REG-003 | An admission and withdrawal register print view MUST list students in admission-number order with admission number, name, parents' names, date of birth, date and class of admission, date and class of leaving and the TC serial number. *(Proposed; PO to confirm.)* | T |
+| FR-REG-004 | Register views MUST be A4 landscape print pages with bilingual headings, IST dates as DD/MM/YYYY and Telugu text that never clips; they need `register.read`ᴿ (bulk personal data, like an export, FR-EXP-004) and are audited with counts only (`register.viewed`). *(Proposed; PO to confirm.)* | T |
+| FR-REG-005 | Register entries MUST be append-only: an issued certificate's number, content and dates are frozen by a trigger, the app role has no `DELETE`, and only workflow columns (status to `cancelled`, cancellation fields, PDF state, document link) change. *(Proposed; PO to confirm.)* | T |
+
 ---
 
 ## 4. Non-functional requirements
@@ -356,6 +382,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | BO-03 less re-typing | FR-STU-002..006, FR-IMP-*, FR-EXP-001 |
 | BO-05 trust | FR-IAM-*, FR-TEN-002, FR-AUD-*, FR-PLT-028..029, NFR-SEC-*, NFR-PRV-* |
 | BO-06 willingness to pay | FR-PLT-010..019, FR-PLT-030 |
+| BO-04 faster certificates (M3) | FR-CERT-*, FR-REG-* |
 | BO-07 repeatable onboarding | FR-TEN-003, FR-IMP-002, FR-PLT-001..005, FR-PLT-020..026 |
 
 ## 9. Verification approach

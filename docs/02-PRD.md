@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
+| Version | 0.4 · 2026-09-29 |
 | Scope | Core capabilities C1–C14 (milestones M0–M2) + extension points |
 | Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security, 16-Platform admin panel |
-| Changes | 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
+| Changes | 0.4: C15 certificates and registers (M3) with US-1101..US-1108, proposed from the roadmap scope (PO to confirm). 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
 
 ---
 
@@ -50,8 +50,9 @@
 | C12 | School admin console (users, roles, retention, data export, plan & billing) | M0–M2 |
 | C13 | Platform operator console: folded into C14 (ID kept for traceability; tenant-side break-glass stays under FR-OPS-004) | — |
 | C14 | Platform admin panel / control plane: schools, provisioning (shared and dedicated tiers), plans, subscriptions, invoices, usage, flags, fleet, announcements, support, operators, platform audit (spec in 16) | M0 |
+| C15 | Certificates & registers (TC, bonafide, study, conduct; serial numbers; register entries; duplicates; register print views; certificate PDFs as documents) | M3 |
 
-Extension points for later modules: certificates & registers (M3), circulars→tasks & notices (M4), student timeline & early warning (M5), Tally connector (M6).
+Extension points for later modules: circulars→tasks & notices (M4), student timeline & early warning (M5), Tally connector (M6).
 
 ---
 
@@ -244,6 +245,51 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC1: Given I hold `platform.operators.manage` and completed step-up, I can invite, assign roles to and deactivate operators; I cannot change my own roles; at least one active platform owner always remains.
 - AC2: Given a new operator has not enrolled MFA, then they cannot use the panel.
 - AC3: Every control-plane change writes exactly one platform audit event in the same transaction; "Verify chain" reports the first broken or missing sequence number, if any.
+
+### C15 · Certificates & registers (M3)
+
+*(Proposed from the roadmap scope (14 §2 M3, BRD §9 and BR-11/BR-12); PO to confirm.)* Story IDs use the US-11xx block, which was unused because notifications (C11) have no stories of their own. Certificates are generated from the checked student record (C3, C5), never typed by hand; every issued certificate is a register entry with a serial number. Personas: Lakshmi (office admin) prepares and issues; the principal approves transfer certificates and signs the paper copy.
+
+**US-1101** · As an office admin, I want to issue a bonafide, study or conduct certificate from the checked student record so that a parent at the counter gets a correct certificate in minutes. [FR-CERT-001..003, FR-CERT-006, FR-CERT-009..012, BO-04] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I hold `certificate.issue` and can see the student, when I choose a certificate type from the student's page, then a preview shows every value the certificate prints with its source (admission register, verified or provisional) and the inputs the type needs (for example the purpose of a bonafide certificate).
+- AC2: Given the student has an open blocker finding on a field the certificate prints, or a required printed field is empty, then I cannot issue it: the preview lists each problem with a link to the finding or to a new change request, and the API answers `409 certificate_blocked`. There is no override inside certificates: the value is corrected through a change request or the finding is waived by someone allowed to waive blockers (US-502, step-up).
+- AC3: Given there are no blockers, when I confirm, then in one transaction the certificate gets the next serial number for its type and academic year, the register entry is written with the printed values frozen as they were, and the certificate is audited; the PDF is ready to print shortly after (median request-to-print under 5 minutes, BO-04).
+- AC4: Provisional (unverified) values are printed but marked in the preview so I can check the paper register first.
+- AC5: No certificate ever shows an Aadhaar number, and restricted (C3) fields such as caste, religion or category are not printed.
+
+**US-1102** · As an office admin and a principal, I want transfer certificates to need the principal's approval so that no student leaves the rolls by one person's mistake. [FR-CERT-004, FR-CERT-005, FR-CERT-012, BR-04] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I hold `certificate.issue`, when I prepare a TC with the date of leaving, reason, conduct and promotion status, then it waits for approval (no serial number yet) and everyone holding `certificate.approve` is notified in English and Telugu.
+- AC2: Given I prepared the TC, I cannot approve it myself (checked by the service and by a database constraint); a different person holding `certificate.approve` approves or rejects it after a fresh MFA sign-in (step-up), rejection needs a reason, and I am notified either way. I can withdraw my own pending request.
+- AC3: When the TC is approved, then in one transaction it gets its serial number, the TC register entry is written, the student's active enrolment ends (transferred, on the date of leaving) and the student is marked as left; blockers are checked again at approval.
+- AC4: A student has at most one pending or issued original TC.
+
+**US-1103** · As an office admin, I want certificate serial numbers that never repeat or skip so that the register reconciles with the paper counterfoils. [FR-CERT-006, FR-REG-005] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Numbers run per school, per certificate type and per academic year in the format set in versioned configuration (default `TC/2026-27/0001`).
+- AC2: Two clerks issuing at the same moment get consecutive numbers, never the same one, and a failed issue leaves no gap.
+- AC3: A cancelled certificate keeps its number, which is never given to another certificate.
+
+**US-1104** · As an office admin, I want to issue a duplicate of a lost certificate so that the parent gets a copy that is clearly marked. [FR-CERT-007] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: A duplicate repeats the original's printed values exactly (it is a copy, not a new certificate), shows "DUPLICATE" with the original serial number, the copy number and the date of the duplicate, and needs a reason.
+- AC2: A duplicate of a TC needs the principal's approval like the original; every duplicate is a line in the register and is audited.
+
+**US-1105** · As a principal, I want to cancel a certificate that was issued in error so that the register shows it is no longer valid. [FR-CERT-008] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I hold `certificate.approve` and signed in with MFA within 5 minutes, when I cancel an issued certificate with a reason, then it keeps its number, the register marks it cancelled with the date and reason, and its PDF leaves the searchable documents.
+- AC2: Cancelling a TC does not re-admit the student; re-admission is a separate, deliberate step.
+- AC3: To correct a certificate, the record is corrected through a change request and a new certificate is issued; the system never edits an issued certificate.
+
+**US-1106** · As an office admin, I want to print the TC register, the certificate issue register and the admission and withdrawal register in familiar A4 formats so that the paper registers stay complete. [FR-REG-001..005, BR-11] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I hold `register.read` and signed in with MFA within 5 minutes, I can open a print view of each register for an academic year: bilingual headings, dates as DD/MM/YYYY, A4 landscape, Telugu text never clipped.
+- AC2: The TC register (counterfoil) and the certificate issue register list every serial number in order, including cancelled certificates and duplicates, with who issued and approved each.
+- AC3: The admission and withdrawal register lists students in admission-number order with their admission and leaving details and the TC serial number.
+- AC4: Every register view is audited (register, year, row count; never names).
+
+**US-1107** · As an office admin, I want every issued certificate kept as a document so that it can be found and printed again later. [FR-CERT-010, FR-CERT-011] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: The certificate PDF is stored privately (encrypted) as a document of type "certificate", visible only to the office roles set in configuration, virus-scanned and indexed for "Ask the school" like other personal (C2) documents.
+- AC2: Certificate documents cannot be uploaded, replaced or deleted by hand while the register entry exists; opening or downloading one is audited.
+
+**US-1108** · As a principal, I want to set the school's letterhead once so that certificates show our name in English and Telugu, address and recognition details. [FR-CERT-013] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I hold `tenant.settings.manage` (step-up), I can set the Telugu school name, the address in English and Telugu, the recognition/affiliation line and the place printed on certificates; the English name is the school's name.
+- AC2: A school logo is not supported yet (PO question).
 
 ---
 
