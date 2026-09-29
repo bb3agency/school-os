@@ -157,6 +157,14 @@ EXPECTED_TABLES = {
     "circular_suggestions",
     "tasks",
     "parent_notices",
+    # M5 (0035_student_insights; FR-EW-018): school records and restricted insights.
+    "attendance_marks",
+    "exams",
+    "exam_marks",
+    "behaviour_notes",
+    "insight_flags",
+    "flag_actions",
+    "insight_settings",
     "retention_settings",
 }
 

@@ -33,6 +33,10 @@ REQUIRED = {
     "task.assigned",
     "task.due_soon",
     "task.overdue",
+    # M5 (FR-EW-006)
+    "insights.flag_raised",
+    "insights.flag_assigned",
+    "insights.flag_overdue",
 }
 NUMERIC = {
     "blockers",

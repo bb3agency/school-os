@@ -322,3 +322,35 @@ templates:
     te:
       title: పని గడువు దాటింది
       body: మీ పనుల్లో ఒకదాని గడువు దాటిపోయింది. వీలైనంత త్వరగా పూర్తి చేయండి, లేదా తేదీ మార్చమని కార్యాలయాన్ని అడగండి.
+
+  # M5 early warning (FR-EW-006). Params are the flag id and the rule code only: never the
+  # student's name or what the rule saw (the flag shows that to people allowed to see it).
+  insights.flag_raised:
+    params: [flag_id, rule]
+    resource_type: insight_flag
+    en:
+      title: A student may need follow-up
+      body: "{rule, select, attendance_streak {A student was absent on several school days in a row.} attendance_rate {A student's attendance has dropped.} course_low {A student's marks in the latest exam are low.} course_decline {A student's marks dropped between two exams.} behaviour_concerns {Several concern notes were written about a student.} other {A concern was raised about a student.}} Open the flag, talk to the student or a parent, and record what you did by the due date."
+    te:
+      title: ఒక విద్యార్థిని గమనించాలి
+      body: "{rule, select, attendance_streak {ఒక విద్యార్థి వరుసగా కొన్ని బడి రోజులు గైర్హాజరయ్యారు.} attendance_rate {ఒక విద్యార్థి హాజరు తగ్గింది.} course_low {తాజా పరీక్షలో ఒక విద్యార్థి మార్కులు తక్కువగా ఉన్నాయి.} course_decline {రెండు పరీక్షల మధ్య ఒక విద్యార్థి మార్కులు తగ్గాయి.} behaviour_concerns {ఒక విద్యార్థి గురించి పలు ఆందోళన నోట్లు రాశారు.} other {ఒక విద్యార్థి గురించి ఆందోళన వ్యక్తమైంది.}} ఫ్లాగ్‌ను తెరిచి, విద్యార్థితో లేదా తల్లిదండ్రులతో మాట్లాడి, గడువులోగా మీరు చేసినది నమోదు చేయండి."
+
+  insights.flag_assigned:
+    params: [flag_id]
+    resource_type: insight_flag
+    en:
+      title: A follow-up flag was given to you
+      body: A student's early-warning flag is now yours. Open it to see why it was raised and record what you do.
+    te:
+      title: ఒక ఫాలో-అప్ ఫ్లాగ్ మీకు ఇవ్వబడింది
+      body: ఒక విద్యార్థి ముందస్తు హెచ్చరిక ఫ్లాగ్ ఇప్పుడు మీది. ఎందుకు వచ్చిందో చూడటానికి దాన్ని తెరిచి, మీరు చేసినది నమోదు చేయండి.
+
+  insights.flag_overdue:
+    params: [flag_id]
+    resource_type: insight_flag
+    en:
+      title: Follow-up is overdue
+      body: A student's flag is past its due date and nobody has recorded an action yet. Open it and record what was done, or close it with a reason.
+    te:
+      title: ఫాలో-అప్ గడువు దాటింది
+      body: ఒక విద్యార్థి ఫ్లాగ్ గడువు దాటింది, ఇంకా ఎవరూ చర్యను నమోదు చేయలేదు. దాన్ని తెరిచి చేసినది నమోదు చేయండి, లేదా కారణంతో మూసివేయండి.

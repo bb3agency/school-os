@@ -53,6 +53,18 @@ categories:
     max_days: 180
     configurable: false
     enforced_by: knowledge.purge_queries  # daily; query_log.retention_days in knowledge models.yaml
+  behaviour_notes:
+    default_days: 365     # FR-EW-017: M5 behaviour notes (C3), after their date;
+    min_days: 365         # DPDP Rules keep personal data 1 year (docs/08 §3); the
+    max_days: 365         # insights module keeps the same value (rules.yaml retention)
+    configurable: false
+    enforced_by: insights.purge_expired
+  closed_flags:
+    default_days: 365     # FR-EW-017: M5 early-warning flags and their actions (C3),
+    min_days: 365         # after closing; open flags are kept until a person closes
+    max_days: 365         # them
+    configurable: false
+    enforced_by: insights.purge_expired
   audit_events:
     default_days: 395     # at least 13 months online (PRV-018), archived 3 years (Object Lock)
     min_days: 395

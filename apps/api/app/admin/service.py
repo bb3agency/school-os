@@ -59,6 +59,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.academics import service as academics
 from app.admin import archive
 from app.admin import repository as repo
 from app.admin.config import RetentionCategory, load_config, load_retention
@@ -105,6 +106,7 @@ from app.dq import service as dq
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.imports import service as imports
+from app.insights import service as insights
 from app.notifications import service as notifications
 from app.ops import service as ops
 from app.students import service as students
@@ -552,6 +554,8 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *documents.export_records(session),
         *certificates.export_records(session),
         *circulars.export_records(session),
+        *academics.export_records(session),
+        *insights.export_records(session, include_sensitive=snap.include_sensitive),
         repo.retention_record_table(session),
     ]
     names = [t.name for t in tables]

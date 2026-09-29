@@ -6,6 +6,8 @@ version: 1
 # refuses to start when any of them is not registered (fail closed).
 purge_order:
   - circulars
+  - insights
+  - academics
   - knowledge
   - extraction
   - dq

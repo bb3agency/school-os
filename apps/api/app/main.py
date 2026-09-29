@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from app.academics.api import router as academics_router
 from app.admin.api import router as admin_router
 from app.audit.api import router as audit_router
 from app.breakglass.api import router as breakglass_router
@@ -22,6 +23,7 @@ from app.exports.api import router as exports_router
 from app.extraction.api import router as extraction_router
 from app.identity.api import router as identity_router
 from app.imports.api import router as imports_router
+from app.insights.api import router as insights_router
 from app.knowledge.api import router as knowledge_router
 from app.notifications.api import invitations_router
 from app.notifications.api import router as notifications_router
@@ -67,6 +69,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(certificates_router)
     app.include_router(knowledge_router)
     app.include_router(circulars_router)
+    app.include_router(academics_router)
+    app.include_router(insights_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

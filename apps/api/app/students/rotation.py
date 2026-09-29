@@ -99,6 +99,8 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     ("sis.import_cell_edits", "new_value_ciphertext"),
     ("kb.queries", "question_ciphertext"),
     ("kb.queries", "answer_ciphertext"),
+    ("sis.behaviour_notes", "body_ciphertext"),
+    ("sis.flag_actions", "note_ciphertext"),
 )
 
 # Ciphertext-looking columns that are NOT under a tenant DEK, with the reason.

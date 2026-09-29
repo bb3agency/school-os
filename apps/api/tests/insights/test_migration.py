@@ -247,8 +247,13 @@ def _insert_rows(admin: Engine, ids: _Ids) -> dict[str, uuid.UUID]:
                 "on_date, status, recorded_by) VALUES (:i, :t, :s, :sec, '2031-07-01', "
                 "'absent', :u)"
             ),
-            {"i": out["mark"], "t": ids.tenant_id, "s": ids.student_id, "sec": ids.section_id,
-             "u": ids.user_id},
+            {
+                "i": out["mark"],
+                "t": ids.tenant_id,
+                "s": ids.student_id,
+                "sec": ids.section_id,
+                "u": ids.user_id,
+            },
         )
         c.execute(
             text(
@@ -263,8 +268,14 @@ def _insert_rows(admin: Engine, ids: _Ids) -> dict[str, uuid.UUID]:
                 "subject, max_marks, marks, recorded_by) VALUES (:i, :t, :e, :s, :sec, "
                 "'Mathematics', 50, 21.5, :u)"
             ),
-            {"i": out["exam_mark"], "t": ids.tenant_id, "e": out["exam"], "s": ids.student_id,
-             "sec": ids.section_id, "u": ids.user_id},
+            {
+                "i": out["exam_mark"],
+                "t": ids.tenant_id,
+                "e": out["exam"],
+                "s": ids.student_id,
+                "sec": ids.section_id,
+                "u": ids.user_id,
+            },
         )
         c.execute(
             text(
@@ -273,8 +284,15 @@ def _insert_rows(admin: Engine, ids: _Ids) -> dict[str, uuid.UUID]:
                 "created_by_membership) VALUES (:i, :t, :s, :sec, 'concern', '2031-07-02', :b, "
                 "1, :u, :m)"
             ),
-            {"i": out["note"], "t": ids.tenant_id, "s": ids.student_id, "sec": ids.section_id,
-             "b": blob, "u": ids.user_id, "m": ids.membership_id},
+            {
+                "i": out["note"],
+                "t": ids.tenant_id,
+                "s": ids.student_id,
+                "sec": ids.section_id,
+                "b": blob,
+                "u": ids.user_id,
+                "m": ids.membership_id,
+            },
         )
         c.execute(
             text(
@@ -284,8 +302,13 @@ def _insert_rows(admin: Engine, ids: _Ids) -> dict[str, uuid.UUID]:
                 "'attendance_streak', 1, 'run:2031-07-01', '{\"days\": 3}', :m, "
                 "'2031-07-03', '2031-07-10')"
             ),
-            {"i": out["flag"], "t": ids.tenant_id, "s": ids.student_id, "sec": ids.section_id,
-             "m": ids.membership_id},
+            {
+                "i": out["flag"],
+                "t": ids.tenant_id,
+                "s": ids.student_id,
+                "sec": ids.section_id,
+                "m": ids.membership_id,
+            },
         )
         c.execute(
             text(
@@ -293,13 +316,18 @@ def _insert_rows(admin: Engine, ids: _Ids) -> dict[str, uuid.UUID]:
                 "created_by, created_by_membership) VALUES (:i, :t, :f, 'called_parent', "
                 "'2031-07-04', :u, :m)"
             ),
-            {"i": out["action"], "t": ids.tenant_id, "f": out["flag"], "u": ids.user_id,
-             "m": ids.membership_id},
+            {
+                "i": out["action"],
+                "t": ids.tenant_id,
+                "f": out["flag"],
+                "u": ids.user_id,
+                "m": ids.membership_id,
+            },
         )
         c.execute(
             text(
                 "INSERT INTO sis.insight_settings (id, tenant_id, rules, updated_by) "
-                "VALUES (:i, :t, '{\"attendance_streak\": {\"threshold\": 4}}', :u) "
+                'VALUES (:i, :t, \'{"attendance_streak": {"threshold": 4}}\', :u) '
                 "ON CONFLICT (tenant_id) DO NOTHING"
             ),
             {"i": uuid.uuid4(), "t": ids.tenant_id, "u": ids.user_id},
@@ -318,18 +346,31 @@ def test_FR_ATT_001_one_status_per_student_and_day(world: Any, admin_engine: Eng
                 "on_date, status, recorded_by) VALUES (:i, :t, :s, :sec, '2031-07-01', "
                 "'present', :u)"
             ),
-            {"i": uuid.uuid4(), "t": ids.tenant_id, "s": ids.student_id, "sec": ids.section_id,
-             "u": ids.user_id},
+            {
+                "i": uuid.uuid4(),
+                "t": ids.tenant_id,
+                "s": ids.student_id,
+                "sec": ids.section_id,
+                "u": ids.user_id,
+            },
         )
-    with pytest.raises(DBAPIError, match="attendance_marks_status_check"), admin_engine.begin() as c:
+    with (
+        pytest.raises(DBAPIError, match="attendance_marks_status_check"),
+        admin_engine.begin() as c,
+    ):
         c.execute(
             text(
                 "INSERT INTO sis.attendance_marks (id, tenant_id, student_id, section_id, "
                 "on_date, status, recorded_by) VALUES (:i, :t, :s, :sec, '2031-07-05', "
                 "'holiday', :u)"
             ),
-            {"i": uuid.uuid4(), "t": ids.tenant_id, "s": ids.student_id, "sec": ids.section_id,
-             "u": ids.user_id},
+            {
+                "i": uuid.uuid4(),
+                "t": ids.tenant_id,
+                "s": ids.student_id,
+                "sec": ids.section_id,
+                "u": ids.user_id,
+            },
         )
 
 
@@ -343,8 +384,13 @@ def test_FR_MRK_002_marks_stay_within_max_and_absent_has_no_marks(
         "max_marks, marks, absent, recorded_by) VALUES (:i, :t, :e, :s, :sec, :subj, 50, :mk, "
         ":ab, :u)"
     )
-    params = {"t": ids.tenant_id, "e": rows["exam"], "s": ids.student_id,
-              "sec": ids.section_id, "u": ids.user_id}
+    params = {
+        "t": ids.tenant_id,
+        "e": rows["exam"],
+        "s": ids.student_id,
+        "sec": ids.section_id,
+        "u": ids.user_id,
+    }
     for subject, marks, absent, constraint in (
         ("Science", 51, False, "exam_marks_marks_range"),
         ("English", None, False, "exam_marks_absent_has_no_marks"),
@@ -368,14 +414,20 @@ def test_FR_EW_003_one_open_flag_per_student_and_rule(world: Any, admin_engine: 
     params = {"t": ids.tenant_id, "s": ids.student_id, "sec": ids.section_id}
     with pytest.raises(DBAPIError, match="insight_flags_one_open"), admin_engine.begin() as c:
         c.execute(text(insert), {**params, "i": uuid.uuid4(), "b": "run:2031-07-18"})
-    with pytest.raises(DBAPIError, match="insight_flags_basis_key"), admin_engine.begin() as c:
+    with admin_engine.begin() as c:
         c.execute(
-            text("UPDATE sis.insight_flags SET status = 'closed', closed_at = now(), "
-                 "closed_by = :u, close_reason = 'improved', first_action_at = now() "
-                 "WHERE tenant_id = :t AND student_id = :s"),
+            text(
+                "UPDATE sis.insight_flags SET status = 'closed', closed_at = now(), "
+                "closed_by = :u, close_reason = 'improved', first_action_at = now() "
+                "WHERE tenant_id = :t AND student_id = :s"
+            ),
             {"t": ids.tenant_id, "s": ids.student_id, "u": ids.user_id},
         )
+    # Closed: a new run may be flagged, but never the same basis again.
+    with pytest.raises(DBAPIError, match="insight_flags_basis_key"), admin_engine.begin() as c:
         c.execute(text(insert), {**params, "i": uuid.uuid4(), "b": "run:2031-07-01"})
+    with admin_engine.begin() as c:
+        c.execute(text(insert), {**params, "i": uuid.uuid4(), "b": "run:2031-07-18"})
 
 
 def test_FR_EW_007_a_closed_flag_has_its_reason_and_an_action_time(
@@ -385,8 +437,10 @@ def test_FR_EW_007_a_closed_flag_has_its_reason_and_an_action_time(
     rows = _insert_rows(admin_engine, ids)
     with pytest.raises(DBAPIError, match="insight_flags_closed_fields"), admin_engine.begin() as c:
         c.execute(
-            text("UPDATE sis.insight_flags SET status = 'closed', first_action_at = now() "
-                 "WHERE id = :f"),
+            text(
+                "UPDATE sis.insight_flags SET status = 'closed', first_action_at = now() "
+                "WHERE id = :f"
+            ),
             {"f": rows["flag"]},
         )
     with pytest.raises(DBAPIError, match="insight_flags_actioned"), admin_engine.begin() as c:

@@ -24,6 +24,7 @@ from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
+from app.insights.tasks import beat_schedule as insights_beat_schedule
 from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
@@ -35,6 +36,7 @@ import app.identity.service  # isort: skip
 
 # Offboarding (FR-PLT-005, ADR-0029): every module that owns school data registers its purge with
 # app.tenancy at import; the purge refuses to run unless all of them are registered.
+import app.academics.service  # isort: skip
 import app.admin.service  # isort: skip
 import app.breakglass.service  # isort: skip
 import app.changes.service  # isort: skip
@@ -44,6 +46,7 @@ import app.dq.service  # isort: skip
 import app.exports.service  # isort: skip
 import app.extraction.service  # isort: skip
 import app.imports.service  # isort: skip
+import app.insights.service  # isort: skip
 import app.knowledge.service  # isort: skip
 import app.notifications.service  # isort: skip
 import app.ops.service  # isort: skip
@@ -70,6 +73,7 @@ TASK_MODULES: list[str] = [
     "app.admin.tasks",
     "app.certificates.tasks",
     "app.circulars.tasks",
+    "app.insights.tasks",
 ]
 
 
@@ -135,6 +139,13 @@ def create_celery() -> Celery:
             "circulars.read_version": {"queue": "ingest"},
             "circulars.render_notice": {"queue": "pdf"},
             "circulars.send_task_reminders": {"queue": "maintenance"},
+            # M5 (FR-EW-005..006, FR-EW-017): the early-warning rules after attendance and
+            # marks writes (outbox consumer) and daily, overdue reminders and the retention
+            # purge; database work only (no files, no AI).
+            "insights.evaluate_students": {"queue": "maintenance"},
+            "insights.evaluate_all": {"queue": "maintenance"},
+            "insights.send_flag_reminders": {"queue": "maintenance"},
+            "insights.purge_expired": {"queue": "maintenance"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
@@ -166,6 +177,9 @@ def create_celery() -> Celery:
             **circulars_beat_schedule(),
             # docs/05 §13: Ask-the-school questions and answers deleted after 180 days (daily).
             **knowledge_beat_schedule(),
+            # FR-EW-005, FR-EW-006, FR-EW-017: early-warning rules (17:40 IST), overdue flag
+            # reminders (07:20 IST) and the retention purge of notes and closed flags.
+            **insights_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

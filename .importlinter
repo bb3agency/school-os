@@ -54,6 +54,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -84,6 +86,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -114,6 +118,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -147,6 +153,8 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 
 # The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
 # a neutral building block. The control plane prints its invoices through it and never through
@@ -182,6 +190,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.platform
 
@@ -210,6 +220,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -240,6 +252,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -270,6 +284,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -300,6 +316,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -330,6 +348,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -360,6 +380,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -414,6 +436,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.imports.repository
     app.imports.models
@@ -468,6 +492,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.changes.repository
     app.changes.models
@@ -498,6 +524,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.extraction.repository
     app.extraction.models
@@ -527,6 +555,8 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.exports.repository
     app.exports.models
@@ -578,6 +608,8 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.admin.repository
     app.admin.models
@@ -610,6 +642,8 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.admin
 
@@ -663,6 +697,8 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.knowledge.gateway
     app.knowledge.embeddings
@@ -736,6 +772,8 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.academics
+    app.insights
 allow_indirect_imports = True
 
 # Record tools are read-only and have no network (invariant 9, ADR-0008, SEC-020): no model
@@ -830,6 +868,8 @@ source_modules =
     app.knowledge
     app.admin
     app.certificates
+    app.academics
+    app.insights
 forbidden_modules =
     app.circulars.repository
     app.circulars.models
@@ -881,6 +921,8 @@ source_modules =
     app.knowledge
     app.admin
     app.circulars
+    app.academics
+    app.insights
 forbidden_modules =
     app.certificates.repository
     app.certificates.models
@@ -908,3 +950,117 @@ forbidden_modules =
     app.students
     app.documents
     app.dq
+
+# --- 6. student timeline and early warning (M5: attendance, marks, notes, flags) -----------
+# Other modules use only app.academics.service and app.insights.service. Insights read the
+# records through app.academics.service; academics never depend on insights (the rules run
+# after writes through the outbox), and no AI is involved (neither imports app.knowledge).
+
+[importlinter:contract:academics-internals]
+name = academics: repository/models are private (use app.academics.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.insights
+forbidden_modules =
+    app.academics.repository
+    app.academics.models
+allow_indirect_imports = True
+
+[importlinter:contract:insights-internals]
+name = insights: repository/models/crypto are private (use app.insights.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.academics
+forbidden_modules =
+    app.insights.repository
+    app.insights.models
+    app.insights.crypto
+allow_indirect_imports = True
+
+# Purpose limit (docs/08 §4, invariant 14): no AI reads attendance, marks, notes or flags in M5,
+# and school records never depend on the early-warning module.
+[importlinter:contract:insights-without-ai]
+name = academics and insights never import the knowledge module (no AI in M5)
+type = forbidden
+source_modules =
+    app.academics
+    app.insights
+forbidden_modules =
+    app.knowledge
+allow_indirect_imports = True
+
+[importlinter:contract:academics-below-insights]
+name = academics never imports insights (records first; rules read them)
+type = forbidden
+source_modules =
+    app.academics
+forbidden_modules =
+    app.insights
+
+# The rules engine, sheet parser and configuration stay pure (no database, web or feature
+# modules), so the rules are testable and explainable on their own (FR-EW-001).
+[importlinter:contract:insights-pure-library]
+name = insights engine/config and academics sheets/config stay pure (no DB, web or modules)
+type = forbidden
+source_modules =
+    app.insights.engine
+    app.insights.config
+    app.academics.sheets
+    app.academics.config
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.students
+    app.documents
+    app.knowledge

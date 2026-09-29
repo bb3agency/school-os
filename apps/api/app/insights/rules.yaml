@@ -1,0 +1,70 @@
+# Early-warning rules, indicators and vocabularies (M5; FR-EW-001..018). Versioned configuration
+# shipped inside the package (read by app/insights/config.py; CLAUDE.md invariant 13). Change
+# together with tests/insights and the CHECK constraints of migration 0035_student_insights.
+#
+# Every flag records the `version` it was raised under. Thresholds are defaults: a school's
+# principal may change them only within [min, max] (FR-EW-014); rules with `can_disable: false`
+# stay on. Purpose limit (docs/08 §4 PRV-003..005): these rules only point a person at a child who
+# may need support; nothing happens to the child unless a person acts.
+version: 1
+
+flags:
+  due_days: 7            # FR-EW-004: a flag is due 7 days after it is raised (M5 exit metric)
+
+rules:
+  attendance_streak:
+    # AP follow-up: a child absent on 3 consecutive school days is followed up (call or visit).
+    # A school day = a day the student has a mark; late/present/leave end the run.
+    indicator: attendance
+    can_disable: false
+    threshold: {default: 3, min: 2, max: 5}          # consecutive absences
+  attendance_rate:
+    # Share of the last `window` marked school days the student was present or late; leave days
+    # are left out of the count (authorised absence).
+    indicator: attendance
+    can_disable: true
+    threshold: {default: 75, min: 60, max: 90}       # percent; flag when below
+    window: 30
+    min_days: 10
+  course_low:
+    # Overall percentage of the latest exam of the current year with marks (FR-MRK-005).
+    indicator: course
+    can_disable: true
+    threshold: {default: 35, min: 25, max: 50}       # percent; flag when below (AP pass mark 35)
+  course_decline:
+    # Drop between the two latest exams of the current year with marks.
+    indicator: course
+    can_disable: true
+    threshold: {default: 15, min: 10, max: 30}       # percentage points; flag when >= drop
+  behaviour_concerns:
+    # Behaviour notes of category "concern" dated within the last `window` days.
+    indicator: behaviour
+    can_disable: true
+    threshold: {default: 3, min: 2, max: 5}          # notes; flag when >=
+    window: 30
+
+notes:
+  categories: [positive, observation, concern]
+  max_chars: 500
+  max_backdate_days: 60  # a note may be dated at most this many days back
+
+actions:
+  kinds: [talked_with_student, called_parent, met_parent, home_visit, remedial_support,
+          referred_counsellor, referred_principal, other]
+  max_note_chars: 1000
+
+close_reasons: [improved, support_in_place, parent_informed, no_concern, student_left,
+                raised_in_error]
+
+erase_reasons: [parent_request, entered_in_error]
+
+evaluation:
+  history_days: 120      # attendance read per student for the rules (covers the rate window)
+
+timeline:
+  attendance_months: 12  # monthly attendance summaries shown
+
+retention:
+  # FR-EW-017 (fixed categories in app/admin/retention.yaml; DPDP 1-year minimum, 08 §3):
+  notes_days: 365        # behaviour notes, after their date
+  closed_flags_days: 365 # closed flags with their actions, after closing

@@ -6,7 +6,7 @@ role cannot delete in normal operation (append-only and frozen tables). The dele
 (ADR-0029; ``tests/tenancy/test_offboarding_purge.py``) prove the purge leaves
 none of them, whatever new table a migration adds, and assert ``tables_without_rows`` lists
 only the retained audit tables, so this helper grows with the schema. Checked on 2026-09-29
-against ``0033_certificates``: every tenant table except ``audit.events`` gets a row.
+against ``0035_student_insights``: every tenant table except ``audit.events`` gets a row.
 
 Synthetic values only (CLAUDE.md §6.11): names like "Synthetic Student", no real identifiers.
 """
@@ -678,6 +678,79 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             d=ids["doc"],
             u=u["user"],
+        )
+        # --- student timeline and early warning (M5, 0035_student_insights) ---------------
+        exam, flag = uuid.uuid4(), uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO sis.attendance_marks (id, tenant_id, student_id, section_id, on_date, "
+            "status, recorded_by) VALUES (:i, :t, :s, :sec, '2026-07-01', 'absent', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            sec=ids["section"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.exams (id, tenant_id, academic_year_id, name, held_on, created_by) "
+            "VALUES (:i, :t, :y, 'Synthetic unit test', '2026-07-15', :u)",
+            i=exam,
+            t=t,
+            y=ids["year1"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.exam_marks (id, tenant_id, exam_id, student_id, section_id, "
+            "subject, max_marks, marks, recorded_by) VALUES (:i, :t, :e, :s, :sec, 'Maths', "
+            "50, 20, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            e=exam,
+            s=ids["student"],
+            sec=ids["section"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.behaviour_notes (id, tenant_id, student_id, section_id, category, "
+            "noted_on, body_ciphertext, key_version, created_by, created_by_membership) VALUES "
+            "(:i, :t, :s, :sec, 'concern', '2026-07-02', '\\x010001', 1, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            sec=ids["section"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.insight_flags (id, tenant_id, student_id, section_id, indicator, "
+            "rule, rules_version, basis, owner_membership_id, raised_on, due_on) VALUES "
+            "(:i, :t, :s, :sec, 'attendance', 'attendance_streak', 1, 'run:2026-07-01', :m, "
+            "'2026-07-03', '2026-07-10')",
+            i=flag,
+            t=t,
+            s=ids["student"],
+            sec=ids["section"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.flag_actions (id, tenant_id, flag_id, kind, acted_on, created_by, "
+            "created_by_membership) VALUES (:i, :t, :f, 'called_parent', '2026-07-04', :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            f=flag,
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.insight_settings (id, tenant_id, rules) VALUES (:i, :t, '{}')",
+            i=uuid.uuid4(),
+            t=t,
         )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(

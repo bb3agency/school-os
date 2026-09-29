@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
+from sqlalchemy import Engine
 
 
 def _load(name: str, path: Path) -> ModuleType:
@@ -35,5 +35,11 @@ api = W.api
 
 
 @pytest.fixture(autouse=True)
-def installed() -> Iterator[Any]:
-    yield S.install()
+def installed() -> Any:
+    return S.install()
+
+
+@pytest.fixture(scope="session")
+def school(world: Any, admin_engine: Engine) -> Any:
+    """A separate synthetic school (see ``support.insights_school``)."""
+    return S.insights_school(admin_engine)
