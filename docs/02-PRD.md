@@ -6,7 +6,7 @@
 | Scope | Core capabilities C1–C14 (milestones M0–M2) + extension points |
 | Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security, 16-Platform admin panel |
 | Changes | 0.4: C15 certificates and registers (M3) with US-1101..US-1108, proposed from the roadmap scope (PO to confirm). 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
-| Changes | 0.4: C16 circulars, tasks and parent notices (M4) with US-1601..US-1606, proposed from the roadmap scope for the product owner to confirm. 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
+| Changes | 0.5: C17 student timeline and early warning (M5) with US-1701..US-1709, proposed from the roadmap scope (PO to confirm). 0.4: C16 circulars, tasks and parent notices (M4) with US-1601..US-1606, proposed from the roadmap scope for the product owner to confirm. 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
 
 ---
 
@@ -55,6 +55,7 @@
 
 Extension points for later modules: circulars→tasks & notices (M4), student timeline & early warning (M5), Tally connector (M6).
 | C16 | Circulars → tasks, reminders and bilingual parent notices (AI suggestions confirmed by staff) | M4 |
+| C17 | Student timeline and early warning: attendance and marks, behaviour notes, ABC indicators, flags with an owner and an intervention log (rules only, no AI) | M5 |
 
 Extension points for later modules: certificates & registers (M3), circulars→tasks & notices (M4, C16 below), student timeline & early warning (M5), Tally connector (M6).
 
@@ -329,6 +330,63 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC1: Only holders of `notice.approve` can approve; both languages must be filled; an approved notice cannot be edited.
 - AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups.
 - AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9).
+
+### C17 · Student timeline and early warning (M5)
+
+*Proposed from the roadmap scope (14 · M5; BRD BO-08; 08 §4 PRV-003..005); PO to confirm.* Class teachers record attendance and marks once; SchoolOS turns them, with short behaviour notes, into three indicators (**A**ttendance, **B**ehaviour, **C**ourse performance) and raises a **flag** when a versioned rule says a child needs follow-up. Every flag has an owner (the class teacher by default), a due date 7 days out and an intervention log; nothing happens to a child without a person acting (PRV-005). Flags come from deterministic rules the teacher can read, never from AI. Exit metric (14 · M5): at least 90% of flags actioned within 7 days in the class-teacher pilot.
+
+Purpose limit (08 §4): these features exist only for the school's educational activities and the safety of its enrolled children. Insights are visible only to the student's class teacher and the principal (PRV-004), never used for punishment, marketing or comparisons between schools, and never sent to an AI provider.
+
+**US-1701** · As a class teacher, I want to mark today's attendance for my section on one screen so that the register is done in two minutes. [FR-ATT-001..003, FR-ATT-005] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I hold `attendance.record` for section 9A, when I open 9A for a date (today by default, IST), then I see every student actively enrolled in 9A with their roll number and a status (present, absent, late, leave), all present by default for a new day.
+- AC2: When I save, then the whole day is stored in one step (all or nothing) and audited with counts only; saving the same day again corrects it.
+- AC3: A date in the future or outside the section's academic year is refused with a message saying why.
+- AC4: Given I teach only 9A, then 9C is not found (404) and does not appear in my list.
+- AC5: The month view shows the register grid (students × days) and prints on A4 landscape.
+
+**US-1702** · As an office admin or class teacher, I want to import a month of attendance from our spreadsheet so that I don't retype the paper register. [FR-ATT-004] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: I upload an XLSX or CSV (first column admission number or roll number, then one column per date, cells P/A/L/LV); after the virus check I see a preview: rows matched to students, dates found and every problem (unknown student, bad code, future date) with its row and column.
+- AC2: Formulas are never run; a file with a full Aadhaar number is refused; the uploaded file is deleted as soon as it has been read.
+- AC3: I can add the rows only when the preview has no problems; they are added in one step.
+
+**US-1703** · As an exam coordinator or class teacher, I want to enter or import marks per exam and subject with the maximum marks so that course performance is based on real results. [FR-MRK-001..005] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given I hold `exam.manage`, I can add an exam (name, date) for the current academic year.
+- AC2: Given I hold `marks.record` for 9A, I can enter marks per student and subject with the maximum marks, or mark a student absent (AB); marks above the maximum are refused.
+- AC3: I can import the same grid from a spreadsheet (row 1: admission number and subjects; row 2: maximum marks; then one row per student) with a preview, like US-1702.
+- AC4: Each student's result shows the overall percentage for the exam and the change from the previous exam of the year.
+
+**US-1704** · As a class teacher, I want to write a short behaviour note about a student so that concerns and progress are not lost in my memory. [FR-EW-010..012] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: A note has a category (positive, observation, concern), a date and up to 500 characters; a full Aadhaar number is refused.
+- AC2: Notes are restricted (C3): stored encrypted and visible only to the student's class teacher and the principal; every view is audited.
+- AC3: Notes are never sent to an AI provider and never leave the school except in the owner's full data export.
+
+**US-1705** · As a class teacher, I want the system to flag a student who needs follow-up, with the reason in plain words, so that no child slips through. [FR-EW-001..006] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given a student was absent on 3 consecutive school days (AP follow-up rule), then a flag "Absent 3 school days in a row" is raised the same day, owned by the section's class teacher and due in 7 days.
+- AC2: Other rules raise flags for low attendance over the last 30 school days, a low overall percentage or a large drop between two exams, and repeated concern notes; each flag shows the numbers that triggered it (for example "absent 3 days: 22/09 to 24/09").
+- AC3: The same situation never raises two flags; a student has at most one open flag per rule.
+- AC4: I get an in-app notification in my language when a flag is raised for me and once if it becomes overdue.
+- AC5: Given the section has no class teacher who can act, the flag is unassigned and the principal is notified.
+
+**US-1706** · As a flag owner, I want to record what I did and close the flag when it is resolved so that the school can show follow-up was done. [FR-EW-007..009] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: I can add an action (talked with the student, called a parent, met a parent, home visit, remedial support, referred to the principal or counsellor, other) with a date and an optional note; the first action marks the flag in progress and counts as "actioned".
+- AC2: I close a flag with a reason (improved, support in place, parent informed, no concern, student left, raised in error) and an optional note.
+- AC3: "My flags" lists my open flags, overdue first; I can also raise a flag myself for a student in my section.
+- AC4: No flag changes a student's record, marks or attendance, and nothing is decided automatically.
+
+**US-1707** · As a class teacher or principal, I want one timeline per student so that I understand the child before I talk to the parent. [FR-EW-013] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: The student's page has a Timeline tab listing, newest first: enrolment and section changes, monthly attendance, exam results, behaviour notes, flags and actions, and (if I may see certificates) certificates issued.
+- AC2: The timeline prints on A4 so the principal can answer a parent's request for the data held about their child.
+- AC3: Opening a timeline is audited; given the student is not in my sections, it is not found.
+
+**US-1708** · As a principal, I want to see every flag, reassign owners and set the school's thresholds within safe limits so that follow-up works for our school. [FR-EW-014, FR-EW-015] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: The school view lists all flags with filters (status, indicator, overdue) and a summary: raised, actioned within 7 days (the M5 exit metric), overdue and open, as counts for this school only.
+- AC2: With a fresh MFA sign-in I can reassign a flag to another staff member who may act for that student, and change thresholds only within the bounds SchoolOS sets (for example the consecutive-absence rule between 2 and 5 days); every change is audited.
+
+**US-1709** · As the school (data fiduciary), I want insights to respect children's data rules so that we stay within DPDP's education exemption. [FR-EW-016..018] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: There is no export, download or share of flags, notes or indicators except the owner's full data export (restricted values masked unless explicitly included) and the printed timeline.
+- AC2: Behaviour notes are deleted 1 year after they were written and closed flags 1 year after closing; attendance and marks are school records and are kept per school policy.
+- AC3: With a fresh MFA sign-in the principal can erase a note or a flag on a parent's request or when it was entered in error (reason recorded, never the text).
+- AC4: No figures are ever combined across schools, and no AI reads insights in M5.
 
 ---
 
