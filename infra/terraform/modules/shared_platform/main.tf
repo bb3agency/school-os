@@ -354,12 +354,16 @@ data "aws_iam_policy_document" "api" {
     resources = ["${module.s3.files_bucket_arn}/t/*"]
   }
 
-  # Control-plane invoice PDFs (docs/16 §5.8, ADR-0017 Amendment 2026-09-28): rendered by
-  # worker-pdf, downloaded through presigned GETs signed by the api. Never under a school prefix.
+  # Control-plane invoice PDFs (docs/16 §5.8, ADR-0017 Amendment 2026-09-28) and certificates
+  # of deletion (docs/16 §5.5, ADR-0029): rendered by worker-pdf, downloaded through presigned
+  # GETs signed by the api. Never under a school prefix.
   statement {
-    sid       = "InvoicePdfObjects"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = ["${module.s3.files_bucket_arn}/platform/invoices/*"]
+    sid     = "InvoicePdfObjects"
+    actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = [
+      "${module.s3.files_bucket_arn}/platform/invoices/*",
+      "${module.s3.files_bucket_arn}/platform/deletion-certificates/*",
+    ]
   }
 
   statement {
@@ -383,9 +387,12 @@ data "aws_iam_policy_document" "api" {
   dynamic "statement" {
     for_each = var.platform_invoice_bucket == null ? [] : [var.platform_invoice_bucket]
     content {
-      sid       = "InvoicePdfBucketObjects"
-      actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-      resources = ["arn:aws:s3:::${statement.value}/platform/invoices/*"]
+      sid     = "InvoicePdfBucketObjects"
+      actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+      resources = [
+        "arn:aws:s3:::${statement.value}/platform/invoices/*",
+        "arn:aws:s3:::${statement.value}/platform/deletion-certificates/*",
+      ]
     }
   }
 }

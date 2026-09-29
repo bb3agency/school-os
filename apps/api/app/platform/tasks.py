@@ -21,6 +21,7 @@ from app.platform import (
     fleet,
     heartbeat_client,
     invoice_files,
+    offboarding,
     support,
     tenant_audit,
     usage,
@@ -89,6 +90,31 @@ def deliver_tenant_audit() -> dict[str, int]:
     }
 
 
+@shared_task(name="offboarding.process", acks_late=True, ignore_result=True)
+def process_offboarding() -> dict[str, int]:
+    """Every 10 minutes on ``maintenance`` (shared only): advance scheduled deletions (inventory,
+    purge, verify, crypto-shred), check the 30-day deadlines, delete audit chains whose retention
+    ended (FR-PLT-005, ADR-0029). Resumable: each run continues from the recorded state."""
+    result = offboarding.process_due()
+    deadlines = offboarding.check_deadlines()
+    return {
+        "advanced": result.advanced,
+        "failed": result.failed,
+        "skipped": result.skipped,
+        "due_soon": deadlines["due_soon"],
+        "overdue": deadlines["overdue"],
+        "audit_chains_deleted": offboarding.purge_expired_audit(),
+    }
+
+
+@shared_task(name="offboarding.certify", queue="pdf", acks_late=True, ignore_result=True)
+def certify_offboarding() -> dict[str, int]:
+    """Every 5 minutes on the ``pdf`` queue (Chromium workers): issue certificates of deletion
+    for schools whose keys are destroyed, and set them ``deleted`` (FR-PLT-005)."""
+    result = offboarding.certify_pending()
+    return {"issued": result.advanced, "failed": result.failed, "skipped": result.skipped}
+
+
 # Both deployment modes: the dedicated host's own provisioning queues school-chain copies too.
 _BOTH_MODES: dict[str, dict[str, Any]] = {
     "platform-deliver-tenant-audit": {
@@ -124,6 +150,16 @@ def beat_schedule(settings: Settings | None = None) -> dict[str, dict[str, Any]]
         },
         "fleet-check-staleness": {"task": "fleet.check_staleness", "schedule": 300.0},
         "announcements-publish": {"task": "announcements.publish", "schedule": 60.0},
+        "offboarding-process": {
+            "task": "offboarding.process",
+            "schedule": 600.0,
+            "options": {"queue": "maintenance"},
+        },
+        "offboarding-certify": {
+            "task": "offboarding.certify",
+            "schedule": 300.0,
+            "options": {"queue": "pdf"},
+        },
         "support-purge-closed": {
             "task": "support.purge_closed",
             "schedule": crontab(minute=15, hour=21),  # 02:45 IST

@@ -42,6 +42,13 @@ TENANCY_ALLOWED = frozenset(
         # usage counts (definer core.tenant_usage_summary) and the fan-out over school IDs
         "tenant_usage",
         "list_tenant_ids",
+        # offboard: the deletion job (ADR-0029, ADR-0020 amendment 2026-09-29). Each opens the
+        # school's own tenant_session inside tenancy and returns counts and codes only.
+        "tenant_data_inventory",
+        "purge_tenant",
+        "verify_tenant_purged",
+        "destroy_tenant_keys",
+        "purge_expired_audit_chain",
     }
 )
 

@@ -19,15 +19,17 @@ import base64
 import datetime as dt
 import secrets
 import uuid
+from collections.abc import Callable
 from typing import Any
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import RowMapping, and_, func, or_, select
+from sqlalchemy.orm import Session
 
 from app.core.crypto import KeyWrapper
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound
 from app.core.logging import get_logger
-from app.platform import billing, tenant_audit
+from app.platform import billing, offboarding, tenant_audit
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import (
@@ -165,6 +167,10 @@ def get_tenant(tenant_id: uuid.UUID, *, with_counts: bool = True) -> TenantDetai
             )
         ).scalar_one()
         run = repo.get_by(s, m.provisioning_runs, m.provisioning_runs.c.tenant_id == tenant_id)
+        off_run = repo.get_by(s, m.offboarding_runs, m.offboarding_runs.c.tenant_id == tenant_id)
+        cert = repo.get_by(
+            s, m.deletion_certificates, m.deletion_certificates.c.tenant_id == tenant_id
+        )
         overrides = {
             r["key"]: bool(r["enabled"])
             for r in s.execute(
@@ -187,6 +193,7 @@ def get_tenant(tenant_id: uuid.UUID, *, with_counts: bool = True) -> TenantDetai
             "invoices": invoices,
             "flag_overrides": overrides,
             "provisioning": _provisioning_view(run),
+            "offboarding": offboarding.view(off_run, cert, at=now()),
         }
     )
 
@@ -225,6 +232,7 @@ def _set_status(
     reason: str | None,
     extra: dict[str, Any] | None = None,
     require_provisioned: bool = False,
+    after: Callable[[Session, RowMapping], None] | None = None,
 ) -> TenantDetailOut:
     dep0 = _deployment(tenant_id)
     shared = dep0["mode"] == "shared"
@@ -260,6 +268,8 @@ def _set_status(
             {"from": dep["tenant_status"], "to": target, "tier": dep["mode"]},
             tenant_id=tenant_id,
         )
+        if after is not None:  # more rows in the same transaction (the offboarding run)
+            after(s, dep)
         if shared:  # dedicated schools' chains live on their host
             tenant_audit.enqueue(
                 s, tenant_id, actor, action, {"from": dep["tenant_status"], "to": target}
@@ -347,6 +357,7 @@ def approve_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
         raise Conflict("No offboarding request to approve.", code="not_requested")
     if dep0["offboard_requested_by"] == actor.operator_id:
         raise Conflict("A different operator must approve.", code="same_operator")
+    approved_at = now()
     return _set_status(
         actor,
         tenant_id,
@@ -354,7 +365,8 @@ def approve_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
         allowed_from=("active", "suspended"),
         action="tenant.offboard_approved",
         reason="offboarding",
-        extra={"offboard_approved_by": actor.operator_id, "offboard_approved_at": now()},
+        extra={"offboard_approved_by": actor.operator_id, "offboard_approved_at": approved_at},
+        after=lambda s, row: offboarding.create_run(s, row, approved_at),
     )
 
 

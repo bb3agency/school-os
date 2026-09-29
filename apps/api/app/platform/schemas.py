@@ -494,6 +494,95 @@ class ProvisioningOut(Out):
     updated_at: dt.datetime | None
 
 
+# --- offboarding (FR-PLT-005, ADR-0029) --------------------------------------------------------
+
+# A short reference to the school's written confirmation or our delivery record (e.g. a ticket
+# or letter number). Not free text: no personal data (docs/16 §5.5).
+OffboardingReference = Annotated[
+    str,
+    BeforeValidator(_nfc),
+    StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._/#:-]{0,79}$"),
+]
+OffboardingState = Literal[
+    "awaiting_export", "scheduled", "deleting", "keys_destroyed", "completed"
+]
+
+
+class ConfirmExportIn(In):
+    """The school confirmed it has its data export, or we delivered it (runbook R8)."""
+
+    basis: Literal["school_confirmed", "delivered_by_us"]
+    reference: OffboardingReference
+
+
+class ConfirmTeardownIn(In):
+    """Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed
+    (Terraform, docs/16 §13.4); references to those runs."""
+
+    kms_deletion_reference: OffboardingReference
+    host_teardown_reference: OffboardingReference
+
+
+class DeletionCertificateOut(Out):
+    id: uuid.UUID
+    issued_at: dt.datetime
+    template_version: str
+    content_sha256: str
+    pdf_sha256: str
+    size_bytes: int
+
+
+class CertificateDownloadOut(Out):
+    """A presigned GET (at most 5 minutes, attachment) for a certificate of deletion."""
+
+    url: str
+    expires_at: dt.datetime
+    filename: str
+    content_type: Literal["application/pdf"] = "application/pdf"
+    size_bytes: int
+    sha256: str
+
+
+class OffboardingOut(Out):
+    """Progress of a school's offboarding (docs/16 §5.5). Codes, counts and IDs only.
+
+    ``inventory``: rows per category before deletion; ``remaining``: rows per table still found
+    by the last verification (empty when complete). ``overdue``: the 30-day deadline passed
+    before the certificate was issued.
+    """
+
+    tenant_id: uuid.UUID
+    tier: Tier
+    state: OffboardingState
+    approved_at: dt.datetime
+    deadline_at: dt.datetime
+    overdue: bool
+    due_soon: bool
+    export_basis: Literal["school_confirmed", "delivered_by_us"] | None
+    export_reference: str | None
+    export_confirmed_at: dt.datetime | None
+    kms_deletion_reference: str | None
+    host_teardown_reference: str | None
+    teardown_confirmed_at: dt.datetime | None
+    inventory: dict[str, int] | None
+    objects_before: int | None
+    remaining: dict[str, int] | None
+    objects_deleted: int | None
+    profiles_cleared: int | None
+    keys_destroyed: int | None
+    deletion_started_at: dt.datetime | None
+    data_deleted_at: dt.datetime | None
+    keys_destroyed_at: dt.datetime | None
+    completed_at: dt.datetime | None
+    audit_delete_after: dt.datetime | None
+    audit_deleted_at: dt.datetime | None
+    failed_step: Literal["inventory", "purge", "verify", "keys", "certificate", "audit"] | None
+    last_error: str | None
+    attempts: int
+    in_progress: bool
+    certificate: DeletionCertificateOut | None
+
+
 class TenantDetailOut(TenantSummaryOut):
     boards: list[str]
     tenant_status_reason: str | None
@@ -505,6 +594,7 @@ class TenantDetailOut(TenantSummaryOut):
     invoices: list[InvoiceOut]
     flag_overrides: dict[str, bool]
     provisioning: ProvisioningOut | None = None
+    offboarding: OffboardingOut | None = None
 
 
 # --- usage ------------------------------------------------------------------------------------

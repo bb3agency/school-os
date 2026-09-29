@@ -103,3 +103,61 @@ provisioning:
   # One runner at a time holds a run's lease; a crashed runner's lease expires after this and
   # the next retry or resume takes over. Longer than a normal run (KMS + role cloning).
   lease_seconds: 120
+# Offboarding: deletion job, deadline and certificate of deletion (FR-PLT-005; docs/16 §5.5;
+# ADR-0029). No student data anywhere; the certificate names categories and counts only.
+offboarding:
+  deletion_deadline_days: 30    # data deleted within 30 days of the two-person approval
+  due_soon_days: 7              # log platform.offboarding.due_soon this long before the deadline
+  lease_seconds: 900            # one runner per school; a purge of a large school takes minutes
+  # School audit chain kept after deletion, then deleted (product owner 2026-09-29). The
+  # database refuses events younger than 365 days (migration 0032), so never lower than that.
+  audit_chain_retention_days: 366
+  audit_archive_retention_days: 1095  # signed daily archives under S3 Object Lock (docs/05 §13)
+  # Shared tier: the last backup that can still hold the school's data expires this long after
+  # the deletion (monthly snapshot kept 12 months; docs/10 §9). Dedicated hosts are crypto-shredded.
+  shared_backup_max_age_days: 365
+  certificate:
+    template_version: v0
+    # Control-plane prefix of the invoice bucket (never under a school prefix t/<tenant_id>/).
+    object_prefix: platform/deletion-certificates/
+    download_url_ttl_s: 300
+    # English and Telugu labels. The Telugu wording is PENDING REVIEW (docs/16 §19 Q14).
+    telugu_review: pending
+    title:
+      en: Certificate of deletion
+      te: "డేటా తొలగింపు ధృవీకరణ పత్రం"
+    categories:
+      knowledge: {en: "Ask-the-school records", te: "పాఠశాల ప్రశ్నల రికార్డులు"}
+      extraction: {en: "Register photo extraction", te: "రిజిస్టర్ ఫోటో సంగ్రహణ"}
+      dq: {en: "Data-quality checks", te: "డేటా నాణ్యత తనిఖీలు"}
+      changes: {en: "Change requests", te: "మార్పు అభ్యర్థనలు"}
+      students: {en: "Student records", te: "విద్యార్థుల రికార్డులు"}
+      imports: {en: "Spreadsheet imports", te: "స్ప్రెడ్‌షీట్ దిగుమతులు"}
+      documents: {en: "Documents", te: "పత్రాలు"}
+      exports: {en: "Exports", te: "ఎగుమతులు"}
+      notifications: {en: "Notifications", te: "నోటిఫికేషన్లు"}
+      breakglass: {en: "Support access grants", te: "సపోర్ట్ యాక్సెస్ అనుమతులు"}
+      ops: {en: "Background jobs and queues", te: "నేపథ్య పనులు మరియు క్యూలు"}
+      identity: {en: "Staff memberships and roles", te: "సిబ్బంది సభ్యత్వాలు మరియు పాత్రలు"}
+      tenancy: {en: "Academic structure and settings", te: "విద్యా నిర్మాణం మరియు సెట్టింగ్‌లు"}
+      files: {en: "Stored files", te: "నిల్వ చేసిన ఫైళ్లు"}
+      keys: {en: "Encryption keys (crypto-shredded)", te: "ఎన్‌క్రిప్షన్ కీలు (నాశనం చేయబడ్డాయి)"}
+      school_audit_log: {en: "School audit log (IDs and codes only)", te: "పాఠశాల ఆడిట్ లాగ్ (ఐడీలు మరియు కోడ్‌లు మాత్రమే)"}
+      audit_archives: {en: "Signed audit archives (S3 Object Lock)", te: "సంతకం చేసిన ఆడిట్ ఆర్కైవ్‌లు"}
+      billing_records: {en: "Invoices and billing account (business records)", te: "ఇన్‌వాయిస్‌లు మరియు బిల్లింగ్ ఖాతా"}
+      backups: {en: "Database backups", te: "డేటాబేస్ బ్యాకప్‌లు"}
+      dedicated_host: {en: "Dedicated host with all school data, files and backups", te: "పాఠశాల డేటా, ఫైళ్లు మరియు బ్యాకప్‌లతో ప్రత్యేక హోస్ట్"}
+      staff_sign_in_accounts: {en: "Staff sign-in accounts", te: "సిబ్బంది సైన్-ఇన్ ఖాతాలు"}
+    text:
+      intro:
+        en: "SchoolOS confirms that the data of the school named below was deleted from the SchoolOS service after the school left the service."
+        te: "సేవను విడిచిపెట్టిన తర్వాత కింద పేర్కొన్న పాఠశాల డేటా SchoolOS సేవ నుండి తొలగించబడిందని SchoolOS ధృవీకరిస్తుంది."
+      deleted: {en: "Deleted", te: "తొలగించబడింది"}
+      retained: {en: "Kept, then deleted", te: "ఉంచబడింది, తర్వాత తొలగించబడుతుంది"}
+      pending: {en: "Pending", te: "పెండింగ్‌లో ఉంది"}
+      staff_sign_in_pending:
+        en: "Removed by the separate staff account work (identity system); not part of this deletion."
+        te: "ప్రత్యేక సిబ్బంది ఖాతా పని ద్వారా తొలగించబడుతుంది; ఈ తొలగింపులో భాగం కాదు."
+      footer:
+        en: "Counts only. This certificate contains no student or staff personal data."
+        te: "సంఖ్యలు మాత్రమే. ఈ పత్రంలో విద్యార్థుల లేదా సిబ్బంది వ్యక్తిగత డేటా లేదు."

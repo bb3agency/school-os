@@ -2954,6 +2954,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/tenants/{tenant_id}/deletion-certificate/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deletion Certificate Download Url
+         * @description A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English
+         *     and Telugu). ``409 certificate_pending`` until it is issued. Audited as
+         *     ``tenant.deletion_certificate_downloaded``.
+         */
+        get: operations["deletion_certificate_download_url_api_v1_platform_tenants__tenant_id__deletion_certificate_download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/tenants/{tenant_id}/offboarding": {
         parameters: {
             query?: never;
@@ -2961,7 +2983,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Offboarding
+         * @description Offboarding progress (docs/16 §5.5, FR-PLT-005): state, 30-day deadline, counts per
+         *     category before deletion, what verification still finds, keys, certificate. Counts and codes
+         *     only. ``409 not_offboarding`` when offboarding was never approved.
+         */
+        get: operations["get_offboarding_api_v1_platform_tenants__tenant_id__offboarding_get"];
         put?: never;
         /**
          * Request Offboarding
@@ -2988,6 +3016,49 @@ export interface paths {
          * @description Two-person rule step 2: a different operator (409 ``same_operator`` otherwise).
          */
         post: operations["approve_offboarding_api_v1_platform_tenants__tenant_id__offboarding_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/offboarding:confirm-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Offboarding Export
+         * @description The export gate: the school confirmed it has its data export (``school_confirmed``) or we
+         *     delivered it (``delivered_by_us``, runbook R8), with a short reference. The deletion job
+         *     starts only after this (``409 export_already_confirmed`` on a second call).
+         */
+        post: operations["confirm_offboarding_export_api_v1_platform_tenants__tenant_id__offboarding_confirm_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/offboarding:confirm-teardown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Offboarding Teardown
+         * @description Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed
+         *     (Terraform, docs/16 §13.4); the certificate follows. ``409 not_dedicated`` for shared.
+         */
+        post: operations["confirm_offboarding_teardown_api_v1_platform_tenants__tenant_id__offboarding_confirm_teardown_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4513,6 +4584,31 @@ export interface components {
             /** Value */
             value?: string | null;
         };
+        /**
+         * CertificateDownloadOut
+         * @description A presigned GET (at most 5 minutes, attachment) for a certificate of deletion.
+         */
+        CertificateDownloadOut: {
+            /**
+             * Content Type
+             * @default application/pdf
+             * @constant
+             */
+            content_type: "application/pdf";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Url */
+            url: string;
+        };
         /** ChangePlanIn */
         ChangePlanIn: {
             /**
@@ -4735,6 +4831,30 @@ export interface components {
              */
             skip_error_rows: boolean;
         };
+        /**
+         * ConfirmExportIn
+         * @description The school confirmed it has its data export, or we delivered it (runbook R8).
+         */
+        ConfirmExportIn: {
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "school_confirmed" | "delivered_by_us";
+            /** Reference */
+            reference: string;
+        };
+        /**
+         * ConfirmTeardownIn
+         * @description Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed
+         *     (Terraform, docs/16 §13.4); references to those runs.
+         */
+        ConfirmTeardownIn: {
+            /** Host Teardown Reference */
+            host_teardown_reference: string;
+            /** Kms Deletion Reference */
+            kms_deletion_reference: string;
+        };
         /** DashboardOut */
         DashboardOut: {
             /** Ai Spend Mtd Inr */
@@ -4779,6 +4899,27 @@ export interface components {
             trials_ending_14d?: number | null;
             /** Trials Running */
             trials_running?: number | null;
+        };
+        /** DeletionCertificateOut */
+        DeletionCertificateOut: {
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /** Pdf Sha256 */
+            pdf_sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Template Version */
+            template_version: string;
         };
         /** DeploymentOut */
         DeploymentOut: {
@@ -6361,6 +6502,94 @@ export interface components {
             template_key: string;
             /** Title */
             title: string;
+        };
+        /**
+         * OffboardingOut
+         * @description Progress of a school's offboarding (docs/16 §5.5). Codes, counts and IDs only.
+         *
+         *     ``inventory``: rows per category before deletion; ``remaining``: rows per table still found
+         *     by the last verification (empty when complete). ``overdue``: the 30-day deadline passed
+         *     before the certificate was issued.
+         */
+        OffboardingOut: {
+            /**
+             * Approved At
+             * Format: date-time
+             */
+            approved_at: string;
+            /** Attempts */
+            attempts: number;
+            /** Audit Delete After */
+            audit_delete_after: string | null;
+            /** Audit Deleted At */
+            audit_deleted_at: string | null;
+            certificate: components["schemas"]["DeletionCertificateOut"] | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Data Deleted At */
+            data_deleted_at: string | null;
+            /**
+             * Deadline At
+             * Format: date-time
+             */
+            deadline_at: string;
+            /** Deletion Started At */
+            deletion_started_at: string | null;
+            /** Due Soon */
+            due_soon: boolean;
+            /** Export Basis */
+            export_basis: ("school_confirmed" | "delivered_by_us") | null;
+            /** Export Confirmed At */
+            export_confirmed_at: string | null;
+            /** Export Reference */
+            export_reference: string | null;
+            /** Failed Step */
+            failed_step: ("inventory" | "purge" | "verify" | "keys" | "certificate" | "audit") | null;
+            /** Host Teardown Reference */
+            host_teardown_reference: string | null;
+            /** In Progress */
+            in_progress: boolean;
+            /** Inventory */
+            inventory: {
+                [key: string]: number;
+            } | null;
+            /** Keys Destroyed */
+            keys_destroyed: number | null;
+            /** Keys Destroyed At */
+            keys_destroyed_at: string | null;
+            /** Kms Deletion Reference */
+            kms_deletion_reference: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Objects Before */
+            objects_before: number | null;
+            /** Objects Deleted */
+            objects_deleted: number | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Profiles Cleared */
+            profiles_cleared: number | null;
+            /** Remaining */
+            remaining: {
+                [key: string]: number;
+            } | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "awaiting_export" | "scheduled" | "deleting" | "keys_destroyed" | "completed";
+            /** Teardown Confirmed At */
+            teardown_confirmed_at: string | null;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "shared" | "dedicated";
         };
         /** OffboardRequestIn */
         OffboardRequestIn: {
@@ -8265,6 +8494,7 @@ export interface components {
             offboard_approved_at: string | null;
             /** Offboard Requested At */
             offboard_requested_at: string | null;
+            offboarding?: components["schemas"]["OffboardingOut"] | null;
             /** Open Tickets */
             open_tickets: number;
             /** Plan Code */
@@ -14360,6 +14590,68 @@ export interface operations {
             };
         };
     };
+    deletion_certificate_download_url_api_v1_platform_tenants__tenant_id__deletion_certificate_download_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateDownloadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_offboarding_api_v1_platform_tenants__tenant_id__offboarding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffboardingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     request_offboarding_api_v1_platform_tenants__tenant_id__offboarding_post: {
         parameters: {
             query?: never;
@@ -14413,6 +14705,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_offboarding_export_api_v1_platform_tenants__tenant_id__offboarding_confirm_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmExportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffboardingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_offboarding_teardown_api_v1_platform_tenants__tenant_id__offboarding_confirm_teardown_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmTeardownIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffboardingOut"];
                 };
             };
             /** @description Validation Error */

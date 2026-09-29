@@ -36,6 +36,7 @@ from app.platform import (
     flags,
     fleet,
     invoice_files,
+    offboarding,
     operators,
     provisioning,
     support,
@@ -53,7 +54,10 @@ from app.platform.schemas import (
     BillingAccountOut,
     BreakGlassIn,
     BreakGlassOut,
+    CertificateDownloadOut,
     ChangePlanIn,
+    ConfirmExportIn,
+    ConfirmTeardownIn,
     DashboardOut,
     DeploymentOut,
     DeploymentPatch,
@@ -72,6 +76,7 @@ from app.platform.schemas import (
     InvoiceRunIn,
     JobOut,
     MeOut,
+    OffboardingOut,
     OffboardRequestIn,
     OperatorInvite,
     OperatorOut,
@@ -358,6 +363,63 @@ def approve_offboarding(
 ) -> TenantDetailOut:
     """Two-person rule step 2: a different operator (409 ``same_operator`` otherwise)."""
     return tenants.approve_offboarding(_actor(ctx), tenant_id)
+
+
+@router.get("/tenants/{tenant_id}/offboarding", response_model=OffboardingOut)
+def get_offboarding(
+    *,
+    tenant_id: uuid.UUID,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.read"))],
+) -> OffboardingOut:
+    """Offboarding progress (docs/16 §5.5, FR-PLT-005): state, 30-day deadline, counts per
+    category before deletion, what verification still finds, keys, certificate. Counts and codes
+    only. ``409 not_offboarding`` when offboarding was never approved."""
+    del ctx
+    return offboarding.get_offboarding(tenant_id)
+
+
+@router.post("/tenants/{tenant_id}/offboarding:confirm-export", response_model=OffboardingOut)
+def confirm_offboarding_export(
+    *,
+    tenant_id: uuid.UUID,
+    data: ConfirmExportIn,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.offboard"))],
+) -> OffboardingOut:
+    """The export gate: the school confirmed it has its data export (``school_confirmed``) or we
+    delivered it (``delivered_by_us``, runbook R8), with a short reference. The deletion job
+    starts only after this (``409 export_already_confirmed`` on a second call)."""
+    return offboarding.confirm_export(_actor(ctx), tenant_id, data.basis, data.reference)
+
+
+@router.post("/tenants/{tenant_id}/offboarding:confirm-teardown", response_model=OffboardingOut)
+def confirm_offboarding_teardown(
+    *,
+    tenant_id: uuid.UUID,
+    data: ConfirmTeardownIn,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.offboard"))],
+) -> OffboardingOut:
+    """Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed
+    (Terraform, docs/16 §13.4); the certificate follows. ``409 not_dedicated`` for shared."""
+    return offboarding.confirm_teardown(
+        _actor(ctx), tenant_id, data.kms_deletion_reference, data.host_teardown_reference
+    )
+
+
+@router.get(
+    "/tenants/{tenant_id}/deletion-certificate/download-url",
+    response_model=CertificateDownloadOut,
+)
+def deletion_certificate_download_url(
+    *,
+    tenant_id: uuid.UUID,
+    response: Response,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.read"))],
+) -> CertificateDownloadOut:
+    """A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English
+    and Telugu). ``409 certificate_pending`` until it is issued. Audited as
+    ``tenant.deletion_certificate_downloaded``."""
+    response.headers["Cache-Control"] = "no-store"
+    return offboarding.download_url(_actor(ctx), tenant_id)
 
 
 def _range(start: dt.date | None, end: dt.date | None) -> tuple[dt.date, dt.date]:

@@ -28,7 +28,21 @@ from app.platform.tasks import beat_schedule as platform_beat_schedule
 
 # Importing identity.service registers the system-role cloning hook in
 # tenancy.POST_PROVISION_HOOKS so provisioning behaves the same in workers as in the API.
-import app.identity.service  # noqa: F401  isort: skip
+import app.identity.service  # isort: skip
+
+# Offboarding (FR-PLT-005, ADR-0029): every module that owns school data registers its purge with
+# app.tenancy at import; the purge refuses to run unless all of them are registered.
+import app.breakglass.service  # isort: skip
+import app.changes.service  # isort: skip
+import app.documents.service  # isort: skip
+import app.dq.service  # isort: skip
+import app.exports.service  # isort: skip
+import app.extraction.service  # isort: skip
+import app.imports.service  # isort: skip
+import app.knowledge.service  # isort: skip
+import app.notifications.service  # isort: skip
+import app.ops.service  # isort: skip
+import app.students.service  # noqa: F401  isort: skip
 
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
 
@@ -92,6 +106,9 @@ def create_celery() -> Celery:
             "exports.render": {"queue": "pdf"},
             # docs/16 §5.8: invoice PDFs render on the same Chromium workers (ADR-0025).
             "billing.render_invoice_pdfs": {"queue": "pdf"},
+            # FR-PLT-005 (ADR-0029): the deletion job on "maintenance", certificates on "pdf".
+            "offboarding.process": {"queue": "maintenance"},
+            "offboarding.certify": {"queue": "pdf"},
             "exports.purge_expired": {"queue": "maintenance"},
             # docs/06 §4: document ingestion (extract, redact, chunk, embed, index), ACL
             # refresh and chunk removal (outbox consumers of the kb.* events).

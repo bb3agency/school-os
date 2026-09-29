@@ -1550,6 +1550,47 @@
         "title": "CellEditIn",
         "type": "object"
       },
+      "CertificateDownloadOut": {
+        "description": "A presigned GET (at most 5 minutes, attachment) for a certificate of deletion.",
+        "properties": {
+          "content_type": {
+            "const": "application/pdf",
+            "default": "application/pdf",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "filename",
+          "size_bytes",
+          "sha256"
+        ],
+        "title": "CertificateDownloadOut",
+        "type": "object"
+      },
       "ChangePlanIn": {
         "additionalProperties": false,
         "properties": {
@@ -2103,6 +2144,50 @@
         "title": "CommitIn",
         "type": "object"
       },
+      "ConfirmExportIn": {
+        "additionalProperties": false,
+        "description": "The school confirmed it has its data export, or we delivered it (runbook R8).",
+        "properties": {
+          "basis": {
+            "enum": [
+              "school_confirmed",
+              "delivered_by_us"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "basis",
+          "reference"
+        ],
+        "title": "ConfirmExportIn",
+        "type": "object"
+      },
+      "ConfirmTeardownIn": {
+        "additionalProperties": false,
+        "description": "Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed\n(Terraform, docs/16 \u00a713.4); references to those runs.",
+        "properties": {
+          "host_teardown_reference": {
+            "title": "Host Teardown Reference",
+            "type": "string"
+          },
+          "kms_deletion_reference": {
+            "title": "Kms Deletion Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kms_deletion_reference",
+          "host_teardown_reference"
+        ],
+        "title": "ConfirmTeardownIn",
+        "type": "object"
+      },
       "DashboardOut": {
         "properties": {
           "ai_spend_mtd_inr": {
@@ -2296,6 +2381,46 @@
           }
         },
         "title": "DashboardOut",
+        "type": "object"
+      },
+      "DeletionCertificateOut": {
+        "properties": {
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "pdf_sha256": {
+            "title": "Pdf Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "issued_at",
+          "template_version",
+          "content_sha256",
+          "pdf_sha256",
+          "size_bytes"
+        ],
+        "title": "DeletionCertificateOut",
         "type": "object"
       },
       "DeploymentOut": {
@@ -6985,6 +7110,351 @@
           "reason"
         ],
         "title": "OffboardRequestIn",
+        "type": "object"
+      },
+      "OffboardingOut": {
+        "description": "Progress of a school's offboarding (docs/16 \u00a75.5). Codes, counts and IDs only.\n\n``inventory``: rows per category before deletion; ``remaining``: rows per table still found\nby the last verification (empty when complete). ``overdue``: the 30-day deadline passed\nbefore the certificate was issued.",
+        "properties": {
+          "approved_at": {
+            "format": "date-time",
+            "title": "Approved At",
+            "type": "string"
+          },
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "audit_delete_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit Delete After"
+          },
+          "audit_deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit Deleted At"
+          },
+          "certificate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeletionCertificateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "data_deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Deleted At"
+          },
+          "deadline_at": {
+            "format": "date-time",
+            "title": "Deadline At",
+            "type": "string"
+          },
+          "deletion_started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deletion Started At"
+          },
+          "due_soon": {
+            "title": "Due Soon",
+            "type": "boolean"
+          },
+          "export_basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "school_confirmed",
+                  "delivered_by_us"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Basis"
+          },
+          "export_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Confirmed At"
+          },
+          "export_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Reference"
+          },
+          "failed_step": {
+            "anyOf": [
+              {
+                "enum": [
+                  "inventory",
+                  "purge",
+                  "verify",
+                  "keys",
+                  "certificate",
+                  "audit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Step"
+          },
+          "host_teardown_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Teardown Reference"
+          },
+          "in_progress": {
+            "title": "In Progress",
+            "type": "boolean"
+          },
+          "inventory": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory"
+          },
+          "keys_destroyed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keys Destroyed"
+          },
+          "keys_destroyed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keys Destroyed At"
+          },
+          "kms_deletion_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kms Deletion Reference"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "objects_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objects Before"
+          },
+          "objects_deleted": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objects Deleted"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "profiles_cleared": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profiles Cleared"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          },
+          "state": {
+            "enum": [
+              "awaiting_export",
+              "scheduled",
+              "deleting",
+              "keys_destroyed",
+              "completed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "teardown_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Teardown Confirmed At"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "shared",
+              "dedicated"
+            ],
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "tier",
+          "state",
+          "approved_at",
+          "deadline_at",
+          "overdue",
+          "due_soon",
+          "export_basis",
+          "export_reference",
+          "export_confirmed_at",
+          "kms_deletion_reference",
+          "host_teardown_reference",
+          "teardown_confirmed_at",
+          "inventory",
+          "objects_before",
+          "remaining",
+          "objects_deleted",
+          "profiles_cleared",
+          "keys_destroyed",
+          "deletion_started_at",
+          "data_deleted_at",
+          "keys_destroyed_at",
+          "completed_at",
+          "audit_delete_after",
+          "audit_deleted_at",
+          "failed_step",
+          "last_error",
+          "attempts",
+          "in_progress",
+          "certificate"
+        ],
+        "title": "OffboardingOut",
         "type": "object"
       },
       "OperatorInvite": {
@@ -12385,6 +12855,16 @@
               }
             ],
             "title": "Offboard Requested At"
+          },
+          "offboarding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffboardingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "open_tickets": {
             "title": "Open Tickets",
@@ -23792,7 +24272,93 @@
         ]
       }
     },
+    "/api/v1/platform/tenants/{tenant_id}/deletion-certificate/download-url": {
+      "get": {
+        "description": "A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English\nand Telugu). ``409 certificate_pending`` until it is issued. Audited as\n``tenant.deletion_certificate_downloaded``.",
+        "operationId": "deletion_certificate_download_url_api_v1_platform_tenants__tenant_id__deletion_certificate_download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateDownloadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deletion Certificate Download Url",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/v1/platform/tenants/{tenant_id}/offboarding": {
+      "get": {
+        "description": "Offboarding progress (docs/16 \u00a75.5, FR-PLT-005): state, 30-day deadline, counts per\ncategory before deletion, what verification still finds, keys, certificate. Counts and codes\nonly. ``409 not_offboarding`` when offboarding was never approved.",
+        "operationId": "get_offboarding_api_v1_platform_tenants__tenant_id__offboarding_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OffboardingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Offboarding",
+        "tags": [
+          "platform"
+        ]
+      },
       "post": {
         "description": "Two-person rule step 1 (SEC-029).",
         "operationId": "request_offboarding_api_v1_platform_tenants__tenant_id__offboarding_post",
@@ -23885,6 +24451,114 @@
           }
         },
         "summary": "Approve Offboarding",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/offboarding:confirm-export": {
+      "post": {
+        "description": "The export gate: the school confirmed it has its data export (``school_confirmed``) or we\ndelivered it (``delivered_by_us``, runbook R8), with a short reference. The deletion job\nstarts only after this (``409 export_already_confirmed`` on a second call).",
+        "operationId": "confirm_offboarding_export_api_v1_platform_tenants__tenant_id__offboarding_confirm_export_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OffboardingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Offboarding Export",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/offboarding:confirm-teardown": {
+      "post": {
+        "description": "Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed\n(Terraform, docs/16 \u00a713.4); the certificate follows. ``409 not_dedicated`` for shared.",
+        "operationId": "confirm_offboarding_teardown_api_v1_platform_tenants__tenant_id__offboarding_confirm_teardown_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTeardownIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OffboardingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Offboarding Teardown",
         "tags": [
           "platform"
         ]
