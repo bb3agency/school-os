@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-29 |
+| Version | 0.4 · 2026-09-29 |
 | Laws/regimes | DPDP Act 2023 + DPDP Rules 2025 · IT Act 2000 / CERT-In Directions (Apr 2022) · UIDAI Aadhaar rules |
 | Related | 05-Data model §8–13, 07-Security, 11-Operations §7 (incident response), 16-Platform admin panel, ADR-0015, ADR-0016 |
-| Changes | 0.3: circulars and parent notices privacy rules (§8). 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
+| Changes | 0.4: student insights (M5) purpose limits as built (§4), fixed retention for notes and closed flags (§7), DPIA inputs (§10), records of processing (§11). 0.3: circulars and parent notices privacy rules (§8). 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
 
 > **Not legal advice.** This document records engineering and product commitments based on public sources checked in September 2026. Have a qualified lawyer review the DPA, notices and incident process before handling real data.
 
@@ -60,6 +60,17 @@ The DPDP Rules' Fourth Schedule (Part A) exempts **educational institutions** fr
 | PRV-005 | No automated decisions with significant effects on a child; every flag requires a human to act. |
 | PRV-006 | Where the school chooses consent (e.g., optional features), SchoolOS records who consented, when, for what, and supports withdrawal. |
 
+**Student insights as built (M5; 05 §5.8, FR-EW-001..018).** How PRV-003..005 are applied, with the most restrictive choice where the rules above do not decide (open points are listed in 14 · M5 status):
+
+- **Who sees them (PRV-004).** Behaviour notes, flags, their action logs, indicators and the student timeline are shown only to a member who holds both `insights.read` and `student.read_sensitive` and whose scopes both reach the student's **current-year section**: in the default roles, the class teacher of that section and the principal. Anyone else gets 404 (not 403), so the page does not reveal that a flag exists. The owner (management) no longer has `insights.read`; office staff and exam coordinators handle attendance and marks but never see insights; no counsellor role exists yet. The database reporting role `sos_readonly` has no access to the restricted tables.
+- **Fixed rules, never AI, a person always acts (PRV-005).** Flags come only from the published rules in `app/insights/rules.yaml` (consecutive absences, attendance rate, low or falling marks, concern notes). Each flag shows the numbers that raised it, gets an owner and a due date (7 days), and is closed only by a person with a reason. Nothing is decided about a child automatically: no score, grade, label, ranking or prediction is stored or shown, and nothing is sent to parents or students. No AI model reads notes, flags or indicators (an import-linter contract forbids the `insights` module from importing `knowledge`), and they are not in the "Ask the school" corpus.
+- **Purpose (PRV-003).** Every insights screen says it is for the student's learning and safety only. There is no route that exports or downloads insights (the only exception is the school's own full data export, where note and action text and flag evidence stay masked unless the owner explicitly includes restricted data). There is no cross-school view or aggregate anywhere; the principal's counts are for their own school and scope.
+- **Minimisation.** Notes are short (500 characters), dated, in three categories, and written as observations; action notes are optional (1000 characters). Both are encrypted with the school's key, never logged, never in notifications (which carry IDs and codes only) and never in audit events (which record IDs, codes, counts and reasons). Full Aadhaar numbers are refused in notes, action notes and uploaded sheets.
+- **Accountability.** Every read of a flag, a flag list, notes or a timeline is audited (`insights.viewed`: which view and how many items), as is every write, reassignment, rule change and erasure.
+- **Correction and erasure.** The principal can erase a note or a flag with its log on a parent's request or when entered in error (reason code recorded, text not kept). Attendance and marks are corrected in place with an audit record.
+- **Retention.** Notes are deleted 365 days after their date and closed flags with their logs 365 days after closing; open flags stay until closed. These periods are fixed (not configurable by the school) pending PO and legal review. Attendance and marks are school records kept like other official records.
+- **Uploaded sheets.** An attendance or marks sheet is deleted as soon as it has been read into a preview; nothing is saved until a person confirms.
+
 **Exports (ADR-0021).** Board and portal pre-checks and student lists copy children's personal data out of the system in bulk, so creating any export needs a fresh MFA sign-in. Restricted values such as the UDISE+ social `category` are included only when a member allowed to see them explicitly asks (`include_sensitive`), and the audit log records which restricted columns were included (never the values). Only the requester, and members the school has given `export.download_any` (the owner by default; always with a fresh MFA sign-in), can download an export's files; every download is audited, including whether it was someone else's export. Files are deleted 7 days after they are ready (05 §13).
 
 ## 5. Aadhaar handling
@@ -89,7 +100,7 @@ The April 2022 CERT-In directions apply to service providers and body corporates
 
 See 05-Data model §13. Principles: keep official school records per the school's legal obligations; delete working data (imports, exports, AI query logs) quickly; keep security and audit logs at least 1 year (in India); support **legal holds** that suspend deletion for specific records when the school instructs.
 
-**Retention settings (FR-ADM-002, as built):** the owner or principal may shorten the retention of working data (raw import files 7–90 days, export files 1–7, read notifications 30–90) on the Data retention screen; SchoolOS never keeps working data longer than the defaults, and audit/security logs (≥ 13 months) and the full-export archive (24 hours) are fixed. Every change is audited (`admin.retention.updated`). Official student records and uploaded documents are never deleted automatically. The minimums are engineering choices pending legal review.
+**Retention settings (FR-ADM-002, as built):** the owner or principal may shorten the retention of working data (raw import files 7–90 days, export files 1–7, read notifications 30–90) on the Data retention screen; SchoolOS never keeps working data longer than the defaults, and audit/security logs (≥ 13 months) and the full-export archive (24 hours) are fixed. Every change is audited (`admin.retention.updated`). Behaviour notes (365 days after their date) and closed early-warning flags (365 days after closing) are fixed categories shown on the same screen (M5, §4). Official student records and uploaded documents are never deleted automatically. The minimums are engineering choices pending legal review.
 
 **Full data export (FR-ADM-001, as built):** the owner (`tenant.export_all`, fresh MFA sign-in) exports every record table as CSV and JSON, every document that passed the virus scan and the audit log as CSV in one archive, downloadable for 24 hours. Restricted (C3) values are masked unless the owner explicitly includes them (needs `student.read_sensitive`; the audit event lists the restricted fields included); the Aadhaar-as-printed name, date of birth and gender are never exported and full Aadhaar numbers are never stored. This is the export the school takes before offboarding, and it stays available while a school is suspended (16 §5.5).
 
@@ -129,6 +140,19 @@ How it works (built; ADR-0029, docs/16 §5.5.1; decisions of 2026-09-29):
 
 Describe processing → necessity and proportionality → risks to children and parents (exposure, misidentification, over-monitoring, AI error) → controls (07/08) → residual risk and sign-off. Required refresh when adding M5 insights or any new sub-processor.
 
+**DPIA inputs for M5 (student timeline and early warning), from the build:**
+
+| Topic | What SchoolOS does (as built) | For the school to decide or confirm |
+|---|---|---|
+| Data | Daily attendance status, exam marks per subject, behaviour notes (category, date, ≤ 500 characters), flags (rule, numbers seen, owner, due date, status) and action logs | Whether behaviour notes are needed at all, and what staff may write |
+| Purpose and legal basis | Educational activities and child safety only (DPDP Rules, Fourth Schedule Part A); no consent flow | Confirm the exemption applies to its use; legal review |
+| Who sees what | Class teacher of the current section and principal only; others 404; owner excluded | Whether a counsellor or vice-principal role should see insights |
+| Automated processing | Fixed, published rules; thresholds within bounds; no AI; every flag needs a person | The thresholds (defaults: 3 absences in a row, attendance below 75 %, marks below 35 % or a fall of 15 points, 3 concern notes in 30 days) |
+| Over-monitoring risk | No scores or labels; counts only for management; no cross-school analytics; no parent/student-facing output | How flags are discussed with parents |
+| Security | C3 encryption with the school key, audit of every read and write, no logs of text, RLS and scoped access | — |
+| Retention | Notes 365 days; closed flags 365 days after closing; attendance and marks as school records | The periods (fixed today) |
+| Rights | Erasure by the principal (parent request, error); correction of records in place; the full data export includes insights (masked by default) | How parents ask, and who answers |
+
 ## 11. Records of processing (summary)
 
 | Activity | Data categories | Purpose | Basis (school decides) | Retention |
@@ -137,6 +161,8 @@ Describe processing → necessity and proportionality → risks to children and 
 | Data-quality checks | Identity fields per source | Accuracy of official records | As above | With records |
 | Documents & knowledge base | Circulars, minutes, scans | Administration, institutional memory | As above | School policy |
 | Ask the school | Questions, retrieved excerpts | Staff productivity | As above | Encrypted Q/A 180 days |
+| Attendance and marks (M5) | Daily attendance status, exam marks (C2) | Education; statutory attendance follow-up | Legal obligation / educational activities | School records |
+| Student insights (M5) | Behaviour notes, early-warning flags and action logs (C3) | Educational support and child safety only (§4) | Educational-institution exemption, within its conditions | Notes 365 days; closed flags 365 days after closing |
 | Audit & security logs | User actions, IP hashes | Security, accountability | Legal obligation (DPDP/CERT-In) | ≥ 13 months online |
 | Support tickets (school-opened) | Staff user ID, ticket text (student data not allowed; redacted) | Support | Legitimate use (contract) | 1 year after closing |
 | Fleet heartbeat (dedicated tier) | Versions, health, aggregate counts; no personal data | Operating the service | Not personal data | Last payload + daily counts |

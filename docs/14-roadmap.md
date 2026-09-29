@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.7 · 2026-09-29 |
+| Version | 0.8 · 2026-09-29 |
 | Approach | Module by module on a shared core; real school needs decide order after M1; no calendar commitments |
 | Related | 01-BRD §7, §11, 02-PRD §3, 03-TRD, 12-Testing strategy, 16-Platform admin panel |
-| Changes | 0.7: M4 status (circulars, tasks, parent notices built on the M4 branch; PO questions). 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
+| Changes | 0.8: M5 status (attendance, marks, early-warning flags, notes and timeline built on the M5 branch; PO questions). 0.7: M4 status (circulars, tasks, parent notices built on the M4 branch; PO questions). 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
 
 ---
 
@@ -220,6 +220,40 @@ Not done: a live-model eval of `circular_reading` and `parent_notice` (the offli
 ### M5 · Student timeline and early warning
 **Scope:** attendance and marks import · per-student timeline · ABC indicators (attendance, behaviour notes, course performance) · flags with assigned owner and intervention log · purpose limits (08 §4) · AP three-consecutive-absence follow-up support.
 **Exit:** pilot with class teachers; ≥ 90% of flags actioned within 7 days; DPIA updated.
+
+### M5 status (2026-09-29)
+
+Built on the M5 branch (not yet merged; migration `0035_student_insights` has `down_revision = "0034_circulars"` and must be relinked with M6's `0036` before merge). Stories US-1701..US-1709 and FR-ATT-001..005, FR-MRK-001..005, FR-EW-001..018 are written in 02-PRD C17 and 03-TRD §3.15, each *proposed from the roadmap scope; PO to confirm*.
+
+| Area | State | Where | Open |
+|---|---|---|---|
+| Attendance (mark, month register, sheet import) | **Done** | `app/academics`, `/attendance`; sheet deleted once read; A4 landscape register | Checking the register layout against the paper register at the design partner |
+| Exams and marks (entry, grid, sheet import) | **Done** | `app/academics`, `/marks`; overall % per exam (absent papers left out) | Grading scales and CCE/FA/SA structure (not modelled) |
+| ABC indicators and rules | **Done** | `app/insights/engine.py` (pure), `rules.yaml` v1; daily beat and after each write | Thresholds and bounds (PO) |
+| AP three-consecutive-absence follow-up | **Done** | Rule `attendance_streak` (cannot be switched off), flag to the class teacher, due in 7 days, overdue reminder | The official definition (does a leave day end the run? holidays?) |
+| Flags, owners, intervention log | **Done** | `/flags`, `/flags/[id]`: my flags and the school view, actions, close, reassign, erase | — |
+| Behaviour notes and the student timeline | **Done** | Timeline tab on the student profile (class teacher and principal only), A4 print | — |
+| Purpose limits (08 §4) | **Done** | Scope intersection, no export route, no AI (import-linter), audited reads, fixed retention, `sos_readonly` revoked | Legal review of the education exemption |
+| Exit metric (≥ 90 % of flags actioned within 7 days) | **Measurable** | `GET /insights/summary` (`actioned_on_time` / `raised`) and the flags screen | The pilot itself |
+| DPIA | **Inputs written** | 08 §10 (M5 table) | The school's DPIA and sign-off |
+| e2e | **Listed, not run here** | `e2e/support/responsive.ts` and stand-in data for the four pages | Run in CI (no Playwright browsers in this environment) |
+
+Release notes: after `0035_student_insights`, run `python -m app.identity.sync_system_roles --apply` (new grants) and `--prune` (the owner loses `insights.read`, PRV-004). The system-role fingerprint changed.
+
+Not done: attendance by period (one status per day only); a school calendar (a school day is a day with at least one mark in the section); parent-facing messages about flags (by design none are sent); a counsellor role; Telugu register codes in sheets (only P/A/L/LV and the English words are read; the Telugu codes used on paper were not verified); every human exit criterion.
+
+**Questions for the PO** (the most restrictive behaviour is built meanwhile):
+1. Confirm US-1701..US-1709 and the FR-ATT/FR-MRK/FR-EW requirements (all proposed from the roadmap scope).
+2. The owner (management) no longer sees insights, only a principal and the class teacher of the student's current section do (PRV-004). Should management see counts only, and should a counsellor or vice-principal role be added?
+3. Insights need `student.read_sensitive` as well as `insights.read`, both reaching the student's current section (the default class teacher and principal roles have both); a custom role with only `insights.read` sees nothing, and a student not placed in a section this year has no visible insights. Confirm, with the default role grants in 07 §6.2.
+4. Default thresholds and bounds: 3 absences in a row (2–5), attendance below 75 % over 30 marked days (60–90), marks below 35 % (25–50), a fall of 15 points (10–30), 3 concern notes in 30 days (2–5); due in 7 days. Confirm, and confirm that the AP rule cannot be switched off.
+5. The AP follow-up definition: consecutive **marked** school days; a leave, late or present day ends the run. Confirm against the department's circular.
+6. FR-MRK-005: absent papers are left out of the overall percentage (so illness is not read as low performance). The first draft said "absent counts as 0"; confirm.
+7. Retention: behaviour notes 365 days after their date, closed flags 365 days after closing, fixed (not configurable). Confirm the periods and whether schools may shorten them.
+8. Erasure: the principal erases a note or a flag on a parent's request or for an error. Who handles a parent's request, and should the parent be told?
+9. Behaviour notes can be dated up to 60 days back; action notes are optional. Confirm.
+10. Which Telugu attendance codes appear on the paper registers (to accept them in sheets)?
+11. Should exam coordinators see the course-performance flags of students (they record marks but do not see insights today)?
 
 ### M6 · Tally read connector
 **Scope:** edge agent (Windows service) reading TallyPrime via XML over HTTP on localhost · configured ledgers only · sync to SchoolOS · `get_fee_dues` tool for accountant/management.

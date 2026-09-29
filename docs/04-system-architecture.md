@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 · 2026-09-26 |
+| Version | 0.4 · 2026-09-29 |
 | Style | Modular monolith + async workers, multi-tenant (pool model with RLS); managed SaaS in a shared tier and a dedicated tier |
 | Related | ADR-0001..0017, 05-Data model, 06-RAG, 07-Security, 10-Infrastructure, 16-Platform admin panel |
-| Changes | 0.3: `platform` dependencies as built (§4); tenancy provisioning functions; local stack table matches `docker-compose.yml` (§17). 0.2: deployment tiers and control plane (§16), local and CI stack (§17), `platform` module (§4), `set_config` tenant context (§5), Valkey replaces Redis (§3, §10, §12, §14), dedicated tier replaces the silo escape hatch (§9), flags moved to `platform.feature_flags` (§13), ADR index (§15). 0.1: baseline |
+| Changes | 0.4: modules `academics` and `insights` (M5) and their scheduled jobs. 0.3: `platform` dependencies as built (§4); tenancy provisioning functions; local stack table matches `docker-compose.yml` (§17). 0.2: deployment tiers and control plane (§16), local and CI stack (§17), `platform` module (§4), `set_config` tenant context (§5), Valkey replaces Redis (§3, §10, §12, §14), dedicated tier replaces the silo escape hatch (§9), flags moved to `platform.feature_flags` (§13), ADR index (§15). 0.1: baseline |
 
 ---
 
@@ -94,6 +94,8 @@ flowchart TB
 | `exports` | export profiles, report generation | `generate()` | students, dq |
 | `certificates` | certificate requests, serial numbers, TC/certificate registers, print views, certificate PDFs (M3; 05 §5.7) | `request_certificate()`, `approve()`, `render_pdf()`, `export_records()` | students, dq, documents, tenancy, notifications, ops (via service) |
 | `circulars` | circular readings and deadline suggestions (storage and workflow; the AI call is `knowledge`'s), tasks and reminders, parent notices and their PDF/PNG (M4, 05 §6.3) | `on_version_indexed()`, `run_reading()`, `confirm_suggestion()`, `create_task()`, `send_reminders()`, `create_notice()`, `render_notice()` | core, authz, audit, identity, tenancy, documents, knowledge, notifications, ops (via service) |
+| `academics` | attendance marks, exams and marks per subject, register/marks sheet previews (M5; 05 §5.8) | `record_attendance()`, `attendance_month()`, `record_marks()`, `attendance_history()`, `exam_results()` | core, authz, audit, students, tenancy, documents, ops (via service); never `insights` |
+| `insights` | early-warning rules engine (pure, no AI), flags, owners and action log, behaviour notes (C3), student timeline, reminders, retention (M5; 05 §5.8, 08 §4) | `evaluate()`, `list_flags()`, `add_action()`, `close_flag()`, `timeline()`, `purge_expired()` | core, authz, audit, students, tenancy, academics, certificates (timeline only), identity, notifications, ops (via service); never `knowledge` (import-linter) |
 | `notifications` | in-app notifications, templates; email (provider interface: fake, Amazon SES) | `notify()`, `request_email()` | core, identity, tenancy, ops (via service) |
 | `admin` | tenant admin, retention, full export | `export_tenant()` | all services (read) |
 | `ops` | job runs, outbox, idempotency keys, break-glass grants (tenant-side) | `grant_break_glass()`, `claim_outbox()` | tenancy, audit |
@@ -133,7 +135,7 @@ Signed-out browsers: every school console page needs a staff session and sends a
 - **Task contract:** every tenant task receives `tenant_id`, `actor_user_id`, `idempotency_key`, `correlation_id`; opens its own `tenant_session()`; is **idempotent** (safe to retry); records progress in `ops.job_runs` (`tenant_id NOT NULL`). Platform tasks (invoice runs, usage collection, fleet checks) use `platform_session()` and record progress in `platform.job_runs`.
 - **Retries:** exponential backoff with jitter, max 5; poison messages go to a dead-letter queue with an alert.
 - **Fairness:** per-tenant concurrency caps (Valkey semaphore) so one school's bulk upload cannot starve others.
-- **Scheduling:** Celery beat for audit verification (daily), retention purges (daily), budget resets (monthly), stale verified-answer review (daily).
+- **Scheduling:** Celery beat for audit verification (daily), retention purges (daily), budget resets (monthly), stale verified-answer review (daily). M5 adds the daily early-warning evaluation, overdue-flag reminders and the notes/closed-flags purge (queue `maintenance`, `insights.*` beat entries in `sos_worker.celery_app`).
 
 ## 7. Key flows
 
