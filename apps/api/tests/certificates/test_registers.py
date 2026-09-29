@@ -106,6 +106,24 @@ def test_FR_REG_003_admission_and_withdrawal_register(school: Any) -> None:
     del staying
 
 
+def test_FR_REG_003_admission_numbers_sort_naturally_on_every_number() -> None:
+    """Admission numbers that carry a year (``2024/15``) sort by year first, then by number:
+    every run of digits is compared as a number, not only the last one."""
+    given = ["2025/3", "2024/15", "", "2024/2", "2025/10", "A/9", "A/10", "2024/100", "B/1"]
+    ordered = sorted(given, key=certificates._admission_sort_key)
+    assert ordered == [
+        "2024/2",
+        "2024/15",
+        "2024/100",
+        "2025/3",
+        "2025/10",
+        "A/9",
+        "A/10",
+        "B/1",
+        "",
+    ]
+
+
 def test_FR_REG_004_register_rows_are_limited(school: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     C.issue(school, C.student(school), "study")
     C.issue(school, C.student(school), "study")

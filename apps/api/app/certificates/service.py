@@ -1601,11 +1601,20 @@ def register_page(
     return templates.render_register(page)
 
 
-def _admission_sort_key(value: str | None) -> tuple[int, str, int]:
-    """Admission numbers in natural order (``A/9`` before ``A/10``)."""
+AdmissionKey = tuple[int, tuple[tuple[int, int, str], ...]]
+
+
+def _admission_sort_key(value: str | None) -> AdmissionKey:
+    """Admission numbers in natural order (``A/9`` before ``A/10``, ``2024/15`` before
+    ``2025/3``): every run of digits compares as a number, the text between runs as text;
+    an empty number sorts last."""
     text = value or ""
-    digits = re.findall(r"\d+", text)
-    return (0 if text else 1, re.sub(r"\d+", "", text), int(digits[-1]) if digits else 0)
+    parts = tuple(
+        (0, int(part), "") if part.isdecimal() else (1, 0, part)
+        for part in re.split(r"(\d+)", text)
+        if part
+    )
+    return (0 if text else 1, parts)
 
 
 def admission_register_page(
@@ -1636,7 +1645,7 @@ def admission_register_page(
         en, _ = structure.class_labels(enrolment.section_id)
         return f"{en} ({structure.year_label(enrolment.academic_year_id)})"
 
-    def order(sid: uuid.UUID) -> tuple[tuple[int, str, int], str]:
+    def order(sid: uuid.UUID) -> tuple[AdmissionKey, str]:
         adm = values.get(sid, {}).get("admission_no")
         return (_admission_sort_key(adm.value if adm is not None else None), str(sid))
 
