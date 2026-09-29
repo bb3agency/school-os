@@ -52,6 +52,7 @@ schoolos/
 - Small (aim < 400 changed lines excluding generated files), one story or fix per PR.
 - Description: what/why, requirement IDs, screenshots for UI (synthetic data), risk and rollback notes, `make check` summary.
 - Template: `.github/pull_request_template.md` (security/privacy checklist included).
+- **Merge gate:** the single required check `ci-ok` (`.github/workflows/ci.yml`) needs `lint`, `typecheck`, `test (test-api)`, `test (test-web)`, `e2e (1/2)` and `e2e (2/2)` (the whole Playwright suite with the stand-in IdP and canned API: journeys, axe, keyboard, responsive layout; docs/12 §9), `migrations`, `authz-suite`, `security`, `ci-config`, `terraform` and `images`. `make check` does not build the web app, so for UI changes also run `npm run build -w @schoolos/web` and `E2E_STAND_IN=1 make e2e` locally (Valkey at `REDIS_URL`; apps/web/README.md).
 - **Review rules:** even as a solo developer, every PR gets a structured self-review against the checklist plus an independent AI review pass (fresh session, reviewer instructions, no write access). Changes to `core/`, `authz/` (incl. `permissions.yaml`, `roles.yaml`), `audit/`, `platform/` (incl. `roles.yaml`, `billing.yaml`), `knowledge/gateway/`, migrations, `tests/security/rls_allowlist.yaml`, crypto, `infra/` (incl. `infra/db/`) and `deploy/dedicated/` require the full security checklist and a second review sitting on a different day.
 
 ## 4. Python standards (API/workers)

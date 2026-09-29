@@ -160,8 +160,8 @@ Every screen must work at **1366×768** (office PC, the design baseline) and **3
 in English and Telugu: no horizontal page scroll, nothing past the screen or its card edge, no
 clipped text, touch targets of at least 24×24 px (WCAG 2.5.8; inline links in a sentence and
 well-spaced small targets are the exceptions). `e2e/responsive.spec.ts` checks all of it for
-every screen (`make e2e` with `E2E_STAND_IN=1`); `e2e/audit/responsive.audit.ts` sweeps ten
-viewports with screenshots.
+every screen (`make e2e` with `E2E_STAND_IN=1`, on every pull request); `e2e/audit/responsive.audit.ts`
+sweeps ten viewports with screenshots (`make e2e-audit`, nightly).
 
 - **Spacing scale** (`globals.css`): `--page-gutter` 16px on phones, 24px from md, 32px from lg
   (utility `px-page`, outside the consoles); `--shell-gutter` 16/24px (`shell-gutter`, inside
