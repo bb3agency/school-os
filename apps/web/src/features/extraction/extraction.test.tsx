@@ -18,7 +18,7 @@ import {
 } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { afterActionOf } from "./after";
-import { BatchView } from "./BatchScreen";
+import { BatchView, lowestConfidence } from "./BatchScreen";
 import {
   ItemReviewView,
   NextItemScreen,
@@ -234,6 +234,25 @@ describe("US-402 AC4 / PRV-016: a batch", () => {
     const query = stub.callsTo("GET /bff/api/v1/extraction-items")[0]?.url.searchParams;
     expect(query?.get("batch_id")).toBe(ID.batch);
     expect(query?.get("status")).toBe("pending_review");
+  });
+
+  it("NFR-A11Y-001: queue cards show the lowest certainty only when the reader gave one", async () => {
+    const unsure = extractionItem();
+    const plain = {
+      ...extractionItem({ id: ID.page2, row_index: 1, low_confidence: false }),
+      low_confidence_fields: [],
+      fields: { full_name: { ...unsure.fields.full_name!, confidence: null } },
+    };
+    stub.routes["GET /bff/api/v1/extraction-items"] = () => page([unsure, plain]);
+    renderWithIntl(<BatchView batch={ready(extractionBatch())} permissions={perms} />);
+    const queue = await screen.findByRole("list", { name: xm.queue.title });
+    expect(within(queue).getAllByRole("listitem")).toHaveLength(2);
+    const rings = within(queue).getAllByRole("progressbar");
+    expect(rings).toHaveLength(1);
+    expect(rings[0]).toHaveAttribute("aria-valuenow", "41");
+    expect(lowestConfidence(plain)).toBeNull();
+    // Masked values stay masked on the cards too (the API sends only the masked text).
+    expect(within(queue).queryByText(/\d{12}/)).toBeNull();
   });
 
   it("announces that pages are still being read", () => {

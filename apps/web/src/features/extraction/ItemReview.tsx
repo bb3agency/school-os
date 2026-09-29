@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
@@ -31,6 +32,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { useDateInput } from "@/lib/date-format";
+import { formatDateTime } from "@/lib/format";
 import { useApiForm } from "@/lib/forms";
 import type { Loadable } from "@/lib/loadable";
 import type { AfterAction } from "./after";
@@ -131,7 +133,7 @@ function PageImage({
   return (
     <figure className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2" data-print="hide">
-        <figcaption className="text-sm font-semibold">
+        <figcaption className="text-sm font-medium text-ink">
           {t("caption", { page: seq, row: item.row_index + 1 })}
         </figcaption>
         <Button
@@ -148,7 +150,7 @@ function PageImage({
         role="region"
         aria-label={t("scrollLabel")}
         tabIndex={0}
-        className="max-h-[70vh] overflow-auto rounded-md border border-border bg-surface-muted"
+        className="max-h-[70vh] overflow-auto rounded-lg border border-border bg-surface-muted"
       >
         <div className={cn("relative", large ? "w-[200%]" : "w-full")}>
           <PhotoImg src={item.image.url} alt={t("alt", { page: seq })} onBroken={onBroken} />
@@ -277,6 +279,9 @@ function ConfirmForm({
   );
   const schema = useMemo(() => confirmSchema(editable), [editable]);
   const withheld = item.image_unavailable === "withheld_sensitive_number";
+  const choice =
+    "flex cursor-pointer items-start gap-3 rounded-lg border border-border-soft p-3 text-sm " +
+    "has-[:checked]:border-primary has-[:checked]:bg-primary-soft";
 
   const form = useApiForm({
     schema,
@@ -307,7 +312,7 @@ function ConfirmForm({
   return (
     <form noValidate onSubmit={form.onSubmit} className="space-y-5">
       <fieldset className="space-y-4">
-        <legend className="mb-1 text-lg font-semibold">{t("valuesLegend")}</legend>
+        <legend className="mb-1 text-lg font-medium text-ink">{t("valuesLegend")}</legend>
         <p className="text-sm text-ink-muted">{t("valuesHint")}</p>
         {keys.map((key) => {
           const field = item.fields[key];
@@ -330,14 +335,20 @@ function ConfirmForm({
             .filter(Boolean)
             .join(" ");
           const wrapper = cn(
-            low && "rounded-md border-l-4 border-warning-border bg-warning-soft/40 p-2",
+            "flex items-start gap-3",
+            low && "rounded-lg border border-warning-border bg-warning-soft p-3",
           );
           if (field?.masked) {
             return (
               <div key={key} className={wrapper}>
-                <p className="text-sm font-semibold">{fieldLabel}</p>
-                <p className="font-mono">{field.value}</p>
-                <p className="text-sm text-ink-muted">{t("maskedHint")}</p>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-sm font-medium text-ink">{fieldLabel}</p>
+                  <p className="inline-flex items-center gap-2 rounded-md bg-surface-muted px-3 py-2 font-mono text-ink">
+                    <Icon name="lock" className="size-4 text-ink-muted" />
+                    {field.value}
+                  </p>
+                  <p className="text-sm text-ink-muted">{t("maskedHint")}</p>
+                </div>
               </div>
             );
           }
@@ -346,6 +357,7 @@ function ConfirmForm({
             return (
               <div key={key} className={wrapper}>
                 <SelectField
+                  className="min-w-0 flex-1"
                   name="gender"
                   label={fieldLabel}
                   hint={
@@ -364,28 +376,30 @@ function ConfirmForm({
           }
           return (
             <div key={key} className={wrapper}>
-              <GuardedTextField
-                name={key}
-                label={fieldLabel}
-                hint={hint || undefined}
-                defaultValue={formValueOf(key, field)}
-                error={fieldError(key)}
-                maxLength={200}
-                autoComplete="off"
-                spellCheck={false}
-                inputMode={DATE_FIELDS.has(key) ? "numeric" : undefined}
-                placeholder={DATE_FIELDS.has(key) ? dates.placeholder : undefined}
-                onFocus={() => onFocusField(key)}
-                onBlur={() => onFocusField(null)}
-              />
+              <div className="min-w-0 flex-1">
+                <GuardedTextField
+                  name={key}
+                  label={fieldLabel}
+                  hint={hint || undefined}
+                  defaultValue={formValueOf(key, field)}
+                  error={fieldError(key)}
+                  maxLength={200}
+                  autoComplete="off"
+                  spellCheck={false}
+                  inputMode={DATE_FIELDS.has(key) ? "numeric" : undefined}
+                  placeholder={DATE_FIELDS.has(key) ? dates.placeholder : undefined}
+                  onFocus={() => onFocusField(key)}
+                  onBlur={() => onFocusField(null)}
+                />
+              </div>
             </div>
           );
         })}
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="mb-1 text-lg font-semibold">{t("studentLegend")}</legend>
-        <label className="flex items-start gap-2 text-sm">
+        <legend className="mb-1 text-lg font-medium text-ink">{t("studentLegend")}</legend>
+        <label className={choice}>
           <input
             type="radio"
             name="student_id"
@@ -397,7 +411,7 @@ function ConfirmForm({
           <span>{t("createNew")}</span>
         </label>
         {item.possible_matches.map((match) => (
-          <label key={match.id} className="flex items-start gap-2 text-sm">
+          <label key={match.id} className={choice}>
             <input
               type="radio"
               name="student_id"
@@ -546,7 +560,10 @@ function Reviewed({ item }: { item: ExtractionItemDetail }) {
           <>
             <dt className="text-ink-muted">{t("student")}</dt>
             <dd>
-              <Link href={`/students/${item.student_id}`} className="text-primary underline">
+              <Link
+                href={`/students/${item.student_id}`}
+                className="text-primary underline underline-offset-4"
+              >
                 {item.created_student ? t("openCreated") : t("openStudent")}
               </Link>
             </dd>
@@ -590,14 +607,24 @@ export function ItemReviewView({
   onImageBroken,
 }: ItemReviewViewProps) {
   const t = useTranslations("extraction.review");
+  const tb = useTranslations("extraction.batch");
+  const tl = useTranslations("extraction.list");
+  const tn = useTranslations("school.nav");
   const tc = useTranslations("common");
   const index = useAttributeIndex(attributes);
   const [focused, setFocused] = useState<string | null>(null);
+  const crumbs = [
+    { label: tn("home"), href: "/" },
+    { label: tl("title"), href: "/register-photos" },
+  ];
 
   if (item.status !== "ready") {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("loadingTitle")} />
+        <PageHeader
+          title={t("loadingTitle")}
+          breadcrumb={[...crumbs, { label: t("loadingTitle") }]}
+        />
         <LoadGate state={item} />
       </div>
     );
@@ -610,18 +637,24 @@ export function ItemReviewView({
   const canDecide = permissions.has(PERM.importCommit);
   const withheld = data.image_unavailable === "withheld_sensitive_number";
 
+  const title = t("title", { page: seq, row: data.row_index + 1 });
+  const batchLabel =
+    batch.status === "ready"
+      ? tb("title", { date: formatDateTime(batch.data.created_at) ?? "" })
+      : t("backToBatch");
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={t("title", { page: seq, row: data.row_index + 1 })}
+        title={title}
+        breadcrumb={[
+          ...crumbs,
+          { label: batchLabel, href: `/register-photos/${data.batch_id}` },
+          { label: title },
+        ]}
         badge={<ItemStatusBadge status={data.status} />}
         description={t("description")}
       />
-      <nav aria-label={t("relatedLabel")} data-print="hide">
-        <Link href={`/register-photos/${data.batch_id}`} className="text-sm text-primary underline">
-          {t("backToBatch")}
-        </Link>
-      </nav>
       {after ? (
         <Alert tone="success" live>
           {t(`after.${after}`)}

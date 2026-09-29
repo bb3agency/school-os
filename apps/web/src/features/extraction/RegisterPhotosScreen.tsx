@@ -3,12 +3,13 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
+import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable, type Column } from "@/components/ui/Table";
+import { FileDropZone, fileInputClasses } from "@/features/imports/parts";
 import { extensionOf, uploadDocument, type UploadProgress } from "@/features/imports/upload";
 import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
 import { Pager, useCursorStack } from "@/features/students/paging";
@@ -22,7 +23,6 @@ import {
   MAX_PHOTO_BYTES,
   MAX_PHOTOS,
   PHOTO_EXTENSIONS,
-  batchTone,
   type BatchStatus,
   type ExtractionBatch,
 } from "./types";
@@ -30,9 +30,18 @@ import {
 export const EXTRACTION_KEY = ["staff", "extraction"] as const;
 const ACCEPT = ".jpg,.jpeg,.png,image/jpeg,image/png";
 
+/** Workflow pills: being read = in progress, rows to check = review, all checked = done. */
+const batchPill: Record<BatchStatus, PillVariant> = {
+  queued: "progress",
+  processing: "progress",
+  review: "review",
+  completed: "done",
+  failed: "negative",
+};
+
 export function BatchStatusBadge({ status }: { status: BatchStatus }) {
   const t = useTranslations("extraction.batchStatus");
-  return <Badge tone={batchTone[status]}>{t(status)}</Badge>;
+  return <Pill variant={batchPill[status]}>{t(status)}</Pill>;
 }
 
 export type PhotoProblem =
@@ -143,19 +152,21 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
         }
       >
         {({ id, describedBy, invalid }) => (
-          <input
-            ref={fileRef}
-            id={id}
-            name="photos"
-            type="file"
-            multiple
-            accept={ACCEPT}
-            aria-describedby={describedBy}
-            aria-invalid={invalid || undefined}
-            disabled={busy}
-            onChange={() => setProblem(null)}
-            className="block w-full rounded-md border border-border-strong bg-surface p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:font-semibold file:text-primary"
-          />
+          <FileDropZone title={t("dropTitle")} icon="camera" disabled={busy}>
+            <input
+              ref={fileRef}
+              id={id}
+              name="photos"
+              type="file"
+              multiple
+              accept={ACCEPT}
+              aria-describedby={describedBy}
+              aria-invalid={invalid || undefined}
+              disabled={busy}
+              onChange={() => setProblem(null)}
+              className={fileInputClasses}
+            />
+          </FileDropZone>
         )}
       </Field>
       <Alert tone="warning" title={ts("aadhaarWarningTitle")}>
@@ -164,12 +175,12 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
       <div id={statusId} role="status" aria-live="polite" className="min-h-6 space-y-2">
         {progress ? (
           <>
-            <p className="text-sm font-semibold">{statusText(progress)}</p>
+            <p className="text-sm font-medium">{statusText(progress)}</p>
             <progress
               max={progress.total}
               value={progress.starting ? progress.total : progress.current - 1}
               aria-label={t("progressLabel")}
-              className="h-2 w-full"
+              className="h-2 w-full accent-primary"
             />
           </>
         ) : null}
@@ -203,6 +214,7 @@ export function RegisterPhotosView({
   onStarted,
 }: RegisterPhotosViewProps) {
   const t = useTranslations("extraction.list");
+  const tn = useTranslations("school.nav");
   const locale = useLocale() as Locale;
   const count = (value: number) => formatCount(value, locale) ?? String(value);
   const canUpload = permissions.has(PERM.importRun) && permissions.has(PERM.documentUpload);
@@ -212,7 +224,10 @@ export function RegisterPhotosView({
       key: "started",
       header: t("colStarted"),
       cell: (row) => (
-        <Link href={`/register-photos/${row.id}`} className="font-semibold text-primary underline">
+        <Link
+          href={`/register-photos/${row.id}`}
+          className="font-medium text-primary underline underline-offset-4"
+        >
           {formatDateTime(row.created_at) ?? t("open")}
           <span className="sr-only">{t("openHint")}</span>
         </Link>
@@ -221,16 +236,33 @@ export function RegisterPhotosView({
     {
       key: "pages",
       header: t("colPages"),
-      cell: (row) => t("pagesDone", { done: count(row.pages_done), total: count(row.page_count) }),
+      cell: (row) => (
+        <span className="tabular-nums">
+          {t("pagesDone", { done: count(row.pages_done), total: count(row.page_count) })}
+        </span>
+      ),
     },
-    { key: "pending", header: t("colPending"), cell: (row) => count(row.items_pending) },
-    { key: "confirmed", header: t("colConfirmed"), cell: (row) => count(row.items_confirmed) },
+    {
+      key: "pending",
+      header: t("colPending"),
+      cell: (row) =>
+        row.items_pending > 0 ? (
+          <Pill variant="review">{count(row.items_pending)}</Pill>
+        ) : (
+          <span className="tabular-nums">{count(row.items_pending)}</span>
+        ),
+    },
+    {
+      key: "confirmed",
+      header: t("colConfirmed"),
+      cell: (row) => <span className="tabular-nums">{count(row.items_confirmed)}</span>,
+    },
     {
       key: "withheld",
       header: t("colWithheld"),
       cell: (row) =>
         row.pages_withheld > 0 ? (
-          <Badge tone="danger">{count(row.pages_withheld)}</Badge>
+          <Pill variant="negative">{count(row.pages_withheld)}</Pill>
         ) : (
           count(row.pages_withheld)
         ),
@@ -244,28 +276,30 @@ export function RegisterPhotosView({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
-      <div className="grid gap-6 xl:grid-cols-[2fr_3fr]">
-        {canUpload ? (
-          <Card title={t("uploadTitle")} description={t("uploadDescription")}>
-            <UploadPhotos onStarted={onStarted} />
-          </Card>
-        ) : null}
-        <Card title={t("historyTitle")} {...(canUpload ? {} : { className: "xl:col-span-2" })}>
-          <div className="space-y-3">
-            <DataTable
-              caption={t("historyTitle")}
-              captionHidden
-              columns={columns}
-              state={batches}
-              rowKey={(row) => row.id}
-              emptyTitle={t("emptyTitle")}
-              emptyBody={t("emptyBody")}
-            />
-            <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
-          </div>
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+      />
+      {canUpload ? (
+        <Card title={t("uploadTitle")} description={t("uploadDescription")}>
+          <UploadPhotos onStarted={onStarted} />
         </Card>
-      </div>
+      ) : null}
+      <Card title={t("historyTitle")}>
+        <div className="space-y-3">
+          <DataTable
+            caption={t("historyTitle")}
+            captionHidden
+            columns={columns}
+            state={batches}
+            rowKey={(row) => row.id}
+            emptyTitle={t("emptyTitle")}
+            emptyBody={t("emptyBody")}
+          />
+          <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
+        </div>
+      </Card>
     </div>
   );
 }

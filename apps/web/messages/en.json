@@ -2264,7 +2264,8 @@
         "scanning": "checking for viruses",
         "ready": "done"
       },
-      "photoOf": "Photo {current} of {total}: {stage}"
+      "photoOf": "Photo {current} of {total}: {stage}",
+      "dropTitle": "Choose the photos, or drag them here"
     },
     "list": {
       "title": "Register photos",
@@ -2340,7 +2341,8 @@
       "emptyPendingTitle": "No rows left to check",
       "emptyPendingBody": "Every row found so far has been checked. Pages still being read add rows here.",
       "emptyTitle": "No rows to show",
-      "pagesLabel": "Pages of rows"
+      "pagesLabel": "Pages of rows",
+      "lowestLabel": "Lowest reading certainty, {where}"
     },
     "batch": {
       "loadingTitle": "Register photos",
