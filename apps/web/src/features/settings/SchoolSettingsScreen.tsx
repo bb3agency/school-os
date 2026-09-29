@@ -352,7 +352,7 @@ function SettingsForm({
           defaultValue={String(settings.idle_timeout_minutes ?? 15)}
           inputMode="numeric"
           maxLength={2}
-          className="max-w-48"
+          className="max-w-sm"
           required
         />
       </Card>
@@ -377,7 +377,7 @@ function SettingsForm({
             defaultValue={String(settings.ai_monthly_budget_inr ?? 5000)}
             inputMode="numeric"
             maxLength={8}
-            className="max-w-48"
+            className="max-w-sm"
             required
           />
         </div>

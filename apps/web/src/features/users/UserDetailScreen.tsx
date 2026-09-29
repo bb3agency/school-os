@@ -6,7 +6,6 @@ import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -387,7 +386,6 @@ export function UserDetailScreen({ userId }: { userId: string }) {
         ]}
         badge={
           <span className="inline-flex flex-wrap items-center gap-2">
-            <Avatar name={user.display_name} size="sm" decorative />
             <UserStatusBadge status={user.status} />
             {isSelf ? <Badge tone="info">{td("you")}</Badge> : null}
           </span>
