@@ -468,7 +468,8 @@
       "colAmountDue": "Still to pay",
       "colStatus": "Status",
       "emptyTitle": "No invoices yet",
-      "emptyBody": "Invoices appear here each month once your subscription is active."
+      "emptyBody": "Invoices appear here each month once your subscription is active.",
+      "home": "Home"
     },
     "audit": {
       "title": "Audit log",
@@ -562,7 +563,8 @@
       "reply": "Your reply",
       "closedNote": "This ticket is closed. Open a new ticket if you still need help.",
       "backToList": "Back to all tickets",
-      "priorityLine": "Priority: {priority}"
+      "priorityLine": "Priority: {priority}",
+      "home": "Home"
     }
   },
   "platform": {

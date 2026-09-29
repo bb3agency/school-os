@@ -79,7 +79,10 @@ export function SupportScreen() {
       key: "number",
       header: t("colNumber"),
       cell: (row) => (
-        <Link href={`/support/${row.id}`} className="font-semibold text-primary underline">
+        <Link
+          href={`/support/${row.id}`}
+          className="font-mono text-xs font-medium text-primary underline underline-offset-4 hover:no-underline"
+        >
           {row.number}
         </Link>
       ),
@@ -93,13 +96,21 @@ export function SupportScreen() {
     {
       key: "updated",
       header: t("colUpdated"),
-      cell: (row) => <Value>{formatDateTime(row.updated_at ?? row.created_at)}</Value>,
+      cell: (row) => (
+        <span className="font-mono text-xs whitespace-nowrap text-ink-muted">
+          <Value>{formatDateTime(row.updated_at ?? row.created_at)}</Value>
+        </span>
+      ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: t("home"), href: "/" }, { label: t("title") }]}
+      />
       <StudentDataWarning />
       <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
         <Card title={t("listTitle")}>
@@ -113,7 +124,7 @@ export function SupportScreen() {
             emptyBody={t("emptyBody")}
           />
         </Card>
-        <Card title={t("newTitle")} description={t("newBody")}>
+        <Card title={t("newTitle")} description={t("newBody")} tone="default">
           <form noValidate onSubmit={form.onSubmit} className="space-y-4">
             <TextField
               name="subject"
@@ -214,10 +225,15 @@ export function SupportTicketScreen({ ticketId }: { ticketId: string }) {
         title={`${data.number} · ${data.subject}`}
         badge={<Badge tone={ticketTone[data.status]}>{tstatus(data.status)}</Badge>}
         description={priority ? t("priorityLine", { priority: tprio(priority) }) : undefined}
+        breadcrumb={[
+          { label: t("home"), href: "/" },
+          { label: t("title"), href: "/support" },
+          { label: data.number },
+        ]}
       />
       <StudentDataWarning />
       <Card title={t("thread")}>
-        <TicketThread ticket={data} />
+        <TicketThread ticket={data} schoolSide />
         {data.status !== "closed" ? (
           <form
             noValidate
