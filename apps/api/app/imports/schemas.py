@@ -179,7 +179,8 @@ def _cell_value(value: Any) -> Any:
     return value
 
 
-CellValueIn = Annotated[str | None, BeforeValidator(_cell_value), Field(max_length=1000)]
+# The length limit applies to text only: null (and blank, after trimming) clears the cell.
+CellValueIn = Annotated[Annotated[str, Field(max_length=1000)] | None, BeforeValidator(_cell_value)]
 
 
 class CellEditIn(_In):

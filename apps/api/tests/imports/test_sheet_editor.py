@@ -276,6 +276,24 @@ def test_FR_IMP_008_edits_are_refused_safely(world: Any, api: Any, admin_engine:
     assert same.headers["ETag"] == ok.headers["ETag"]
 
 
+def test_FR_IMP_008_null_or_blank_clears_a_cell(world: Any, api: Any, admin_engine: Engine) -> None:
+    admin = world.person("office_admin")
+    batch_id, _ = _batch_with_problem(admin_engine, world)
+    etag = _sheet(api, admin, batch_id).headers["ETag"]
+    res = _edit(api, admin, batch_id, 2, [{"column": 2, "value": None}], etag=etag)
+    assert res.status_code == 200, res.text
+    assert res.json()["row"]["cells"][2] == {
+        "value": None,
+        "edited": True,
+        "restricted": False,
+        "formula": False,
+    }
+    res = _edit(api, admin, batch_id, 3, [{"column": 2, "value": "   "}], etag=res.headers["ETag"])
+    assert res.status_code == 200, res.text
+    assert res.json()["row"]["cells"][2]["value"] is None
+    assert _sheet(api, admin, batch_id).json()["edited_cells"] == 2
+
+
 def test_FR_IMP_008_invariant_6_no_edits_after_the_rows_were_added(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
