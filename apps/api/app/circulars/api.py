@@ -42,6 +42,7 @@ from app.circulars.schemas import (
     TaskUpdate,
     TaskView,
 )
+from app.core.db import tenant_session
 
 router = APIRouter(prefix="/api/v1", tags=["circulars"])
 
@@ -249,21 +250,25 @@ def list_notices(
 
 
 @router.post("/notices", response_model=NoticeOut, status_code=201)
-def create_notice(
-    ctx: NoticeDrafter, db: TenantDB, body: NoticeCreate, idem: IdempotencyDep
-) -> Response:
+def create_notice(ctx: NoticeDrafter, body: NoticeCreate, idem: IdempotencyDep) -> Response:
     """Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a
     circular (only C1, else 422 ``notice_source_personal``) or from your text (422
     ``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or
     ``blank``. Only the circular's text is sent to the AI, never student records. If AI is not
     available the notice starts empty and ``draft_error`` says why. Accepts
     ``Idempotency-Key``."""
-    return idem.run(
-        db,
-        body,
-        lambda: service.create_notice(db, ctx, body),
-        headers=lambda out: {"Location": f"/api/v1/notices/{out.id}", "ETag": etag(out.version)},
-    )
+    # The AI draft may take longer than the database lets a transaction sit idle: the write
+    # transaction begins only when the notice is stored (deferred), after the model call.
+    with tenant_session(ctx.tenant_id, ctx.user_id, deferred=True) as db:
+        return idem.run(
+            db,
+            body,
+            lambda: service.create_notice(db, ctx, body),
+            headers=lambda out: {
+                "Location": f"/api/v1/notices/{out.id}",
+                "ETag": etag(out.version),
+            },
+        )
 
 
 @router.get("/notices/{notice_id}", response_model=NoticeOut)

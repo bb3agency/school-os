@@ -309,6 +309,49 @@ def test_US_1605_notice_from_a_circular_is_bilingual_and_never_sees_students(
     )
 
 
+def test_FR_NOTICE_003_the_ai_draft_runs_with_no_database_transaction_open(
+    ai_on: Any, api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The model call may take longer than ``idle_in_transaction_session_timeout`` (30 s for
+    ``sos_app``, docs/05 §3.1): drafting must not hold a transaction open, or the database ends
+    the connection and the request fails. Like the circular reading, the draft runs between two
+    short transactions."""
+    from app.knowledge import service as knowledge
+
+    original = knowledge.draft_notice
+    seen: list[int] = []
+
+    def watching(tenant_id: Any, source: Any) -> Any:
+        with admin_engine.connect() as c:
+            seen.append(
+                int(
+                    c.execute(
+                        text(
+                            "SELECT count(*) FROM pg_stat_activity WHERE usename = 'sos_app' "
+                            "AND datname = current_database() "
+                            "AND state LIKE 'idle in transaction%'"
+                        )
+                    ).scalar_one()
+                )
+            )
+        return original(tenant_id, source)
+
+    monkeypatch.setattr(knowledge, "draft_notice", watching)
+    office = ai_on.person("office_staff")
+    headers = {"Idempotency-Key": f"notice-draft-{uuid.uuid4().hex}"}
+    body = {"source": "staff_text", "text": "Sports day is on 14/11/2026 at the school ground."}
+    res = api.call(office, "POST", "/api/v1/notices", json=body, headers=headers)
+    assert res.status_code == 201, res.text
+    assert res.json()["ai_drafted"] is True
+    assert seen == [0]
+    # A retry with the same key replays the first answer without drafting again.
+    again = api.call(office, "POST", "/api/v1/notices", json=body, headers=headers)
+    assert again.status_code == 201
+    assert again.headers["Idempotent-Replayed"] == "true"
+    assert again.json()["id"] == res.json()["id"]
+    assert seen == [0]
+
+
 def test_FR_NOTICE_002_personal_circulars_and_numbers_are_refused(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:

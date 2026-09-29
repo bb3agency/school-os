@@ -17,8 +17,8 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection, Engine, create_engine, event, text
+from sqlalchemy.orm import Session, SessionTransaction
 
 from app.core.config import Settings, get_settings
 
@@ -90,21 +90,33 @@ def tenant_session(
     *,
     statement_timeout_ms: int | None = None,
     engine: Engine | None = None,
+    deferred: bool = False,
 ) -> Iterator[Session]:
     """Open one transaction bound to ``tenant_id`` (and optionally ``user_id``).
 
     Commits on success, rolls back on any exception. RLS policies read the context via
     ``core.current_tenant()`` / ``core.current_user_id()`` and fail closed when it is unset.
+
+    ``deferred=True``: no connection is taken (and no transaction begins in the database) until
+    the first statement, which gets the context first. For a request that must call something
+    slow (an AI model) before it writes, without holding a transaction open meanwhile
+    (``idle_in_transaction_session_timeout`` is 30 s for ``sos_app``, docs/05 §3.1).
     """
     tid = _as_uuid(tenant_id, "tenant_id")
     uid = _as_uuid(user_id, "user_id") if user_id is not None else None
     timeout = statement_timeout_ms or get_settings().db_statement_timeout_ms
     engine = engine or get_engine("app")
+    params = {"tenant_id": str(tid), "user_id": str(uid) if uid else "", "timeout": str(timeout)}
     with Session(engine, expire_on_commit=False, autoflush=False) as session, session.begin():
-        session.execute(
-            _SET_CONTEXT,
-            {"tenant_id": str(tid), "user_id": str(uid) if uid else "", "timeout": str(timeout)},
-        )
+        if deferred:
+            # No connection until the first statement; the context is set on that connection
+            # before the statement runs (same transaction, same bound parameters).
+            def _set_context(_s: Session, _t: SessionTransaction, connection: Connection) -> None:
+                connection.execute(_SET_CONTEXT, params)
+
+            event.listen(session, "after_begin", _set_context)
+        else:
+            session.execute(_SET_CONTEXT, params)
         yield session
 
 

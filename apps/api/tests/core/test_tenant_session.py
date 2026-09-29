@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import uuid
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, text
@@ -178,6 +179,35 @@ def test_concurrent_sessions_do_not_leak_context(
     for t in threads:
         t.join()
     assert errors == []
+
+
+def test_FR_TEN_001_deferred_session_takes_no_connection_until_used_then_sets_the_context(
+    notes_table: str, tenant_ids: tuple[uuid.UUID, uuid.UUID], app_engine: Engine
+) -> None:
+    """``deferred=True`` (a request that calls a slow AI model before it writes): nothing is
+    checked out of the pool until the first statement, and that statement already runs with
+    the tenant context, transaction-local as usual (invariant 1)."""
+    a, b = tenant_ids
+    _insert(a, notes_table, "deferred-a")
+    _insert(b, notes_table, "deferred-b")
+    pool: Any = app_engine.pool
+    before = pool.checkedout()
+    with tenant_session(a, deferred=True, engine=app_engine) as s:
+        assert pool.checkedout() == before
+        bodies: set[str] = set(s.execute(text(f"SELECT body FROM {notes_table}")).scalars())
+        assert "deferred-a" in bodies
+        assert "deferred-b" not in bodies
+        assert s.execute(text("SELECT core.current_tenant()")).scalar_one() == a
+    with tenant_session(a, deferred=True, engine=app_engine) as s:
+        s.execute(
+            text(f"INSERT INTO {notes_table} (id, tenant_id, body) VALUES (:i, :t, 'late')"),
+            {"i": uuid.uuid4(), "t": a},
+        )
+    with tenant_session(a, engine=app_engine) as s:
+        assert "late" in set(s.execute(text(f"SELECT body FROM {notes_table}")).scalars())
+    # The context was transaction-local: a pooled connection carries nothing afterwards.
+    with app_engine.connect() as conn:
+        assert conn.execute(text("SELECT core.current_tenant()")).scalar_one() is None
 
 
 def test_current_tenant_is_null_for_empty_setting(app_engine: Engine) -> None:

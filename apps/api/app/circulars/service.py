@@ -35,6 +35,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
@@ -1111,14 +1112,24 @@ def _notice_source(
     return source, doc.id
 
 
+def _engine_of(session: Session) -> Engine:
+    bind = session.get_bind()
+    return bind if isinstance(bind, Engine) else bind.engine
+
+
 def create_notice(session: Session, ctx: UserContext, data: NoticeCreate) -> NoticeOut:
     """Start a parent notice (``notice.draft``; FR-NOTICE-001..003). From a circular (C1 only,
     else 422 ``notice_source_personal``) or staff text (422 ``notice_personal_data`` with phone
     numbers, emails or Aadhaar-like numbers) the AI drafts both languages; if AI is not
-    available the draft is empty and ``draft_error`` says why. Audited ``notice.drafted``."""
+    available the draft is empty and ``draft_error`` says why. Audited ``notice.drafted``.
+
+    The source is read in its own short transaction and the model is called before ``session``
+    is used: with a deferred ``session`` (the route) no transaction is open during the call,
+    which may outlast ``idle_in_transaction_session_timeout`` (like the circular reading)."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    source, document_id = _notice_source(session, ctx, data)
+    with tenant_session(ctx.tenant_id, ctx.user_id, engine=_engine_of(session)) as read:
+        source, document_id = _notice_source(read, ctx, data)
     values: dict[str, Any] = {"ai_drafted": False, "draft_error": None}
     if source is not None:
         if source.kind == "circular" and not source.passages:
