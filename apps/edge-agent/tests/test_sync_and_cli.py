@@ -94,6 +94,26 @@ def test_FR_TALLY_005_a_retry_of_the_same_snapshot_is_the_same_batch(
     assert len(server.syncs) == 2
 
 
+def test_FR_TALLY_005_a_snapshot_back_to_earlier_figures_is_applied_again(
+    server: FakeServer, tally: FakeTally, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A payment entered and then deleted the same day: A, B, then A again. The third snapshot
+    # is not a retry of the first; answered "repeat", SchoolOS would keep showing B all day.
+    def party(balance: str) -> dict[str, Any]:
+        return {"guid": "g-1", "name": "Synthetic P", "group": "Sundry Debtors",
+                "closing_balance": balance}  # fmt: skip
+
+    snapshots = iter([[party("100.00")], [party("0.00")], [party("100.00")], [party("100.00")]])
+    monkeypatch.setattr(sync, "collect", lambda *args: next(snapshots))
+    agent = _agent(server, tally)
+    reports = [agent.sync_once() for _ in range(4)]
+    assert [r.repeat for r in reports] == [False, False, False, True]
+    batches = [p["batch_id"] for p in _sent(server, "/syncs")]
+    assert len(set(batches[:3])) == 3
+    assert batches[3] == batches[2]
+    assert len(server.syncs) == 3
+
+
 def test_FR_TALLY_004_nothing_is_sent_until_groups_are_selected(tally: FakeTally) -> None:
     server = FakeServer(groups=[], company=None)
     report = _agent(server, tally).sync_once()

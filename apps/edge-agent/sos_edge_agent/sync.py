@@ -11,7 +11,8 @@
    from (its own parent when that is also selected), once.
 4. ``POST /syncs`` with a ``batch_id`` derived from the snapshot's content and date: a retry of
    the same snapshot is recognised by the server and never applied twice; a newer snapshot has a
-   new id.
+   new id, also when its figures go back to an earlier snapshot's (the id then also names the
+   last batch the server accepted, so A, B, A is three batches, not a repeat of A).
 
 :meth:`Agent.run` repeats that every ``sync_interval_minutes``; a failure waits with exponential
 backoff and jitter (1 minute doubling to 30 minutes), a 429 waits for ``Retry-After``, and a
@@ -82,11 +83,20 @@ def _version(value: str) -> tuple[int, ...]:
         return (0,)
 
 
-def batch_id(device_id: uuid.UUID, snapshot: dict[str, Any]) -> uuid.UUID:
-    """Same content and date -> same id (a retry is recognised by the server)."""
+def snapshot_digest(snapshot: dict[str, Any]) -> str:
     content = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), default=str)
-    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
-    return uuid.uuid5(BATCH_NAMESPACE, f"{device_id}:{digest}")
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def batch_id(
+    device_id: uuid.UUID, snapshot: dict[str, Any], after: uuid.UUID | None = None
+) -> uuid.UUID:
+    """Same content and date -> same id (a retry is recognised by the server). ``after``: the
+    batch the server last accepted from this agent when its content differed, so figures that
+    go back to an earlier snapshot's (A, B, then A again) are a new batch, not a repeat of A."""
+    digest = snapshot_digest(snapshot)
+    tail = f":{after}" if after is not None else ""
+    return uuid.uuid5(BATCH_NAMESPACE, f"{device_id}:{digest}{tail}")
 
 
 def collect(
@@ -130,6 +140,8 @@ class Agent:
         self._on_key_rotated = on_key_rotated
         self.interval_s = 30 * 60.0
         self.rotate_after_days = 90
+        # The last snapshot the server accepted (content digest, batch id), in memory only.
+        self._accepted: tuple[str, uuid.UUID] | None = None
 
     # --- one sync -------------------------------------------------------------------------------
 
@@ -171,7 +183,13 @@ class Agent:
         device = self.server.config.device_id
         if device is None:  # pragma: no cover - SchoolOSClient.signed refused already
             raise CredentialRefused("not_enrolled")
-        result = self.server.post_sync({"batch_id": str(batch_id(device, snapshot)), **snapshot})
+        digest = snapshot_digest(snapshot)
+        if self._accepted is not None and self._accepted[0] == digest:
+            batch = self._accepted[1]  # unchanged since the server accepted it: a repeat
+        else:
+            batch = batch_id(device, snapshot, self._accepted[1] if self._accepted else None)
+        result = self.server.post_sync({"batch_id": str(batch), **snapshot})
+        self._accepted = (digest, batch)
         report = SyncReport(
             outcome="synced",
             groups=len(selected),
