@@ -1,5 +1,5 @@
 """0034_circulars: schema facts, database checks and a populated round trip (CLAUDE.md §6.1,
-§6.12, §8; docs/05 §6.4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
+§6.12, §8; docs/05 §6.3; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
 
 A fresh database is migrated to head, seeded with a synthetic school (``seed-synthetic``), and
 given a reading, a suggestion, a task and a notice; the walk head -> previous revision -> head

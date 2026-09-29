@@ -1,4 +1,4 @@
-"""Circulars, tasks and parent notices (M4; docs/05 §6.4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
+"""Circulars, tasks and parent notices (M4; docs/05 §6.3; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
 
 Tenant tables (``tenant_id`` first, ``UNIQUE (tenant_id, id)``, RLS ENABLE + FORCE with
 ``tenant_isolation``, composite FKs; offboarding ``offboarding_purge`` policy and ``sos_purger``

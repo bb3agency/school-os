@@ -92,6 +92,7 @@ flowchart TB
 | `documents` | files, versions, ACLs, scanning | `upload()`, `get_download_url()` | core, authz, audit |
 | `knowledge` | ingestion, chunks, embeddings, retrieval, tools, gateway, evals | `ask()`, `ingest()` | documents, students (via service), dq (via service) |
 | `exports` | export profiles, report generation | `generate()` | students, dq |
+| `circulars` | circular readings and deadline suggestions (storage and workflow; the AI call is `knowledge`'s), tasks and reminders, parent notices and their PDF/PNG (M4, 05 §6.3) | `on_version_indexed()`, `run_reading()`, `confirm_suggestion()`, `create_task()`, `send_reminders()`, `create_notice()`, `render_notice()` | core, authz, audit, identity, tenancy, documents, knowledge, notifications, ops (via service) |
 | `notifications` | in-app notifications, templates; email (provider interface: fake, Amazon SES) | `notify()`, `request_email()` | core, identity, tenancy, ops (via service) |
 | `admin` | tenant admin, retention, full export | `export_tenant()` | all services (read) |
 | `ops` | job runs, outbox, idempotency keys, break-glass grants (tenant-side) | `grant_break_glass()`, `claim_outbox()` | tenancy, audit |

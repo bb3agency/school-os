@@ -1,4 +1,4 @@
-"""Circulars, tasks and notices tables (migration 0034_circulars; docs/05 §6.4).
+"""Circulars, tasks and notices tables (migration 0034_circulars; docs/05 §6.3).
 
 Typed mappings for queries only; DDL (RLS, CHECKs, composite FKs, column grants, the offboarding
 purge policy) lives in the migration.
