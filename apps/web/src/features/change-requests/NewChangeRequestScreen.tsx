@@ -121,6 +121,8 @@ function formField(field: string): string {
  */
 export function NewChangeRequestScreen({ params }: { params: NewRequestParams }) {
   const t = useTranslations("changeRequests.new");
+  const tl = useTranslations("changeRequests");
+  const crumbs = [{ label: tl("title"), href: "/change-requests" }, { label: t("title") }];
   const tv = useTranslations("changeRequests.validation");
   const tfe = useTranslations("changeRequests.fieldErrors");
   const tsrc = useTranslations("findings.sources");
@@ -205,7 +207,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
   if (!canRequest) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("title")} />
+        <PageHeader breadcrumb={crumbs} title={t("title")} />
         <Alert tone="warning" title={t("noPermissionTitle")}>
           {t("noPermissionBody")}
         </Alert>
@@ -359,7 +361,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader breadcrumb={crumbs} title={t("title")} description={t("description")} />
       {created ? (
         <Alert tone="success" live title={t("createdTitle")}>
           <p>{t("createdBody")}</p>

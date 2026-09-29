@@ -2897,7 +2897,8 @@
       "evidenceChip": "సాక్ష్య పత్రం",
       "waitingDecision": "నిర్ణయం కోసం వేచి ఉంది",
       "decideHint": "సాక్ష్యాన్ని చూసి, ఈ అభ్యర్థనను ఆమోదించండి లేదా తిరస్కరించండి.",
-      "timelineLabel": "ఈ అభ్యర్థన దశలు"
+      "timelineLabel": "ఈ అభ్యర్థన దశలు",
+      "relatedLabel": "సంబంధిత పేజీలు"
     },
     "crumbHome": "హోమ్"
   },

@@ -1,13 +1,24 @@
 import { useTranslations } from "next-intl";
-import { Badge } from "@/components/ui/Badge";
+import { Pill } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/format";
-import { changeRequestTone, type ChangeRequest, type ChangeRequestStatus } from "./types";
+import { changeRequestPill, type ChangeRequest, type ChangeRequestStatus } from "./types";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function ChangeRequestStatusBadge({ status }: { status: ChangeRequestStatus }) {
+/** Workflow pill: waiting = review (violet), approved = done (teal), rejected = negative. */
+export function ChangeRequestStatusBadge({
+  status,
+  size = "sm",
+}: {
+  status: ChangeRequestStatus;
+  size?: "sm" | "md";
+}) {
   const t = useTranslations("changeRequests.status");
-  return <Badge tone={changeRequestTone[status]}>{t(status)}</Badge>;
+  return (
+    <Pill variant={changeRequestPill[status]} size={size}>
+      {t(status)}
+    </Pill>
+  );
 }
 
 /** Whole days until `iso` (0 on the last day, negative once passed). */
@@ -55,16 +66,18 @@ export function DisplayValue({
 export function ValueChange({ request }: { request: ChangeRequest }) {
   const t = useTranslations("changeRequests");
   return (
-    <span className="flex flex-wrap items-baseline gap-x-2">
+    <span className="flex flex-wrap items-baseline gap-x-2 font-mono text-sm">
       <span className="sr-only">{t("oldValue")}:</span>
       <DisplayValue
         value={request.old_value}
         masked={request.masked}
         attributeKey={request.attribute_key}
       />
-      <span aria-hidden="true">→</span>
+      <span aria-hidden="true" className="text-ink-muted">
+        →
+      </span>
       <span className="sr-only">{t("newValue")}:</span>
-      <strong>
+      <strong className="font-medium">
         <DisplayValue
           value={request.new_value}
           masked={request.masked}

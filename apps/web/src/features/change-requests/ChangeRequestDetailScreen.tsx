@@ -7,15 +7,19 @@ import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { Avatar } from "@/components/ui/Avatar";
+import { Pill } from "@/components/ui/Badge";
+import { Button, ButtonLink, buttonClasses } from "@/components/ui/Button";
+import { Card, cardClasses } from "@/components/ui/Card";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Icon } from "@/components/ui/Icon";
 import { TextAreaField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { DQ_KEYS } from "@/features/findings/data";
 import { SourceChip } from "@/features/findings/parts";
-import { Link } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
@@ -94,6 +98,10 @@ function EvidenceViewer({ documentId }: { documentId: string }) {
   }
   return (
     <div className="space-y-2">
+      <Pill variant="tag">
+        <Icon name="file" className="size-3.5" />
+        {t("evidenceChip")}
+      </Pill>
       {image ? (
         <figure className="space-y-2">
           {/* A short-lived presigned URL on the files origin (CSP img-src): next/image would
@@ -102,7 +110,7 @@ function EvidenceViewer({ documentId }: { documentId: string }) {
           <img
             src={image}
             alt={t("evidenceAlt")}
-            className="max-h-96 max-w-full rounded-md border border-border"
+            className="max-h-96 max-w-full rounded-lg border border-border"
           />
           <figcaption className="text-xs text-ink-muted">{t("evidenceLinkNote")}</figcaption>
         </figure>
@@ -115,17 +123,18 @@ function EvidenceViewer({ documentId }: { documentId: string }) {
   );
 }
 
-function Decisions({ request, mine }: { request: ChangeRequest; mine: boolean }) {
+/**
+ * Approve and reject (`mode="decide"`, checkers only) or withdraw (`mode="cancel"`, the
+ * requester only). The caller decides which one applies (SEC-014 / FR-CR-002).
+ */
+function Decisions({ request, mode }: { request: ChangeRequest; mode: "decide" | "cancel" }) {
   const t = useTranslations("changeRequests.detail");
   const api = useBffClient("staff");
-  const can = useStaffCan();
   const invalidate = [CR_KEYS.all, DQ_KEYS.findings, DQ_KEYS.summary] as const;
   const path = { change_request_id: request.id };
   const headers = { "If-Match": ifMatch(request.version) };
-  // SEC-014 / FR-CR-002: the requester is never offered approve or reject (the API refuses too).
-  const decide = request.status === "pending" && request.can_decide && !mine && can(CR_APPROVE);
-  const cancel = request.status === "pending" && request.can_cancel && mine && can(CR_REQUEST);
-  if (!decide && !cancel) return null;
+  const decide = mode === "decide";
+  const cancel = mode === "cancel";
   return (
     <>
       {decide ? (
@@ -228,6 +237,7 @@ function Decisions({ request, mine }: { request: ChangeRequest; mine: boolean })
 export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId: string }) {
   const t = useTranslations("changeRequests");
   const td = useTranslations("changeRequests.detail");
+  const tstatus = useTranslations("changeRequests.status");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
   const locale = useLocale();
@@ -243,29 +253,79 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
   );
   const data = request.status === "ready" ? request.data : null;
   const student = useStudentLabel(data?.student_id ?? null, can("student.read_basic"));
+  const crumbs = (last: string) => [
+    { label: t("title"), href: "/change-requests" },
+    { label: last },
+  ];
 
   if (request.status === "loading") return <LoadingState label={tc("loading")} />;
   if (!data) {
     return (
-      <Alert tone="danger" title={tc("loadErrorTitle")}>
-        {request.status === "error" && request.reason
-          ? te(`load.${request.reason}`)
-          : tc("loadErrorBody")}
-      </Alert>
+      <div className="space-y-6">
+        <PageHeader breadcrumb={crumbs(t("nav"))} title={t("nav")} />
+        <Alert tone="danger" title={tc("loadErrorTitle")}>
+          {request.status === "error" && request.reason
+            ? te(`load.${request.reason}`)
+            : tc("loadErrorBody")}
+        </Alert>
+      </div>
     );
   }
   const mine = me?.membership_id === data.requested_by;
   const memoHref = `/bff/api/v1/change-requests/${data.id}/memo`;
+  // SEC-014 / FR-CR-002: the requester is never offered approve or reject (the API refuses too).
+  const decide = data.status === "pending" && data.can_decide && !mine && can(CR_APPROVE);
+  const cancel = data.status === "pending" && data.can_cancel && mine && can(CR_REQUEST);
+  const field = fieldLabel(data, locale);
+
+  const steps: TimelineItem[] = [
+    {
+      id: "asked",
+      title: td("requestedAt"),
+      time: <Value>{formatDateTime(data.requested_at)}</Value>,
+      body: mine ? t("byYou") : t("bySomeoneElse"),
+      status: "done",
+    },
+    data.status === "pending"
+      ? {
+          id: "waiting",
+          title: td("waitingDecision"),
+          body: <ExpiryText request={data} />,
+          status: "current",
+        }
+      : {
+          id: "decided",
+          title: tstatus(data.status),
+          ...(data.decided_at ? { time: <Value>{formatDateTime(data.decided_at)}</Value> } : {}),
+          body: data.decision_note ? (
+            <dl>
+              <dt className="font-medium text-ink">
+                {data.status === "rejected" ? td("rejectReason") : td("decisionNote")}
+              </dt>
+              <dd className="whitespace-pre-line">{data.decision_note}</dd>
+            </dl>
+          ) : undefined,
+          status: "done",
+        },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={td("title", { field: fieldLabel(data, locale) })}
+        breadcrumb={crumbs(field)}
+        title={td("title", { field })}
         description={student?.name ?? undefined}
-        badge={<ChangeRequestStatusBadge status={data.status} />}
-        actions={<Decisions request={data} mine={mine} />}
+        badge={<ChangeRequestStatusBadge status={data.status} size="md" />}
+        actions={cancel ? <Decisions request={data} mode="cancel" /> : null}
       />
 
+      {decide ? (
+        <Card
+          title={td("waitingDecision")}
+          description={td("decideHint")}
+          actions={<Decisions request={data} mode="decide" />}
+        />
+      ) : null}
       {data.status === "pending" && mine ? (
         <Alert tone="info" title={td("ownRequestTitle")}>
           {td("ownRequestBody")}
@@ -277,110 +337,106 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
 
       <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
         <Card title={td("changeTitle")}>
-          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
-            <dt className="font-semibold">{td("student")}</dt>
-            <dd>
-              <Value>{student?.name}</Value>
-              {student?.admissionNo ? (
-                <span className="ml-2 text-sm text-ink-muted">
-                  {td("admissionNo", { number: student.admissionNo })}
+          <div className="space-y-5">
+            <div className="grid items-stretch gap-3 sm:grid-cols-[1fr_auto_1fr]">
+              <div className={cardClasses({ padding: "sm", tone: "muted" })}>
+                <Eyebrow as="p">{t("oldValue")}</Eyebrow>
+                <p className="mt-2 font-mono text-lg break-words text-ink-muted">
+                  <DisplayValue
+                    value={data.old_value}
+                    masked={data.masked}
+                    attributeKey={data.attribute_key}
+                  />
+                </p>
+              </div>
+              <span
+                aria-hidden="true"
+                className="flex items-center justify-center text-ink-muted max-sm:rotate-90"
+              >
+                <Icon name="arrowRight" />
+              </span>
+              <div className={cardClasses({ padding: "sm", tone: "outline" })}>
+                <Eyebrow as="p" tone="brand">
+                  {t("newValue")}
+                </Eyebrow>
+                <p className="mt-2 font-mono text-lg font-medium break-words text-ink">
+                  <DisplayValue
+                    value={data.new_value}
+                    masked={data.masked}
+                    attributeKey={data.attribute_key}
+                  />
+                </p>
+              </div>
+            </div>
+            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-[max-content_1fr]">
+              <dt className="text-sm text-ink-muted">{td("student")}</dt>
+              <dd className="flex flex-wrap items-center gap-2">
+                {student?.name ? <Avatar name={student.name} size="sm" decorative /> : null}
+                <span className="font-medium">
+                  <Value>{student?.name}</Value>
                 </span>
-              ) : null}
-            </dd>
-            <dt className="font-semibold">{t("colField")}</dt>
-            <dd>{fieldLabel(data, locale)}</dd>
-            <dt className="font-semibold">{td("source")}</dt>
-            <dd>
-              <SourceChip source={data.target_source} />
-            </dd>
-            <dt className="font-semibold">{t("oldValue")}</dt>
-            <dd>
-              <DisplayValue
-                value={data.old_value}
-                masked={data.masked}
-                attributeKey={data.attribute_key}
-              />
-            </dd>
-            <dt className="font-semibold">{t("newValue")}</dt>
-            <dd className="font-semibold">
-              <DisplayValue
-                value={data.new_value}
-                masked={data.masked}
-                attributeKey={data.attribute_key}
-              />
-            </dd>
-            <dt className="font-semibold">{td("reason")}</dt>
-            <dd className="whitespace-pre-line">{data.reason}</dd>
-            <dt className="font-semibold">{td("evidence")}</dt>
-            <dd>
-              <EvidenceViewer documentId={data.evidence_document_id} />
-            </dd>
-          </dl>
-          {data.masked ? <p className="mt-4 text-sm text-ink-muted">{td("maskedNote")}</p> : null}
+                {student?.admissionNo ? (
+                  <Pill variant="tag">
+                    <span className="font-mono">
+                      {td("admissionNo", { number: student.admissionNo })}
+                    </span>
+                  </Pill>
+                ) : null}
+              </dd>
+              <dt className="text-sm text-ink-muted">{t("colField")}</dt>
+              <dd>{field}</dd>
+              <dt className="text-sm text-ink-muted">{td("source")}</dt>
+              <dd>
+                <SourceChip source={data.target_source} />
+              </dd>
+              <dt className="text-sm text-ink-muted">{td("reason")}</dt>
+              <dd className="whitespace-pre-line">{data.reason}</dd>
+              <dt className="text-sm text-ink-muted">{td("evidence")}</dt>
+              <dd>
+                <EvidenceViewer documentId={data.evidence_document_id} />
+              </dd>
+            </dl>
+            {data.masked ? <p className="text-sm text-ink-muted">{td("maskedNote")}</p> : null}
+          </div>
         </Card>
 
-        <Card title={td("timelineTitle")}>
-          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[max-content_1fr]">
-            <dt className="font-semibold">{td("requestedAt")}</dt>
-            <dd>
-              <Value>{formatDateTime(data.requested_at)}</Value>
-              <span className="block text-ink-muted">{mine ? t("byYou") : t("bySomeoneElse")}</span>
-            </dd>
-            {data.status === "pending" ? (
-              <>
-                <dt className="font-semibold">{td("expires")}</dt>
-                <dd>
-                  <ExpiryText request={data} />
-                </dd>
-              </>
+        <div className="space-y-6">
+          <Card title={td("timelineTitle")}>
+            <Timeline label={td("timelineLabel")} items={steps} />
+            {data.status === "approved" ? (
+              <p className="mt-4 text-sm">{td("approvedNote")}</p>
             ) : null}
-            {data.decided_at ? (
-              <>
-                <dt className="font-semibold">{td("decidedAt")}</dt>
-                <dd>
-                  <Value>{formatDateTime(data.decided_at)}</Value>
-                </dd>
-              </>
-            ) : null}
-            {data.decision_note ? (
-              <>
-                <dt className="font-semibold">
-                  {data.status === "rejected" ? td("rejectReason") : td("decisionNote")}
-                </dt>
-                <dd className="whitespace-pre-line">{data.decision_note}</dd>
-              </>
-            ) : null}
-          </dl>
-          {data.status === "approved" ? <p className="mt-4 text-sm">{td("approvedNote")}</p> : null}
-          {data.status === "expired" ? <p className="mt-4 text-sm">{td("expiredNote")}</p> : null}
-        </Card>
+            {data.status === "expired" ? <p className="mt-4 text-sm">{td("expiredNote")}</p> : null}
+          </Card>
+
+          <Card title={td("memoTitle")} description={td("memoBody")}>
+            {/* The memo is an API page with its own strict CSP, served through the BFF. */}
+            <a
+              href={memoHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClasses("secondary", "md")}
+            >
+              <Icon name="file" className="size-4" />
+              {td("openMemo")}
+              <span className="sr-only"> ({td("newTab")})</span>
+            </a>
+          </Card>
+        </div>
       </div>
 
-      <Card title={td("memoTitle")} description={td("memoBody")}>
-        {/* The memo is an API page with its own strict CSP, served through the BFF. */}
-        <a
-          href={memoHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-semibold text-primary underline"
-        >
-          {td("openMemo")}
-          <span className="sr-only"> ({td("newTab")})</span>
-        </a>
-      </Card>
-
-      <p>
-        <Link
+      <nav aria-label={td("relatedLabel")} className="flex flex-wrap gap-2" data-print="hide">
+        <ButtonLink
           href={`/change-requests?student_id=${data.student_id}`}
-          className="text-primary underline"
+          variant="secondary"
+          size="sm"
         >
           {td("allForStudent")}
-        </Link>
-        <span aria-hidden="true"> · </span>
-        <Link href="/change-requests" className="text-primary underline">
+        </ButtonLink>
+        <ButtonLink href="/change-requests" variant="ghost" size="sm">
           {td("backToList")}
-        </Link>
-      </p>
+        </ButtonLink>
+      </nav>
     </div>
   );
 }

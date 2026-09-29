@@ -2897,7 +2897,8 @@
       "evidenceChip": "Evidence document",
       "waitingDecision": "Waiting for a decision",
       "decideHint": "Check the evidence, then approve or reject this request.",
-      "timelineLabel": "Steps of this request"
+      "timelineLabel": "Steps of this request",
+      "relatedLabel": "Related pages"
     },
     "crumbHome": "Home"
   },
