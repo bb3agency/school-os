@@ -983,8 +983,9 @@ def set_task_status(
 
 
 def assignees(session: Session, ctx: UserContext) -> list[AssigneeOut]:
-    """Active staff a task can be given to (``task.manage`` or ``circular.review``)."""
-    if not (ctx.has(TASK_MANAGE) or ctx.has(REVIEW)):
+    """Active staff a task can be given to (a school-wide ``task.manage`` or
+    ``circular.review``, the grants every route that assigns a task requires)."""
+    if not any(ctx.has(p) and ctx.scope_for(p).school_wide for p in (TASK_MANAGE, REVIEW)):
         raise Forbidden()
     members = identity.active_members(session)
     return sorted(

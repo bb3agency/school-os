@@ -8,6 +8,7 @@ this module checks behaviour, object visibility, audit and notifications.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import uuid
 from typing import Any
@@ -17,6 +18,7 @@ from sqlalchemy import Engine, text
 
 from app.circulars import service
 from app.core.db import tenant_session
+from app.core.errors import Forbidden
 
 from .conftest import C
 
@@ -443,3 +445,22 @@ def test_invariant_5_no_circular_or_notice_text_in_logs(
     text_ = str(logs)
     for secret in ("Headmasters", "UDISE", "Secret title ZQX", "Sports day", "క్రీడా", "Guntur"):
         assert secret not in text_, secret
+
+
+def test_FR_TASK_002_assignees_need_a_school_wide_grant(ai_on: Any) -> None:
+    """``GET /task-assignees`` is a ``require_any`` read: the service, not the guard, checks
+    the reach. Every other ``task.manage`` / ``circular.review`` route is school-wide, so a
+    section-scoped grant (a custom role) does not open the staff list either (SEC-003)."""
+    school = ai_on.a
+    base = C.ctx(school, "office_admin")
+    scoped = dataclasses.replace(
+        base,
+        scopes=dataclasses.replace(
+            base.scopes, school=False, section_ids=frozenset({school.ids["section_9a"]})
+        ),
+        scoped_permissions=frozenset({"task.manage", "circular.review"}),
+    )
+    with tenant_session(school.tenant_id, base.user_id) as db:
+        assert service.assignees(db, base)
+        with pytest.raises(Forbidden):
+            service.assignees(db, scoped)
