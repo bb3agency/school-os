@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -73,6 +73,8 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   const tp = useTranslations("exports.precheck");
   const tf = useTranslations("exports.format");
   const tc = useTranslations("common");
+  const tn = useTranslations("school.nav");
+  const te = useTranslations("exports");
   const locale = useLocale();
   const router = useRouter();
   const api = useBffClient("staff");
@@ -127,7 +129,14 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   if (!mayRun) {
     return (
       <div className="space-y-6">
-        <PageHeader title={tp("title")} />
+        <PageHeader
+          title={tp("title")}
+          breadcrumb={[
+            { label: tn("home"), href: "/" },
+            { label: te("title"), href: "/exports" },
+            { label: tp("title") },
+          ]}
+        />
         <Alert tone="warning" title={tp("noPermissionTitle")}>
           {tp("noPermissionBody")}
         </Alert>
@@ -138,7 +147,14 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   if (profiles.isError || runnable.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title={tp("title")} />
+        <PageHeader
+          title={tp("title")}
+          breadcrumb={[
+            { label: tn("home"), href: "/" },
+            { label: te("title"), href: "/exports" },
+            { label: tp("title") },
+          ]}
+        />
         <Alert
           tone="warning"
           title={tp(profiles.isError ? "profilesErrorTitle" : "noProfilesTitle")}
@@ -158,7 +174,15 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tp("title")} description={tp("description")} />
+      <PageHeader
+        title={tp("title")}
+        description={tp("description")}
+        breadcrumb={[
+          { label: tn("home"), href: "/" },
+          { label: te("title"), href: "/exports" },
+          { label: tp("title") },
+        ]}
+      />
       <StepUpNotice />
       <form noValidate onSubmit={form.onSubmit} className="space-y-6">
         <Card title={tp("profileTitle")}>
@@ -243,7 +267,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
 
         <ApiErrorAlert error={form.error} namespace="exports" />
         <div className="flex flex-wrap justify-end gap-3">
-          <Link href="/exports" className="self-center text-primary underline">
+          <Link href="/exports" className={buttonClasses("ghost", "md")}>
             {tc("cancel")}
           </Link>
           <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>

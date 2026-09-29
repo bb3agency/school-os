@@ -4,13 +4,12 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
+import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { useSectionOptions, type SectionOption } from "@/features/findings/data";
 import { uuid } from "@/lib/validation";
 import { profileName } from "./data";
 import {
   EXPORT_LANGUAGES,
-  exportTone,
   MAX_CLASSES,
   MAX_SECTIONS,
   type Export,
@@ -20,9 +19,18 @@ import {
   type ExportStatus,
 } from "./types";
 
+/** Preparing = in progress, ready = done, failed = negative; deleted files are a plain tag. */
+const exportPill: Record<ExportStatus, PillVariant> = {
+  queued: "progress",
+  running: "progress",
+  ready: "done",
+  failed: "negative",
+  expired: "tag",
+};
+
 export function ExportStatusBadge({ status }: { status: ExportStatus }) {
   const t = useTranslations("exports.status");
-  return <Badge tone={exportTone[status]}>{t(status)}</Badge>;
+  return <Pill variant={exportPill[status]}>{t(status)}</Pill>;
 }
 
 /** "Board pre-check · CISCE registration 2026" or "Student list". */

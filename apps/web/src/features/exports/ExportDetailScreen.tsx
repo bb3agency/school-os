@@ -4,9 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { Card, cardClasses } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
@@ -45,7 +47,7 @@ function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="space-y-0.5">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-semibold text-ink">{children}</dd>
+      <dd className="font-medium text-ink">{children}</dd>
     </div>
   );
 }
@@ -92,11 +94,26 @@ function Downloads({ row }: { row: Export }) {
   return (
     <div className="space-y-3">
       {downloadNeedsStepUp(row) ? <p className="text-sm">{tc("stepUpNote")}</p> : null}
-      <ul className="flex flex-wrap gap-3">
+      <ul className="grid gap-3 sm:grid-cols-2">
         {files.map((file) => {
           const size = formatBytes(file.size_bytes, locale);
           return (
-            <li key={file.format}>
+            <li
+              key={file.format}
+              className={`${cardClasses({ padding: "sm", tone: "outline" })} flex flex-wrap items-center gap-3`}
+            >
+              <span
+                aria-hidden="true"
+                className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"
+              >
+                <Icon name="file" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium text-ink">{tf(file.format)}</span>
+                {size ? (
+                  <span className="block font-mono text-xs text-ink-muted">{size}</span>
+                ) : null}
+              </span>
               <Button
                 variant="primary"
                 onClick={() => void download(file.format)}
@@ -195,6 +212,7 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
   const tl = useTranslations("exports.language");
   const tstatus = useTranslations("exports.status");
   const tc = useTranslations("common");
+  const tn = useTranslations("school.nav");
   const locale = useLocale() as Locale;
   const can = useStaffCan();
   const state = useExport(exportId);
@@ -209,12 +227,17 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
     </Link>
   );
 
+  const crumbs = [
+    { label: tn("home"), href: "/" },
+    { label: t("title"), href: "/exports" },
+  ];
+
   if (state.status === "loading") return <LoadingState label={tc("loading")} />;
   if (state.status !== "ready") {
     const missing = state.status === "error" && state.reason === "not_found";
     return (
       <div className="space-y-6">
-        <PageHeader title={t("title")} />
+        <PageHeader title={t("title")} breadcrumb={[...crumbs, { label: td("title") }]} />
         <Alert
           tone={missing ? "warning" : "danger"}
           title={td(missing ? "notFoundTitle" : "loadErrorTitle")}
@@ -227,6 +250,7 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
   }
 
   const row = state.data;
+  const title = exportTitle(row, profiles.data, locale, (kind) => tk(kind));
   const count = (value: number) => formatCount(value, locale) ?? String(value);
   const columnName = (key: string) =>
     isStructureColumn(key)
@@ -236,9 +260,9 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={exportTitle(row, profiles.data, locale, (kind) => tk(kind))}
+        title={title}
+        breadcrumb={[...crumbs, { label: title }]}
         badge={<ExportStatusBadge status={row.status} />}
-        actions={back}
       />
       <Card title={td("filesTitle")}>
         {/* Announces status changes while polling; the buttons stay outside the live region. */}
@@ -274,7 +298,13 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
         {row.columns && row.columns.length > 0 ? (
           <div className="mt-4 space-y-1">
             <h3 className="text-sm text-ink-muted">{td("columns")}</h3>
-            <p className="font-semibold">{row.columns.map(columnName).join(", ")}</p>
+            <ul className="flex flex-wrap gap-1.5">
+              {row.columns.map((key) => (
+                <li key={key}>
+                  <Pill variant="tag">{columnName(key)}</Pill>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
         <p className="mt-4 text-sm text-ink-muted">{td("retentionNote")}</p>

@@ -3067,7 +3067,20 @@
       "emptyTitle": "No exports yet",
       "emptyBody": "Exports made in this school will be listed here.",
       "emptyBodyMaker": "Make a pre-check or a student list with the buttons above.",
-      "pagesLabel": "Pages of exports"
+      "pagesLabel": "Pages of exports",
+      "historyTitle": "Earlier exports",
+      "types": {
+        "precheck": {
+          "eyebrow": "Boards and portals",
+          "title": "Pre-check before you submit",
+          "body": "Check students against a board registration or portal format. You get the problems to fix first and a sheet in the portal's field order."
+        },
+        "studentList": {
+          "eyebrow": "Spreadsheet",
+          "title": "Student list",
+          "body": "Choose the columns and students for an Excel or CSV file of student details."
+        }
+      }
     },
     "scope": {
       "legend": "Which students",
