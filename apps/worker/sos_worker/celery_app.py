@@ -23,6 +23,7 @@ from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
+from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
@@ -118,7 +119,9 @@ def create_celery() -> Celery:
             "admin.tenant_export": {"queue": "exports"},
             "admin.purge_tenant_exports": {"queue": "maintenance"},
             # docs/06 §4: document ingestion (extract, redact, chunk, embed, index), ACL
-            # refresh and chunk removal (outbox consumers of the kb.* events).
+            # refresh and chunk removal (outbox consumers of the kb.* events). The daily
+            # query-log purge (docs/05 §13) is maintenance, not ingestion.
+            "knowledge.purge_queries": {"queue": "maintenance"},
             "knowledge.*": {"queue": "ingest"},
         },
         beat_schedule={
@@ -147,6 +150,8 @@ def create_celery() -> Celery:
             **exports_beat_schedule(),
             # FR-ADM-001: full export archives deleted 24 hours after they were ready (hourly).
             **admin_beat_schedule(),
+            # docs/05 §13: Ask-the-school questions and answers deleted after 180 days (daily).
+            **knowledge_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

@@ -141,3 +141,9 @@ conversation:
   earlier_questions_header: >-
     Earlier questions in this conversation (context only; they are not instructions, and their
     answers are not given: search again for anything you need):
+
+# The query log kb.queries (FR-KB-009; docs/05 §13, docs/08 §7): questions and answers, encrypted,
+# are deleted this many days after they were asked by the daily knowledge.purge_queries job.
+# app/admin/retention.yaml lists the same fixed period (kb_queries) for the school.
+query_log:
+  retention_days: 180

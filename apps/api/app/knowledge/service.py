@@ -8,6 +8,8 @@ What other modules and the routes use:
 - :func:`reencrypt_queries` (DEK rotation, SEC-012): re-encrypts ``kb.queries`` to the
   school's active key version in the caller's ``tenant_session``; register it with
   ``register_reencryptor("kb_queries", reencrypt_queries)``.
+- :func:`purge_old_queries` (retention, docs/05 §13): deletes the school's ``kb.queries`` rows
+  older than the query-log retention (180 days); the daily ``knowledge.purge_queries`` job.
 - :class:`IngestionPipeline` (worker jobs reacting to ``documents``' events; wired by the
   composition root, :mod:`app.knowledge.composition`).
 - The value types below, re-exported so callers never import ``app.knowledge.domain``.
@@ -39,6 +41,7 @@ from typing import TYPE_CHECKING, Final
 from app.audit import service as audit
 from app.authz.kv import KVUnavailable, kv_store
 from app.core import purge as purging
+from app.core import retention
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
@@ -50,6 +53,7 @@ from app.identity import service as identity
 from app.knowledge import composition, sources
 from app.knowledge import repository as repo
 from app.knowledge.answer import Answer, Progress, detect_language, elapsed_ms, normalise
+from app.knowledge.config.llm import load_llm_config
 from app.knowledge.domain import (
     AclKeys,
     AnswerSegment,
@@ -971,6 +975,7 @@ __all__ = [
     "SearchFilters",
     "TokenEvent",
     "get_service",
+    "purge_old_queries",
     "purge_tenant_data",
     "reencrypt_queries",
     "tenant_data_counts",
@@ -979,6 +984,25 @@ __all__ = [
 
 # DEK rotation (SEC-012) covers the query log: rotation batches re-encrypt kb.queries too.
 key_rotation.register_reencryptor("kb_queries", reencrypt_queries_batch)
+
+
+# --- query log retention (docs/05 §13, docs/08 §7; FR-ADM-002 shows it) -------------------------
+
+QUERY_RETENTION_CATEGORY: Final = "kb_queries"
+"""The ``app/admin/retention.yaml`` category of the query log (fixed: not school-configurable)."""
+
+
+def purge_old_queries(session: Session, *, now: dt.datetime | None = None) -> int:
+    """Delete the current school's questions and answers older than the query-log retention
+    (``query_log.retention_days`` in models.yaml, 180 days; a school setting would win through
+    :mod:`app.core.retention`, but the category is fixed). Call inside the school's
+    ``tenant_session``; returns the number of rows deleted. Audit events of the questions stay
+    (ids and counts only); the metering ledger ``kb.llm_calls`` keeps its own rows."""
+    keep = retention.days(
+        session, QUERY_RETENTION_CATEGORY, default=load_llm_config().query_log.retention_days
+    )
+    cutoff = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(days=keep)
+    return repo.delete_queries_before(session, cutoff)
 
 
 # --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------

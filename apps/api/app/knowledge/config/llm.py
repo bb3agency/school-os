@@ -159,6 +159,15 @@ class Conversation(ConfigModel):
     """Introduces the earlier questions in the user turn (prompt text, invariant 13)."""
 
 
+class QueryLog(ConfigModel):
+    """The Ask-the-school query log ``kb.queries`` (FR-KB-009; docs/05 §13, docs/08 §7)."""
+
+    retention_days: int = Field(default=180, ge=1, le=3650)
+    """Questions and answers (encrypted) older than this are deleted by the daily
+    ``knowledge.purge_queries`` job. ``app/admin/retention.yaml`` shows the same fixed period
+    (category ``kb_queries``); a test keeps the two equal."""
+
+
 class LlmConfig(ConfigModel):
     version: int = Field(ge=1)
     provider: Literal["anthropic"]
@@ -175,6 +184,7 @@ class LlmConfig(ConfigModel):
     answer_checks: AnswerChecks
     streaming: Streaming = Field(default_factory=Streaming)
     conversation: Conversation = Field(default_factory=Conversation)
+    query_log: QueryLog = Field(default_factory=QueryLog)
 
     @model_validator(mode="after")
     def _consistent(self) -> LlmConfig:

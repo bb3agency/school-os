@@ -1225,7 +1225,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Exports | 7 days (school may set 1–7) | Regenerate on demand. The school's setting applies to exports completed after it changes (`expires_at` is set at completion) |
 | Full data export (`ops.tenant_exports` archive, FR-ADM-001) | 24 hours after it is ready | Hourly `admin.purge_tenant_exports` deletes the archive; bucket rule `tenant-export-2d` (noncurrent 1 day) is the backstop; the row stays |
 | Retention settings (`ops.retention_settings`) | Life of the school | Configuration, no personal data |
-| `kb.queries` (encrypted Q/A) | 180 days | Metadata aggregates kept longer, de-identified |
+| `kb.queries` (encrypted Q/A) | 180 days | Rows deleted by the daily `knowledge.purge_queries` job (`query_log.retention_days` in `app/knowledge/config/models.yaml`); metadata aggregates (the `kb.llm_calls` metering ledger, audit events: ids and counts only) kept longer |
 | Audit events | ≥ 1 year online; archive 3 years (Object Lock) | DPDP ≥ 1 year; CERT-In 180 days in India |
 | Security/ICT logs | ≥ 1 year, stored in India | See 08 §6 |
 | Tenant offboarding | Export confirmed → delete within 30 days (one transaction as `sos_purger`, then files) → verify → crypto-shred (delete `core.tenant_keys`) | Certificate of deletion issued (docs/16 §5.5.1, ADR-0029). The school's audit chain (IDs, codes, counts) is kept 366 days after the certificate, then deleted; staff `core.users` rows stay until the identity rework (docs/16 §5.5 TODO) |
