@@ -392,6 +392,23 @@ def _b_query(w: Any) -> uuid.UUID:
     return value
 
 
+def _b_tenant_export(w: Any) -> uuid.UUID:
+    """A ready full export of school B made by its owner (tests/admin/support.py)."""
+    name = "sos_test_admin_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "admin" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    if "bola_tenant_export" not in w.b.ids:
+        w.b.ids["bola_tenant_export"] = sys.modules[name].ready_export(_ADMIN[0], w.b)
+    value: uuid.UUID = w.b.ids["bola_tenant_export"]
+    return value
+
+
 def _b_verified_answer(w: Any) -> uuid.UUID:
     """An active verified answer of school B (synthetic row; FR-KB-030)."""
     if "bola_verified" not in w.b.ids:
@@ -444,6 +461,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "item_id": lambda w: _b_extraction(w)[1],
     # Exports (US-501 AC4, US-901): a ready export of school B.
     "export_id": _b_export,
+    # Full data export (FR-ADM-001): a ready full export of school B.
+    "tenant_export_id": _b_tenant_export,
     # Knowledge (FR-KB-012): a logged question of school B.
     "query_id": _b_query,
     # Knowledge (FR-KB-030): a verified answer of school B.
@@ -553,6 +572,19 @@ def test_SEC_001_all_exports_list_never_shows_other_school(world: Any, api: Any,
     assert b_export not in {e["id"] for e in items}
     b_members = {str(p.membership_id) for p in world.b.people.values()}
     assert not {e["requested_by"]["membership_id"] for e in items} & b_members
+
+
+def test_SEC_001_full_export_list_never_shows_other_school(world: Any, api: Any) -> None:
+    """FR-ADM-001: the owner lists this school's full exports only; school B's ready export is
+    neither listed nor downloadable (404 like a random id)."""
+    b_export = str(_b_tenant_export(world))
+    owner = world.person("owner")
+    res = api.call(owner, "GET", "/api/v1/admin/tenant-export", params={"limit": 200})
+    assert res.status_code == 200, res.text
+    assert b_export not in {e["id"] for e in res.json()["data"]}
+    for suffix in ("", "/download-url"):
+        other = api.call(owner, "GET", f"/api/v1/admin/tenant-export/{b_export}{suffix}")
+        assert other.status_code == 404
 
 
 @pytest.mark.parametrize(

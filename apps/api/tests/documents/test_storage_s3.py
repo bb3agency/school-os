@@ -380,3 +380,86 @@ def test_FR_DOC_001_browser_to_s3_to_api_round_trip(
     )
     assert bad.status_code == 415
     assert s3_store.head(up["fields"]["key"]) is None
+
+
+# --- streamed uploads (the school's full data export, FR-ADM-001) ------------------------------
+
+
+def test_FR_ADM_001_streamed_upload_carries_sse_kms_and_the_tenant_export_tag() -> None:
+    """The archive is streamed as a multipart upload (never written to the worker's disk): the
+    create request carries SSE-KMS and ``sos-lifecycle=tenant-export-2d`` (bucket rule
+    ``tenant-export-2d``); parts are sent when full and the upload completes on close."""
+    client = boto3.client(
+        "s3",
+        region_name="ap-south-1",
+        aws_access_key_id="synthetic-access",
+        aws_secret_access_key="synthetic-secret",
+        config=Config(signature_version="s3v4"),
+    )
+    kms = "arn:aws:kms:ap-south-1:000000000000:key/synthetic"
+    store = S3ObjectStore(client, BUCKET, kms_key_id=kms)
+    key = storage.tenant_export_key(uuid.UUID(int=1), uuid.UUID(int=2))
+    assert key == f"t/{uuid.UUID(int=1)}/tenant-export/{uuid.UUID(int=2)}.zip"
+    with Stubber(client) as stub:
+        stub.add_response(
+            "create_multipart_upload",
+            {"UploadId": "u-1"},
+            {
+                "Bucket": BUCKET,
+                "Key": key,
+                "ContentType": "application/zip",
+                "ServerSideEncryption": "aws:kms",
+                "SSEKMSKeyId": kms,
+                "Tagging": "sos-lifecycle=tenant-export-2d",
+            },
+        )
+        stub.add_response(
+            "upload_part",
+            {"ETag": '"e1"'},
+            {"Bucket": BUCKET, "Key": key, "UploadId": "u-1", "PartNumber": 1, "Body": b"PK-small"},
+        )
+        stub.add_response(
+            "complete_multipart_upload",
+            {},
+            {
+                "Bucket": BUCKET,
+                "Key": key,
+                "UploadId": "u-1",
+                "MultipartUpload": {"Parts": [{"ETag": '"e1"', "PartNumber": 1}]},
+            },
+        )
+        writer = store.open_writer(
+            key, "application/zip", lifecycle=storage.LIFECYCLE_TENANT_EXPORT
+        )
+        writer.write(b"PK-")
+        writer.write(b"small")
+        assert writer.size == 8
+        writer.close()
+        stub.assert_no_pending_responses()
+    with pytest.raises(ValueError, match="lifecycle"):
+        store.open_writer(key, "application/zip", lifecycle="forever")
+
+
+def test_FR_ADM_001_streamed_upload_round_trip_and_abort(
+    s3_store: S3ObjectStore, s3_endpoint: str
+) -> None:
+    client = _client(s3_endpoint)
+    key = storage.tenant_export_key(uuid.uuid4(), uuid.uuid4())
+    data = (b"synthetic archive bytes " * 400_000)[: storage.MULTIPART_PART_BYTES + 12_345]
+    writer = s3_store.open_writer(key, "application/zip", lifecycle=storage.LIFECYCLE_TENANT_EXPORT)
+    for i in range(0, len(data), 1_000_000):
+        writer.write(data[i : i + 1_000_000])
+    assert s3_store.head(key) is None, "nothing is visible before the upload completes"
+    writer.close()
+    assert b"".join(s3_store.iter_chunks(key)) == data
+    tags = client.get_object_tagging(Bucket=BUCKET, Key=key)["TagSet"]
+    assert tags == [{"Key": "sos-lifecycle", "Value": "tenant-export-2d"}]
+    s3_store.delete(key)
+
+    aborted = storage.tenant_export_key(uuid.uuid4(), uuid.uuid4())
+    writer = s3_store.open_writer(aborted, "application/zip")
+    writer.write(data)
+    writer.abort()
+    assert s3_store.head(aborted) is None
+    with pytest.raises(ValueError, match="closed"):
+        writer.write(b"more")

@@ -1,0 +1,61 @@
+# School admin console: the school's full data export (US-1201, FR-ADM-001; docs/05 §7.4).
+# Versioned configuration shipped inside the package next to the module that reads it
+# (app/admin/config.py; CLAUDE.md §4, invariant 13).
+version: 1
+
+tenant_export:
+  # Archive layout (manifest.json "layout_version"); bump when files or columns change meaning.
+  layout_version: 1
+  # FR-ADM-001: the archive can be downloaded for 24 hours after it is ready, then the purge
+  # job deletes it (the bucket rule tenant-export-2d is the backstop).
+  link_valid_hours: 24
+  # Each download link is a presigned GET valid at most 5 minutes (docs/07 §10).
+  download_url_ttl_s: 300
+  # A failed export's leftovers (none are kept: an aborted upload stores nothing) are checked
+  # this long after the request.
+  failed_cleanup_hours: 24
+  # Most audit events one export may hold (the audit CSV is streamed; docs/12 budget).
+  max_audit_rows: 5000000
+  # Most bytes of stored documents one export may copy (20 GiB). Larger: fails with
+  # "too_large" and support splits the export (docs/11 runbook).
+  max_document_bytes: 21474836480
+  # Worker time limits for one export (queue "exports").
+  task_soft_time_limit_s: 3300
+  task_time_limit_s: 3600
+  # Attributes never exported, not even with include_sensitive (the Aadhaar-as-printed fields;
+  # docs/08 §5 PRV-013/014, the same list as app/exports/config.yaml never_exported).
+  never_exported: [aadhaar_name_as_printed, aadhaar_dob_as_printed, aadhaar_gender_as_printed]
+
+  # README.txt at the top of the archive (plain language, English then Telugu).
+  readme_en: |
+    SchoolOS full data export
+
+    This archive holds your school's records as it was when the export was made:
+    - records/: one CSV file (opens in Excel) and one JSON file per table.
+    - documents/: every uploaded document version that passed the virus check.
+    - audit/audit-log.csv: the school's audit log.
+    - manifest.json: what is in the archive, row counts and notes.
+
+    Restricted details (health notes, category, guardian phone numbers and addresses, the
+    last four Aadhaar digits) show as •••• unless the export was made with "include
+    restricted details". Full Aadhaar numbers are never stored by SchoolOS, so they are never
+    in an export. The Aadhaar-as-printed name, date of birth and gender are never exported.
+
+    This file contains children's personal data. Keep it on a secure computer, do not email
+    it, and delete copies you no longer need.
+  readme_te: |
+    SchoolOS పూర్తి డేటా ఎగుమతి
+
+    ఈ ఆర్కైవ్‌లో ఎగుమతి చేసిన సమయానికి మీ పాఠశాల రికార్డులు ఉన్నాయి:
+    - records/: ప్రతి పట్టికకు ఒక CSV ఫైల్ (Excelలో తెరుచుకుంటుంది) మరియు ఒక JSON ఫైల్.
+    - documents/: వైరస్ తనిఖీ పూర్తయిన ప్రతి అప్‌లోడ్ చేసిన పత్రం.
+    - audit/audit-log.csv: పాఠశాల ఆడిట్ లాగ్.
+    - manifest.json: ఆర్కైవ్‌లో ఏమి ఉన్నాయి, వరుసల సంఖ్యలు మరియు గమనికలు.
+
+    పరిమిత వివరాలు (ఆరోగ్య గమనికలు, కేటగిరీ, సంరక్షకుల ఫోన్ నంబర్లు మరియు చిరునామాలు,
+    ఆధార్ చివరి నాలుగు అంకెలు) "పరిమిత వివరాలను చేర్చు" ఎంచుకోకపోతే •••• గా కనిపిస్తాయి.
+    SchoolOS పూర్తి ఆధార్ నంబర్లను ఎప్పుడూ నిల్వ చేయదు, కాబట్టి అవి ఎగుమతిలో ఉండవు. ఆధార్‌పై
+    ముద్రించిన పేరు, పుట్టిన తేదీ మరియు లింగం ఎప్పుడూ ఎగుమతి చేయబడవు.
+
+    ఈ ఫైల్‌లో పిల్లల వ్యక్తిగత వివరాలు ఉన్నాయి. దీన్ని సురక్షితమైన కంప్యూటర్‌లో ఉంచండి, ఈమెయిల్
+    చేయకండి, అవసరం లేని కాపీలను తొలగించండి.

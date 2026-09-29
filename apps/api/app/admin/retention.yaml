@@ -1,0 +1,61 @@
+# Retention periods per data category and the bounds a school may choose within (US-1201,
+# FR-ADM-002, BR-08; docs/05 §13, docs/08 §7). Versioned configuration shipped inside the
+# package next to the module that reads it (app/admin/config.py; invariant 13).
+#
+# Per category
+#   default_days   what applies while the school keeps the default (docs/05 §13)
+#   min_days       shortest period a school may set
+#   max_days       longest period a school may set
+#   configurable   false: shown to the school, fixed by SchoolOS (law, security or a feature)
+#   enforced_by    the job that deletes the data (null: no deletion job yet, or never deleted
+#                  by the app); every configurable category names its job
+#
+# Principles (docs/08 §7): working data (imports, exports, read notifications) is deleted
+# quickly, so a school may shorten these periods but never keep them longer than the default:
+# the bucket lifecycle rules are set to the defaults as a backstop (exports-7d), and keeping
+# children's data longer than needed is not allowed (DPDP Rule 8, data minimisation). Security
+# and audit logs are kept at least 13 months (DPDP 1 year, CERT-In 180 days in India; PRV-018)
+# and cannot be shortened. Official student records follow the school's legal obligations and
+# are never deleted automatically (no category here).
+#
+# PENDING product/legal review: the minimums below are engineering choices, not legal advice
+# (docs/08 "Not legal advice"); see the FR-ADM-002 open questions in docs/14.
+version: 1
+
+categories:
+  import_raw_files:
+    default_days: 90      # FR-IMP-007; app/imports/config.yaml raw_file_retention_days
+    min_days: 7
+    max_days: 90
+    configurable: true
+    enforced_by: imports.purge_raw_files
+  exports:
+    default_days: 7       # FR-EXP; app/exports/config.yaml retention_days, bucket rule exports-7d
+    min_days: 1
+    max_days: 7
+    configurable: true
+    enforced_by: exports.purge_expired
+  notifications_read:
+    default_days: 90      # FR-NOT-001; app/notifications/templates.yaml retention.read_days
+    min_days: 30
+    max_days: 90
+    configurable: true
+    enforced_by: notifications.purge_read
+  tenant_exports:
+    default_days: 1       # FR-ADM-001: the full export is downloadable for 24 hours
+    min_days: 1
+    max_days: 1
+    configurable: false
+    enforced_by: admin.purge_tenant_exports
+  kb_queries:
+    default_days: 180     # docs/05 §13 "Ask the school" questions and answers (encrypted)
+    min_days: 180
+    max_days: 180
+    configurable: false
+    enforced_by: null     # no purge job yet (knowledge module); see docs/14
+  audit_events:
+    default_days: 395     # at least 13 months online (PRV-018), archived 3 years (Object Lock)
+    min_days: 395
+    max_days: 395
+    configurable: false
+    enforced_by: null     # the audit log is append-only; the app never deletes events
