@@ -967,7 +967,7 @@ class AppFakeAdapter:
         if support.pipeline().ingest(school.tenant_id, doc_id, version_id) != "indexed":
             return CircularResult(failed=True)
         with self._admin.connect() as c:
-            reading_id = c.execute(
+            reading_id: uuid.UUID = c.execute(
                 text("SELECT id FROM kb.circular_readings WHERE version_id = :v"),
                 {"v": version_id},
             ).scalar_one()

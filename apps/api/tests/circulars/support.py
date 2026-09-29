@@ -101,7 +101,7 @@ def circular(
     acl: list[tuple[str, str]] | None = None,
     sensitivity: str = "C1",
 ) -> uuid.UUID:
-    document_id, _version = KB.text_document(
+    ids: tuple[uuid.UUID, uuid.UUID] = KB.text_document(
         admin,
         school,
         body,
@@ -109,7 +109,7 @@ def circular(
         acl=KB.ALL_ROLES_ACL if acl is None else acl,
         sensitivity=sensitivity,
     )
-    return document_id
+    return ids[0]
 
 
 def reading_row(admin: Engine, document_id: uuid.UUID) -> dict[str, Any]:
