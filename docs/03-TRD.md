@@ -88,6 +88,8 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-IMP-005 | Batches MUST be reversible within 24 h if no dependent changes exist. | T |
 | FR-IMP-006 | 2,000-row files MUST validate in ≤ 60 s. | T |
 | FR-IMP-007 | Imported raw files MUST be retained per retention policy and then deleted. | T |
+| FR-IMP-008 | Before commit the uploaded file MUST be viewable as a sheet (columns with their mapped field, rows in file order with their check result) and its cells editable with optimistic concurrency (`If-Match`). The raw file is never changed: edits are stored as an append-only, encrypted history (who, when, cell) applied whenever the file is read, a checked batch re-checks after each edit, and commit adds the edited values. Restricted (C3) columns (mapped to, or suggested for, a C3 field) are never shown or edited; full Aadhaar numbers are refused and never stored; no edits once the batch is committed, reverted or busy. *(As built; PO to confirm.)* | T |
+| FR-IMP-009 | The staged sheet with its edits MUST be downloadable as CSV (UTF-8 with BOM) or XLSX (text cells, watermark), with Aadhaar-like numbers masked, formula injection neutralised (SEC-017), restricted columns empty without `student.read_sensitive`, step-up re-authentication (FR-EXP-004) and an audit event (counts only). *(As built; PO to confirm.)* | T |
 | FR-IMP-020 | Register-page photos (JPG/PNG/PDF) MUST go through extraction into a verification queue; nothing becomes a record without human confirmation. | T |
 | FR-IMP-021 | Extraction MUST output per-field confidence and bounding regions where available. | T |
 | FR-IMP-022 | Aadhaar-like 12-digit numbers (Verhoeff-valid) MUST be masked in extracted text before storage. | T |
@@ -128,6 +130,9 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-DOC-006 | Versioning MUST keep history; latest version is default for retrieval. | T |
 | FR-DOC-007 | Deleting a document MUST remove its chunks and embeddings from retrieval within 5 min and purge storage per retention. | T |
 | FR-DOC-008 | Processing status MUST be tracked (queued, scanning, extracting, chunking, embedding, ready, failed) with retry. | T |
+| FR-DOC-009 | XLSX/CSV documents MUST open as a paged table (first worksheet of the newest scanned version, row 1 as column names) without evaluating formulas, with Aadhaar-like numbers masked, the same visibility and C3 rules as downloads, and a size limit (larger files are downloaded instead). Import files open from their import (FR-IMP-008). *(As built; PO to confirm.)* | T |
+| FR-DOC-010 | Holders of `document.upload` MUST be able to save edited cells of a single-sheet XLSX without formulas as the next version (`If-Match`, base version must be current; values only; history kept; scanned and indexed like an upload); full Aadhaar numbers refused; audit with cell references, never values. *(As built; PO to confirm.)* | T |
+| FR-DOC-011 | A document sheet, with unsaved edits, MUST be downloadable as CSV or XLSX with masking, formula neutralisation (SEC-017), watermark (FR-EXP-003) and an audit event; personal (C2) and restricted (C3) documents need step-up (FR-EXP-004). *(As built; PO to confirm.)* | T |
 
 ### 3.8 Knowledge & Ask (FR-KB) (details in 06-RAG)
 

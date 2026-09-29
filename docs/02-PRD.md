@@ -109,6 +109,8 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC2: Validation shows row-level errors (missing fields, bad dates, duplicates) before anything is saved.
 - AC3: Commit is all-or-nothing per batch, attributed to the chosen source (e.g., `udise_plus`), and reversible within 24 hours.
 - AC4: 2,000 rows validate in under 60 seconds.
+- AC5: Before commit I can see the uploaded file as a sheet (every column with the field it fills, each row with its check result) and correct cells in place; a checked file re-checks the row at once, the uploaded file itself is kept as it was, every edit is recorded with who and when, and the commit adds the edited values. Restricted (C3) columns are never shown or edited there, a full Aadhaar number is refused, and nothing can be edited once the rows were added (corrections then go through the student profile or a change request). *(Written from the implementation; to be confirmed by the product owner.)*
+- AC6: I can download the sheet with my edits as CSV or XLSX (one header row, the data rows) after confirming it's me (MFA within 5 minutes). Aadhaar-like numbers are masked, formulas are neutralised, restricted columns are empty unless I may see sensitive data, and every download is audited. *(Written from the implementation; to be confirmed by the product owner.)*
 
 **US-402** · As an office admin, I want to photograph admission register pages so that old entries become searchable records. [FR-IMP-020..026]
 - AC1: I upload photos; the system extracts rows (admission no., name, DOB, parent names, dates) into a verification queue with the image beside each row.
@@ -143,6 +145,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC2: Each document has type, date, issuing body, academic year, language (auto-detected, editable) and visibility (roles/scopes).
 - AC3: Processing status is visible (queued → extracting → indexing → ready / needs attention).
 - AC4: Uploading a new version keeps history; search uses the latest unless I ask about older versions.
+- AC5: An XLSX or CSV document opens as a table (first worksheet, row 1 as column names) with Aadhaar-like numbers masked and formulas shown as text. If I may upload, I can correct cells of a single-sheet XLSX without formulas and save them as the next version (history kept, scanned and indexed like an upload), and I can download the sheet, with unsaved edits, as CSV or XLSX; personal (C2) or restricted (C3) sheets ask me to confirm it's me first. Files uploaded for an import open from the import instead. *(Written from the implementation; to be confirmed by the product owner.)*
 
 ### C8 · Ask the school
 

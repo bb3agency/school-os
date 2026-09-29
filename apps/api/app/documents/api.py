@@ -272,7 +272,8 @@ def get_sheet(
     the first worksheet of the newest checked version, row 1 as column names, 100 rows per
     page. ``sheet_count`` says when the workbook has more sheets (not shown). Aadhaar-like
     numbers are masked; formulas are shown as text, never run. 415 ``not_a_sheet`` for other
-    files, 413 above 10 MB (download instead), 403 for restricted (C3) files as downloads.
+    files, 413 above 10 MB (download instead), 403 for restricted (C3) files as downloads,
+    409 ``import_file_sheet`` for files uploaded for an import (open them from the import).
     ``editable`` says whether you may save edits as a new version; ``ETag`` is needed to save."""
     response.headers["Cache-Control"] = "no-store"
     out = service.get_sheet(db, ctx, document_id, limit=limit, cursor=cursor)
@@ -312,8 +313,10 @@ def export_sheet(
     ctx: Reader, db: TenantDB, document_id: uuid.UUID, body: SheetExportIn
 ) -> Response:
     """Download the sheet, with any unsaved edits, as CSV or XLSX (permission
-    ``document.read``, as downloads; FR-DOC-011). Aadhaar-like numbers masked, formulas
-    neutralised, CSV in UTF-8 with BOM so Telugu opens in Excel. Every download is audited."""
+    ``document.read``, as downloads; FR-DOC-011). Personal (C2) and restricted (C3) documents
+    also need a recent sign-in with MFA (428 ``step_up_required``; FR-EXP-004). Aadhaar-like
+    numbers masked, formulas neutralised, CSV in UTF-8 with BOM so Telugu opens in Excel, XLSX
+    with the internal-checking watermark. Every download is audited."""
     file = service.export_sheet(db, ctx, document_id, body)
     return Response(
         content=file.content,
