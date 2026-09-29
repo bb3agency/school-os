@@ -80,6 +80,7 @@ from app.core.errors import (
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
+from app.core.redaction import contains_full_aadhaar
 from app.documents import service as documents
 from app.documents.schemas import DocumentDetail, DocumentOut
 from app.identity import service as identity
@@ -132,6 +133,23 @@ def _request_id() -> str | None:
 
 def _error(field: str, code: str) -> dict[str, str]:
     return {"field": field, "code": code, "message_key": f"errors.{code}"}
+
+
+AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
+
+
+def _refuse_aadhaar(values: Mapping[str, str | None]) -> None:
+    """Typed text is never stored with a full Aadhaar number (invariant 4): 422 per field,
+    like reasons, notes and cell edits in the other modules."""
+    fields = sorted(k for k, v in values.items() if v and contains_full_aadhaar(v))
+    if fields:
+        raise ValidationFailed(
+            [
+                {"field": f, "code": AADHAAR_CODE, "message_key": "errors.aadhaar_last4_only"}
+                for f in fields
+            ],
+            detail="Don't enter Aadhaar numbers. Enter only the last 4 digits.",
+        )
 
 
 def _audit(
@@ -656,6 +674,7 @@ def confirm_suggestion(
     the task keeps the circular's citation. Audited ``circular.suggestion_confirmed`` and
     ``task.created``; the owner is notified."""
     suggestion, reading = _locked_suggestion(session, ctx, suggestion_id, version)
+    _refuse_aadhaar({"title": data.title, "details": data.details})
     _active_owner(session, data.owner_membership_id, "owner_membership_id")
     limits = rules().tasks
     edited = sorted(
@@ -881,6 +900,7 @@ def create_task(session: Session, ctx: UserContext, data: TaskCreate) -> TaskOut
     """Add a task by hand (``task.manage``), optionally linked to a circular you can see."""
     if not ctx.has(TASK_MANAGE):
         raise Forbidden()
+    _refuse_aadhaar({"title": data.title, "details": data.details})
     _active_owner(session, data.owner_membership_id, "owner_membership_id")
     document_id = _linked_document(session, ctx, data.document_id) if data.document_id else None
     task = repo.insert_task(
@@ -909,6 +929,7 @@ def update_task(
     cancelled tasks cannot change (409 ``task_closed``). A new owner is notified."""
     if not ctx.has(TASK_MANAGE):
         raise Forbidden()
+    _refuse_aadhaar({"title": data.title, "details": data.details})
     task = _visible_task(session, ctx, task_id, lock=True)
     _check_version(task.version, version)
     if task.status not in ACTIVE:
@@ -1225,6 +1246,7 @@ def update_notice(
     values = {
         k: v for k, v in data.model_dump(exclude_none=True).items() if v != getattr(notice, k)
     }
+    _refuse_personal(values)
     if not values:
         return _notice_out(session, notice)
     notice = repo.update_notice(session, notice.id, values)

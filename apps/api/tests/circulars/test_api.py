@@ -507,3 +507,62 @@ def test_FR_TASK_002_assignees_need_a_school_wide_grant(ai_on: Any) -> None:
         assert service.assignees(db, base)
         with pytest.raises(Forbidden):
             service.assignees(db, scoped)
+
+
+def test_invariant_4_tasks_and_notice_drafts_refuse_full_aadhaar_numbers(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """No Aadhaar number is ever stored (invariant 4): typed task titles and details are refused
+    with ``aadhaar_full_number_rejected`` (like reasons, notes and cell edits elsewhere), and a
+    notice draft's texts with ``notice_personal_data`` when saved (docs/09), not only when the
+    notice is approved."""
+    from app.core.redaction import verhoeff_check_digit
+
+    digits = "73920184556"
+    aadhaar = digits + verhoeff_check_digit(digits)
+    spaced = f"{aadhaar[:4]} {aadhaar[4:8]} {aadhaar[8:]}"
+    school = ai_on.a
+    owner = school.people["owner"]
+    teacher = school.people["class_teacher"]
+    due = (service.today_ist() + dt.timedelta(days=5)).isoformat()
+    created = api.call(
+        owner,
+        "POST",
+        "/api/v1/tasks",
+        json={
+            "title": "Collect the forms",
+            "details": f"Student Aadhaar {spaced} is missing a photo",
+            "owner_membership_id": str(teacher.membership_id),
+            "due_on": due,
+        },
+    )
+    assert created.status_code == 422, created.text
+    assert [(e["field"], e["code"]) for e in created.json()["errors"]] == [
+        ("details", "aadhaar_full_number_rejected")
+    ]
+    task = C.task(school, owner=teacher)
+    edited = api.call(
+        owner, "PATCH", f"/api/v1/tasks/{task}", json={"title": f"Check {aadhaar}"}, headers=_if(1)
+    )
+    assert edited.status_code == 422, edited.text
+    assert edited.json()["errors"][0]["code"] == "aadhaar_full_number_rejected"
+    office = school.people["office_staff"]
+    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    draft = api.call(
+        office,
+        "PATCH",
+        f"/api/v1/notices/{blank['id']}",
+        json={"body_te": f"ఆధార్ {spaced}"},
+        headers=_if(blank["version"]),
+    )
+    assert draft.status_code == 422, draft.text
+    assert draft.json()["errors"][0]["field"] == "body_te"
+    # docs/09: PATCH /notices refuses personal numbers (Aadhaar-like, phones, emails) at once.
+    assert draft.json()["errors"][0]["code"] == "notice_personal_data"
+    for sql in (
+        "SELECT count(*) FROM ops.tasks WHERE tenant_id = :t "
+        "AND coalesce(title, '') || coalesce(details, '') LIKE :p",
+        "SELECT count(*) FROM ops.parent_notices WHERE tenant_id = :t "
+        "AND title_en || body_en || title_te || body_te LIKE :p",
+    ):
+        assert C.db_value(admin_engine, sql, t=school.tenant_id, p=f"%{aadhaar[8:]}%") == 0
