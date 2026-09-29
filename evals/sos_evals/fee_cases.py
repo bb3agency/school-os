@@ -260,7 +260,10 @@ CASES: tuple[FeeCase, ...] = (
         "AB-2026-0201 ఫీజు బకాయి ఎంత?",
         "owner",
         [RAVI, DEVI],
-        [_l("L1", "Surampalli Ravi Teja Fees 10A", "12000.00"), _l("L2", "Lakshmi Devi 9B", "5600.00")],
+        [
+            _l("L1", "Surampalli Ravi Teja Fees 10A", "12000.00"),
+            _l("L2", "Lakshmi Devi 9B", "5600.00"),
+        ],
         [("L2", "S2")],
         refuse=True,
         note="name-matching ledger not linked",
