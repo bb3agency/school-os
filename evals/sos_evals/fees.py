@@ -284,6 +284,11 @@ def _check_keys(case: FeeCase) -> None:
             raise ValueError(f"{case.id}: link to an unknown ledger or student")
     if case.student is not None and case.student not in students:
         raise ValueError(f"{case.id}: asks about an unknown student")
+    for ledger in case.ledgers:
+        if any(ledger.name.casefold() in s.name.casefold() for s in case.students):
+            # A ledger named exactly like a student could not be told apart from the student's
+            # own name in an answer, so the ledger-name leak check would be meaningless.
+            raise ValueError(f"{case.id}: ledger {ledger.key} is named exactly like a student")
 
 
 def expected_total(case: FeeCase) -> Decimal:

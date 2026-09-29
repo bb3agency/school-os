@@ -51,6 +51,17 @@ offline stand-in (``knowledge.gateway.fake_circulars``: sentences that write a d
 word), and scored from the stored suggestions. Recall and precision therefore measure that
 stand-in plus the application's grounding checks, never Claude.
 
+Fee dues (M6, ``sos_evals.fees``; ADR-0032): each synthetic case is its own school (the
+academic structure above) with the case's students created through ``students.service``, its
+Tally ledgers, links and the ``tally.connector.enabled`` flag as the case says, and one asker
+with the case's role (class and subject teachers scoped to the asked student's section). The
+question goes through ``knowledge.service`` like any other; the stand-in, when the application
+offers ``get_fee_dues``, finds the student by the admission number in the question (never by a
+name) and calls the tool (without a number: the school totals), then answers with the tool's text
+and cites it whole. Without the tool (no ``finance.read``, connector off) it searches documents
+(there are none) and answers "not found". The figures therefore measure the application's tool,
+links, permission and flag checks, never Claude.
+
 Mapping: record sources carry the application's student ids; the bridge rewrites them to the
 corpus ids (``sos://student/<corpus id>/...``). Document ids are the corpus ids. Corpus doc
 types outside the documents module's list (``note``, ``checklist``, ``timetable``) are stored as
@@ -163,6 +174,9 @@ FIELD_WORDS: Final = (
     ("dob", ("date of birth", "dob", "birth", "పుట్టిన", "puttina")),
 )
 """Record fields the stand-in recognises (first match wins)."""
+FEES: Final = "get_fee_dues"
+FEE_WORDS: Final = ("fee", "dues", "owe", "ఫీజు", "బకాయి", "బాకీ", "kattali")
+"""Fee questions the stand-in recognises (only when the application offers get_fee_dues)."""
 _STUDENT_ID: Final = re.compile(r"Student ID: ([0-9a-f-]{36})\.")
 _STUDENT_URI: Final = re.compile(r"^sos://student/([0-9a-f-]{36})(.*)$")
 Step = tuple[str, dict[str, Any]] | list[dict[str, Any]]
@@ -341,6 +355,38 @@ class EvalFakeTransport:
         facts = [(r, _block_text(r)) for r in self._results(messages, FACTS)]
         return self._cite(facts, prefix, first_only=True)
 
+    def _fee_step(
+        self, messages: Sequence[Mapping[str, Any]], question: str, tools: set[str], prefix: str
+    ) -> Step:
+        """Find the student by the admission number in the question (never by a name), then
+        ``get_fee_dues``; no number: the school totals. The answer is the tool's text, cited."""
+        called = set(self._calls(messages).values())
+        number = ADMISSION_NO.search(question)
+        if number is not None:
+            if FIND not in called and FIND in tools:
+                return FIND, {"query": number.group(0)}
+            student = student_id_for(number.group(0), self._results(messages, FIND))
+            if student is None:
+                return []
+            if FEES not in called:
+                return FEES, {"student_id": student}
+        elif FEES not in called:
+            return FEES, {}
+        content = []
+        for index, result in enumerate(self._results(messages, FEES)):
+            text_ = _block_text(result)
+            citation = {
+                "type": "search_result_location",
+                "source": result.get("source"),
+                "title": result.get("title"),
+                "cited_text": text_,
+                "search_result_index": index,
+                "start_block_index": 0,
+                "end_block_index": 1,
+            }
+            content.append({"type": "text", "text": prefix + text_, "citations": [citation]})
+        return content
+
     def _document_step(
         self, messages: Sequence[Mapping[str, Any]], question: str, tools: set[str], prefix: str
     ) -> Step:
@@ -373,11 +419,12 @@ class EvalFakeTransport:
             if (body.get("tool_choice") or {}).get("type") != "none":
                 tools = {str(t.get("name")) for t in body.get("tools") or ()}
             wanted = record_request(question)
-            step = (
-                self._record_step(messages, wanted, tools, prefix)
-                if wanted is not None
-                else self._document_step(messages, question, tools, prefix)
-            )
+            if FEES in tools and any(w in question.casefold() for w in FEE_WORDS):
+                step = self._fee_step(messages, question, tools, prefix)
+            elif wanted is not None:
+                step = self._record_step(messages, wanted, tools, prefix)
+            else:
+                step = self._document_step(messages, question, tools, prefix)
         if isinstance(step, tuple):
             return self._use(step[0], step[1], body)
         return self._reply(step or [{"type": "text", "text": not_found}], "end_turn", body)
@@ -449,8 +496,9 @@ class ParityError(ValueError):
 
 
 class AppFakeAdapter:
-    """``RetrievalAdapter`` + ``AskAdapter`` over ``knowledge.service``, and the M4
-    ``CircularAdapter`` over ``circulars.service`` (see the docstring)."""
+    """``RetrievalAdapter`` + ``AskAdapter`` over ``knowledge.service``, the M4
+    ``CircularAdapter`` over ``circulars.service`` and the M6 ``FeeAdapter`` over
+    ``knowledge.service`` with ``get_fee_dues`` (see the docstring)."""
 
     name = "app-fake"
 
@@ -992,6 +1040,97 @@ class AppFakeAdapter:
             ),
             reference_no=row.reference_no,
             issued_on=row.issued_on,
+        )
+
+    # --- M6 fee dues from Tally (sos_evals.fees; FR-TALLY-008) --------------------------------
+
+    def _fee_school(self, case: Any) -> tuple[Any, dict[str, uuid.UUID]]:
+        """The case's own school: students through ``students.service``, its ledgers and links
+        (connector rows as the agent and the accountant would leave them), the flag as given."""
+        from app.core.db import tenant_session
+        from app.students import service as students
+        from app.students.schemas import StudentCreate, ValueIn
+
+        tally = _load("sos_test_tally_support", TESTS / "tally" / "support.py")
+        school = self._school(f"fees:{case.id}")
+        owner = school.people["owner"]
+        register = "admission_register"
+        ids: dict[str, uuid.UUID] = {}
+        for s in case.students:
+            values = [
+                ValueIn(attribute_key="full_name", source=register, value=s.name),
+                ValueIn(attribute_key="dob", source=register, value="2012-03-14"),
+                ValueIn(attribute_key="admission_no", source=register, value=s.admission_no),
+            ]
+            with tenant_session(school.tenant_id, owner.user_id) as db:
+                out = students.create_student(
+                    db,
+                    self.K.SW.admin_ctx(school),
+                    StudentCreate(values=values, section_id=school.ids[f"section:{s.section}"]),
+                )
+            ids[s.key] = out.id
+        parties: dict[str, uuid.UUID] = {}
+        for ledger in case.ledgers:
+            parties[ledger.key] = tally.seed_party(
+                self._admin, school.tenant_id, owner.user_id, ledger=ledger.name
+            )
+            with self._admin.begin() as c:
+                c.execute(
+                    text(
+                        "UPDATE ops.tally_parties SET closing_balance = :b, group_name = :g "
+                        "WHERE id = :i"
+                    ),
+                    {"b": ledger.balance, "g": ledger.group, "i": parties[ledger.key]},
+                )
+        for ledger_key, student_key in case.links:
+            tally.seed_link(
+                self._admin,
+                school.tenant_id,
+                parties[ledger_key],
+                ids[student_key],
+                owner.user_id,
+            )
+        tally.set_flag(self._admin, school.tenant_id, enabled=case.connector_on)
+        return school, ids
+
+    def ask_fees(self, case: Any) -> Any:
+        """One fee case through ``knowledge.service`` (see the module docstring)."""
+        from app.authz.catalog import implicit_permissions, system_roles
+        from app.authz.context import Scopes, UserContext
+        from app.core.db import tenant_session
+        from app.knowledge.domain import AskRequest
+        from sos_evals.fees import FeeCitation, FeeResult
+
+        school, _ = self._fee_school(case)
+        member = self.K.W.add_member(self._admin, school.tenant_id, [case.asker])
+        template = system_roles()[case.asker]
+        scoped = {p for p in template.permission_keys if (g := template.grant(p)) and g.scoped}
+        target = next((s for s in case.students if s.key == case.student), case.students[0])
+        sections = frozenset({school.ids[f"section:{target.section}"]}) if scoped else frozenset()
+        ctx = UserContext(
+            user_id=member.user_id,
+            tenant_id=school.tenant_id,
+            membership_id=member.membership_id,
+            roles=frozenset({case.asker}),
+            permissions=frozenset(set(template.permission_keys) | set(implicit_permissions())),
+            scopes=Scopes(school=not scoped, section_ids=sections),
+            mfa=True,
+            auth_time=None,
+            scoped_permissions=frozenset(scoped),
+        )
+        with tenant_session(school.tenant_id, ctx.user_id) as s:
+            outcome = self._service.respond(
+                s, ctx, AskRequest(question=case.question, session_id=uuid.uuid4())
+            )
+        answer = outcome.answer
+        return FeeResult(
+            text=" ".join(seg.text for seg in answer.segments),
+            citations=tuple(
+                FeeCitation(source=c.source, cited_text=c.cited_text)
+                for seg in answer.segments
+                for c in seg.citations
+            ),
+            provided_sources=tuple(answer.provided),
         )
 
 

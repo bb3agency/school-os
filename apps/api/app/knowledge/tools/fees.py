@@ -134,9 +134,9 @@ class GetFeeDuesTool:
 
     def _student(self, tenant_id: uuid.UUID, dues: tally.StudentFeeDues) -> SearchResultBlock:
         name = dues.display_name or "(no name recorded)"
-        who = f"{name}, admission no. {dues.admission_no or 'none'}"
-        if dues.class_section:
-            who += f", class {dues.class_section}"
+        # "admission number", not "no.": answers are split into sentences at ". ".
+        who = f"{name} (admission number {dues.admission_no or 'none'}"
+        who += f", class {dues.class_section})" if dues.class_section else ")"
         source = self._source(tenant_id, str(dues.student_id), dues.as_of, dues.synced_at)
         title = f"Fee dues from Tally · {name}"
         if not dues.ledgers:
