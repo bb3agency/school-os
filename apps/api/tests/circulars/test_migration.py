@@ -378,7 +378,8 @@ def test_FR_NOTICE_003_the_app_may_record_the_draft_outcome(admin_engine: Engine
 def test_CLAUDE_6_12_notice_drafting_migration_reversible_with_data(populated: _Walk) -> None:
     admin = populated.admin
     before = ScriptDirectory.from_config(populated.cfg).get_revision(DRAFTING).down_revision
-    assert before == "0034_circulars"
+    # Relinked after M5 and M6 at merge (0035_student_insights, 0036_tally).
+    assert before == "0036_tally"
     tenant_id, user_id, _membership_id = _member(admin)
     with admin.begin() as c:
         drafting = _notice_row(

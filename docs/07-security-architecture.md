@@ -200,7 +200,6 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | marks.read (M5: see marks) | — | ✓ | — | — | — | ✓ | S | — | — |
 | tally.device.manage (M6: enrol the Tally edge agent with a one-time code, revoke it; ADR-0032 Proposed, behind a flag) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | tally.configure (M6: choose Tally ledger groups, link Tally ledgers to students; ADR-0032 Proposed, behind a flag) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
-| insights.read (M5) | ✓ | ✓ | — | — | — | — | S | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | tenant.export_all | ✓ᴿ | — | — | — | — | — | — | — | — |
 | certificate.read (see, print and download certificates; M3) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ |
