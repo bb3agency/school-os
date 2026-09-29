@@ -527,7 +527,7 @@
         "eventsChecked": "Events checked"
       },
       "home": "Home",
-      "filterActionPlaceholder": "For example student.update",
+      "filterActionPlaceholder": "Such as student.update",
       "filterUserPlaceholder": "The person's user ID",
       "clearFilters": "Clear filters",
       "exportLater": "Downloading the audit log as a CSV file is not available on this screen yet."

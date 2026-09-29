@@ -132,7 +132,7 @@ export function AuditView({
           method="get"
           role="search"
           aria-label={t("filtersTitle")}
-          className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[2fr_2fr_1fr_1fr_auto]"
+          className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem_9rem_auto]"
         >
           <SearchInput
             name="action"
