@@ -6,6 +6,7 @@
 | Scope | Core platform (M0–M2) + platform admin panel (C14) + interfaces for M3–M6 |
 | Related | 02-PRD (stories), 04-Architecture, 05-Data model, 06-RAG, 07-Security, 16-Platform admin panel |
 | Changes | 0.4: FR-CERT-001..014 and FR-REG-001..005 (§3.14, M3 certificates and registers), proposed from the roadmap scope (PO to confirm). 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
+| Changes | 0.4: §3.14 circulars, tasks and parent notices (FR-CIR-001..008, FR-TASK-001..008, FR-NOTICE-001..008; M4), proposed from the roadmap scope for the product owner to confirm; traceability row for BRD P4. 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
 
 Normative keywords: **MUST / SHOULD / MAY** (RFC 2119). Every requirement has an ID and a verification method: **T** test · **I** inspection · **D** demonstration · **A** analysis.
 
@@ -257,6 +258,36 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-REG-003 | An admission and withdrawal register print view MUST list students in admission-number order with admission number, name, parents' names, date of birth, date and class of admission, date and class of leaving and the TC serial number. *(Proposed; PO to confirm.)* | T |
 | FR-REG-004 | Register views MUST be A4 landscape print pages with bilingual headings, IST dates as DD/MM/YYYY and Telugu text that never clips; they need `register.read`ᴿ (bulk personal data, like an export, FR-EXP-004) and are audited with counts only (`register.viewed`). *(Proposed; PO to confirm.)* | T |
 | FR-REG-005 | Register entries MUST be append-only: an issued certificate's number, content and dates are frozen by a trigger, the app role has no `DELETE`, and only workflow columns (status to `cancelled`, cancellation fields, PDF state, document link) change. *(Proposed; PO to confirm.)* | T |
+### 3.14 Circulars, tasks and parent notices (FR-CIR, FR-TASK, FR-NOTICE) (M4; details in 06 §4.10, §10.4-10.5, §13)
+
+Every row below is proposed from the roadmap scope (14 · M4; stories US-1601..US-1606) and waits for the product owner to confirm it.
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-CIR-001 | When the current version of a document of type `circular` is indexed, a reading job MUST be queued in the same transaction (outbox); holders of `circular.review` MAY request it again while it is not `ready`. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-002 | Reading MUST go through `knowledge.gateway` (role `circular`, prompt `circular_reading` in `app/knowledge/prompts/`, model and caps in `models.yaml`) with only that version's indexed, Aadhaar-masked passages as input; the strict-JSON output (issuer, reference number, date, subject, EN and TE summary, deadlines) MUST be validated server-side. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-003 | Every suggested deadline MUST cite a passage of the same version with a quote that is a substring of it and contains the due date; issuer, reference number and date MUST appear in the passages. Anything else is dropped (counted, never stored) or left empty; nothing is guessed. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-004 | Suggestions MUST NOT create tasks: a person holding `circular.review` confirms (optionally editing title, details, due date; choosing the owner) or dismisses each one, once; decisions are audited in the same transaction (invariant 9). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-005 | Reading MUST be idempotent per document version (one row per version); a failure (AI off, budget used up, provider unavailable, invalid output, no text) MUST end in `needs_review` with an error code, never in silence. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-006 | Reading results MUST be visible only to users who can see the document (documents visibility, 404 otherwise). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-007 | Every reading MUST be metered (`kb.llm_calls`, feature `circulars`) and audited (`circular.read_completed` / `circular.read_failed`: ids, counts, codes only); logs MUST NOT carry prompt, passage or completion text. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-008 | The eval harness MUST gate reading on synthetic EN, TE and code-mixed circulars: deadline recall ≥ 0.90, deadline precision ≥ 0.90, citation validity = 1.00, hallucinated deadlines = 0 (hard). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-001 | A task MUST have title, optional details, owner (an active membership of the school), due date, status (`open`, `in_progress`, `done`, `cancelled`) and source (`manual` or `circular` with document and citation). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-002 | Owners MUST see their own tasks (`task.read`); only holders of `task.read_all` see every task; others get 404 for a task that is not theirs. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-003 | Holders of `task.manage` MUST be able to create, reassign, edit and cancel tasks with optimistic locking (`If-Match`). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-004 | Owners MUST be able to move their task between `open`, `in_progress` and `done`; `done` records who and when. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-005 | Task lists MUST filter by status, owner, source circular and due window (`overdue`, `week`) and page with cursors. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-006 | Creating, assigning, completing and cancelling a task MUST be audited in the same transaction (ids and codes only). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-007 | A daily job MUST send each open task's owner one in-app reminder (EN/TE) N days before the due date (N in `app/circulars/config.yaml`) and one when it becomes overdue; reruns MUST NOT duplicate them. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-008 | Email reminders are out of scope until the notifications email interface supports staff templates beyond invitations. *(Proposed from the roadmap scope; PO to confirm.)* | I |
+| FR-NOTICE-001 | A parent notice MUST be drafted only from a confirmed circular's passages (and its confirmed deadlines) or from staff text; no student record is ever sent to the model. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-002 | Circulars classified C2 or C3 MUST NOT be used for notices; staff text and edited notices with phone numbers, email addresses or Aadhaar-like numbers MUST be refused with a fix-it message. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-003 | Drafting MUST go through `knowledge.gateway` (role `notice`, prompt `parent_notice`); the draft is marked AI-drafted and is editable; if AI is unavailable an empty draft opens. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-004 | A notice MUST have English and Telugu title and body within configured lengths before approval. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-005 | Only holders of `notice.approve` may approve; approved notices are immutable. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-006 | After approval the worker MUST render an A4 PDF and a PNG with headless Chromium and the bundled Noto Sans Telugu; downloads use presigned links ≤ 5 min and are audited. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-007 | Drafting, editing, approving and downloading MUST be audited (ids and codes only) and every model call metered (feature `notices`). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-008 | SchoolOS MUST NOT send notices to parents; staff copy or download them. *(Proposed from the roadmap scope; PO to confirm.)* | I |
 
 ---
 
@@ -380,6 +411,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | BO-01 zero avoidable submission errors | FR-DQ-*, FR-CR-*, FR-EXP-*, FR-IMP-020..023 |
 | BO-02 fast answers | FR-KB-*, FR-DOC-*, NFR-PERF-003 |
 | BO-03 less re-typing | FR-STU-002..006, FR-IMP-*, FR-EXP-001 |
+| BRD P4 missed circular deadlines (M4 exit, 14 · M4) | FR-CIR-*, FR-TASK-*, FR-NOTICE-* |
 | BO-05 trust | FR-IAM-*, FR-TEN-002, FR-AUD-*, FR-PLT-028..029, NFR-SEC-*, NFR-PRV-* |
 | BO-06 willingness to pay | FR-PLT-010..019, FR-PLT-030 |
 | BO-04 faster certificates (M3) | FR-CERT-*, FR-REG-* |

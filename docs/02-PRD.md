@@ -6,6 +6,7 @@
 | Scope | Core capabilities C1–C14 (milestones M0–M2) + extension points |
 | Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security, 16-Platform admin panel |
 | Changes | 0.4: C15 certificates and registers (M3) with US-1101..US-1108, proposed from the roadmap scope (PO to confirm). 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
+| Changes | 0.4: C16 circulars, tasks and parent notices (M4) with US-1601..US-1606, proposed from the roadmap scope for the product owner to confirm. 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
 
 ---
 
@@ -53,6 +54,9 @@
 | C15 | Certificates & registers (TC, bonafide, study, conduct; serial numbers; register entries; duplicates; register print views; certificate PDFs as documents) | M3 |
 
 Extension points for later modules: circulars→tasks & notices (M4), student timeline & early warning (M5), Tally connector (M6).
+| C16 | Circulars → tasks, reminders and bilingual parent notices (AI suggestions confirmed by staff) | M4 |
+
+Extension points for later modules: certificates & registers (M3), circulars→tasks & notices (M4, C16 below), student timeline & early warning (M5), Tally connector (M6).
 
 ---
 
@@ -290,6 +294,41 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 **US-1108** · As a principal, I want to set the school's letterhead once so that certificates show our name in English and Telugu, address and recognition details. [FR-CERT-013] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Given I hold `tenant.settings.manage` (step-up), I can set the Telugu school name, the address in English and Telugu, the recognition/affiliation line and the place printed on certificates; the English name is the school's name.
 - AC2: A school logo is not supported yet (PO question).
+### C16 · Circulars, tasks and parent notices (M4)
+
+*Proposed from the roadmap scope (14 · M4); PO to confirm.* The AI reads a circular and **suggests**; a person confirms before anything is created (invariant 9). Parent notices never carry student personal data (08 §4). Exit metric (14 · M4): at least 90% of a term's circulars processed with their deadlines captured.
+
+**US-1601** · As an office admin, I want every circular I upload to be read for its issuer, reference number, date, subject, a short summary in English and Telugu and its deadlines, so that nothing in it is missed. [FR-CIR-001..003, FR-CIR-005..007] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given a document of type "circular" finishes indexing, when its current version has text, then reading starts by itself and the circulars inbox shows its status (waiting → reading → ready, or "needs manual review").
+- AC2: Every suggested deadline shows the sentence it came from with a source chip that opens the circular at that page; a date that is not written in the circular is never suggested.
+- AC3: The same version is read only once; a new version is read once more and earlier decisions stay as they were.
+- AC4: Given AI is switched off for the school, the monthly AI budget is used up, the AI service is unavailable or the circular has no readable text, then the circular shows "needs manual review" with the reason and staff can still add tasks by hand; "Try again" re-reads it.
+- AC5: Given I cannot see the circular (document visibility), then I cannot see its summary or suggestions either (404).
+
+**US-1602** · As an office admin, I want to confirm, edit or dismiss each suggested deadline, so that only real work becomes a task. [FR-CIR-004, FR-TASK-001] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: When I confirm a suggestion I can change its title, details and due date and must choose an owner; one task is created, linked to the circular and its citation.
+- AC2: When I dismiss a suggestion no task is created; either decision is recorded in the audit log and cannot be made twice.
+- AC3: When every suggestion is decided (or there were none), I can mark the circular "reviewed"; the inbox shows reviewed and not-yet-reviewed circulars separately.
+
+**US-1603** · As staff, I want to see my tasks, and as a principal or office admin the whole school's tasks, with due and overdue filters, so that deadlines are met. [FR-TASK-002..006] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: "My tasks" lists tasks I own, soonest due first, with overdue ones marked; I can mark a task in progress or done.
+- AC2: The school view (permission `task.read_all`) lists every task with filters by status, owner and due window (overdue, this week).
+- AC3: Holders of `task.manage` can add a task by hand, change its owner, title or due date and cancel it; the owner is told in the app.
+- AC4: I never see another person's task unless I hold `task.read_all` (404 otherwise); another school's task is always 404.
+
+**US-1604** · As a task owner, I want a reminder in my language before a task is due and when it becomes overdue. [FR-TASK-007, FR-TASK-008] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Given a task due in the configured number of days (default 2), then I get one in-app reminder (English or Telugu, my choice); given it is overdue, one overdue reminder; no duplicates when the job runs again.
+- AC2: Done or cancelled tasks get no reminders. (Email reminders wait for general staff email templates; in-app only for now.)
+
+**US-1605** · As an office admin, I want a short parent notice in English and Telugu drafted from a circular (or from my own text), which I can edit, so that I can post it in the existing parents' groups quickly. [FR-NOTICE-001..004, FR-NOTICE-007] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: The draft is made only from the circular's text (and deadlines I confirmed); no student records are ever sent to the AI, and the draft is marked "AI draft, check before use".
+- AC2: A circular marked personal (C2) or restricted (C3) cannot be used for a notice; free text with phone numbers, email addresses or Aadhaar-like numbers is refused with a message saying what to remove.
+- AC3: If AI is unavailable, an empty draft opens so I can write the notice myself.
+
+**US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
+- AC1: Only holders of `notice.approve` can approve; both languages must be filled; an approved notice cannot be edited.
+- AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups.
+- AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9).
 
 ---
 

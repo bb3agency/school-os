@@ -42,6 +42,9 @@ const LINKS: Record<string, (id: string) => string> = {
   extraction_batch: (id) => `/register-photos/${id}`,
   // document.quarantined: the document screen explains why the file was blocked.
   document: (id) => `/documents/${id}`,
+  // M4: a circular's reading is ready or needs manual review; a task was given or is due.
+  circular: (id) => `/circulars/${id}`,
+  task: () => "/tasks",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

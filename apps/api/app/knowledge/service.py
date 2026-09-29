@@ -47,9 +47,33 @@ from app.core.redaction import mask_aadhaar
 from app.core.textnorm import nfc
 from app.documents import service as documents
 from app.identity import service as identity
-from app.knowledge import composition, sources
+from app.knowledge import circular_ai, composition, sources
 from app.knowledge import repository as repo
 from app.knowledge.answer import Answer, Progress, detect_language, elapsed_ms, normalise
+from app.knowledge.circular_ai import (
+    NO_TEXT as CIRCULAR_NO_TEXT,
+)
+from app.knowledge.circular_ai import (
+    AiUnavailable,
+    ReadingOutcome,
+    circular_passages,
+    draft_notice,
+    read_circular,
+)
+from app.knowledge.circulars.notice import (
+    ConfirmedDeadline,
+    NoticeDraft,
+    NoticeSource,
+    has_personal_numbers,
+)
+from app.knowledge.circulars.reading import (
+    CircularContext,
+    CircularReading,
+    DeadlineSuggestion,
+    Passage,
+    PassageCitation,
+)
+from app.knowledge.config.circulars import CircularsConfig
 from app.knowledge.domain import (
     AclKeys,
     AnswerSegment,
@@ -69,6 +93,7 @@ from app.knowledge.domain import (
     TokenEvent,
 )
 from app.knowledge.gateway.errors import AiRateLimited
+from app.knowledge.ingestion.pipeline import INDEXED_HOOKS, IndexedHook
 from app.knowledge.interfaces import IngestionPipeline, KnowledgeService
 from app.knowledge.keys import (
     ANSWER_COLUMN,
@@ -945,33 +970,57 @@ def get_service() -> SchoolKnowledgeService:
     return _service
 
 
+def circulars_config() -> CircularsConfig:
+    """Limits for circular reading and notice drafting (``knowledge/config/circulars.yaml``)."""
+    return circular_ai.config()
+
+
 __all__ = [
     "ASK",
+    "CIRCULAR_NO_TEXT",
+    "INDEXED_HOOKS",
     "MANAGE_VERIFIED",
     "SEARCH",
     "AclKeys",
+    "AiUnavailable",
     "AnswerSegment",
     "AskEvent",
     "AskMode",
     "AskRequest",
     "AskResponse",
     "AskStream",
+    "CircularContext",
+    "CircularReading",
+    "CircularsConfig",
     "Citation",
     "CitationEvent",
+    "ConfirmedDeadline",
+    "DeadlineSuggestion",
     "DeltaEvent",
     "DoneEvent",
     "ErrorEvent",
     "FinalEvent",
+    "IndexedHook",
     "IngestionPipeline",
     "KnowledgeService",
     "Locale",
     "MetaEvent",
+    "NoticeDraft",
+    "NoticeSource",
+    "Passage",
+    "PassageCitation",
     "RankedChunk",
+    "ReadingOutcome",
     "SchoolKnowledgeService",
     "SearchFilters",
     "TokenEvent",
+    "circular_passages",
+    "circulars_config",
+    "draft_notice",
     "get_service",
+    "has_personal_numbers",
     "purge_tenant_data",
+    "read_circular",
     "reencrypt_queries",
     "tenant_data_counts",
 ]

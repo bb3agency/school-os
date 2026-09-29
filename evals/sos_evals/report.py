@@ -23,6 +23,7 @@ LOWER_IS_BETTER = frozenset(
         "latency_p95_ms",
         "latency_p99_ms",
         "retrieval_latency_p95_ms",
+        "circular_hallucinated_deadlines",
     }
 )
 _MAX_LISTED = 20
@@ -125,7 +126,7 @@ def to_markdown(report: Report) -> str:
             f"{fmt(gate.threshold)} | {'pass' if result.passed else '**FAIL**'} | "
             f"{', '.join(gate.requirements)} |"
         )
-    names = [n for n in Metrics.model_fields if n != "items"]
+    names = [n for n in Metrics.model_fields if n != "items" and not n.startswith("circular_")]
     lines += [
         "",
         "## By category",
@@ -151,6 +152,8 @@ def to_markdown(report: Report) -> str:
             )
     lines += ["", "## Failures", ""]
     lines += _failures(report.run.outcomes) or ["None."]
+    lines += ["", "## Circular reading (M4)", ""]
+    lines += _circular_lines(report.run) or ["Not measured."]
     return "\n".join(lines) + "\n"
 
 
@@ -176,6 +179,36 @@ def _failures(outcomes: Sequence[ItemOutcome]) -> list[str]:
             lines.append(f"- `{o.id}` ({o.category}): " + "; ".join(problems))
     if len(lines) > _MAX_LISTED:
         lines = [*lines[:_MAX_LISTED], f"- … and {len(lines) - _MAX_LISTED} more (see report.json)"]
+    return lines
+
+
+def _circular_lines(run: RunResult) -> list[str]:
+    if not run.circular_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- Circulars: {m.circular_items} · recall {fmt(m.circular_deadline_recall)} · "
+        f"precision {fmt(m.circular_deadline_precision)} · citation validity "
+        f"{fmt(m.circular_citation_validity)} · hallucinated "
+        f"{fmt(m.circular_hallucinated_deadlines)} · complete "
+        f"{fmt(m.circular_complete_rate)} · metadata {fmt(m.circular_metadata_accuracy)}",
+    ]
+    for o in run.circular_outcomes:
+        problems = []
+        if o.failed:
+            problems.append("not read (manual review)")
+        if o.found < o.expected:
+            problems.append(f"missed {o.expected - o.found} of {o.expected} deadlines")
+        if o.correct < o.suggested:
+            problems.append(f"{o.suggested - o.correct} suggestion(s) not a deadline")
+        if o.valid_citations < o.suggested:
+            problems.append(f"{o.suggested - o.valid_citations} invalid citation(s)")
+        if o.hallucinated:
+            problems.append(f"{o.hallucinated} date(s) not in the circular")
+        if o.metadata_right < o.metadata_checked:
+            problems.append("metadata wrong")
+        if problems:
+            lines.append(f"- `{o.id}` ({o.locale}): " + "; ".join(problems))
     return lines
 
 

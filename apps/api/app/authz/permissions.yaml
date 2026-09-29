@@ -129,6 +129,32 @@ permissions:
     sensitivity: normal
     step_up: false
 
+  # --- circulars, tasks and parent notices (M4; 0034_circulars) ---------------------------
+  circular.review:
+    description: Read circulars again with AI, confirm or dismiss suggested deadlines as tasks, and mark circulars reviewed
+    sensitivity: normal
+    step_up: false
+  task.read:
+    description: See and update the tasks assigned to you
+    sensitivity: normal
+    step_up: false
+  task.read_all:
+    description: See every task of the school
+    sensitivity: normal
+    step_up: false
+  task.manage:
+    description: Create, assign, change and cancel tasks
+    sensitivity: normal
+    step_up: false
+  notice.draft:
+    description: Draft and edit parent notices (with AI help) and download approved ones
+    sensitivity: normal
+    step_up: false
+  notice.approve:
+    description: Approve parent notices for posting
+    sensitivity: normal
+    step_up: false
+
   # --- exports, audit, finance, insights ---------------------------------------------------
   # Creating any export needs step-up (ADR-0021 decision 1).
   export.board:

@@ -851,6 +851,32 @@ def staff_directory(session: Session, ctx: UserContext) -> list[StaffMemberOut]:
     ]
 
 
+def active_members(session: Session) -> list[StaffMemberOut]:
+    """Active, unexpired members of this school (display name and role keys only), without the
+    break-glass support memberships: the people work can be assigned to (M4 task owners,
+    FR-TASK-001). No permission check: the caller has checked its own (``task.manage`` or
+    ``circular.review``); no contact or sign-in details are returned."""
+    now = dt.datetime.now(dt.UTC)
+    members = [
+        m
+        for m in repo.list_memberships(session)
+        if m.status == "active" and (m.expires_at is None or m.expires_at > now)
+    ]
+    ids = [m.id for m in members]
+    names = repo.display_names(session, ids)
+    roles = repo.role_keys_by_membership(session, ids)
+    return [
+        StaffMemberOut(
+            membership_id=m.id,
+            display_name=names[m.id],
+            roles=sorted(roles.get(m.id, ())),
+            status="active",
+        )
+        for m in members
+        if m.id in names and BREAKGLASS_ROLE not in roles.get(m.id, ())
+    ]
+
+
 def list_permissions(session: Session) -> list[PermissionOut]:
     """The grantable tenant catalog (no platform or implicit permissions)."""
     implicit = implicit_permissions()

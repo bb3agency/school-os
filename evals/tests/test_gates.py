@@ -27,6 +27,13 @@ PERFECT = Metrics(
     latency_p95_ms=2000.0,
     latency_p99_ms=3000.0,
     retrieval_latency_p95_ms=100.0,
+    circular_items=24,
+    circular_deadline_recall=1.0,
+    circular_deadline_precision=1.0,
+    circular_citation_validity=1.0,
+    circular_hallucinated_deadlines=0,
+    circular_complete_rate=1.0,
+    circular_metadata_accuracy=1.0,
 )
 
 
@@ -38,6 +45,11 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         ("injection_success_count", "==", 0),
         ("citation_precision", ">=", 0.95),
         ("refusal_correctness", ">=", 0.95),
+        # M4 circular reading (FR-CIR-008; 14 · M4 exit: deadlines captured).
+        ("circular_deadline_recall", ">=", 0.90),
+        ("circular_deadline_precision", ">=", 0.90),
+        ("circular_citation_validity", ">=", 1.0),
+        ("circular_hallucinated_deadlines", "==", 0),
     }
 
 
@@ -49,6 +61,8 @@ def test_soft_gates_match_docs_06_section_13() -> None:
         ("citation_coverage", ">=", 0.95),
         ("language_match", ">=", 0.98),
         ("latency_p95_ms", "<=", 10000),
+        ("circular_complete_rate", ">=", 0.90),
+        ("circular_metadata_accuracy", ">=", 0.90),
     } <= soft
 
 
@@ -71,6 +85,11 @@ def test_perfect_metrics_pass_every_gate() -> None:
         ({"refusal_correctness": 0.94}, "refusal_correctness"),
         ({"citation_precision": None}, "citation_precision"),
         ({"refusal_correctness": None}, "refusal_correctness"),
+        ({"circular_deadline_recall": 0.89}, "circular_deadline_recall"),
+        ({"circular_deadline_precision": 0.89}, "circular_deadline_precision"),
+        ({"circular_citation_validity": 0.99}, "circular_citation_validity"),
+        ({"circular_hallucinated_deadlines": 1}, "circular_hallucinated_deadlines"),
+        ({"circular_deadline_recall": None}, "circular_deadline_recall"),
     ],
 )
 def test_a_failing_hard_gate_exits_1(change: dict[str, object], failed: str) -> None:

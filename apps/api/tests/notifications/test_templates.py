@@ -27,6 +27,12 @@ REQUIRED = {
     "export.failed",
     "admin.tenant_export.ready",
     "admin.tenant_export.failed",
+    # M4 (FR-CIR-001, FR-CIR-005, FR-TASK-003, FR-TASK-007)
+    "circular.read_ready",
+    "circular.needs_review",
+    "task.assigned",
+    "task.due_soon",
+    "task.overdue",
 }
 NUMERIC = {
     "blockers",
@@ -38,6 +44,8 @@ NUMERIC = {
     "low_confidence_rows",
     "students",
     "hours",
+    "suggestions",
+    "days",
 }
 
 

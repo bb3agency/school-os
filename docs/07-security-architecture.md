@@ -195,6 +195,12 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | certificate.issue (prepare and issue certificates; M3) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
 | certificate.approve (approve TCs, cancel certificates; maker-checker; M3) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | register.read (print the TC, certificate and admission and withdrawal registers; M3) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | ✓ᴿ |
+| circular.review (M4: read circulars again with AI, confirm or dismiss suggested deadlines, mark reviewed; proposed, PO to confirm) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — |
+| task.read (M4: see and update your own tasks) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| task.read_all (M4: every task of the school) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| task.manage (M4: create, assign, change, cancel tasks) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| notice.draft (M4: draft and edit parent notices, download approved ones) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — |
+| notice.approve (M4: approve parent notices) | ✓ | ✓ | — | — | — | — | — | — | — |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 

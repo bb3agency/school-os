@@ -635,6 +635,50 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=ids["outbox"],
             t=t,
         )
+        # --- circulars, tasks and parent notices (M4, 0034_circulars) ------------------------
+        reading, task = uuid.uuid4(), uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO kb.circular_readings (id, tenant_id, document_id, version_id, "
+            "version_no, status, completed_at) VALUES (:i, :t, :d, :v, 1, 'ready', now())",
+            i=reading,
+            t=t,
+            d=ids["doc"],
+            v=ids["ver"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tasks (id, tenant_id, title, owner_membership_id, due_on, source, "
+            "document_id, citation, created_by, created_by_membership) VALUES (:i, :t, "
+            "'Synthetic task', :m, '2026-10-15', 'circular', :d, CAST(:cit AS jsonb), :u, :m)",
+            i=task,
+            t=t,
+            m=ids["m1"],
+            d=ids["doc"],
+            cit='{"source": "sos://doc/' + str(ids["doc"]) + '/v1#p1", "quote": "synthetic"}',
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO kb.circular_suggestions (id, tenant_id, reading_id, position, title, "
+            "due_on, citation, status, task_id, decided_by, decided_at) VALUES (:i, :t, :r, 1, "
+            "'Synthetic deadline', '2026-10-15', CAST(:cit AS jsonb), 'confirmed', :k, :u, now())",
+            i=uuid.uuid4(),
+            t=t,
+            r=reading,
+            cit='{"source": "sos://doc/' + str(ids["doc"]) + '/v1#p1", "quote": "synthetic"}',
+            k=task,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.parent_notices (id, tenant_id, source, document_id, created_by) "
+            "VALUES (:i, :t, 'circular', :d, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            d=ids["doc"],
+            u=u["user"],
+        )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(
             c,

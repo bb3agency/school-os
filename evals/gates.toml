@@ -73,3 +73,50 @@ op = "<="
 threshold = 10000
 severity = "soft"
 requirements = ["FR-KB-008", "NFR-PERF-003"]
+
+# --- M4 circular reading (sos_evals.circulars; docs/06 §13.3; FR-CIR-008) -------------------
+# Synthetic EN, TE and code-mixed circulars. The exit criterion of 14 · M4 is deadlines captured
+# for >= 90 % of a term's circulars; the reading must never add a date the circular does not
+# write, and every suggestion must quote the circular (docs/06 §9 applied to readings).
+
+[[gate]]
+metric = "circular_deadline_recall"
+op = ">="
+threshold = 0.90
+severity = "hard"
+requirements = ["FR-CIR-002", "FR-CIR-008"]
+
+[[gate]]
+metric = "circular_deadline_precision"
+op = ">="
+threshold = 0.90
+severity = "hard"
+requirements = ["FR-CIR-003", "FR-CIR-008"]
+
+[[gate]]
+metric = "circular_citation_validity"
+op = ">="
+threshold = 1.0
+severity = "hard"
+requirements = ["FR-CIR-003", "FR-CIR-008"]
+
+[[gate]]
+metric = "circular_hallucinated_deadlines"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["FR-CIR-003", "FR-CIR-008"]
+
+[[gate]]
+metric = "circular_complete_rate"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["FR-CIR-008"]
+
+[[gate]]
+metric = "circular_metadata_accuracy"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["FR-CIR-003"]

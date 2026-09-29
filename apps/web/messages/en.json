@@ -149,7 +149,8 @@
         "records": "Records",
         "checks": "Checks and submissions",
         "ask": "Ask",
-        "admin": "School admin"
+        "admin": "School admin",
+        "work": "Circulars and tasks"
       }
     },
     "home": {
@@ -5242,6 +5243,335 @@
       "logoNote": "A school logo cannot be added yet.",
       "save": "Save letterhead",
       "saved": "Letterhead saved. New certificates use it."
+    }
+  },
+  "circulars": {
+    "nav": "Circulars",
+    "title": "Circulars",
+    "detailTitle": "Circular",
+    "description": "Circulars you can see, read with AI into a short summary and suggested deadlines. Nothing becomes a task until you confirm it.",
+    "upload": "Upload a circular",
+    "noAccessTitle": "You can't see documents",
+    "noAccessBody": "Ask your school's office admin if you need to see circulars.",
+    "inboxTitle": "Circulars inbox",
+    "showLabel": "Show",
+    "showOpen": "To review",
+    "showAll": "All",
+    "emptyTitle": "No circulars yet",
+    "emptyOpenTitle": "Nothing to review",
+    "emptyBody": "Upload a circular as a document of type Circular; it is read with AI and appears here.",
+    "reviewed": "Reviewed",
+    "columns": {
+      "circular": "Circular",
+      "issuedOn": "Date",
+      "reading": "Reading",
+      "toDecide": "To decide",
+      "tasks": "Tasks"
+    },
+    "status": {
+      "not_read": "Not read",
+      "queued": "Waiting",
+      "running": "Reading",
+      "ready": "Ready",
+      "needs_review": "Needs manual review"
+    },
+    "reason": {
+      "ai_disabled": "AI is switched off for your school.",
+      "ai_budget_exhausted": "This month's AI budget is used up.",
+      "ai_rate_limited": "Too many AI requests just now.",
+      "ai_unavailable": "The AI service was not available.",
+      "ai_request_rejected": "The AI service refused the request.",
+      "ai_invalid_output": "The AI answer could not be checked.",
+      "no_text": "The file has no readable text (for example a photo or scan).",
+      "document_gone": "The file was removed.",
+      "worker_error": "Reading stopped because of an error.",
+      "other": "The circular could not be read."
+    },
+    "aiBadge": "AI suggestion",
+    "aiNote": "Read by AI from this circular only. Check it against the circular before you act.",
+    "openDocument": "Open the circular",
+    "notReadTitle": "Not read yet",
+    "notReadBody": "This circular has not been read with AI yet. It is read when its file has been checked and indexed.",
+    "busyTitle": "Reading the circular",
+    "busyBody": "This takes a few seconds. The page updates by itself.",
+    "needsReviewTitle": "Read this circular yourself",
+    "needsReviewBody": "Add its deadlines on the Tasks page, or try again later.",
+    "readNow": "Read with AI",
+    "tryAgain": "Try again",
+    "readingTitle": "What the circular says",
+    "notFound": "Not found in the circular",
+    "fields": {
+      "issuer": "Issued by",
+      "reference": "Reference number",
+      "issuedOn": "Date of the circular",
+      "subject": "Subject"
+    },
+    "summaryEn": "Summary (English)",
+    "summaryTe": "Summary (Telugu)",
+    "sources": "Sources in the circular",
+    "partial": "This circular is long; only its first part was read. Check the rest yourself.",
+    "dropped": "{count, plural, one {# suggestion was left out because its date or sentence is not in the circular.} other {# suggestions were left out because their date or sentence is not in the circular.}}",
+    "suggestionsTitle": "Suggested deadlines",
+    "suggestionsDescription": "Each one quotes the sentence it comes from. Confirm it as a task with an owner, or dismiss it.",
+    "noSuggestions": "No deadlines were found in this circular. Read it and add tasks by hand if needed.",
+    "suggestion": {
+      "due": "Due {date}",
+      "owner": "Owner",
+      "chooseOwner": "Choose a person",
+      "taskTitle": "Task",
+      "dueOn": "Due date",
+      "confirm": "Confirm as task",
+      "dismiss": "Dismiss",
+      "openTasks": "See it in Tasks",
+      "status": {
+        "suggested": "Suggested",
+        "confirmed": "Task created",
+        "dismissed": "Dismissed"
+      }
+    },
+    "reviewTitle": "Review",
+    "reviewPending": "{count, plural, one {Decide # more suggestion first.} other {Decide # more suggestions first.}}",
+    "reviewReady": "Every suggestion is decided. Mark the circular reviewed.",
+    "markReviewed": "Mark reviewed",
+    "reviewedBy": "Reviewed by {name} on {when}.",
+    "notReviewed": "Not reviewed yet.",
+    "formerStaff": "a former staff member",
+    "noticeTitle": "Notice for parents",
+    "noticeDescription": "Draft a short notice in English and Telugu from this circular. Only the circular's text is used, never student records.",
+    "draftNotice": "Draft a parent notice",
+    "noticePersonal": "This circular is marked personal or restricted, so it can't be used for a parent notice.",
+    "errors": {
+      "reading_in_progress": {
+        "title": "Already being read",
+        "body": "This circular is being read now. Wait a few seconds."
+      },
+      "reading_done": {
+        "title": "Already read",
+        "body": "This version of the circular has been read. Upload a new version to read it again."
+      },
+      "reading_attempts_used": {
+        "title": "Tried several times",
+        "body": "Reading failed several times. Read it yourself and add its tasks by hand."
+      },
+      "document_not_ready": {
+        "title": "File still being checked",
+        "body": "The file is still being checked. Try again in a minute."
+      },
+      "suggestion_decided": {
+        "title": "Already decided",
+        "body": "Someone already confirmed or dismissed this suggestion. The page shows the latest."
+      },
+      "suggestions_open": {
+        "title": "Suggestions left",
+        "body": "Confirm or dismiss every suggested deadline first."
+      },
+      "version_mismatch": {
+        "title": "Changed meanwhile",
+        "body": "Someone else changed this. The page shows the latest; try again."
+      }
+    }
+  },
+  "tasks": {
+    "nav": "Tasks",
+    "title": "Tasks",
+    "description": "Work with an owner and a due date, from circulars or added by hand. You get a reminder before the due date and when it is late.",
+    "noAccessTitle": "You can't see tasks",
+    "noAccessBody": "Ask your school's office admin if you need tasks.",
+    "listTitle": "Task list",
+    "viewLabel": "Whose tasks",
+    "view": {
+      "mine": "My tasks",
+      "all": "Whole school"
+    },
+    "statusLabel": "Status",
+    "dueLabel": "Due",
+    "filter": {
+      "status": {
+        "active": "Open and in progress",
+        "open": "Open",
+        "in_progress": "In progress",
+        "done": "Done",
+        "cancelled": "Cancelled"
+      },
+      "due": {
+        "any": "Any time",
+        "overdue": "Overdue",
+        "week": "Next 7 days",
+        "later": "Later"
+      }
+    },
+    "emptyTitle": "No tasks here",
+    "emptyBody": "Tasks appear when someone confirms a circular's deadline or adds a task for you.",
+    "columns": {
+      "task": "Task",
+      "due": "Due date",
+      "owner": "Owner",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "due": {
+      "overdue": "Overdue",
+      "today": "Due today",
+      "soon": "Due soon"
+    },
+    "move": {
+      "open": "Reopen",
+      "in_progress": "Start",
+      "done": "Mark done",
+      "cancelled": "Cancel task"
+    },
+    "fromCircular": "From a circular",
+    "formerStaff": "Former staff member",
+    "new": {
+      "title": "Add a task",
+      "description": "For work that is not in a circular. The owner is told in the app.",
+      "taskTitle": "Task",
+      "owner": "Owner",
+      "chooseOwner": "Choose a person",
+      "dueOn": "Due date",
+      "details": "Details (optional)",
+      "submit": "Add task",
+      "saved": "Task added."
+    },
+    "errors": {
+      "task_closed": {
+        "title": "Task is closed",
+        "body": "Done or cancelled tasks can't be changed. Reopen it first."
+      },
+      "task_status_not_allowed": {
+        "title": "Not possible",
+        "body": "This change of status is not possible. The page shows the latest."
+      },
+      "task_cancel_not_allowed": {
+        "title": "Only the office can cancel",
+        "body": "Ask the office admin or principal to cancel this task."
+      },
+      "not_task_owner": {
+        "title": "Not your task",
+        "body": "Only the task's owner can change its status."
+      },
+      "tasks_not_all": {
+        "title": "Only your tasks",
+        "body": "You can see only the tasks given to you."
+      },
+      "version_mismatch": {
+        "title": "Changed meanwhile",
+        "body": "Someone else changed this task. The page shows the latest; try again."
+      }
+    }
+  },
+  "notices": {
+    "nav": "Parent notices",
+    "title": "Parent notices",
+    "detailTitle": "Parent notice",
+    "description": "Short notices in English and Telugu for your parents' groups. Staff edit them and an approver approves them; SchoolOS never sends them itself.",
+    "noAccessTitle": "You can't make parent notices",
+    "noAccessBody": "Ask your school's office admin if you need to make parent notices.",
+    "listTitle": "Notices",
+    "emptyTitle": "No notices yet",
+    "emptyBody": "Start one below, or from a circular's page.",
+    "untitled": "Untitled notice",
+    "columns": {
+      "notice": "Notice",
+      "status": "Status",
+      "updated": "Last change"
+    },
+    "status": {
+      "draft": "Draft",
+      "approved": "Approved"
+    },
+    "fromCircular": "Made from a circular",
+    "aiDrafted": "Drafted by AI from the circular only. Check every date and word before approving.",
+    "draftErrorTitle": "Write this notice yourself",
+    "draftError": {
+      "ai_disabled": "AI is switched off for your school, so the notice starts empty.",
+      "ai_budget_exhausted": "This month's AI budget is used up, so the notice starts empty.",
+      "no_text": "The circular has no readable text, so the notice starts empty.",
+      "other": "AI could not draft this notice just now, so it starts empty."
+    },
+    "editTitle": "Edit the notice",
+    "approvedTitle": "Approved notice",
+    "approvedBy": "Approved by {name} on {when}.",
+    "formerStaff": "a former staff member",
+    "new": {
+      "title": "Start a notice",
+      "description": "Write what parents need to know; AI drafts it in English and Telugu. Or start empty.",
+      "privacyTitle": "No personal details",
+      "privacyBody": "Never write student names, phone numbers, Aadhaar numbers or email addresses in a parent notice.",
+      "textLabel": "What should parents know?",
+      "textHint": "For example: sports day on 14/11/2026 at 9:00, students wear house T-shirts.",
+      "personal": "Remove phone numbers, email addresses and 12-digit numbers first.",
+      "draftWithAi": "Draft with AI",
+      "blank": "Start empty",
+      "fromCircularHint": "To draft from a circular, open it on the Circulars page."
+    },
+    "editor": {
+      "english": "English",
+      "telugu": "Telugu",
+      "title": "Title",
+      "body": "Notice",
+      "noPersonal": "Do not add names, phone numbers, Aadhaar numbers or email addresses.",
+      "personal": "Remove phone numbers, email addresses and 12-digit numbers.",
+      "save": "Save draft",
+      "approve": "Approve notice",
+      "approverNeeded": "The principal or owner approves notices.",
+      "incomplete": "Fill in both titles and both notices before approving."
+    },
+    "approved": {
+      "preview": "Notice for parents",
+      "copy": "Copy text",
+      "copied": "Copied. Paste it into your parents' group.",
+      "print": "Print (A4)",
+      "downloadPdf": "Download A4 PDF",
+      "downloadImage": "Download image",
+      "rendering": "Making the PDF and image…",
+      "renderAgain": "Make PDF and image",
+      "renderFailed": "The PDF and image could not be made. Try again.",
+      "postNote": "SchoolOS does not send notices to parents. Post it in your existing groups yourself."
+    },
+    "errors": {
+      "notice_personal_data": {
+        "title": "Personal details found",
+        "body": "Remove phone numbers, email addresses and 12-digit numbers, then try again."
+      },
+      "notice_source_personal": {
+        "title": "Circular can't be used",
+        "body": "This circular is marked personal or restricted. Write the notice yourself."
+      },
+      "notice_incomplete": {
+        "title": "Notice not complete",
+        "body": "Fill in both titles and both notices before approving."
+      },
+      "notice_approved": {
+        "title": "Already approved",
+        "body": "An approved notice can't be changed. Start a new one."
+      },
+      "notice_not_approved": {
+        "title": "Not approved yet",
+        "body": "Approve the notice first."
+      },
+      "notice_files_not_ready": {
+        "title": "Files not ready",
+        "body": "The PDF and image are still being made. Try again shortly."
+      },
+      "notice_files_expired": {
+        "title": "Files removed",
+        "body": "The files are kept for a few days only. Make them again."
+      },
+      "render_in_progress": {
+        "title": "Already being made",
+        "body": "The PDF and image are being made now."
+      },
+      "version_mismatch": {
+        "title": "Changed meanwhile",
+        "body": "Someone else changed this notice. The page shows the latest; try again."
+      }
     }
   }
 }

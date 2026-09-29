@@ -3,7 +3,8 @@
 
 A neutral building block in ``core`` so every module that prints a document uses the same
 hardened renderer: school exports (``app.exports``) and control-plane invoices
-(``app.platform.invoice_pdf``). It knows nothing about what it prints: callers pass finished,
+(``app.platform.invoice_pdf``), and parent notices as PDF and PNG (``app.circulars``).
+It knows nothing about what it prints: callers pass finished,
 escaped HTML and get bytes back.
 
 :class:`PdfRenderer` is the interface; :class:`ChromiumRenderer` the real implementation and
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from collections.abc import Callable
 from functools import lru_cache
 from importlib import resources
 from pathlib import Path
@@ -33,7 +35,7 @@ from typing import Final, Protocol
 
 import yaml
 from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import Route, sync_playwright
+from playwright.sync_api import Page, Route, sync_playwright
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import Environment, get_settings
@@ -76,6 +78,12 @@ class PdfRenderer(Protocol):
     def render(self, html: str) -> bytes: ...
 
 
+class ImageRenderer(Protocol):
+    def render_png(self, html: str, *, width_px: int) -> bytes:
+        """A PNG of the whole page laid out ``width_px`` CSS pixels wide (screen media)."""
+        ...
+
+
 @lru_cache(maxsize=1)
 def font_bytes() -> bytes:
     """The bundled font, verified against the SHA-256 recorded in fonts/SOURCE.txt."""
@@ -100,6 +108,32 @@ class ChromiumRenderer:
         self.timeout_ms = timeout_ms
 
     def render(self, html: str) -> bytes:
+        return self._run(html, self._pdf)
+
+    def render_png(self, html: str, *, width_px: int) -> bytes:
+        """Screenshot of the whole page (M4 parent notices as images; same hardening)."""
+
+        def shoot(page: Page) -> bytes:
+            page.set_viewport_size({"width": width_px, "height": 400})
+            page.set_content(html, wait_until="load")
+            page.emulate_media(media="screen")
+            return page.screenshot(full_page=True, type="png")
+
+        return self._run(html, shoot, load=False)
+
+    @staticmethod
+    def _pdf(page: Page) -> bytes:
+        page.emulate_media(media="print")
+        return page.pdf(
+            format="A4",
+            print_background=True,
+            prefer_css_page_size=True,
+            display_header_footer=True,
+            header_template="<span></span>",
+            footer_template=FOOTER_TEMPLATE,
+        )
+
+    def _run(self, html: str, work: Callable[[Page], bytes], *, load: bool = True) -> bytes:
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(chromium_sandbox=self.sandbox, timeout=self.timeout_ms)
@@ -112,16 +146,9 @@ class ChromiumRenderer:
                     context.route("**/*", _route)
                     page = context.new_page()
                     page.set_default_timeout(self.timeout_ms)
-                    page.set_content(html, wait_until="load")
-                    page.emulate_media(media="print")
-                    return page.pdf(
-                        format="A4",
-                        print_background=True,
-                        prefer_css_page_size=True,
-                        display_header_footer=True,
-                        header_template="<span></span>",
-                        footer_template=FOOTER_TEMPLATE,
-                    )
+                    if load:
+                        page.set_content(html, wait_until="load")
+                    return work(page)
                 finally:
                     browser.close()
         except PlaywrightError as exc:
@@ -155,16 +182,41 @@ def set_renderer(renderer: PdfRenderer | None) -> None:
         _renderer = renderer
 
 
+_image_renderer: ImageRenderer | None = None
+
+
+def get_image_renderer() -> ImageRenderer:
+    """The PNG renderer (the same hardened headless Chromium as PDFs)."""
+    global _image_renderer  # noqa: PLW0603
+    with _lock:
+        if _image_renderer is None:
+            cfg = load_config()
+            env = get_settings().env
+            sandbox = cfg.chromium_sandbox and env in (Environment.STAGING, Environment.PROD)
+            _image_renderer = ChromiumRenderer(sandbox=sandbox, timeout_ms=cfg.timeout_ms)
+        return _image_renderer
+
+
+def set_image_renderer(renderer: ImageRenderer | None) -> None:
+    """Override the PNG renderer (tests); ``None`` rebuilds the default from config."""
+    global _image_renderer  # noqa: PLW0603
+    with _lock:
+        _image_renderer = renderer
+
+
 __all__ = [
     "FONT_FAMILY",
     "FONT_URL",
     "ChromiumRenderer",
+    "ImageRenderer",
     "PdfConfig",
     "PdfRenderer",
     "RenderError",
     "default_renderer",
     "font_bytes",
+    "get_image_renderer",
     "get_renderer",
     "load_config",
+    "set_image_renderer",
     "set_renderer",
 ]

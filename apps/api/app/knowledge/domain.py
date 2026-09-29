@@ -22,10 +22,14 @@ Locale = Literal["en", "te", "mixed"]
 InputType = Literal["document", "query"]
 """What an embedding is for (ADR-0006: ``embed(texts, input_type)``)."""
 
-ModelRole = Literal["answer", "router", "metadata", "translation", "extraction", "eval_judge"]
-"""Keys of ``knowledge/config/models.yaml`` ``roles`` (docs/06 §4.4, §5, §6, §10.2, §12)."""
+ModelRole = Literal[
+    "answer", "router", "metadata", "translation", "extraction", "circular", "notice", "eval_judge"
+]
+"""Keys of ``knowledge/config/models.yaml`` ``roles`` (docs/06 §4.4, §4.10, §5, §6, §10, §12)."""
 
-Feature = Literal["ask", "metadata", "translation", "extraction", "embeddings", "eval"]
+Feature = Literal[
+    "ask", "metadata", "translation", "extraction", "circulars", "notices", "embeddings", "eval"
+]
 """What a metered model call was for (FR-KB-009, NFR-CST-001: spend per tenant and feature)."""
 
 AskMode = Literal["full", "search_only"]

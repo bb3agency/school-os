@@ -52,6 +52,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.identity.repository
@@ -81,6 +82,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.tenancy.repository
@@ -110,6 +112,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.platform.repository
@@ -142,6 +145,7 @@ forbidden_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 
 # The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
@@ -176,6 +180,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.platform
@@ -203,6 +208,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.ops.repository
@@ -232,6 +238,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.dq.repository
@@ -261,6 +268,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.students.repository
@@ -290,6 +298,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.documents.repository
@@ -319,6 +328,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.notifications.repository
@@ -348,6 +358,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.breakglass.repository
@@ -401,6 +412,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.imports.repository
@@ -454,6 +466,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.changes.repository
@@ -483,6 +496,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.extraction.repository
@@ -511,7 +525,7 @@ source_modules =
     app.changes
     app.extraction
     app.knowledge
-    app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.exports.repository
@@ -562,6 +576,7 @@ source_modules =
     app.extraction
     app.exports
     app.knowledge
+    app.circulars
     app.certificates
 forbidden_modules =
     app.admin.repository
@@ -593,6 +608,7 @@ source_modules =
     app.extraction
     app.exports
     app.knowledge
+    app.circulars
     app.certificates
 forbidden_modules =
     app.admin
@@ -645,6 +661,7 @@ source_modules =
     app.extraction
     app.exports
     app.admin
+    app.circulars
     app.certificates
 forbidden_modules =
     app.knowledge.gateway
@@ -660,6 +677,8 @@ forbidden_modules =
     app.knowledge.sources
     app.knowledge.repository
     app.knowledge.models
+    app.knowledge.circulars
+    app.knowledge.circular_ai
 allow_indirect_imports = True
 
 # Top to bottom: a package may import only packages below it. Consequences that matter:
@@ -715,6 +734,7 @@ forbidden_modules =
     app.extraction
     app.exports
     app.admin
+    app.circulars
     app.certificates
 allow_indirect_imports = True
 
@@ -746,6 +766,7 @@ source_modules =
     app.knowledge.config
     app.knowledge.domain
     app.knowledge.sources
+    app.knowledge.circulars
 forbidden_modules =
     sqlalchemy
     fastapi
@@ -777,7 +798,63 @@ forbidden_modules =
     app.knowledge.embeddings
     app.knowledge.interfaces
     app.admin
+    app.circulars
     app.certificates
+
+# --- 5. circulars (M4: circular readings, tasks, parent notices) ---------------------------
+# Other modules use only app.circulars.service. It reaches the model only through
+# app.knowledge.service (knowledge-internals forbids the gateway, prompts and config).
+
+[importlinter:contract:circulars-internals]
+name = circulars: repository/models are private (use app.circulars.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.certificates
+forbidden_modules =
+    app.circulars.repository
+    app.circulars.models
+allow_indirect_imports = True
+
+# The configuration and the notice page builder stay pure (no database, web or feature modules).
+[importlinter:contract:circulars-pure-library]
+name = circulars config/rendering stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.circulars.config
+    app.circulars.rendering
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.students
+    app.documents
+    app.knowledge
 
 [importlinter:contract:certificates-internals]
 name = certificates: repository/models are private (use app.certificates.service)
@@ -803,6 +880,7 @@ source_modules =
     app.exports
     app.knowledge
     app.admin
+    app.circulars
 forbidden_modules =
     app.certificates.repository
     app.certificates.models
@@ -810,6 +888,7 @@ allow_indirect_imports = True
 
 # Certificate configuration and templates stay pure (no database, web or feature modules), so
 # pages render and test without a database (FR-CERT-001).
+
 [importlinter:contract:certificates-pure-library]
 name = certificates config/templates stay pure (no DB, web or feature modules)
 type = forbidden

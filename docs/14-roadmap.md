@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.6 · 2026-09-28 |
+| Version | 0.7 · 2026-09-29 |
 | Approach | Module by module on a shared core; real school needs decide order after M1; no calendar commitments |
 | Related | 01-BRD §7, §11, 02-PRD §3, 03-TRD, 12-Testing strategy, 16-Platform admin panel |
-| Changes | 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
+| Changes | 0.7: M4 status (circulars, tasks, parent notices built on the M4 branch; PO questions). 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
 
 ---
 
@@ -192,6 +192,30 @@ Release notes: run `python -m app.identity.sync_system_roles --apply` after `003
 ### M4 · Circulars → tasks and bilingual notices
 **Scope:** circular metadata/deadline extraction · task list with owners and due dates · reminders · parent notice generator (EN/TE text + printable/image) for posting in existing groups.
 **Exit:** ≥ 90% of circulars in a term processed with deadlines captured; staff confirm fewer missed tasks.
+
+### M4 status (2026-09-29)
+
+Built on the M4 branch (not yet merged; migration `0034_circulars` must be relinked after M3's `0033` before merge). Stories US-1601..US-1606 and FR-CIR-001..008, FR-TASK-001..008, FR-NOTICE-001..008 are written in 02-PRD C16 and 03-TRD §3.14, each *proposed from the roadmap scope; PO to confirm*.
+
+- **Circular reading** (docs/06 §4.10): a circular is read after it is indexed (hook `INDEXED_HOOKS`, outbox, `ingest` queue) through the gateway with only its own Aadhaar-masked passages; metadata, an EN/TE summary with citation chips and deadline suggestions, each kept only if its quote is in the cited passage and writes the date. Failures end in "needs manual review" with a code; "Read again" up to 3 times.
+- **Tasks**: suggestions become tasks only when a `circular.review` holder confirms them (owner, title, date editable); manual tasks for `task.manage`; my tasks and the school view; owners mark in progress / done; in-app reminders 2 days before and when overdue (daily beat 07:10 IST, `maintenance` queue, dedupe keys).
+- **Parent notices**: AI draft in English and Telugu from a C1 circular (its passages and confirmed dates) or staff text (personal numbers refused), edited by staff, approved by `notice.approve`, then copied or downloaded as an A4 PDF / PNG made by Chromium with Noto Sans Telugu (`pdf` queue, files kept 6 days, made again on request). SchoolOS never sends it.
+- **Data, access, audit**: four RLS tables (docs/05 §6.3), six permissions (07 §6.2), 19 routes (09 §4), audit per action with IDs and codes only, metering features `circulars` / `notices`, offboarding purge.
+- **Web**: Circulars inbox and detail with source chips, Tasks, Notices list and editor (EN/TE, print, copy, download), nav section "Work", bell links, `circulars`/`tasks`/`notices` messages in EN and TE.
+- **Eval** (docs/06 §13.3): 24 synthetic circulars, 36 deadlines; hard gates recall ≥ 0.90, precision ≥ 0.90, citation validity 1.00, hallucinated 0. `app-fake` run: recall 0.944, precision 1.00, citation validity 1.00, hallucinated 0.
+
+Not done: a live-model eval of `circular_reading` and `parent_notice` (the offline numbers measure the application's controls with a heuristic stand-in, not Claude); email reminders (the notifications email interface sends invitations only; FR-TASK-008); OCR for scanned circulars (they end in manual review with `no_text`); an Ask tool for "what's due this week"; retention periods for tasks and notices; every human exit criterion (≥ 90 % of a term's circulars with deadlines captured at the design partner, fewer missed tasks).
+
+**Questions for the PO** (safer behaviour chosen meanwhile):
+1. `notice.approve` is granted to owner and principal only; should office admins approve?
+2. Any phone number in a notice is refused, including the school office landline; allow an office number configured per school?
+3. Email (or SMS) reminders for tasks: needed for the pilot?
+4. "Read again" is limited to 3 attempts per circular version; enough?
+5. People who confirm suggestions see every active staff member's name in the owner list; acceptable, or limit to their own section's staff?
+6. A task owner who cannot see the source circular sees the task without its citation; acceptable?
+7. Only C1 circulars can be turned into parent notices (C2/C3 refused); confirm.
+8. Rendered notice files are kept 6 days (the exports bucket rule is 7); confirm, and set retention for tasks and notices (kept for the life of the school today).
+9. Approve the live-model eval budget before the pilot.
 
 ### M5 · Student timeline and early warning
 **Scope:** attendance and marks import · per-student timeline · ABC indicators (attendance, behaviour notes, course performance) · flags with assigned owner and intervention log · purpose limits (08 §4) · AP three-consecutive-absence follow-up support.

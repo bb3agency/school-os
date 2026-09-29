@@ -69,6 +69,10 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/ask",
       "/ask/search",
       "/ask/verified",
+      // M4: circulars inbox, tasks and parent notices.
+      "/circulars",
+      "/tasks",
+      "/notices",
       "/notifications",
       "/audit",
       "/audit/verify",

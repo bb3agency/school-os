@@ -22,6 +22,12 @@ roles:
     mfa_required: true
     assign_any_role: true
     grants:
+      circular.review: school
+      task.read: school
+      task.read_all: school
+      task.manage: school
+      notice.draft: school
+      notice.approve: school
       tenant.settings.manage: school_step_up
       tenant.structure.manage: school
       tenant.billing.read: school
@@ -53,6 +59,12 @@ roles:
     name_te: ప్రధానోపాధ్యాయులు
     mfa_required: true
     grants:
+      circular.review: school
+      task.read: school
+      task.read_all: school
+      task.manage: school
+      notice.draft: school
+      notice.approve: school
       tenant.settings.manage: school_step_up
       tenant.structure.manage: school
       tenant.billing.read: school
@@ -93,6 +105,11 @@ roles:
     name_te: కార్యాలయ నిర్వాహకులు
     mfa_required: true
     grants:
+      circular.review: school
+      task.read: school
+      task.read_all: school
+      task.manage: school
+      notice.draft: school
       tenant.structure.manage: school
       user.manage: school_step_up
       student.read_basic: school
@@ -125,6 +142,9 @@ roles:
     name_te: కార్యాలయ సిబ్బంది
     mfa_required: false
     grants:
+      circular.review: school
+      task.read: school
+      notice.draft: school
       student.read_basic: school
       student.create: school
       student.update_nonidentity: school
@@ -144,6 +164,7 @@ roles:
     name_te: అకౌంటెంట్
     mfa_required: false
     grants:
+      task.read: school
       tenant.billing.read: school
       student.read_basic: school
       document.upload: school
@@ -157,6 +178,7 @@ roles:
     name_te: పరీక్షల సమన్వయకర్త
     mfa_required: false
     grants:
+      task.read: school
       student.read_basic: school
       student.identity_change.request: school
       student.export: school_step_up
@@ -176,6 +198,7 @@ roles:
     name_te: తరగతి ఉపాధ్యాయులు
     mfa_required: false
     grants:
+      task.read: school
       student.read_basic: scoped
       student.read_sensitive: scoped
       dq.findings.read: scoped
@@ -190,6 +213,7 @@ roles:
     name_te: ఉపాధ్యాయులు
     mfa_required: false
     grants:
+      task.read: school
       student.read_basic: scoped
       document.read: scoped
       kb.ask: scoped
