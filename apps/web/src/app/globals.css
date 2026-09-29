@@ -509,12 +509,14 @@
     overflow-wrap: anywhere;
   }
 
-  /* The page does not scroll: headers and long values wrap to stay inside A4. */
+  /* The page does not scroll: headers and long values wrap, and the screen's minimum
+     column widths (legible inside a scroll region) give way, so tables stay inside A4. */
   th,
   td,
   th *,
   td * {
     white-space: normal !important;
+    min-width: 0 !important;
   }
 
   .table-scroll {
