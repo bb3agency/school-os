@@ -2990,6 +2990,11 @@
       "revokeTitle": "End support access now",
       "revokeBody": "Support loses access immediately. You will be asked to confirm it's you.",
       "backToList": "Back to support access"
+    },
+    "timeline": {
+      "done": "Done:",
+      "now": "Now:",
+      "later": "Still to come:"
     }
   },
   "exports": {
