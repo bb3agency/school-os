@@ -23,8 +23,11 @@ import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { FieldErrors } from "@/lib/forms";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
 import { PLAN_CODE_PATTERN, money, optionalInt, optionalMoney, text } from "@/lib/validation";
+import { Link } from "@/i18n/navigation";
 import { PK, useCan, usePlanDirectory, useSchoolDirectory } from "./data";
 import { InvoiceTable } from "./InvoiceTable";
+import { FilterCard } from "./FilterCard";
+import { Mono, TierTag } from "./pills";
 import { SubscriptionActions } from "./SubscriptionActions";
 
 /* ------------------------------------------------------------------ plans */
@@ -216,9 +219,9 @@ function PlanFields({ errors, base }: { errors: FieldErrors; base?: Plan | undef
 /** FR-PLT-010..011 (docs/16 §5.6): versioned plans; a published plan never changes. */
 export function PlansScreen({ status = "" }: { status?: string }) {
   const t = useTranslations("platform.plans");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const tstatus = useTranslations("status.plan");
-  const tmode = useTranslations("deploymentMode");
   const locale = useLocale();
   const api = useBffClient("operator");
   const can = useCan();
@@ -266,16 +269,16 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       key: "version",
       header: t("colVersion"),
       className: "tabular-nums",
-      cell: (row) => row.version,
+      cell: (row) => <Mono>v{row.version}</Mono>,
     },
-    { key: "tier", header: t("colTier"), cell: (row) => tmode(row.tier) },
+    { key: "tier", header: t("colTier"), cell: (row) => <TierTag tier={row.tier} /> },
     {
       key: "price",
       header: t("colPrice"),
       className: "text-right tabular-nums",
       cell: (row) => (
-        <span>
-          {formatInr(row.base_price_inr, locale)}
+        <span className="whitespace-nowrap">
+          <Mono>{formatInr(row.base_price_inr, locale)}</Mono>
           <span className="text-ink-muted">
             {" "}
             / {row.billing_period === "annual" ? t("perYear") : t("perMonth")}
@@ -287,7 +290,14 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       key: "gst",
       header: t("gstRate"),
       className: "tabular-nums",
-      cell: (row) => `${Number(row.gst_rate)}%`,
+      cell: (row) => (
+        <span className="flex flex-col">
+          <Mono>{`${Number(row.gst_rate)}%`}</Mono>
+          <span className="text-xs text-ink-muted">
+            {t("sacCode")}: <span className="font-mono">{row.sac_code}</span>
+          </span>
+        </span>
+      ),
     },
     {
       key: "students",
@@ -295,7 +305,11 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       className: "text-right tabular-nums",
       cell: (row) => {
         const value = row.limits.students;
-        return <Value>{typeof value === "number" ? formatCount(value, locale) : null}</Value>;
+        return (
+          <Mono>
+            <Value>{typeof value === "number" ? formatCount(value, locale) : null}</Value>
+          </Mono>
+        );
       },
     },
     {
@@ -365,9 +379,10 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={manage ? createDialog() : undefined}
       />
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      <FilterCard clearHref={status ? "/platform/plans" : undefined}>
         <SelectField
           name="status"
           label={t("colStatus")}
@@ -379,10 +394,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
           }))}
           className="w-52"
         />
-        <Button type="submit" variant="secondary">
-          {tc("applyFilters")}
-        </Button>
-      </form>
+      </FilterCard>
       <DataTable
         caption={t("title")}
         captionHidden
@@ -401,6 +413,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
 /** FR-PLT-012..014 (docs/16 §5.7): subscriptions with status filter and actions. */
 export function SubscriptionsScreen({ status = "" }: { status?: string }) {
   const t = useTranslations("platform.subscriptions");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const tstatus = useTranslations("status.subscription");
   const api = useBffClient("operator");
@@ -413,7 +426,18 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
       (await unwrap(api.GET("/api/v1/platform/subscriptions", { params: { query } }))).data,
   );
   const columns: Column<Subscription>[] = [
-    { key: "school", header: t("colSchool"), cell: (row) => schoolName(row.tenant_id) },
+    {
+      key: "school",
+      header: t("colSchool"),
+      cell: (row) => (
+        <Link
+          href={`/platform/schools/${row.tenant_id}?tab=subscription`}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {schoolName(row.tenant_id)}
+        </Link>
+      ),
+    },
     {
       key: "plan",
       header: t("colPlan"),
@@ -443,12 +467,20 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
     {
       key: "period",
       header: t("colPeriodEnd"),
-      cell: (row) => <Value>{formatDate(row.current_period_end)}</Value>,
+      cell: (row) => (
+        <Mono>
+          <Value>{formatDate(row.current_period_end)}</Value>
+        </Mono>
+      ),
     },
     {
       key: "trial",
       header: t("colTrialEnds"),
-      cell: (row) => <Value>{formatDate(row.trial_ends_at)}</Value>,
+      cell: (row) => (
+        <Mono>
+          <Value>{formatDate(row.trial_ends_at)}</Value>
+        </Mono>
+      ),
     },
     {
       key: "actions",
@@ -458,8 +490,12 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
   ];
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
+      />
+      <FilterCard clearHref={status ? "/platform/subscriptions" : undefined}>
         <SelectField
           name="status"
           label={t("filterStatus")}
@@ -468,10 +504,7 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
           options={SUBSCRIPTION_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
           className="w-64"
         />
-        <Button type="submit" variant="secondary">
-          {tc("applyFilters")}
-        </Button>
-      </form>
+      </FilterCard>
       <DataTable
         caption={t("title")}
         captionHidden
@@ -498,6 +531,7 @@ const FY = /^[0-9]{4}-[0-9]{2}$/;
 /** FR-PLT-015..019 (docs/16 §5.8–5.10): list, filter, monthly run, issue, pay, void. */
 export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
   const t = useTranslations("platform.invoices");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const tstatus = useTranslations("status.invoice");
   const api = useBffClient("operator");
@@ -521,6 +555,7 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={
           can("platform.invoices.manage") ? (
             <ActionDialog
@@ -563,11 +598,18 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
           ) : undefined
         }
       />
-      <Alert tone="info">
+      <Alert tone="info" title={t("gstNoteTitle")}>
         <p>{t("numberingNote")}</p>
+        <p>{t("gstNote")}</p>
         <p>{t("manualPaymentNote")}</p>
       </Alert>
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      <FilterCard
+        clearHref={
+          filters.status || filters.financialYear || filters.tenantId
+            ? "/platform/invoices"
+            : undefined
+        }
+      >
         <SelectField
           name="status"
           label={t("colStatus")}
@@ -595,10 +637,7 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
           }))}
           className="w-72"
         />
-        <Button type="submit" variant="secondary">
-          {tc("applyFilters")}
-        </Button>
-      </form>
+      </FilterCard>
       <InvoiceTable invoices={invoices} caption={t("title")} schoolName={nameOf} />
     </div>
   );

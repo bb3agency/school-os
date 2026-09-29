@@ -8,9 +8,18 @@ export const generateMetadata = pageMetadata((t) => t("platform.provision.title"
 /** FR-PLT-001..003: provision wizard → POST /api/v1/platform/tenants (step-up MFA). */
 export default function ProvisionSchoolPage() {
   const t = useTranslations("platform.provision");
+  const tn = useTranslations("platform.nav");
   return (
     <>
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[
+          { label: tn("dashboard"), href: "/platform" },
+          { label: tn("schools"), href: "/platform/schools" },
+          { label: t("title") },
+        ]}
+      />
       <ProvisionSchoolForm />
     </>
   );

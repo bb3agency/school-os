@@ -770,7 +770,9 @@
         "existing": "The owner already has a SchoolOS account; they were added to this school."
       },
       "openSchool": "Open the school's page",
-      "backToSchools": "Back to schools"
+      "backToSchools": "Back to schools",
+      "stepDone": "done",
+      "reviewEdit": "Change"
     },
     "plans": {
       "title": "Plans and pricing",
@@ -916,7 +918,17 @@
       "month": "Month",
       "monthHint": "For example September 2026.",
       "financialYear": "Financial year",
-      "financialYearHint": "For example 2026-27."
+      "financialYearHint": "For example 2026-27.",
+      "download": "Download PDF",
+      "downloadFor": "Download PDF {number}",
+      "downloadErrors": {
+        "invoice_pdf_pending": "The PDF is still being prepared. Try again in a minute.",
+        "invoice_draft": "Draft invoices have no PDF. Issue the invoice first."
+      },
+      "gstNoteTitle": "Numbers and GST",
+      "gstNote": "CGST and SGST apply when the school is in the same state as our billing entity; IGST applies otherwise. The GST column shows the split.",
+      "gstSplitIntra": "CGST {cgst} + SGST {sgst}",
+      "gstSplitInter": "IGST {igst}"
     },
     "usage": {
       "title": "Usage and quotas",
@@ -973,7 +985,16 @@
       "clearOverride": "Clear",
       "clearOverrideTitle": "Clear the school's setting for {key}?",
       "emptyTitle": "No feature flags yet",
-      "emptyBody": "Create a flag to release a feature gradually."
+      "emptyBody": "Create a flag to release a feature gradually.",
+      "stateOn": "On",
+      "stateOff": "Off",
+      "switchHint": "Switching a flag asks you to confirm first. Nothing changes until you do.",
+      "turnOn": "Turn on",
+      "turnOff": "Turn off",
+      "turnOnTitle": "Turn on {key} for everyone?",
+      "turnOffTitle": "Turn off {key} for everyone?",
+      "turnOnBody": "Schools without their own override get this feature, within the rollout percentage. It applies within a minute.",
+      "turnOffBody": "Schools without their own override lose this feature. Schools forced on keep it. It applies within a minute."
     },
     "fleet": {
       "title": "Fleet",
@@ -1009,7 +1030,9 @@
       "heartbeatKey": "New heartbeat key",
       "decommission": "Decommission",
       "decommissionTitle": "Decommission this deployment?",
-      "decommissionBody": "Only after offboarding is complete. Heartbeats from this host are then refused."
+      "decommissionBody": "Only after offboarding is complete. Heartbeats from this host are then refused.",
+      "heartbeatNever": "No heartbeat yet",
+      "heartbeatJustNow": "Just now"
     },
     "announcements": {
       "title": "Announcements",
@@ -1094,7 +1117,18 @@
       "resolutionDue": "Resolution due",
       "flagPersonalData": "This ticket contains personal data (it will be redacted)",
       "flaggedTitle": "Flagged: personal data",
-      "flaggedBody": "Do not copy this ticket's text anywhere. Ask the school to use record IDs."
+      "flaggedBody": "Do not copy this ticket's text anywhere. Ask the school to use record IDs.",
+      "lifecycle": {
+        "title": "Progress",
+        "opened": "Ticket opened",
+        "responded": "First reply sent",
+        "resolved": "Resolved",
+        "closed": "Closed",
+        "dueBy": "Due by",
+        "done": "Done:",
+        "next": "Next:",
+        "pending": "Not yet:"
+      }
     },
     "breakGlass": {
       "title": "Break-glass requests",
@@ -1128,7 +1162,8 @@
       "confirmEmergencyBody": "Access starts without the school's approval. The school is told within 24 hours.",
       "twoPersonNote": "Two-person rule: the operator who requested it cannot confirm it.",
       "emptyTitle": "No break-glass requests",
-      "emptyBody": "Requests for temporary access to a school appear here."
+      "emptyBody": "Requests for temporary access to a school appear here.",
+      "needsSecondOperator": "A different operator must confirm."
     },
     "operators": {
       "title": "Operators and roles",
@@ -1175,7 +1210,8 @@
         "support_agent": "Support tickets, announcements and access requests.",
         "billing_admin": "Plans, subscriptions, invoices and payments.",
         "platform_viewer": "Read-only view of everything."
-      }
+      },
+      "twoPersonNote": "Two actions need two different operators: offboarding a school and confirming an emergency break-glass request."
     },
     "audit": {
       "title": "Platform audit log",

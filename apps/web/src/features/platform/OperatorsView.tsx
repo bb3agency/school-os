@@ -1,22 +1,22 @@
 "use client";
 
 import { PLATFORM_ROLES, type Operator, type PlatformRole } from "@schoolos/api-client";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
-import { Badge } from "@/components/ui/Badge";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable, type Column } from "@/components/ui/Table";
-import { Value } from "@/components/ui/Value";
 import { personTone } from "@/features/status";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
-import { formatDateTime, formatList } from "@/lib/format";
 import { formList } from "@/lib/forms";
 import { ready } from "@/lib/loadable";
 import { email, text } from "@/lib/validation";
 import { PK, useOperatorMe } from "./data";
+import { MonoTime } from "./pills";
 
 const roles = z.array(z.enum(PLATFORM_ROLES)).min(1, { error: "chooseRole" });
 
@@ -80,8 +80,8 @@ function RoleCheckboxes({
 export function OperatorsScreen() {
   const t = useTranslations("platform.operators");
   const tc = useTranslations("common");
+  const tn = useTranslations("platform.nav");
   const tstatus = useTranslations("status.person");
-  const locale = useLocale();
   const api = useBffClient("operator");
   const me = useOperatorMe();
   const operators = useApiQuery(
@@ -92,16 +92,38 @@ export function OperatorsScreen() {
   );
 
   const columns: Column<Operator>[] = [
-    { key: "name", header: t("colName"), cell: (row) => row.display_name },
-    { key: "email", header: t("colEmail"), cell: (row) => row.email },
+    {
+      key: "name",
+      header: t("colName"),
+      cell: (row) => (
+        <span className="flex min-w-48 items-center gap-3">
+          <Avatar name={row.display_name} size="sm" decorative />
+          <span className="flex min-w-0 flex-col">
+            <span className="font-medium text-ink">
+              {row.display_name}
+              {me?.operator_id === row.id ? (
+                <span className="ml-2 align-middle">
+                  <Pill variant="dark">{t("you")}</Pill>
+                </span>
+              ) : null}
+            </span>
+            <span className="text-xs break-all text-ink-muted">{row.email}</span>
+          </span>
+        </span>
+      ),
+    },
     {
       key: "roles",
       header: t("colRoles"),
-      cell: (row) =>
-        formatList(
-          row.roles.map((role) => t(`roles.${role}`)),
-          locale,
-        ),
+      cell: (row) => (
+        <ul className="flex flex-wrap gap-1.5" aria-label={t("colRoles")}>
+          {row.roles.map((role) => (
+            <li key={role}>
+              <Badge tone="violet">{t(`roles.${role}`)}</Badge>
+            </li>
+          ))}
+        </ul>
+      ),
     },
     {
       key: "mfa",
@@ -121,7 +143,7 @@ export function OperatorsScreen() {
     {
       key: "last",
       header: t("colLastSignIn"),
-      cell: (row) => <Value>{formatDateTime(row.last_login_at)}</Value>,
+      cell: (row) => <MonoTime value={row.last_login_at} />,
     },
     {
       key: "actions",
@@ -181,7 +203,11 @@ export function OperatorsScreen() {
   ];
 
   const roleColumns: Column<PlatformRole>[] = [
-    { key: "name", header: t("colRole"), cell: (role) => t(`roles.${role}`) },
+    {
+      key: "name",
+      header: t("colRole"),
+      cell: (role) => <Badge tone="violet">{t(`roles.${role}`)}</Badge>,
+    },
     { key: "hint", header: t("colRoleHint"), cell: (role) => t(`roleHints.${role}`) },
     {
       key: "key",
@@ -195,6 +221,7 @@ export function OperatorsScreen() {
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={
           <ActionDialog
             triggerLabel={t("invite")}
@@ -253,7 +280,7 @@ export function OperatorsScreen() {
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
       />
-      <Card title={t("rolesTitle")}>
+      <Card title={t("rolesTitle")} description={t("twoPersonNote")}>
         <DataTable
           caption={t("rolesTitle")}
           captionHidden

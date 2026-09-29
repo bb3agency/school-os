@@ -17,18 +17,19 @@ import { TextAreaField, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
+import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { DataTable, type Column } from "@/components/ui/Table";
-import { Value } from "@/components/ui/Value";
 import { TicketThread } from "@/features/support/TicketThread";
 import { known, priorityTone, ticketTone } from "@/features/status";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
-import { formatDateTime } from "@/lib/format";
 import { useApiForm } from "@/lib/forms";
 import type { Loadable } from "@/lib/loadable";
 import { checkbox, text, uuid } from "@/lib/validation";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { PK, ifMatch, useCan, useOperatorMe, useSchoolDirectory } from "./data";
+import { FilterCard } from "./FilterCard";
+import { MonoTime } from "./pills";
 
 /** Always-visible warning on every support screen (docs/16 §15; CLAUDE.md §11). */
 export function StudentDataWarning() {
@@ -71,7 +72,10 @@ export function TicketTable({
       key: "number",
       header: t("colNumber"),
       cell: (row) => (
-        <Link href={`/platform/support/${row.id}`} className="font-semibold text-primary underline">
+        <Link
+          href={`/platform/support/${row.id}`}
+          className="font-mono text-sm font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
+        >
           {row.number}
         </Link>
       ),
@@ -96,17 +100,15 @@ export function TicketTable({
       key: "sla",
       header: t("colSla"),
       cell: (row) => (
-        <Value>
-          {formatDateTime(
-            row.first_responded_at ? row.resolution_due_at : row.first_response_due_at,
-          )}
-        </Value>
+        <MonoTime
+          value={row.first_responded_at ? row.resolution_due_at : row.first_response_due_at}
+        />
       ),
     },
     {
       key: "updated",
       header: t("colUpdated"),
-      cell: (row) => <Value>{formatDateTime(row.updated_at)}</Value>,
+      cell: (row) => <MonoTime value={row.updated_at} />,
     },
   ];
   return (
@@ -140,6 +142,7 @@ const newTicketSchema = z.object({
 /** FR-PLT-027 (docs/16 §5.14): the operator queue with filters. */
 export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilters }) {
   const t = useTranslations("platform.support");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const tstatus = useTranslations("status.ticket");
   const tprio = useTranslations("status.priority");
@@ -166,6 +169,7 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={
           can("platform.support.manage") ? (
             <ActionDialog
@@ -245,7 +249,11 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
         }
       />
       <StudentDataWarning />
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      <FilterCard
+        clearHref={
+          filters.status || filters.priority || filters.mine ? "/platform/support" : undefined
+        }
+      >
         <SelectField
           name="status"
           label={t("colStatus")}
@@ -262,7 +270,7 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
           options={TICKET_PRIORITIES.map((value) => ({ value, label: tprio(value) }))}
           className="w-44"
         />
-        <label className="flex items-center gap-2 pb-2 text-sm">
+        <label className="flex min-h-10 items-center gap-2 text-sm">
           <input
             type="checkbox"
             name="mine"
@@ -272,10 +280,7 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
           />
           {t("assignedToMe")}
         </label>
-        <Button type="submit" variant="secondary">
-          {tc("applyFilters")}
-        </Button>
-      </form>
+      </FilterCard>
       <TicketTable tickets={tickets} caption={t("title")} schoolName={nameOf} />
     </div>
   );
@@ -286,6 +291,7 @@ const replySchema = z.object({ body: text(4000), internal_note: checkbox });
 /** One ticket: thread, reply or internal note, status, priority, assignee, PII flag. */
 export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
   const t = useTranslations("platform.support");
+  const tn = useTranslations("platform.nav");
   const tc = useTranslations("common");
   const tstatus = useTranslations("status.ticket");
   const tprio = useTranslations("status.priority");
@@ -373,9 +379,20 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${data.number} · ${data.subject}`}
+        eyebrow={data.number}
+        title={data.subject}
         description={nameOf(data.tenant_id)}
-        badge={<StatusBadge ticket={data} />}
+        breadcrumb={[
+          { label: tn("dashboard"), href: "/platform" },
+          { label: tn("support"), href: "/platform/support" },
+          { label: data.number },
+        ]}
+        badge={
+          <span className="flex flex-wrap items-center gap-2">
+            <StatusBadge ticket={data} />
+            <PriorityBadge priority={data.priority} />
+          </span>
+        }
       />
       <StudentDataWarning />
       {data.personal_data_flagged ? (
@@ -414,7 +431,7 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
           ) : null}
         </Card>
         <Card title={t("details")}>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
             <dt className="text-ink-muted">{t("colPriority")}</dt>
             <dd>
               <PriorityBadge priority={data.priority} />
@@ -425,15 +442,9 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
             <dd>{data.channel}</dd>
             <dt className="text-ink-muted">{t("assignee")}</dt>
             <dd>{assignee}</dd>
-            <dt className="text-ink-muted">{t("firstResponseDue")}</dt>
-            <dd>
-              <Value>{formatDateTime(data.first_response_due_at)}</Value>
-            </dd>
-            <dt className="text-ink-muted">{t("resolutionDue")}</dt>
-            <dd>
-              <Value>{formatDateTime(data.resolution_due_at)}</Value>
-            </dd>
           </dl>
+          <h3 className="mt-6 mb-3 font-medium text-ink">{t("lifecycle.title")}</h3>
+          <TicketLifecycle ticket={data} />
           {manage ? (
             <form
               noValidate
@@ -485,4 +496,38 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
       </div>
     </div>
   );
+}
+
+/**
+ * Ticket lifecycle from its own timestamps: opened, first response (or when it is due),
+ * resolved (or when it is due) and closed. SLA due times come from the API.
+ */
+function TicketLifecycle({ ticket }: { ticket: SupportTicket }) {
+  const t = useTranslations("platform.support.lifecycle");
+  const step = (id: string, title: string, at: string | null, due?: string): TimelineItem => ({
+    id,
+    title,
+    status: at ? "done" : "pending",
+    statusLabel: at ? t("done") : t("pending"),
+    time: at ? (
+      <MonoTime value={at} />
+    ) : due ? (
+      <span>
+        {t("dueBy")} <MonoTime value={due} />
+      </span>
+    ) : undefined,
+  });
+  const items: TimelineItem[] = [
+    step("opened", t("opened"), ticket.created_at),
+    step("responded", t("responded"), ticket.first_responded_at, ticket.first_response_due_at),
+    step("resolved", t("resolved"), ticket.resolved_at, ticket.resolution_due_at),
+    step("closed", t("closed"), ticket.closed_at),
+  ];
+  const firstPending = items.findIndex((item) => item.status === "pending");
+  const current = items[firstPending];
+  if (current) {
+    current.status = "current";
+    current.statusLabel = t("next");
+  }
+  return <Timeline items={items} label={t("title")} />;
 }
