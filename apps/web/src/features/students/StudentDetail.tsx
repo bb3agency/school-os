@@ -140,7 +140,10 @@ function AttributeRow({
 
   return (
     <tr className="align-top">
-      <th scope="row" className="px-4 py-4 text-left font-medium whitespace-normal text-ink">
+      <th
+        scope="row"
+        className="min-w-40 px-4 py-4 text-left font-medium whitespace-normal text-ink"
+      >
         {label}
         {attribute?.is_identity ? (
           <span className="block text-xs font-normal text-ink-muted">{t("identityField")}</span>
@@ -164,14 +167,14 @@ function AttributeRow({
               ) : null}
               {canonical.provisional ? <Badge tone="warning">{t("provisional")}</Badge> : null}
               {conflicts.length > 0 ? (
-                <Badge tone="warning">
+                <Pill variant="negative">
                   {t("conflicts", {
                     sources: formatList(
                       conflicts.map((source) => ts(`sourceShort.${source}`)),
                       locale,
                     ),
                   })}
-                </Badge>
+                </Pill>
               ) : null}
             </div>
           </div>

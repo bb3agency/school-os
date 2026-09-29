@@ -262,8 +262,8 @@ export function StudentListView({
             <div
               className={
                 yearOptions.length > 0
-                  ? "grid items-start gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr]"
-                  : "grid items-start gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr]"
+                  ? "grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr]"
+                  : "grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr]"
               }
             >
               <GuardedTextField

@@ -1715,7 +1715,7 @@
       "tabBySource": "By source",
       "tabGuardians": "Parents",
       "tabEnrolments": "Class history",
-      "tabHistory": "History",
+      "tabHistory": "All recorded values",
       "historyTitle": "Recorded values",
       "historyDescription": "Every value recorded for this student, newest first. Replaced values stay in the history; nothing is deleted.",
       "historyTimeline": "Recorded values, newest first",

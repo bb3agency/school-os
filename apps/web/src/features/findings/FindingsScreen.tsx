@@ -3,7 +3,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
-import { Avatar } from "@/components/ui/Avatar";
 import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -134,26 +133,22 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       key: "student",
       header: t("colStudent"),
       cell: (row) => (
-        <span className="flex items-center gap-3">
-          {row.student.display_name ? (
-            <Avatar name={row.student.display_name} size="sm" decorative />
-          ) : null}
-          <span>
-            <span className="block font-medium">
-              <Value>{row.student.display_name}</Value>
-            </span>
-            {row.student.admission_no ? (
-              <span className="block font-mono text-xs text-ink-muted">
-                {t("admissionNo", { number: row.student.admission_no })}
-              </span>
-            ) : null}
+        <span className="block min-w-36">
+          <span className="block font-medium">
+            <Value>{row.student.display_name}</Value>
           </span>
+          {row.student.admission_no ? (
+            <span className="block font-mono text-xs whitespace-nowrap text-ink-muted">
+              {t("admissionNo", { number: row.student.admission_no })}
+            </span>
+          ) : null}
         </span>
       ),
     },
     {
       key: "field",
       header: t("colField"),
+      className: "min-w-32",
       cell: (row) => (
         <span>
           <Value>{attributeLabel(attributes.data, row.attribute_key, locale)}</Value>
