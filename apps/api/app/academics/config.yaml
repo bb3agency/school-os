@@ -1,0 +1,53 @@
+# Attendance, exams and marks (M5; FR-ATT-*, FR-MRK-*). Versioned configuration shipped inside the
+# package (read by app/academics/config.py; CLAUDE.md invariant 13). Change together with
+# tests/academics.
+version: 1
+
+attendance:
+  # Codes accepted in attendance sheets (case-insensitive, after trimming) and the status each
+  # one stores: the English letters of the paper register. Telugu abbreviations wait for the
+  # schools' own register formats (PO question, 14 M5 status).
+  codes:
+    p: present
+    present: present
+    a: absent
+    absent: absent
+    l: late
+    late: late
+    lv: leave
+    leave: leave
+  # Entries per write request (a month of a large section: 31 days x 80 students).
+  max_entries: 2500
+  # Dates per sheet (one month of a register, with some slack).
+  max_sheet_dates: 31
+
+marks:
+  max_subjects: 20
+  max_subject_chars: 60
+  max_marks_ceiling: 1000
+  # Cell text meaning "absent from this paper" (case-insensitive).
+  absent_codes: [ab, abs, absent]
+  max_entries: 2500
+
+sheets:
+  # Header texts of the student column and the maximum-marks row. Compared after normalising
+  # both sides the same way: NFC, lower case, everything but letters, marks and digits removed
+  # (the same synonyms as app/imports/config.yaml where they overlap).
+  admission_headers: [adm no, admn no, adm number, admission no, admission number, admission num,
+                      ad no, admission, ప్రవేశ సంఖ్య, అడ్మిషన్ నంబర్, ప్రవేశ నంబర్]
+  roll_headers: [roll no, roll number, roll, రోల్ నంబర్]
+  # Optional name column: skipped, never stored or returned.
+  name_headers: [name, student name, name of the student, name of student, students name,
+                 full name, విద్యార్థి పేరు, పేరు]
+  max_label_rows: [max marks, maximum marks, max, out of, గరిష్ఠ మార్కులు]
+  # Readers' limits (app.core.spreadsheet): same zip-bomb and size guards as imports.
+  limits:
+    max_rows: 200
+    max_columns: 40
+    max_cell_chars: 200
+    xlsx_max_uncompressed_bytes: 20971520   # 20 MB
+    xlsx_max_compression_ratio: 200
+    xlsx_max_members: 500
+    max_scanned_rows: 2000
+  max_file_bytes: 2097152                   # 2 MB: one section's register or marks sheet
+  max_issues: 200                           # problems listed per preview (the rest are counted)
