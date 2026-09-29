@@ -151,6 +151,8 @@ EXPECTED_TABLES = {
     "documents",
     "document_versions",
     "document_acl",
+    "certificates",
+    "certificate_counters",
     "retention_settings",
 }
 

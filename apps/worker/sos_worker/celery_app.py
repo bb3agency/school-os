@@ -65,6 +65,7 @@ TASK_MODULES: list[str] = [
     "app.knowledge.tasks",
     "app.students.tasks",
     "app.admin.tasks",
+    "app.certificates.tasks",
 ]
 
 
@@ -112,6 +113,8 @@ def create_celery() -> Celery:
             # FR-PLT-005 (ADR-0029): the deletion job on "maintenance", certificates on "pdf".
             "offboarding.process": {"queue": "maintenance"},
             "offboarding.certify": {"queue": "pdf"},
+            # FR-CERT-010: certificate PDFs render on the Chromium workers.
+            "certificates.render": {"queue": "pdf"},
             "exports.purge_expired": {"queue": "maintenance"},
             # FR-ADM-001: the school's full data export on "exports"; the hourly purge of
             # archives past their 24 hours on "maintenance".

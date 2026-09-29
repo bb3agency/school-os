@@ -1,0 +1,159 @@
+# Certificates and registers (M3; US-1101..US-1108, FR-CERT-001, FR-CERT-006, FR-REG-004).
+# Versioned configuration shipped inside the package (the API image does not copy /config;
+# CLAUDE.md §6.13). Read and validated by app/certificates/config.py.
+#
+# (Proposed from the roadmap scope; PO to confirm.) The formats of the design partner's school
+# and of the AP official transfer certificate are not collected yet (PRD §11 Q4): fields that
+# SchoolOS cannot fill are listed under `official_format_todo` and printed as a blank line to
+# fill by hand, never guessed.
+version: 1
+
+# The HTML/CSS template version recorded with every issued certificate (FR-CERT-003).
+template_version: v1
+
+# Serial numbers per school, type and academic year (FR-CERT-006). Placeholders: {prefix} (per
+# type below), {year} (the academic year label, e.g. 2026-27) and {number} (zero-padded to
+# number_width). The result must match the database CHECK certificates_serial_shape.
+serial:
+  format: "{prefix}/{year}/{number}"
+  number_width: 4
+
+# Minimum and maximum length of reasons (reject, cancel, duplicate) and of free-text inputs.
+# The same bounds are CHECK constraints in migration 0033_certificates.
+reason_min_length: 10
+reason_max_length: 1000
+
+# Who may open a certificate PDF in the document library (documents ACL: role keys). Holders of
+# certificate.read open them from the certificate itself regardless (FR-CERT-010, FR-CERT-011).
+document_acl_roles: [owner, principal, office_admin, office_staff]
+
+# Presigned PDF download lifetime (FR-DOC-004: at most 5 minutes).
+download_url_ttl_s: 300
+
+# Register print views (FR-REG-001..004): the most rows one view may show.
+register_max_rows: 5000
+
+# Values printed on a certificate come from the canonical record (BR-01). Only C1/C2 attributes
+# may be listed (FR-CERT-009: no Aadhaar data, no restricted C3 attributes; checked at load).
+types:
+  transfer:
+    label_en: Transfer certificate
+    label_te: బదిలీ ధృవీకరణ పత్రం
+    prefix: TC
+    requires_approval: true
+    ends_enrolment: true
+    needs_enrolment: false
+    printed: [full_name, father_name, mother_name, dob, gender, nationality, mother_tongue,
+              admission_no, admission_date]
+    required: [full_name, father_name, dob, admission_no]
+    inputs:
+      leaving_date: {kind: date, required: true}
+      leaving_reason:
+        kind: choice
+        required: true
+        choices: [parent_request, parent_transferred, course_completed, other]
+      promotion:
+        kind: choice
+        required: true
+        choices: [promoted, not_promoted, not_applicable]
+      conduct:
+        kind: choice
+        required: true
+        choices: [very_good, good, satisfactory]
+      remarks: {kind: text, required: false, max_length: 200}
+    official_format_todo:
+      - religion_and_caste        # C3 in SchoolOS (encrypted): printing needs a PO decision
+      - community_sc_st_bc        # C3 (category): printing needs a PO decision
+      - identification_marks      # not recorded yet
+      - first_language_and_subjects
+      - fees_paid_up_to           # finance (M6)
+      - total_working_days_and_attendance
+      - date_of_application_for_tc
+  bonafide:
+    label_en: Bonafide certificate
+    label_te: బోనఫైడ్ ధృవీకరణ పత్రం
+    prefix: BC
+    requires_approval: false
+    ends_enrolment: false
+    needs_enrolment: true
+    printed: [full_name, father_name, dob, admission_no]
+    required: [full_name, father_name, admission_no]
+    inputs:
+      purpose:
+        kind: choice
+        required: true
+        choices: [scholarship, bus_pass, bank_account, passport, aadhaar_update, other]
+      purpose_note: {kind: text, required: false, max_length: 120}
+    official_format_todo: []
+  study:
+    label_en: Study certificate
+    label_te: చదువు ధృవీకరణ పత్రం
+    prefix: SC
+    requires_approval: false
+    ends_enrolment: false
+    needs_enrolment: false
+    printed: [full_name, father_name, dob, admission_no, admission_date]
+    required: [full_name, father_name, admission_no]
+    inputs:
+      purpose_note: {kind: text, required: false, max_length: 120}
+    official_format_todo:
+      - place_of_study_district_mandal
+  conduct:
+    label_en: Conduct certificate
+    label_te: ప్రవర్తన ధృవీకరణ పత్రం
+    prefix: CC
+    requires_approval: false
+    ends_enrolment: false
+    needs_enrolment: false
+    printed: [full_name, father_name, admission_no]
+    required: [full_name, father_name, admission_no]
+    inputs:
+      conduct:
+        kind: choice
+        required: true
+        choices: [very_good, good, satisfactory]
+    official_format_todo: []
+
+# Bilingual labels for input choices (printed on the certificate and shown in the web app).
+choice_labels:
+  parent_request: {en: "At the request of the parent", te: "తల్లిదండ్రుల అభ్యర్థన మేరకు"}
+  parent_transferred: {en: "Parent transferred", te: "తల్లిదండ్రుల బదిలీ"}
+  course_completed: {en: "Completed the course", te: "చదువు పూర్తయింది"}
+  other: {en: "Other", te: "ఇతర"}
+  promoted: {en: "Yes, promoted", te: "అవును, పై తరగతికి అర్హులు"}
+  not_promoted: {en: "Not promoted", te: "పై తరగతికి అర్హత లేదు"}
+  not_applicable: {en: "Not applicable", te: "వర్తించదు"}
+  very_good: {en: "Very good", te: "చాలా మంచిది"}
+  good: {en: "Good", te: "మంచిది"}
+  satisfactory: {en: "Satisfactory", te: "సంతృప్తికరం"}
+  scholarship: {en: "Scholarship", te: "ఉపకార వేతనం"}
+  bus_pass: {en: "Bus pass", te: "బస్ పాస్"}
+  bank_account: {en: "Bank account", te: "బ్యాంకు ఖాతా"}
+  passport: {en: "Passport", te: "పాస్‌పోర్ట్"}
+  aadhaar_update: {en: "Aadhaar update", te: "ఆధార్ నవీకరణ"}
+
+# Labels of the other lines a certificate prints (inputs and values worked out from the record).
+detail_labels:
+  class_at_leaving: {en: "Class in which the pupil last studied", te: "చివరగా చదివిన తరగతి"}
+  admission_class: {en: "Class to which admitted", te: "ప్రవేశం పొందిన తరగతి"}
+  dob_in_words: {en: "Date of birth (in words)", te: "పుట్టిన తేదీ (అక్షరాల్లో)"}
+  leaving_date: {en: "Date of leaving the school", te: "పాఠశాల విడిచిన తేదీ"}
+  leaving_reason: {en: "Reason for leaving", te: "విడిచిపెట్టడానికి కారణం"}
+  promotion: {en: "Whether qualified for promotion to a higher class", te: "పై తరగతికి అర్హులా"}
+  conduct: {en: "Conduct and character", te: "ప్రవర్తన, నడవడిక"}
+  remarks: {en: "Remarks", te: "వ్యాఖ్యలు"}
+  purpose: {en: "Purpose", te: "ప్రయోజనం"}
+  purpose_note: {en: "Purpose (details)", te: "ప్రయోజనం (వివరాలు)"}
+  study_from: {en: "Studied from", te: "నుండి చదివారు"}
+  study_to: {en: "Studied up to", te: "వరకు చదివారు"}
+
+# Lines of the official format that SchoolOS cannot fill yet: printed blank, filled by hand.
+blank_labels:
+  religion_and_caste: {en: "Religion and caste", te: "మతం, కులం"}
+  community_sc_st_bc: {en: "Whether the pupil belongs to SC, ST or BC", te: "ఎస్సీ, ఎస్టీ లేదా బీసీ వర్గానికి చెందినవారా"}
+  identification_marks: {en: "Personal marks of identification", te: "గుర్తింపు చిహ్నాలు"}
+  first_language_and_subjects: {en: "First language and subjects studied", te: "ప్రథమ భాష, చదివిన విషయాలు"}
+  fees_paid_up_to: {en: "Month up to which fees were paid", te: "ఫీజు చెల్లించిన నెల"}
+  total_working_days_and_attendance: {en: "Working days and days attended", te: "పని దినాలు, హాజరైన దినాలు"}
+  date_of_application_for_tc: {en: "Date of application for the certificate", te: "ధృవీకరణ పత్రం కోసం దరఖాస్తు తేదీ"}
+  place_of_study_district_mandal: {en: "District and mandal of the school", te: "పాఠశాల జిల్లా, మండలం"}

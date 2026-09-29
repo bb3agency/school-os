@@ -241,3 +241,34 @@ templates:
     te:
       title: SchoolOS నుండి కొత్త సందేశం
       body: SchoolOS నుండి కొత్త సందేశం వచ్చింది. పేజీ పైభాగంలోని బ్యానర్‌లో దాన్ని చదవండి.
+
+  # --- certificates (M3; US-1102, FR-CERT-012) ------------------------------------------------
+  certificate.approval_requested:
+    params: [certificate_id, student_id, certificate_type]
+    resource_type: certificate
+    en:
+      title: "{certificate_type, select, transfer {Transfer certificate} other {Certificate}} waiting for your approval"
+      body: "A {certificate_type, select, transfer {transfer certificate} other {certificate}} is waiting for your approval. Open it to check the draft, then approve or reject it."
+    te:
+      title: "మీ ఆమోదం కోసం {certificate_type, select, transfer {బదిలీ ధృవీకరణ పత్రం} other {ధృవీకరణ పత్రం}} వేచి ఉంది"
+      body: "ఒక {certificate_type, select, transfer {బదిలీ ధృవీకరణ పత్రం} other {ధృవీకరణ పత్రం}} మీ ఆమోదం కోసం వేచి ఉంది. ముసాయిదా చూసి ఆమోదించండి లేదా తిరస్కరించండి."
+
+  certificate.approved:
+    params: [certificate_id, student_id, certificate_type]
+    resource_type: certificate
+    en:
+      title: Certificate approved
+      body: The certificate you prepared was approved and has its serial number. Print it from the certificate page.
+    te:
+      title: ధృవీకరణ పత్రం ఆమోదించబడింది
+      body: మీరు తయారు చేసిన ధృవీకరణ పత్రం ఆమోదించబడింది, క్రమ సంఖ్య ఇవ్వబడింది. ధృవీకరణ పత్రం పేజీ నుండి ముద్రించండి.
+
+  certificate.rejected:
+    params: [certificate_id, student_id, certificate_type]
+    resource_type: certificate
+    en:
+      title: Certificate not approved
+      body: The certificate you prepared was not approved. Open it to see why.
+    te:
+      title: ధృవీకరణ పత్రం ఆమోదించబడలేదు
+      body: మీరు తయారు చేసిన ధృవీకరణ పత్రం ఆమోదించబడలేదు. కారణం తెలుసుకోవడానికి దాన్ని తెరవండి.
