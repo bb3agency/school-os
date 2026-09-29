@@ -742,6 +742,32 @@ def get_profile(session: Session, student_id: uuid.UUID) -> StudentProfile | Non
     ).one_or_none()
 
 
+def summary_rows(session: Session, student_ids: Collection[uuid.UUID]) -> list[Row[Any]]:
+    """Id, admission number, status, display name and current section of ``student_ids`` (the
+    C2 list projection; one query). The caller has already limited the ids to its scope."""
+    if not student_ids:
+        return []
+    stmt = (
+        select(
+            Student.id,
+            Student.admission_no,
+            Student.status,
+            StudentProfile.full_name,
+            StudentProfile.current_section_id,
+        )
+        .outerjoin(
+            StudentProfile,
+            and_(
+                StudentProfile.tenant_id == Student.tenant_id,
+                StudentProfile.student_id == Student.id,
+            ),
+        )
+        .where(Student.id.in_(list(student_ids)))
+        .order_by(Student.id)
+    )
+    return list(session.execute(stmt))
+
+
 # --- search ----------------------------------------------------------------------------------
 
 

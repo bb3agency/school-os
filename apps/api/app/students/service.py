@@ -1524,6 +1524,38 @@ def list_students_in_scope(
     )
 
 
+def summaries(
+    session: Session, ctx: UserContext, student_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, StudentSummary]:
+    """Display fields (name, admission number, status, current class-section) of the given
+    students the caller may read (``student.read_basic`` and its scope, as in :func:`search`);
+    ids outside the scope or unknown are left out. For modules that keep student ids of their
+    own (Tally ledger links, FR-TALLY-006). C2 only, never a C3 value."""
+    if not student_ids or not ctx.has(READ):
+        return {}
+    structure = _structure(session)
+    allowed = _allowed_sections(ctx, READ, structure)
+    wanted = set(student_ids)
+    if allowed is not None:
+        if structure.year_id is None or not allowed:
+            return {}
+        wanted = repo.students_in_sections(
+            session, wanted, academic_year_id=structure.year_id, section_ids=allowed
+        )
+    return {
+        r.id: StudentSummary(
+            id=r.id,
+            display_name=r.full_name,
+            admission_no=r.admission_no,
+            status=r.status,
+            class_section=structure.label(r.current_section_id),
+            section_id=r.current_section_id,
+            match=StudentMatch(field=None, score=None),
+        )
+        for r in repo.summary_rows(session, wanted)
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalValue:
     value: str | None
