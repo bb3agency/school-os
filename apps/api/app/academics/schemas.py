@@ -43,7 +43,7 @@ class RosterStudentOut(_Out):
     roll_no: str | None
 
 
-class SectionOut(_Out):
+class RecordSectionOut(_Out):
     id: uuid.UUID
     class_id: uuid.UUID
     academic_year_id: uuid.UUID
@@ -59,7 +59,7 @@ class AttendanceDayStudent(_Out):
 
 
 class AttendanceDayOut(_Out):
-    section: SectionOut
+    section: RecordSectionOut
     on_date: dt.date
     marked: bool = Field(description="Whether any student of the section is marked that day")
     students: list[AttendanceDayStudent]
@@ -75,7 +75,7 @@ class AttendanceMonthStudent(_Out):
 class AttendanceMonthOut(_Out):
     """The month register: school days (dates with any mark) x students (A4 print)."""
 
-    section: SectionOut
+    section: RecordSectionOut
     month: str
     school_days: list[dt.date]
     students: list[AttendanceMonthStudent]
@@ -167,7 +167,7 @@ class MarksStudentOut(_Out):
 
 
 class MarksGridOut(_Out):
-    section: SectionOut
+    section: RecordSectionOut
     exam: ExamOut
     subjects: list[str]
     students: list[MarksStudentOut]
@@ -199,9 +199,9 @@ __all__ = [
     "MarksStudentOut",
     "MarksWrite",
     "Month",
+    "RecordSectionOut",
     "RecordSource",
     "RosterStudentOut",
-    "SectionOut",
     "SheetIn",
     "SheetIssueOut",
     "WriteResultOut",

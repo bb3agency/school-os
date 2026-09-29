@@ -57,8 +57,8 @@ from app.academics.schemas import (
     MarksSheetOut,
     MarksStudentOut,
     MarksWrite,
+    RecordSectionOut,
     RosterStudentOut,
-    SectionOut,
     SheetIn,
     SheetIssueOut,
     WriteResultOut,
@@ -159,7 +159,7 @@ def _queue_rules(session: Session, student_ids: Iterable[uuid.UUID], kind: str) 
 class _Section:
     section: TenancySection
     year: AcademicYearOut
-    out: SectionOut
+    out: RecordSectionOut
 
 
 def _section(
@@ -173,7 +173,7 @@ def _section(
     ensure_section_visible(ctx, permission, section)
     year = tenancy.get_academic_year(session, section.academic_year_id)
     klass = tenancy.get_class(session, section.class_id)
-    out = SectionOut(
+    out = RecordSectionOut(
         id=section.id,
         class_id=section.class_id,
         academic_year_id=section.academic_year_id,

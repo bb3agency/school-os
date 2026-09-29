@@ -26,18 +26,18 @@ from app.insights.schemas import (
     DueFilter,
     ErasedOut,
     EraseIn,
-    FlagDetail,
-    FlagOut,
     FlagStatus,
     FlagView,
     IndicatorName,
+    InsightFlagDetail,
+    InsightFlagOut,
+    InsightSummaryOut,
     ManualFlagIn,
     NoteIn,
     NoteOut,
     OwnerOut,
     SettingsIn,
     SettingsOut,
-    SummaryOut,
     TimelineOut,
 )
 
@@ -50,7 +50,7 @@ ManagerRead = Annotated[UserContext, Depends(require(service.MANAGE, scope="scho
 Manager = Annotated[UserContext, Depends(require(service.MANAGE, scope="school", step_up=True))]
 
 
-def _flag_etag(response: Response, out: FlagDetail) -> FlagDetail:
+def _flag_etag(response: Response, out: InsightFlagDetail) -> InsightFlagDetail:
     response.headers["ETag"] = etag(out.version)
     return out
 
@@ -58,7 +58,7 @@ def _flag_etag(response: Response, out: FlagDetail) -> FlagDetail:
 # --- flags ----------------------------------------------------------------------------------------
 
 
-@router.get("/insights/flags", response_model=Page[FlagOut])
+@router.get("/insights/flags", response_model=Page[InsightFlagOut])
 def list_flags(
     ctx: Reader,
     db: TenantDB,
@@ -71,7 +71,7 @@ def list_flags(
     due: DueFilter | None = None,
     limit: Limit = 50,
     cursor: Cursor = None,
-) -> Page[FlagOut]:
+) -> Page[InsightFlagOut]:
     """Early-warning flags (``insights.read``): ``mine`` = flags you own; ``all`` = every flag
     of students in your scope (class teachers: their sections). Without ``status``: open and in
     progress. Soonest due first. Audited."""
@@ -89,25 +89,27 @@ def list_flags(
     )
 
 
-@router.get("/insights/summary", response_model=SummaryOut)
+@router.get("/insights/summary", response_model=InsightSummaryOut)
 def summary(
     ctx: Reader,
     db: TenantDB,
     since: Annotated[dt.date | None, Query(description="Default: 30 days ago")] = None,
-) -> SummaryOut:
+) -> InsightSummaryOut:
     """Counts only for your scope in this school: flags raised, first acted on by their due
     date (the M5 exit metric), late, not yet, overdue and open (``insights.read``)."""
     return service.summary(db, ctx, since)
 
 
-@router.get("/insights/flags/{flag_id}", response_model=FlagDetail)
-def get_flag(ctx: Reader, db: TenantDB, flag_id: uuid.UUID, response: Response) -> FlagDetail:
+@router.get("/insights/flags/{flag_id}", response_model=InsightFlagDetail)
+def get_flag(
+    ctx: Reader, db: TenantDB, flag_id: uuid.UUID, response: Response
+) -> InsightFlagDetail:
     """One flag with the numbers that raised it and its action log (``insights.read``; 404
     outside your scope). Audited."""
     return _flag_etag(response, service.get_flag(db, ctx, flag_id))
 
 
-@router.post("/students/{student_id}/flags", response_model=FlagDetail, status_code=201)
+@router.post("/students/{student_id}/flags", response_model=InsightFlagDetail, status_code=201)
 def raise_flag(
     ctx: Actor, db: TenantDB, student_id: uuid.UUID, body: ManualFlagIn, idem: IdempotencyDep
 ) -> Response:
@@ -124,17 +126,17 @@ def raise_flag(
     )
 
 
-@router.post("/insights/flags/{flag_id}/actions", response_model=FlagDetail, status_code=201)
+@router.post("/insights/flags/{flag_id}/actions", response_model=InsightFlagDetail, status_code=201)
 def add_action(
     ctx: Actor, db: TenantDB, flag_id: uuid.UUID, body: ActionIn, response: Response
-) -> FlagDetail:
+) -> InsightFlagDetail:
     """Record what was done about a flag (``insights.act``): talked with the student, called or
     met a parent, home visit, remedial support, referral, other; optional note. The first
     action marks the flag actioned. 409 ``flag_closed``."""
     return _flag_etag(response, service.add_action(db, ctx, flag_id, body))
 
 
-@router.post("/insights/flags/{flag_id}/close", response_model=FlagDetail)
+@router.post("/insights/flags/{flag_id}/close", response_model=InsightFlagDetail)
 def close_flag(
     ctx: Actor,
     db: TenantDB,
@@ -143,7 +145,7 @@ def close_flag(
     body: CloseIn,
     version: IfMatch,
     response: Response,
-) -> FlagDetail:
+) -> InsightFlagDetail:
     """Close a flag with a reason (``insights.act``; ``If-Match``). 409 ``flag_closed``."""
     return _flag_etag(response, service.close_flag(db, ctx, flag_id, body, version))
 
@@ -155,7 +157,7 @@ def flag_owners(ctx: ManagerRead, db: TenantDB, flag_id: uuid.UUID) -> list[Owne
     return service.owners(db, ctx, flag_id)
 
 
-@router.post("/insights/flags/{flag_id}/assign", response_model=FlagDetail)
+@router.post("/insights/flags/{flag_id}/assign", response_model=InsightFlagDetail)
 def assign_flag(
     ctx: Manager,
     db: TenantDB,
@@ -164,7 +166,7 @@ def assign_flag(
     body: AssignIn,
     version: IfMatch,
     response: Response,
-) -> FlagDetail:
+) -> InsightFlagDetail:
     """Give a flag another owner (``insights.manage``, recent MFA sign-in; ``If-Match``). 422
     ``owner_not_eligible``."""
     return _flag_etag(response, service.assign_flag(db, ctx, flag_id, body, version))

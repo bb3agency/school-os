@@ -5243,7 +5243,7 @@ export interface components {
              * Format: date
              */
             acted_on: string;
-            by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            by: components["schemas"]["StaffRef"] | null;
             /**
              * Created At
              * Format: date-time
@@ -5382,29 +5382,6 @@ export interface components {
             /** Version */
             version: number;
         };
-        /** SectionOut */
-        app__academics__schemas__SectionOut: {
-            /**
-             * Academic Year Id
-             * Format: uuid
-             */
-            academic_year_id: string;
-            /**
-             * Class Id
-             * Format: uuid
-             */
-            class_id: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Label
-             * @description Class code and section name, e.g. IX-A
-             */
-            label: string;
-        };
         /**
          * MemberOut
          * @description A staff member shown next to a record: membership id and display name only (``null``
@@ -5429,13 +5406,6 @@ export interface components {
             ok: boolean;
             /** Reason */
             reason: string | null;
-        };
-        /** Page[FlagOut] */
-        app__authz__http__Page_FlagOut_: {
-            /** Data */
-            data: components["schemas"]["app__insights__schemas__FlagOut"][];
-            /** Next Cursor */
-            next_cursor: string | null;
         };
         /** Page[TicketOut] */
         app__authz__http__Page_TicketOut_: {
@@ -5485,39 +5455,6 @@ export interface components {
             /** Version No */
             version_no: number;
         };
-        /** StudentRef */
-        app__dq__schemas__StudentRef: {
-            /** Admission No */
-            admission_no: string | null;
-            /** Display Name */
-            display_name: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-        };
-        /**
-         * SummaryOut
-         * @description Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).
-         */
-        app__dq__schemas__SummaryOut: {
-            /** Blockers */
-            blockers: number;
-            /** By Rule */
-            by_rule: components["schemas"]["RuleCount"][];
-            /** By Severity */
-            by_severity: {
-                [key: string]: number;
-            };
-            last_run: components["schemas"]["RunOut"] | null;
-            /** Profile Key */
-            profile_key: string | null;
-            /** Students With Blockers */
-            students_with_blockers: number;
-            /** Warnings */
-            warnings: number;
-        };
         /** MeOut */
         app__identity__schemas__MeOut: {
             /** Display Name */
@@ -5564,131 +5501,6 @@ export interface components {
              */
             user_id: string;
         };
-        /** FlagOut */
-        app__insights__schemas__FlagOut: {
-            /** Actioned */
-            actioned: boolean;
-            /** Close Reason */
-            close_reason: ("improved" | "support_in_place" | "parent_informed" | "no_concern" | "student_left" | "raised_in_error") | null;
-            /** Closed At */
-            closed_at: string | null;
-            /**
-             * Due On
-             * Format: date
-             */
-            due_on: string;
-            /**
-             * Evidence
-             * @description What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)
-             */
-            evidence: {
-                [key: string]: number | string;
-            };
-            /** First Action At */
-            first_action_at: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Indicator
-             * @enum {string}
-             */
-            indicator: "attendance" | "behaviour" | "course";
-            /**
-             * Overdue
-             * @description Past the due date and nobody has acted yet
-             */
-            overdue: boolean;
-            /** @description None: unassigned (the principal assigns it) */
-            owner: components["schemas"]["app__insights__schemas__MemberOut"] | null;
-            /** @description Set for flags a person raised (manual) */
-            raised_by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
-            /**
-             * Raised On
-             * Format: date
-             */
-            raised_on: string;
-            /**
-             * Rule
-             * @enum {string}
-             */
-            rule: "attendance_streak" | "attendance_rate" | "course_low" | "course_decline" | "behaviour_concerns" | "manual";
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "open" | "in_progress" | "closed";
-            student: components["schemas"]["app__insights__schemas__StudentRef"];
-            /** Version */
-            version: number;
-        };
-        /**
-         * MemberOut
-         * @description A staff member next to a record: membership id and display name only.
-         */
-        app__insights__schemas__MemberOut: {
-            /** Display Name */
-            display_name: string | null;
-            /**
-             * Membership Id
-             * Format: uuid
-             */
-            membership_id: string;
-        };
-        /** StudentRef */
-        app__insights__schemas__StudentRef: {
-            /** Admission No */
-            admission_no: string | null;
-            /** Full Name */
-            full_name: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Section Label
-             * @description Current section, e.g. IX-A
-             */
-            section_label: string | null;
-        };
-        /**
-         * SummaryOut
-         * @description Counts only, for the caller's scope in this school (FR-EW-015; the M5 exit metric).
-         */
-        app__insights__schemas__SummaryOut: {
-            /** Actioned Late */
-            actioned_late: number;
-            /**
-             * Actioned On Time
-             * @description Of those, first acted on by their due date
-             */
-            actioned_on_time: number;
-            /** Not Actioned */
-            not_actioned: number;
-            /**
-             * Open
-             * @description Flags not closed (now)
-             */
-            open: number;
-            /**
-             * Overdue
-             * @description Open flags past their due date with no action (now)
-             */
-            overdue: number;
-            /**
-             * Raised
-             * @description Flags raised since the date
-             */
-            raised: number;
-            /**
-             * Since
-             * Format: date
-             */
-            since: string;
-        };
         /** AuditVerifyOut */
         app__platform__schemas__AuditVerifyOut: {
             /** Checked */
@@ -5705,23 +5517,6 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
-        /** FlagOut */
-        app__platform__schemas__FlagOut: {
-            /** Description */
-            description: string | null;
-            /** Enabled */
-            enabled: boolean;
-            /** Key */
-            key: string;
-            /** Rollout Percent */
-            rollout_percent: number | null;
-            /** Tenant Id */
-            tenant_id: string | null;
-            /** Updated At */
-            updated_at: string | null;
-            /** Version */
-            version: number;
-        };
         /** MeOut */
         app__platform__schemas__MeOut: {
             /**
@@ -5736,63 +5531,12 @@ export interface components {
             /** Step Up Fresh */
             step_up_fresh: boolean;
         };
-        /** Page[FlagOut] */
-        app__platform__schemas__Page_FlagOut_: {
-            /** Data */
-            data: components["schemas"]["app__platform__schemas__FlagOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
         /** Page[TicketOut] */
         app__platform__schemas__Page_TicketOut_: {
             /** Data */
             data: components["schemas"]["TicketOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
-        };
-        /** SectionOut */
-        app__tenancy__schemas__SectionOut: {
-            /**
-             * Academic Year Id
-             * Format: uuid
-             */
-            academic_year_id: string;
-            /**
-             * Archived At
-             * @description When it was archived (hidden from lists); null while in use.
-             */
-            archived_at?: string | null;
-            /**
-             * Class Id
-             * Format: uuid
-             */
-            class_id: string;
-            /** Class Teacher Membership Id */
-            class_teacher_membership_id: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * In Use
-             * @description Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.
-             */
-            in_use?: boolean | null;
-            /** Name */
-            name: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-            /** Version */
-            version: number;
         };
         /** ApproveIn */
         ApproveIn: {
@@ -5852,7 +5596,7 @@ export interface components {
              * Format: date
              */
             on_date: string;
-            section: components["schemas"]["app__academics__schemas__SectionOut"];
+            section: components["schemas"]["RecordSectionOut"];
             /** Students */
             students: components["schemas"]["AttendanceDayStudent"][];
         };
@@ -5932,7 +5676,7 @@ export interface components {
             month: string;
             /** School Days */
             school_days: string[];
-            section: components["schemas"]["app__academics__schemas__SectionOut"];
+            section: components["schemas"]["RecordSectionOut"];
             /** Students */
             students: components["schemas"]["AttendanceMonthStudent"][];
         };
@@ -7864,7 +7608,7 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "resolved" | "waived" | "reopened";
-            student: components["schemas"]["app__dq__schemas__StudentRef"];
+            student: components["schemas"]["StudentRef"];
             /** Values */
             values: components["schemas"]["FindingValue"][];
             /** Version */
@@ -7898,68 +7642,6 @@ export interface components {
              */
             value_id: string;
         };
-        /** FlagDetail */
-        FlagDetail: {
-            /** Actioned */
-            actioned: boolean;
-            /** Actions */
-            actions: components["schemas"]["ActionOut"][];
-            /** Close Reason */
-            close_reason: ("improved" | "support_in_place" | "parent_informed" | "no_concern" | "student_left" | "raised_in_error") | null;
-            /** Closed At */
-            closed_at: string | null;
-            /**
-             * Due On
-             * Format: date
-             */
-            due_on: string;
-            /**
-             * Evidence
-             * @description What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)
-             */
-            evidence: {
-                [key: string]: number | string;
-            };
-            /** First Action At */
-            first_action_at: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Indicator
-             * @enum {string}
-             */
-            indicator: "attendance" | "behaviour" | "course";
-            /**
-             * Overdue
-             * @description Past the due date and nobody has acted yet
-             */
-            overdue: boolean;
-            /** @description None: unassigned (the principal assigns it) */
-            owner: components["schemas"]["app__insights__schemas__MemberOut"] | null;
-            /** @description Set for flags a person raised (manual) */
-            raised_by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
-            /**
-             * Raised On
-             * Format: date
-             */
-            raised_on: string;
-            /**
-             * Rule
-             * @enum {string}
-             */
-            rule: "attendance_streak" | "attendance_rate" | "course_low" | "course_decline" | "behaviour_concerns" | "manual";
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "open" | "in_progress" | "closed";
-            student: components["schemas"]["app__insights__schemas__StudentRef"];
-            /** Version */
-            version: number;
-        };
         /** FlagIn */
         FlagIn: {
             /** Description */
@@ -7968,6 +7650,23 @@ export interface components {
             enabled: boolean;
             /** Rollout Percent */
             rollout_percent?: number | null;
+        };
+        /** FlagOut */
+        FlagOut: {
+            /** Description */
+            description: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Key */
+            key: string;
+            /** Rollout Percent */
+            rollout_percent: number | null;
+            /** Tenant Id */
+            tenant_id: string | null;
+            /** Updated At */
+            updated_at: string | null;
+            /** Version */
+            version: number;
         };
         /** FlagOverrideIn */
         FlagOverrideIn: {
@@ -8364,6 +8063,180 @@ export interface components {
             max_length: number | null;
             /** Required */
             required: boolean;
+        };
+        /** InsightFlagDetail */
+        InsightFlagDetail: {
+            /** Actioned */
+            actioned: boolean;
+            /** Actions */
+            actions: components["schemas"]["ActionOut"][];
+            /** Close Reason */
+            close_reason: ("improved" | "support_in_place" | "parent_informed" | "no_concern" | "student_left" | "raised_in_error") | null;
+            /** Closed At */
+            closed_at: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /**
+             * Evidence
+             * @description What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)
+             */
+            evidence: {
+                [key: string]: number | string;
+            };
+            /** First Action At */
+            first_action_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Indicator
+             * @enum {string}
+             */
+            indicator: "attendance" | "behaviour" | "course";
+            /**
+             * Overdue
+             * @description Past the due date and nobody has acted yet
+             */
+            overdue: boolean;
+            /** @description None: unassigned (the principal assigns it) */
+            owner: components["schemas"]["StaffRef"] | null;
+            /** @description Set for flags a person raised (manual) */
+            raised_by: components["schemas"]["StaffRef"] | null;
+            /**
+             * Raised On
+             * Format: date
+             */
+            raised_on: string;
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "attendance_streak" | "attendance_rate" | "course_low" | "course_decline" | "behaviour_concerns" | "manual";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "closed";
+            student: components["schemas"]["InsightStudentRef"];
+            /** Version */
+            version: number;
+        };
+        /** InsightFlagOut */
+        InsightFlagOut: {
+            /** Actioned */
+            actioned: boolean;
+            /** Close Reason */
+            close_reason: ("improved" | "support_in_place" | "parent_informed" | "no_concern" | "student_left" | "raised_in_error") | null;
+            /** Closed At */
+            closed_at: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /**
+             * Evidence
+             * @description What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)
+             */
+            evidence: {
+                [key: string]: number | string;
+            };
+            /** First Action At */
+            first_action_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Indicator
+             * @enum {string}
+             */
+            indicator: "attendance" | "behaviour" | "course";
+            /**
+             * Overdue
+             * @description Past the due date and nobody has acted yet
+             */
+            overdue: boolean;
+            /** @description None: unassigned (the principal assigns it) */
+            owner: components["schemas"]["StaffRef"] | null;
+            /** @description Set for flags a person raised (manual) */
+            raised_by: components["schemas"]["StaffRef"] | null;
+            /**
+             * Raised On
+             * Format: date
+             */
+            raised_on: string;
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "attendance_streak" | "attendance_rate" | "course_low" | "course_decline" | "behaviour_concerns" | "manual";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "closed";
+            student: components["schemas"]["InsightStudentRef"];
+            /** Version */
+            version: number;
+        };
+        /** InsightStudentRef */
+        InsightStudentRef: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Full Name */
+            full_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Section Label
+             * @description Current section, e.g. IX-A
+             */
+            section_label: string | null;
+        };
+        /**
+         * InsightSummaryOut
+         * @description Counts only, for the caller's scope in this school (FR-EW-015; the M5 exit metric).
+         */
+        InsightSummaryOut: {
+            /** Actioned Late */
+            actioned_late: number;
+            /**
+             * Actioned On Time
+             * @description Of those, first acted on by their due date
+             */
+            actioned_on_time: number;
+            /** Not Actioned */
+            not_actioned: number;
+            /**
+             * Open
+             * @description Flags not closed (now)
+             */
+            open: number;
+            /**
+             * Overdue
+             * @description Open flags past their due date with no action (now)
+             */
+            overdue: number;
+            /**
+             * Raised
+             * @description Flags raised since the date
+             */
+            raised: number;
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
         };
         /**
          * InvitationEmailOut
@@ -8869,7 +8742,7 @@ export interface components {
         /** MarksGridOut */
         MarksGridOut: {
             exam: components["schemas"]["ExamOut"];
-            section: components["schemas"]["app__academics__schemas__SectionOut"];
+            section: components["schemas"]["RecordSectionOut"];
             /** Students */
             students: components["schemas"]["MarksStudentOut"][];
             /** Subjects */
@@ -8927,7 +8800,7 @@ export interface components {
         };
         /** NoteOut */
         NoteOut: {
-            by: components["schemas"]["app__insights__schemas__MemberOut"] | null;
+            by: components["schemas"]["StaffRef"] | null;
             /**
              * Category
              * @enum {string}
@@ -9353,6 +9226,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[FlagOut] */
+        Page_FlagOut_: {
+            /** Data */
+            data: components["schemas"]["FlagOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[GrantOut] */
         Page_GrantOut_: {
             /** Data */
@@ -9371,6 +9251,13 @@ export interface components {
         Page_ImportSummary_: {
             /** Data */
             data: components["schemas"]["ImportSummary"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Page[InsightFlagOut] */
+        Page_InsightFlagOut_: {
+            /** Data */
+            data: components["schemas"]["InsightFlagOut"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -9440,7 +9327,7 @@ export interface components {
         /** Page[SectionOut] */
         Page_SectionOut_: {
             /** Data */
-            data: components["schemas"]["app__tenancy__schemas__SectionOut"][];
+            data: components["schemas"]["SectionOut"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -10279,6 +10166,29 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** RecordSectionOut */
+        RecordSectionOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Label
+             * @description Class code and section name, e.g. IX-A
+             */
+            label: string;
+        };
         /** RejectIn */
         RejectIn: {
             /** Reason */
@@ -10713,6 +10623,50 @@ export interface components {
              */
             to_section_id: string;
         };
+        /** SectionOut */
+        SectionOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Archived At
+             * @description When it was archived (hidden from lists); null while in use.
+             */
+            archived_at?: string | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Teacher Membership Id */
+            class_teacher_membership_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * In Use
+             * @description Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.
+             */
+            in_use?: boolean | null;
+            /** Name */
+            name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
         /**
          * SectionUpdate
          * @description Omit a field to keep it; send ``class_teacher_membership_id: null`` to clear it.
@@ -10941,6 +10895,19 @@ export interface components {
             status: "active" | "invited";
         };
         /**
+         * StaffRef
+         * @description A staff member next to a record: membership id and display name only.
+         */
+        StaffRef: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+        };
+        /**
          * StudentCreate
          * @description New student with its first values (docs/09: source required per value).
          *
@@ -11034,6 +11001,18 @@ export interface components {
              * @enum {string}
              */
             status: "provisional" | "active" | "left" | "graduated";
+        };
+        /** StudentRef */
+        StudentRef: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
         };
         /**
          * StudentSearchIn
@@ -11197,6 +11176,27 @@ export interface components {
             title: string;
             /** Version */
             version: number;
+        };
+        /**
+         * SummaryOut
+         * @description Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).
+         */
+        SummaryOut: {
+            /** Blockers */
+            blockers: number;
+            /** By Rule */
+            by_rule: components["schemas"]["RuleCount"][];
+            /** By Severity */
+            by_severity: {
+                [key: string]: number;
+            };
+            last_run: components["schemas"]["RunOut"] | null;
+            /** Profile Key */
+            profile_key: string | null;
+            /** Students With Blockers */
+            students_with_blockers: number;
+            /** Warnings */
+            warnings: number;
         };
         /**
          * SupportSessionIn
@@ -11881,7 +11881,7 @@ export interface components {
             certificate?: components["schemas"]["CertificateEvent"] | null;
             enrolment?: components["schemas"]["EnrolmentEvent"] | null;
             exam?: components["schemas"]["ExamEvent"] | null;
-            flag?: components["schemas"]["FlagDetail"] | null;
+            flag?: components["schemas"]["InsightFlagDetail"] | null;
             /**
              * Kind
              * @enum {string}
@@ -11899,7 +11899,7 @@ export interface components {
             indicators: components["schemas"]["IndicatorsOut"];
             /** Items */
             items: components["schemas"]["TimelineItem"][];
-            student: components["schemas"]["app__insights__schemas__StudentRef"];
+            student: components["schemas"]["InsightStudentRef"];
         };
         /** UnreadCountOut */
         UnreadCountOut: {
@@ -15008,7 +15008,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__dq__schemas__SummaryOut"];
+                    "application/json": components["schemas"]["SummaryOut"];
                 };
             };
             /** @description Validation Error */
@@ -15983,7 +15983,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__authz__http__Page_FlagOut_"];
+                    "application/json": components["schemas"]["Page_InsightFlagOut_"];
                 };
             };
             /** @description Validation Error */
@@ -16014,7 +16014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlagDetail"];
+                    "application/json": components["schemas"]["InsightFlagDetail"];
                 };
             };
             /** @description Validation Error */
@@ -16049,7 +16049,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlagDetail"];
+                    "application/json": components["schemas"]["InsightFlagDetail"];
                 };
             };
             /** @description Validation Error */
@@ -16084,7 +16084,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlagDetail"];
+                    "application/json": components["schemas"]["InsightFlagDetail"];
                 };
             };
             /** @description Validation Error */
@@ -16119,7 +16119,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlagDetail"];
+                    "application/json": components["schemas"]["InsightFlagDetail"];
                 };
             };
             /** @description Validation Error */
@@ -16270,7 +16270,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__insights__schemas__SummaryOut"];
+                    "application/json": components["schemas"]["InsightSummaryOut"];
                 };
             };
             /** @description Validation Error */
@@ -17508,7 +17508,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__platform__schemas__Page_FlagOut_"];
+                    "application/json": components["schemas"]["Page_FlagOut_"];
                 };
             };
         };
@@ -17534,7 +17534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__platform__schemas__FlagOut"];
+                    "application/json": components["schemas"]["FlagOut"];
                 };
             };
             /** @description Validation Error */
@@ -17570,7 +17570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__platform__schemas__FlagOut"];
+                    "application/json": components["schemas"]["FlagOut"];
                 };
             };
             /** @description Validation Error */
@@ -19674,7 +19674,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
+                    "application/json": components["schemas"]["SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -19705,7 +19705,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
+                    "application/json": components["schemas"]["SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -19740,7 +19740,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
+                    "application/json": components["schemas"]["SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -19771,7 +19771,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
+                    "application/json": components["schemas"]["SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -20044,7 +20044,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__tenancy__schemas__SectionOut"];
+                    "application/json": components["schemas"]["SectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -20533,7 +20533,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlagDetail"];
+                    "application/json": components["schemas"]["InsightFlagDetail"];
                 };
             };
             /** @description Validation Error */

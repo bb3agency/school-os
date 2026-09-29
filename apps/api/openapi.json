@@ -298,7 +298,7 @@
           "by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+                "$ref": "#/components/schemas/StaffRef"
               },
               {
                 "type": "null"
@@ -717,7 +717,7 @@
             "type": "string"
           },
           "section": {
-            "$ref": "#/components/schemas/app__academics__schemas__SectionOut"
+            "$ref": "#/components/schemas/RecordSectionOut"
           },
           "students": {
             "items": {
@@ -911,7 +911,7 @@
             "type": "array"
           },
           "section": {
-            "$ref": "#/components/schemas/app__academics__schemas__SectionOut"
+            "$ref": "#/components/schemas/RecordSectionOut"
           },
           "students": {
             "items": {
@@ -6332,7 +6332,7 @@
             "type": "string"
           },
           "student": {
-            "$ref": "#/components/schemas/app__dq__schemas__StudentRef"
+            "$ref": "#/components/schemas/StudentRef"
           },
           "values": {
             "items": {
@@ -6471,182 +6471,6 @@
         "title": "FindingValue",
         "type": "object"
       },
-      "FlagDetail": {
-        "properties": {
-          "actioned": {
-            "title": "Actioned",
-            "type": "boolean"
-          },
-          "actions": {
-            "items": {
-              "$ref": "#/components/schemas/ActionOut"
-            },
-            "title": "Actions",
-            "type": "array"
-          },
-          "close_reason": {
-            "anyOf": [
-              {
-                "enum": [
-                  "improved",
-                  "support_in_place",
-                  "parent_informed",
-                  "no_concern",
-                  "student_left",
-                  "raised_in_error"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Close Reason"
-          },
-          "closed_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Closed At"
-          },
-          "due_on": {
-            "format": "date",
-            "title": "Due On",
-            "type": "string"
-          },
-          "evidence": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "string"
-                }
-              ]
-            },
-            "description": "What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)",
-            "title": "Evidence",
-            "type": "object"
-          },
-          "first_action_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Action At"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "indicator": {
-            "enum": [
-              "attendance",
-              "behaviour",
-              "course"
-            ],
-            "title": "Indicator",
-            "type": "string"
-          },
-          "overdue": {
-            "description": "Past the due date and nobody has acted yet",
-            "title": "Overdue",
-            "type": "boolean"
-          },
-          "owner": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "None: unassigned (the principal assigns it)"
-          },
-          "raised_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Set for flags a person raised (manual)"
-          },
-          "raised_on": {
-            "format": "date",
-            "title": "Raised On",
-            "type": "string"
-          },
-          "rule": {
-            "enum": [
-              "attendance_streak",
-              "attendance_rate",
-              "course_low",
-              "course_decline",
-              "behaviour_concerns",
-              "manual"
-            ],
-            "title": "Rule",
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "open",
-              "in_progress",
-              "closed"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "student": {
-            "$ref": "#/components/schemas/app__insights__schemas__StudentRef"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "student",
-          "indicator",
-          "rule",
-          "evidence",
-          "status",
-          "owner",
-          "raised_on",
-          "due_on",
-          "overdue",
-          "actioned",
-          "first_action_at",
-          "closed_at",
-          "close_reason",
-          "raised_by",
-          "version",
-          "actions"
-        ],
-        "title": "FlagDetail",
-        "type": "object"
-      },
       "FlagIn": {
         "additionalProperties": false,
         "properties": {
@@ -6684,6 +6508,79 @@
           "enabled"
         ],
         "title": "FlagIn",
+        "type": "object"
+      },
+      "FlagOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "rollout_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rollout Percent"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "tenant_id",
+          "enabled",
+          "rollout_percent",
+          "description",
+          "updated_at",
+          "version"
+        ],
+        "title": "FlagOut",
         "type": "object"
       },
       "FlagOverrideIn": {
@@ -7902,6 +7799,450 @@
           "choices"
         ],
         "title": "InputOut",
+        "type": "object"
+      },
+      "InsightFlagDetail": {
+        "properties": {
+          "actioned": {
+            "title": "Actioned",
+            "type": "boolean"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionOut"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "improved",
+                  "support_in_place",
+                  "parent_informed",
+                  "no_concern",
+                  "student_left",
+                  "raised_in_error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)",
+            "title": "Evidence",
+            "type": "object"
+          },
+          "first_action_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Action At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "indicator": {
+            "enum": [
+              "attendance",
+              "behaviour",
+              "course"
+            ],
+            "title": "Indicator",
+            "type": "string"
+          },
+          "overdue": {
+            "description": "Past the due date and nobody has acted yet",
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaffRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None: unassigned (the principal assigns it)"
+          },
+          "raised_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaffRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for flags a person raised (manual)"
+          },
+          "raised_on": {
+            "format": "date",
+            "title": "Raised On",
+            "type": "string"
+          },
+          "rule": {
+            "enum": [
+              "attendance_streak",
+              "attendance_rate",
+              "course_low",
+              "course_decline",
+              "behaviour_concerns",
+              "manual"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/InsightStudentRef"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student",
+          "indicator",
+          "rule",
+          "evidence",
+          "status",
+          "owner",
+          "raised_on",
+          "due_on",
+          "overdue",
+          "actioned",
+          "first_action_at",
+          "closed_at",
+          "close_reason",
+          "raised_by",
+          "version",
+          "actions"
+        ],
+        "title": "InsightFlagDetail",
+        "type": "object"
+      },
+      "InsightFlagOut": {
+        "properties": {
+          "actioned": {
+            "title": "Actioned",
+            "type": "boolean"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "improved",
+                  "support_in_place",
+                  "parent_informed",
+                  "no_concern",
+                  "student_left",
+                  "raised_in_error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)",
+            "title": "Evidence",
+            "type": "object"
+          },
+          "first_action_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Action At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "indicator": {
+            "enum": [
+              "attendance",
+              "behaviour",
+              "course"
+            ],
+            "title": "Indicator",
+            "type": "string"
+          },
+          "overdue": {
+            "description": "Past the due date and nobody has acted yet",
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaffRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None: unassigned (the principal assigns it)"
+          },
+          "raised_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaffRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for flags a person raised (manual)"
+          },
+          "raised_on": {
+            "format": "date",
+            "title": "Raised On",
+            "type": "string"
+          },
+          "rule": {
+            "enum": [
+              "attendance_streak",
+              "attendance_rate",
+              "course_low",
+              "course_decline",
+              "behaviour_concerns",
+              "manual"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/InsightStudentRef"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student",
+          "indicator",
+          "rule",
+          "evidence",
+          "status",
+          "owner",
+          "raised_on",
+          "due_on",
+          "overdue",
+          "actioned",
+          "first_action_at",
+          "closed_at",
+          "close_reason",
+          "raised_by",
+          "version"
+        ],
+        "title": "InsightFlagOut",
+        "type": "object"
+      },
+      "InsightStudentRef": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "section_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current section, e.g. IX-A",
+            "title": "Section Label"
+          }
+        },
+        "required": [
+          "id",
+          "full_name",
+          "admission_no",
+          "section_label"
+        ],
+        "title": "InsightStudentRef",
+        "type": "object"
+      },
+      "InsightSummaryOut": {
+        "description": "Counts only, for the caller's scope in this school (FR-EW-015; the M5 exit metric).",
+        "properties": {
+          "actioned_late": {
+            "title": "Actioned Late",
+            "type": "integer"
+          },
+          "actioned_on_time": {
+            "description": "Of those, first acted on by their due date",
+            "title": "Actioned On Time",
+            "type": "integer"
+          },
+          "not_actioned": {
+            "title": "Not Actioned",
+            "type": "integer"
+          },
+          "open": {
+            "description": "Flags not closed (now)",
+            "title": "Open",
+            "type": "integer"
+          },
+          "overdue": {
+            "description": "Open flags past their due date with no action (now)",
+            "title": "Overdue",
+            "type": "integer"
+          },
+          "raised": {
+            "description": "Flags raised since the date",
+            "title": "Raised",
+            "type": "integer"
+          },
+          "since": {
+            "format": "date",
+            "title": "Since",
+            "type": "string"
+          }
+        },
+        "required": [
+          "since",
+          "raised",
+          "actioned_on_time",
+          "actioned_late",
+          "not_actioned",
+          "overdue",
+          "open"
+        ],
+        "title": "InsightSummaryOut",
         "type": "object"
       },
       "InvitationEmailOut": {
@@ -9257,7 +9598,7 @@
             "$ref": "#/components/schemas/ExamOut"
           },
           "section": {
-            "$ref": "#/components/schemas/app__academics__schemas__SectionOut"
+            "$ref": "#/components/schemas/RecordSectionOut"
           },
           "students": {
             "items": {
@@ -9430,7 +9771,7 @@
           "by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
+                "$ref": "#/components/schemas/StaffRef"
               },
               {
                 "type": "null"
@@ -10950,6 +11291,33 @@
         "title": "Page[FindingOut]",
         "type": "object"
       },
+      "Page_FlagOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FlagOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Page[FlagOut]",
+        "type": "object"
+      },
       "Page_GrantOut_": {
         "properties": {
           "data": {
@@ -11032,6 +11400,34 @@
           "next_cursor"
         ],
         "title": "Page[ImportSummary]",
+        "type": "object"
+      },
+      "Page_InsightFlagOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/InsightFlagOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[InsightFlagOut]",
         "type": "object"
       },
       "Page_InvoiceOut_": {
@@ -11286,7 +11682,7 @@
         "properties": {
           "data": {
             "items": {
-              "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
+              "$ref": "#/components/schemas/SectionOut"
             },
             "title": "Data",
             "type": "array"
@@ -13507,6 +13903,38 @@
         "title": "Reasoned",
         "type": "object"
       },
+      "RecordSectionOut": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "description": "Class code and section name, e.g. IX-A",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "class_id",
+          "academic_year_id",
+          "label"
+        ],
+        "title": "RecordSectionOut",
+        "type": "object"
+      },
       "RejectIn": {
         "additionalProperties": false,
         "properties": {
@@ -14722,6 +15150,92 @@
         "title": "SectionMapEntry",
         "type": "object"
       },
+      "SectionOut": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was archived (hidden from lists); null while in use.",
+            "title": "Archived At"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "class_teacher_membership_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Teacher Membership Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "in_use": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
+            "title": "In Use"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "academic_year_id",
+          "class_id",
+          "name",
+          "class_teacher_membership_id",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SectionOut",
+        "type": "object"
+      },
       "SectionUpdate": {
         "additionalProperties": false,
         "description": "Omit a field to keep it; send ``class_teacher_membership_id: null`` to clear it.",
@@ -15308,6 +15822,33 @@
         "title": "StaffMemberOut",
         "type": "object"
       },
+      "StaffRef": {
+        "description": "A staff member next to a record: membership id and display name only.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "StaffRef",
+        "type": "object"
+      },
       "StudentCreate": {
         "additionalProperties": false,
         "description": "New student with its first values (docs/09: source required per value).\n\n``values`` must include ``full_name``. ``section_id`` enrols the student in that section's\nacademic year.",
@@ -15539,6 +16080,44 @@
           "status"
         ],
         "title": "StudentPatch",
+        "type": "object"
+      },
+      "StudentRef": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "admission_no"
+        ],
+        "title": "StudentRef",
         "type": "object"
       },
       "StudentSearchIn": {
@@ -16010,6 +16589,69 @@
           "version"
         ],
         "title": "SuggestionOut",
+        "type": "object"
+      },
+      "SummaryOut": {
+        "description": "Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).",
+        "properties": {
+          "blockers": {
+            "title": "Blockers",
+            "type": "integer"
+          },
+          "by_rule": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCount"
+            },
+            "title": "By Rule",
+            "type": "array"
+          },
+          "by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Severity",
+            "type": "object"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Key"
+          },
+          "students_with_blockers": {
+            "title": "Students With Blockers",
+            "type": "integer"
+          },
+          "warnings": {
+            "title": "Warnings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_key",
+          "blockers",
+          "warnings",
+          "students_with_blockers",
+          "by_severity",
+          "by_rule",
+          "last_run"
+        ],
+        "title": "SummaryOut",
         "type": "object"
       },
       "SupportSessionIn": {
@@ -17940,7 +18582,7 @@
           "flag": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FlagDetail"
+                "$ref": "#/components/schemas/InsightFlagDetail"
               },
               {
                 "type": "null"
@@ -17995,7 +18637,7 @@
             "type": "array"
           },
           "student": {
-            "$ref": "#/components/schemas/app__insights__schemas__StudentRef"
+            "$ref": "#/components/schemas/InsightStudentRef"
           }
         },
         "required": [
@@ -19176,38 +19818,6 @@
         "title": "WriteResultOut",
         "type": "object"
       },
-      "app__academics__schemas__SectionOut": {
-        "properties": {
-          "academic_year_id": {
-            "format": "uuid",
-            "title": "Academic Year Id",
-            "type": "string"
-          },
-          "class_id": {
-            "format": "uuid",
-            "title": "Class Id",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "label": {
-            "description": "Class code and section name, e.g. IX-A",
-            "title": "Label",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "class_id",
-          "academic_year_id",
-          "label"
-        ],
-        "title": "SectionOut",
-        "type": "object"
-      },
       "app__admin__schemas__MemberOut": {
         "description": "A staff member shown next to a record: membership id and display name only (``null``\nwhen the account is no longer visible).",
         "properties": {
@@ -19275,34 +19885,6 @@
           "reason"
         ],
         "title": "AuditVerifyOut",
-        "type": "object"
-      },
-      "app__authz__http__Page_FlagOut_": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/app__insights__schemas__FlagOut"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "data",
-          "next_cursor"
-        ],
-        "title": "Page[FlagOut]",
         "type": "object"
       },
       "app__authz__http__Page_TicketOut_": {
@@ -19418,107 +20000,6 @@
         "title": "DownloadUrlOut",
         "type": "object"
       },
-      "app__dq__schemas__StudentRef": {
-        "properties": {
-          "admission_no": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admission No"
-          },
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Display Name"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "display_name",
-          "admission_no"
-        ],
-        "title": "StudentRef",
-        "type": "object"
-      },
-      "app__dq__schemas__SummaryOut": {
-        "description": "Open findings for the pre-check screen: blockers apart from warnings (US-501 AC2).",
-        "properties": {
-          "blockers": {
-            "title": "Blockers",
-            "type": "integer"
-          },
-          "by_rule": {
-            "items": {
-              "$ref": "#/components/schemas/RuleCount"
-            },
-            "title": "By Rule",
-            "type": "array"
-          },
-          "by_severity": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "By Severity",
-            "type": "object"
-          },
-          "last_run": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RunOut"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "profile_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Key"
-          },
-          "students_with_blockers": {
-            "title": "Students With Blockers",
-            "type": "integer"
-          },
-          "warnings": {
-            "title": "Warnings",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "profile_key",
-          "blockers",
-          "warnings",
-          "students_with_blockers",
-          "by_severity",
-          "by_rule",
-          "last_run"
-        ],
-        "title": "SummaryOut",
-        "type": "object"
-      },
       "app__identity__schemas__MeOut": {
         "properties": {
           "display_name": {
@@ -19613,301 +20094,6 @@
         "title": "MeOut",
         "type": "object"
       },
-      "app__insights__schemas__FlagOut": {
-        "properties": {
-          "actioned": {
-            "title": "Actioned",
-            "type": "boolean"
-          },
-          "close_reason": {
-            "anyOf": [
-              {
-                "enum": [
-                  "improved",
-                  "support_in_place",
-                  "parent_informed",
-                  "no_concern",
-                  "student_left",
-                  "raised_in_error"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Close Reason"
-          },
-          "closed_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Closed At"
-          },
-          "due_on": {
-            "format": "date",
-            "title": "Due On",
-            "type": "string"
-          },
-          "evidence": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "string"
-                }
-              ]
-            },
-            "description": "What the rule saw: numbers, codes and ISO dates only (e.g. days, from, to, rate, percent, drop, concerns, threshold)",
-            "title": "Evidence",
-            "type": "object"
-          },
-          "first_action_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Action At"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "indicator": {
-            "enum": [
-              "attendance",
-              "behaviour",
-              "course"
-            ],
-            "title": "Indicator",
-            "type": "string"
-          },
-          "overdue": {
-            "description": "Past the due date and nobody has acted yet",
-            "title": "Overdue",
-            "type": "boolean"
-          },
-          "owner": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "None: unassigned (the principal assigns it)"
-          },
-          "raised_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/app__insights__schemas__MemberOut"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Set for flags a person raised (manual)"
-          },
-          "raised_on": {
-            "format": "date",
-            "title": "Raised On",
-            "type": "string"
-          },
-          "rule": {
-            "enum": [
-              "attendance_streak",
-              "attendance_rate",
-              "course_low",
-              "course_decline",
-              "behaviour_concerns",
-              "manual"
-            ],
-            "title": "Rule",
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "open",
-              "in_progress",
-              "closed"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "student": {
-            "$ref": "#/components/schemas/app__insights__schemas__StudentRef"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "student",
-          "indicator",
-          "rule",
-          "evidence",
-          "status",
-          "owner",
-          "raised_on",
-          "due_on",
-          "overdue",
-          "actioned",
-          "first_action_at",
-          "closed_at",
-          "close_reason",
-          "raised_by",
-          "version"
-        ],
-        "title": "FlagOut",
-        "type": "object"
-      },
-      "app__insights__schemas__MemberOut": {
-        "description": "A staff member next to a record: membership id and display name only.",
-        "properties": {
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Display Name"
-          },
-          "membership_id": {
-            "format": "uuid",
-            "title": "Membership Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "membership_id",
-          "display_name"
-        ],
-        "title": "MemberOut",
-        "type": "object"
-      },
-      "app__insights__schemas__StudentRef": {
-        "properties": {
-          "admission_no": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admission No"
-          },
-          "full_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Full Name"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "section_label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Current section, e.g. IX-A",
-            "title": "Section Label"
-          }
-        },
-        "required": [
-          "id",
-          "full_name",
-          "admission_no",
-          "section_label"
-        ],
-        "title": "StudentRef",
-        "type": "object"
-      },
-      "app__insights__schemas__SummaryOut": {
-        "description": "Counts only, for the caller's scope in this school (FR-EW-015; the M5 exit metric).",
-        "properties": {
-          "actioned_late": {
-            "title": "Actioned Late",
-            "type": "integer"
-          },
-          "actioned_on_time": {
-            "description": "Of those, first acted on by their due date",
-            "title": "Actioned On Time",
-            "type": "integer"
-          },
-          "not_actioned": {
-            "title": "Not Actioned",
-            "type": "integer"
-          },
-          "open": {
-            "description": "Flags not closed (now)",
-            "title": "Open",
-            "type": "integer"
-          },
-          "overdue": {
-            "description": "Open flags past their due date with no action (now)",
-            "title": "Overdue",
-            "type": "integer"
-          },
-          "raised": {
-            "description": "Flags raised since the date",
-            "title": "Raised",
-            "type": "integer"
-          },
-          "since": {
-            "format": "date",
-            "title": "Since",
-            "type": "string"
-          }
-        },
-        "required": [
-          "since",
-          "raised",
-          "actioned_on_time",
-          "actioned_late",
-          "not_actioned",
-          "overdue",
-          "open"
-        ],
-        "title": "SummaryOut",
-        "type": "object"
-      },
       "app__platform__schemas__AuditVerifyOut": {
         "properties": {
           "checked": {
@@ -19956,79 +20142,6 @@
         "title": "AuditVerifyOut",
         "type": "object"
       },
-      "app__platform__schemas__FlagOut": {
-        "properties": {
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "enabled": {
-            "title": "Enabled",
-            "type": "boolean"
-          },
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "rollout_percent": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rollout Percent"
-          },
-          "tenant_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tenant Id"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "key",
-          "tenant_id",
-          "enabled",
-          "rollout_percent",
-          "description",
-          "updated_at",
-          "version"
-        ],
-        "title": "FlagOut",
-        "type": "object"
-      },
       "app__platform__schemas__MeOut": {
         "properties": {
           "operator_id": {
@@ -20064,33 +20177,6 @@
         "title": "MeOut",
         "type": "object"
       },
-      "app__platform__schemas__Page_FlagOut_": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/app__platform__schemas__FlagOut"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "Page[FlagOut]",
-        "type": "object"
-      },
       "app__platform__schemas__Page_TicketOut_": {
         "properties": {
           "data": {
@@ -20116,92 +20202,6 @@
           "data"
         ],
         "title": "Page[TicketOut]",
-        "type": "object"
-      },
-      "app__tenancy__schemas__SectionOut": {
-        "properties": {
-          "academic_year_id": {
-            "format": "uuid",
-            "title": "Academic Year Id",
-            "type": "string"
-          },
-          "archived_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "When it was archived (hidden from lists); null while in use.",
-            "title": "Archived At"
-          },
-          "class_id": {
-            "format": "uuid",
-            "title": "Class Id",
-            "type": "string"
-          },
-          "class_teacher_membership_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Class Teacher Membership Id"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "in_use": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Whether it has active enrolments, so archiving it answers 409 ``structure_in_use`` (FR-TEN-010). Given by the list and get routes; null elsewhere.",
-            "title": "In Use"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "updated_at": {
-            "format": "date-time",
-            "title": "Updated At",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "academic_year_id",
-          "class_id",
-          "name",
-          "class_teacher_membership_id",
-          "version",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "SectionOut",
         "type": "object"
       }
     }
@@ -24801,7 +24801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__dq__schemas__SummaryOut"
+                  "$ref": "#/components/schemas/SummaryOut"
                 }
               }
             },
@@ -26564,7 +26564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__authz__http__Page_FlagOut_"
+                  "$ref": "#/components/schemas/Page_InsightFlagOut_"
                 }
               }
             },
@@ -26608,7 +26608,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlagDetail"
+                  "$ref": "#/components/schemas/InsightFlagDetail"
                 }
               }
             },
@@ -26662,7 +26662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlagDetail"
+                  "$ref": "#/components/schemas/InsightFlagDetail"
                 }
               }
             },
@@ -26716,7 +26716,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlagDetail"
+                  "$ref": "#/components/schemas/InsightFlagDetail"
                 }
               }
             },
@@ -26770,7 +26770,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlagDetail"
+                  "$ref": "#/components/schemas/InsightFlagDetail"
                 }
               }
             },
@@ -26987,7 +26987,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__insights__schemas__SummaryOut"
+                  "$ref": "#/components/schemas/InsightSummaryOut"
                 }
               }
             },
@@ -28931,7 +28931,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__platform__schemas__Page_FlagOut_"
+                  "$ref": "#/components/schemas/Page_FlagOut_"
                 }
               }
             },
@@ -28975,7 +28975,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__platform__schemas__FlagOut"
+                  "$ref": "#/components/schemas/FlagOut"
                 }
               }
             },
@@ -29084,7 +29084,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__platform__schemas__FlagOut"
+                  "$ref": "#/components/schemas/FlagOut"
                 }
               }
             },
@@ -32606,7 +32606,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
+                  "$ref": "#/components/schemas/SectionOut"
                 }
               }
             },
@@ -32650,7 +32650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
+                  "$ref": "#/components/schemas/SectionOut"
                 }
               }
             },
@@ -32702,7 +32702,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
+                  "$ref": "#/components/schemas/SectionOut"
                 }
               }
             },
@@ -32746,7 +32746,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
+                  "$ref": "#/components/schemas/SectionOut"
                 }
               }
             },
@@ -33195,7 +33195,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__tenancy__schemas__SectionOut"
+                  "$ref": "#/components/schemas/SectionOut"
                 }
               }
             },
@@ -34126,7 +34126,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlagDetail"
+                  "$ref": "#/components/schemas/InsightFlagDetail"
                 }
               }
             },

@@ -77,14 +77,14 @@ class _Out(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class MemberOut(_Out):
+class StaffRef(_Out):
     """A staff member next to a record: membership id and display name only."""
 
     membership_id: uuid.UUID
     display_name: str | None
 
 
-class StudentRef(_Out):
+class InsightStudentRef(_Out):
     id: uuid.UUID
     full_name: str | None
     admission_no: str | None
@@ -99,13 +99,13 @@ class ActionOut(_Out):
     kind: LogKind
     acted_on: dt.date
     note: str | None = Field(description="Restricted (C3); shown only to people who may act")
-    by: MemberOut | None
+    by: StaffRef | None
     created_at: dt.datetime
 
 
-class FlagOut(_Out):
+class InsightFlagOut(_Out):
     id: uuid.UUID
-    student: StudentRef
+    student: InsightStudentRef
     indicator: IndicatorName
     rule: FlagRule
     evidence: Evidence = Field(
@@ -113,7 +113,7 @@ class FlagOut(_Out):
         "to, rate, percent, drop, concerns, threshold)"
     )
     status: FlagStatus
-    owner: MemberOut | None = Field(description="None: unassigned (the principal assigns it)")
+    owner: StaffRef | None = Field(description="None: unassigned (the principal assigns it)")
     raised_on: dt.date
     due_on: dt.date
     overdue: bool = Field(description="Past the due date and nobody has acted yet")
@@ -121,11 +121,11 @@ class FlagOut(_Out):
     first_action_at: dt.datetime | None
     closed_at: dt.datetime | None
     close_reason: CloseReason | None
-    raised_by: MemberOut | None = Field(description="Set for flags a person raised (manual)")
+    raised_by: StaffRef | None = Field(description="Set for flags a person raised (manual)")
     version: int
 
 
-class FlagDetail(FlagOut):
+class InsightFlagDetail(InsightFlagOut):
     actions: list[ActionOut]
 
 
@@ -166,7 +166,7 @@ class OwnerOut(_Out):
     roles: list[str]
 
 
-class SummaryOut(_Out):
+class InsightSummaryOut(_Out):
     """Counts only, for the caller's scope in this school (FR-EW-015; the M5 exit metric)."""
 
     since: dt.date
@@ -193,7 +193,7 @@ class NoteOut(_Out):
     category: NoteCategory
     noted_on: dt.date
     text: str
-    by: MemberOut | None
+    by: StaffRef | None
     created_at: dt.datetime
 
 
@@ -304,12 +304,12 @@ class TimelineItem(_Out):
     attendance: AttendanceMonthEvent | None = None
     exam: ExamEvent | None = None
     note: NoteOut | None = None
-    flag: FlagDetail | None = None
+    flag: InsightFlagDetail | None = None
     certificate: CertificateEvent | None = None
 
 
 class TimelineOut(_Out):
-    student: StudentRef
+    student: InsightStudentRef
     indicators: IndicatorsOut
     items: list[TimelineItem]
 
@@ -333,16 +333,17 @@ __all__ = [
     "ErasedOut",
     "Evidence",
     "ExamEvent",
-    "FlagDetail",
-    "FlagOut",
     "FlagRule",
     "FlagStatus",
     "FlagView",
     "IndicatorName",
     "IndicatorsOut",
+    "InsightFlagDetail",
+    "InsightFlagOut",
+    "InsightStudentRef",
+    "InsightSummaryOut",
     "LogKind",
     "ManualFlagIn",
-    "MemberOut",
     "NoteCategory",
     "NoteIn",
     "NoteOut",
@@ -351,8 +352,7 @@ __all__ = [
     "RuleSettingOut",
     "SettingsIn",
     "SettingsOut",
-    "StudentRef",
-    "SummaryOut",
+    "StaffRef",
     "TimelineItem",
     "TimelineKind",
     "TimelineOut",

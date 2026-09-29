@@ -82,14 +82,15 @@ from app.insights.schemas import (
     ErasedOut,
     EraseIn,
     ExamEvent,
-    FlagDetail,
-    FlagOut,
     FlagStatus,
     FlagView,
     IndicatorName,
     IndicatorsOut,
+    InsightFlagDetail,
+    InsightFlagOut,
+    InsightStudentRef,
+    InsightSummaryOut,
     ManualFlagIn,
-    MemberOut,
     NoteIn,
     NoteOut,
     OwnerOut,
@@ -97,8 +98,7 @@ from app.insights.schemas import (
     RuleSettingOut,
     SettingsIn,
     SettingsOut,
-    StudentRef,
-    SummaryOut,
+    StaffRef,
     TimelineItem,
     TimelineOut,
 )
@@ -309,19 +309,19 @@ def _members(session: Session, membership_ids: Iterable[uuid.UUID | None]) -> di
     return identity.member_display_names(session, wanted) if wanted else {}
 
 
-def _member(names: Mapping[uuid.UUID, str], membership_id: uuid.UUID | None) -> MemberOut | None:
+def _member(names: Mapping[uuid.UUID, str], membership_id: uuid.UUID | None) -> StaffRef | None:
     if membership_id is None:
         return None
-    return MemberOut(membership_id=membership_id, display_name=names.get(membership_id))
+    return StaffRef(membership_id=membership_id, display_name=names.get(membership_id))
 
 
 def _user_members(
     session: Session, user_ids: Iterable[uuid.UUID | None]
-) -> dict[uuid.UUID, MemberOut]:
+) -> dict[uuid.UUID, StaffRef]:
     wanted = {u for u in user_ids if u is not None}
     found = identity.members_for_users(session, wanted) if wanted else {}
     return {
-        user: MemberOut(membership_id=membership, display_name=name)
+        user: StaffRef(membership_id=membership, display_name=name)
         for user, (membership, name) in found.items()
     }
 
@@ -338,7 +338,7 @@ def _section_labels(session: Session) -> dict[uuid.UUID, str]:
 
 def _student_refs(
     session: Session, student_ids: Collection[uuid.UUID]
-) -> dict[uuid.UUID, StudentRef]:
+) -> dict[uuid.UUID, InsightStudentRef]:
     """Name, admission number and current section of students the caller already reached."""
     if not student_ids:
         return {}
@@ -346,12 +346,12 @@ def _student_refs(
     values = students.canonical_values(session, ids, ["full_name", "admission_no"])
     placements = students.current_placements(session, ids)
     labels = _section_labels(session)
-    out: dict[uuid.UUID, StudentRef] = {}
+    out: dict[uuid.UUID, InsightStudentRef] = {}
     for sid in ids:
         vals = values.get(sid, {})
         name, adm = vals.get("full_name"), vals.get("admission_no")
         section = placements.get(sid)
-        out[sid] = StudentRef(
+        out[sid] = InsightStudentRef(
             id=sid,
             full_name=name.value if name else None,
             admission_no=adm.value if adm else None,
@@ -369,12 +369,12 @@ def _overdue(flag: InsightFlag, today: dt.date) -> bool:
 
 def _flag_out(
     flag: InsightFlag,
-    refs: Mapping[uuid.UUID, StudentRef],
+    refs: Mapping[uuid.UUID, InsightStudentRef],
     names: Mapping[uuid.UUID, str],
-    users: Mapping[uuid.UUID, MemberOut],
+    users: Mapping[uuid.UUID, StaffRef],
     today: dt.date,
-) -> FlagOut:
-    return FlagOut(
+) -> InsightFlagOut:
+    return InsightFlagOut(
         id=flag.id,
         student=refs[flag.student_id],
         indicator=flag.indicator,
@@ -405,7 +405,7 @@ def _action_out(session: Session, action: FlagAction, names: Mapping[uuid.UUID, 
     )
 
 
-def _details(session: Session, flags: Sequence[InsightFlag]) -> list[FlagDetail]:
+def _details(session: Session, flags: Sequence[InsightFlag]) -> list[InsightFlagDetail]:
     if not flags:
         return []
     today = today_ist()
@@ -418,7 +418,7 @@ def _details(session: Session, flags: Sequence[InsightFlag]) -> list[FlagDetail]
     )
     users = _user_members(session, [f.raised_by for f in flags])
     return [
-        FlagDetail(
+        InsightFlagDetail(
             **_flag_out(f, refs, names, users, today).model_dump(),
             actions=[_action_out(session, a, names) for a in actions.get(f.id, [])],
         )
@@ -654,7 +654,7 @@ def list_flags(
     due: DueFilter | None,
     limit: int,
     cursor: str | None,
-) -> Page[FlagOut]:
+) -> Page[InsightFlagOut]:
     """``mine``: flags I own; ``all``: every flag in my scope (class teachers: their sections'
     students; the principal: the school). Without ``status``: open and in progress. Soonest due
     first. Audit ``insights.viewed`` (view ``flags``, count)."""
@@ -690,10 +690,10 @@ def list_flags(
     next_cursor = (
         encode_cursor({"d": rows[-1].due_on.isoformat(), "i": str(rows[-1].id)}) if more else None
     )
-    return Page[FlagOut](data=data, next_cursor=next_cursor)
+    return Page[InsightFlagOut](data=data, next_cursor=next_cursor)
 
 
-def get_flag(session: Session, ctx: UserContext, flag_id: uuid.UUID) -> FlagDetail:
+def get_flag(session: Session, ctx: UserContext, flag_id: uuid.UUID) -> InsightFlagDetail:
     """One flag with its action log (404 outside my scope). Audit ``insights.viewed``."""
     flag = _visible_flag(session, ctx, flag_id)
     detail = _details(session, [flag])[0]
@@ -708,7 +708,7 @@ def get_flag(session: Session, ctx: UserContext, flag_id: uuid.UUID) -> FlagDeta
     return detail
 
 
-def summary(session: Session, ctx: UserContext, since: dt.date | None = None) -> SummaryOut:
+def summary(session: Session, ctx: UserContext, since: dt.date | None = None) -> InsightSummaryOut:
     """Counts only for the caller's scope in this school (FR-EW-015; the M5 exit metric:
     flags first acted on by their due date)."""
     today = today_ist()
@@ -723,7 +723,7 @@ def summary(session: Session, ctx: UserContext, since: dt.date | None = None) ->
             on_time += 1
         else:
             late += 1
-    return SummaryOut(
+    return InsightSummaryOut(
         since=start,
         raised=len(raised),
         actioned_on_time=on_time,
@@ -765,7 +765,7 @@ def _insert_action(
 
 def raise_flag(
     session: Session, ctx: UserContext, student_id: uuid.UUID, data: ManualFlagIn
-) -> FlagDetail:
+) -> InsightFlagDetail:
     """A person raises a concern for a student in their scope (``insights.act``; FR-EW-008).
     Owner: the section's class teacher when they may act, else the person raising it. 422
     ``not_enrolled`` for students without a current-year section. Audit
@@ -822,7 +822,7 @@ def raise_flag(
 
 def add_action(
     session: Session, ctx: UserContext, flag_id: uuid.UUID, data: ActionIn
-) -> FlagDetail:
+) -> InsightFlagDetail:
     """Record what was done (``insights.act``; FR-EW-007): kind, date (not in the future, not
     before the flag), optional note (encrypted). The first action marks the flag actioned and
     in progress. 409 ``flag_closed``. Audit ``insights.flag_action_added``."""
@@ -857,7 +857,7 @@ def add_action(
 
 def close_flag(
     session: Session, ctx: UserContext, flag_id: uuid.UUID, data: CloseIn, version: int
-) -> FlagDetail:
+) -> InsightFlagDetail:
     """Close a flag with a reason (``insights.act``; ``If-Match``). Closing counts as acting on
     it. 409 ``flag_closed``. Audit ``insights.flag_closed``."""
     flag = _visible_flag(session, ctx, flag_id, ACT, lock=True)
@@ -909,7 +909,7 @@ def owners(session: Session, ctx: UserContext, flag_id: uuid.UUID) -> list[Owner
 
 def assign_flag(
     session: Session, ctx: UserContext, flag_id: uuid.UUID, data: AssignIn, version: int
-) -> FlagDetail:
+) -> InsightFlagDetail:
     """Give a flag another owner (``insights.manage``, step-up; ``If-Match``; FR-EW-014). 422
     ``owner_not_eligible``; 409 ``flag_closed``. The new owner is told in the app. Audit
     ``insights.flag_assigned``."""
