@@ -279,8 +279,8 @@ def _check_keys(case: FeeCase) -> None:
     ledgers = {ledger.key for ledger in case.ledgers}
     if len(students) != len(case.students) or len(ledgers) != len(case.ledgers):
         raise ValueError(f"{case.id}: duplicate student or ledger keys")
-    for ledger, student in case.links:
-        if ledger not in ledgers or student not in students:
+    for ledger_key, student_key in case.links:
+        if ledger_key not in ledgers or student_key not in students:
             raise ValueError(f"{case.id}: link to an unknown ledger or student")
     if case.student is not None and case.student not in students:
         raise ValueError(f"{case.id}: asks about an unknown student")

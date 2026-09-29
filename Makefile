@@ -138,7 +138,9 @@ ifneq ($(HAS_WEB),)
 endif
 
 typecheck: ## mypy --strict + tsc
-	$(UV) run mypy apps/api apps/worker evals apps/edge-agent
+	$(UV) run mypy apps/api apps/worker evals
+	# The edge agent separately: its tests/conftest.py would clash with apps/api's as `tests.conftest`.
+	$(UV) run mypy apps/edge-agent
 ifneq ($(HAS_WEB),)
 	npm run typecheck
 endif
