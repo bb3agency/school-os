@@ -18,7 +18,7 @@ TaskStatus = Literal["open", "in_progress", "done", "cancelled"]
 TaskSource = Literal["manual", "circular"]
 TaskView = Literal["mine", "all"]
 DueWindow = Literal["overdue", "week", "later"]
-NoticeStatus = Literal["draft", "approved"]
+NoticeStatus = Literal["drafting", "draft", "draft_failed", "approved"]
 NoticeSource = Literal["circular", "staff_text", "blank"]
 RenderStatus = Literal["queued", "ready", "failed"]
 NoticeFileFormat = Literal["pdf", "png"]
@@ -220,14 +220,23 @@ class NoticeRenderIn(_In):
     """Render the A4 PDF and the image again (files are kept for a few days only)."""
 
 
+class NoticeRedraftIn(_In):
+    """Ask the AI to draft a notice again after it could not (``draft_failed``)."""
+
+
 class NoticeOut(_Out):
     id: uuid.UUID
     source: NoticeSource
     document_id: uuid.UUID | None
-    status: NoticeStatus
+    status: NoticeStatus = Field(
+        description="drafting (the AI is drafting it in the background: ask again shortly), "
+        "draft, draft_failed (see draft_error: try again or write it yourself) or approved."
+    )
     ai_drafted: bool
     draft_error: str | None = Field(
-        description="Why the AI did not draft it (ai_disabled, ai_unavailable, ...): write it."
+        description="Why the AI did not draft it (ai_disabled, ai_budget_exhausted, "
+        "ai_unavailable, no_text, source_unavailable, notice_source_personal, worker_error, "
+        "...): try again or write it."
     )
     title_en: str
     body_en: str
@@ -263,6 +272,7 @@ __all__ = [
     "NoticeDownloadOut",
     "NoticeFileFormat",
     "NoticeOut",
+    "NoticeRedraftIn",
     "NoticeRenderIn",
     "NoticeUpdate",
     "ReadingOut",

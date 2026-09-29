@@ -81,10 +81,13 @@ def _tidy(text: str) -> str:
 
 
 def _cut(text: str, limit: int) -> str:
+    """``text`` within ``limit`` characters, the "…" included: at the last space that leaves
+    room for it, else mid-word."""
     if len(text) <= limit:
         return text
-    head = text[:limit].rsplit(" ", 1)[0]
-    return (head or text[:limit]).rstrip(" ,;:") + "…"
+    window = text[:limit]
+    head = window.rsplit(" ", 1)[0] if " " in window else ""  # at most limit - 1 characters
+    return (head.rstrip(" ,;:") or window[: limit - 1]) + "…"
 
 
 def build_request(source: NoticeSource, config: NoticeConfig) -> str:

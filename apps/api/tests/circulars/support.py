@@ -167,15 +167,25 @@ def task(
     return out.id
 
 
+def draft_now(school: Any, notice_id: uuid.UUID) -> str:
+    """Run the notice-drafting worker job in-process (``circulars.notice.draft_requested``)."""
+    return service.run_notice_draft(school.tenant_id, notice_id)
+
+
 def notice(school: Any, *, by: str = "owner", approved: bool = False) -> uuid.UUID:
+    """A notice drafted by the AI from staff text (the worker job run in-process), optionally
+    filled in by hand and approved."""
     actor = ctx(school, by)
     with tenant_session(school.tenant_id, actor.user_id) as db:
         out = service.create_notice(
             db, actor, NoticeCreate(source="staff_text", text="Sports day is on 14/11/2026.")
         )
-        if approved:
-            from app.circulars.schemas import NoticeUpdate
+    draft_now(school, out.id)
+    if approved:
+        from app.circulars.schemas import NoticeUpdate
 
+        with tenant_session(school.tenant_id, actor.user_id) as db:
+            current = service.get_notice(db, actor, out.id)
             draft = service.update_notice(
                 db,
                 actor,
@@ -186,10 +196,28 @@ def notice(school: Any, *, by: str = "owner", approved: bool = False) -> uuid.UU
                     title_te="క్రీడా దినోత్సవం",
                     body_te="క్రీడా దినోత్సవం 14/11/2026 ఉదయం 9:00కు.",
                 ),
-                out.version,
+                current.version,
             )
             service.approve_notice(db, actor, out.id, draft.version)
     return out.id
+
+
+def failed_notice(admin: Engine, school: Any) -> tuple[uuid.UUID, int]:
+    """A staff-text notice the AI could not draft (``draft_failed``, ``ai_unavailable``)."""
+    actor = ctx(school, "owner")
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        out = service.create_notice(
+            db, actor, NoticeCreate(source="staff_text", text="Sports day is on 14/11/2026.")
+        )
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.parent_notices SET status = 'draft_failed', "
+                "draft_error = 'ai_unavailable' WHERE id = :i"
+            ),
+            {"i": out.id},
+        )
+    return out.id, out.version
 
 
 def render_all(school: Any, notice_id: uuid.UUID) -> str:
@@ -312,6 +340,8 @@ __all__ = [
     "circular",
     "ctx",
     "db_value",
+    "draft_now",
+    "failed_notice",
     "install",
     "notice",
     "read_circular",

@@ -153,6 +153,20 @@ function notice(overrides: Partial<Notice> = {}): Notice {
   };
 }
 
+/** A notice the AI is still drafting in the background (FR-NOTICE-003). */
+function drafting(overrides: Partial<Notice> = {}): Partial<Notice> {
+  return {
+    status: "drafting",
+    ai_drafted: false,
+    title_en: "",
+    body_en: "",
+    title_te: "",
+    body_te: "",
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
 let stub: BffStub;
 let opened: string[];
 
@@ -263,7 +277,11 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
   it("drafts a parent notice from a C1 circular and opens it", async () => {
     signedIn(["document.read", "notice.draft"]);
     stub.routes[`GET /bff/api/v1/circulars/${DOC}`] = () => Response.json(detail());
-    stub.routes["POST /bff/api/v1/notices"] = () => Response.json(notice(), { status: 201 });
+    stub.routes["POST /bff/api/v1/notices"] = () =>
+      Response.json(notice(drafting()), {
+        status: 202,
+        headers: { Location: `/api/v1/notices/${NOTICE}` },
+      });
     renderWithIntl(<CircularDetailScreen documentId={DOC} />);
     await userEvent.click(await screen.findByRole("button", { name: en.circulars.draftNotice }));
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/notices/${NOTICE}`));
@@ -343,6 +361,93 @@ describe("parent notices (US-1605, US-1606)", () => {
     expect(screen.getByRole("button", { name: en.notices.new.draftWithAi })).toBeDisabled();
     expect(looksPersonal("Sports day on 14/11/2026 at 9:00")).toBe(false);
     expect(looksPersonal("mail office@example.org")).toBe(true);
+  });
+
+  it("starts an AI notice (202) and opens it while it is drafted in the background", async () => {
+    signedIn(["notice.draft"]);
+    stub.routes["GET /bff/api/v1/notices"] = () => page([]);
+    stub.routes["POST /bff/api/v1/notices"] = () =>
+      Response.json(notice(drafting({ source: "staff_text", document_id: null })), {
+        status: 202,
+        headers: { Location: `/api/v1/notices/${NOTICE}` },
+      });
+    renderWithIntl(<NoticesScreen />);
+    await userEvent.type(
+      await screen.findByLabelText(en.notices.new.textLabel),
+      "Sports day on 14/11/2026 at 9:00",
+    );
+    await userEvent.click(screen.getByRole("button", { name: en.notices.new.draftWithAi }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/notices/${NOTICE}`));
+    const call = stub.callsTo("POST /bff/api/v1/notices")[0];
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+      source: "staff_text",
+      text: "Sports day on 14/11/2026 at 9:00",
+    });
+    expect(call?.headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("shows progress while the AI drafts, asks again with backoff, then opens the draft", async () => {
+    signedIn(["notice.draft"]);
+    let asked = 0;
+    stub.routes[`GET /bff/api/v1/notices/${NOTICE}`] = () => {
+      asked += 1;
+      return Response.json(asked < 3 ? notice(drafting()) : notice({ version: 2 }));
+    };
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    expect(await screen.findByText(en.notices.drafting.title)).toBeVisible();
+    expect(screen.getByText(en.notices.drafting.body)).toBeVisible();
+    expect(screen.getAllByText(en.notices.status.drafting).length).toBeGreaterThan(0);
+    // Nothing to edit or approve while drafting.
+    expect(screen.queryByLabelText(en.notices.editor.title)).toBeNull();
+    expect(await screen.findByText(en.notices.aiDrafted)).toBeVisible();
+    expect(screen.getAllByLabelText(en.notices.editor.title)[0]).toHaveValue("Sports day");
+    expect(asked).toBe(3);
+    // Done: no more asking.
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(asked).toBe(3);
+  });
+
+  it("says when drafting takes longer than usual", async () => {
+    signedIn(["notice.draft"]);
+    const longAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    stub.routes[`GET /bff/api/v1/notices/${NOTICE}`] = () =>
+      Response.json(notice(drafting({ updated_at: longAgo })));
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    expect(await screen.findByText(en.notices.drafting.slow)).toBeVisible();
+  });
+
+  it("a failed AI draft says why and can be tried again with If-Match", async () => {
+    signedIn(["notice.draft"]);
+    let current = notice(
+      drafting({ status: "draft_failed", draft_error: "ai_budget_exhausted", version: 2 }),
+    );
+    stub.routes[`GET /bff/api/v1/notices/${NOTICE}`] = () => Response.json(current);
+    stub.routes[`POST /bff/api/v1/notices/${NOTICE}/draft`] = () => {
+      current = notice(drafting({ version: 3 }));
+      return Response.json(current, { status: 202 });
+    };
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    expect(await screen.findByText(en.notices.draftFailed.title)).toBeVisible();
+    expect(screen.getByText(en.notices.draftError.ai_budget_exhausted)).toBeVisible();
+    // Writing it by hand stays possible.
+    expect(screen.getAllByLabelText(en.notices.editor.title)[0]).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: en.notices.draftFailed.retry }));
+    expect(await screen.findByText(en.notices.drafting.title)).toBeVisible();
+    const call = stub.callsTo(`POST /bff/api/v1/notices/${NOTICE}/draft`)[0];
+    expect(call?.headers.get("If-Match")).toBe('W/"2"');
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({});
+  });
+
+  it("explains a refused retry", async () => {
+    signedIn(["notice.draft"]);
+    stub.routes[`GET /bff/api/v1/notices/${NOTICE}`] = () =>
+      Response.json(notice(drafting({ status: "draft_failed", draft_error: "worker_error" })));
+    stub.routes[`POST /bff/api/v1/notices/${NOTICE}/draft`] = () =>
+      problem(409, "notice_not_draft_failed");
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    expect(await screen.findByText(en.notices.draftError.other)).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: en.notices.draftFailed.retry }));
+    expect(await screen.findByText(en.notices.errors.notice_not_draft_failed.title)).toBeVisible();
   });
 
   it("marks an AI draft, saves the edit, then approves with the new version", async () => {

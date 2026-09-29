@@ -5,6 +5,11 @@
   (FR-CIR-002). Idempotent (the reading's status gates the work); retried with backoff on
   database errors; after the last attempt the reading shows "needs manual review"
   (``worker_error``).
+- ``circulars.draft_notice`` (queue ``ingest``, with the circular reading): consumer of
+  ``circulars.notice.draft_requested``; drafts one parent notice in English and Telugu through
+  the knowledge gateway with no transaction open (FR-NOTICE-003). Idempotent (only a
+  ``drafting`` notice is drafted); retried with backoff; after the last attempt the notice shows
+  ``draft_failed`` (``worker_error``) and can be tried again or written by hand.
 - ``circulars.render_notice`` (queue ``pdf``, Chromium workers): consumer of
   ``circulars.notice.render_requested``; the A4 PDF and PNG of an approved notice (FR-NOTICE-006).
 - ``circulars.send_task_reminders`` (beat, daily, queue ``maintenance``): due-soon and overdue
@@ -57,6 +62,27 @@ def read_version(
     except Exception as exc:
         if self.request.retries >= MAX_RETRIES:
             service.abandon_reading(tid, reading_id, "worker_error")
+            raise
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 600)) from exc
+
+
+@shared_task(
+    name=service.DRAFT_TASK,
+    bind=True,
+    queue="ingest",
+    acks_late=True,
+    max_retries=MAX_RETRIES,
+    ignore_result=True,
+)
+def draft_notice(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> str:
+    tid, notice_id = _uuid(tenant_id), _uuid(payload["notice_id"])
+    try:
+        return service.run_notice_draft(tid, notice_id)
+    except Exception as exc:
+        if self.request.retries >= MAX_RETRIES:
+            service.abandon_draft(tid, notice_id, "worker_error")
             raise
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 600)) from exc
 
@@ -115,4 +141,11 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
     }
 
 
-__all__ = ["beat_schedule", "read_version", "remind_all", "render_notice", "send_task_reminders"]
+__all__ = [
+    "beat_schedule",
+    "draft_notice",
+    "read_version",
+    "remind_all",
+    "render_notice",
+    "send_task_reminders",
+]

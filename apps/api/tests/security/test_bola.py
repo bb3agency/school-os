@@ -214,6 +214,7 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "student_id": "01920000-0000-7000-8000-000000000001"
     },
     ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): None,
+    ("POST", "/api/v1/notices/{notice_id}/draft"): {},
 }
 
 

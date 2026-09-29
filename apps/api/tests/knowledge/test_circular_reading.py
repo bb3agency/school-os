@@ -377,3 +377,35 @@ def test_FR_NOTICE_003_draft_through_the_gateway_is_bilingual_and_redacted() -> 
     )
     assert "9876543210" not in leaky.body_en + leaky.body_te
     assert leaky.title_te == ""  # Telugu fields must be Telugu script
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "A" * 300,  # one long word: no space to cut at
+        "Sports" + "-" * 250,
+        "Word " + "B" * 300,  # the only space comes too early to help
+        ("Sports day " * 30).strip(),
+    ],
+    ids=["no_space", "hyphens", "one_early_space", "words"],
+)
+def test_FR_NOTICE_003_cut_values_fit_the_configured_limits(value: str) -> None:
+    """A cut value keeps its "…" within the limit, so an AI title always passes the notice
+    PATCH validation (``max_length=120``) and a reading keeps within its own limits."""
+    limits = CFG.notice
+    draft = notice_rules.validate_notice(
+        {"title_en": value, "body_en": value * 10, "title_te": "క" * 300, "body_te": "ఆ" * 3000},
+        limits,
+    )
+    for text, limit in (
+        (draft.title_en, limits.max_title_chars),
+        (draft.title_te, limits.max_title_chars),
+        (draft.body_en, limits.max_body_chars),
+        (draft.body_te, limits.max_body_chars),
+    ):
+        assert 0 < len(text) <= limit
+        assert text.endswith("…")
+    for limit in (120, CFG.reading.max_title_chars):
+        cut = reading_rules._cut(value, limit)
+        assert len(cut) <= limit
+        assert cut.endswith("…")

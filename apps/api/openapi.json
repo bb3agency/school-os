@@ -10689,7 +10689,7 @@
                 "type": "null"
               }
             ],
-            "description": "Why the AI did not draft it (ai_disabled, ai_unavailable, ...): write it.",
+            "description": "Why the AI did not draft it (ai_disabled, ai_budget_exhausted, ai_unavailable, no_text, source_unavailable, notice_source_personal, worker_error, ...): try again or write it.",
             "title": "Draft Error"
           },
           "files_available": {
@@ -10738,8 +10738,11 @@
             "type": "string"
           },
           "status": {
+            "description": "drafting (the AI is drafting it in the background: ask again shortly), draft, draft_failed (see draft_error: try again or write it yourself) or approved.",
             "enum": [
+              "drafting",
               "draft",
+              "draft_failed",
               "approved"
             ],
             "title": "Status",
@@ -10785,6 +10788,13 @@
           "version"
         ],
         "title": "NoticeOut",
+        "type": "object"
+      },
+      "NoticeRedraftIn": {
+        "additionalProperties": false,
+        "description": "Ask the AI to draft a notice again after it could not (``draft_failed``).",
+        "properties": {},
+        "title": "NoticeRedraftIn",
         "type": "object"
       },
       "NoticeRenderIn": {
@@ -28782,7 +28792,9 @@
               "anyOf": [
                 {
                   "enum": [
+                    "drafting",
                     "draft",
+                    "draft_failed",
                     "approved"
                   ],
                   "type": "string"
@@ -28856,7 +28868,7 @@
         ]
       },
       "post": {
-        "description": "Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. Only the circular's text is sent to the AI, never student records. If AI is not\navailable the notice starts empty and ``draft_error`` says why. Accepts\n``Idempotency-Key``.",
+        "description": "Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the\nbackground; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``\n(``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it\nyourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the\nAI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer\nand queues nothing).",
         "operationId": "create_notice_api_v1_notices_post",
         "requestBody": {
           "content": {
@@ -28869,7 +28881,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
@@ -28940,7 +28952,7 @@
         ]
       },
       "patch": {
-        "description": "Edit a draft notice (``notice.draft``; ``If-Match``). 409 ``notice_approved``.",
+        "description": "Edit a draft notice (``notice.draft``; ``If-Match``); editing a ``draft_failed`` notice\nmakes it a ``draft``. 409 ``notice_approved`` or ``notice_drafting`` (the AI is still\ndrafting it).",
         "operationId": "update_notice_api_v1_notices__notice_id__patch",
         "parameters": [
           {
@@ -28994,7 +29006,7 @@
     },
     "/api/v1/notices/{notice_id}/approve": {
       "post": {
-        "description": "Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and\nbodies filled (422 ``notice_incomplete``) and no personal numbers (422\n``notice_personal_data``). The A4 PDF and the image are made next.",
+        "description": "Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and\nbodies filled (422 ``notice_incomplete``) and no personal numbers (422\n``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and\nthe image are made next.",
         "operationId": "approve_notice_api_v1_notices__notice_id__approve_post",
         "parameters": [
           {
@@ -29101,6 +29113,60 @@
           }
         },
         "summary": "Notice Download Url",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}/draft": {
+      "post": {
+        "description": "Ask the AI to draft the notice again after it could not (``notice.draft``;\n``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as\nfor ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state.",
+        "operationId": "retry_notice_draft_api_v1_notices__notice_id__draft_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeRedraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Notice Draft",
         "tags": [
           "circulars"
         ]
@@ -33500,7 +33566,7 @@
     },
     "/api/v1/registers/admission-withdrawal": {
       "get": {
-        "description": "The admission and withdrawal register of the students enrolled in an academic year, in\nadmission-number order, as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited.",
+        "description": "The admission and withdrawal register of the students enrolled in an academic year, in\nadmission-number order, as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204\nonly, not audited.",
         "operationId": "admission_withdrawal_register_api_v1_registers_admission_withdrawal_get",
         "parameters": [
           {
@@ -33519,6 +33585,18 @@
               ],
               "title": "Academic Year Id"
             }
+          },
+          {
+            "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+              "title": "Check",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -33531,6 +33609,9 @@
               }
             },
             "description": "Print-ready A4 page"
+          },
+          "204": {
+            "description": "With check=true: the register can be printed now (nothing audited)"
           },
           "422": {
             "content": {
@@ -33551,7 +33632,7 @@
     },
     "/api/v1/registers/certificates": {
       "get": {
-        "description": "The certificate issue register (bonafide, study and conduct certificates, or one of them)\nof an academic year as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited.",
+        "description": "The certificate issue register (bonafide, study and conduct certificates, or one of them)\nof an academic year as an A4 landscape print page (permission ``register.read``,\nschool-wide, MFA within 5 minutes). Audited (``register.viewed``); with ``check=true`` 204\nonly, not audited.",
         "operationId": "certificate_register_api_v1_registers_certificates_get",
         "parameters": [
           {
@@ -33592,6 +33673,18 @@
               ],
               "title": "Certificate Type"
             }
+          },
+          {
+            "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+              "title": "Check",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -33604,6 +33697,9 @@
               }
             },
             "description": "Print-ready A4 page"
+          },
+          "204": {
+            "description": "With check=true: the register can be printed now (nothing audited)"
           },
           "422": {
             "content": {
@@ -33624,7 +33720,7 @@
     },
     "/api/v1/registers/transfer-certificates": {
       "get": {
-        "description": "The TC register (counterfoil) of an academic year (default: the current one) as an A4\nlandscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).\nAudited.",
+        "description": "The TC register (counterfoil) of an academic year (default: the current one) as an A4\nlandscape print page (permission ``register.read``, school-wide, MFA within 5 minutes).\nAudited (``register.viewed``); with ``check=true`` 204 only, not audited.",
         "operationId": "transfer_certificate_register_api_v1_registers_transfer_certificates_get",
         "parameters": [
           {
@@ -33643,6 +33739,18 @@
               ],
               "title": "Academic Year Id"
             }
+          },
+          {
+            "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only check that the register can be printed now (step-up, year, type, size) and answer 204 without the page; the print view itself is audited once.",
+              "title": "Check",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -33655,6 +33763,9 @@
               }
             },
             "description": "Print-ready A4 page"
+          },
+          "204": {
+            "description": "With check=true: the register can be printed now (nothing audited)"
           },
           "422": {
             "content": {

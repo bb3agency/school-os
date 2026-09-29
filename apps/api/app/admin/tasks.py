@@ -6,7 +6,8 @@
   requester is notified. Longer time limits than the default (``app/admin/config.yaml``).
 - ``admin.purge_tenant_exports`` (beat, hourly, queue ``maintenance``): archives are deleted
   24 hours after they were ready, one tenant session per school (suspended and offboarding
-  schools included: retention purges keep running, docs/16 §5.5).
+  schools included: retention purges keep running, docs/16 §5.5); a failing school does not
+  stop the others (logged with ids only, counted in ``failed``, retried on the next run).
 
 Register this module in ``sos_worker.celery_app.TASK_MODULES`` and merge :func:`beat_schedule`
 into the beat configuration.
@@ -60,13 +61,22 @@ def tenant_export(
 
 
 def purge_all() -> dict[str, int]:
+    """Purge every school's expired archives, each school on its own: a school that fails is
+    logged (ids and error type only) and counted, the others still run, and its archives are
+    due again on the next run."""
     with context_free_session() as session:
         tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
-    purged = 0
+    purged = failed = 0
     for tenant_id in tenant_ids:
-        purged += service.purge_expired(tenant_id)
-    log.info("admin.export.purge_done", count=purged)
-    return {"tenants": len(tenant_ids), "purged": purged}
+        try:
+            purged += service.purge_expired(tenant_id)
+        except Exception as exc:  # storage or database: this school only, retried next run
+            failed += 1
+            log.warning(
+                "admin.export.purge_failed", tenant_id=tenant_id, error_type=type(exc).__name__
+            )
+    log.info("admin.export.purge_done", count=purged, failed=failed)
+    return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
 
 
 @shared_task(name=service.PURGE_TASK, queue="maintenance", acks_late=True)

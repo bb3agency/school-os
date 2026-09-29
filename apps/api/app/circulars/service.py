@@ -19,9 +19,13 @@ general staff email templates; ``notifications`` sends only invitations today).
 
 **Notices.** ``notice.draft`` holders start a notice from a C1 circular (its passages and the
 dates confirmed as tasks), from their own text (refused with phone numbers, emails or Aadhaar-like
-numbers) or blank; the AI draft (``knowledge.service.draft_notice``) is marked as such and
-editable; ``notice.approve`` holders approve; the worker renders an A4 PDF and a PNG (queue
-``pdf``); downloads are presigned (<= 5 minutes) and audited. No student data is ever read here.
+numbers) or blank. An AI notice starts ``drafting`` and the worker job :func:`run_notice_draft`
+(outbox ``circulars.notice.draft_requested``, queue ``ingest``) drafts it through
+``knowledge.service.draft_notice`` with no transaction open, ending in ``draft`` or
+``draft_failed`` with a code ("Try again" or write it by hand); the request never waits for the
+model. The AI draft is marked as such and editable; ``notice.approve`` holders approve; the
+worker renders an A4 PDF and a PNG (queue ``pdf``); downloads are presigned (<= 5 minutes) and
+audited. No student data is ever read here.
 
 Every change is audited in its own transaction with IDs, counts and codes only; logs carry IDs and
 codes only (invariant 5).
@@ -35,12 +39,12 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
 from app.authz.context import Scopes, UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
+from app.authz.resolver import build_snapshot
 from app.circulars import repository as repo
 from app.circulars.config import rules
 from app.circulars.models import CircularReading, CircularSuggestion, ParentNotice, Task
@@ -84,6 +88,7 @@ from app.core.redaction import contains_full_aadhaar
 from app.documents import service as documents
 from app.documents.schemas import DocumentDetail, DocumentOut
 from app.identity import service as identity
+from app.identity.schemas import MembershipAccess, RoleAccess, RoleOut, UserOut
 from app.knowledge import service as knowledge
 from app.notifications import service as notifications
 from app.ops import service as ops
@@ -104,15 +109,21 @@ READ_EVENT: Final = "circulars.read.requested"
 READ_TASK: Final = "circulars.read_version"
 RENDER_EVENT: Final = "circulars.notice.render_requested"
 RENDER_TASK: Final = "circulars.render_notice"
+DRAFT_EVENT: Final = "circulars.notice.draft_requested"
+DRAFT_TASK: Final = "circulars.draft_notice"
+SOURCE_UNAVAILABLE: Final = "source_unavailable"
+DRAFT_FAILED: Final = "ai_unavailable"
 DOCUMENT_GONE: Final = "document_gone"
 ACTIVE: Final = ("open", "in_progress")
 IST: Final = ZoneInfo("Asia/Kolkata")
 SYSTEM_ID: Final = uuid.UUID(int=0)
 NOTICE_MIME: Final[dict[str, str]] = {"pdf": "application/pdf", "png": "image/png"}
 DOWNLOAD_TTL_S: Final = 300
+_USER_PAGE: Final = 200
 
 ops.register_outbox_route(READ_EVENT, READ_TASK)
 ops.register_outbox_route(RENDER_EVENT, RENDER_TASK)
+ops.register_outbox_route(DRAFT_EVENT, DRAFT_TASK)
 
 
 # --- helpers --------------------------------------------------------------------------------------
@@ -160,7 +171,9 @@ def _audit(
     summary: Mapping[str, Any],
     *,
     system: bool = False,
+    actor_id: uuid.UUID | None = None,
 ) -> None:
+    """``actor_id``: work a worker finishes for the person who asked (their event, no request)."""
     audit.record(
         session,
         action=action,
@@ -168,7 +181,8 @@ def _audit(
         resource_id=resource_id,
         summary=summary,
         actor_type="system" if system else "user",
-        request_id=None if system else _request_id(),
+        actor_id=actor_id,
+        request_id=None if system or actor_id is not None else _request_id(),
     )
 
 
@@ -226,6 +240,65 @@ def _user_members(
         user: MemberOut(membership_id=membership, display_name=name)
         for user, (membership, name) in found.items()
     }
+
+
+def _member_context(
+    tenant_id: uuid.UUID, user: UserOut, roles: Mapping[str, RoleOut]
+) -> UserContext:
+    """A member's current permissions and scopes, read in the caller's transaction (what their
+    next request would get), for checks made on their behalf: who may be told about a circular,
+    and what a notice drafted in the worker may read."""
+    access = MembershipAccess(
+        roles=tuple(
+            RoleAccess(
+                key=key,
+                is_system=roles[key].is_system,
+                permissions=frozenset(roles[key].permissions),
+            )
+            for key in user.roles
+            if key in roles
+        ),
+        scopes=tuple((s.type, s.ref) for s in user.scopes),
+        mfa_required=False,
+    )
+    snap = build_snapshot(access)
+    return UserContext(
+        user_id=user.id,
+        tenant_id=tenant_id,
+        membership_id=user.membership_id,
+        roles=snap.roles,
+        permissions=snap.permissions,
+        scopes=snap.scopes,
+        mfa=False,
+        auth_time=None,
+        scoped_permissions=snap.scoped_permissions,
+    )
+
+
+def _active(user: UserOut, now: dt.datetime) -> bool:
+    return user.status == "active" and (user.expires_at is None or user.expires_at > now)
+
+
+def _reviewers_who_see(
+    session: Session, tenant_id: uuid.UUID, document_id: uuid.UUID
+) -> list[uuid.UUID]:
+    """Active ``circular.review`` holders whose document visibility reaches the circular (its
+    ACL, their role, sections and classes; FR-CIR-006): a notification names the circular, so
+    nobody outside a restrictive ACL is told about it."""
+    roles = {r.key: r for r in identity.list_roles(session)}
+    now = _now()
+    out: list[uuid.UUID] = []
+    after: uuid.UUID | None = None
+    while True:
+        users, after = identity.list_users(session, limit=_USER_PAGE, after=after)
+        for user in users:
+            if not _active(user, now):
+                continue
+            member = _member_context(tenant_id, user, roles)
+            if member.has(REVIEW) and documents.is_visible(session, member, document_id):
+                out.append(user.membership_id)
+        if after is None:
+            return out
 
 
 # --- circulars: the reading -----------------------------------------------------------------------
@@ -394,7 +467,7 @@ def _store_reading(
     notifications.notify(
         session,
         tenant_id=tenant_id,
-        recipients=notifications.PermissionSelector(REVIEW),
+        recipients=_reviewers_who_see(session, tenant_id, row.document_id),
         template_key="circular.read_ready",
         params={"document_id": str(row.document_id), "suggestions": len(result.deadlines)},
         resource_id=row.document_id,
@@ -418,7 +491,7 @@ def _needs_review(session: Session, tenant_id: uuid.UUID, row: CircularReading, 
     notifications.notify(
         session,
         tenant_id=tenant_id,
-        recipients=notifications.PermissionSelector(REVIEW),
+        recipients=_reviewers_who_see(session, tenant_id, row.document_id),
         template_key="circular.needs_review",
         params={"document_id": str(row.document_id), "code": code},
         resource_id=row.document_id,
@@ -1090,16 +1163,17 @@ def _refuse_personal(values: Mapping[str, str | None]) -> None:
         raise ValidationFailed([_error(f, "notice_personal_data") for f in fields])
 
 
-def _notice_source(
-    session: Session, ctx: UserContext, data: NoticeCreate
-) -> tuple[knowledge.NoticeSource | None, uuid.UUID | None]:
+def _checked_source(session: Session, ctx: UserContext, data: NoticeCreate) -> uuid.UUID | None:
+    """What a notice may be drafted from, checked with the caller's access (FR-NOTICE-001,
+    FR-NOTICE-002): the circular's id (one they can see, C1 only), or None for staff text (no
+    phone numbers, emails or Aadhaar-like numbers) and blank notices. 422 otherwise."""
     if data.source == "blank":
-        return None, None
+        return None
     if data.source == "staff_text":
         if not data.text:
             raise ValidationFailed([_error("text", "required")])
         _refuse_personal({"text": data.text})
-        return knowledge.NoticeSource(kind="staff_text", staff_text=data.text), None
+        return None
     if data.document_id is None:
         raise ValidationFailed([_error("document_id", "required")])
     try:
@@ -1108,10 +1182,42 @@ def _notice_source(
         raise ValidationFailed([_error("document_id", "not_found")]) from None
     if doc.sensitivity != "C1":
         raise ValidationFailed([_error("document_id", "notice_source_personal")])
+    return doc.id
+
+
+class _NoDraft(Exception):
+    """The worker cannot draft this notice; ``code`` says why (stored as ``draft_error``)."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def _notice_source(
+    session: Session, ctx: UserContext, notice: ParentNotice
+) -> knowledge.NoticeSource:
+    """The text the AI drafts from, read with the requester's CURRENT access (invariant 8: a
+    circular they can no longer see, or one no longer C1, is not sent): the circular's indexed
+    passages and the dates confirmed from it as tasks, or the staff text. Never student data."""
+    if notice.source == "staff_text":
+        text = notice.source_text or ""
+        if not text or knowledge.has_personal_numbers(text):
+            raise _NoDraft(SOURCE_UNAVAILABLE)
+        return knowledge.NoticeSource(kind="staff_text", staff_text=text)
+    if notice.document_id is None:  # the circular was deleted
+        raise _NoDraft(SOURCE_UNAVAILABLE)
+    try:
+        doc = _circular(session, ctx, notice.document_id)
+    except NotFound:
+        raise _NoDraft(SOURCE_UNAVAILABLE) from None
+    if doc.sensitivity != "C1":
+        raise _NoDraft("notice_source_personal")
     version = doc.current_version
     passages: tuple[knowledge.Passage, ...] = ()
     if version is not None:
         passages = knowledge.circular_passages(session, doc.id, version.id, version.version_no)
+    if not passages:
+        raise _NoDraft(knowledge.CIRCULAR_NO_TEXT)
     confirmed = repo.list_tasks(
         session,
         owner=None,
@@ -1127,69 +1233,187 @@ def _notice_source(
         for t in confirmed
         if t.source == "circular"
     )
-    source = knowledge.NoticeSource(
+    return knowledge.NoticeSource(
         kind="circular", title=doc.title, passages=passages, deadlines=deadlines
     )
-    return source, doc.id
 
 
-def _engine_of(session: Session) -> Engine:
-    bind = session.get_bind()
-    return bind if isinstance(bind, Engine) else bind.engine
+def _queue_draft(session: Session, notice_id: uuid.UUID) -> None:
+    ops.enqueue_event(session, DRAFT_EVENT, {"notice_id": notice_id})
 
 
 def create_notice(session: Session, ctx: UserContext, data: NoticeCreate) -> NoticeOut:
     """Start a parent notice (``notice.draft``; FR-NOTICE-001..003). From a circular (C1 only,
     else 422 ``notice_source_personal``) or staff text (422 ``notice_personal_data`` with phone
-    numbers, emails or Aadhaar-like numbers) the AI drafts both languages; if AI is not
-    available the draft is empty and ``draft_error`` says why. Audited ``notice.drafted``.
-
-    The source is read in its own short transaction and the model is called before ``session``
-    is used: with a deferred ``session`` (the route) no transaction is open during the call,
-    which may outlast ``idle_in_transaction_session_timeout`` (like the circular reading)."""
+    numbers, emails or Aadhaar-like numbers) the notice starts ``drafting`` and the worker
+    drafts both languages (:func:`run_notice_draft`, queue ``ingest``): the request never waits
+    for the model. A ``blank`` notice starts as a ``draft``. Audited ``notice.draft_requested``
+    (``notice.drafted`` when the draft is done; at once for a blank notice)."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    with tenant_session(ctx.tenant_id, ctx.user_id, engine=_engine_of(session)) as read:
-        source, document_id = _notice_source(read, ctx, data)
-    values: dict[str, Any] = {"ai_drafted": False, "draft_error": None}
-    if source is not None:
-        if source.kind == "circular" and not source.passages:
-            values["draft_error"] = knowledge.CIRCULAR_NO_TEXT
-        else:
-            try:
-                draft = knowledge.draft_notice(ctx.tenant_id, source)
-            except knowledge.AiUnavailable as exc:
-                values["draft_error"] = exc.code
-            else:
-                values |= {
-                    "ai_drafted": True,
-                    "title_en": draft.title_en,
-                    "body_en": draft.body_en,
-                    "title_te": draft.title_te,
-                    "body_te": draft.body_te,
-                }
+    document_id = _checked_source(session, ctx, data)
+    by_ai = data.source != "blank"
     notice = repo.insert_notice(
         session,
         {
             "id": new_id(),
             "source": data.source,
             "document_id": document_id,
-            "status": "draft",
+            "status": "drafting" if by_ai else "draft",
+            "source_text": data.text if data.source == "staff_text" else None,
+            "ai_drafted": False,
+            "draft_error": None,
             "created_by": ctx.user_id,
-            **values,
         },
     )
+    summary: dict[str, Any] = {"source": data.source, "document_id": document_id}
+    if by_ai:
+        _queue_draft(session, notice.id)
+        _audit(session, "notice.draft_requested", "parent_notice", notice.id, summary)
+    else:
+        summary |= {"ai_drafted": False, "draft_error": None}
+        _audit(session, "notice.drafted", "parent_notice", notice.id, summary)
+    return _notice_out(session, notice)
+
+
+def _requester(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID) -> UserContext | None:
+    """The person who asked for the draft, with their current roles and scopes (None when they
+    left the school or were suspended)."""
+    try:
+        user = identity.get_user(session, user_id)
+    except NotFound:
+        return None
+    if not _active(user, _now()):
+        return None
+    roles = {r.key: r for r in identity.list_roles(session)}
+    return _member_context(tenant_id, user, roles)
+
+
+def run_notice_draft(tenant_id: uuid.UUID, notice_id: uuid.UUID) -> str:
+    """Worker (outbox ``circulars.notice.draft_requested``, queue ``ingest``): draft one notice
+    in English and Telugu (FR-NOTICE-003).
+
+    Like the circular reading, three short transactions: read the source with the requester's
+    current access; call the model with no transaction open (it may outlast
+    ``idle_in_transaction_session_timeout``); store the draft (``draft``) or the reason
+    (``draft_failed`` with ``draft_error``) with its audit event ``notice.drafted``. Idempotent:
+    only a ``drafting`` notice is drafted. Returns ``draft``, the failure code or ``skipped``.
+    """
+    source: knowledge.NoticeSource | None = None
+    code: str | None = None
+    with tenant_session(tenant_id) as session:
+        notice = repo.get_notice(session, notice_id, lock=True)
+        if notice is None or notice.status != "drafting":
+            return "skipped"
+        requester = _requester(session, tenant_id, notice.created_by)
+        if requester is None or not requester.has(NOTICE_DRAFT):
+            code = SOURCE_UNAVAILABLE
+        else:
+            try:
+                source = _notice_source(session, requester, notice)
+            except _NoDraft as exc:
+                code = exc.code
+    draft: knowledge.NoticeDraft | None = None
+    if source is not None:
+        try:
+            draft = knowledge.draft_notice(tenant_id, source)
+        except knowledge.AiUnavailable as exc:
+            code = exc.code
+    with tenant_session(tenant_id) as session:
+        notice = repo.get_notice(session, notice_id, lock=True)
+        if notice is None or notice.status != "drafting":
+            return "skipped"
+        return _finish_draft(session, tenant_id, notice, draft, code)
+
+
+def _finish_draft(
+    session: Session,
+    tenant_id: uuid.UUID,
+    notice: ParentNotice,
+    draft: knowledge.NoticeDraft | None,
+    code: str | None,
+) -> str:
+    values: dict[str, Any]
+    if draft is not None:
+        values = {
+            "status": "draft",
+            "ai_drafted": True,
+            "draft_error": None,
+            "source_text": None,
+            "title_en": draft.title_en,
+            "body_en": draft.body_en,
+            "title_te": draft.title_te,
+            "body_te": draft.body_te,
+        }
+    else:
+        values = {"status": "draft_failed", "draft_error": code or DRAFT_FAILED}
+    notice = repo.update_notice(session, notice.id, values)
     _audit(
         session,
         "notice.drafted",
         "parent_notice",
         notice.id,
         {
-            "source": data.source,
-            "document_id": document_id,
+            "source": notice.source,
+            "document_id": notice.document_id,
             "ai_drafted": notice.ai_drafted,
             "draft_error": notice.draft_error,
         },
+        actor_id=notice.created_by,
+    )
+    log.info(
+        "circulars.notice.drafted",
+        tenant_id=tenant_id,
+        resource_type="parent_notice",
+        resource_id=notice.id,
+        error_code=notice.draft_error,
+    )
+    return notice.draft_error or "draft"
+
+
+def abandon_draft(tenant_id: uuid.UUID, notice_id: uuid.UUID, code: str) -> None:
+    """The worker gave up (retries used): the notice shows ``draft_failed`` with ``code``."""
+    with tenant_session(tenant_id) as session:
+        notice = repo.get_notice(session, notice_id, lock=True)
+        if notice is not None and notice.status == "drafting":
+            _finish_draft(session, tenant_id, notice, None, code)
+
+
+def retry_notice_draft(
+    session: Session, ctx: UserContext, notice_id: uuid.UUID, version: int
+) -> NoticeOut:
+    """Ask the AI again after it could not draft the notice (``notice.draft``; ``If-Match``):
+    ``draft_failed -> drafting``, with the source checked again with the caller's access (422
+    like :func:`create_notice`). 409 ``notice_not_draft_failed`` in any other state. Audited
+    ``notice.draft_requested``."""
+    if not ctx.has(NOTICE_DRAFT):
+        raise Forbidden()
+    notice = _notice(session, notice_id, lock=True)
+    _check_version(notice.version, version)
+    if notice.status != "draft_failed":
+        raise Conflict(
+            "Only a notice the AI could not draft can be tried again.",
+            code="notice_not_draft_failed",
+        )
+    if notice.source == "circular" and notice.document_id is None:  # the circular was deleted
+        raise ValidationFailed([_error("document_id", "not_found")])
+    _checked_source(
+        session,
+        ctx,
+        NoticeCreate(
+            source=notice.source,
+            document_id=notice.document_id,
+            text=notice.source_text,
+        ),
+    )
+    notice = repo.update_notice(session, notice.id, {"status": "drafting", "draft_error": None})
+    _queue_draft(session, notice.id)
+    _audit(
+        session,
+        "notice.draft_requested",
+        "parent_notice",
+        notice.id,
+        {"source": notice.source, "document_id": notice.document_id, "again": True},
     )
     return _notice_out(session, notice)
 
@@ -1239,19 +1463,31 @@ def update_notice(
         raise Forbidden()
     notice = _notice(session, notice_id, lock=True)
     _check_version(notice.version, version)
-    if notice.status != "draft":
+    _refuse_drafting(notice)
+    if notice.status == "approved":
         raise Conflict(
             "An approved notice cannot be changed. Start a new one.", code="notice_approved"
         )
-    values = {
+    values: dict[str, Any] = {
         k: v for k, v in data.model_dump(exclude_none=True).items() if v != getattr(notice, k)
     }
     _refuse_personal(values)
     if not values:
         return _notice_out(session, notice)
+    fields = sorted(values)
+    if notice.status == "draft_failed":  # written by hand now: a draft like any other
+        values |= {"status": "draft", "source_text": None}
     notice = repo.update_notice(session, notice.id, values)
-    _audit(session, "notice.edited", "parent_notice", notice.id, {"fields": sorted(values)})
+    _audit(session, "notice.edited", "parent_notice", notice.id, {"fields": fields})
     return _notice_out(session, notice)
+
+
+def _refuse_drafting(notice: ParentNotice) -> None:
+    if notice.status == "drafting":
+        raise Conflict(
+            "The AI is still drafting this notice. Try again in a moment.",
+            code="notice_drafting",
+        )
 
 
 def _queue_render(session: Session, notice_id: uuid.UUID) -> None:
@@ -1268,7 +1504,8 @@ def approve_notice(
         raise Forbidden()
     notice = _notice(session, notice_id, lock=True)
     _check_version(notice.version, version)
-    if notice.status != "draft":
+    _refuse_drafting(notice)
+    if notice.status == "approved":
         raise Conflict("This notice is already approved.", code="notice_approved")
     texts = {
         "title_en": notice.title_en,
@@ -1288,6 +1525,7 @@ def approve_notice(
             "approved_by": ctx.user_id,
             "approved_at": _now(),
             "render_status": "queued",
+            "source_text": None,
         },
     )
     _queue_render(session, notice.id)
@@ -1465,6 +1703,8 @@ tenancy.register_data_owner(
 
 
 __all__ = [
+    "DRAFT_EVENT",
+    "DRAFT_TASK",
     "NOTICE_APPROVE",
     "NOTICE_DRAFT",
     "READ",
@@ -1476,6 +1716,7 @@ __all__ = [
     "TASK_ALL",
     "TASK_MANAGE",
     "TASK_READ",
+    "abandon_draft",
     "abandon_reading",
     "abandon_render",
     "approve_notice",
@@ -1498,6 +1739,8 @@ __all__ = [
     "render_notice",
     "request_reading",
     "request_render",
+    "retry_notice_draft",
+    "run_notice_draft",
     "run_reading",
     "send_reminders",
     "set_task_status",

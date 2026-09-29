@@ -162,8 +162,11 @@ def _cut(text: str, limit: int) -> str:
     text = _WS.sub(" ", unicodedata.normalize("NFC", text)).strip()
     if len(text) <= limit:
         return text
-    head = text[:limit].rsplit(" ", 1)[0]
-    return (head or text[:limit]).rstrip(" ,;:") + "…"
+    # Within ``limit`` with the "…": at the last space (at most limit - 1 characters before
+    # it), else mid-word.
+    window = text[:limit]
+    head = window.rsplit(" ", 1)[0] if " " in window else ""
+    return (head.rstrip(" ,;:") or window[: limit - 1]) + "…"
 
 
 def _one_line(text: str) -> str:

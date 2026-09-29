@@ -140,6 +140,8 @@ def create_celery() -> Celery:
             # ingestion that triggers it; notice PDFs/PNGs on the Chromium workers
             # (FR-NOTICE-006); the daily task reminders on "maintenance" (FR-TASK-007).
             "circulars.read_version": {"queue": "ingest"},
+            # FR-NOTICE-003: parent notices are drafted in the background, next to the reading.
+            "circulars.draft_notice": {"queue": "ingest"},
             "circulars.render_notice": {"queue": "pdf"},
             "circulars.send_task_reminders": {"queue": "maintenance"},
             # M5 (FR-EW-005..006, FR-EW-017): the early-warning rules after attendance and
