@@ -2607,7 +2607,9 @@
       "allForStudent": "ఈ విద్యార్థి సమస్యలన్నీ",
       "backToList": "జాబితాకు తిరిగి వెళ్లండి",
       "timelineLabel": "ఈ సమస్య చరిత్ర",
-      "stillOpen": "ఇంకా తెరిచి ఉంది"
+      "stillOpen": "ఇంకా తెరిచి ఉంది",
+      "problem": "సమస్య",
+      "relatedLabel": "సంబంధిత పేజీలు"
     },
     "rules": {
       "title": "SchoolOS ఏమి తనిఖీ చేస్తుంది",
@@ -2662,7 +2664,7 @@
       "seeFindings": "కనిపించిన సమస్యలను చూడండి"
     },
     "crumbHome": "హోమ్",
-    "summaryBySeverity": "తీవ్రత వారీగా: {list}"
+    "summaryBySeverityLabel": "తీవ్రత వారీగా:"
   },
   "changeRequests": {
     "nav": "సవరణ అభ్యర్థనలు",

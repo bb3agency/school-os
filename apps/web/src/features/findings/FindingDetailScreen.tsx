@@ -5,13 +5,17 @@ import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
+import { Avatar } from "@/components/ui/Avatar";
+import { Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { TextAreaField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Table, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
+import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { CR_APPROVE, CR_REQUEST, ifMatch } from "@/features/change-requests/types";
 import { Link } from "@/i18n/navigation";
@@ -124,11 +128,17 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
   if (finding.status === "loading") return <LoadingState label={tc("loading")} />;
   if (finding.status !== "ready") {
     return (
-      <Alert tone="danger" title={tc("loadErrorTitle")}>
-        {finding.status === "error" && finding.reason
-          ? te(`load.${finding.reason}`)
-          : tc("loadErrorBody")}
-      </Alert>
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb={[{ label: t("title"), href: "/findings" }, { label: td("problem") }]}
+          title={td("problem")}
+        />
+        <Alert tone="danger" title={tc("loadErrorTitle")}>
+          {finding.status === "error" && finding.reason
+            ? te(`load.${finding.reason}`)
+            : tc("loadErrorBody")}
+        </Alert>
+      </div>
     );
   }
   const data = finding.data;
@@ -143,6 +153,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
+        breadcrumb={[{ label: t("title"), href: "/findings" }, { label: data.rule_id }]}
         title={td("title", { rule: data.rule_id })}
         description={ruleText(rules.data, data.rule_id, locale) ?? undefined}
         badge={
@@ -249,27 +260,34 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
 
       <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
         <Card title={td("whatTitle")}>
-          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
-            <dt className="font-semibold">{t("colStudent")}</dt>
-            <dd>
-              <Value>{data.student.display_name}</Value>
+          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-[max-content_1fr]">
+            <dt className="text-sm text-ink-muted">{t("colStudent")}</dt>
+            <dd className="flex flex-wrap items-center gap-2">
+              {data.student.display_name ? (
+                <Avatar name={data.student.display_name} size="sm" decorative />
+              ) : null}
+              <span className="font-medium">
+                <Value>{data.student.display_name}</Value>
+              </span>
               {data.student.admission_no ? (
-                <span className="ml-2 text-sm text-ink-muted">
-                  {t("admissionNo", { number: data.student.admission_no })}
-                </span>
+                <Pill variant="tag">
+                  <span className="font-mono">
+                    {t("admissionNo", { number: data.student.admission_no })}
+                  </span>
+                </Pill>
               ) : null}
             </dd>
-            <dt className="font-semibold">{t("colField")}</dt>
+            <dt className="text-sm text-ink-muted">{t("colField")}</dt>
             <dd>
               <Value>{field}</Value>
             </dd>
-            <dt className="font-semibold">{td("explanation")}</dt>
+            <dt className="text-sm text-ink-muted">{td("explanation")}</dt>
             <dd>
               <BothLanguages text={data.explanation} />
             </dd>
             {data.match_explanation ? (
               <>
-                <dt className="font-semibold">{td("matchExplanation")}</dt>
+                <dt className="text-sm text-ink-muted">{td("matchExplanation")}</dt>
                 <dd>
                   <BothLanguages text={data.match_explanation} />
                 </dd>
@@ -277,7 +295,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
             ) : null}
             {data.profile_key ? (
               <>
-                <dt className="font-semibold">{t("filterProfile")}</dt>
+                <dt className="text-sm text-ink-muted">{t("filterProfile")}</dt>
                 <dd>{profileLabel(profiles.data, data.profile_key, locale)}</dd>
               </>
             ) : null}
@@ -288,9 +306,15 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
           {data.routes.length === 0 ? (
             <p className="text-sm text-ink-muted">{td("noRoutes")}</p>
           ) : (
-            <ol className="list-decimal space-y-3 pl-5">
-              {data.routes.map((route) => (
-                <li key={route.code}>
+            <ol className="space-y-3">
+              {data.routes.map((route, position) => (
+                <li key={route.code} className="flex gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-action text-xs font-medium text-on-action"
+                  >
+                    {position + 1}
+                  </span>
                   <BothLanguages text={route} />
                 </li>
               ))}
@@ -307,7 +331,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
             role="region"
             aria-label={tc("scrollableTable", { caption: td("valuesTitle") })}
             tabIndex={0}
-            className="overflow-x-auto rounded-md border border-border"
+            className="overflow-x-auto rounded-xl border border-border"
           >
             <Table>
               <caption className="sr-only">{td("valuesTitle")}</caption>
@@ -326,10 +350,17 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                     </Td>
                     <Td>{attributeLabel(attributes.data, item.attribute_key, locale)}</Td>
                     <Td>
-                      {item.value ?? item.masked ?? t("noValue")}
-                      {item.sensitive || item.value === null ? (
-                        <span className="ml-2 text-xs text-ink-muted">({t("maskedNote")})</span>
-                      ) : null}
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono">
+                          {item.value ?? item.masked ?? t("noValue")}
+                        </span>
+                        {item.sensitive || item.value === null ? (
+                          <Pill variant="tag">
+                            <Icon name="lock" className="size-3" />
+                            {t("maskedNote")}
+                          </Pill>
+                        ) : null}
+                      </span>
                     </Td>
                   </Tr>
                 ))}
@@ -340,73 +371,106 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
       </Card>
 
       <Card title={td("historyTitle")}>
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-          <dt className="font-semibold">{td("firstSeen")}</dt>
-          <dd>
-            <Value>{formatDateTime(data.first_seen_at)}</Value>
-          </dd>
-          <dt className="font-semibold">{td("lastSeen")}</dt>
-          <dd>
-            <Value>{formatDateTime(data.last_seen_at)}</Value>
-          </dd>
-          {data.reopened_count > 0 ? (
-            <>
-              <dt className="font-semibold">{td("reopened")}</dt>
-              <dd>{td("reopenedCount", { count: data.reopened_count })}</dd>
-            </>
-          ) : null}
-          {data.status === "resolved" ? (
-            <>
-              <dt className="font-semibold">{td("resolvedAt")}</dt>
-              <dd>
-                <Value>{formatDateTime(data.resolved_at)}</Value>
-              </dd>
-              {data.resolution_note ? (
-                <>
-                  <dt className="font-semibold">{td("note")}</dt>
-                  <dd className="whitespace-pre-line">{data.resolution_note}</dd>
-                </>
-              ) : null}
-              {data.change_request_id ? (
-                <>
-                  <dt className="font-semibold">{td("linkedRequest")}</dt>
-                  <dd>
-                    <Link
-                      href={`/change-requests/${data.change_request_id}`}
-                      className="text-primary underline"
-                    >
-                      {td("openRequest")}
-                    </Link>
-                  </dd>
-                </>
-              ) : null}
-            </>
-          ) : null}
-          {data.status === "waived" ? (
-            <>
-              <dt className="font-semibold">{td("waivedAt")}</dt>
-              <dd>
-                <Value>{formatDateTime(data.waived_at)}</Value>
-              </dd>
-              <dt className="font-semibold">{td("waiveReason")}</dt>
-              <dd className="whitespace-pre-line">
-                <Value>{data.waived_reason}</Value>
-              </dd>
-            </>
-          ) : null}
-        </dl>
+        <Timeline
+          label={td("timelineLabel")}
+          items={[
+            {
+              id: "first",
+              title: td("firstSeen"),
+              time: <Value>{formatDateTime(data.first_seen_at)}</Value>,
+              status: "done",
+            },
+            ...(data.reopened_count > 0
+              ? [
+                  {
+                    id: "reopened",
+                    title: td("reopened"),
+                    body: td("reopenedCount", { count: data.reopened_count }),
+                    status: "done" as const,
+                  },
+                ]
+              : []),
+            {
+              id: "last",
+              title: td("lastSeen"),
+              time: <Value>{formatDateTime(data.last_seen_at)}</Value>,
+              status: "done",
+            },
+            ...(data.status === "resolved"
+              ? [
+                  {
+                    id: "resolved",
+                    title: td("resolvedAt"),
+                    time: <Value>{formatDateTime(data.resolved_at)}</Value>,
+                    status: "done" as const,
+                    body:
+                      data.resolution_note || data.change_request_id ? (
+                        <dl className="space-y-2">
+                          {data.resolution_note ? (
+                            <div>
+                              <dt className="font-medium text-ink">{td("note")}</dt>
+                              <dd className="whitespace-pre-line">{data.resolution_note}</dd>
+                            </div>
+                          ) : null}
+                          {data.change_request_id ? (
+                            <div>
+                              <dt className="font-medium text-ink">{td("linkedRequest")}</dt>
+                              <dd>
+                                <Link
+                                  href={`/change-requests/${data.change_request_id}`}
+                                  className="text-primary underline"
+                                >
+                                  {td("openRequest")}
+                                </Link>
+                              </dd>
+                            </div>
+                          ) : null}
+                        </dl>
+                      ) : undefined,
+                  },
+                ]
+              : []),
+            ...(data.status === "waived"
+              ? [
+                  {
+                    id: "waived",
+                    title: td("waivedAt"),
+                    time: <Value>{formatDateTime(data.waived_at)}</Value>,
+                    status: "done" as const,
+                    body: (
+                      <dl>
+                        <dt className="font-medium text-ink">{td("waiveReason")}</dt>
+                        <dd className="whitespace-pre-line">
+                          <Value>{data.waived_reason}</Value>
+                        </dd>
+                      </dl>
+                    ),
+                  },
+                ]
+              : []),
+            ...(open
+              ? [
+                  {
+                    id: "open",
+                    title: td("stillOpen"),
+                    status: "current" as const,
+                    chips: <FindingStatusBadge status={data.status} />,
+                  },
+                ]
+              : []),
+          ]}
+        />
         {!open ? <p className="mt-4 text-sm text-ink-muted">{td("reopenNote")}</p> : null}
       </Card>
 
-      <p>
-        <Link href={`/findings?student_id=${data.student.id}`} className="text-primary underline">
+      <nav aria-label={td("relatedLabel")} className="flex flex-wrap gap-2" data-print="hide">
+        <ButtonLink href={`/findings?student_id=${data.student.id}`} variant="secondary" size="sm">
           {td("allForStudent")}
-        </Link>
-        <span aria-hidden="true"> · </span>
-        <Link href="/findings" className="text-primary underline">
+        </ButtonLink>
+        <ButtonLink href="/findings" variant="ghost" size="sm">
           {td("backToList")}
-        </Link>
-      </p>
+        </ButtonLink>
+      </nav>
     </div>
   );
 }

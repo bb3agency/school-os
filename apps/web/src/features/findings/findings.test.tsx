@@ -162,6 +162,31 @@ describe("findings list (US-501 AC1/AC2, FR-DQ-006)", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows only the counts the API returns, and filters one severity at a time (NFR-A11Y-001)", async () => {
+    common(READ);
+    stub.routes["GET /bff/api/v1/dq/summary"] = () =>
+      Response.json({
+        profile_key: null,
+        blockers: 1,
+        warnings: 1,
+        students_with_blockers: 1,
+        by_severity: { blocker: 1, low: 1 },
+        by_rule: [],
+        last_run: null,
+      });
+    stub.routes["GET /bff/api/v1/dq/findings"] = () => page([finding()]);
+    renderWithIntl(<FindingsScreen filters={parseFindingFilters({ severity: "blocker" })} />);
+    const blockers = await screen.findByRole("group", { name: "Blockers" });
+    await waitFor(() => expect(within(blockers).getByText("1")).toBeInTheDocument());
+    expect(await screen.findByText("By severity:")).toBeInTheDocument();
+    // Severities with no findings are not listed (no invented zero rows).
+    expect(screen.queryByText("Medium", { selector: "p span" })).toBeNull();
+    expect(screen.getByText("Not checked yet")).toBeInTheDocument();
+    const severity = screen.getByRole("group", { name: "Severity" });
+    expect(within(severity).getByRole("radio", { name: "Blocker" })).toBeChecked();
+    expect(within(severity).getByRole("radio", { name: "All" })).not.toBeChecked();
+  });
+
   it("says what to do when nothing is found", async () => {
     common(READ);
     stub.routes["GET /bff/api/v1/dq/findings"] = () => page([]);

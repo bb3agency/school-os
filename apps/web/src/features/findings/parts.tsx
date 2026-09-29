@@ -57,7 +57,7 @@ export function FindingStatusBadge({ status }: { status: FindingStatus }) {
 export function SourceChip({ source }: { source: string }) {
   const t = useTranslations("findings.sources");
   return (
-    <span className="inline-flex items-center rounded-sm border border-border-strong px-1.5 text-xs font-semibold whitespace-nowrap text-ink">
+    <span className="inline-flex items-center rounded-full border border-border-soft bg-surface-muted px-2 py-0.5 text-xs font-medium whitespace-nowrap text-ink">
       {isSourceKey(source) ? t(source) : source}
     </span>
   );
@@ -71,11 +71,11 @@ export function FindingValues({ values }: { values: readonly FindingValue[] }) {
   const t = useTranslations("findings");
   if (values.length === 0) return <span className="text-ink-muted">{t("noValues")}</span>;
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {values.map((item) => (
-        <li key={item.value_id} className="flex flex-wrap items-baseline gap-2">
+        <li key={item.value_id} className="flex flex-wrap items-center gap-2">
           <SourceChip source={item.source} />
-          <span className="break-words">
+          <span className="font-mono text-sm break-words">
             {item.value ?? item.masked ?? t("noValue")}
             {item.sensitive || item.value === null ? (
               <span className="sr-only"> ({t("maskedNote")})</span>

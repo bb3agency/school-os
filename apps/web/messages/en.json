@@ -2607,7 +2607,9 @@
       "allForStudent": "All problems for this student",
       "backToList": "Back to the list",
       "timelineLabel": "History of this problem",
-      "stillOpen": "Still open"
+      "stillOpen": "Still open",
+      "problem": "Problem",
+      "relatedLabel": "Related pages"
     },
     "rules": {
       "title": "What SchoolOS checks",
@@ -2662,7 +2664,7 @@
       "seeFindings": "See the problems found"
     },
     "crumbHome": "Home",
-    "summaryBySeverity": "By severity: {list}"
+    "summaryBySeverityLabel": "By severity:"
   },
   "changeRequests": {
     "nav": "Correction requests",
