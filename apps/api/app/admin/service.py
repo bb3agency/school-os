@@ -108,6 +108,7 @@ from app.imports import service as imports
 from app.notifications import service as notifications
 from app.ops import service as ops
 from app.students import service as students
+from app.tally import service as tally
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -552,6 +553,7 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *documents.export_records(session),
         *certificates.export_records(session),
         *circulars.export_records(session),
+        *tally.export_records(session),
         repo.retention_record_table(session),
     ]
     names = [t.name for t in tables]
