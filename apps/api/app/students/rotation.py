@@ -35,8 +35,21 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final
 
-from sqlalchemy import Engine, text
+from sqlalchemy import (
+    ColumnElement,
+    Engine,
+    Integer,
+    LargeBinary,
+    and_,
+    func,
+    or_,
+    select,
+    update,
+)
+from sqlalchemy import column as sql_column
+from sqlalchemy import table as sql_table
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.expression import ColumnClause, TableClause
 
 from app.audit import service as audit
 from app.core.crypto import KeyWrapper, ciphertext_key_version
@@ -110,25 +123,39 @@ ciphertext whose header version differs from ``target_version`` and keep the ass
 """
 
 
-def _version_sql(column: str) -> str:
+def _table(name: str, *columns: str) -> TableClause:
+    """A lightweight table construct (``id``, ``key_version`` and the given bytea columns) for a
+    constant ``schema.table`` name: SQLAlchemy Core quotes it, no SQL is built from strings."""
+    schema, _, relation = name.partition(".")
+    return sql_table(
+        relation,
+        sql_column("id"),
+        sql_column("key_version", Integer),
+        *(sql_column(c, LargeBinary) for c in columns),
+        schema=schema,
+    )
+
+
+def _key_version(value: ColumnClause[Any]) -> ColumnElement[int]:
     # Header: version(1) | key_version(2, big-endian) | ... (app.core.crypto).
-    return f"(get_byte({column}, 1) * 256 + get_byte({column}, 2))"
+    return func.get_byte(value, 1, type_=Integer) * 256 + func.get_byte(value, 2, type_=Integer)
 
 
-def _stale(column: str) -> str:
-    return f"({column} IS NOT NULL AND {_version_sql(column)} <> :v)"
+def _stale(value: ColumnClause[Any], version: int) -> ColumnElement[bool]:
+    return and_(value.is_not(None), _key_version(value) != version)
 
 
 def _attribute_values(
     session: Session, ring: crypto.TenantKeyring, version: int, limit: int
 ) -> int:
-    table, column = "sis.attribute_values", "value_ciphertext"
+    name, col = "sis.attribute_values", "value_ciphertext"
+    t = _table(name, col, "value_blind_index")
     rows = session.execute(
-        text(
-            f"SELECT id, value_ciphertext, value_blind_index FROM {table} "  # noqa: S608 - constants
-            f"WHERE {_stale(column)} ORDER BY id LIMIT :n FOR UPDATE"
-        ),
-        {"v": version, "n": limit},
+        select(t.c.id, t.c.value_ciphertext, t.c.value_blind_index)
+        .where(_stale(t.c.value_ciphertext, version))
+        .order_by(t.c.id)
+        .limit(limit)
+        .with_for_update()
     ).all()
     for row in rows:
         if row.value_blind_index is not None:
@@ -137,32 +164,30 @@ def _attribute_values(
         blob = crypto.reencrypt_value(
             session,
             bytes(row.value_ciphertext),
-            table=table,
-            column=column,
+            table=name,
+            column=col,
             row_id=row.id,
             key_version=version,
             keyring=ring,
         )
         session.execute(
-            text(f"UPDATE {table} SET value_ciphertext = :b, key_version = :v WHERE id = :i"),  # noqa: S608
-            {"b": blob, "v": version, "i": row.id},
+            update(t).where(t.c.id == row.id).values(value_ciphertext=blob, key_version=version)
         )
     return len(rows)
 
 
 def _guardians(session: Session, ring: crypto.TenantKeyring, version: int, limit: int) -> int:
     table = "sis.guardians"
+    t = _table(table, "phone_ciphertext", "address_ciphertext", "phone_blind_index")
     rows = session.execute(
-        text(
-            f"SELECT id, phone_ciphertext, address_ciphertext FROM {table} "  # noqa: S608
-            f"WHERE {_stale('phone_ciphertext')} OR {_stale('address_ciphertext')} "
-            "ORDER BY id LIMIT :n FOR UPDATE"
-        ),
-        {"v": version, "n": limit},
+        select(t.c.id, t.c.phone_ciphertext, t.c.address_ciphertext)
+        .where(or_(_stale(t.c.phone_ciphertext, version), _stale(t.c.address_ciphertext, version)))
+        .order_by(t.c.id)
+        .limit(limit)
+        .with_for_update()
     ).all()
     for row in rows:
-        values: dict[str, Any] = {"v": version, "i": row.id}
-        sets = ["key_version = :v"]
+        values: dict[str, Any] = {"key_version": version}
         phone = bytes(row.phone_ciphertext) if row.phone_ciphertext is not None else None
         if phone is not None and ciphertext_key_version(phone) != version:
             plain = crypto.decrypt_value(
@@ -172,7 +197,7 @@ def _guardians(session: Session, ring: crypto.TenantKeyring, version: int, limit
                 session, plain, purpose=PHONE_INDEX_PURPOSE, key_version=version, keyring=ring
             )
             del plain
-            values["p"] = crypto.reencrypt_value(
+            values["phone_ciphertext"] = crypto.reencrypt_value(
                 session,
                 phone,
                 table=table,
@@ -181,11 +206,10 @@ def _guardians(session: Session, ring: crypto.TenantKeyring, version: int, limit
                 key_version=version,
                 keyring=ring,
             )
-            values["pi"] = digest
-            sets += ["phone_ciphertext = :p", "phone_blind_index = :pi"]
+            values["phone_blind_index"] = digest
         address = bytes(row.address_ciphertext) if row.address_ciphertext is not None else None
         if address is not None and ciphertext_key_version(address) != version:
-            values["a"] = crypto.reencrypt_value(
+            values["address_ciphertext"] = crypto.reencrypt_value(
                 session,
                 address,
                 table=table,
@@ -194,46 +218,42 @@ def _guardians(session: Session, ring: crypto.TenantKeyring, version: int, limit
                 key_version=version,
                 keyring=ring,
             )
-            sets.append("address_ciphertext = :a")
         # Re-encryption is not an edit: updated_at moves (trigger) but the ETag version does not.
-        session.execute(
-            text(f"UPDATE {table} SET {', '.join(sets)} WHERE id = :i"),  # noqa: S608
-            values,
-        )
+        session.execute(update(t).where(t.c.id == row.id).values(values))
     return len(rows)
 
 
 def _change_requests(session: Session, ring: crypto.TenantKeyring, version: int, limit: int) -> int:
     table = "sis.change_requests"
+    t = _table(table, "new_value_ciphertext", "old_value_ciphertext")
     rows = session.execute(
-        text(
-            f"SELECT id, new_value_ciphertext, old_value_ciphertext FROM {table} "  # noqa: S608
-            f"WHERE {_stale('new_value_ciphertext')} OR {_stale('old_value_ciphertext')} "
-            "ORDER BY id LIMIT :n FOR UPDATE"
-        ),
-        {"v": version, "n": limit},
+        select(t.c.id, t.c.new_value_ciphertext, t.c.old_value_ciphertext)
+        .where(
+            or_(
+                _stale(t.c.new_value_ciphertext, version),
+                _stale(t.c.old_value_ciphertext, version),
+            )
+        )
+        .order_by(t.c.id)
+        .limit(limit)
+        .with_for_update()
     ).all()
     for row in rows:
-        values: dict[str, Any] = {"v": version, "i": row.id}
-        sets = ["key_version = :v"]
-        for column, param in (("new_value_ciphertext", "n"), ("old_value_ciphertext", "o")):
-            raw = getattr(row, column)
+        values: dict[str, Any] = {"key_version": version}
+        for col in ("new_value_ciphertext", "old_value_ciphertext"):
+            raw = getattr(row, col)
             if raw is None or ciphertext_key_version(bytes(raw)) == version:
                 continue
-            values[param] = crypto.reencrypt_value(
+            values[col] = crypto.reencrypt_value(
                 session,
                 bytes(raw),
                 table=table,
-                column=column,
+                column=col,
                 row_id=row.id,
                 key_version=version,
                 keyring=ring,
             )
-            sets.append(f"{column} = :{param}")
-        session.execute(
-            text(f"UPDATE {table} SET {', '.join(sets)} WHERE id = :i"),  # noqa: S608
-            values,
-        )
+        session.execute(update(t).where(t.c.id == row.id).values(values))
     return len(rows)
 
 
@@ -269,12 +289,11 @@ def census(session: Session) -> dict[int, int]:
     Reads only the 3-byte header of each value (never decrypts). RLS limits it to the school.
     """
     counts: dict[int, int] = {}
-    for table, column in CIPHERTEXT_COLUMNS:
+    for name, col in CIPHERTEXT_COLUMNS:
+        value = _table(name, col).c[col]
+        version = _key_version(value).label("v")
         rows = session.execute(
-            text(
-                f"SELECT {_version_sql(column)} AS v, count(*) AS n FROM {table} "  # noqa: S608
-                f"WHERE {column} IS NOT NULL GROUP BY 1"
-            )
+            select(version, func.count().label("n")).where(value.is_not(None)).group_by(version)
         ).all()
         for row in rows:
             counts[int(row.v)] = counts.get(int(row.v), 0) + int(row.n)

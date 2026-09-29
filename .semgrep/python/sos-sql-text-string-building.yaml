@@ -35,6 +35,16 @@ rules:
           - pattern: $FN("..." + $X, ...)
           - pattern: $FN($X + "...", ...)
           - pattern: $FN("...".join(...), ...)
+          # Implicit concatenation with an f-string part ("..." f"{x}" or f"{x}" "..."), which
+          # the f-string pattern above does not see: every part is a literal, one has an f prefix.
+          - patterns:
+              - pattern: $FN($S, ...)
+              - metavariable-regex:
+                  metavariable: $S
+                  regex: (?s)^[rRbBuUfF]{0,2}["'].*["']$
+              - metavariable-regex:
+                  metavariable: $S
+                  regex: (?s)^(?:[fF][rR]?|[rR][fF])["']|.*\s(?:[fF][rR]?|[rR][fF])["']
           # SQL built in a local variable first
           - patterns:
               - pattern-either:
