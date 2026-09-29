@@ -9,6 +9,7 @@ purge_order:
   - extraction
   - dq
   - changes
+  - certificates
   - students
   - imports
   - documents

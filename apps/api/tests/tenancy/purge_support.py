@@ -6,7 +6,7 @@ role cannot delete in normal operation (append-only and frozen tables). The dele
 (ADR-0029; ``tests/tenancy/test_offboarding_purge.py``) prove the purge leaves
 none of them, whatever new table a migration adds, and assert ``tables_without_rows`` lists
 only the retained audit tables, so this helper grows with the schema. Checked on 2026-09-29
-against ``0031_admin``: every tenant table except ``audit.events`` gets a row.
+against ``0033_certificates``: every tenant table except ``audit.events`` gets a row.
 
 Synthetic values only (CLAUDE.md §6.11): names like "Synthetic Student", no real identifiers.
 """
@@ -98,6 +98,9 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             "outbox",
             "scope",
             "attrdef",
+            "cert",
+            "cert2",
+            "counter",
         )
     }
     t = tenant_id
@@ -488,6 +491,43 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=ids["student"],
             h=_sha("conflict"),
             r=ids["dqrun"],
+        )
+        # --- certificates and registers (0033_certificates) ---------------------------------
+        _run(
+            c,
+            "INSERT INTO sis.certificate_counters (id, tenant_id, certificate_type, "
+            "academic_year_id, last_no) VALUES (:i, :t, 'bonafide', :y, 1)",
+            i=ids["counter"],
+            t=t,
+            y=ids["year1"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.certificates (id, tenant_id, student_id, certificate_type, status, "
+            "inputs, academic_year_id, serial_no, serial, content, content_sha256, "
+            "template_version, requested_by, issued_by, issued_at, document_id, pdf_status) "
+            "VALUES (:i, :t, :s, 'bonafide', 'issued', CAST(:inputs AS jsonb), :y, 1, "
+            "'BC/2025-26/0001', CAST(:content AS jsonb), :sha, 'v1', :m, :m, now(), :d, 'ready')",
+            i=ids["cert"],
+            t=t,
+            s=ids["student"],
+            inputs='{"purpose": "bus_pass"}',
+            y=ids["year1"],
+            content='{"serial": "BC/2025-26/0001"}',
+            sha=hashlib.sha256(b"certificate").digest(),
+            m=ids["m1"],
+            d=ids["doc"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.certificates (id, tenant_id, student_id, certificate_type, status, "
+            "inputs, requested_by) VALUES (:i, :t, :s, 'transfer', 'pending', "
+            "CAST(:inputs AS jsonb), :m)",
+            i=ids["cert2"],
+            t=t,
+            s=ids["student2"],
+            inputs='{"leaving_date": "2026-06-01"}',
+            m=ids["m1"],
         )
         # --- register-photo extraction -------------------------------------------------------
         _run(
