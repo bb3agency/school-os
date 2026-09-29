@@ -249,6 +249,8 @@ describe("promotions screen (FR-TEN-011, US-202 AC2)", () => {
     school([READ, MANAGE]);
     stub.routes[`POST ${PROMOTIONS}:preview`] = () => Response.json(PREVIEW_PROBLEM);
     const preview = await openPlan();
+    const steps = screen.getByRole("navigation", { name: "Promotion steps" });
+    expect(within(steps).getByText("Plan").closest("li")).toHaveAttribute("aria-current", "step");
     const target = screen.getByLabelText("Promote into");
     expect(target).toHaveValue(NEXT.id);
     // Only later years that are in use: not the archived one, not older ones.
@@ -444,6 +446,13 @@ describe("promotions screen (FR-TEN-011, US-202 AC2)", () => {
     expect(screen.getAllByText("2 promoted, 1 held back, 0 graduated, 0 skipped")).toHaveLength(2);
     expect(screen.getByText("You can undo it until 28/09/2026 10:30.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Preview promotion" })).toBeNull();
+    // Step indicator: plan, preview and promote are done; undo is the current step.
+    const steps = screen.getByRole("navigation", { name: "Promotion steps" });
+    expect(within(steps).getByText("Undo within 24 hours").closest("li")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    expect(within(steps).getAllByText("Done:", { exact: false })).toHaveLength(3);
     await userEvent.click(screen.getByRole("button", { name: "Undo promotion" }));
     const dialog = screen.getByRole("dialog", { name: "Undo this promotion?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Undo promotion" }));

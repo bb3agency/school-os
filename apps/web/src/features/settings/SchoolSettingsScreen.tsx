@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
+import { Toggle } from "@/components/ui/Toggle";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
@@ -42,6 +43,7 @@ export function SchoolSettingsScreen() {
   const t = useTranslations("schoolSettings");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
+  const tn = useTranslations("school.nav");
   const api = useBffClient("staff");
   const can = useStaffCan();
   const meLoaded = useStaffMe() !== undefined;
@@ -66,27 +68,29 @@ export function SchoolSettingsScreen() {
     body = (
       <>
         <ProfileCard tenant={tenant.data} />
-        <Card title={t("settings.title")} description={t("settings.description")}>
-          {manage ? (
-            <SettingsEditor tenant={tenant.data} />
-          ) : (
-            <>
-              {meLoaded ? (
-                <Alert tone="info" className="mb-4">
-                  {t("readOnlyNote")}
-                </Alert>
-              ) : null}
-              <SettingsList settings={tenant.data.settings} />
-            </>
-          )}
-        </Card>
+        {manage ? (
+          <SettingsEditor tenant={tenant.data} />
+        ) : (
+          <Card title={t("settings.title")} description={t("settings.description")}>
+            {meLoaded ? (
+              <Alert tone="info" className="mb-4">
+                {t("readOnlyNote")}
+              </Alert>
+            ) : null}
+            <SettingsList settings={tenant.data.settings} />
+          </Card>
+        )}
       </>
     );
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+      />
       {body}
     </div>
   );
@@ -94,9 +98,19 @@ export function SchoolSettingsScreen() {
 
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid gap-1 py-2 sm:grid-cols-[14rem_1fr] sm:gap-4">
-      <dt className="font-semibold text-ink">{label}</dt>
-      <dd className="text-ink">{children}</dd>
+    <div className="grid gap-1 py-3 sm:grid-cols-[16rem_1fr] sm:gap-4">
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd className="font-medium text-ink">{children}</dd>
+    </div>
+  );
+}
+
+/** One fact of the school profile: small muted label over the value. */
+function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd className="font-medium break-words text-ink">{children}</dd>
     </div>
   );
 }
@@ -108,17 +122,19 @@ function ProfileCard({ tenant }: { tenant: TenantProfile }) {
   const status = known(schoolTone, tenant.status);
   return (
     <Card title={t("title")} description={t("description")}>
-      <dl className="divide-y divide-border">
-        <Row label={t("name")}>{tenant.name}</Row>
-        <Row label={t("code")}>{tenant.code}</Row>
-        <Row label={t("boards")}>
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Fact label={t("name")}>{tenant.name}</Fact>
+        <Fact label={t("code")}>
+          <span className="font-mono text-sm">{tenant.code}</span>
+        </Fact>
+        <Fact label={t("boards")}>
           <Value>{tenant.boards.join(", ")}</Value>
-        </Row>
-        <Row label={t("stateCode")}>{tenant.state_code}</Row>
-        <Row label={t("status")}>
+        </Fact>
+        <Fact label={t("stateCode")}>{tenant.state_code}</Fact>
+        <Fact label={t("status")}>
           {status ? <Badge tone={schoolTone[status]}>{tstatus(status)}</Badge> : tenant.status}
-        </Row>
-        <Row label={t("tier")}>{tmode(tenant.plan_tier)}</Row>
+        </Fact>
+        <Fact label={t("tier")}>{tmode(tenant.plan_tier)}</Fact>
       </dl>
     </Card>
   );
@@ -214,7 +230,7 @@ function SettingsForm({
   const api = useBffClient("staff");
   const languagesId = useId();
   const dateId = useId();
-  const aiId = useId();
+  const saveId = useId();
   const [reloading, setReloading] = useState(false);
   const settings = tenant.settings;
   const queryClient = useQueryClient();
@@ -260,130 +276,155 @@ function SettingsForm({
   const languagesError = errors.languages;
   const dateError = errors.date_format;
 
+  // Checkbox and radio "chips": the native input stays (keyboard, form value); the label
+  // around it gets a soft outline, and a blue fill when checked (`:has()`, Baseline).
+  const chip =
+    "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm has-checked:border-primary has-checked:bg-primary-soft";
+
   return (
-    <form noValidate onSubmit={form.onSubmit} className="max-w-2xl space-y-5">
-      <fieldset
-        className="space-y-2"
-        aria-describedby={languagesError ? `${languagesId}-error` : `${languagesId}-hint`}
-      >
-        <legend className="text-sm font-semibold text-ink">{t("form.languagesField")}</legend>
-        <p id={`${languagesId}-hint`} className="text-sm text-ink-muted">
-          {t("form.languagesHint")}
-        </p>
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          {LANGUAGES.map((code) => (
-            <label key={code} className="inline-flex min-h-8 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="languages"
-                value={code}
-                defaultChecked={(settings.languages ?? []).includes(code)}
-                aria-invalid={languagesError ? true : undefined}
-                className="size-4 accent-primary"
-              />
-              <span lang={code}>{tl(code)}</span>
-            </label>
-          ))}
+    <form noValidate onSubmit={form.onSubmit} className="space-y-6">
+      <Card title={t("groups.languages.title")} description={t("groups.languages.description")}>
+        <div className="space-y-6">
+          <fieldset
+            className="space-y-2"
+            aria-describedby={languagesError ? `${languagesId}-error` : `${languagesId}-hint`}
+          >
+            <legend className="text-sm font-medium text-ink">{t("form.languagesField")}</legend>
+            <p id={`${languagesId}-hint`} className="text-sm text-ink-muted">
+              {t("form.languagesHint")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {LANGUAGES.map((code) => (
+                <label key={code} className={chip}>
+                  <input
+                    type="checkbox"
+                    name="languages"
+                    value={code}
+                    defaultChecked={(settings.languages ?? []).includes(code)}
+                    aria-invalid={languagesError ? true : undefined}
+                    className="size-4 accent-primary"
+                  />
+                  <span lang={code}>{tl(code)}</span>
+                </label>
+              ))}
+            </div>
+            {languagesError ? (
+              <p id={`${languagesId}-error`} className="text-sm font-semibold text-danger">
+                {languagesError}
+              </p>
+            ) : null}
+          </fieldset>
+
+          <fieldset
+            className="space-y-2"
+            aria-describedby={dateError ? `${dateId}-error` : undefined}
+          >
+            <legend className="text-sm font-medium text-ink">{t("form.dateFormatField")}</legend>
+            <div className="flex flex-wrap gap-2">
+              {DATE_FORMATS.map((format) => (
+                <label key={format} className={chip}>
+                  <input
+                    type="radio"
+                    name="date_format"
+                    value={format}
+                    defaultChecked={settings.date_format === format}
+                    className="size-4 accent-primary"
+                  />
+                  <span className="font-mono">{format}</span>
+                </label>
+              ))}
+            </div>
+            {dateError ? (
+              <p id={`${dateId}-error`} className="text-sm font-semibold text-danger">
+                {dateError}
+              </p>
+            ) : null}
+          </fieldset>
         </div>
-        {languagesError ? (
-          <p id={`${languagesId}-error`} className="text-sm font-semibold text-danger">
-            {languagesError}
-          </p>
-        ) : null}
-      </fieldset>
+      </Card>
 
-      <fieldset className="space-y-2" aria-describedby={dateError ? `${dateId}-error` : undefined}>
-        <legend className="text-sm font-semibold text-ink">{t("form.dateFormatField")}</legend>
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          {DATE_FORMATS.map((format) => (
-            <label key={format} className="inline-flex min-h-8 items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="date_format"
-                value={format}
-                defaultChecked={settings.date_format === format}
-                className="size-4 accent-primary"
-              />
-              <span>{format}</span>
-            </label>
-          ))}
-        </div>
-        {dateError ? (
-          <p id={`${dateId}-error`} className="text-sm font-semibold text-danger">
-            {dateError}
-          </p>
-        ) : null}
-      </fieldset>
+      <Card title={t("groups.session.title")} description={t("groups.session.description")}>
+        <TextField
+          name="idle_timeout_minutes"
+          label={t("form.idleField")}
+          hint={t("form.idleHint")}
+          error={errors.idle_timeout_minutes}
+          defaultValue={String(settings.idle_timeout_minutes ?? 15)}
+          inputMode="numeric"
+          maxLength={2}
+          className="max-w-sm"
+          required
+        />
+      </Card>
 
-      <TextField
-        name="idle_timeout_minutes"
-        label={t("form.idleField")}
-        hint={t("form.idleHint")}
-        error={errors.idle_timeout_minutes}
-        defaultValue={String(settings.idle_timeout_minutes ?? 15)}
-        inputMode="numeric"
-        maxLength={2}
-        className="max-w-48"
-        required
-      />
-
-      <div className="space-y-1">
-        <label className="flex items-center gap-2 text-sm font-semibold">
-          <input
-            type="checkbox"
-            name="ai_features_enabled"
-            defaultChecked={settings.ai_features_enabled ?? true}
-            aria-describedby={`${aiId}-hint`}
-            className="size-4 accent-primary"
+      <Card title={t("groups.ai.title")} description={t("groups.ai.description")}>
+        <div className="space-y-6">
+          <div className="max-w-xl rounded-lg border border-border bg-surface-muted p-4">
+            {/* Submitted with the form ("on"/"off"); it applies when the settings are saved. */}
+            <Toggle
+              name="ai_features_enabled"
+              label={t("form.aiToggle")}
+              description={t("form.aiHint")}
+              defaultChecked={settings.ai_features_enabled ?? true}
+              labelFirst
+            />
+          </div>
+          <TextField
+            name="ai_monthly_budget_inr"
+            label={t("form.budgetField")}
+            hint={t("form.budgetHint")}
+            error={errors.ai_monthly_budget_inr}
+            defaultValue={String(settings.ai_monthly_budget_inr ?? 5000)}
+            inputMode="numeric"
+            maxLength={8}
+            className="max-w-sm"
+            required
           />
-          {t("form.aiField")}
-        </label>
-        <p id={`${aiId}-hint`} className="text-sm text-ink-muted">
-          {t("form.aiHint")}
-        </p>
-      </div>
+        </div>
+      </Card>
 
-      <TextField
-        name="ai_monthly_budget_inr"
-        label={t("form.budgetField")}
-        hint={t("form.budgetHint")}
-        error={errors.ai_monthly_budget_inr}
-        defaultValue={String(settings.ai_monthly_budget_inr ?? 5000)}
-        inputMode="numeric"
-        maxLength={8}
-        className="max-w-48"
-        required
-      />
-
-      <p className="text-sm text-ink-muted">{tc("stepUpNote")}</p>
-      <ApiErrorAlert error={form.error} namespace="schoolSettings" />
-      {stale ? (
-        <Button
-          variant="secondary"
-          disabled={reloading}
-          onClick={() => {
-            setReloading(true);
-            void onReload().finally(() => setReloading(false));
-          }}
-        >
-          {t("form.reload")}
-        </Button>
-      ) : null}
-      {outcome === "saved" ? (
-        <Alert tone="success" live>
-          {t("form.saved")}
-        </Alert>
-      ) : null}
-      {outcome === "unchanged" ? (
-        <Alert tone="info" live>
-          {t("form.nothingChanged")}
-        </Alert>
-      ) : null}
-      <div>
-        <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
-          {form.pending ? tc("working") : t("form.save")}
-        </Button>
-      </div>
+      <section
+        aria-labelledby={`${saveId}-title`}
+        className="space-y-4 rounded-xl border border-border bg-surface p-5 shadow-card md:p-6 print:hidden"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <h2 id={`${saveId}-title`} className="font-medium text-ink">
+              {t("saveBar.title")}
+            </h2>
+            <p className="text-sm text-ink-muted">{t("saveBar.body")}</p>
+            <p className="text-sm text-ink-muted">{tc("stepUpNote")}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {stale ? (
+              <Button
+                variant="secondary"
+                disabled={reloading}
+                onClick={() => {
+                  setReloading(true);
+                  void onReload().finally(() => setReloading(false));
+                }}
+              >
+                {t("form.reload")}
+              </Button>
+            ) : null}
+            <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
+              {form.pending ? tc("working") : t("form.save")}
+            </Button>
+          </div>
+        </div>
+        <ApiErrorAlert error={form.error} namespace="schoolSettings" />
+        {outcome === "saved" ? (
+          <Alert tone="success" live>
+            {t("form.saved")}
+          </Alert>
+        ) : null}
+        {outcome === "unchanged" ? (
+          <Alert tone="info" live>
+            {t("form.nothingChanged")}
+          </Alert>
+        ) : null}
+      </section>
     </form>
   );
 }

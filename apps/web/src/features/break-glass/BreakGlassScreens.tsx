@@ -12,6 +12,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
+import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { useSectionOptions } from "@/features/findings/data";
 import { Link } from "@/i18n/navigation";
@@ -90,11 +91,26 @@ function useCanApprove(): { loading: boolean; allowed: boolean; canReadAudit: bo
   };
 }
 
+/** Home › Support access (› this request). */
+function useCrumbs(): (current?: string) => { label: string; href?: string }[] {
+  const t = useTranslations("breakGlass");
+  const tn = useTranslations("school.nav");
+  return (current) =>
+    current
+      ? [
+          { label: tn("home"), href: "/" },
+          { label: t("title"), href: "/break-glass" },
+          { label: current },
+        ]
+      : [{ label: tn("home"), href: "/" }, { label: t("title") }];
+}
+
 function NoAccess() {
   const t = useTranslations("breakGlass");
+  const crumbs = useCrumbs();
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader title={t("title")} description={t("description")} breadcrumb={crumbs()} />
       <Alert tone="warning" title={t("noAccessTitle")}>
         {t("noAccessBody")}
       </Alert>
@@ -116,6 +132,7 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
   const api = useBffClient("staff");
   const access = useCanApprove();
   const hours = useDuration();
+  const crumbs = useCrumbs();
   const list = useInfiniteQuery({
     queryKey: [...BREAKGLASS_KEYS.all, "list", status],
     queryFn: ({ pageParam }) =>
@@ -206,13 +223,13 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader title={t("title")} description={t("description")} breadcrumb={crumbs()} />
+      {waiting > 0 ? <Alert tone="warning" title={t("waitingCount", { count: waiting })} /> : null}
       <Alert tone="info" title={t("howTitle")}>
         {t("howBody")}
       </Alert>
-      {waiting > 0 ? <Alert tone="warning">{t("waitingCount", { count: waiting })}</Alert> : null}
-      <Card title={t("filtersTitle")}>
-        <form method="get" className="flex flex-wrap items-end gap-4">
+      <Card title={t("filtersTitle")} padding="sm">
+        <form method="get" className="flex flex-wrap items-end gap-3">
           <SelectField
             name="status"
             label={t("filterStatus")}
@@ -262,6 +279,65 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
 const noInput = z.object({});
 
 /**
+ * The life of one request as a timeline: asked → decided → access started → access ends (or
+ * ended by the school). Only the steps with a time from the API are shown; while access is
+ * open, "Access started" is the current step and its end is still to come.
+ */
+function GrantTimeline({ grant }: { grant: Grant }) {
+  const t = useTranslations("breakGlass");
+  const td = useTranslations("breakGlass.detail");
+  const ts = useTranslations("breakGlass.timeline");
+  const open = grant.status === "active" || grant.status === "approved";
+  const at = (value: string | null | undefined) => <Value>{formatDateTime(value ?? null)}</Value>;
+  const items: TimelineItem[] = [
+    {
+      id: "requested",
+      title: t("colRequested"),
+      time: at(grant.requested_at ?? grant.created_at),
+      status: "done",
+      statusLabel: ts("done"),
+    },
+  ];
+  if (grant.decided_at) {
+    items.push({
+      id: "decided",
+      title: td("decidedAt"),
+      time: at(grant.decided_at),
+      chips: <GrantStatusBadge status={grant.status} />,
+      status: "done",
+      statusLabel: ts("done"),
+    });
+  }
+  if (grant.starts_at) {
+    items.push({
+      id: "started",
+      title: td("startsAt"),
+      time: at(grant.starts_at),
+      status: open ? "current" : "done",
+      statusLabel: open ? ts("now") : ts("done"),
+    });
+  }
+  if (grant.revoked_at) {
+    items.push({
+      id: "revoked",
+      title: td("revokedAt"),
+      time: at(grant.revoked_at),
+      status: "done",
+      statusLabel: ts("done"),
+    });
+  } else if (grant.expires_at) {
+    items.push({
+      id: "expires",
+      title: td("expiresAt"),
+      time: at(grant.expires_at),
+      status: open ? "pending" : "done",
+      statusLabel: open ? ts("later") : ts("done"),
+    });
+  }
+  return <Timeline items={items} label={td("timelineTitle")} />;
+}
+
+/**
  * One support-access request or grant (US-103 AC1/AC2): reason, scope, duration and who asked;
  * approve or deny while it waits, end it early while it is open. Every decision needs step-up
  * MFA; the API refuses anyone but the owner and principal and never lets the approver be the
@@ -276,6 +352,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
   const api = useBffClient("staff");
   const access = useCanApprove();
   const hours = useDuration();
+  const crumbs = useCrumbs();
   const grant = useApiQuery(
     BREAKGLASS_KEYS.one(grantId),
     () =>
@@ -310,6 +387,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
     <div className="space-y-6">
       <PageHeader
         title={td("title")}
+        breadcrumb={crumbs(td("title"))}
         description={translateOr(t, `reasonCodes.${data.reason_code}`, "reasonCodes.other")}
         badge={
           <span className="flex flex-wrap gap-2">
@@ -422,44 +500,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
       </Card>
 
       <Card title={td("timelineTitle")}>
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-          <dt className="font-semibold">{t("colRequested")}</dt>
-          <dd>
-            <Value>{formatDateTime(data.requested_at ?? data.created_at)}</Value>
-          </dd>
-          {data.decided_at ? (
-            <>
-              <dt className="font-semibold">{td("decidedAt")}</dt>
-              <dd>
-                <Value>{formatDateTime(data.decided_at)}</Value>
-              </dd>
-            </>
-          ) : null}
-          {data.starts_at ? (
-            <>
-              <dt className="font-semibold">{td("startsAt")}</dt>
-              <dd>
-                <Value>{formatDateTime(data.starts_at)}</Value>
-              </dd>
-            </>
-          ) : null}
-          {data.expires_at ? (
-            <>
-              <dt className="font-semibold">{td("expiresAt")}</dt>
-              <dd>
-                <Value>{formatDateTime(data.expires_at)}</Value>
-              </dd>
-            </>
-          ) : null}
-          {data.revoked_at ? (
-            <>
-              <dt className="font-semibold">{td("revokedAt")}</dt>
-              <dd>
-                <Value>{formatDateTime(data.revoked_at)}</Value>
-              </dd>
-            </>
-          ) : null}
-        </dl>
+        <GrantTimeline grant={data} />
       </Card>
 
       <p className="flex flex-wrap gap-x-4">

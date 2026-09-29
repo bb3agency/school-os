@@ -134,7 +134,9 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
       ]);
     renderWithIntl(<UsersScreen />);
     expect(await screen.findByText("Lakshmi K")).toBeInTheDocument();
-    expect(screen.getByText("Office staff and custom_librarian")).toBeInTheDocument();
+    // Role tags: the built-in name, and the key of a role /roles could not name.
+    expect(screen.getByText("Office staff")).toBeInTheDocument();
+    expect(screen.getByText("custom_librarian")).toBeInTheDocument();
     expect(screen.getByText("1 class and 2 sections")).toBeInTheDocument();
     expect(screen.getByText(messages.en.status.member.suspended)).toBeInTheDocument();
     expect(seen.find((u) => u.pathname === "/bff/api/v1/users")?.searchParams.get("limit")).toBe(

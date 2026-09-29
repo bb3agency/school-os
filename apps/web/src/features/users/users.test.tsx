@@ -159,7 +159,14 @@ describe("users list (US-102, FR-IAM-010..014)", () => {
     const link = await screen.findByRole("link", { name: "Lakshmi Sample" });
     expect(link).toHaveAttribute("href", `/en/settings/users/${USER}`);
     const ravi = screen.getAllByRole("row").find((row) => within(row).queryByText("Ravi Sample"));
-    expect(ravi && (await within(ravi).findByText("Librarian and Office staff"))).toBeTruthy();
+    // Roles are tags, one list item each, with names from /roles or the messages.
+    expect(ravi && (await within(ravi).findByText("Librarian"))).toBeTruthy();
+    expect(
+      ravi &&
+        within(ravi)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+    ).toEqual(["Librarian", "Office staff"]);
     expect(ravi && within(ravi).getByText("None chosen")).toBeInTheDocument();
     expect(ravi && within(ravi).getByText("Invited")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Invite user" })).toHaveAttribute(

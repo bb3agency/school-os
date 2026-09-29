@@ -4,7 +4,7 @@ import { TENANT_ROLES, type TenantRoleKey } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { z } from "zod";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { useSectionOptions, type SectionOption } from "@/features/findings/data";
 import { memberTone } from "@/features/status";
 import type { Locale } from "@/i18n/routing";
@@ -28,6 +28,29 @@ function isSystemRole(role: string): role is TenantRoleKey {
 export function UserStatusBadge({ status }: { status: MemberStatus }) {
   const t = useTranslations("status.member");
   return <Badge tone={memberTone[status]}>{t(status)}</Badge>;
+}
+
+/**
+ * Roles as soft tags (a list, so screen readers hear how many); "No roles" when there are none.
+ */
+export function RoleTags({
+  roles,
+  label,
+}: {
+  roles: readonly string[];
+  label: (key: string) => string;
+}) {
+  const t = useTranslations("school.users");
+  if (roles.length === 0) return <span className="text-ink-muted">{t("noRoles")}</span>;
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {roles.map((key) => (
+        <li key={key}>
+          <Pill variant="tag">{label(key)}</Pill>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /**

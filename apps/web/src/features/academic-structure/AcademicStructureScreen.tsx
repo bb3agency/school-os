@@ -7,9 +7,12 @@ import { useId, useState, type ReactNode } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { Toggle } from "@/components/ui/Toggle";
 import { TextField } from "@/components/ui/Input";
 import { Select, SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
@@ -67,29 +70,31 @@ export function AcademicStructureScreen() {
   const staff = useStaffDirectory(manage, locale);
   // The read-only note waits for /me so it never flashes for managers.
   const meLoaded = useStaffMe() !== undefined;
-  const toggleId = useId();
+  const tn = useTranslations("school.nav");
 
   return (
     <div className="space-y-6">
-      <PageHeader title={ts("title")} description={ts("description")} />
+      <PageHeader
+        title={ts("title")}
+        description={ts("description")}
+        breadcrumb={[{ label: tn("home"), href: "/" }, { label: ts("title") }]}
+        actions={
+          manage ? (
+            <ButtonLink href="/settings/structure/promotions" variant="secondary">
+              {tn("promotions")}
+            </ButtonLink>
+          ) : undefined
+        }
+      />
       {!manage && meLoaded ? <Alert tone="info">{t("readOnlyNote")}</Alert> : null}
-      <div className="flex items-start gap-2 text-sm">
-        <input
-          id={toggleId}
-          type="checkbox"
+      {/* Applies at once (a view filter), so a switch rather than a checkbox. */}
+      <div className="max-w-2xl rounded-xl border border-border bg-surface px-5 py-4 shadow-card">
+        <Toggle
+          label={t("showArchived")}
+          description={t("showArchivedHint")}
           checked={showArchived}
-          onChange={(event) => setShowArchived(event.target.checked)}
-          className="mt-1 size-4 accent-primary"
-          aria-describedby={`${toggleId}-hint`}
+          onCheckedChange={setShowArchived}
         />
-        <span>
-          <label htmlFor={toggleId} className="font-semibold">
-            {t("showArchived")}
-          </label>
-          <span id={`${toggleId}-hint`} className="block text-ink-muted">
-            {t("showArchivedHint")}
-          </span>
-        </span>
       </div>
       <YearsCard years={years} manage={manage} />
       <ClassesCard classes={classes} sections={sections} manage={manage} />
@@ -143,76 +148,96 @@ function ArchiveOrInUse(props: {
 
 function YearsCard({ years, manage }: { years: Lists["years"]; manage: boolean }) {
   const ts = useTranslations("school.structure");
-  const t = useTranslations("academicStructure");
   const tc = useTranslations("common");
-  const columns: Column<AcademicYear>[] = [
-    {
-      key: "label",
-      header: ts("years.colYear"),
-      cell: (row) => <NameCell name={row.label} archived={isArchived(row)} />,
-    },
-    {
-      key: "starts",
-      header: ts("years.colStarts"),
-      cell: (row) => <Value>{formatDate(row.starts_on)}</Value>,
-    },
-    {
-      key: "ends",
-      header: ts("years.colEnds"),
-      cell: (row) => <Value>{formatDate(row.ends_on)}</Value>,
-    },
-    {
-      key: "current",
-      header: ts("years.colCurrent"),
-      cell: (row) =>
-        row.is_current ? (
-          <Badge tone="success">{ts("currentBadge")}</Badge>
-        ) : manage && !isArchived(row) ? (
-          <MakeCurrentDialog year={row} />
-        ) : (
-          <span className="text-ink-muted">{tc("no")}</span>
-        ),
-    },
-    ...(manage
-      ? [
-          {
-            key: "actions",
-            header: t("colActions"),
-            cell: (row: AcademicYear) =>
-              isArchived(row) ? (
-                <ArchiveDialog kind="year" row={row} name={row.label} archive={false} />
-              ) : (
-                <Actions>
-                  <EditYearDialog year={row} />
-                  <ButtonLink
-                    href={`/settings/structure/years/${row.id}/promotions`}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    {t("years.promote")}{" "}
-                    <span className="sr-only">{t("years.promoteFor", { label: row.label })}</span>
-                  </ButtonLink>
-                  {row.is_current ? null : (
-                    <ArchiveOrInUse kind="year" row={row} name={row.label} />
-                  )}
-                </Actions>
-              ),
-          },
-        ]
-      : []),
-  ];
+  const te = useTranslations("errors");
+  let body: ReactNode;
+  if (years.status === "loading") {
+    body = <LoadingState label={tc("loading")} variant="cards" rows={3} />;
+  } else if (years.status === "error") {
+    body = (
+      <Alert tone="danger" title={tc("loadErrorTitle")}>
+        {years.reason ? te(`load.${years.reason}`) : tc("loadErrorBody")}
+      </Alert>
+    );
+  } else if (years.status === "unavailable") {
+    body = <EmptyState title={tc("notAvailableYetTitle")} body={tc("notAvailableYetBody")} />;
+  } else if (years.data.length === 0) {
+    body = (
+      <EmptyState icon="calendar" title={ts("years.emptyTitle")} body={ts("years.emptyBody")} />
+    );
+  } else {
+    body = (
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {years.data.map((row) => (
+          <YearCard key={row.id} year={row} manage={manage} />
+        ))}
+      </ul>
+    );
+  }
   return (
     <Card title={ts("years.title")} actions={manage ? <AddYearDialog /> : undefined}>
-      <DataTable
-        caption={ts("years.title")}
-        captionHidden
-        columns={columns}
-        state={years}
-        rowKey={(row) => row.id}
-        emptyTitle={ts("years.emptyTitle")}
-        emptyBody={ts("years.emptyBody")}
-      />
+      {body}
     </Card>
+  );
+}
+
+/**
+ * One academic year: its label, a "Current" pill, the dates and (for managers) the actions.
+ * Archive and "Make current" are secondary; editing and promotion come first.
+ */
+function YearCard({ year, manage }: { year: AcademicYear; manage: boolean }) {
+  const ts = useTranslations("school.structure");
+  const t = useTranslations("academicStructure");
+  const archived = isArchived(year);
+  return (
+    <li
+      className={
+        year.is_current
+          ? "flex flex-col gap-4 rounded-lg border border-primary bg-primary-soft p-4"
+          : "flex flex-col gap-4 rounded-lg border border-border bg-surface-muted p-4"
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-lg font-medium text-ink">{year.label}</h3>
+        {year.is_current ? <Pill variant="done">{ts("currentBadge")}</Pill> : null}
+        {archived ? <Badge tone="warning">{t("archivedBadge")}</Badge> : null}
+      </div>
+      <dl className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <dt className="text-ink-muted">{ts("years.colStarts")}</dt>
+          <dd className="font-medium text-ink">
+            <Value>{formatDate(year.starts_on)}</Value>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-ink-muted">{ts("years.colEnds")}</dt>
+          <dd className="font-medium text-ink">
+            <Value>{formatDate(year.ends_on)}</Value>
+          </dd>
+        </div>
+      </dl>
+      {manage ? (
+        <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-3">
+          {archived ? (
+            <ArchiveDialog kind="year" row={year} name={year.label} archive={false} />
+          ) : (
+            <>
+              <EditYearDialog year={year} />
+              <ButtonLink
+                href={`/settings/structure/years/${year.id}/promotions`}
+                variant="secondary"
+                size="sm"
+              >
+                {t("years.promote")}{" "}
+                <span className="sr-only">{t("years.promoteFor", { label: year.label })}</span>
+              </ButtonLink>
+              {year.is_current ? null : <MakeCurrentDialog year={year} />}
+              {year.is_current ? null : <ArchiveOrInUse kind="year" row={year} name={year.label} />}
+            </>
+          )}
+        </div>
+      ) : null}
+    </li>
   );
 }
 
@@ -381,6 +406,7 @@ function ArchiveDialog({
   return (
     <ActionDialog
       triggerLabel={archive ? t("archive") : t("unarchive")}
+      triggerVariant={archive ? "ghost" : "secondary"}
       triggerSize="sm"
       triggerDescription={
         archive ? t(`${kind}.describe`, values) : t(`${kind}.unarchiveDescribe`, values)
@@ -421,7 +447,11 @@ function ClassesCard({
       header: ts("classes.colName"),
       cell: (row) => <NameCell name={classLabel(row, locale)} archived={isArchived(row)} />,
     },
-    { key: "code", header: t("classes.colCode"), cell: (row) => row.code },
+    {
+      key: "code",
+      header: t("classes.colCode"),
+      cell: (row) => <span className="font-mono text-sm">{row.code}</span>,
+    },
     { key: "order", header: ts("classes.colOrder"), cell: (row) => row.sort_order },
     {
       key: "sections",

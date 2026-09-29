@@ -121,6 +121,14 @@ describe("support access request (US-103 AC1/AC2)", () => {
       Response.json(grant({ status: "revoked" }));
     renderWithIntl(<BreakGlassDetailScreen grantId={ID} />);
     expect(await screen.findByText("Support can see your records now")).toBeInTheDocument();
+    // Lifecycle as a timeline: asked, started (now), ends (still to come).
+    const timeline = screen.getByRole("list", { name: "Timeline" });
+    const steps = within(timeline).getAllByRole("listitem");
+    expect(steps.map((step) => step.querySelector("p")?.textContent)).toEqual([
+      "Done: Asked on",
+      "Now: Access started",
+      "Still to come: Access ends",
+    ]);
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "End access now" }));
     const dialog = screen.getByRole("dialog", { name: "End support access now" });
