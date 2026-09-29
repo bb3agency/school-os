@@ -47,6 +47,7 @@ const READ_ALL = "export.read_all";
 const READ_BASIC = "student.read_basic";
 const SENSITIVE = "student.read_sensitive";
 const FINDINGS = "dq.findings.read";
+const SETTINGS = "tenant.settings.manage";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CREATED = "0192f3a4-0000-7000-8000-00000000e0b1";
 
@@ -483,7 +484,9 @@ describe("export detail and download (FR-EXP-003..004, SEC-005, ADR-0021)", () =
     answer = problem(409, "export_expired");
     await userEvent.click(screen.getByRole("button", { name: /Download PDF/ }));
     expect(
-      await screen.findByText("Files are deleted 7 days after they are ready. Make a new export."),
+      await screen.findByText(
+        "The files were deleted when your school's retention period ended. Make a new export.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -533,6 +536,116 @@ describe("export detail and download (FR-EXP-003..004, SEC-005, ADR-0021)", () =
     stub.routes[`GET /bff/api/v1/exports/${EXPORT_ID}`] = () => problem(404, "not_found");
     renderWithIntl(<ExportDetailScreen exportId={EXPORT_ID} />);
     expect(await screen.findByText("We couldn't find this export")).toBeInTheDocument();
+  });
+});
+
+/** GET /admin/retention with the school's export period (FR-ADM-002). */
+function retentionSettings(exportDays: number) {
+  return {
+    categories: [
+      {
+        key: "exports",
+        days: exportDays,
+        default_days: 7,
+        min_days: 1,
+        max_days: 7,
+        configurable: true,
+        enforced: true,
+        is_default: exportDays === 7,
+      },
+    ],
+    version: 1,
+    updated_at: "2026-09-28T10:00:00Z",
+    updated_by: null,
+  };
+}
+
+describe("retention period on the export screens (FR-ADM-002)", () => {
+  it("shows the school's own export period to members who may read the settings", async () => {
+    setMe([BOARD, READ_BASIC, FINDINGS, SETTINGS]);
+    stub.routes["GET /bff/api/v1/exports"] = () => page([]);
+    stub.routes["GET /bff/api/v1/admin/retention"] = () => Response.json(retentionSettings(3));
+    renderWithIntl(<ExportsScreen filters={parseExportListFilters({})} />);
+    expect(
+      await screen.findByText(/Files are deleted 3 days after they are ready\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/7 days/)).not.toBeInTheDocument();
+  });
+
+  it("uses the singular for one day, and Telugu words for the period", async () => {
+    setMe([BOARD, READ_BASIC, FINDINGS, SETTINGS]);
+    stub.routes["GET /bff/api/v1/exports"] = () => page([]);
+    stub.routes["GET /bff/api/v1/admin/retention"] = () => Response.json(retentionSettings(1));
+    renderWithIntl(<ExportsScreen filters={parseExportListFilters({})} />, "te");
+    expect(await screen.findByText(/సిద్ధమైన 1 రోజు తర్వాత/)).toBeInTheDocument();
+  });
+
+  it("names no fixed number for members who may not read the settings (and asks nothing)", async () => {
+    setMe([BOARD, READ_BASIC, FINDINGS]);
+    stub.routes["GET /bff/api/v1/exports"] = () => page([]);
+    renderWithIntl(<ExportsScreen filters={parseExportListFilters({})} />);
+    expect(
+      await screen.findByText(/Files are deleted when your school's retention period ends/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/7 days/)).not.toBeInTheDocument();
+    expect(stub.callsTo("GET /bff/api/v1/admin/retention")).toHaveLength(0);
+  });
+
+  it("the detail states the period this export is kept for, from its own dates", async () => {
+    setMe([BOARD, READ_BASIC, FINDINGS]);
+    stub.routes[`GET /bff/api/v1/exports/${EXPORT_ID}`] = () =>
+      Response.json(
+        exportRow({ finished_at: "2026-09-26T05:01:00Z", expires_at: "2026-09-28T05:01:00Z" }),
+      );
+    renderWithIntl(<ExportDetailScreen exportId={EXPORT_ID} />);
+    expect(
+      await screen.findByText(
+        "Files are deleted 2 days after they are ready. This record of who exported what stays.",
+      ),
+    ).toBeInTheDocument();
+    expect(stub.callsTo("GET /bff/api/v1/admin/retention")).toHaveLength(0);
+  });
+
+  it("an export still being made falls back to the school's setting", async () => {
+    setMe([BOARD, READ_BASIC, FINDINGS, SETTINGS]);
+    stub.routes["GET /bff/api/v1/admin/retention"] = () => Response.json(retentionSettings(5));
+    stub.routes[`GET /bff/api/v1/exports/${EXPORT_ID}`] = () =>
+      Response.json(
+        exportRow({ status: "running", finished_at: null, expires_at: null, files: [] }),
+      );
+    renderWithIntl(<ExportDetailScreen exportId={EXPORT_ID} />);
+    expect(
+      await screen.findByText(
+        "Files are deleted 5 days after they are ready. This record of who exported what stays.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("an expired export says the school's period ended, without a fixed number", async () => {
+    setMe([BOARD, READ_BASIC, FINDINGS]);
+    stub.routes[`GET /bff/api/v1/exports/${EXPORT_ID}`] = () =>
+      Response.json(
+        exportRow({
+          status: "expired",
+          files: [],
+          can_download: false,
+          finished_at: "2026-09-26T05:01:00Z",
+          expires_at: "2026-09-29T05:01:00Z",
+        }),
+      );
+    renderWithIntl(<ExportDetailScreen exportId={EXPORT_ID} />);
+    expect(
+      await screen.findByText(
+        "The files were deleted when your school's retention period ended. Make a new export to get up-to-date files.",
+      ),
+    ).toBeInTheDocument();
+    // The period that applied to this export, from its own dates (the school had 3 days).
+    expect(
+      screen.getByText(
+        "Files are deleted 3 days after they are ready. This record of who exported what stays.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/7 days/)).not.toBeInTheDocument();
   });
 });
 

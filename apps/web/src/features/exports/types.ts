@@ -9,6 +9,16 @@ import type { BadgeTone } from "@/components/ui/Badge";
 type Schemas = components["schemas"];
 type ListQuery = NonNullable<operations["list_exports_api_v1_exports_get"]["parameters"]["query"]>;
 
+/**
+ * Days this export's files are kept after they are ready: `expires_at` is set to `finished_at`
+ * plus the school's retention period when the export finishes (FR-ADM-002). `null` until then.
+ */
+export function exportKeptDays(row: Pick<Export, "finished_at" | "expires_at">): number | null {
+  if (!row.finished_at || !row.expires_at) return null;
+  const days = Math.round((Date.parse(row.expires_at) - Date.parse(row.finished_at)) / 86_400_000);
+  return Number.isFinite(days) && days >= 1 ? days : null;
+}
+
 export type Export = Schemas["ExportOut"];
 export type ExportFile = Schemas["ExportFileOut"];
 export type ExportProfile = Schemas["ExportProfileOut"];
