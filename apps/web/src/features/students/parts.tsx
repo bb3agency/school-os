@@ -71,12 +71,12 @@ export function SourceChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
         verification === "verified"
-          ? "border-success-ink/40 bg-success-soft text-success-ink"
+          ? "border-positive-border bg-positive-soft text-positive-ink"
           : verification === "rejected"
-            ? "border-danger/40 bg-danger-soft text-danger line-through"
-            : "border-border-strong bg-surface text-ink",
+            ? "border-danger/30 bg-danger-soft text-danger line-through"
+            : "border-border-soft bg-surface-muted text-ink",
       )}
     >
       <span aria-hidden="true">{label}</span>
