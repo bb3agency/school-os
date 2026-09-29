@@ -31,6 +31,7 @@ import {
   ProvisioningStatus,
   ResumeProvisioningAction,
 } from "./ProvisioningStatus";
+import { OffboardingProgress } from "./OffboardingProgress";
 import { MonoTime, SchoolStatusPill, TierTag } from "./pills";
 import { TicketTable } from "./SupportScreens";
 import { SCHOOL_TABS, type SchoolTab } from "./school-tabs";
@@ -316,6 +317,9 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
             <Timeline items={offboardSteps} label={t("offboardStepsTitle")} className="mt-4" />
           ) : null}
         </Alert>
+      ) : null}
+      {school ? (
+        <OffboardingProgress school={school} canOffboard={can("platform.tenants.offboard")} />
       ) : null}
       {school ? (
         <ProvisioningStatus

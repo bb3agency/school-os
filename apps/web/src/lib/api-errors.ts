@@ -52,6 +52,11 @@ export const KNOWN_API_CODES = [
   // Academic structure (US-202, FR-TEN-010): archived rows and rows still in use.
   "structure_archived",
   "structure_in_use",
+  // Offboarding (FR-PLT-005, docs/16 §5.5.1): export gate, dedicated teardown, certificate.
+  "export_already_confirmed",
+  "not_dedicated",
+  "not_offboarding",
+  "certificate_pending",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 

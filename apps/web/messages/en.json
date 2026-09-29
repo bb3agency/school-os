@@ -766,6 +766,88 @@
         "approved": "Approved by a second operator",
         "done": "Done:",
         "waiting": "Waiting:"
+      },
+      "offboarding": {
+        "eyebrow": "Offboarding",
+        "state": {
+          "awaiting_export": "Waiting for the export to be confirmed",
+          "scheduled": "Deletion is scheduled",
+          "deleting": "Deleting the school's data",
+          "keys_destroyed": "Data deleted and keys destroyed. The certificate is being prepared.",
+          "completed": "Deleted. The certificate of deletion is ready."
+        },
+        "deadline": "Data must be deleted by {date}.",
+        "dueSoon": "Due soon",
+        "overdue": "Overdue",
+        "timelineLabel": "Offboarding steps",
+        "steps": {
+          "approved": "Approved by two operators",
+          "export": "Export confirmed",
+          "deleted": "School data deleted and checked",
+          "teardown": "Host destroyed and its key scheduled for deletion",
+          "keys": "Encryption keys destroyed",
+          "certificate": "Certificate of deletion issued"
+        },
+        "stepStatus": {
+          "done": "Done:",
+          "current": "Next:",
+          "pending": "Not started:"
+        },
+        "exportGateHint": "Nothing is deleted until someone confirms that the school has its data export, or that we delivered it.",
+        "teardownHint": "Destroy the dedicated host and schedule its key for deletion in Terraform, then record both references here.",
+        "failedAt": "The last attempt stopped while {step}.",
+        "failedSteps": {
+          "inventory": "counting the school's data",
+          "purge": "deleting the school's data",
+          "verify": "checking that nothing is left",
+          "keys": "destroying the keys",
+          "certificate": "preparing the certificate",
+          "audit": "deleting the kept audit log"
+        },
+        "errorCode": "Error code for support: {code}",
+        "retryHint": "SchoolOS tries again automatically every 10 minutes. The keys are only destroyed once nothing is left.",
+        "inProgress": "Deletion is running right now. Reload the page in a few minutes.",
+        "inventoryTitle": "Found before deletion",
+        "category": "Category",
+        "rows": "Records",
+        "categories": {
+          "students": "Student records",
+          "changes": "Change requests",
+          "dq": "Data-quality checks",
+          "extraction": "Register photo extraction",
+          "imports": "Spreadsheet imports",
+          "documents": "Documents",
+          "knowledge": "Ask-the-school records",
+          "exports": "Exports",
+          "notifications": "Notifications",
+          "breakglass": "Support access grants",
+          "ops": "Background jobs and queues",
+          "identity": "Staff memberships and roles",
+          "tenancy": "Academic structure and settings",
+          "files": "Stored files"
+        },
+        "remainingTitle": "Still found after deletion",
+        "keysDestroyed": "Encryption keys destroyed: {count, number}.",
+        "certificateIssued": "Certificate issued {date}.",
+        "auditRetained": "The school's audit log is kept until {date}, then deleted.",
+        "auditDeleted": "The school's audit log was deleted on {date}.",
+        "confirmExport": "Confirm export",
+        "confirmExportTitle": "Confirm that the school has its data?",
+        "confirmExportBody": "Deletion starts after this. Record how the school got its export and a reference to the letter or ticket. Do not type names or other personal details.",
+        "basis": "How the school got its data",
+        "bases": {
+          "school_confirmed": "The school confirmed in writing that it has its export",
+          "delivered_by_us": "We delivered the export to the school"
+        },
+        "reference": "Reference",
+        "referenceHint": "Letter, ticket or Terraform run number: letters, digits, spaces and . _ / # : - only.",
+        "confirmTeardown": "Confirm host teardown",
+        "confirmTeardownTitle": "Confirm the dedicated host is destroyed?",
+        "confirmTeardownBody": "Only after the Terraform run destroyed the host and scheduled its key for deletion. This destroys the school's data and backups on that host.",
+        "kmsReference": "Key deletion reference",
+        "hostReference": "Host teardown reference",
+        "downloadCertificate": "Download certificate",
+        "certificatePending": "The certificate is not ready yet. Try again in a few minutes."
       }
     },
     "provision": {
@@ -1558,6 +1640,22 @@
       "structure_in_use": {
         "title": "Students are still enrolled here",
         "body": "This can't be archived while students are enrolled in it. Move the students first, then try again."
+      },
+      "export_already_confirmed": {
+        "title": "The export is already confirmed",
+        "body": "Deletion has been scheduled. Reload the page to see its progress."
+      },
+      "not_dedicated": {
+        "title": "This school is not on a dedicated host",
+        "body": "Shared-tier schools are deleted by SchoolOS automatically; there is no host to tear down."
+      },
+      "not_offboarding": {
+        "title": "This school is not being offboarded",
+        "body": "Two operators must request and approve offboarding first."
+      },
+      "certificate_pending": {
+        "title": "The certificate is not ready yet",
+        "body": "It is issued a few minutes after the keys are destroyed. Try again later."
       }
     },
     "stepUp": {
