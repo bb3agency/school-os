@@ -44,6 +44,9 @@ roles:
       export.read_all: school
       export.download_any: school_step_up
       support.ticket.create: school
+      certificate.read: school
+      certificate.approve: school_step_up
+      register.read: school_step_up
 
   principal:
     name_en: Principal
@@ -80,6 +83,10 @@ roles:
       insights.read: school
       breakglass.approve: school_step_up
       support.ticket.create: school
+      certificate.read: school
+      certificate.issue: school
+      certificate.approve: school_step_up
+      register.read: school_step_up
 
   office_admin:
     name_en: Office admin
@@ -109,6 +116,9 @@ roles:
       export.read_all: school
       audit.read: school
       support.ticket.create: school
+      certificate.read: school
+      certificate.issue: school
+      register.read: school_step_up
 
   office_staff:
     name_en: Office staff
@@ -126,6 +136,8 @@ roles:
       document.read: school
       kb.ask: school
       support.ticket.create: school
+      certificate.read: school
+      certificate.issue: school
 
   accountant:
     name_en: Accountant
@@ -194,6 +206,8 @@ roles:
       document.read: school
       audit.read: school
       finance.read: school
+      certificate.read: school
+      register.read: school_step_up
 
 # Break-glass support access (docs/07 §6.4, US-103, FR-OPS-004). NOT a system role: it is not
 # cloned at provisioning, not listed for assignment and never assignable by staff. It is created

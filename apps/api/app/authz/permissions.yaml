@@ -161,6 +161,25 @@ permissions:
     sensitivity: sensitive
     step_up: false
 
+  # --- certificates and registers (M3; US-1101..US-1108, FR-CERT-*, FR-REG-*) --------------
+  # Migration 0033_certificates upserts these into core.permissions.
+  certificate.read:
+    description: See certificates, print them and download their PDFs
+    sensitivity: sensitive
+    step_up: false
+  certificate.issue:
+    description: Prepare and issue certificates (transfer certificates need approval)
+    sensitivity: sensitive
+    step_up: false
+  certificate.approve:
+    description: Approve or reject transfer certificates and cancel issued certificates
+    sensitivity: critical
+    step_up: true
+  register.read:
+    description: Print the TC, certificate issue and admission and withdrawal registers (recent MFA sign-in)
+    sensitivity: sensitive
+    step_up: true
+
   # --- control plane (docs/07 §6.5, contract §5); never grantable to tenant roles ------------
   platform.tenants.read:
     description: See schools, their plan, status, deployment and usage (no student data)

@@ -191,6 +191,10 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | insights.read (M5) | ✓ | ✓ | — | — | — | — | S | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | tenant.export_all | ✓ᴿ | — | — | — | — | — | — | — | — |
+| certificate.read (see, print and download certificates; M3) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ |
+| certificate.issue (prepare and issue certificates; M3) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
+| certificate.approve (approve TCs, cancel certificates; maker-checker; M3) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| register.read (print the TC, certificate and admission and withdrawal registers; M3) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | ✓ᴿ |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
