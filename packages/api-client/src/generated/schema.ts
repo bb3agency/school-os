@@ -825,6 +825,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sheet
+         * @description Open an XLSX or CSV document as a table (permission ``document.read``; FR-DOC-009):
+         *     the first worksheet of the newest checked version, row 1 as column names, 100 rows per
+         *     page. ``sheet_count`` says when the workbook has more sheets (not shown). Aadhaar-like
+         *     numbers are masked; formulas are shown as text, never run. 415 ``not_a_sheet`` for other
+         *     files, 413 above 10 MB (download instead), 403 for restricted (C3) files as downloads,
+         *     409 ``import_file_sheet`` for files uploaded for an import (open them from the import).
+         *     ``editable`` says whether you may save edits as a new version; ``ETag`` is needed to save.
+         */
+        get: operations["get_sheet_api_v1_documents__document_id__sheet_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/sheet/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Sheet
+         * @description Download the sheet, with any unsaved edits, as CSV or XLSX (permission
+         *     ``document.read``, as downloads; FR-DOC-011). Personal (C2) and restricted (C3) documents
+         *     also need a recent sign-in with MFA (428 ``step_up_required``; FR-EXP-004). Aadhaar-like
+         *     numbers masked, formulas neutralised, CSV in UTF-8 with BOM so Telugu opens in Excel, XLSX
+         *     with the internal-checking watermark. Every download is audited.
+         */
+        post: operations["export_sheet_api_v1_documents__document_id__sheet_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/sheet/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Sheet Version
+         * @description Save edited cells as the next version (permission ``document.upload``; ``If-Match``;
+         *     FR-DOC-010). The current file is kept in the history; the new version (values only, an
+         *     XLSX) is checked for viruses and indexed like an upload (202). 409 for import files and
+         *     CSVs, archived documents, workbooks with several sheets or with formulas (edit those in a
+         *     spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full
+         *     Aadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``.
+         */
+        post: operations["save_sheet_version_api_v1_documents__document_id__sheet_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/unarchive": {
         parameters: {
             query?: never;
@@ -1537,6 +1612,80 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sheet
+         * @description The uploaded file as a sheet (permission ``import.run``; FR-IMP-008): every column with
+         *     the field it fills, the rows in file order with staged edits applied and marked, and each
+         *     row's check result. Restricted (C3) columns show no values and Aadhaar-like numbers are
+         *     masked. ``editable`` says whether cells can still be changed (not after the import was
+         *     added). ``ETag`` is the import's version, needed to edit. 409 ``import_not_ready`` while the
+         *     file is being read, ``file_missing`` after the raw file was deleted (90 days after import).
+         */
+        get: operations["get_sheet_api_v1_imports__import_id__sheet_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/sheet/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Sheet
+         * @description Download the staged sheet with its edits as CSV or XLSX (permission ``import.run`` and
+         *     a recent sign-in with MFA, 428 ``step_up_required``; FR-IMP-009, FR-EXP-004). One header
+         *     row and the data rows; Aadhaar-like numbers masked, formulas neutralised; restricted (C3)
+         *     columns are empty unless you may see sensitive fields. Every download is audited.
+         */
+        get: operations["export_sheet_api_v1_imports__import_id__sheet_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/sheet/rows/{row_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Sheet Row
+         * @description Change cells of one row before the import is added (permission ``import.run``;
+         *     ``If-Match``; FR-IMP-008). The uploaded file is kept as it was; the edit is recorded with
+         *     who and when, and a checked file re-checks the row at once. 412 when the import changed
+         *     meanwhile (reload), 409 ``import_not_editable`` once it was added or reverted (correct
+         *     records on the student profile or with a change request), 422 for a full Aadhaar number
+         *     (``aadhaar_full_number_rejected``: enter only the last 4 digits), line breaks, text over
+         *     1,000 characters or a restricted column.
+         */
+        patch: operations["edit_sheet_row_api_v1_imports__import_id__sheet_rows__row_no__patch"];
         trace?: never;
     };
     "/api/v1/imports/{import_id}/validate": {
@@ -4352,6 +4501,18 @@ export interface components {
             /** Verified */
             verified: boolean;
         };
+        /**
+         * CellEditIn
+         * @description One cell of a staged row: ``column`` is the 0-based column index, ``value`` the new text
+         *     (``null`` or blank clears the cell). Up to 1,000 characters, no line breaks or control
+         *     characters, never a full Aadhaar number.
+         */
+        CellEditIn: {
+            /** Column */
+            column: number;
+            /** Value */
+            value?: string | null;
+        };
         /** ChangePlanIn */
         ChangePlanIn: {
             /**
@@ -4682,6 +4843,33 @@ export interface components {
             target_version?: string | null;
         };
         /**
+         * DocSheetCellOut
+         * @description Display text (Aadhaar-like numbers masked; null when empty); ``formula`` marks a cell
+         *     kept as inert formula text (never evaluated).
+         */
+        DocSheetCellOut: {
+            /** Formula */
+            formula: boolean;
+            /** Value */
+            value: string | null;
+        };
+        /** DocSheetColumnOut */
+        DocSheetColumnOut: {
+            /** Header */
+            header: string | null;
+            /** Index */
+            index: number;
+            /** Letter */
+            letter: string;
+        };
+        /** DocSheetRowOut */
+        DocSheetRowOut: {
+            /** Cells */
+            cells: components["schemas"]["DocSheetCellOut"][];
+            /** Row No */
+            row_no: number;
+        };
+        /**
          * DocumentCreate
          * @description Register an uploaded object as a new document (metadata FR-DOC-005 + ACL).
          */
@@ -4846,6 +5034,45 @@ export interface components {
             uploaded_by_me: boolean;
             /** Version */
             version: number;
+        };
+        /**
+         * DocumentSheetOut
+         * @description A page of the first worksheet of the newest checked version (row 1 is the header).
+         *     ``sheet_count`` > 1 means the workbook has more sheets that are not shown. ``editable``
+         *     says whether you can save edits as a new version; ``read_only_reason`` says why not.
+         *     ``version`` is the document's ETag version (send it in ``If-Match`` to save).
+         */
+        DocumentSheetOut: {
+            /** Columns */
+            columns: components["schemas"]["DocSheetColumnOut"][];
+            /** Data */
+            data: components["schemas"]["DocSheetRowOut"][];
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Editable */
+            editable: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "csv" | "xlsx";
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Offset */
+            offset: number;
+            /** Read Only Reason */
+            read_only_reason: ("no_permission" | "not_versionable" | "archived" | "several_sheets" | "formulas" | "newer_version") | null;
+            /** Sheet Count */
+            sheet_count: number;
+            /** Total Rows */
+            total_rows: number;
+            /** Version */
+            version: number;
+            /** Version No */
+            version_no: number;
         };
         /**
          * DocumentUpdate
@@ -5583,6 +5810,45 @@ export interface components {
             };
             /** Warnings */
             warnings: components["schemas"]["Issue"][];
+        };
+        /**
+         * ImportSheetOut
+         * @description A page of the staged sheet (file order). ``editable`` is false once the import was added
+         *     or reverted, while a check or commit is running, and for callers who cannot edit;
+         *     ``read_only_reason`` says why. ``version`` is the import's ETag version (send it in
+         *     ``If-Match`` to edit).
+         */
+        ImportSheetOut: {
+            /** Columns */
+            columns: components["schemas"]["SheetColumnOut"][];
+            /** Data */
+            data: components["schemas"]["SheetRowOut"][];
+            /** Editable */
+            editable: boolean;
+            /** Edited Cells */
+            edited_cells: number;
+            /** Header Row */
+            header_row: number;
+            /**
+             * Import Id
+             * Format: uuid
+             */
+            import_id: string;
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Offset */
+            offset: number;
+            /** Read Only Reason */
+            read_only_reason: ("committed" | "reverted" | "in_progress" | "failed") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
+            /** Total Rows */
+            total_rows: number;
+            /** Version */
+            version: number;
         };
         /** ImportSummary */
         ImportSummary: {
@@ -7128,6 +7394,14 @@ export interface components {
              */
             roles: string[];
         };
+        /**
+         * RowEditIn
+         * @description Cells to change in one staged row (each column at most once).
+         */
+        RowEditIn: {
+            /** Cells */
+            cells: components["schemas"]["CellEditIn"][];
+        };
         /** RuleCount */
         RuleCount: {
             /** Count */
@@ -7450,6 +7724,123 @@ export interface components {
              * @enum {string}
              */
             mode: "fixed" | "match_class";
+        };
+        /**
+         * SheetCellEdit
+         * @description One edited cell: ``row_no`` as the sheet shows it (data rows start at 2; row 1 is the
+         *     header row), 0-based ``column``, the new text (``null`` or blank clears it). No line breaks
+         *     or control characters, never a full Aadhaar number.
+         */
+        SheetCellEdit: {
+            /** Column */
+            column: number;
+            /** Row No */
+            row_no: number;
+            /** Value */
+            value?: string | null;
+        };
+        /**
+         * SheetCellOut
+         * @description ``value`` is the display text (Aadhaar-like numbers masked; null when empty or
+         *     restricted); ``edited`` marks a value changed in SchoolOS; ``formula`` a cell kept as inert
+         *     text.
+         */
+        SheetCellOut: {
+            /** Edited */
+            edited: boolean;
+            /** Formula */
+            formula: boolean;
+            /** Restricted */
+            restricted: boolean;
+            /** Value */
+            value: string | null;
+        };
+        /**
+         * SheetColumnOut
+         * @description A column as uploaded: its letter and header, the field it fills (``target``, null when
+         *     not imported), and whether its cells may be shown and edited. ``restricted`` columns fill a
+         *     restricted (C3) field, or their header was suggested for one (even when the column is not
+         *     imported): their values are never shown or edited here.
+         */
+        SheetColumnOut: {
+            /** Editable */
+            editable: boolean;
+            /** Header */
+            header: string;
+            /** Index */
+            index: number;
+            /** Letter */
+            letter: string;
+            /** Restricted */
+            restricted: boolean;
+            /** Target */
+            target: string | null;
+        };
+        /**
+         * SheetEditOut
+         * @description The edited row after its re-check, the import's new version (ETag), its counts, and the
+         *     other rows whose check result changed (e.g. a duplicate admission number resolved).
+         */
+        SheetEditOut: {
+            /** Changed Rows */
+            changed_rows: number[];
+            /** Error Count */
+            error_count: number;
+            row: components["schemas"]["SheetRowOut"];
+            /** Row Count */
+            row_count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
+            /** Version */
+            version: number;
+        };
+        /**
+         * SheetExportIn
+         * @description Download the sheet of ``base_version_no`` (default: the one shown) with ``edits``
+         *     applied (unsaved edits may be included).
+         */
+        SheetExportIn: {
+            /** Base Version No */
+            base_version_no?: number | null;
+            /** Edits */
+            edits?: components["schemas"]["SheetCellEdit"][];
+            /**
+             * Format
+             * @default csv
+             * @enum {string}
+             */
+            format: "csv" | "xlsx";
+        };
+        /**
+         * SheetRowOut
+         * @description One data row as the spreadsheet numbers it, with its check result (``status`` null when
+         *     the file was not checked with the current mapping yet).
+         */
+        SheetRowOut: {
+            /** Cells */
+            cells: components["schemas"]["SheetCellOut"][];
+            /** Errors */
+            errors: components["schemas"]["Issue"][];
+            /** Row No */
+            row_no: number;
+            /** Status */
+            status: ("valid" | "error" | "committed" | "skipped" | "reverted") | null;
+            /** Warnings */
+            warnings: components["schemas"]["Issue"][];
+        };
+        /**
+         * SheetSaveIn
+         * @description Save edited cells as the document's next version. ``base_version_no`` is the version
+         *     the edits were made on; it must still be the current version.
+         */
+        SheetSaveIn: {
+            /** Base Version No */
+            base_version_no: number;
+            /** Edits */
+            edits: components["schemas"]["SheetCellEdit"][];
         };
         /**
          * StaffMemberOut
@@ -10048,6 +10439,113 @@ export interface operations {
             };
         };
     };
+    get_sheet_api_v1_documents__document_id__sheet_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Rows per page (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_sheet_api_v1_documents__document_id__sheet_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SheetExportIn"];
+            };
+        };
+        responses: {
+            /** @description The sheet as a file (CSV: UTF-8 with BOM; XLSX: text cells) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_sheet_version_api_v1_documents__document_id__sheet_versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SheetSaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     unarchive_document_api_v1_documents__document_id__unarchive_post: {
         parameters: {
             query?: never;
@@ -11142,6 +11640,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ImportRowOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sheet_api_v1_imports__import_id__sheet_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Rows per page (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_sheet_api_v1_imports__import_id__sheet_export_get: {
+        parameters: {
+            query?: {
+                /** @description csv or xlsx */
+                format?: "csv" | "xlsx";
+            };
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The staged sheet as a file (CSV: UTF-8 with BOM; XLSX: text cells) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_sheet_row_api_v1_imports__import_id__sheet_rows__row_no__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+                /** @description Row number as the file shows it */
+                row_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RowEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SheetEditOut"];
                 };
             };
             /** @description Validation Error */

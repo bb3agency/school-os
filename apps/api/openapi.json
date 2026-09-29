@@ -1521,6 +1521,35 @@
         "title": "CanonicalOut",
         "type": "object"
       },
+      "CellEditIn": {
+        "additionalProperties": false,
+        "description": "One cell of a staged row: ``column`` is the 0-based column index, ``value`` the new text\n(``null`` or blank clears the cell). Up to 1,000 characters, no line breaks or control\ncharacters, never a full Aadhaar number.",
+        "properties": {
+          "column": {
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Column",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "column"
+        ],
+        "title": "CellEditIn",
+        "type": "object"
+      },
       "ChangePlanIn": {
         "additionalProperties": false,
         "properties": {
@@ -2494,6 +2523,83 @@
         "title": "DeploymentPatch",
         "type": "object"
       },
+      "DocSheetCellOut": {
+        "description": "Display text (Aadhaar-like numbers masked; null when empty); ``formula`` marks a cell\nkept as inert formula text (never evaluated).",
+        "properties": {
+          "formula": {
+            "title": "Formula",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "formula"
+        ],
+        "title": "DocSheetCellOut",
+        "type": "object"
+      },
+      "DocSheetColumnOut": {
+        "properties": {
+          "header": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "letter": {
+            "title": "Letter",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "letter",
+          "header"
+        ],
+        "title": "DocSheetColumnOut",
+        "type": "object"
+      },
+      "DocSheetRowOut": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/DocSheetCellOut"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "row_no": {
+            "title": "Row No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_no",
+          "cells"
+        ],
+        "title": "DocSheetRowOut",
+        "type": "object"
+      },
       "DocumentCreate": {
         "additionalProperties": false,
         "description": "Register an uploaded object as a new document (metadata FR-DOC-005 + ACL).",
@@ -3015,6 +3121,108 @@
           "version"
         ],
         "title": "DocumentOut",
+        "type": "object"
+      },
+      "DocumentSheetOut": {
+        "description": "A page of the first worksheet of the newest checked version (row 1 is the header).\n``sheet_count`` > 1 means the workbook has more sheets that are not shown. ``editable``\nsays whether you can save edits as a new version; ``read_only_reason`` says why not.\n``version`` is the document's ETag version (send it in ``If-Match`` to save).",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/DocSheetColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DocSheetRowOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "read_only_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_permission",
+                  "not_versionable",
+                  "archived",
+                  "several_sheets",
+                  "formulas",
+                  "newer_version"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Only Reason"
+          },
+          "sheet_count": {
+            "title": "Sheet Count",
+            "type": "integer"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "document_id",
+          "version_no",
+          "version",
+          "kind",
+          "sheet_count",
+          "editable",
+          "read_only_reason",
+          "total_rows",
+          "offset",
+          "columns",
+          "data",
+          "next_cursor"
+        ],
+        "title": "DocumentSheetOut",
         "type": "object"
       },
       "DocumentUpdate": {
@@ -5304,6 +5512,114 @@
           "warnings"
         ],
         "title": "ImportRowOut",
+        "type": "object"
+      },
+      "ImportSheetOut": {
+        "description": "A page of the staged sheet (file order). ``editable`` is false once the import was added\nor reverted, while a check or commit is running, and for callers who cannot edit;\n``read_only_reason`` says why. ``version`` is the import's ETag version (send it in\n``If-Match`` to edit).",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/SheetColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SheetRowOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "edited_cells": {
+            "title": "Edited Cells",
+            "type": "integer"
+          },
+          "header_row": {
+            "title": "Header Row",
+            "type": "integer"
+          },
+          "import_id": {
+            "format": "uuid",
+            "title": "Import Id",
+            "type": "string"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "read_only_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "committed",
+                  "reverted",
+                  "in_progress",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Only Reason"
+          },
+          "status": {
+            "enum": [
+              "uploaded",
+              "parsing",
+              "parsed",
+              "validating",
+              "validated",
+              "committing",
+              "committed",
+              "reverting",
+              "reverted",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "import_id",
+          "status",
+          "version",
+          "editable",
+          "read_only_reason",
+          "header_row",
+          "total_rows",
+          "offset",
+          "edited_cells",
+          "columns",
+          "data",
+          "next_cursor"
+        ],
+        "title": "ImportSheetOut",
         "type": "object"
       },
       "ImportSummary": {
@@ -9722,6 +10038,26 @@
         "title": "RolesIn",
         "type": "object"
       },
+      "RowEditIn": {
+        "additionalProperties": false,
+        "description": "Cells to change in one staged row (each column at most once).",
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/CellEditIn"
+            },
+            "maxItems": 60,
+            "minItems": 1,
+            "title": "Cells",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cells"
+        ],
+        "title": "RowEditIn",
+        "type": "object"
+      },
       "RuleCount": {
         "properties": {
           "count": {
@@ -10624,6 +10960,299 @@
           "cap"
         ],
         "title": "SeverityPolicyOut",
+        "type": "object"
+      },
+      "SheetCellEdit": {
+        "additionalProperties": false,
+        "description": "One edited cell: ``row_no`` as the sheet shows it (data rows start at 2; row 1 is the\nheader row), 0-based ``column``, the new text (``null`` or blank clears it). No line breaks\nor control characters, never a full Aadhaar number.",
+        "properties": {
+          "column": {
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Column",
+            "type": "integer"
+          },
+          "row_no": {
+            "maximum": 1000000.0,
+            "minimum": 2.0,
+            "title": "Row No",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "row_no",
+          "column"
+        ],
+        "title": "SheetCellEdit",
+        "type": "object"
+      },
+      "SheetCellOut": {
+        "description": "``value`` is the display text (Aadhaar-like numbers masked; null when empty or\nrestricted); ``edited`` marks a value changed in SchoolOS; ``formula`` a cell kept as inert\ntext.",
+        "properties": {
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "boolean"
+          },
+          "restricted": {
+            "title": "Restricted",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "edited",
+          "restricted",
+          "formula"
+        ],
+        "title": "SheetCellOut",
+        "type": "object"
+      },
+      "SheetColumnOut": {
+        "description": "A column as uploaded: its letter and header, the field it fills (``target``, null when\nnot imported), and whether its cells may be shown and edited. ``restricted`` columns fill a\nrestricted (C3) field, or their header was suggested for one (even when the column is not\nimported): their values are never shown or edited here.",
+        "properties": {
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "letter": {
+            "title": "Letter",
+            "type": "string"
+          },
+          "restricted": {
+            "title": "Restricted",
+            "type": "boolean"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "index",
+          "letter",
+          "header",
+          "target",
+          "restricted",
+          "editable"
+        ],
+        "title": "SheetColumnOut",
+        "type": "object"
+      },
+      "SheetEditOut": {
+        "description": "The edited row after its re-check, the import's new version (ETag), its counts, and the\nother rows whose check result changed (e.g. a duplicate admission number resolved).",
+        "properties": {
+          "changed_rows": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Changed Rows",
+            "type": "array"
+          },
+          "error_count": {
+            "title": "Error Count",
+            "type": "integer"
+          },
+          "row": {
+            "$ref": "#/components/schemas/SheetRowOut"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "uploaded",
+              "parsing",
+              "parsed",
+              "validating",
+              "validated",
+              "committing",
+              "committed",
+              "reverting",
+              "reverted",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row",
+          "version",
+          "status",
+          "row_count",
+          "error_count",
+          "changed_rows"
+        ],
+        "title": "SheetEditOut",
+        "type": "object"
+      },
+      "SheetExportIn": {
+        "additionalProperties": false,
+        "description": "Download the sheet of ``base_version_no`` (default: the one shown) with ``edits``\napplied (unsaved edits may be included).",
+        "properties": {
+          "base_version_no": {
+            "anyOf": [
+              {
+                "maximum": 999999.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version No"
+          },
+          "edits": {
+            "items": {
+              "$ref": "#/components/schemas/SheetCellEdit"
+            },
+            "maxItems": 5000,
+            "title": "Edits",
+            "type": "array"
+          },
+          "format": {
+            "default": "csv",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "title": "SheetExportIn",
+        "type": "object"
+      },
+      "SheetRowOut": {
+        "description": "One data row as the spreadsheet numbers it, with its check result (``status`` null when\nthe file was not checked with the current mapping yet).",
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/SheetCellOut"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "row_no": {
+            "title": "Row No",
+            "type": "integer"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "valid",
+                  "error",
+                  "committed",
+                  "skipped",
+                  "reverted"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "row_no",
+          "cells",
+          "status",
+          "errors",
+          "warnings"
+        ],
+        "title": "SheetRowOut",
+        "type": "object"
+      },
+      "SheetSaveIn": {
+        "additionalProperties": false,
+        "description": "Save edited cells as the document's next version. ``base_version_no`` is the version\nthe edits were made on; it must still be the current version.",
+        "properties": {
+          "base_version_no": {
+            "maximum": 999999.0,
+            "minimum": 1.0,
+            "title": "Base Version No",
+            "type": "integer"
+          },
+          "edits": {
+            "items": {
+              "$ref": "#/components/schemas/SheetCellEdit"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Edits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_version_no",
+          "edits"
+        ],
+        "title": "SheetSaveIn",
         "type": "object"
       },
       "StaffMemberOut": {
@@ -16631,6 +17260,197 @@
         ]
       }
     },
+    "/api/v1/documents/{document_id}/sheet": {
+      "get": {
+        "description": "Open an XLSX or CSV document as a table (permission ``document.read``; FR-DOC-009):\nthe first worksheet of the newest checked version, row 1 as column names, 100 rows per\npage. ``sheet_count`` says when the workbook has more sheets (not shown). Aadhaar-like\nnumbers are masked; formulas are shown as text, never run. 415 ``not_a_sheet`` for other\nfiles, 413 above 10 MB (download instead), 403 for restricted (C3) files as downloads,\n409 ``import_file_sheet`` for files uploaded for an import (open them from the import).\n``editable`` says whether you may save edits as a new version; ``ETag`` is needed to save.",
+        "operationId": "get_sheet_api_v1_documents__document_id__sheet_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows per page (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Rows per page (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentSheetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Sheet",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/sheet/export": {
+      "post": {
+        "description": "Download the sheet, with any unsaved edits, as CSV or XLSX (permission\n``document.read``, as downloads; FR-DOC-011). Personal (C2) and restricted (C3) documents\nalso need a recent sign-in with MFA (428 ``step_up_required``; FR-EXP-004). Aadhaar-like\nnumbers masked, formulas neutralised, CSV in UTF-8 with BOM so Telugu opens in Excel, XLSX\nwith the internal-checking watermark. Every download is audited.",
+        "operationId": "export_sheet_api_v1_documents__document_id__sheet_export_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The sheet as a file (CSV: UTF-8 with BOM; XLSX: text cells)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Sheet",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/sheet/versions": {
+      "post": {
+        "description": "Save edited cells as the next version (permission ``document.upload``; ``If-Match``;\nFR-DOC-010). The current file is kept in the history; the new version (values only, an\nXLSX) is checked for viruses and indexed like an upload (202). 409 for import files and\nCSVs, archived documents, workbooks with several sheets or with formulas (edit those in a\nspreadsheet program), when a newer version exists, or when nothing changed; 422 for a full\nAadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``.",
+        "operationId": "save_sheet_version_api_v1_documents__document_id__sheet_versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetSaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Sheet Version",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/api/v1/documents/{document_id}/unarchive": {
       "post": {
         "description": "Make an archived document active again (permission ``document.manage_acl``;\n``If-Match``).",
@@ -18538,6 +19358,216 @@
           }
         },
         "summary": "List Rows",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/sheet": {
+      "get": {
+        "description": "The uploaded file as a sheet (permission ``import.run``; FR-IMP-008): every column with\nthe field it fills, the rows in file order with staged edits applied and marked, and each\nrow's check result. Restricted (C3) columns show no values and Aadhaar-like numbers are\nmasked. ``editable`` says whether cells can still be changed (not after the import was\nadded). ``ETag`` is the import's version, needed to edit. 409 ``import_not_ready`` while the\nfile is being read, ``file_missing`` after the raw file was deleted (90 days after import).",
+        "operationId": "get_sheet_api_v1_imports__import_id__sheet_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows per page (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Rows per page (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportSheetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Sheet",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/sheet/export": {
+      "get": {
+        "description": "Download the staged sheet with its edits as CSV or XLSX (permission ``import.run`` and\na recent sign-in with MFA, 428 ``step_up_required``; FR-IMP-009, FR-EXP-004). One header\nrow and the data rows; Aadhaar-like numbers masked, formulas neutralised; restricted (C3)\ncolumns are empty unless you may see sensitive fields. Every download is audited.",
+        "operationId": "export_sheet_api_v1_imports__import_id__sheet_export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "csv or xlsx",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "csv",
+              "description": "csv or xlsx",
+              "enum": [
+                "csv",
+                "xlsx"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The staged sheet as a file (CSV: UTF-8 with BOM; XLSX: text cells)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Sheet",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/sheet/rows/{row_no}": {
+      "patch": {
+        "description": "Change cells of one row before the import is added (permission ``import.run``;\n``If-Match``; FR-IMP-008). The uploaded file is kept as it was; the edit is recorded with\nwho and when, and a checked file re-checks the row at once. 412 when the import changed\nmeanwhile (reload), 409 ``import_not_editable`` once it was added or reverted (correct\nrecords on the student profile or with a change request), 422 for a full Aadhaar number\n(``aadhaar_full_number_rejected``: enter only the last 4 digits), line breaks, text over\n1,000 characters or a restricted column.",
+        "operationId": "edit_sheet_row_api_v1_imports__import_id__sheet_rows__row_no__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Row number as the file shows it",
+            "in": "path",
+            "name": "row_no",
+            "required": true,
+            "schema": {
+              "description": "Row number as the file shows it",
+              "maximum": 1000000,
+              "minimum": 1,
+              "title": "Row No",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowEditIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetEditOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Sheet Row",
         "tags": [
           "imports"
         ]
