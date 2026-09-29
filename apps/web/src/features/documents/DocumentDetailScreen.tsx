@@ -159,19 +159,17 @@ function VersionsSection({ doc }: { doc: DocumentDetail }) {
           </span>
         ),
         time: <Value>{formatDateTime(row.created_at)}</Value>,
-        chips: (
-          <>
-            <VersionStatusBadge version={row} />
-            <Pill variant="command">{fileKind(row.mime_type) ?? t("otherKind")}</Pill>
-            <Pill variant="tag">
-              <span className="font-mono">
-                <Value>{formatBytes(row.size_bytes, locale)}</Value>
-              </span>
-            </Pill>
-          </>
-        ),
         body: (
-          <div className="space-y-2">
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              <VersionStatusBadge version={row} />
+              <Pill variant="command">{fileKind(row.mime_type) ?? t("otherKind")}</Pill>
+              <Pill variant="tag">
+                <span className="font-mono">
+                  <Value>{formatBytes(row.size_bytes, locale)}</Value>
+                </span>
+              </Pill>
+            </div>
             {row.status !== "ready" ? (
               <p>
                 <VersionReason version={row} />

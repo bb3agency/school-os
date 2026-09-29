@@ -5,7 +5,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TabNav } from "@/components/ui/TabNav";
@@ -128,12 +128,11 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
   const canPrecheck = can([EXPORT_PERM.board, EXPORT_PERM.portal]);
   const canList = can(EXPORT_PERM.studentList);
 
-  const types: { key: string; icon: IconName; href: string; action: string; primary: boolean }[] = [
+  const types: { key: string; href: string; action: string; primary: boolean }[] = [
     ...(canPrecheck
       ? [
           {
             key: "precheck",
-            icon: "clipboard" as const,
             href: "/exports/new/precheck",
             action: t("newPrecheck"),
             primary: true,
@@ -144,7 +143,6 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
       ? [
           {
             key: "studentList",
-            icon: "users" as const,
             href: "/exports/new/student-list",
             action: t("newStudentList"),
             primary: !canPrecheck,
@@ -168,14 +166,6 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
               eyebrow={tl(`types.${type.key as "precheck"}.eyebrow`)}
               title={tl(`types.${type.key as "precheck"}.title`)}
               description={tl(`types.${type.key as "precheck"}.body`)}
-              actions={
-                <span
-                  aria-hidden="true"
-                  className="flex size-10 items-center justify-center rounded-full bg-primary-soft text-primary"
-                >
-                  <Icon name={type.icon} />
-                </span>
-              }
             >
               <ButtonLink href={type.href} variant={type.primary ? "primary" : "secondary"}>
                 <Icon name="plus" className="size-4" />
