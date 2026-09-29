@@ -135,6 +135,7 @@ offboarding:
       imports: {en: "Spreadsheet imports", te: "స్ప్రెడ్‌షీట్ దిగుమతులు"}
       documents: {en: "Documents", te: "పత్రాలు"}
       exports: {en: "Exports", te: "ఎగుమతులు"}
+      admin: {en: "Full data exports and retention settings", te: "పూర్తి డేటా ఎగుమతులు మరియు నిల్వ సెట్టింగ్‌లు"}
       notifications: {en: "Notifications", te: "నోటిఫికేషన్లు"}
       breakglass: {en: "Support access grants", te: "సపోర్ట్ యాక్సెస్ అనుమతులు"}
       ops: {en: "Background jobs and queues", te: "నేపథ్య పనులు మరియు క్యూలు"}

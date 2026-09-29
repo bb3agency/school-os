@@ -6,7 +6,7 @@ role cannot delete in normal operation (append-only and frozen tables). The dele
 (ADR-0029; ``tests/tenancy/test_offboarding_purge.py``) prove the purge leaves
 none of them, whatever new table a migration adds, and assert ``tables_without_rows`` lists
 only the retained audit tables, so this helper grows with the schema. Checked on 2026-09-29
-against ``0030_import_cell_edits``: every tenant table except ``audit.events`` gets a row.
+against ``0031_admin``: every tenant table except ``audit.events`` gets a row.
 
 Synthetic values only (CLAUDE.md §6.11): names like "Synthetic Student", no real identifiers.
 """
@@ -543,6 +543,24 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             e=ids["export"],
             k=f"t/{t}/exports/{ids['export']}/students.csv",
             sha=hashlib.sha256(b"csv").digest(),
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tenant_exports (id, tenant_id, requested_by, "
+            "requested_by_membership, job_id) VALUES (:i, :t, :u, :m, :j)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
+            m=ids["m1"],
+            j=ids["job"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.retention_settings (id, tenant_id, rules, updated_by) "
+            "VALUES (:i, :t, '{\"import_raw_files\": 30}', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
         )
         _run(
             c,

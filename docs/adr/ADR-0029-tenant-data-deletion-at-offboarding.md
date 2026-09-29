@@ -82,7 +82,8 @@ names it, and nothing of another school (the flag and tenant context must match)
   file `app/tenancy/offboarding.yaml` and **fails closed** when any listed owner is not
   registered. Counting runs as `sos_app`; each module's optional `prepare` step (identity clears
   sole profiles, tenancy resets the settings) runs as `sos_app` before the role switch. The
-  shared helpers are in `app/core/purge.py` (`PurgeTables`, `purge_role`, `remaining_rows`). Order: knowledge, extraction, dq, changes, students, imports, documents, exports,
+  shared helpers are in `app/core/purge.py` (`PurgeTables`, `purge_role`, `remaining_rows`).
+  Order: knowledge, extraction, dq, changes, students, imports, documents, exports, admin,
   notifications, breakglass, ops, identity, tenancy.
 
 ### 2. New role `sos_purger` for the protected tables
@@ -239,13 +240,13 @@ names it, and nothing of another school (the flag and tenant context must match)
    confirm the KMS key deletion and the host teardown (references on the run and certificate).
 4. **Staff logins (`core.users` and external identities):** out of scope for this job. The owner
    decided to replace Cognito with an in-house sign-up, login and account-management system,
-   with its own ADR (being drafted). This job deletes the school's memberships and clears the
+   with its own ADR ([ADR-0030](ADR-0030-in-house-identity-and-sessions.md), Proposed). This job deletes the school's memberships and clears the
    profiles only this school used; `core.users` rows stay. The certificate names "staff sign-in
    accounts" as pending removal under the identity work (docs/16 §5.5 TODO).
 5. **Lead's decisions on the other items:**
    - Export confirmation: an operator records `school_confirmed` or `delivered_by_us` with a
-     reference before deletion can start. FR-ADM-001 (the full export, built in parallel) is
-     linked from the docs only; no code dependency.
+     reference before deletion can start. FR-ADM-001 (the full export, `POST
+     /api/v1/admin/tenant-export`, built) is linked from the docs only; no code dependency.
    - Certificate language: English and Telugu; the Telugu wording is marked for review
      (`billing.yaml` → `offboarding.certificate.telugu_review: pending`; docs/16 §19 Q14).
    - Status: no `deleting` status; the school stays `offboarding` until the certificate, and
@@ -260,8 +261,8 @@ names it, and nothing of another school (the flag and tenant context must match)
      `platform/deletion-certificates/` prefix to the invoice-PDF statement so the worker can store
      certificates.)
    - ADR number: 0029 kept.
-6. **Migration:** `0032_offboarding` with `down_revision = "0030_import_cell_edits"`; the lead
-   relinks it after `0031_admin`.
+6. **Migration:** `0032_offboarding` with `down_revision = "0031_admin"` (after the admin module
+   merged; its `ops.tenant_exports` and `ops.retention_settings` are purged by the `admin` owner).
 
 ## Related requirements
 

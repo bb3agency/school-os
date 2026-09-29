@@ -75,9 +75,13 @@ def test_SEC_001_admin_tables_force_rls_and_the_app_cannot_delete(admin_engine: 
         ).all()
     assert {r.relname for r in rows} == {"tenant_exports", "retention_settings"}
     assert all(r.relrowsecurity and r.relforcerowsecurity for r in rows)
+    # ADR-0029 (0032_offboarding): plus the restrictive offboarding purge policy for sos_purger
+    # only (its shape is pinned by tests/tenancy/test_offboarding_purge.py).
     assert {(p.tablename, p.policyname) for p in policies} == {
         ("tenant_exports", "tenant_isolation"),
         ("retention_settings", "tenant_isolation"),
+        ("tenant_exports", "offboarding_purge"),
+        ("retention_settings", "offboarding_purge"),
     }
     for table in ("tenant_exports", "retention_settings"):
         grants = _scalar(

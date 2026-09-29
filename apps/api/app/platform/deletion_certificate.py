@@ -32,6 +32,7 @@ CATEGORY_ORDER: Final = (
     "documents",
     "knowledge",
     "exports",
+    "admin",
     "notifications",
     "breakglass",
     "ops",

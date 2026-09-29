@@ -81,6 +81,7 @@ from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
 from app.changes import service as changes
+from app.core import purge as purging
 from app.core import retention
 from app.core.config import get_settings
 from app.core.db import tenant_session
@@ -1007,8 +1008,33 @@ __all__ = [
     "get_retention",
     "list_exports",
     "purge_expired",
+    "purge_tenant_data",
     "request_export",
     "retention_days",
     "run_export",
+    "tenant_data_counts",
     "update_retention",
 ]
+
+
+# --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
+# Full-export records (their archives live under t/<tenant_id>/tenant-export/ and go with the
+# school's files) and the school's retention settings. Registered with app.tenancy at import;
+# the offboarding job counts them as sos_app and deletes them as sos_purger.
+_PURGE = purging.PurgeTables(deleted=("ops.tenant_exports", "ops.retention_settings"))
+
+
+def tenant_data_counts(session: Session) -> dict[str, int]:
+    """Rows of the current school in this module's tables (offboarding inventory)."""
+    return _PURGE.count(session)
+
+
+def purge_tenant_data(session: Session) -> dict[str, int]:
+    """Delete the current school's rows of this module (offboarding only: the database allows it
+    only as ``sos_purger`` for a school in ``offboarding``)."""
+    return _PURGE.delete(session)
+
+
+tenancy.register_data_owner(
+    tenancy.TenantDataOwner(name="admin", count=tenant_data_counts, purge=purge_tenant_data)
+)

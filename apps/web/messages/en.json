@@ -827,6 +827,7 @@
           "documents": "Documents",
           "knowledge": "Ask-the-school records",
           "exports": "Exports",
+          "admin": "Full data exports and retention settings",
           "notifications": "Notifications",
           "breakglass": "Support access grants",
           "ops": "Background jobs and queues",

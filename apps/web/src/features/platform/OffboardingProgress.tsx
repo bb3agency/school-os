@@ -48,6 +48,7 @@ const CATEGORIES = [
   "documents",
   "knowledge",
   "exports",
+  "admin",
   "notifications",
   "breakglass",
   "ops",

@@ -13,6 +13,7 @@ purge_order:
   - imports
   - documents
   - exports
+  - admin
   - notifications
   - breakglass
   - ops

@@ -33,6 +33,7 @@ import app.identity.service  # isort: skip
 
 # Offboarding (FR-PLT-005, ADR-0029): every module that owns school data registers its purge with
 # app.tenancy at import; the purge refuses to run unless all of them are registered.
+import app.admin.service  # isort: skip
 import app.breakglass.service  # isort: skip
 import app.changes.service  # isort: skip
 import app.documents.service  # isort: skip

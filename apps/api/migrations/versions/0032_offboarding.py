@@ -29,7 +29,7 @@ Control plane (schema ``platform``, no student data):
 Requires ``sos_purger``: re-run ``infra/db/bootstrap.sql`` before this migration (docs/10 §9).
 
 Revision ID: 0032_offboarding
-Revises: 0030_import_cell_edits (the lead relinks it after 0031_admin)
+Revises: 0031_admin
 Create Date: 2026-09-29
 """
 
@@ -38,7 +38,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "0032_offboarding"
-down_revision = "0030_import_cell_edits"
+down_revision = "0031_admin"
 branch_labels = None
 depends_on = None
 
@@ -69,6 +69,8 @@ PURGE_TABLES = (
     "sis.import_batches",
     "sis.import_mapping_templates",
     "ops.exports",
+    "ops.tenant_exports",
+    "ops.retention_settings",
     "ops.notifications",
     "ops.break_glass_grants",
     "ops.job_runs",
