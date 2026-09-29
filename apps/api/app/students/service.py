@@ -1311,6 +1311,90 @@ def end_enrollment(
     return EnrollmentOut.model_validate(updated)
 
 
+@dataclass(frozen=True, slots=True)
+class Withdrawal:
+    """What :func:`withdraw_for_transfer_certificate` changed (IDs and codes only)."""
+
+    enrollment_ids: tuple[uuid.UUID, ...]
+    previous_status: str
+    status: str
+
+
+def withdraw_for_transfer_certificate(
+    session: Session,
+    student_id: uuid.UUID,
+    *,
+    left_on: dt.date,
+    certificate_id: uuid.UUID,
+) -> Withdrawal:
+    """End the student's active enrolments (``transferred`` on ``left_on``) and set the record
+    status to ``left`` (unless already ``left`` or ``graduated``), for a transfer certificate
+    being issued in the same transaction (FR-CERT-005, US-1102 AC3).
+
+    For ``app.certificates`` only: the caller has checked its own permission
+    (``certificate.approve`` / ``certificate.issue``) and the student's scope; this function
+    applies no permission of its own. A leaving date before an active enrolment's start answers
+    422 ``leaving_date_before_enrolment``. Audit ``student.withdrawn`` ({certificate_id,
+    enrollment_ids, from, to}); the enrolment change is queued for DQ like any enrolment write.
+    """
+    student = repo.get_student(session, student_id, lock=True)
+    if student is None:
+        raise NotFound("Student not found")
+    active = [e for e in repo.enrollments_of(session, student_id) if e.status == "active"]
+    for enrollment in active:
+        if enrollment.started_on is not None and left_on < enrollment.started_on:
+            raise ValidationFailed([error("leaving_date", "leaving_date_before_enrolment")])
+    ended: list[uuid.UUID] = []
+    with _db_errors():
+        for enrollment in active:
+            updated = repo.update_enrollment(
+                session,
+                enrollment.id,
+                expected_version=enrollment.version,
+                values={"status": "transferred", "ended_on": left_on},
+            )
+            if updated is None:  # pragma: no cover - the student row is locked
+                raise PreconditionFailed("The enrolment was changed meanwhile. Try again.")
+            ended.append(enrollment.id)
+    previous = student.status
+    target = previous if previous in ("left", "graduated") else "left"
+    defs = _definitions(session)
+    if target != previous:
+        with _db_errors():
+            changed = repo.update_student(session, student_id, values={"status": target})
+        if changed is None:  # pragma: no cover - row locked above
+            raise NotFound("Student not found")
+        student = changed
+    _touch(session, student, defs)
+    _audit(
+        session,
+        action="student.withdrawn",
+        resource_type="student",
+        resource_id=student_id,
+        summary={
+            "certificate_id": certificate_id,
+            "enrollment_ids": ended,
+            "from": previous,
+            "to": target,
+        },
+    )
+    if ended:
+        _values_changed(session, student_id, [ENROLLMENT_KEY])
+    return Withdrawal(enrollment_ids=tuple(ended), previous_status=previous, status=target)
+
+
+def enrolment_histories(
+    session: Session, student_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, list[EnrollmentOut]]:
+    """Every enrolment (any year and status) of many students, oldest first, for registers and
+    certificates (``app.certificates``). ``student_ids`` MUST come from
+    :func:`list_students_in_scope` or a student the caller already reached."""
+    out: dict[uuid.UUID, list[EnrollmentOut]] = {sid: [] for sid in student_ids}
+    for row in repo.enrollments_of_many(session, list(student_ids)):
+        out.setdefault(row.student_id, []).append(EnrollmentOut.model_validate(row))
+    return out
+
+
 # --- search and lists --------------------------------------------------------------------------
 
 

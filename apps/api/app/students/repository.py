@@ -371,6 +371,23 @@ def get_enrollment(
     return session.scalars(stmt, execution_options={"populate_existing": True}).one_or_none()
 
 
+def enrollments_of_many(session: Session, student_ids: Collection[uuid.UUID]) -> list[Enrollment]:
+    """Every enrolment of ``student_ids`` (any year and status), oldest first per student."""
+    if not student_ids:
+        return []
+    stmt = (
+        select(Enrollment)
+        .where(Enrollment.student_id.in_(list(student_ids)))
+        .order_by(
+            Enrollment.student_id,
+            Enrollment.started_on.asc().nulls_first(),
+            Enrollment.created_at,
+            Enrollment.id,
+        )
+    )
+    return list(session.scalars(stmt))
+
+
 def update_enrollment(
     session: Session, enrollment_id: uuid.UUID, *, expected_version: int, values: dict[str, Any]
 ) -> Enrollment | None:

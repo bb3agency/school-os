@@ -1068,6 +1068,42 @@ def summary(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class BlockerRef:
+    """An open blocker finding (IDs and codes only)."""
+
+    finding_id: uuid.UUID
+    rule_id: str
+    attribute_key: str | None
+
+
+def open_blockers(
+    session: Session, student_id: uuid.UUID, attribute_keys: Collection[str]
+) -> list[BlockerRef]:
+    """Open or reopened **blocker** findings of base rules (no export profile) on one student
+    that concern ``attribute_keys`` or the student as a whole (no attribute), for
+    ``app.certificates`` (FR-CERT-002: a certificate is issued only from a checked record).
+
+    No permission check (like :func:`app.changes.service.request_student`): the caller holds
+    its own permission on the student and must not learn more than that a blocker exists and
+    where (IDs and codes). Findings are not filtered by the caller's ``dq.findings.read``, so a
+    clerk without it is still stopped."""
+    keys = frozenset(attribute_keys)
+    rows = repo.list_findings(
+        session,
+        repo.FindingFilter(
+            student_ids=[student_id], statuses=ACTIVE_STATUSES, severities=("blocker",)
+        ),
+        offset=0,
+        limit=1000,
+    )
+    return [
+        BlockerRef(finding_id=r["id"], rule_id=r["rule_id"], attribute_key=r["attribute_key"])
+        for r in rows
+        if r["profile_key"] is None and (r["attribute_key"] is None or r["attribute_key"] in keys)
+    ]
+
+
 def export_records(session: Session) -> list[RecordTable]:
     """Worker only: every data-quality run and finding of the current school for its full data
     export (``app.admin``; the caller checked ``tenant.export_all`` and audits the export).
@@ -1085,6 +1121,7 @@ __all__ = [
     "RUN_REQUESTED_EVENT",
     "UNLINK_TASK",
     "WAIVE",
+    "BlockerRef",
     "execute_queued_run",
     "export_records",
     "findings_for_student",
@@ -1093,6 +1130,7 @@ __all__ = [
     "get_run",
     "link_change_request",
     "list_findings",
+    "open_blockers",
     "profiles_catalog",
     "purge_tenant_data",
     "request_run",

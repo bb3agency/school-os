@@ -282,6 +282,28 @@ def _unique_languages(v: list[Language] | None) -> list[Language] | None:
     return v
 
 
+LetterheadText = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(max_length=300, pattern=r"^[^\x00-\x1f\x7f]*$")
+]
+
+
+class CertificateLetterhead(BaseModel):
+    """What certificates print at the top and at the signature (FR-CERT-013, US-1108). The
+    English school name is the school's name; empty fields are left out of the page."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    school_name_te: LetterheadText = Field(default="", max_length=200)
+    address_en: LetterheadText = ""
+    address_te: LetterheadText = ""
+    affiliation: LetterheadText = Field(
+        default="",
+        max_length=200,
+        description="Recognition or affiliation line, e.g. the recognition order or UDISE code.",
+    )
+    place: LetterheadText = Field(default="", max_length=80)
+
+
 class TenantSettings(BaseModel):
     """Validated school settings stored in ``core.tenants.settings`` (FR-TEN-012).
 
@@ -298,6 +320,7 @@ class TenantSettings(BaseModel):
     idle_timeout_minutes: int = Field(default=15, ge=5, le=30)
     ai_features_enabled: bool = True
     ai_monthly_budget_inr: int = Field(default=5000, ge=0, le=10_000_000)
+    certificate_letterhead: CertificateLetterhead = Field(default_factory=CertificateLetterhead)
 
     @field_validator("languages")
     @classmethod
@@ -314,6 +337,7 @@ class TenantSettingsPatch(_In):
     idle_timeout_minutes: int | None = Field(default=None, ge=5, le=30)
     ai_features_enabled: bool | None = None
     ai_monthly_budget_inr: int | None = Field(default=None, ge=0, le=10_000_000)
+    certificate_letterhead: CertificateLetterhead | None = None
 
     @field_validator("languages")
     @classmethod

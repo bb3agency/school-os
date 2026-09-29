@@ -20,7 +20,11 @@ from pydantic import (
     model_validator,
 )
 
-Purpose = Literal["evidence", "register_scan", "circular", "policy", "other", "import_file"]
+# Purposes a client may upload for; ``certificate`` documents are generated (FR-CERT-010).
+UploadPurpose = Literal["evidence", "register_scan", "circular", "policy", "other", "import_file"]
+Purpose = Literal[
+    "evidence", "register_scan", "circular", "policy", "other", "import_file", "certificate"
+]
 DocType = Literal[
     "circular",
     "policy",
@@ -50,6 +54,7 @@ PURPOSES: Final[tuple[str, ...]] = (
     "policy",
     "other",
     "import_file",
+    "certificate",
 )
 MAX_ACL_ENTRIES: Final = 50
 
@@ -96,7 +101,7 @@ class UploadCreate(_In):
     filename: FileName
     content_type: ContentType
     size_bytes: int = Field(ge=1, le=100 * 1024 * 1024)
-    purpose: Purpose
+    purpose: UploadPurpose
     document_id: uuid.UUID | None = None
 
 
