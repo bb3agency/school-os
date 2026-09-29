@@ -1650,7 +1650,8 @@
       "unnamed": "Name not recorded",
       "matchedOn": "Found by: {field}",
       "filterYear": "Academic year",
-      "currentYear": "Current year"
+      "currentYear": "Current year",
+      "crumbHome": "Home"
     },
     "create": {
       "title": "Add a student",
@@ -1707,7 +1708,19 @@
       "classTitle": "Class and enrolment",
       "classSection": "Class and section",
       "rollNo": "Roll number",
-      "notEnrolled": "Not in a section this academic year."
+      "notEnrolled": "Not in a section this academic year.",
+      "admissionShort": "Adm. no.",
+      "tabsLabel": "Parts of the student record",
+      "tabDetails": "Details",
+      "tabBySource": "By source",
+      "tabGuardians": "Parents",
+      "tabEnrolments": "Class history",
+      "tabHistory": "All recorded values",
+      "historyTitle": "Recorded values",
+      "historyDescription": "Every value recorded for this student, newest first. Replaced values stay in the history; nothing is deleted.",
+      "historyTimeline": "Recorded values, newest first",
+      "historyInUse": "In use",
+      "historyCorrection": "Correction request"
     },
     "record": {
       "open": "Record a value",
@@ -1828,7 +1841,8 @@
       "historyTitle": "History of {field}",
       "replaced": "Replaced",
       "fromChangeRequest": "from a correction request",
-      "empty": "No values are recorded for this student yet."
+      "empty": "No values are recorded for this student yet.",
+      "matches": "Matches the register"
     },
     "enrolments": {
       "description": "Every year the student was in a section, newest first. Correct a roll number here, or move the student to another section of the same class.",
@@ -2591,7 +2605,11 @@
       "waiveReason": "Why is it right as it is?",
       "waiveReasonHint": "At least 3 characters. Do not type personal details or Aadhaar numbers.",
       "allForStudent": "All problems for this student",
-      "backToList": "Back to the list"
+      "backToList": "Back to the list",
+      "timelineLabel": "History of this problem",
+      "stillOpen": "Still open",
+      "problem": "Problem",
+      "relatedLabel": "Related pages"
     },
     "rules": {
       "title": "What SchoolOS checks",
@@ -2644,7 +2662,9 @@
       "pageTitle": "Check progress",
       "pageDescription": "Progress and results of one check of student records.",
       "seeFindings": "See the problems found"
-    }
+    },
+    "crumbHome": "Home",
+    "summaryBySeverityLabel": "By severity:"
   },
   "changeRequests": {
     "nav": "Correction requests",
@@ -2873,8 +2893,14 @@
       "openMemo": "Open the memo to print",
       "newTab": "opens in a new tab",
       "allForStudent": "All correction requests for this student",
-      "backToList": "Back to the list"
-    }
+      "backToList": "Back to the list",
+      "evidenceChip": "Evidence document",
+      "waitingDecision": "Waiting for a decision",
+      "decideHint": "Check the evidence, then approve or reject this request.",
+      "timelineLabel": "Steps of this request",
+      "relatedLabel": "Related pages"
+    },
+    "crumbHome": "Home"
   },
   "notifications": {
     "title": "Notifications",

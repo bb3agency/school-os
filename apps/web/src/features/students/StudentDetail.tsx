@@ -5,12 +5,14 @@ import { useLocale, useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
-import { Badge } from "@/components/ui/Badge";
-import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge, Pill } from "@/components/ui/Badge";
+import { Button, ButtonLink, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTable, Table, TBody, THead, Th, Tr, type Column } from "@/components/ui/Table";
+import { Tabs } from "@/components/ui/Tabs";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
@@ -33,7 +35,7 @@ import {
 } from "./parts";
 import { ProblemAlert, problemCode } from "./ProblemAlert";
 import { SensitiveValue } from "./SensitiveValue";
-import { ValuesBySource } from "./SourceCompare";
+import { ValuesBySource, ValuesHistory } from "./SourceCompare";
 import { EnrolmentsCard } from "./Enrolments";
 import {
   GuardianDialog,
@@ -66,19 +68,15 @@ function RelatedLinks({ studentId, permissions }: { studentId: string; permissio
       ? [{ href: `/change-requests?${q}`, label: t("changeRequestsLink") }]
       : []),
   ];
+  if (links.length === 0) return null;
   return (
     <nav aria-label={t("relatedLabel")} data-print="hide">
-      <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        <li>
-          <Link href="/students" className="text-primary underline">
-            {t("backToList")}
-          </Link>
-        </li>
+      <ul className="flex flex-wrap gap-2">
         {links.map((link) => (
           <li key={link.href}>
-            <Link href={link.href} className="text-primary underline">
+            <ButtonLink href={link.href} variant="secondary" size="sm">
               {link.label}
-            </Link>
+            </ButtonLink>
           </li>
         ))}
       </ul>
@@ -133,7 +131,7 @@ function AttributeRow({
         canReveal={canReveal}
       />
     ) : (
-      <span className="font-semibold">
+      <span className="font-mono font-medium">
         <Value>{format(value, attribute)}</Value>
       </span>
     );
@@ -142,7 +140,10 @@ function AttributeRow({
 
   return (
     <tr className="align-top">
-      <th scope="row" className="px-3 py-3 text-left font-semibold whitespace-normal">
+      <th
+        scope="row"
+        className="min-w-40 px-4 py-4 text-left font-medium whitespace-normal text-ink"
+      >
         {label}
         {attribute?.is_identity ? (
           <span className="block text-xs font-normal text-ink-muted">{t("identityField")}</span>
@@ -156,7 +157,7 @@ function AttributeRow({
           </span>
         ) : null}
       </th>
-      <td className="px-3 py-3">
+      <td className="px-4 py-4">
         {canonical ? (
           <div className="space-y-1">
             {shown(canonical.value, canonical.masked)}
@@ -166,14 +167,14 @@ function AttributeRow({
               ) : null}
               {canonical.provisional ? <Badge tone="warning">{t("provisional")}</Badge> : null}
               {conflicts.length > 0 ? (
-                <Badge tone="warning">
+                <Pill variant="negative">
                   {t("conflicts", {
                     sources: formatList(
                       conflicts.map((source) => ts(`sourceShort.${source}`)),
                       locale,
                     ),
                   })}
-                </Badge>
+                </Pill>
               ) : null}
             </div>
           </div>
@@ -181,7 +182,7 @@ function AttributeRow({
           <Value>{null}</Value>
         )}
       </td>
-      <td className="px-3 py-3">
+      <td className="px-4 py-4">
         {values.length === 0 ? (
           <Value>{null}</Value>
         ) : (
@@ -447,6 +448,7 @@ function GuardiansCard({
       header: t("colName"),
       cell: (row) => (
         <span className="flex flex-wrap items-center gap-2">
+          <Avatar name={row.full_name} size="sm" decorative />
           {row.full_name}
           {row.is_primary ? <Badge tone="info">{t("primary")}</Badge> : null}
         </span>
@@ -511,6 +513,7 @@ export function StudentDetailView({
   permissions,
 }: StudentDetailViewProps) {
   const t = useTranslations("students.detail");
+  const tl = useTranslations("students.list");
   const index = useAttributeIndex(attributes);
   const api = useBffClient("staff");
   const [verifying, setVerifying] = useState<string | null>(null);
@@ -524,7 +527,10 @@ export function StudentDetailView({
   if (student.status !== "ready") {
     return (
       <div className="space-y-6">
-        <PageHeader title={t("loadingTitle")} />
+        <PageHeader
+          breadcrumb={[{ label: tl("title"), href: "/students" }, { label: t("loadingTitle") }]}
+          title={t("loadingTitle")}
+        />
         <LoadGate state={student} />
       </div>
     );
@@ -594,85 +600,125 @@ export function StudentDetailView({
     }
   }
 
+  const canReveal = permissions.has(PERM.readSensitive) && data.sensitive_revealable;
+  const fullName = data.canonical.full_name;
+  const avatarName = fullName && !fullName.masked && fullName.value ? fullName.value : null;
+
+  const detailsPanel = (
+    <Card
+      title={t("valuesTitle")}
+      description={t("valuesDescription")}
+      actions={
+        permissions.has(PERM.updateNonIdentity) && attributes.status === "ready" ? (
+          <RecordValueDialog student={data} attributes={index.sorted} />
+        ) : null
+      }
+    >
+      <div className="space-y-3">
+        <ProblemAlert error={verifyError} namespace="students.errors" />
+        {verified ? (
+          <Alert tone="success" live>
+            {verified === "verified" ? t("verifiedDone") : t("rejectedDone")}
+          </Alert>
+        ) : null}
+        {keys.length === 0 ? (
+          <p className="text-sm text-ink-muted">{t("noValues")}</p>
+        ) : (
+          <div
+            role="region"
+            aria-label={t("valuesTable")}
+            tabIndex={0}
+            className="overflow-x-auto rounded-xl border border-border print:overflow-visible print:border-0"
+          >
+            <Table>
+              <caption className="sr-only">{t("valuesTable")}</caption>
+              <THead>
+                <Tr>
+                  <Th>{t("colField")}</Th>
+                  <Th>{t("colUsed")}</Th>
+                  <Th>{t("colSources")}</Th>
+                </Tr>
+              </THead>
+              <TBody>
+                {keys.map((key) => (
+                  <AttributeRow
+                    key={key}
+                    student={data}
+                    attributeKey={key}
+                    attribute={index.byKey.get(key)}
+                    label={index.label(key)}
+                    permissions={permissions}
+                    onVerify={verify}
+                    verifying={verifying}
+                    action={rowAction(key)}
+                  />
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={name}
+        breadcrumb={[{ label: tl("title"), href: "/students" }, { label: name }]}
+        title={
+          <span className="inline-flex items-center gap-3">
+            {avatarName ? <Avatar name={avatarName} size="lg" decorative /> : null}
+            <span>{name}</span>
+          </span>
+        }
         badge={<StudentStatusBadge status={data.status} />}
         actions={canEdit ? <StatusDialog student={data} /> : null}
-        description={t("summary", {
-          admission: data.admission_no ?? "—",
-          classSection: data.enrollment?.label ?? t("noClass"),
-        })}
+        description={
+          <span className="mt-1 flex flex-wrap items-center gap-2">
+            <Pill variant="tag" size="md">
+              {t("admissionShort")}{" "}
+              <span className="font-mono text-ink">
+                <Value>{data.admission_no}</Value>
+              </span>
+            </Pill>
+            <Pill variant="tag" size="md">
+              {data.enrollment?.label ?? t("noClass")}
+            </Pill>
+            {data.enrollment?.roll_no ? (
+              <Pill variant="tag" size="md">
+                {t("rollNo")} <span className="font-mono text-ink">{data.enrollment.roll_no}</span>
+              </Pill>
+            ) : null}
+          </span>
+        }
       />
       <RelatedLinks studentId={data.id} permissions={permissions} />
-      <Card
-        title={t("valuesTitle")}
-        description={t("valuesDescription")}
-        actions={
-          permissions.has(PERM.updateNonIdentity) && attributes.status === "ready" ? (
-            <RecordValueDialog student={data} attributes={index.sorted} />
-          ) : null
-        }
-      >
-        <div className="space-y-3">
-          <ProblemAlert error={verifyError} namespace="students.errors" />
-          {verified ? (
-            <Alert tone="success" live>
-              {verified === "verified" ? t("verifiedDone") : t("rejectedDone")}
-            </Alert>
-          ) : null}
-          {keys.length === 0 ? (
-            <p className="text-sm text-ink-muted">{t("noValues")}</p>
-          ) : (
-            <div
-              role="region"
-              aria-label={t("valuesTable")}
-              tabIndex={0}
-              className="overflow-x-auto rounded-md border border-border print:overflow-visible print:border-0"
-            >
-              <table className="w-full border-collapse text-left text-sm">
-                <caption className="sr-only">{t("valuesTable")}</caption>
-                <thead className="bg-surface-muted">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 font-semibold">
-                      {t("colField")}
-                    </th>
-                    <th scope="col" className="px-3 py-2 font-semibold">
-                      {t("colUsed")}
-                    </th>
-                    <th scope="col" className="px-3 py-2 font-semibold">
-                      {t("colSources")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {keys.map((key) => (
-                    <AttributeRow
-                      key={key}
-                      student={data}
-                      attributeKey={key}
-                      attribute={index.byKey.get(key)}
-                      label={index.label(key)}
-                      permissions={permissions}
-                      onVerify={verify}
-                      verifying={verifying}
-                      action={rowAction(key)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Card>
-      <ValuesBySource
-        studentId={data.id}
-        index={index}
-        canReveal={permissions.has(PERM.readSensitive) && data.sensitive_revealable}
+      <Tabs
+        label={t("tabsLabel")}
+        items={[
+          { id: "details", label: t("tabDetails"), panel: detailsPanel },
+          {
+            id: "by-source",
+            label: t("tabBySource"),
+            panel: <ValuesBySource studentId={data.id} index={index} canReveal={canReveal} />,
+          },
+          {
+            id: "guardians",
+            label: t("tabGuardians"),
+            panel: <GuardiansCard student={data} guardians={guardians} permissions={permissions} />,
+          },
+          {
+            id: "enrolments",
+            label: t("tabEnrolments"),
+            panel: <EnrolmentsCard student={data} permissions={permissions} />,
+          },
+          {
+            id: "history",
+            label: t("tabHistory"),
+            panel: <ValuesHistory studentId={data.id} index={index} canReveal={canReveal} />,
+          },
+        ]}
       />
-      <GuardiansCard student={data} guardians={guardians} permissions={permissions} />
-      <EnrolmentsCard student={data} permissions={permissions} />
     </div>
   );
 }

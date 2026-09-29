@@ -105,7 +105,11 @@ export function RulesScreen() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader
+        breadcrumb={[{ label: tf("title"), href: "/findings" }, { label: t("title") }]}
+        title={t("title")}
+        description={t("description")}
+      />
       <Card title={t("rulesTitle")}>
         <DataTable
           caption={t("rulesTitle")}

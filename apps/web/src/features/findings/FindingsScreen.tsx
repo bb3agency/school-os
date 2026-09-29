@@ -3,13 +3,16 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
-import { StatCard } from "@/components/ui/StatCard";
+import { KpiCard } from "@/components/ui/StatCard";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
@@ -52,7 +55,7 @@ function Checkbox({
         name={name}
         value={value}
         defaultChecked={defaultChecked}
-        className="size-4"
+        className="size-4 accent-action"
       />
       {label}
     </label>
@@ -130,12 +133,12 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       key: "student",
       header: t("colStudent"),
       cell: (row) => (
-        <span>
-          <span className="block font-semibold">
+        <span className="block min-w-36">
+          <span className="block font-medium">
             <Value>{row.student.display_name}</Value>
           </span>
           {row.student.admission_no ? (
-            <span className="block text-xs text-ink-muted">
+            <span className="block font-mono text-xs whitespace-nowrap text-ink-muted">
               {t("admissionNo", { number: row.student.admission_no })}
             </span>
           ) : null}
@@ -145,6 +148,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
     {
       key: "field",
       header: t("colField"),
+      className: "min-w-32",
       cell: (row) => (
         <span>
           <Value>{attributeLabel(attributes.data, row.attribute_key, locale)}</Value>
@@ -183,7 +187,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       cell: (row) => (
         <Link
           href={`/findings/${row.id}`}
-          className="font-semibold whitespace-nowrap text-primary underline"
+          className="inline-flex items-center gap-1 font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {t("openFinding")}
           <span className="sr-only">
@@ -205,11 +209,20 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
     .filter(Boolean)
     .join(" · ");
 
+  // Counts by severity exactly as the API returns them (no zero rows invented).
+  const bySeverity = SEVERITIES.filter(
+    (severity) => (summary.data?.by_severity[severity] ?? 0) > 0,
+  ).map((severity) => ({ severity, count: summary.data?.by_severity[severity] ?? 0 }));
+  // One severity at a time (a link with several severity= parameters shows "All" here).
+  const severityValue = filters.severity.length === 1 ? (filters.severity[0] ?? "") : "";
+  const lastRun = formatDateTime(summary.data?.last_run?.finished_at ?? null);
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
         actions={
           <>
             {can("dq.findings.read") ? (
@@ -226,52 +239,80 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       </p>
 
       <section aria-labelledby="dq-summary-heading" className="space-y-3">
-        <h2 id="dq-summary-heading" className="text-lg font-semibold">
+        <h2 id="dq-summary-heading" className="sr-only">
           {t("summaryTitle")}
         </h2>
         {summary.isError ? (
           <Alert tone="warning">{t("summaryUnavailable")}</Alert>
         ) : (
-          <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label={t("summaryBlockers")}
-              value={count(summary.data?.blockers)}
-              unavailableLabel={tc("notAvailable")}
-            />
-            <StatCard
-              label={t("summaryWarnings")}
-              value={count(summary.data?.warnings)}
-              unavailableLabel={tc("notAvailable")}
-            />
-            <StatCard
-              label={t("summaryStudents")}
-              value={count(summary.data?.students_with_blockers)}
-              unavailableLabel={tc("notAvailable")}
-            />
-            <StatCard
-              label={t("summaryLastRun")}
-              value={formatDateTime(summary.data?.last_run?.finished_at ?? null)}
-              unavailableLabel={t("neverRun")}
-            />
-          </dl>
+          <>
+            <div className="grid gap-4 md:grid-cols-3">
+              <KpiCard
+                label={t("summaryBlockers")}
+                value={count(summary.data?.blockers)}
+                unavailableLabel={tc("notAvailable")}
+                aside={<SeverityBadge severity="blocker" />}
+              />
+              <KpiCard
+                label={t("summaryWarnings")}
+                value={count(summary.data?.warnings)}
+                unavailableLabel={tc("notAvailable")}
+              />
+              <KpiCard
+                label={t("summaryStudents")}
+                value={count(summary.data?.students_with_blockers)}
+                unavailableLabel={tc("notAvailable")}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-muted">
+              <p className="inline-flex flex-wrap items-center gap-2">
+                <span>{t("summaryLastRun")}:</span>
+                <Pill variant="date">{lastRun ?? t("neverRun")}</Pill>
+              </p>
+              {bySeverity.length > 0 ? (
+                <p className="inline-flex flex-wrap items-center gap-2">
+                  <span>{t("summaryBySeverityLabel")}</span>
+                  {bySeverity.map((item) => (
+                    <span key={item.severity} className="inline-flex items-center gap-1">
+                      <SeverityBadge severity={item.severity} />
+                      <span className="font-mono text-ink tabular-nums">{count(item.count)}</span>
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+            </div>
+          </>
         )}
       </section>
 
       <Card title={t("filtersTitle")} className="print:hidden">
-        <form method="get" className="space-y-4">
+        <form method="get" className="space-y-5">
           {filters.studentId ? (
             <div className="flex flex-wrap items-center gap-3">
               <input type="hidden" name="student_id" value={filters.studentId} />
-              <p className="text-sm">{t("oneStudentOnly")}</p>
+              <Pill variant="date" size="md">
+                {t("oneStudentOnly")}
+              </Pill>
               <Link href="/findings" className="text-sm text-primary underline">
                 {t("allStudents")}
               </Link>
             </div>
           ) : null}
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+            <SegmentedControl
+              name="severity"
+              legend={t("filterSeverity")}
+              legendVisible
+              size="sm"
+              defaultValue={severityValue}
+              options={[
+                { value: "", label: tc("all") },
+                ...SEVERITIES.map((severity) => ({ value: severity, label: tsev(severity) })),
+              ]}
+            />
             <fieldset className="space-y-1">
-              <legend className="text-sm font-semibold text-ink">{t("filterStatus")}</legend>
-              <div className="flex flex-wrap gap-x-4">
+              <legend className="mb-1 text-sm font-medium text-ink">{t("filterStatus")}</legend>
+              <div className="flex min-h-10 flex-wrap items-center gap-x-4">
                 {FINDING_STATUSES.map((status) => (
                   <Checkbox
                     key={status}
@@ -279,20 +320,6 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
                     value={status}
                     label={tstatus(status)}
                     defaultChecked={filters.status.includes(status)}
-                  />
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className="space-y-1">
-              <legend className="text-sm font-semibold text-ink">{t("filterSeverity")}</legend>
-              <div className="flex flex-wrap gap-x-4">
-                {SEVERITIES.map((severity) => (
-                  <Checkbox
-                    key={severity}
-                    name="severity"
-                    value={severity}
-                    label={tsev(severity)}
-                    defaultChecked={filters.severity.includes(severity)}
                   />
                 ))}
               </div>
@@ -332,11 +359,12 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
                 ...sections.map((section) => ({ value: section.id, label: section.label })),
               ]}
             />
-            <div className="flex flex-wrap gap-3">
-              <Button type="submit" variant="secondary">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit">
+                <Icon name="filter" className="size-4" />
                 {tc("applyFilters")}
               </Button>
-              <Link href="/findings/rules" className="self-center text-sm text-primary underline">
+              <Link href="/findings/rules" className="text-sm text-primary underline">
                 {t("rulesLink")}
               </Link>
             </div>
@@ -354,14 +382,13 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           emptyTitle={t("emptyTitle")}
         />
       ) : rows.length === 0 ? (
-        <EmptyState title={t("emptyTitle")} body={t("emptyBody")} />
+        <EmptyState icon="checkCircle" title={t("emptyTitle")} body={t("emptyBody")} />
       ) : (
         <>
-          <section aria-labelledby="dq-blockers-heading" className="space-y-3">
-            <h2 id="dq-blockers-heading" className="text-lg font-semibold">
-              {t("blockersTitle", { count: blockers.length })}
-            </h2>
-            <p className="text-sm text-ink-muted">{t("blockersHint")}</p>
+          <Card
+            title={t("blockersTitle", { count: blockers.length })}
+            description={t("blockersHint")}
+          >
             {blockers.length > 0 ? (
               <DataTable
                 caption={t("blockersCaption")}
@@ -372,13 +399,10 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
                 emptyTitle={t("noBlockers")}
               />
             ) : (
-              <p className="text-sm">{t("noBlockers")}</p>
+              <p className="text-sm text-ink-muted">{t("noBlockers")}</p>
             )}
-          </section>
-          <section aria-labelledby="dq-warnings-heading" className="space-y-3">
-            <h2 id="dq-warnings-heading" className="text-lg font-semibold">
-              {t("warningsTitle", { count: others.length })}
-            </h2>
+          </Card>
+          <Card title={t("warningsTitle", { count: others.length })}>
             {others.length > 0 ? (
               <DataTable
                 caption={t("warningsCaption")}
@@ -389,9 +413,9 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
                 emptyTitle={t("noWarnings")}
               />
             ) : (
-              <p className="text-sm">{t("noWarnings")}</p>
+              <p className="text-sm text-ink-muted">{t("noWarnings")}</p>
             )}
-          </section>
+          </Card>
           {findings.hasNextPage ? (
             <div className="flex justify-center print:hidden">
               <Button

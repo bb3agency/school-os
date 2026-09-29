@@ -2,7 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 
 /**
  * Cursor paging (docs/09 §2: `?cursor=` with `next_cursor`): the cursors of the pages already
@@ -35,13 +37,19 @@ export function Pager({
   const t = useTranslations("students.list");
   if (!onPrevious && !onNext) return null;
   return (
-    <nav aria-label={label} className="flex flex-wrap items-center gap-3" data-print="hide">
-      <Button variant="secondary" onClick={onPrevious} disabled={!onPrevious}>
+    <nav
+      aria-label={label}
+      className="flex flex-wrap items-center justify-end gap-3"
+      data-print="hide"
+    >
+      <Button variant="secondary" size="sm" onClick={onPrevious} disabled={!onPrevious}>
+        <Icon name="chevronLeft" className="size-4" />
         {t("previous")}
       </Button>
-      <span className="text-sm text-ink-muted">{t("pageNumber", { page })}</span>
-      <Button variant="secondary" onClick={onNext} disabled={!onNext}>
+      <Pill variant="dark">{t("pageNumber", { page })}</Pill>
+      <Button variant="secondary" size="sm" onClick={onNext} disabled={!onNext}>
         {t("next")}
+        <Icon name="chevronRight" className="size-4" />
       </Button>
     </nav>
   );

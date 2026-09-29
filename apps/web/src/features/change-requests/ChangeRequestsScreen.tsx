@@ -2,11 +2,13 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { Badge } from "@/components/ui/Badge";
+import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { SelectField } from "@/components/ui/Select";
+import { Icon } from "@/components/ui/Icon";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
@@ -61,12 +63,16 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
     {
       key: "requested",
       header: t("colRequested"),
-      cell: (row) => <Value>{formatDateTime(row.requested_at)}</Value>,
+      cell: (row) => (
+        <span className="font-mono text-xs whitespace-nowrap text-ink-muted">
+          <Value>{formatDateTime(row.requested_at)}</Value>
+        </span>
+      ),
     },
     {
       key: "field",
       header: t("colField"),
-      cell: (row) => fieldLabel(row, locale),
+      cell: (row) => <span className="font-medium">{fieldLabel(row, locale)}</span>,
     },
     { key: "change", header: t("colChange"), cell: (row) => <ValueChange request={row} /> },
     {
@@ -76,7 +82,7 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
         <span className="flex flex-col items-start gap-1">
           <ChangeRequestStatusBadge status={row.status} />
           {row.status === "pending" && row.can_decide && !mine(row) ? (
-            <Badge tone="info">{t("waitingForYou")}</Badge>
+            <Pill variant="dark">{t("waitingForYou")}</Pill>
           ) : null}
           <span className="text-xs text-ink-muted">
             <ExpiryText request={row} />
@@ -95,7 +101,7 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
       cell: (row) => (
         <Link
           href={`/change-requests/${row.id}`}
-          className="font-semibold whitespace-nowrap text-primary underline"
+          className="font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {t("open")}
           <span className="sr-only">
@@ -111,6 +117,7 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
         actions={
           can(CR_REQUEST) ? (
             <ButtonLink
@@ -120,40 +127,46 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
                   : "/change-requests/new"
               }
             >
+              <Icon name="plus" className="size-4" />
               {t("newRequest")}
             </ButtonLink>
           ) : null
         }
       />
-      {can(CR_APPROVE) ? <p className="text-sm text-ink-muted">{t("approverHint")}</p> : null}
+      {can(CR_APPROVE) ? <Alert tone="info">{t("approverHint")}</Alert> : null}
       <Card title={t("filtersTitle")}>
-        <form method="get" className="flex flex-wrap items-end gap-4">
+        <form method="get" className="space-y-4">
           {filters.studentId ? (
-            <>
+            <div className="flex flex-wrap items-center gap-3">
               <input type="hidden" name="student_id" value={filters.studentId} />
-              <p className="self-center text-sm">
-                {t("oneStudentOnly")}{" "}
-                <Link href="/change-requests" className="text-primary underline">
-                  {t("allStudents")}
-                </Link>
-              </p>
-            </>
+              <Pill variant="date" size="md">
+                {t("oneStudentOnly")}
+              </Pill>
+              <Link href="/change-requests" className="text-sm text-primary underline">
+                {t("allStudents")}
+              </Link>
+            </div>
           ) : null}
-          <SelectField
-            name="status"
-            label={t("filterStatus")}
-            defaultValue={filters.status ?? ""}
-            options={[
-              { value: "", label: tc("all") },
-              ...CHANGE_REQUEST_STATUSES.map((status) => ({
-                value: status,
-                label: tstatus(status),
-              })),
-            ]}
-          />
-          <Button type="submit" variant="secondary">
-            {tc("applyFilters")}
-          </Button>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SegmentedControl
+              name="status"
+              legend={t("filterStatus")}
+              legendVisible
+              size="sm"
+              defaultValue={filters.status ?? ""}
+              options={[
+                { value: "", label: tc("all") },
+                ...CHANGE_REQUEST_STATUSES.map((status) => ({
+                  value: status,
+                  label: tstatus(status),
+                })),
+              ]}
+            />
+            <Button type="submit">
+              <Icon name="filter" className="size-4" />
+              {tc("applyFilters")}
+            </Button>
+          </div>
         </form>
       </Card>
       <DataTable

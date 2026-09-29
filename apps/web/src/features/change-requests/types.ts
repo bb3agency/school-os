@@ -3,7 +3,7 @@
  * carry `satisfies` checks so they fail to compile if the API adds a value.
  */
 import type { components } from "@schoolos/api-client";
-import type { BadgeTone } from "@/components/ui/Badge";
+import type { PillVariant } from "@/components/ui/Badge";
 
 type Schemas = components["schemas"];
 
@@ -25,12 +25,12 @@ const statuses = [
 ] as const satisfies readonly ChangeRequestStatus[];
 export const CHANGE_REQUEST_STATUSES: Exhaustive<ChangeRequestStatus, typeof statuses> = statuses;
 
-export const changeRequestTone: Record<ChangeRequestStatus, BadgeTone> = {
-  pending: "warning",
-  approved: "success",
-  rejected: "danger",
-  expired: "neutral",
-  cancelled: "neutral",
+export const changeRequestPill: Record<ChangeRequestStatus, PillVariant> = {
+  pending: "review",
+  approved: "done",
+  rejected: "negative",
+  expired: "tag",
+  cancelled: "tag",
 };
 
 /** Permission keys (apps/api/app/authz/permissions.yaml). */

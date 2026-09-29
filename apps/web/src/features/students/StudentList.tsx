@@ -4,11 +4,15 @@ import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 import { z } from "zod";
+import { Avatar } from "@/components/ui/Avatar";
+import { Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTable, Table, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { classLabel as classDisplay } from "@/lib/school-class";
 import { Link } from "@/i18n/navigation";
@@ -202,43 +206,6 @@ export function StudentListView({
           .map((row) => ({ value: row.id, label: row.label }))
       : [];
 
-  const columns: Column<StudentSummary>[] = [
-    {
-      key: "name",
-      header: t("colName"),
-      cell: (row) => (
-        <div>
-          <Link
-            href={`/students/${row.id}`}
-            className="font-semibold text-primary underline underline-offset-2"
-          >
-            {row.display_name ?? t("unnamed")}
-          </Link>
-          {row.match.field && !["full_name", "admission_no"].includes(row.match.field) ? (
-            <p className="text-xs text-ink-muted" data-print="hide">
-              {t("matchedOn", { field: index.label(row.match.field) })}
-            </p>
-          ) : null}
-        </div>
-      ),
-    },
-    {
-      key: "admission",
-      header: t("colAdmissionNo"),
-      cell: (row) => <Value>{row.admission_no}</Value>,
-    },
-    {
-      key: "class",
-      header: t("colClassSection"),
-      cell: (row) => <Value>{row.class_section}</Value>,
-    },
-    {
-      key: "status",
-      header: t("colStatus"),
-      cell: (row) => <StudentStatusBadge status={row.status} />,
-    },
-  ];
-
   const rows: Loadable<readonly StudentSummary[]> | null =
     results === null
       ? null
@@ -259,10 +226,14 @@ export function StudentListView({
       <PageHeader
         title={t("title")}
         description={t("description")}
+        breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
         actions={
           <>
             {permissions.has(PERM.create) ? (
-              <ButtonLink href="/students/new">{t("add")}</ButtonLink>
+              <ButtonLink href="/students/new">
+                <Icon name="plus" className="size-4" />
+                {t("add")}
+              </ButtonLink>
             ) : null}
             {permissions.has(PERM.importRun) ? (
               <ButtonLink href="/imports" variant="secondary">
@@ -288,7 +259,13 @@ export function StudentListView({
             noValidate
             onSubmit={submit}
           >
-            <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
+            <div
+              className={
+                yearOptions.length > 0
+                  ? "grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr]"
+                  : "grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr]"
+              }
+            >
               <GuardedTextField
                 id={SEARCH_FIELD_ID}
                 name="q"
@@ -327,45 +304,56 @@ export function StudentListView({
                 defaultValue={filters.sectionId ?? ""}
                 key={`section-${yearId}-${classId}`}
               />
-              <SelectField
-                name="status"
-                label={t("filterStatus")}
-                placeholder={tc("all")}
-                options={STUDENT_STATUSES.map((value) => ({
-                  value,
-                  label: ts(`status.${value}`),
-                }))}
-                defaultValue={filters.status ?? ""}
-              />
-              <div className="flex gap-2">
-                <Button type="submit">{tc("search")}</Button>
-              </div>
             </div>
-            {hasFilters ? (
-              <div>
-                <Button variant="ghost" size="sm" onClick={onClear}>
-                  {t("clear")}
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <SegmentedControl
+                name="status"
+                legend={t("filterStatus")}
+                legendVisible
+                size="sm"
+                defaultValue={filters.status ?? ""}
+                options={[
+                  { value: "", label: tc("all") },
+                  ...STUDENT_STATUSES.map((value) => ({
+                    value,
+                    label: ts(`status.${value}`),
+                  })),
+                ]}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                {hasFilters ? (
+                  <Button variant="ghost" onClick={onClear}>
+                    {t("clear")}
+                  </Button>
+                ) : null}
+                <Button type="submit">
+                  <Icon name="search" className="size-4" />
+                  {tc("search")}
                 </Button>
               </div>
-            ) : null}
+            </div>
           </form>
         </Card>
       </div>
 
       {rows === null ? null : (
         <section aria-labelledby="student-results" className="space-y-3">
-          <h2 id="student-results" className="text-lg font-semibold">
+          <h2 id="student-results" className="text-lg font-medium text-ink">
             {t("resultsTitle")}
           </h2>
-          <DataTable
-            caption={t("resultsTitle")}
-            captionHidden
-            columns={columns}
-            state={rows}
-            rowKey={(row) => row.id}
-            emptyTitle={hasFilters ? t("noMatchTitle") : t("emptyTitle")}
-            emptyBody={hasFilters ? t("noMatchBody") : t("emptyBody")}
-          />
+          {rows.status === "ready" && rows.data.length > 0 ? (
+            <StudentRows rows={rows.data} matchedOn={(row) => matchedField(row, index.label)} />
+          ) : (
+            <DataTable
+              caption={t("resultsTitle")}
+              captionHidden
+              columns={[]}
+              state={rows}
+              rowKey={(row) => row.id}
+              emptyTitle={hasFilters ? t("noMatchTitle") : t("emptyTitle")}
+              emptyBody={hasFilters ? t("noMatchBody") : t("emptyBody")}
+            />
+          )}
           {results?.status === "ready" ? (
             <Pager
               label={t("pagesLabel")}
@@ -376,6 +364,93 @@ export function StudentListView({
           ) : null}
         </section>
       )}
+    </div>
+  );
+}
+
+/** "Found by: Father's name" when the match was not on the name or admission number. */
+function matchedField(row: StudentSummary, label: (key: string) => string): string | null {
+  const field = row.match.field;
+  if (!field || ["full_name", "admission_no"].includes(field)) return null;
+  return label(field);
+}
+
+/**
+ * The results table. The name is the row's one link; it stretches over the whole row, so a
+ * click anywhere on the row opens the profile while keyboard users still Tab to one link
+ * per student (no row-level tabindex or click handlers).
+ */
+function StudentRows({
+  rows,
+  matchedOn,
+}: {
+  rows: readonly StudentSummary[];
+  matchedOn: (row: StudentSummary) => string | null;
+}) {
+  const t = useTranslations("students.list");
+  const tc = useTranslations("common");
+  return (
+    <div
+      role="region"
+      aria-label={tc("scrollableTable", { caption: t("resultsTitle") })}
+      tabIndex={0}
+      className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card print:overflow-visible print:border-0 print:shadow-none"
+    >
+      <Table>
+        <caption className="sr-only">{t("resultsTitle")}</caption>
+        <THead>
+          <Tr>
+            <Th>{t("colName")}</Th>
+            <Th>{t("colAdmissionNo")}</Th>
+            <Th>{t("colClassSection")}</Th>
+            <Th>{t("colStatus")}</Th>
+          </Tr>
+        </THead>
+        <TBody>
+          {rows.map((row) => {
+            const found = matchedOn(row);
+            return (
+              <Tr key={row.id} className="relative">
+                <Td>
+                  <div className="flex items-center gap-3">
+                    {row.display_name ? (
+                      <Avatar name={row.display_name} size="sm" decorative />
+                    ) : null}
+                    <div className="min-w-0">
+                      <Link
+                        href={`/students/${row.id}`}
+                        className="font-medium text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
+                      >
+                        {row.display_name ?? t("unnamed")}
+                      </Link>
+                      {found ? (
+                        <p className="text-xs text-ink-muted" data-print="hide">
+                          {t("matchedOn", { field: found })}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </Td>
+                <Td>
+                  <span className="font-mono text-sm">
+                    <Value>{row.admission_no}</Value>
+                  </span>
+                </Td>
+                <Td>
+                  {row.class_section ? (
+                    <Pill variant="tag">{row.class_section}</Pill>
+                  ) : (
+                    <Value>{null}</Value>
+                  )}
+                </Td>
+                <Td>
+                  <StudentStatusBadge status={row.status} />
+                </Td>
+              </Tr>
+            );
+          })}
+        </TBody>
+      </Table>
     </div>
   );
 }

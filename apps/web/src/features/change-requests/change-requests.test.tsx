@@ -131,6 +131,18 @@ describe("change request detail (US-601 AC1–AC4, FR-CR-002, FR-CR-004)", () =>
     expect(JSON.parse(call?.body ?? "{}")).toEqual({ note: null });
   });
 
+  it("puts the checker's decision in its own card and shows the steps as a timeline", async () => {
+    detail([APPROVE]);
+    renderWithIntl(<ChangeRequestDetailScreen changeRequestId={CR} />);
+    const decision = await screen.findByRole("region", { name: "Waiting for a decision" });
+    expect(within(decision).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(decision).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    const steps = screen.getByRole("list", { name: "Steps of this request" });
+    expect(within(steps).getByText("Asked on")).toBeInTheDocument();
+    expect(within(steps).getByText("Waiting for a decision")).toBeInTheDocument();
+    expect(screen.getByText("Evidence document")).toBeInTheDocument();
+  });
+
   it("rejecting needs a reason of at least 10 characters", async () => {
     detail([APPROVE]);
     renderWithIntl(<ChangeRequestDetailScreen changeRequestId={CR} />);

@@ -2,9 +2,12 @@
 
 import { useTranslations } from "next-intl";
 import { useId, useRef, useState } from "react";
-import { Badge } from "@/components/ui/Badge";
+import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
+import { Table, TBody, THead, Th, Tr } from "@/components/ui/Table";
+import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatDate } from "@/lib/format";
@@ -44,12 +47,16 @@ interface Index {
   label: (key: string) => string;
 }
 
-function differs(value: SourceValue, register: SourceValue | undefined): boolean {
-  if (!register || value.id === register.id) return false;
+/** Compared with the register: "differs", "matches", or null when it can't be compared. */
+function comparison(
+  value: SourceValue,
+  register: SourceValue | undefined,
+): "differs" | "matches" | null {
+  if (!register || value.id === register.id) return null;
   if (value.masked || register.masked || value.value === null || register.value === null) {
-    return false;
+    return null;
   }
-  return !sameValue(value.value, register.value);
+  return sameValue(value.value, register.value) ? "matches" : "differs";
 }
 
 function ShownValue({
@@ -125,7 +132,7 @@ function HistoryDialog({
           setOpen(false);
           triggerRef.current?.focus();
         }}
-        className="m-auto w-[min(40rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-ink shadow-xl"
+        className="m-auto w-[min(40rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
       >
         {open ? (
           <>
@@ -137,18 +144,9 @@ function HistoryDialog({
                 type="button"
                 onClick={close}
                 aria-label={tc("close")}
-                className="rounded-md p-1 text-ink-muted hover:bg-surface-muted hover:text-ink"
+                className="rounded-full p-1.5 text-ink-muted hover:bg-surface-muted hover:text-ink"
               >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="size-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
+                <Icon name="close" />
               </button>
             </div>
             <ol className="max-h-[60vh] space-y-3 overflow-y-auto p-5 text-sm">
@@ -163,7 +161,7 @@ function HistoryDialog({
                       studentId={studentId}
                       canReveal={canReveal}
                     />
-                    {value.current ? null : <Badge>{t("replaced")}</Badge>}
+                    {value.current ? null : <Pill variant="tag">{t("replaced")}</Pill>}
                   </div>
                   <p className="text-xs text-ink-muted">
                     {ts("detail.recordedOn", { date: formatDate(value.recorded_at) ?? "" })}
@@ -228,26 +226,20 @@ export function ValuesBySourceView({
           role="region"
           aria-label={t("table")}
           tabIndex={0}
-          className="overflow-x-auto rounded-md border border-border print:overflow-visible print:border-0"
+          className="overflow-x-auto rounded-xl border border-border print:overflow-visible print:border-0"
         >
-          <table className="w-full border-collapse text-left text-sm">
+          <Table>
             <caption className="sr-only">{t("table")}</caption>
-            <thead className="bg-surface-muted">
-              <tr>
-                <th scope="col" className="px-3 py-2 font-semibold">
-                  {ts("detail.colField")}
-                </th>
+            <THead>
+              <Tr>
+                <Th>{ts("detail.colField")}</Th>
                 {MAIN_SOURCES.map((source) => (
-                  <th key={source} scope="col" className="px-3 py-2 font-semibold">
-                    {ts(`sources.${source}`)}
-                  </th>
+                  <Th key={source}>{ts(`sources.${source}`)}</Th>
                 ))}
-                <th scope="col" className="px-3 py-2 font-semibold">
-                  {t("otherSources")}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+                <Th>{t("otherSources")}</Th>
+              </Tr>
+            </THead>
+            <TBody>
               {keys.map((key) => {
                 const all = byKey.get(key) ?? [];
                 const current = all.filter((value) => value.current);
@@ -263,7 +255,7 @@ export function ValuesBySourceView({
                           verification={value.verification_status}
                         />
                       ) : null}
-                      <span className="font-semibold">
+                      <span className="font-mono font-medium">
                         <ShownValue
                           value={value}
                           attribute={attribute}
@@ -273,21 +265,26 @@ export function ValuesBySourceView({
                         />
                       </span>
                     </div>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {withChip ? null : (
                         <span className="text-xs text-ink-muted">
                           {ts(`verification.${value.verification_status}`)}
                         </span>
                       )}
-                      {differs(value, register) ? (
-                        <Badge tone="warning">{t("differs")}</Badge>
+                      {comparison(value, register) === "differs" ? (
+                        <Pill variant="negative">{t("differs")}</Pill>
+                      ) : comparison(value, register) === "matches" ? (
+                        <Pill variant="positive">{t("matches")}</Pill>
                       ) : null}
                     </div>
                   </div>
                 );
                 return (
                   <tr key={key} className="align-top">
-                    <th scope="row" className="px-3 py-3 text-left font-semibold whitespace-normal">
+                    <th
+                      scope="row"
+                      className="px-4 py-4 text-left font-medium whitespace-normal text-ink"
+                    >
                       <span className="block">{label}</span>
                       <span data-print="hide">
                         <HistoryDialog
@@ -302,7 +299,7 @@ export function ValuesBySourceView({
                     {MAIN_SOURCES.map((source) => {
                       const found = current.filter((value) => value.source === source);
                       return (
-                        <td key={source} className="px-3 py-3">
+                        <td key={source} className="px-4 py-4">
                           {found.length === 0 ? (
                             <Value>{null}</Value>
                           ) : (
@@ -311,7 +308,7 @@ export function ValuesBySourceView({
                         </td>
                       );
                     })}
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-4">
                       {current.filter((value) => !isMain(value.source)).length === 0 ? (
                         <Value>{null}</Value>
                       ) : (
@@ -325,8 +322,8 @@ export function ValuesBySourceView({
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       )}
     </Card>
@@ -334,14 +331,90 @@ export function ValuesBySourceView({
 }
 
 /** GET /students/{id}/values (full history; 404 outside the caller's scope). */
-export function ValuesBySource(props: ValuesBySourceProps) {
+function useValues(studentId: string): Loadable<readonly SourceValue[]> {
   const api = useBffClient("staff");
-  const values = useApiQuery(valuesKey(props.studentId), () =>
+  return useApiQuery(valuesKey(studentId), () =>
     unwrap(
       api.GET("/api/v1/students/{student_id}/values", {
-        params: { path: { student_id: props.studentId } },
+        params: { path: { student_id: studentId } },
       }),
     ),
   );
+}
+
+export function ValuesBySource(props: ValuesBySourceProps) {
+  const values = useValues(props.studentId);
   return <ValuesBySourceView {...props} values={values} />;
+}
+
+/**
+ * Every value recorded for the student as a timeline, newest first (the same GET /values
+ * data: nothing new is fetched). Replaced values stay listed; restricted ones stay masked.
+ */
+export function ValuesHistoryView({
+  studentId,
+  index,
+  canReveal,
+  values,
+}: ValuesBySourceProps & { values: Loadable<readonly SourceValue[]> }) {
+  const t = useTranslations("students.detail");
+  const tb = useTranslations("students.bySource");
+  if (values.status !== "ready") {
+    return (
+      <Card title={t("historyTitle")} description={t("historyDescription")}>
+        <LoadGate state={values} />
+      </Card>
+    );
+  }
+  const sorted = [...values.data].sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+  return (
+    <Card title={t("historyTitle")} description={t("historyDescription")}>
+      {sorted.length === 0 ? (
+        <p className="text-sm text-ink-muted">{tb("empty")}</p>
+      ) : (
+        <Timeline
+          label={t("historyTimeline")}
+          items={sorted.map((value) => {
+            const label = index.label(value.attribute_key);
+            return {
+              id: value.id,
+              title: label,
+              time: <time dateTime={value.recorded_at}>{formatDate(value.recorded_at) ?? ""}</time>,
+              status: value.current ? "done" : "pending",
+              statusLabel: value.current ? t("historyInUse") : tb("replaced"),
+              body: (
+                <span className="font-mono text-ink">
+                  <ShownValue
+                    value={value}
+                    attribute={index.byKey.get(value.attribute_key)}
+                    label={label}
+                    studentId={studentId}
+                    canReveal={canReveal}
+                  />
+                </span>
+              ),
+              chips: (
+                <>
+                  <SourceChip source={value.source} verification={value.verification_status} />
+                  {value.current ? (
+                    <Pill variant="positive">{t("historyInUse")}</Pill>
+                  ) : (
+                    <Pill variant="tag">{tb("replaced")}</Pill>
+                  )}
+                  {value.change_request_id ? (
+                    <Pill variant="review">{t("historyCorrection")}</Pill>
+                  ) : null}
+                </>
+              ),
+            };
+          })}
+        />
+      )}
+    </Card>
+  );
+}
+
+export function ValuesHistory(props: ValuesBySourceProps) {
+  const values = useValues(props.studentId);
+  return <ValuesHistoryView {...props} values={values} />;
 }

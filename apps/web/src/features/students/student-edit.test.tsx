@@ -131,6 +131,11 @@ function renderDetail(
   );
 }
 
+/** The profile is tabbed: parents, class history and values by source are later tabs. */
+function openTab(name: string) {
+  fireEvent.click(screen.getByRole("tab", { name }));
+}
+
 beforeEach(() => {
   stub = installBffStub("staff");
   stub.routes["GET /bff/api/v1/academic-years"] = () =>
@@ -198,9 +203,12 @@ describe("invariant 6 / FR-CR-001: identity fields change only through a correct
     expect(screen.queryByRole("link", { name: new RegExp(sm.edit.requestChange) })).toBeNull();
     expect(screen.queryByRole("button", { name: new RegExp(`^${sm.edit.change}`) })).toBeNull();
     expect(screen.queryByRole("button", { name: sm.edit.statusOpen })).toBeNull();
-    expect(screen.queryByRole("button", { name: sm.edit.enrolOpen })).toBeNull();
-    expect(screen.queryByRole("button", { name: sm.guardians.add })).toBeNull();
-    expect(screen.queryByRole("button", { name: new RegExp(`^${sm.guardians.edit}`) })).toBeNull();
+    // Hidden tab panels count too, so these never pass only because a tab is closed.
+    expect(screen.queryByRole("button", { name: sm.edit.enrolOpen, hidden: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: sm.guardians.add, hidden: true })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: new RegExp(`^${sm.guardians.edit}`), hidden: true }),
+    ).toBeNull();
   });
 });
 
@@ -277,6 +285,7 @@ describe("US-301 / FR-STU-005: class and section", () => {
       );
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabEnrolments);
     await user.click(screen.getByRole("button", { name: sm.edit.enrolOpen }));
     const dialog = screen.getByRole("dialog");
     const select = within(dialog).getByLabelText(sm.edit.section);
@@ -302,6 +311,7 @@ describe("US-301 / FR-STU-005: class and section", () => {
       problem(409, "already_enrolled");
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabEnrolments);
     await user.click(screen.getByRole("button", { name: sm.edit.enrolOpen }));
     const dialog = screen.getByRole("dialog");
     const select = within(dialog).getByLabelText(sm.edit.section);
@@ -365,6 +375,7 @@ describe("US-301 / FR-STU-004: parents and guardians", () => {
       Response.json(guardian({ id: "0192f3a4-0000-7000-8000-00000000c302" }), { status: 201 });
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabGuardians);
     await user.click(screen.getByRole("button", { name: sm.guardians.add }));
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText(sm.guardians.fullName), "Lakshmi K.");
@@ -397,6 +408,7 @@ describe("US-301 / FR-STU-004: parents and guardians", () => {
       Response.json(guardian({ version: 3, has_phone: false, phone: null }));
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabGuardians);
     await user.click(screen.getByRole("button", { name: `${sm.guardians.edit}: Ramana K.` }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByLabelText(sm.guardians.fullName)).toHaveValue("Ramana K.");
@@ -420,6 +432,7 @@ describe("US-301 / FR-STU-004: parents and guardians", () => {
       problem(412, "precondition_failed");
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabGuardians);
     await user.click(screen.getByRole("button", { name: `${sm.guardians.edit}: Ramana K.` }));
     const dialog = screen.getByRole("dialog");
     await user.clear(within(dialog).getByLabelText(sm.guardians.fullName));
@@ -448,6 +461,7 @@ describe("US-301 / FR-STU-005: enrolments (list, correct, end)", () => {
 
   it("lists every enrolment, newest first, with its year, class, roll number and status", async () => {
     renderDetail();
+    openTab(sm.detail.tabEnrolments);
     const current = await enrolmentRow("2026-27");
     expect(within(current).getByText("Class 9 · A")).toBeInTheDocument();
     expect(within(current).getByText("12")).toBeInTheDocument();
@@ -494,6 +508,7 @@ describe("US-301 / FR-STU-005: enrolments (list, correct, end)", () => {
     stub.routes[PATCH] = () => Response.json(enrolment({ roll_no: "14", section_id: SECTION_B }));
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabEnrolments);
     const row = await enrolmentRow("2026-27");
     await user.click(within(row).getByRole("button", { name: /^Correct/ }));
     const dialog = screen.getByRole("dialog");
@@ -535,6 +550,7 @@ describe("US-301 / FR-STU-005: enrolments (list, correct, end)", () => {
     };
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabEnrolments);
     const row = await enrolmentRow("2026-27");
     await user.click(within(row).getByRole("button", { name: /^Correct/ }));
     const dialog = screen.getByRole("dialog");
@@ -556,6 +572,7 @@ describe("US-301 / FR-STU-005: enrolments (list, correct, end)", () => {
       Response.json(enrolment({ status: "transferred", ended_on: "2026-07-15", version: 7 }));
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabEnrolments);
     const row = await enrolmentRow("2026-27");
     await user.click(within(row).getByRole("button", { name: /^End/ }));
     let dialog = screen.getByRole("dialog");
@@ -579,6 +596,7 @@ describe("US-301 / FR-STU-005: enrolments (list, correct, end)", () => {
     stub.routes[END] = () => problem(409, "enrollment_not_active");
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabEnrolments);
     const row = await enrolmentRow("2026-27");
     await user.click(within(row).getByRole("button", { name: /^End/ }));
     const dialog = screen.getByRole("dialog");
@@ -591,6 +609,7 @@ describe("US-301 / FR-STU-005: enrolments (list, correct, end)", () => {
 
   it("offers no enrolment changes without student.update_nonidentity", async () => {
     renderDetail(["student.read_basic"]);
+    openTab(sm.detail.tabEnrolments);
     const row = await enrolmentRow("2026-27");
     expect(within(row).queryByRole("button")).toBeNull();
   });
@@ -603,6 +622,7 @@ describe("US-301 / FR-STU-004: remove a parent or guardian", () => {
     stub.routes[DELETE] = () => new Response(null, { status: 204 });
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabGuardians);
     await user.click(screen.getByRole("button", { name: `${sm.guardians.remove}: Ramana K.` }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(sm.guardians.removeBody)).toBeInTheDocument();
@@ -616,6 +636,7 @@ describe("US-301 / FR-STU-004: remove a parent or guardian", () => {
     stub.routes[DELETE] = () => problem(412, "precondition_failed");
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabGuardians);
     await user.click(screen.getByRole("button", { name: `${sm.guardians.remove}: Ramana K.` }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: sm.guardians.removeSubmit }));
@@ -627,6 +648,7 @@ describe("US-301 / FR-STU-004: remove a parent or guardian", () => {
 
   it("offers no remove without student.update_nonidentity", () => {
     renderDetail(["student.read_basic"]);
+    openTab(sm.detail.tabGuardians);
     expect(
       screen.queryByRole("button", { name: new RegExp(`^${sm.guardians.remove}`) }),
     ).toBeNull();
@@ -636,6 +658,7 @@ describe("US-301 / FR-STU-004: remove a parent or guardian", () => {
 describe("US-301 / FR-STU-002: values by source from GET /students/{id}/values", () => {
   it("lines up each source's current value and marks differences from the register", async () => {
     renderDetail();
+    openTab(sm.detail.tabBySource);
     const table = await screen.findByRole("table", { name: sm.bySource.table });
     await within(table).findByText("Venkatasai Kumar");
     const row = within(table).getByRole("row", { name: /Full name/ });
@@ -651,6 +674,7 @@ describe("US-301 / FR-STU-002: values by source from GET /students/{id}/values",
   it("shows a field's full history, oldest values marked as replaced", async () => {
     const user = userEvent.setup();
     renderDetail();
+    openTab(sm.detail.tabBySource);
     const table = await screen.findByRole("table", { name: sm.bySource.table });
     await within(table).findByText("Venkatasai Kumar");
     await user.click(
@@ -660,5 +684,30 @@ describe("US-301 / FR-STU-002: values by source from GET /students/{id}/values",
     expect(within(dialog).getByText("Venkata Sai")).toBeInTheDocument();
     expect(within(dialog).getAllByText(sm.bySource.replaced).length).toBe(1);
     fireEvent.keyDown(dialog, { key: "Escape" });
+  });
+
+  it("marks a value that matches the register apart from spacing as matching (FR-STU-002)", async () => {
+    renderDetail();
+    openTab(sm.detail.tabBySource);
+    const table = await screen.findByRole("table", { name: sm.bySource.table });
+    await within(table).findByText("Venkatasai Kumar");
+    const row = within(table).getByRole("row", { name: /Full name/ });
+    expect(within(row).getAllByText(sm.bySource.matches)).toHaveLength(1);
+  });
+});
+
+describe("US-301: the History tab lists every recorded value, newest first", () => {
+  it("shows replaced values as a timeline without unmasking anything", async () => {
+    renderDetail();
+    openTab(sm.detail.tabHistory);
+    const list = await screen.findByRole("list", { name: sm.detail.historyTimeline });
+    await within(list).findByText("Venkata Sai");
+    const items = within(list).getAllByRole("listitem");
+    // The oldest value (recorded in 2025) comes last and is marked as replaced.
+    expect(
+      within(items[items.length - 1] as HTMLElement).getByText("Venkata Sai"),
+    ).toBeInTheDocument();
+    expect(within(list).getAllByText(sm.bySource.replaced).length).toBeGreaterThan(0);
+    expect(within(list).queryByText(/\d{4} \d{4}/)).toBeNull();
   });
 });
