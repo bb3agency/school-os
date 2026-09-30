@@ -71,6 +71,9 @@
   --color-canvas-from: #dbe9fa; /* ink-muted 6.1:1, ink-subtle 4.8:1, primary 5.4:1 */
   --color-canvas-via: #ecf5fc; /* ink-subtle 5.3:1 */
   --color-canvas-to: #dcf2f0; /* ink-muted 6.5:1, ink-subtle 5.1:1, primary 5.7:1 */
+  /* Near-neutral canvas behind dense record screens (docs/17 §3.2): calm, so status colour
+     inside the tables is the only colour that means something. */
+  --color-canvas-neutral: #f4f6f9; /* ink 16.4:1, ink-muted 7.0:1, ink-subtle 5.4:1, primary 6.2:1 */
 
   /* Surfaces */
   --color-surface: #ffffff;
@@ -124,15 +127,6 @@
   --color-teal-soft: #e6f7f5;
   --color-teal: #0f766e; /* 5.5:1 on white */
 
-  /* Status pills (white text): gradients from the darker to the lighter stop.
-     The ratio is for white text on the LIGHTER stop, i.e. the worst case. */
-  --color-pill-blue-from: #1d4ed8;
-  --color-pill-blue-to: #2563eb; /* white 5.2:1 */
-  --color-pill-violet-from: #4f46e5;
-  --color-pill-violet-to: #7c3aed; /* white 5.7:1 (and 6.3:1 on the first stop) */
-  --color-pill-teal-from: #0f766e;
-  --color-pill-teal-to: #0e7a6f; /* white 5.2:1 */
-
   /* AI panel: white text; lightest stop brand #2563eb (5.2:1). */
   --color-ai-from: #1e3a8a; /* white 10.4:1 */
   --color-ai-to: #2563eb;
@@ -155,13 +149,17 @@
   --color-platform-accent-ink: #3b0764;
   --color-platform-soft: #f5f0ff; /* platform ink on it 13.4:1 */
 
+  /* Radii: the calm app scale (docs/17 §3). Cards, dialogs and panels in the signed-in app
+     are 10-14px, controls a step smaller. The public marketing pages restore their larger
+     scale under `.mk` (features/marketing/marketing.css); tokens.test.ts checks both. */
   --radius-*: initial;
-  --radius-xs: 0.25rem;
-  --radius-sm: 0.5rem; /* 8px */
-  --radius-md: 0.625rem; /* 10px: buttons, inputs */
-  --radius-lg: 0.875rem; /* 14px */
-  --radius-xl: 1.25rem; /* 20px: cards */
-  --radius-2xl: 1.5rem;
+  --radius-xs: 0.25rem; /* 4px */
+  --radius-sm: 0.375rem; /* 6px: small chips, focus targets inside controls */
+  --radius-md: 0.5rem; /* 8px: buttons, inputs, selects, nav rows */
+  --radius-lg: 0.625rem; /* 10px: alerts, segmented track, small panels */
+  --radius-xl: 0.75rem; /* 12px: cards, dialogs, panels, the drawer */
+  --radius-2xl: 0.875rem; /* 14px: large panels */
+  --radius-3xl: 1rem; /* 16px: defined so rounded-3xl exists; the marketing bands use it */
   --radius-full: 9999px;
 
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 12px 32px -12px rgb(30 64 175 / 0.12);
@@ -456,35 +454,6 @@
     background-size: 200% 100%;
   }
 
-  /* Status pills: gradient fill, white text; a transparent border becomes visible in
-     forced-colors mode, where backgrounds are removed. */
-  .pill-gradient-blue {
-    background-color: var(--color-pill-blue-from);
-    background-image: linear-gradient(
-      135deg,
-      var(--color-pill-blue-from),
-      var(--color-pill-blue-to)
-    );
-  }
-
-  .pill-gradient-violet {
-    background-color: var(--color-pill-violet-from);
-    background-image: linear-gradient(
-      135deg,
-      var(--color-pill-violet-from),
-      var(--color-pill-violet-to)
-    );
-  }
-
-  .pill-gradient-teal {
-    background-color: var(--color-pill-teal-from);
-    background-image: linear-gradient(
-      135deg,
-      var(--color-pill-teal-from),
-      var(--color-pill-teal-to)
-    );
-  }
-
   /* AI panel: dark stop at the top left with a soft light over it; the lightest point is
      the brand stop (white text 5.2:1). */
   .ai-gradient {
@@ -561,6 +530,12 @@
     max-width: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
+  }
+
+  /* Near-neutral canvas behind dense record screens (docs/17 §3.2): the console's root
+     covers the body gradient with a flat, calm colour. Set by AppShell (canvas.ts). */
+  .canvas-neutral {
+    background-color: var(--color-canvas-neutral);
   }
 
   /* Pale green quote block (copilot suggestions). */
@@ -919,9 +894,6 @@
 
 /* Windows high contrast: gradients and shadows disappear, so borders carry the shapes. */
 @media (forced-colors: active) {
-  .pill-gradient-blue,
-  .pill-gradient-violet,
-  .pill-gradient-teal,
   .ai-gradient {
     border-color: CanvasText;
   }
@@ -954,9 +926,6 @@
   }
 
   .ai-gradient,
-  .pill-gradient-blue,
-  .pill-gradient-violet,
-  .pill-gradient-teal,
   .quote-gradient {
     background: #ffffff !important;
     color: #000000 !important;
@@ -965,6 +934,10 @@
 
   [data-print="hide"] {
     display: none !important;
+  }
+
+  .canvas-neutral {
+    background: #ffffff !important;
   }
 
   /* Registers (students × days) print on A4 landscape through a named page. Browsers without

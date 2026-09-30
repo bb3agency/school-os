@@ -88,6 +88,7 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
     {
       key: "students",
       header: tl("colStudents"),
+      numeric: true,
       cell: (row) => <span className="tabular-nums">{count(row.student_count)}</span>,
     },
     {
