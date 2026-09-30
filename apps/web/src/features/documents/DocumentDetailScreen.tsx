@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Timeline, type TimelineStatus } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
@@ -296,6 +297,7 @@ function EditDetails({ doc }: { doc: DocumentDetail }) {
   const ttype = useTranslations("documents.docType");
   const tlang = useTranslations("documents.language");
   const api = useBffClient("staff");
+  const telugu = useTeluguEnabled();
   // The API lists the types that suit the purpose (the PATCH check uses the same rule).
   const allowed = doc.allowed_doc_types ?? [];
   const types = allowed.length > 0 ? allowed : [doc.doc_type];
@@ -306,6 +308,8 @@ function EditDetails({ doc }: { doc: DocumentDetail }) {
       description={t("description")}
       confirmLabel={t("confirm")}
       schema={documentEditSchema}
+      // ADR-0036: the language is not asked for while Telugu is switched off; it stays as is.
+      {...(telugu ? {} : { extra: () => ({ language: doc.language ?? "" }) })}
       fieldMap={documentFieldMap}
       invalidate={[DOCUMENT_KEYS.all]}
       errorNamespace="documents"
@@ -341,15 +345,17 @@ function EditDetails({ doc }: { doc: DocumentDetail }) {
             options={types.map((value) => ({ value, label: ttype(value) }))}
             error={errors.doc_type}
           />
-          <SelectField
-            name="language"
-            label={tn("language")}
-            hint={tn("languageHint")}
-            placeholder={tn("languageUnknown")}
-            defaultValue={doc.language ?? ""}
-            options={DOC_LANGUAGES.map((value) => ({ value, label: tlang(value) }))}
-            error={errors.language}
-          />
+          {telugu ? (
+            <SelectField
+              name="language"
+              label={tn("language")}
+              hint={tn("languageHint")}
+              placeholder={tn("languageUnknown")}
+              defaultValue={doc.language ?? ""}
+              options={DOC_LANGUAGES.map((value) => ({ value, label: tlang(value) }))}
+              error={errors.language}
+            />
+          ) : null}
           <TextField
             name="issuer"
             label={tn("issuer")}
@@ -446,6 +452,7 @@ function DeleteDocument({ doc }: { doc: DocumentDetail }) {
  */
 export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   const t = useTranslations("documents");
+  const telugu = useTeluguEnabled();
   const td = useTranslations("documents.detail");
   const ttype = useTranslations("documents.docType");
   const tpurpose = useTranslations("documents.purpose");
@@ -562,9 +569,11 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
           <Item label={td("type")}>{ttype(doc.doc_type)}</Item>
           <Item label={td("purpose")}>{tpurpose(doc.purpose)}</Item>
           <Item label={td("sensitivity")}>{tsens(`${doc.sensitivity}.short`)}</Item>
-          <Item label={td("language")}>
-            {doc.language ? tlang(doc.language) : tc("notAvailable")}
-          </Item>
+          {telugu ? (
+            <Item label={td("language")}>
+              {doc.language ? tlang(doc.language) : tc("notAvailable")}
+            </Item>
+          ) : null}
           <Item label={td("issuer")}>
             <Value>{doc.issuer}</Value>
           </Item>

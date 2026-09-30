@@ -752,7 +752,8 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     presign();
     setDocumentStorageSendForTesting(async () => new Response(null, { status: 204 }));
     stub.routes["POST /bff/api/v1/documents"] = () => Response.json(row(), { status: 202 });
-    renderWithIntl(<NewDocumentScreen />);
+    // Telugu switched on explicitly (ADR-0036): the document language is asked for only then.
+    renderWithIntl(<NewDocumentScreen />, { telugu: true });
     await userEvent.upload(
       await screen.findByLabelText("File to upload"),
       new File(["PK"], "minutes.docx", { type: "" }),
@@ -781,6 +782,28 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
       issued_on: null,
       acl: [{ principal_type: "class", principal_ref: "0192f3a4-0000-7000-8000-0000000000c9" }],
     });
+  });
+
+  it("with Telugu switched off, asks for no language and registers it as unknown (ADR-0036)", async () => {
+    setMe([READ, UPLOAD, READ_BASIC]);
+    presign();
+    setDocumentStorageSendForTesting(async () => new Response(null, { status: 204 }));
+    stub.routes["POST /bff/api/v1/documents"] = () => Response.json(row(), { status: 202 });
+    const { container } = renderWithIntl(<NewDocumentScreen />);
+    await userEvent.upload(
+      await screen.findByLabelText("File to upload"),
+      new File(["PK"], "minutes.docx", { type: "" }),
+    );
+    expect(screen.queryByRole("combobox", { name: /Language/ })).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    await userEvent.type(screen.getByRole("textbox", { name: /Title/ }), "Staff meeting minutes");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Type" }), "minutes");
+    await userEvent.click(screen.getByRole("radio", { name: /Personal details/ }));
+    await userEvent.click(screen.getByRole("radio", { name: "Only some staff" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Class 9" }));
+    await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/documents/${DOC}`));
+    expect(body("POST /bff/api/v1/documents")).toMatchObject({ language: null });
   });
 
   it("asks to upload again when storage refused the file, with a fresh upload form", async () => {
