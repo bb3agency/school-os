@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from app.knowledge.config.tools import ToolsConfig
 from app.knowledge.interfaces import RecordTool
+from app.knowledge.tools.conversations import NAME as CHATS
+from app.knowledge.tools.conversations import SearchMyConversationsTool
 from app.knowledge.tools.counts import NAME as COUNT
 from app.knowledge.tools.counts import CountStudentsTool
 from app.knowledge.tools.documents import LIST_NAME as LIST_DOCUMENTS
@@ -57,6 +59,8 @@ def build_tools(config: ToolsConfig, search: DocumentSearch) -> dict[str, Offere
         tools[LIST_DOCUMENTS] = ListDocumentsTool(specs[LIST_DOCUMENTS])
     if specs[FEES].description:
         tools[FEES] = GetFeeDuesTool(specs[FEES])
+    if specs[CHATS].description:
+        tools[CHATS] = SearchMyConversationsTool(specs[CHATS])
     return tools
 
 

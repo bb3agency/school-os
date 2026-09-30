@@ -688,25 +688,74 @@
       },
       "AskIn": {
         "additionalProperties": false,
-        "description": "One question to the school's records and documents (docs/09 \u00a75.4).",
+        "description": "One question to the school's records and documents (docs/09 \u00a75.4, docs/06 \u00a75).\n\nSend ``conversation_id`` to continue one of your conversations; omit it (and\n``session_id``) to start a new one and read its id from the ``meta`` event.\n``session_id`` is the older name: it continues your conversation with that id or starts\none. ``regenerate_of`` answers one of your latest messages again (``question`` is then\noptional and ignored); ``edit_of`` replaces one with ``question``. Either way the message\nand every later one become ``superseded``.",
         "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One of your conversations (404 for anyone else's).",
+            "title": "Conversation Id"
+          },
+          "edit_of": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replace this message of yours with `question`.",
+            "title": "Edit Of"
+          },
           "question": {
-            "maxLength": 1000,
-            "minLength": 1,
-            "title": "Question",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "regenerate_of": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Answer this message of yours again (never from the cache).",
+            "title": "Regenerate Of"
           },
           "session_id": {
-            "description": "The browser's Ask session: context never crosses users (FR-KB-012).",
-            "format": "uuid",
-            "title": "Session Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Older name of conversation_id: your conversation with this id, or a new one. Context never crosses users (FR-KB-012).",
+            "title": "Session Id"
           }
         },
-        "required": [
-          "question",
-          "session_id"
-        ],
         "title": "AskIn",
         "type": "object"
       },
@@ -4099,6 +4148,141 @@
           "value"
         ],
         "title": "ContentLine",
+        "type": "object"
+      },
+      "ConversationDetailOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "message_count": {
+            "description": "Current (not superseded) messages.",
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "pinned",
+          "created_at",
+          "updated_at",
+          "message_count",
+          "version",
+          "messages"
+        ],
+        "title": "ConversationDetailOut",
+        "type": "object"
+      },
+      "ConversationOut": {
+        "description": "One of your Ask conversations (ETag = ``version``, which changes with the title, the\npin or a deletion; ``updated_at`` = the last activity: a message, a rename or a pin).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "message_count": {
+            "description": "Current (not superseded) messages.",
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "pinned",
+          "created_at",
+          "updated_at",
+          "message_count",
+          "version"
+        ],
+        "title": "ConversationOut",
+        "type": "object"
+      },
+      "ConversationPatchIn": {
+        "additionalProperties": false,
+        "description": "Rename and/or pin (send only what changes).",
+        "properties": {
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ConversationPatchIn",
         "type": "object"
       },
       "CourseIndicatorOut": {
@@ -10440,6 +10624,326 @@
         "title": "MarksWrite",
         "type": "object"
       },
+      "MemoryIn": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "MemoryIn",
+        "type": "object"
+      },
+      "MemoryOut": {
+        "description": "One of your memory items: your own preferences and work context in this school.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When a pending suggestion is deleted unless confirmed.",
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "explicit",
+              "suggested"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "description": "pending: suggested by Ask, used only after you confirm it.",
+            "enum": [
+              "active",
+              "pending"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "source",
+          "status",
+          "created_at",
+          "updated_at",
+          "expires_at",
+          "version"
+        ],
+        "title": "MemoryOut",
+        "type": "object"
+      },
+      "MemoryPatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "MemoryPatchIn",
+        "type": "object"
+      },
+      "MemorySettingsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "MemorySettingsIn",
+        "type": "object"
+      },
+      "MemorySettingsOut": {
+        "properties": {
+          "enabled": {
+            "description": "Your own switch (on unless you turned it off).",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "school_enabled": {
+            "description": "The school's switch (ai_memory_enabled).",
+            "title": "School Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "school_enabled"
+        ],
+        "title": "MemorySettingsOut",
+        "type": "object"
+      },
+      "MessageCitationOut": {
+        "properties": {
+          "index": {
+            "description": "The [n] marker in the answer.",
+            "title": "Index",
+            "type": "integer"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "source": {
+            "description": "sos:// source (ids only).",
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "withheld": {
+            "default": false,
+            "description": "True when you can no longer see the source (title and snippet are withheld) or its details were not kept.",
+            "title": "Withheld",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "index",
+          "source",
+          "title",
+          "snippet"
+        ],
+        "title": "MessageCitationOut",
+        "type": "object"
+      },
+      "MessageOut": {
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The checked final text with [n] citation markers (null when none, or withheld).",
+            "title": "Answer"
+          },
+          "answer_withheld": {
+            "default": false,
+            "description": "True when a source the answer cited is no longer visible to you: the answer and its follow-ups are then withheld too.",
+            "title": "Answer Withheld",
+            "type": "boolean"
+          },
+          "cached": {
+            "default": false,
+            "description": "An exact repeat answered from the cache.",
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/MessageCitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "enum": [
+                  "helpful",
+                  "not_helpful"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          },
+          "followups": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Followups",
+            "type": "array"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te",
+                  "mixed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "mode": {
+            "enum": [
+              "full",
+              "search_only"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "query_id": {
+            "format": "uuid",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "answered",
+              "not_found",
+              "refused",
+              "search_only",
+              "error",
+              "cancelled",
+              "streaming"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summarized": {
+            "default": false,
+            "description": "Earlier messages of the conversation reached the model as a summary only.",
+            "title": "Summarized",
+            "type": "boolean"
+          },
+          "superseded": {
+            "description": "Replaced by a regenerate or an edit.",
+            "title": "Superseded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "query_id",
+          "question",
+          "answer",
+          "status",
+          "mode",
+          "language",
+          "citations",
+          "feedback",
+          "followups",
+          "created_at",
+          "superseded"
+        ],
+        "title": "MessageOut",
+        "type": "object"
+      },
       "NoteIn": {
         "additionalProperties": false,
         "properties": {
@@ -11903,6 +12407,34 @@
         "title": "Page[ClassOut]",
         "type": "object"
       },
+      "Page_ConversationOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[ConversationOut]",
+        "type": "object"
+      },
       "Page_DeploymentOut_": {
         "properties": {
           "data": {
@@ -12206,6 +12738,34 @@
           "next_cursor"
         ],
         "title": "Page[ItemOut]",
+        "type": "object"
+      },
+      "Page_MemoryOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[MemoryOut]",
         "type": "object"
       },
       "Page_NoticeOut_": {
@@ -18959,6 +19519,12 @@
             "title": "Ai Features Enabled",
             "type": "boolean"
           },
+          "ai_memory_enabled": {
+            "default": true,
+            "description": "Ask may remember each person's own preferences and work context (ADR-0034). Off: nothing is saved, suggested or used for anyone in the school.",
+            "title": "Ai Memory Enabled",
+            "type": "boolean"
+          },
           "ai_monthly_budget_inr": {
             "default": 5000,
             "maximum": 10000000.0,
@@ -19017,6 +19583,17 @@
               }
             ],
             "title": "Ai Features Enabled"
+          },
+          "ai_memory_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Memory Enabled"
           },
           "ai_monthly_budget_inr": {
             "anyOf": [
@@ -28286,7 +28863,7 @@
     },
     "/api/v1/knowledge/ask": {
       "post": {
-        "description": "Ask a question of the school's records and documents (permission ``kb.ask``).\n\nAnswers cite their sources (``sos://`` URIs) or say the answer was not found in the school\nrecords you can access. Only records and documents you may see are used. The answer streams\nas ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces\nthe preview. Questions asked earlier in the same ``session_id`` by you are context for a\nfollow-up (never another person's). When the school's AI budget is used up or AI answers\nare unavailable, you get ranked, cited passages instead (``mode: search_only``). 429\n``ai_rate_limited`` when you ask too many questions a minute.",
+        "description": "Ask a question of the school's records and documents (permission ``kb.ask``).\n\nAnswers cite their sources (``sos://`` URIs) or say the answer was not found in the school\nrecords you can access. Only records and documents you may see are used. The answer streams\nas ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces\nthe preview. ``status`` events report progress as codes. Your earlier messages in the same\nconversation (``conversation_id``, or the older ``session_id``) are context for a follow-up\n(never another person's); the ``meta`` event names the conversation (a new one when you\nname none) and its title. ``regenerate_of`` / ``edit_of`` replace one of your latest\nmessages (409 ``message_superseded``, ``message_not_revisable``; 404 for anyone else's).\n``followups`` suggests up to 3 next questions; ``memory`` reports an item saved (\"remember\nthat ...\") or suggested (confirm it in memory settings). When the school's AI budget is\nused up or AI answers are unavailable, you get ranked, cited passages instead (``mode:\nsearch_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.",
         "operationId": "ask_api_v1_knowledge_ask_post",
         "requestBody": {
           "content": {
@@ -28302,13 +28879,13 @@
           "200": {
             "content": {
               "text/event-stream": {
-                "example": "event: meta\ndata: {\"query_id\":\"\u2026\",\"language\":\"en\",\"mode\":\"full\"}\n\nevent: delta\ndata: {\"text\":\"Exams begin on \"}\n\nevent: delta\ndata: {\"text\":\"22/09/2026.\"}\n\nevent: final\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\",\"replaced\":false,\"status\":\"answered\",\"mode\":\"full\"}\n\nevent: token\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\"}\n\nevent: citation\ndata: {\"index\":1,\"source\":\"sos://doc/\u2026/v2#p1\",\"title\":\"Circular \u00b7 \u2026\",\"snippet\":\"\u2026\"}\n\nevent: done\ndata: {\"latency_ms\":4120,\"cited_sources\":1}\n\n",
+                "example": "event: meta\ndata: {\"query_id\":\"\u2026\",\"language\":\"en\",\"mode\":\"full\",\"conversation_id\":\"\u2026\",\"title\":\"When do exams begin?\",\"cached\":false,\"cached_from\":null}\n\nevent: status\ndata: {\"step\":\"understanding\",\"tool\":null,\"count\":null}\n\nevent: status\ndata: {\"step\":\"searching_documents\",\"tool\":\"search_documents\",\"count\":null}\n\nevent: status\ndata: {\"step\":\"searching_documents\",\"tool\":\"search_documents\",\"count\":4}\n\nevent: status\ndata: {\"step\":\"writing\",\"tool\":null,\"count\":null}\n\nevent: delta\ndata: {\"text\":\"Exams begin on \"}\n\nevent: delta\ndata: {\"text\":\"22/09/2026.\"}\n\nevent: final\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\",\"replaced\":false,\"status\":\"answered\",\"mode\":\"full\"}\n\nevent: token\ndata: {\"text\":\"Exams begin on 22/09/2026. [1]\"}\n\nevent: citation\ndata: {\"index\":1,\"source\":\"sos://doc/\u2026/v2#p1\",\"title\":\"Circular \u00b7 \u2026\",\"snippet\":\"\u2026\"}\n\nevent: followups\ndata: {\"questions\":[\"Which classes write the first exam?\"]}\n\nevent: done\ndata: {\"latency_ms\":4120,\"cited_sources\":1,\"status\":\"answered\",\"mode\":\"full\"}\n\n",
                 "schema": {
                   "type": "string"
                 }
               }
             },
-            "description": "Server-Sent Events: meta, delta, error, final, token, citation, done (docs/06 \u00a75.1)."
+            "description": "Server-Sent Events: meta, status, delta, error, final, token, citation, followups, memory, done (docs/06 \u00a75.1)."
           },
           "422": {
             "content": {
@@ -28322,6 +28899,474 @@
           }
         },
         "summary": "Ask",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/conversations": {
+      "get": {
+        "description": "Your Ask conversations in this school (permission ``kb.ask``; only your own), pinned\nfirst, then newest activity first. Titles are decrypted for you only.",
+        "operationId": "list_conversations_api_v1_knowledge_conversations_get",
+        "parameters": [
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ConversationOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Conversations",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/conversations/{conversation_id}": {
+      "delete": {
+        "description": "Remove one of your conversations from your history (at once, everywhere). Its questions\nstay in the school's encrypted query log until it is purged 180 days after they were\nasked (docs/08 \u00a77). 404 for anyone else's or one already removed.",
+        "operationId": "delete_conversation_api_v1_knowledge_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Conversation",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "get": {
+        "description": "One of your conversations with every message, oldest first (``superseded`` marks one\nreplaced by a regenerate or an edit). Sources you can no longer see are withheld\n(``withheld``: no title or snippet; that answer and its follow-ups are withheld too). 404\nfor anyone else's, another school's or a deleted conversation.",
+        "operationId": "get_conversation_api_v1_knowledge_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Conversation",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "patch": {
+        "description": "Rename and/or pin one of your conversations (``If-Match``). A title is 1-120 characters\nand may not hold an Aadhaar-like number (422 ``title_personal_number``). 412 when it changed\nsince you read it; 404 for anyone else's.",
+        "operationId": "update_conversation_api_v1_knowledge_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Conversation",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/memories": {
+      "delete": {
+        "description": "Forget everything: delete all your memory items in this school.",
+        "operationId": "forget_memories_api_v1_knowledge_memories_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget Memories",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "get": {
+        "description": "Your memory items in this school (permission ``kb.ask``): confirmed and pending\nsuggestions, newest first. Only your own; they are used only while memory is on.",
+        "operationId": "list_memories_api_v1_knowledge_memories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MemoryOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Memories",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "post": {
+        "description": "Add a memory item: your own preference or work context (e.g. \"Keep answers short\").\nNever details about students, parents or other staff: refused with 422\n(``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,\n``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check\ncannot run; 409 ``memory_off`` or ``memory_full``.",
+        "operationId": "create_memory_api_v1_knowledge_memories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Memory",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/memories/{memory_id}": {
+      "delete": {
+        "description": "Delete one of your memory items.",
+        "operationId": "delete_memory_api_v1_knowledge_memories__memory_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Memory",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "patch": {
+        "description": "Edit one of your memory items (``If-Match``; checked again like a new item).",
+        "operationId": "update_memory_api_v1_knowledge_memories__memory_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Memory",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/memories/{memory_id}/confirm": {
+      "post": {
+        "description": "Keep a suggested item (it is used from now on). A suggestion not confirmed within 24\nhours is deleted (404 afterwards).",
+        "operationId": "confirm_memory_api_v1_knowledge_memories__memory_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Memory",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/memory-settings": {
+      "get": {
+        "description": "Whether memory is on for you (``enabled``) and for the school (``school_enabled``).",
+        "operationId": "get_memory_settings_api_v1_knowledge_memory_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Memory Settings",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "put": {
+        "description": "Turn memory on or off for you. Off: nothing is saved, suggested or used (your items stay\nlisted so you can delete them).",
+        "operationId": "put_memory_settings_api_v1_knowledge_memory_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Memory Settings",
         "tags": [
           "knowledge"
         ]

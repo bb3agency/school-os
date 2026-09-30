@@ -92,6 +92,8 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             "note",
             "bg",
             "query",
+            "conversation",
+            "memory",
             "answer",
             "llm",
             "intent",
@@ -350,16 +352,43 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=ids["llm"],
             t=t,
         )
+        # 0038 (ADR-0034): a conversation with its question, a memory item and a switch.
         _run(
             c,
-            "INSERT INTO kb.queries (id, tenant_id, session_id, user_id, question_ciphertext, "
-            "question_hmac, key_version, mode, status) VALUES "
-            "(:i, :t, :sess, :u, '\\x0a', :h, 1, 'full', 'answered')",
+            "INSERT INTO kb.conversations (id, tenant_id, user_id, title_ciphertext, key_version) "
+            "VALUES (:i, :t, :u, '\\x0a', 1)",
+            i=ids["conversation"],
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO kb.queries (id, tenant_id, session_id, conversation_id, user_id, "
+            "question_ciphertext, question_hmac, key_version, mode, status) VALUES "
+            "(:i, :t, :sess, :sess, :u, '\\x0a', :h, 1, 'full', 'answered')",
             i=ids["query"],
             t=t,
-            sess=uuid.uuid4(),
+            sess=ids["conversation"],
             u=u["user"],
             h=hashlib.sha256(b"h").digest(),
+        )
+        _run(
+            c,
+            "INSERT INTO kb.user_memories (id, tenant_id, user_id, text_ciphertext, key_version, "
+            "source, status, conversation_id, query_id) VALUES "
+            "(:i, :t, :u, '\\x0a', 1, 'explicit', 'active', :c, :q)",
+            i=ids["memory"],
+            t=t,
+            u=u["user"],
+            c=ids["conversation"],
+            q=ids["query"],
+        )
+        _run(
+            c,
+            "INSERT INTO kb.user_memory_settings (tenant_id, user_id, enabled) "
+            "VALUES (:t, :u, true)",
+            t=t,
+            u=u["user"],
         )
         _run(
             c,

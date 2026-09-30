@@ -53,12 +53,6 @@ def _parts(message: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [p for p in parts if isinstance(p, Mapping)] if isinstance(parts, list) else []
 
 
-def _text(value: object) -> str:
-    if isinstance(value, Mapping):
-        return "\n".join(str(p.get("text", "")) for p in _parts(value) if "text" in p)
-    return ""
-
-
 class GeminiWireFake:
     """A Gemini-wire transport around a Messages-API stand-in (see the module docstring)."""
 
@@ -137,7 +131,11 @@ class GeminiWireFake:
         out: dict[str, Any] = {
             "model": request.model or "fake",
             "max_tokens": generation.get("maxOutputTokens", 1000),
-            "system": [{"type": "text", "text": _text(body.get("systemInstruction"))}],
+            # One system block per part (the static prompt, then the memory block; ADR-0034).
+            "system": [
+                {"type": "text", "text": str(p.get("text", ""))}
+                for p in _parts(body.get("systemInstruction") or {})
+            ],
             "messages": self._messages(body.get("contents") or ()),
         }
         declarations = [

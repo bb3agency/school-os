@@ -4,6 +4,7 @@ import { IdleWarning, SessionControls } from "@/components/session/SessionContro
 import { Icon } from "@/components/ui/Icon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import type { NavItem, NavSection } from "@/components/ui/SidebarNav";
+import { AskRecents } from "@/features/ask/AskRecents";
 import { Link } from "@/i18n/navigation";
 import type { SessionKind } from "@/lib/bff/session-client";
 import { AppShell } from "./AppShell";
@@ -156,7 +157,17 @@ export function SchoolShell({
     },
     {
       id: "ask",
-      items: [{ href: "/ask", label: t("ask.nav"), permission: "kb.ask", icon: "sparkles" }],
+      items: [
+        {
+          href: "/ask",
+          label: t("ask.nav"),
+          permission: "kb.ask",
+          icon: "sparkles",
+          // FR-KB-012: New chat, recent chats, All chats and Memory, while an Ask page is open.
+          sub: <AskRecents />,
+          subActivePattern: "^/ask/(c/[^/]+|history|memory)/?$",
+        },
+      ],
     },
     {
       // M4 (US-1601..US-1606): circulars read with AI, the tasks they become, parent notices.
@@ -265,13 +276,15 @@ export function SchoolShell({
     label: t(`school.nav.sections.${group.id}` as "school.nav.sections.overview"),
     items: group.items
       .filter(allowed)
-      .map(({ href, label, exact, nested, activePattern, icon }) => ({
+      .map(({ href, label, exact, nested, activePattern, icon, sub, subActivePattern }) => ({
         href,
         label,
         ...(exact ? { exact } : {}),
         ...(nested ? { nested } : {}),
         ...(activePattern ? { activePattern } : {}),
         ...(icon ? { icon } : {}),
+        ...(sub ? { sub } : {}),
+        ...(subActivePattern ? { subActivePattern } : {}),
       })),
   }));
   // System roles by name ("Principal, Class teacher"); custom roles have no fixed label here.

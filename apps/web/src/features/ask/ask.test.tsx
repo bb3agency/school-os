@@ -15,7 +15,7 @@ import {
 } from "@/test/bff-stub";
 import { fakeAadhaar, ID, me } from "@/test/records-fixtures";
 import { intlErrors, renderWithIntl } from "@/test/render";
-import AskPage from "@/app/[locale]/(school)/ask/page";
+import { renderChat } from "./chat-test-utils";
 import AskSearchPage from "@/app/[locale]/(school)/ask/search/page";
 import VerifiedAnswersPage from "@/app/[locale]/(school)/ask/verified/page";
 import { verifiedFieldMap } from "./VerifiedAnswerDialog";
@@ -109,7 +109,7 @@ afterEach(() => {
 describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
   it("streams the answer through the BFF with CSRF, the question only in the body", async () => {
     stub.routes[ASK] = () => sseResponse(answered);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
 
     expect(await screen.findByText("The answer is ready.")).toBeInTheDocument();
@@ -117,19 +117,22 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     expect(call?.headers.get("x-csrf-token")).toBe(CSRF);
     expect(call?.headers.get("accept")).toBe("text/event-stream");
     expect(call?.url.search).toBe("");
-    expect(body(ASK)).toEqual({
-      question: "When do exams begin?",
-      session_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
-    });
+    // A new chat: no conversation yet (FR-KB-012); the old per-page session_id is gone.
+    expect(body(ASK)).toEqual({ question: "When do exams begin?" });
 
-    const answer = screen.getByRole("region", { name: "Answer" });
+    const answer = screen.getByRole("article", { name: "Answer" });
     expect(within(answer).getByText(/Exams begin on 22\/09\/2026\./)).toBeInTheDocument();
-    // The answer region is announced politely (NFR-A11Y-001).
-    expect(answer.querySelector("[aria-live='polite']")).not.toBeNull();
+    // The thread is a log that never reads each word; a polite status region announces the
+    // checked answer once (NFR-A11Y-001).
+    expect(screen.getByRole("log", { name: "Conversation" })).toHaveAttribute("aria-live", "off");
+    const status = screen.getByText("The answer is ready.").closest("[role='status']");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveTextContent(/Exams begin on 22\/09\/2026\. Sita joined class 6 in 2024\./);
+    expect(status).not.toHaveTextContent("[1]");
     // Source chips: [n] markers link to the listed sources (CLAUDE.md §10).
     expect(
-      within(answer).getByRole("link", { name: "Source 1: Circular · Exam timings" }),
-    ).toHaveAttribute("href", "#ask-source-1");
+      await within(answer).findByRole("link", { name: "Source 1: Circular · Exam timings" }),
+    ).toHaveAttribute("href", `#ask-${QUERY}-source-1`);
     expect(
       within(answer).getByRole("link", { name: /Circular · Exam timings \(open the document\)/ }),
     ).toHaveAttribute("href", `/en/documents/${DOC}`);
@@ -140,7 +143,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
   });
 
   it("example questions only fill the question box; nothing is sent until Ask (US-801)", async () => {
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = userEvent.setup();
     const examples = await screen.findByRole("list", { name: /^Example questions/ });
     await user.click(
@@ -152,17 +155,33 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     expect(stub.callsTo(ASK)).toHaveLength(0);
   });
 
-  it("the question stays for a second ask in the same session id (FR-KB-012)", async () => {
-    stub.routes[ASK] = () => sseResponse(answered);
-    renderWithIntl(<AskPage />);
+  it("a follow-up is asked in the conversation the first answer started (FR-KB-012)", async () => {
+    const CONVERSATION = "0192f3a4-0000-7000-8000-00000000e901";
+    const ids = [QUERY, "0192f3a4-0000-7000-8000-00000000e002"];
+    let n = 0;
+    stub.routes[ASK] = () =>
+      sseResponse([
+        sse("meta", {
+          query_id: ids[n++ % 2],
+          language: "en",
+          mode: "full",
+          conversation_id: CONVERSATION,
+        }),
+        ...answered.slice(1),
+      ]);
+    renderChat();
     const user = await ask("First?");
     await screen.findByText("The answer is ready.");
+    // The composer is cleared after sending and keeps focus for the next question.
     const box = screen.getByLabelText(/^Your question/);
-    await user.clear(box);
+    expect(box).toHaveValue("");
     await user.type(box, "Second?");
-    await user.click(screen.getByRole("button", { name: "Ask" }));
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(stub.callsTo(ASK)).toHaveLength(2));
-    expect(body(ASK, 1).session_id).toBe(body(ASK, 0).session_id);
+    expect(body(ASK, 0)).toEqual({ question: "First?" });
+    expect(body(ASK, 1)).toEqual({ question: "Second?", conversation_id: CONVERSATION });
+    // Both turns are in the thread.
+    expect(await screen.findAllByRole("article", { name: "Answer" })).toHaveLength(2);
   });
 
   it("downloads exactly the cited version of a document (US-801 AC4)", async () => {
@@ -171,7 +190,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     stub.routes[ASK] = () => sseResponse(answered);
     stub.routes[`GET /bff/api/v1/documents/${DOC}/download-url`] = () =>
       Response.json({ url: "https://files.example/presigned", expires_at: "2026-09-28T05:00:00Z" });
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = await ask();
     await user.click(await screen.findByRole("button", { name: "Download version 2" }));
     await waitFor(() => expect(opened).toEqual(["https://files.example/presigned"]));
@@ -190,13 +209,16 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("citation", { index: 2, source: "https://evil.example", title: "Evil", snippet: "y" }),
         sse("done", { latency_ms: 10, cited_sources: 2 }),
       ]);
-    const { container } = renderWithIntl(<AskPage />);
+    const { container } = renderChat();
     await ask();
     await screen.findByText("The answer is ready.");
     expect(container.querySelector("img, b, script")).toBeNull();
     const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "");
     expect(hrefs.filter((href) => href.includes("evil"))).toEqual([]);
-    expect(screen.getByText(/https:\/\/evil\.example\/raw/)).toBeInTheDocument();
+    const answer = screen.getByRole("article", { name: "Answer" });
+    expect(within(answer).getByText(/https:\/\/evil\.example\/raw/)).toBeInTheDocument();
+    // Markdown link targets are dropped; the label stays as text (docs/06 §9 rule 5).
+    expect(within(answer).getByText(/and the form/)).toBeInTheDocument();
     // A source that is not a sos:// URI is shown without a link.
     expect(screen.getByText("Evil")).toBeInTheDocument();
     expect(screen.getByText("This source cannot be opened here.")).toBeInTheDocument();
@@ -209,7 +231,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("token", { text: "I could not find this in the school records you can access." }),
         sse("done", { latency_ms: 800, cited_sources: 0 }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(
       await screen.findByText("Not found in the school records you can access"),
@@ -225,7 +247,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("citation", { index: 1, source: DOC_SOURCE, title: "Circular", snippet: "Exams at 9" }),
         sse("done", { latency_ms: 300, cited_sources: 1 }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(await screen.findByText("AI answers are not available right now")).toBeInTheDocument();
     expect(screen.getByText(/AI budget for this month is used up/)).toBeInTheDocument();
@@ -244,7 +266,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("error", { type: "x", message_key: key }),
         sse("done", { latency_ms: 300, cited_sources: 0 }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.getByText("No passages matched your question. Try other words.")).toBeVisible();
@@ -260,9 +282,10 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         ": comment\n\n",
         sse("done", { latency_ms: 10, cited_sources: 1 }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
-    expect(await screen.findByText(/Exams begin soon\./)).toBeInTheDocument();
+    const answer = await screen.findByRole("article", { name: "Answer" });
+    expect(await within(answer).findByText(/Exams begin soon\./)).toBeInTheDocument();
   });
 
   it("search-only via final/done even though meta says full (docs/06 §5.1, FR-KB-011)", async () => {
@@ -280,7 +303,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
           mode: "search_only",
         }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(await screen.findByText("AI answers are not available right now")).toBeInTheDocument();
     expect(screen.getByText(/AI budget for this month is used up/)).toBeInTheDocument();
@@ -300,13 +323,17 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         ],
         { close: false },
       );
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     const preview = await screen.findByRole("group", { name: "Draft answer, not checked yet" });
     expect(preview).toHaveTextContent("Exams begin on 22/09/2026. [1]");
     expect(within(preview).queryByRole("link")).toBeNull();
-    expect(screen.getByText("Writing the answer…")).toBeInTheDocument();
-    expect(screen.queryByText("Was this answer helpful?")).toBeNull();
+    // The live status line (visual) and the status region both say what is happening.
+    expect(screen.getAllByText("Writing the answer…").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("article", { name: "Answer" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByRole("button", { name: "Yes, helpful" })).toBeNull();
+    // Stop is always there while it streams.
+    expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });
 
   it("final replaces the preview, later tokens are ignored, and a changed answer says so", async () => {
@@ -324,14 +351,16 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("citation", { index: 1, source: DOC_SOURCE, title: "Circular", snippet: "x" }),
         sse("done", { latency_ms: 900, cited_sources: 1, status: "answered", mode: "full" }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(await screen.findByText("The answer is ready.")).toBeInTheDocument();
-    const answer = screen.getByRole("region", { name: "Answer" });
+    const answer = screen.getByRole("article", { name: "Answer" });
     expect(within(answer).getAllByText(/Exams begin on 22\/09\/2026\./)).toHaveLength(1);
     expect(within(answer).queryByText(/21\/09\/2026/)).toBeNull();
     expect(screen.queryByRole("group", { name: "Draft answer, not checked yet" })).toBeNull();
-    expect(within(answer).getByRole("link", { name: "Source 1: Circular" })).toBeInTheDocument();
+    expect(
+      await within(answer).findByRole("link", { name: "Source 1: Circular" }),
+    ).toBeInTheDocument();
     expect(
       within(answer).getByText(
         "The draft was checked against the sources and changed to what they support.",
@@ -347,7 +376,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("token", { text: "Cannot help." }),
         sse("done", { latency_ms: 90, cited_sources: 0, status: "refused", mode: "full" }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(
       await screen.findByText("This question can't be answered from the school records"),
@@ -363,7 +392,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("error", { type: "internal_error", message_key: "kb.errors.internal" }),
         sse("done", { latency_ms: 50, cited_sources: 0, status: "error", mode: "full" }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
     expect(screen.getByText(/could not finish this answer\. Ask again/)).toBeInTheDocument();
@@ -391,7 +420,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         }),
         sse("done", { latency_ms: 90, cited_sources: 1, status: "answered", mode: "full" }),
       ]);
-    const { container } = renderWithIntl(<AskPage />);
+    const { container } = renderChat();
     await ask();
     expect(await screen.findByText("Students enrolled by class")).toBeInTheDocument();
     expect(screen.getByText("Student count (numbers only)")).toBeInTheDocument();
@@ -421,19 +450,23 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
       ],
     ]) {
       stub.routes[ASK] = () => sseResponse(events);
-      const { unmount } = renderWithIntl(<AskPage />, "te");
+      const { unmount } = renderChat("te");
       const user = userEvent.setup();
       await user.type(await screen.findByLabelText(/^మీ ప్రశ్న/), "ప్రశ్న?");
       await user.click(screen.getByRole("button", { name: "అడగండి" }));
-      await screen.findByRole("region", { name: "సమాధానం" });
-      await waitFor(() => expect(screen.getByRole("status")).not.toHaveTextContent(/^$/));
+      await screen.findByRole("article", { name: "సమాధానం" });
+      await waitFor(() =>
+        expect(document.querySelector("[role='status'][aria-live='polite']")).not.toHaveTextContent(
+          /^$/,
+        ),
+      );
       unmount();
     }
   });
 
   it("explains 429 ai_rate_limited in plain words", async () => {
     stub.routes[ASK] = () => problem(429, "ai_rate_limited");
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Too many questionsYou asked many questions in the last minute. Wait a minute, then ask again.",
@@ -446,7 +479,7 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         sse("meta", { query_id: QUERY, language: "en", mode: "full" }),
         sse("token", { text: "Exams begin" }),
       ]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask();
     expect(await screen.findByText("The answer was cut off")).toBeInTheDocument();
     expect(screen.queryByText("Was this answer helpful?")).toBeNull();
@@ -460,12 +493,12 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
         close: false,
       });
     };
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText(/^Your question/), "When?");
     await user.keyboard("{Control>}{Enter}{/Control}");
     const stop = await screen.findByRole("button", { name: "Stop" });
-    expect(await screen.findByText("Writing the answer…")).toBeInTheDocument();
+    expect((await screen.findAllByText("Writing the answer…")).length).toBeGreaterThan(0);
     stop.focus();
     await user.keyboard("{Enter}");
     expect(await screen.findByText("You stopped the answer.")).toBeInTheDocument();
@@ -475,14 +508,14 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
   });
 
   it("refuses a full Aadhaar number before sending anything (invariant 4)", async () => {
-    renderWithIntl(<AskPage />);
+    renderChat();
     await ask(`Whose Aadhaar is ${fakeAadhaar()}?`);
     expect(await screen.findByText(/looks like a full Aadhaar number/)).toBeInTheDocument();
     expect(stub.callsTo(ASK)).toHaveLength(0);
   });
 
   it("an empty question says what to do", async () => {
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Ask" }));
     expect(await screen.findByText("Fill in this field.")).toBeInTheDocument();
@@ -491,14 +524,14 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
 
   it("without kb.ask says so and never calls the API", async () => {
     setMe(["document.read"]);
-    renderWithIntl(<AskPage />);
+    renderChat();
     expect(await screen.findByText("You can't ask questions here yet")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Your question/)).toBeNull();
   });
 
   it("works in Telugu without missing messages", async () => {
     stub.routes[ASK] = () => sseResponse(answered);
-    renderWithIntl(<AskPage />, "te");
+    renderChat("te");
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText(/^మీ ప్రశ్న/), "పరీక్షలు ఎప్పుడు?");
     await user.click(screen.getByRole("button", { name: "అడగండి" }));
@@ -517,7 +550,7 @@ describe("feedback on an answer (US-801 AC4, FR-KB-009)", () => {
         reason: null,
         recorded_at: "2026-09-28T05:00:00Z",
       });
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = await ask();
     await user.click(await screen.findByRole("button", { name: "Yes, helpful" }));
     expect(await screen.findByText(/Thank you/)).toBeInTheDocument();
@@ -536,7 +569,7 @@ describe("feedback on an answer (US-801 AC4, FR-KB-009)", () => {
         reason: "outdated",
         recorded_at: "2026-09-28T05:00:00Z",
       });
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = await ask();
     await user.click(await screen.findByRole("button", { name: "No, not helpful" }));
     await user.click(screen.getByRole("radio", { name: "It is out of date" }));
@@ -548,7 +581,7 @@ describe("feedback on an answer (US-801 AC4, FR-KB-009)", () => {
 
   it("offers exactly the reason codes the API accepts (FeedbackIn.reason)", async () => {
     stub.routes[ASK] = () => sseResponse(answered);
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = await ask();
     await user.click(await screen.findByRole("button", { name: "No, not helpful" }));
     const values = screen
@@ -564,7 +597,7 @@ describe("feedback on an answer (US-801 AC4, FR-KB-009)", () => {
     stub.routes[ASK] = () => sseResponse(answered);
     stub.routes[`POST /bff/api/v1/knowledge/queries/${QUERY}/feedback`] = () =>
       problem(404, "not_found");
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = await ask();
     await user.click(await screen.findByRole("button", { name: "Yes, helpful" }));
     expect(await screen.findByText("Question not found")).toBeInTheDocument();
@@ -597,7 +630,7 @@ describe("verified answers (US-802, FR-KB-030)", () => {
     stub.routes[ASK] = () => sseResponse(answered);
     stub.routes["POST /bff/api/v1/knowledge/verified-answers"] = () =>
       Response.json(verified(), { status: 201 });
-    renderWithIntl(<AskPage />);
+    renderChat();
     const user = await ask();
     await user.click(await screen.findByRole("button", { name: "Save as verified answer" }));
     const dialog = await screen.findByRole("dialog", { name: "Save a verified answer" });
@@ -896,7 +929,7 @@ describe("navigation (UX only; the API checks every call)", () => {
   });
 
   it("tabs link Ask, Search documents and Verified answers", async () => {
-    renderWithIntl(<AskPage />);
+    renderChat();
     const tabs = await screen.findByRole("navigation", { name: "Ask the school sections" });
     expect(within(tabs).getByRole("link", { name: "Ask" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).getByRole("link", { name: "Search documents" })).toHaveAttribute(

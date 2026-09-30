@@ -384,7 +384,7 @@ def test_FR_TALLY_008_fee_cases_pass_the_hard_gates_through_the_application(brid
     assert len(fee_gates) == 5
 
 
-# --- live evaluation (make eval-live; docs/06 §13.5; ADR-0033) ------------------------------------
+# --- live evaluation (make eval-live; docs/06 §13.6; ADR-0033) ------------------------------------
 
 
 def test_ADR_0033_the_live_run_needs_the_synthetic_only_acknowledgement(

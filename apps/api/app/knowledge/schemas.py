@@ -11,7 +11,7 @@ import datetime as dt
 import uuid
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.knowledge.tools.documents import DocType
 
@@ -35,12 +35,38 @@ class _Out(BaseModel):
 
 
 class AskIn(_In):
-    """One question to the school's records and documents (docs/09 §5.4)."""
+    """One question to the school's records and documents (docs/09 §5.4, docs/06 §5).
 
-    question: str = Field(min_length=1, max_length=1000)
-    session_id: uuid.UUID = Field(
-        description="The browser's Ask session: context never crosses users (FR-KB-012)."
+    Send ``conversation_id`` to continue one of your conversations; omit it (and
+    ``session_id``) to start a new one and read its id from the ``meta`` event.
+    ``session_id`` is the older name: it continues your conversation with that id or starts
+    one. ``regenerate_of`` answers one of your latest messages again (``question`` is then
+    optional and ignored); ``edit_of`` replaces one with ``question``. Either way the message
+    and every later one become ``superseded``."""
+
+    question: str | None = Field(default=None, min_length=1, max_length=1000)
+    session_id: uuid.UUID | None = Field(
+        default=None,
+        description="Older name of conversation_id: your conversation with this id, or a new "
+        "one. Context never crosses users (FR-KB-012).",
     )
+    conversation_id: uuid.UUID | None = Field(
+        default=None, description="One of your conversations (404 for anyone else's)."
+    )
+    regenerate_of: uuid.UUID | None = Field(
+        default=None, description="Answer this message of yours again (never from the cache)."
+    )
+    edit_of: uuid.UUID | None = Field(
+        default=None, description="Replace this message of yours with `question`."
+    )
+
+    @model_validator(mode="after")
+    def _one_request(self) -> AskIn:
+        if self.regenerate_of is not None and self.edit_of is not None:
+            raise ValueError("send regenerate_of or edit_of, not both")
+        if self.regenerate_of is None and self.question is None:
+            raise ValueError("question is required")
+        return self
 
 
 class SearchIn(_In):
@@ -140,13 +166,133 @@ class VerifiedAnswerOut(_Out):
 
 VerifiedStatus = Literal["active", "needs_review", "retired"]
 
+
+# --- conversations (docs/09 Knowledge; ADR-0034) ---------------------------------------------
+
+MessageStatus = Literal[
+    "answered", "not_found", "refused", "search_only", "error", "cancelled", "streaming"
+]
+"""``streaming``: the answer is still being written (or its stream ended unrecorded)."""
+
+
+class ConversationOut(_Out):
+    """One of your Ask conversations (ETag = ``version``, which changes with the title, the
+    pin or a deletion; ``updated_at`` = the last activity: a message, a rename or a pin)."""
+
+    id: uuid.UUID
+    title: str
+    pinned: bool
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    message_count: int = Field(description="Current (not superseded) messages.")
+    version: int
+
+
+class MessageCitationOut(_Out):
+    index: int = Field(description="The [n] marker in the answer.")
+    source: str = Field(description="sos:// source (ids only).")
+    title: str | None
+    snippet: str | None
+    withheld: bool = Field(
+        default=False,
+        description="True when you can no longer see the source (title and snippet are "
+        "withheld) or its details were not kept.",
+    )
+
+
+class MessageOut(_Out):
+    query_id: uuid.UUID
+    question: str
+    answer: str | None = Field(
+        description="The checked final text with [n] citation markers (null when none, or "
+        "withheld)."
+    )
+    answer_withheld: bool = Field(
+        default=False,
+        description="True when a source the answer cited is no longer visible to you: the "
+        "answer and its follow-ups are then withheld too.",
+    )
+    status: MessageStatus
+    mode: Literal["full", "search_only"]
+    language: Locale | None
+    citations: list[MessageCitationOut]
+    feedback: Literal["helpful", "not_helpful"] | None
+    followups: list[str]
+    created_at: dt.datetime
+    superseded: bool = Field(description="Replaced by a regenerate or an edit.")
+    cached: bool = Field(default=False, description="An exact repeat answered from the cache.")
+    summarized: bool = Field(
+        default=False,
+        description="Earlier messages of the conversation reached the model as a summary only.",
+    )
+
+
+class ConversationDetailOut(ConversationOut):
+    messages: list[MessageOut]
+
+
+class ConversationPatchIn(_In):
+    """Rename and/or pin (send only what changes)."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    pinned: bool | None = None
+
+
+# --- memory (ADR-0034) -------------------------------------------------------------------------
+
+
+class MemoryOut(_Out):
+    """One of your memory items: your own preferences and work context in this school."""
+
+    id: uuid.UUID
+    text: str
+    source: Literal["explicit", "suggested"]
+    status: Literal["active", "pending"] = Field(
+        description="pending: suggested by Ask, used only after you confirm it."
+    )
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    expires_at: dt.datetime | None = Field(
+        description="When a pending suggestion is deleted unless confirmed."
+    )
+    version: int
+
+
+class MemoryIn(_In):
+    text: str = Field(min_length=1, max_length=200)
+
+
+class MemoryPatchIn(_In):
+    text: str = Field(min_length=1, max_length=200)
+
+
+class MemorySettingsOut(_Out):
+    enabled: bool = Field(description="Your own switch (on unless you turned it off).")
+    school_enabled: bool = Field(description="The school's switch (ai_memory_enabled).")
+
+
+class MemorySettingsIn(_In):
+    enabled: bool
+
+
 __all__ = [
     "AskIn",
     "Code",
+    "ConversationDetailOut",
+    "ConversationOut",
+    "ConversationPatchIn",
     "FeedbackIn",
     "FeedbackOut",
     "FeedbackReason",
     "Locale",
+    "MemoryIn",
+    "MemoryOut",
+    "MemoryPatchIn",
+    "MemorySettingsIn",
+    "MemorySettingsOut",
+    "MessageCitationOut",
+    "MessageOut",
+    "MessageStatus",
     "SearchIn",
     "SearchOut",
     "SearchResultOut",

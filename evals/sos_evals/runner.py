@@ -9,7 +9,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import circulars, fees, metrics
+from sos_evals import circulars, conversations, fees, metrics
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
@@ -75,6 +75,13 @@ class Metrics(_Model):
     fee_guessed_link_count: int | None = None
     fee_citation_validity: float | None = None
     fee_refusal_correctness: float | None = None
+    # Ask conversations (sos_evals.conversations; ADR-0034, FR-KB-012). None when not measured.
+    conversation_items: int = 0
+    conversation_leakage_count: int | None = None
+    conversation_scope_violations: int | None = None
+    conversation_context_accuracy: float | None = None
+    followup_language_match: float | None = None
+    memory_preference_applied: float | None = None
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -201,6 +208,7 @@ class RunResult(_Model):
     outcomes: tuple[ItemOutcome, ...]
     circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
     fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
+    conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
 
 
 def run(
@@ -213,6 +221,8 @@ def run(
     circular_cases: Sequence[circulars.CircularCase] = (),
     fee: fees.FeeAdapter | None = None,
     fee_cases: Sequence[fees.FeeCase] = (),
+    conversation: conversations.ConversationAdapter | None = None,
+    conversation_cases: Sequence[conversations.ConversationCase] = (),
 ) -> RunResult:
     outcomes = []
     for item in items:
@@ -235,10 +245,15 @@ def run(
     if fee is not None and fee_cases:
         dues, fee_outcomes = fees.run(fee_cases, fee)
         overall = overall.model_copy(update=dues.model_dump())
+    conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
+    if conversation is not None and conversation_cases:
+        talk, conversation_outcomes = conversations.run(conversation_cases, conversation)
+        overall = overall.model_copy(update=talk.model_dump())
     return RunResult(
         metrics=overall,
         by_category=by_category,
         outcomes=tuple(outcomes),
         circular_outcomes=circular_outcomes,
         fee_outcomes=fee_outcomes,
+        conversation_outcomes=conversation_outcomes,
     )

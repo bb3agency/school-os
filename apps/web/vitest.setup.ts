@@ -6,6 +6,12 @@ afterEach(() => {
   cleanup();
 });
 
+// jsdom has no layout and logs "Not implemented" for window.scrollTo: a no-op keeps test
+// output clean (scrolling itself is checked in e2e).
+if (typeof window !== "undefined") {
+  window.scrollTo = () => undefined;
+}
+
 /*
  * jsdom does not implement <dialog>. Emulate what the components rely on from the HTML
  * standard (and what Chrome and Edge do), so tests check the same behaviour users get:

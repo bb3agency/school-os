@@ -51,6 +51,19 @@ KNOWLEDGE_ROUTES = {
     ("POST", "/api/v1/knowledge/verified-answers"): "kb.verified_answer.manage",
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): "kb.verified_answer.manage",
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): "kb.verified_answer.manage",
+    # ADR-0034: the caller's own conversations and memory, all behind kb.ask.
+    ("GET", "/api/v1/knowledge/conversations"): "kb.ask",
+    ("GET", "/api/v1/knowledge/conversations/{conversation_id}"): "kb.ask",
+    ("PATCH", "/api/v1/knowledge/conversations/{conversation_id}"): "kb.ask",
+    ("DELETE", "/api/v1/knowledge/conversations/{conversation_id}"): "kb.ask",
+    ("GET", "/api/v1/knowledge/memories"): "kb.ask",
+    ("POST", "/api/v1/knowledge/memories"): "kb.ask",
+    ("DELETE", "/api/v1/knowledge/memories"): "kb.ask",
+    ("PATCH", "/api/v1/knowledge/memories/{memory_id}"): "kb.ask",
+    ("DELETE", "/api/v1/knowledge/memories/{memory_id}"): "kb.ask",
+    ("POST", "/api/v1/knowledge/memories/{memory_id}/confirm"): "kb.ask",
+    ("GET", "/api/v1/knowledge/memory-settings"): "kb.ask",
+    ("PUT", "/api/v1/knowledge/memory-settings"): "kb.ask",
 }
 
 
@@ -152,3 +165,6 @@ def test_FR_KB_008_sse_event_names_match_the_streaming_protocol() -> None:
         service.ErrorEvent,
     )
     assert [e.event for e in events] == ["meta", "token", "citation", "done", "error"]
+    # Additive (docs/06 §5.1, ADR-0034): progress, follow-ups and memory.
+    added = (service.StatusEvent, service.FollowupsEvent, service.MemoryEvent)
+    assert [e.event for e in added] == ["status", "followups", "memory"]

@@ -150,7 +150,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-KB-009 | Every query MUST log: user, tenant, question hash + encrypted text, tools used, chunk IDs, model, tokens, latency, citations, feedback. | T |
 | FR-KB-010 | Scope leakage tests (cross-section, cross-tenant) MUST be part of the eval gate with zero tolerance. | T |
 | FR-KB-011 | Per-tenant monthly AI budgets MUST be enforced with graceful degradation (search-only mode). | T |
-| FR-KB-012 | Conversation context MUST be session-scoped; no cross-user memory. | T |
+| FR-KB-012 | Conversation context is scoped to the user's own conversations; cross-conversation memory is per user and per school, visible, editable and deletable by that user; never cross-user. *(Amended 2026-09-30 by ADR-0034; was: "Conversation context MUST be session-scoped; no cross-user memory.")* | T |
 | FR-KB-030 | Authorized users MAY promote answers to verified answers; verified answers are flagged for review when cited sources change. | T |
 
 ### 3.9 Exports (FR-EXP)

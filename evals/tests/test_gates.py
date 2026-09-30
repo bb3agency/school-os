@@ -40,6 +40,12 @@ PERFECT = Metrics(
     fee_guessed_link_count=0,
     fee_citation_validity=1.0,
     fee_refusal_correctness=1.0,
+    conversation_items=16,
+    conversation_leakage_count=0,
+    conversation_scope_violations=0,
+    conversation_context_accuracy=1.0,
+    followup_language_match=1.0,
+    memory_preference_applied=1.0,
 )
 
 
@@ -62,6 +68,9 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         ("fee_guessed_link_count", "==", 0),
         ("fee_citation_validity", ">=", 1.0),
         ("fee_refusal_correctness", ">=", 0.95),
+        # Ask conversations and memory (ADR-0034; FR-KB-012): nothing leaks, no rule is broken.
+        ("conversation_leakage_count", "==", 0),
+        ("conversation_scope_violations", "==", 0),
     }
 
 

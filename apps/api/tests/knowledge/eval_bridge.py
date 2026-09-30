@@ -178,6 +178,9 @@ FIELD_WORDS: Final = (
     ("dob", ("date of birth", "dob", "birth", "పుట్టిన", "puttina")),
 )
 """Record fields the stand-in recognises (first match wins)."""
+CHATS: Final = "search_my_conversations"
+CHAT_WORDS: Final = ("did i ask", "i asked", "నేను అడిగిన")
+"""Questions about the caller's own earlier chats (ADR-0034)."""
 FEES: Final = "get_fee_dues"
 FEE_WORDS: Final = ("fee", "dues", "owe", "ఫీజు", "బకాయి", "బాకీ", "kattali")
 """Fee questions the stand-in recognises (only when the application offers get_fee_dues)."""
@@ -277,10 +280,35 @@ class EvalFakeTransport:
         return [b for b in content if isinstance(b, Mapping)] if isinstance(content, list) else []
 
     def _question(self, messages: Sequence[Mapping[str, Any]]) -> str:
-        for block in self._blocks(messages[0]):
-            if block.get("type") == "text":
-                return str(block.get("text", ""))
-        return ""
+        """The question: the LAST text block of the user turn (the conversation's summary,
+        recent turns and the question as written come before it; ADR-0034)."""
+        texts = [
+            str(block.get("text", ""))
+            for block in self._blocks(messages[0])
+            if block.get("type") == "text"
+        ]
+        return texts[-1] if texts else ""
+
+    @staticmethod
+    def _prefers_telugu(body: Mapping[str, Any]) -> bool:
+        """The user's memory block (a system block after the prompt) asks for Telugu."""
+        from app.knowledge.config.llm import load_llm_config
+
+        header = load_llm_config().conversation.memory_header
+        return any(
+            str(b.get("text", "")).startswith(header) and "telugu" in str(b.get("text")).casefold()
+            for b in body.get("system") or ()
+            if isinstance(b, Mapping)
+        )
+
+    def _chat_step(
+        self, messages: Sequence[Mapping[str, Any]], question: str, tools: set[str], prefix: str
+    ) -> Step:
+        """ "What did I ask ...": the caller's own earlier chats, then their cited questions."""
+        if CHATS not in set(self._calls(messages).values()) and CHATS in tools:
+            return CHATS, {"query": question}
+        found = [(r, _block_text(r)) for r in self._results(messages, CHATS)]
+        return self._cite(found, prefix, first_only=True)
 
     def _calls(self, messages: Sequence[Mapping[str, Any]]) -> dict[str, str]:
         """tool_use id -> tool name, for the calls made so far."""
@@ -416,14 +444,16 @@ class EvalFakeTransport:
         question = self._question(messages)
         telugu = bool(re.search(r"[\u0c00-\u0c7f]", question))
         not_found = "ఇది కనబడలేదు." if telugu else "I could not find this in the records."
-        prefix = TELUGU_PREFIX if telugu else ""
+        prefix = TELUGU_PREFIX if telugu or self._prefers_telugu(body) else ""
         step: Step = []
         if not any(w in question.casefold() for w in AADHAAR_WORDS):
             tools: set[str] = set()
             if (body.get("tool_choice") or {}).get("type") != "none":
                 tools = {str(t.get("name")) for t in body.get("tools") or ()}
             wanted = record_request(question)
-            if FEES in tools and any(w in question.casefold() for w in FEE_WORDS):
+            if CHATS in tools and any(w in question.casefold() for w in CHAT_WORDS):
+                step = self._chat_step(messages, question, tools, prefix)
+            elif FEES in tools and any(w in question.casefold() for w in FEE_WORDS):
                 step = self._fee_step(messages, question, tools, prefix)
             elif wanted is not None:
                 step = self._record_step(messages, wanted, tools, prefix)
@@ -1146,6 +1176,233 @@ class AppFakeAdapter:
             provided_sources=tuple(answer.provided),
         )
 
+    # --- Ask conversations (sos_evals.conversations; ADR-0034) --------------------------------
+
+    def run_conversation(self, case: Any) -> Any:
+        """One scripted conversation in its own school (see :class:`_ConversationRunner`)."""
+        return _run_conversation(self, case)
+
+
+class _ConversationRunner:
+    """One scripted conversation case (``sos_evals.conversations``) in its own school, every
+    step through ``knowledge.service`` like the routes call it (``respond``: the whole answer in
+    the caller's transaction), the rolling summary jobs run right after each step (the worker's
+    outbox consumer), and what the model was sent read from the recording stand-in."""
+
+    def __init__(self, adapter: AppFakeAdapter, case: Any) -> None:
+        self.adapter = adapter
+        self.case = case
+        self.school = adapter._school(f"conv:{case.id}")
+        self.tenant = self.school.tenant_id
+        self.members: dict[str, Any] = {}
+        self.ctx: dict[str, Any] = {}
+        self.docs: dict[str, uuid.UUID] = {}
+        self.conversations: dict[tuple[str, str], uuid.UUID] = {}
+        self.step_query: dict[int, uuid.UUID] = {}
+        self.query_step: dict[uuid.UUID, int] = {}
+        self.summaries_seen: set[uuid.UUID] = set()
+        for person in case.people:
+            self._person(person)
+        for doc in case.docs:
+            self.docs[doc.key] = self._document(doc)
+
+    def _person(self, person: Any) -> None:
+        from app.authz.catalog import implicit_permissions, system_roles
+        from app.authz.context import Scopes, UserContext
+
+        k = self.adapter.K
+        scopes = (
+            [("section", self.school.ids[f"section:{person.section}"])] if person.section else None
+        )
+        member = k.W.add_member(self.adapter._admin, self.tenant, [person.role], scopes=scopes)
+        template = system_roles()[person.role]
+        scoped = {p for p in template.permission_keys if (g := template.grant(p)) and g.scoped}
+        sections = (
+            frozenset({self.school.ids[f"section:{person.section}"]})
+            if person.section
+            else frozenset()
+        )
+        self.members[person.key] = member
+        self.ctx[person.key] = UserContext(
+            user_id=member.user_id,
+            tenant_id=self.tenant,
+            membership_id=member.membership_id,
+            roles=frozenset({person.role}),
+            permissions=frozenset(set(template.permission_keys) | set(implicit_permissions())),
+            scopes=Scopes(school=not sections, section_ids=sections),
+            mfa=True,
+            auth_time=None,
+            scoped_permissions=frozenset(scoped),
+        )
+
+    def _acl(self, audience: str) -> list[tuple[str, str]]:
+        if audience == "all":
+            return list(self.adapter.K.ALL_ROLES_ACL)
+        if audience == "owner_only":
+            return [("role", "owner")]
+        if audience == "member_u1":
+            return [("membership", str(self.members["U1"].membership_id))]
+        raise ValueError(f"unknown audience {audience}")
+
+    def _document(self, doc: Any) -> uuid.UUID:
+        doc_id, _version = self.adapter.K.text_document(
+            self.adapter._admin,
+            self.school,
+            doc.content,
+            title=doc.title,
+            acl=self._acl(doc.audience),
+        )
+        value: uuid.UUID = doc_id
+        return value
+
+    def _revoke(self, key: str) -> None:
+        doc_id = self.docs[key]
+        with self.adapter._admin.begin() as c:
+            c.execute(text("DELETE FROM kb.document_acl WHERE document_id = :d"), {"d": doc_id})
+            c.execute(
+                text(
+                    "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, "
+                    "principal_ref) VALUES (:t, :d, 'role', 'owner')"
+                ),
+                {"t": self.tenant, "d": doc_id},
+            )
+        self.adapter.K.pipeline().refresh_acl(self.tenant, doc_id)
+
+    def _revise(self, key: str) -> None:
+        from app.knowledge.ingestion.extract import DOCX_MIME
+
+        k = self.adapter.K
+        doc_id = self.docs[key]
+        content = next(d.revised for d in self.case.docs if d.key == key)
+        data = k.S.docx("".join(k.S.p(line) for line in content.splitlines()))
+        version_id = uuid.uuid4()
+        object_key = f"t/{self.tenant}/docs/{doc_id}/v2/original.docx"
+        with self.adapter._admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO kb.document_versions (id, tenant_id, document_id, version_no, "
+                    "object_key, sha256, mime_type, size_bytes, status, created_by) VALUES "
+                    "(:v, :t, :d, 2, :k, :h, :m, :n, 'ready', :u)"
+                ),
+                {
+                    "v": version_id,
+                    "t": self.tenant,
+                    "d": doc_id,
+                    "k": object_key,
+                    "h": hashlib.sha256(data).digest(),
+                    "m": DOCX_MIME,
+                    "n": len(data),
+                    "u": self.school.people["owner"].user_id,
+                },
+            )
+            c.execute(
+                text("UPDATE kb.documents SET current_version_id = :v WHERE id = :d"),
+                {"v": version_id, "d": doc_id},
+            )
+        k.D.memory_store().put(object_key, data, DOCX_MIME)
+        if k.pipeline().ingest(self.tenant, doc_id, version_id) != "indexed":
+            raise RuntimeError(f"revised document {key} was not indexed")
+
+    def _summaries(self) -> None:
+        """The worker's part: every queued rolling-summary job of this school, run now."""
+        from app.knowledge import conversations, service
+
+        with self.adapter._admin.connect() as c:
+            rows = c.execute(
+                text(
+                    "SELECT id, payload FROM ops.outbox WHERE tenant_id = :t AND event_type = :e "
+                    "ORDER BY created_at"
+                ),
+                {"t": self.tenant, "e": conversations.SUMMARY_EVENT},
+            ).all()
+        for row in rows:
+            if row.id not in self.summaries_seen:
+                self.summaries_seen.add(row.id)
+                service.summarise_conversation(self.tenant, dict(row.payload))
+
+    def _source(self, source: str) -> str:
+        from app.knowledge import sources
+
+        try:
+            ref = sources.parse(source)
+        except ValueError:
+            return source
+        if ref.kind == "conversation" and ref.query_id is not None:
+            return f"chat:{self.query_step.get(ref.query_id, -1)}"
+        by_id = {v: k for k, v in self.docs.items()}
+        return by_id.get(ref.object_id, source)
+
+    def _with(self, who: str) -> Any:
+        from app.core.db import tenant_session
+
+        return tenant_session(self.tenant, self.ctx[who].user_id)
+
+    def step(self, index: int, step: Any) -> Any:
+        from app.knowledge.domain import AskRequest, FollowupsEvent, MemoryEvent, MetaEvent
+        from app.knowledge.schemas import MemorySettingsIn
+        from sos_evals.conversations import TurnResult
+
+        svc, who = self.adapter._service, step.who
+        if step.action == "revoke":
+            self._revoke(step.doc)
+            return None
+        if step.action == "revise":
+            self._revise(step.doc)
+            return None
+        if step.action == "memory_off":
+            with self._with(who) as s:
+                svc.set_memory_settings(s, self.ctx[who], MemorySettingsIn(enabled=False))
+            return None
+        if step.action == "delete_conversation":
+            with self._with(who) as s:
+                svc.delete_conversation(
+                    s, self.ctx[who], self.conversations[(who, step.conversation)]
+                )
+            return None
+        target = self.step_query.get(step.target) if step.target is not None else None
+        request = AskRequest(
+            question=step.question or "",
+            conversation_id=(
+                None if target is not None else self.conversations.get((who, step.conversation))
+            ),
+            regenerate_of=target if step.action == "regenerate" else None,
+            edit_of=target if step.action == "edit" else None,
+        )
+        sent = len(self.adapter.transport.sent)
+        with self._with(who) as s:
+            outcome = svc.respond(s, self.ctx[who], request)
+        model_input = str(self.adapter.transport.sent[sent:])
+        self._summaries()
+        meta = next(e for e in outcome.events if isinstance(e, MetaEvent))
+        if target is None and meta.conversation_id is not None:
+            self.conversations[(who, step.conversation)] = meta.conversation_id
+        self.step_query[index] = outcome.query_id
+        self.query_step[outcome.query_id] = index
+        followups = next((e.questions for e in outcome.events if isinstance(e, FollowupsEvent)), ())
+        memory = tuple((e.action, e.text) for e in outcome.events if isinstance(e, MemoryEvent))
+        with self._with(who) as s:
+            stored = tuple(m.text for m in svc.list_memories(s, self.ctx[who]))
+        answer = outcome.answer
+        return TurnResult(
+            step=index,
+            text=answer.text,
+            citations=tuple(self._source(c.source) for c in answer.cited),
+            provided=tuple(self._source(p) for p in answer.provided),
+            model_input=model_input,
+            followups=tuple(followups),
+            memory=memory,
+            cached_from=self.query_step.get(meta.cached_from) if meta.cached_from else None,
+            memories_after=stored,
+        )
+
+
+def _run_conversation(adapter: AppFakeAdapter, case: Any) -> Any:
+    from sos_evals.conversations import ConversationRun
+
+    runner = _ConversationRunner(adapter, case)
+    turns = [runner.step(i, step) for i, step in enumerate(case.steps)]
+    return ConversationRun(turns=tuple(t for t in turns if t is not None))
+
 
 def build(corpus: Mapping[str, Any], items: Iterable[Any]) -> AppFakeAdapter:
     return AppFakeAdapter(corpus, items)
@@ -1156,7 +1413,7 @@ LIVE_ADAPTER: Final = "app-live"
 
 def live_gateway(config: Any) -> Any:
     """The real gateway on the live providers of ``models.yaml`` (``make eval-live``; docs/06
-    §13.5). Settings come from the environment (``SOS_LLM_GCP_*``; ``SOS_ANTHROPIC_API_KEY``
+    §13.6). Settings come from the environment (``SOS_LLM_GCP_*``; ``SOS_ANTHROPIC_API_KEY``
     only for a fallback role); everything else stays local and synthetic (testcontainers
     database, fake embeddings, the synthetic corpus). Refused against staging/prod settings and
     without an explicit ``SOS_EVAL_LIVE_ACK=synthetic-only``: a live run sends the synthetic

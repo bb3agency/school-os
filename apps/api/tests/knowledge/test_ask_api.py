@@ -25,6 +25,7 @@ from sqlalchemy import Engine, text
 
 from app.core.db import tenant_session
 from app.knowledge import composition, service
+from app.knowledge.config.conversations import load_conversations_config
 from app.knowledge.config.llm import load_llm_config
 from app.knowledge.gateway.fake import FakeTransport
 from app.knowledge.gateway.transport import MessagesRequest, TransportError
@@ -97,10 +98,26 @@ def docs(world: Any, admin_engine: Engine) -> Iterator[dict[str, uuid.UUID]]:
     composition.set_runtime(None)
 
 
+def _install(**overrides: Any) -> tuple[Any, Any]:
+    """The runtime WITHOUT the answer cache: these tests ask the same questions again and
+    check what the model was sent; the cache has its own tests (test_conversations_api.py)."""
+    cfg = load_conversations_config()
+    no_cache = cfg.model_copy(
+        update={"answer_cache": cfg.answer_cache.model_copy(update={"enabled": False})}
+    )
+    installed: tuple[Any, Any] = K.install_runtime(conversations_config=no_cache, **overrides)
+    return installed
+
+
+def _answer_requests(sent: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """The answer loop's requests (not the structured calls: rewrite, follow-ups, screens)."""
+    return [b for b in sent if not isinstance((b.get("output_config") or {}).get("format"), dict)]
+
+
 @pytest.fixture
 def fake(docs: dict[str, uuid.UUID]) -> Any:
     """A fresh runtime per test (its own recording transport and in-memory spend ledger)."""
-    _rt, transport = K.install_runtime()
+    _rt, transport = _install()
     yield transport
     composition.set_runtime(None)
 
@@ -128,16 +145,32 @@ def test_FR_KB_008_ask_streams_meta_tokens_citations_done(
     names = [e for e, _ in events]
     assert names[0] == "meta"
     assert names[-1] == "done"
-    # docs/06 §5.1: meta, delta+ (preview), final, token+, citation+, done, in that order.
+    # docs/06 §5.1: meta, status+ (understanding, the search with and without its count,
+    # writing), delta+ (preview), final, token+, citation+, followups, done, in that order.
     n_delta, n_token, n_cite = (names.count(n) for n in ("delta", "token", "citation"))
     assert n_delta > 1
     assert n_token >= 1
     assert n_cite >= 1
     assert names == (
-        ["meta"] + ["delta"] * n_delta + ["final"] + ["token"] * n_token + ["citation"] * n_cite
-    ) + ["done"]
-    # Clients that predate delta/final still see exactly the old sequence.
-    legacy = [n for n in names if n not in ("delta", "final")]
+        ["meta"]
+        + ["status"] * 4
+        + ["delta"] * n_delta
+        + ["final"]
+        + ["token"] * n_token
+        + ["citation"] * n_cite
+        + ["followups", "done"]
+    )
+    steps = [d for e, d in events if e == "status"]
+    assert [s["step"] for s in steps] == [
+        "understanding",
+        "searching_documents",
+        "searching_documents",
+        "writing",
+    ]
+    assert steps[1] == {"step": "searching_documents", "tool": "search_documents", "count": None}
+    assert steps[2]["count"] >= 1
+    # Clients that predate delta/final (and the additive events) still see the old sequence.
+    legacy = [n for n in names if n not in ("delta", "final", "status", "followups", "memory")]
     assert legacy == ["meta"] + ["token"] * n_token + ["citation"] * n_cite + ["done"]
     final = next(d for e, d in events if e == "final")
     assert final["text"] == _text(events)
@@ -202,7 +235,13 @@ def test_FR_KB_009_query_is_logged_encrypted_and_audited_without_text(
             text("SELECT role, feature, outcome, cost_usd FROM kb.llm_calls WHERE query_id = :q"),
             {"q": query_id},
         ).all()
-    assert [(r.role, r.feature, r.outcome) for r in calls] == [("answer", "ask", "ok")] * 2
+    # Two answer turns (tool round, answer) and the follow-up suggestions (ADR-0034), each
+    # metered with its role; the first question of a conversation needs no rewrite.
+    assert sorted((r.role, r.feature, r.outcome) for r in calls) == [
+        ("answer", "ask", "ok"),
+        ("answer", "ask", "ok"),
+        ("followups", "ask", "ok"),
+    ]
     assert all(r.cost_usd > 0 for r in calls)
 
 
@@ -395,7 +434,7 @@ def test_FR_KB_004_record_question_reads_named_fields_through_scoped_tools(
 ) -> None:
     ids = K.SW.ensure_students(world)
     transport = RecordsTransport("Synthetica Venkata Sai")
-    K.install_runtime(transport=transport)
+    _install(transport=transport)
     try:
         _, events = K.ask(api, world.person("class_teacher"), "Date of birth of Venkata Sai?")
     finally:
@@ -412,6 +451,8 @@ def test_FR_KB_004_record_question_reads_named_fields_through_scoped_tools(
         "list_documents",
         "list_findings",
         "search_documents",
+        # ADR-0034: the caller's own earlier conversations (kb.ask).
+        "search_my_conversations",
     ]
     # Only the named fields reach the model: never the guardian phone or C3 values.
     for body in transport.sent:
@@ -427,7 +468,7 @@ def test_invariant_3_student_outside_scope_is_not_found_through_the_tools(
     ids = K.SW.ensure_students(world)
     for student in (ids["s9c"], ids["b_sb"]):  # another section; another school
         transport = RecordsTransport("unused", student_id=student)
-        K.install_runtime(transport=transport)
+        _install(transport=transport)
         try:
             _, events = K.ask(api, world.person("class_teacher"), "Date of birth of that student?")
         finally:
@@ -667,11 +708,14 @@ def test_invariant_7_the_row_and_audit_event_commit_before_the_first_event(
 def test_FR_KB_008_client_leaving_mid_answer_records_the_question_cancelled(
     world: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
 ) -> None:
-    K.install_runtime(transport=LongAnswerTransport())
+    _install(transport=LongAnswerTransport())
     try:
         stream = _start(_office(world), "When is sports day?")
         assert next(stream).event == "meta"
-        assert next(stream).event == "delta"
+        event = next(stream)
+        while event.event == "status":  # progress codes come before the preview
+            event = next(stream)
+        assert event.event == "delta"
         stream.close()
         stream.close()  # idempotent
     finally:
@@ -692,7 +736,7 @@ def test_FR_KB_008_client_leaving_mid_answer_records_the_question_cancelled(
 def test_FR_KB_005_validation_replaces_a_streamed_answer_it_cannot_support(
     world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
 ) -> None:
-    K.install_runtime(transport=WrongCitationTransport(record=True))
+    _install(transport=WrongCitationTransport(record=True))
     try:
         _, events = K.ask(api, world.person("office_staff"), "When is sports day?")
     finally:
@@ -712,7 +756,7 @@ def test_FR_KB_005_validation_replaces_a_streamed_answer_it_cannot_support(
 def test_NFR_AVL_004_provider_failure_mid_answer_falls_back_to_search_only(
     world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
 ) -> None:
-    K.install_runtime(transport=LongAnswerTransport(fail_mid_answer=True))
+    _install(transport=LongAnswerTransport(fail_mid_answer=True))
     try:
         _, events = K.ask(api, world.person("office_staff"), "When is sports day?")
     finally:
@@ -765,10 +809,10 @@ def test_FR_KB_012_follow_up_gets_the_same_users_earlier_questions_only(
     session_id = uuid.uuid4()
     staff, principal = world.person("office_staff"), world.person("principal")
     _ask_in(api, staff, "When is sports day?", session_id)
-    assert _earlier_block(fake.sent[0]) is None
+    assert _earlier_block(_answer_requests(fake.sent)[0]) is None
     fake.sent.clear()
     _ask_in(api, staff, "Where is it held?", session_id)
-    earlier = _earlier_block(fake.sent[0])
+    earlier = _earlier_block(_answer_requests(fake.sent)[0])
     assert earlier is not None
     assert "- When is sports day?" in earlier
     # Every follow-up is searched again (re-retrieval per turn, invariant 8).
@@ -782,11 +826,13 @@ def test_FR_KB_012_follow_up_gets_the_same_users_earlier_questions_only(
     # Another user reusing the session id sees none of it (no cross-user memory).
     fake.sent.clear()
     _ask_in(api, principal, "And the time?", session_id)
-    assert _earlier_block(fake.sent[0]) is None
+    assert _earlier_block(_answer_requests(fake.sent)[0]) is None
+    # Not in any call of that question (the rewrite included): another user's history.
+    assert "When is sports day?" not in str(fake.sent)
     # A new session starts fresh.
     fake.sent.clear()
     _ask_in(api, staff, "Where is it held?", uuid.uuid4())
-    assert _earlier_block(fake.sent[0]) is None
+    assert _earlier_block(_answer_requests(fake.sent)[0]) is None
 
 
 def test_FR_KB_012_history_is_limited_and_skips_cancelled_questions(
@@ -802,7 +848,7 @@ def test_FR_KB_012_history_is_limited_and_skips_cancelled_questions(
     left.close()
     fake.sent.clear()
     _ask_in(api, who, "The last one?", session_id)
-    earlier = _earlier_block(fake.sent[0])
+    earlier = _earlier_block(_answer_requests(fake.sent)[0])
     assert earlier is not None
     listed = [line for line in earlier.splitlines() if line.startswith("- ")]
     assert listed == [f"- Synthetic question number {n}?" for n in range(1, limit + 1)]

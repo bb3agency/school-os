@@ -39,7 +39,7 @@ from collections.abc import Generator, Iterator, Sequence
 from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Final, Literal, overload
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -54,10 +54,13 @@ from app.knowledge.domain import (
     AssistantMessage,
     Citation,
     ConversationItem,
+    HistoryTurn,
     Locale,
     Metering,
     ModelTurn,
     SearchResultBlock,
+    StatusStep,
+    StepUpdate,
     TextDelta,
     ToolCall,
     ToolOutcome,
@@ -120,6 +123,37 @@ def sanitise(text: str) -> str:
 def is_factual(segment: AnswerSegment) -> bool:
     """§9 rule 3 heuristic: numbers and dates are facts; a cited segment states one too."""
     return bool(segment.citations) or bool(_DIGIT.search(segment.text))
+
+
+CHAT_SEARCH_TOOL: Final = "search_my_conversations"
+
+
+def step_for(tool: str) -> StatusStep:
+    """The ``status`` step code of a tool (docs/06 §5.1)."""
+    if tool == SEARCH_TOOL:
+        return "searching_documents"
+    if tool == CHAT_SEARCH_TOOL:
+        return "searching_chats"
+    return "reading_records"
+
+
+@dataclass(frozen=True, slots=True)
+class AskContext:
+    """What a question carries besides itself (docs/06 §5 prompt layout; ADR-0034): the recent
+    turns of the caller's conversation (answers only where every cited source is still visible),
+    the rolling summary (only when its sources are still visible), the caller's confirmed memory
+    items, and the standalone rewrite of a follow-up (sent as the question; the original goes
+    with it and decides the answer's language). All context only, never evidence: citations are
+    still validated against this request's tool results alone."""
+
+    turns: tuple[HistoryTurn, ...] = ()
+    summary: str | None = None
+    memory: tuple[str, ...] = ()
+    standalone: str | None = None
+
+    @property
+    def has_history(self) -> bool:
+        return bool(self.turns or self.summary)
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,6 +388,7 @@ class AnswerEngine:
         query_id: uuid.UUID,
         school_name: str,
         earlier: Sequence[str] = (),
+        context: AskContext | None = None,
     ) -> Answer:
         """The whole answer at once (the eval harness, the non-streaming service path)."""
         loop = self._loop(
@@ -365,6 +400,8 @@ class AnswerEngine:
             earlier=earlier,
             progress=Progress(),
             stream=False,
+            context=context,
+            steps=False,
         )
         while True:
             try:
@@ -372,6 +409,36 @@ class AnswerEngine:
             except StopIteration as done:
                 answer: Answer = done.value
                 return answer
+
+    @overload
+    def stream(
+        self,
+        session: Session,
+        ctx: UserContext,
+        question: str,
+        *,
+        query_id: uuid.UUID,
+        school_name: str,
+        progress: Progress,
+        earlier: Sequence[str] = (),
+        context: AskContext | None = None,
+        steps: Literal[False] = False,
+    ) -> Generator[TextDelta, None, Answer]: ...
+
+    @overload
+    def stream(
+        self,
+        session: Session,
+        ctx: UserContext,
+        question: str,
+        *,
+        query_id: uuid.UUID,
+        school_name: str,
+        progress: Progress,
+        earlier: Sequence[str] = (),
+        context: AskContext | None = None,
+        steps: Literal[True],
+    ) -> Generator[TextDelta | StepUpdate, None, Answer]: ...
 
     def stream(
         self,
@@ -383,12 +450,15 @@ class AnswerEngine:
         school_name: str,
         progress: Progress,
         earlier: Sequence[str] = (),
-    ) -> Generator[TextDelta, None, Answer]:
+        context: AskContext | None = None,
+        steps: bool = False,
+    ) -> Generator[TextDelta | StepUpdate, None, Answer]:
         """The answer as it is written: tool rounds first, then the final turn's text as
         sanitised preview deltas (docs/06 §5.1); returns the validated :class:`Answer`.
 
         ``progress`` shows what was streamed and used so far, for a client that goes away
-        (closing this generator closes the provider call)."""
+        (closing this generator closes the provider call). With ``steps``, a
+        :class:`StepUpdate` is yielded before each tool runs and with its result count."""
         return self._loop(
             session,
             ctx,
@@ -398,6 +468,8 @@ class AnswerEngine:
             earlier=earlier,
             progress=progress,
             stream=True,
+            context=context,
+            steps=steps,
         )
 
     def _loop(
@@ -411,8 +483,12 @@ class AnswerEngine:
         earlier: Sequence[str],
         progress: Progress,
         stream: bool,
-    ) -> Generator[TextDelta, None, Answer]:
+        context: AskContext | None,
+        steps: bool,
+    ) -> Generator[TextDelta | StepUpdate, None, Answer]:
         language = detect_language(question)
+        context = context or AskContext()
+        search_text = context.standalone or question
         tools = offered(self._tools, ctx, session)
         by_name = {t.spec.name: t for t in tools}
         specs = [t.spec for t in tools]
@@ -423,7 +499,14 @@ class AnswerEngine:
         runs = progress.runs
         turns = progress.turns
         conversation: list[ConversationItem] = [
-            UserMessage(question, earlier_questions=tuple(earlier))
+            UserMessage(
+                search_text,
+                earlier_questions=() if context.turns else tuple(earlier),
+                earlier_turns=context.turns,
+                summary=context.summary,
+                memory=context.memory,
+                asked_as=question if context.standalone else None,
+            )
         ]
         metering = Metering(tenant_id=ctx.tenant_id, feature="ask", query_id=query_id)
         system = self.system_prompt(ctx, school_name)
@@ -442,6 +525,8 @@ class AnswerEngine:
                     break
                 outcomes: list[ToolOutcome] = []
                 for call in turn.tool_calls:
+                    if steps:
+                        yield StepUpdate(step_for(call.name), call.name)
                     outcome = self._run_tool(session, ctx, by_name, call)
                     kept: list[SearchResultBlock] = []
                     for block in outcome.blocks:
@@ -453,6 +538,8 @@ class AnswerEngine:
                         provided.add(block)
                     outcome = dataclasses.replace(outcome, blocks=tuple(kept))
                     runs.append(ToolRun(call.name, len(kept), outcome.is_error))
+                    if steps:
+                        yield StepUpdate(step_for(call.name), call.name, len(kept))
                     outcomes.append(outcome)
                 conversation += [AssistantMessage(turn), ToolResultsMessage(tuple(outcomes))]
             yield from _show(preview.flush(), progress)
@@ -462,7 +549,7 @@ class AnswerEngine:
             return self._fallback(
                 session,
                 ctx,
-                question=question,
+                question=search_text,
                 language=language,
                 turns=turns,
                 runs=runs,
@@ -674,6 +761,7 @@ def elapsed_ms(started: float) -> int:
 __all__ = [
     "Answer",
     "AnswerEngine",
+    "AskContext",
     "CitedSource",
     "PreviewSanitiser",
     "Progress",
@@ -684,5 +772,6 @@ __all__ = [
     "is_factual",
     "normalise",
     "sanitise",
+    "step_for",
     "validate",
 ]

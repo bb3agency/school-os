@@ -89,6 +89,27 @@ const paths = {
   ),
   cornerDownRight: <path d="M5 4v7a4 4 0 0 0 4 4h10m-4-4 4 4-4 4" />,
   more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
+  // Ask chat (docs/17 §5.3).
+  stop: <path d="M7 7h10v10H7Z" />,
+  copy: (
+    <path d="M9 9h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1Zm-4 6H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  ),
+  refresh: <path d="M20 11a8 8 0 0 0-14.8-4M4 4v4h4m-4 5a8 8 0 0 0 14.8 4M20 20v-4h-4" />,
+  pencil: <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Zm10-13 3 3" />,
+  thumbsUp: (
+    <path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Zm0 0 4-8a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7" />
+  ),
+  thumbsDown: (
+    <path d="M17 13V4h3a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1Zm0 0-4 8a2 2 0 0 1-2-2v-4H5.5a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 6.7 4H17" />
+  ),
+  pin: <path d="M9 4h6m-5 0v5l-3 4h10l-3-4V4m-2 9v7" />,
+  trash: <path d="M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />,
+  memory: (
+    <path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V6a2 2 0 0 0-3-2Zm6 0a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1" />
+  ),
+  newChat: (
+    <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6m-1.5-8.5a2.1 2.1 0 0 1 3 3L13 15l-4 1 1-4Z" />
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof paths;

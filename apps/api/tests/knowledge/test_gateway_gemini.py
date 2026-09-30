@@ -34,6 +34,7 @@ from app.knowledge.config.tools import load_tools_config
 from app.knowledge.domain import (
     AssistantMessage,
     ConversationItem,
+    HistoryTurn,
     Metering,
     ModelTurn,
     SearchResultBlock,
@@ -305,6 +306,51 @@ def test_FR_KB_012_earlier_questions_go_first_under_the_configured_header() -> N
     parts = r.transport.bodies[0]["contents"][0]["parts"]
     assert parts[0]["text"].startswith(CONFIG.conversation.earlier_questions_header)
     assert parts[-1] == {"text": "And the venue?"}
+
+
+def test_FR_KB_012_conversation_context_has_the_same_layout_as_on_the_messages_api() -> None:
+    """ADR-0034 on the Gemini wire: summary, recent turns (question and checked answer), the
+    question as written, then its rewrite; memory as a system part after the static prompt,
+    and a request carrying memory is never put in a context cache (it is about a person)."""
+    rules = CONFIG.conversation
+    question = UserMessage(
+        "When do Class 9 exams start at the school?",
+        earlier_turns=(HistoryTurn("Which circular?", "The exam circular."),),
+        summary="Asked about exam dates.",
+        memory=("Answer in Telugu script.",),
+        asked_as="And for 9?",
+    )
+    r = rig()
+    ask(r, [question])
+    (request,) = r.transport.requests
+    parts = [p["text"] for p in request.body["contents"][0]["parts"]]
+    assert parts == [
+        f"{rules.summary_header}\nAsked about exam dates.",
+        f"{rules.earlier_questions_header}\n- Which circular?\n"
+        f"  {rules.earlier_answer_label} The exam circular.",
+        f"{rules.rewritten_header}\nAnd for 9?",
+        "When do Class 9 exams start at the school?",
+    ]
+    system = [p["text"] for p in request.body["systemInstruction"]["parts"]]
+    assert system[0].startswith("You are the records assistant.")
+    assert system[1] == f"{rules.memory_header}\n- Answer in Telugu script."
+    assert request.static_prefix == ()
+    r = rig()
+    ask(r, [UserMessage("When do exams start?")])
+    assert r.transport.requests[0].static_prefix == ("systemInstruction", "tools")
+
+
+def test_ADR_0034_conversation_passages_are_cited_by_marker() -> None:
+    """search_my_conversations results are passages like any other: a [n] marker maps back to
+    the sos://conversation source given in this request."""
+    chat = SearchResultBlock(
+        f"sos://conversation/{DOC}#q{QUERY}", "Your earlier question", "Fees are due 15/10/2026."
+    )
+    answer = fixture("answer_markers.json")
+    answer["candidates"][0]["content"]["parts"] = [{"text": "You were told 15/10/2026 [1]."}]
+    turn = ask(rig(answer), grounded(chat))
+    (segment,) = turn.segments
+    assert [c.source for c in segment.citations] == [chat.source]
 
 
 # --- responses: tool calls, citations, stops, usage ---------------------------------------------

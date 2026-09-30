@@ -199,6 +199,74 @@ def query_row(admin: Engine, school: Any, person: Any) -> uuid.UUID:
     return qid
 
 
+def conversation_row(school: Any, person: Any, question: str = "Synthetic question?") -> uuid.UUID:
+    """A conversation of ``person`` with one answered question, written like the service writes
+    it (title and question encrypted under the school's key; ADR-0034)."""
+    from app.core.db import tenant_session
+    from app.knowledge import conversations
+    from app.knowledge import repository as repo
+    from app.knowledge.keys import QUESTION_PURPOSE, question_key
+    from app.students import crypto
+
+    SW.configure_keyring()
+    cid, qid = uuid.uuid4(), uuid.uuid4()
+    with tenant_session(school.tenant_id, person.user_id) as s:
+        title, version = conversations.seal(
+            s, question, table="kb.conversations", column="title_ciphertext", row_id=cid
+        )
+        repo.insert_conversation(
+            s,
+            {
+                "id": cid,
+                "user_id": person.user_id,
+                "title_ciphertext": title,
+                "key_version": version,
+            },
+        )
+        blob, version = crypto.encrypt_value(
+            s, question, table="kb.queries", column="question_ciphertext", row_id=qid
+        )
+        digest, _ = crypto.blind_index(
+            s, question_key(question), purpose=QUESTION_PURPOSE, key_version=version
+        )
+        repo.insert_query(
+            s,
+            {
+                "id": qid,
+                "session_id": cid,
+                "conversation_id": cid,
+                "user_id": person.user_id,
+                "question_ciphertext": blob,
+                "question_hmac": digest,
+                "key_version": version,
+                "mode": "full",
+                "status": "answered",
+            },
+        )
+    return cid
+
+
+def memory_row(school: Any, person: Any, *, status: str = "active") -> uuid.UUID:
+    """A memory item of ``person`` (encrypted like the service stores it; ADR-0034)."""
+    import datetime as dt
+
+    from app.core.db import tenant_session
+    from app.knowledge import memory
+
+    SW.configure_keyring()
+    with tenant_session(school.tenant_id, person.user_id) as s:
+        row = memory.insert(
+            s,
+            user_id=person.user_id,
+            text="Keep answers short",
+            source="explicit" if status == "active" else "suggested",
+            status="active" if status == "active" else "pending",
+            now=dt.datetime.now(dt.UTC),
+        )
+    value: uuid.UUID = row.id
+    return value
+
+
 ALL_ROLES_ACL = [
     ("role", r)
     for r in (
@@ -247,8 +315,10 @@ __all__ = [
     "W",
     "ask",
     "chunk_rows",
+    "conversation_row",
     "enable_ai",
     "install_runtime",
+    "memory_row",
     "parse_sse",
     "pipeline",
     "query_row",

@@ -46,6 +46,11 @@ def test_SEC_020_output_caps_per_role() -> None:
         "extraction": 2000,
         "circular": 2000,
         "notice": 1200,
+        # ADR-0034: the cheap Ask conversation roles.
+        "followups": 400,
+        "summary": 600,
+        "memory_screen": 150,
+        "query_rewrite": 200,
         "eval_judge": 2000,
     }
 
@@ -158,6 +163,11 @@ def test_ADR_0033_every_role_has_an_evaluated_anthropic_fallback() -> None:
         "extraction": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
         "circular": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
         "notice": ("anthropic", "claude-sonnet-5", "disabled"),
+        # ADR-0034 conversation roles: the models the backend was built and tested with.
+        "followups": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "summary": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "memory_screen": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "query_rewrite": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
         "eval_judge": ("anthropic", "claude-opus-5-5", "provider_default"),
     }
     assert fallback.roles["eval_judge"].effort == "low"

@@ -35,7 +35,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final, cast
 
 from app.core.redaction import mask_aadhaar
-from app.knowledge.config.llm import LlmConfig, RoleConfig
+from app.knowledge.config.llm import Conversation, LlmConfig, RoleConfig
 from app.knowledge.domain import (
     AnswerSegment,
     AssistantMessage,
@@ -58,7 +58,13 @@ from app.knowledge.gateway.citations import (
 from app.knowledge.gateway.codec import ImageInput, ParsedTurn, Prepared
 from app.knowledge.gateway.errors import GatewayMisuse, InvalidModelOutput
 from app.knowledge.gateway.transport import Wire
-from app.knowledge.gateway.wire import RawUsage, redact_payload, tool_rounds_used
+from app.knowledge.gateway.wire import (
+    RawUsage,
+    memory_block,
+    redact_payload,
+    tool_rounds_used,
+    user_texts,
+)
 
 REFUSALS: Final = frozenset(
     {
@@ -102,15 +108,10 @@ def _generation(role: RoleConfig) -> dict[str, Any]:
     return config
 
 
-def _user(item: UserMessage, earlier_header: str | None) -> dict[str, Any]:
-    parts: list[dict[str, Any]] = []
-    if item.earlier_questions:
-        if earlier_header is None:
-            raise GatewayMisuse("earlier questions need the configured conversation header")
-        listed = "\n".join(f"- {q}" for q in item.earlier_questions)
-        parts.append({"text": f"{earlier_header}\n{listed}"})
-    parts.append({"text": item.text})
-    return {"role": "user", "parts": parts}
+def _user(item: UserMessage, rules: Conversation | None) -> dict[str, Any]:
+    """The same layout as the Messages API (summary, recent turns, the question as written,
+    then the question; :func:`app.knowledge.gateway.wire.user_texts`), one part per text."""
+    return {"role": "user", "parts": [{"text": t} for t in user_texts(item, rules)]}
 
 
 def _model(item: AssistantMessage) -> dict[str, Any] | None:
@@ -152,7 +153,7 @@ def _responses(
 def contents(
     conversation: Sequence[ConversationItem],
     passages: Sequence[Passage],
-    earlier_header: str | None = None,
+    rules: Conversation | None = None,
 ) -> tuple[list[dict[str, Any]], list[str | None]]:
     """The ``contents`` list and the thought signature of every function call, in order."""
     names = {
@@ -166,7 +167,7 @@ def contents(
     signatures: list[str | None] = []
     for item in conversation:
         if isinstance(item, UserMessage):
-            out.append(_user(item, earlier_header))
+            out.append(_user(item, rules))
         elif isinstance(item, AssistantMessage):
             message = _model(item)
             if message is not None:
@@ -210,14 +211,18 @@ class GeminiCodec:
         """A redacted tool-use turn. Function calling mode stays ``AUTO`` (never forced); once
         ``max_tool_rounds`` rounds are used it becomes ``NONE`` so the model must answer."""
         passages = number_passages(conversation)
-        items, signatures = contents(
-            conversation, passages, config.conversation.earlier_questions_header
-        )
+        items, signatures = contents(conversation, passages, config.conversation)
         instruction = system
         if tools or passages:
             instruction = f"{system}\n\n{config.citations.marker_instructions}"
+        system_parts = [{"text": instruction}]
+        memory = memory_block(conversation, config.conversation)
+        if memory is not None:
+            # The user's own memory items (ADR-0034) go right after the static prompt, as on
+            # the Messages API. They are about a person, so this prefix is never cached.
+            system_parts.append({"text": memory["text"]})
         body: dict[str, Any] = {
-            "systemInstruction": _system(instruction),
+            "systemInstruction": {"parts": system_parts},
             "contents": items,
             "generationConfig": _generation(role),
         }
@@ -238,7 +243,9 @@ class GeminiCodec:
                 body["toolConfig"] = {"functionCallingConfig": {"mode": "NONE"}}
         redacted = cast(dict[str, Any], redact_payload(body))
         _attach_signatures(redacted, signatures)
-        return Prepared(redacted, STATIC_PREFIX, passages)
+        # Vertex takes no system instruction next to a cache, so with memory nothing is cached.
+        prefix: tuple[str, ...] = STATIC_PREFIX if memory is None else ()
+        return Prepared(redacted, prefix, passages)
 
     def json_request(
         self,

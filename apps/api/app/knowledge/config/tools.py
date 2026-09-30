@@ -31,9 +31,12 @@ WHITELIST: Final = frozenset(
         # M6 Tally connector: ADR-0032 (Proposed) would amend ADR-0008 with this tool; it is
         # offered only behind the school's tally.connector.enabled flag.
         "get_fee_dues",
+        # ADR-0034 (Accepted 2026-09-30) amends ADR-0008: the caller's own conversations only.
+        "search_my_conversations",
     }
 )
-"""ADR-0008 / docs/06 §7 (+ ADR-0032 for get_fee_dues). The only tools the model may call."""
+"""ADR-0008 / docs/06 §7 (+ ADR-0032 for get_fee_dues, ADR-0034 for
+search_my_conversations). The only tools the model may call."""
 
 
 class ToolConfig(ConfigModel):
@@ -55,6 +58,8 @@ class ToolConfig(ConfigModel):
     max_verified_answers: int | None = Field(default=None, ge=0, le=5)
     """``search_documents``: verified answers put before the passages (docs/06 §6 boost)."""
     latest_terms: tuple[str, ...] = ()
+    max_conversations: int | None = Field(default=None, ge=1, le=200)
+    """``search_my_conversations``: how many of the caller's newest conversations are searched."""
     """Words that make a search prefer the latest documents (recency boost, docs/06 §6)."""
 
     @model_validator(mode="after")

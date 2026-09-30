@@ -23,6 +23,8 @@ const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
 const USER = "0192f3a4-0000-7000-8000-0000000000d1";
 const CERTIFICATE = "0192f3a4-0000-7000-8000-0000000ce001";
 const FLAG = "0192f3a4-0000-7000-8000-00000000f501";
+/** Ask conversation with long, mixed-script content (layout-fixtures.ts). */
+const ASK_CHAT = "0192f3a4-0000-7000-8000-00000000e9a1";
 
 export interface ScreenGroup {
   /** Stand-in IdP subject to sign in as (null: public pages). */
@@ -70,6 +72,10 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/ask",
       "/ask/search",
       "/ask/verified",
+      // Ask chat (FR-KB-012): a long conversation, all chats, memory.
+      `/ask/c/${ASK_CHAT}`,
+      "/ask/history",
+      "/ask/memory",
       // M4: circulars inbox, tasks and parent notices.
       "/circulars",
       "/tasks",
@@ -258,7 +264,12 @@ export function detectLayout({ vw }: { vw: number }): LayoutReport {
     const s = getComputedStyle(el);
     const scrollable = /(auto|scroll)/.test(s.overflowX) || /(auto|scroll)/.test(s.overflowY);
     if (!scrollable) {
-      if (/(hidden|clip)/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1)
+      // One documented exception (docs/17 §5.3): a one-line ellipsis whose full text is the
+      // link's tooltip and accessible name (Ask recents in the sidebar).
+      const fullTextKept =
+        s.textOverflow === "ellipsis" &&
+        el.closest("[title]")?.getAttribute("title") === (el.textContent ?? "").trim();
+      if (/(hidden|clip)/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && !fullTextKept)
         out.clipped.push(
           `${s.textOverflow === "ellipsis" ? "ellipsis " : ""}x ${el.scrollWidth}>${el.clientWidth} ${desc(el)}`,
         );
