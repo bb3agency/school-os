@@ -42,7 +42,8 @@ class AvScannerKind(StrEnum):
 class ExtractionProviderKind(StrEnum):
     """Register-photo extraction provider (FR-IMP-024). ``fake`` is synthetic and refuses to run
     in staging/prod; ``not-configured`` fails every batch with an operator-facing error until a
-    real provider (OCR / Claude vision via ``knowledge/gateway``, M2) is chosen by evaluation."""
+    real provider (OCR, or a vision model via ``knowledge/gateway``; ADR-0033) is chosen by
+    evaluation."""
 
     FAKE = "fake"
     NOT_CONFIGURED = "not-configured"
