@@ -149,8 +149,11 @@ describe("notification bell (FR-NOT-001)", () => {
     expect(screen.getByRole("region", { name: "Latest notifications" })).toHaveClass(
       "origin-top-right",
     );
+    const panelId = bell.getAttribute("aria-controls") ?? "";
     await userEvent.click(screen.getByRole("button", { name: "Elsewhere" }));
     expect(bell).toHaveAttribute("aria-expanded", "false");
+    // While it fades out it takes no focus and no clicks (inert), then it is gone.
+    expect(document.getElementById(panelId)).toHaveAttribute("inert");
     await waitFor(() =>
       expect(screen.queryByRole("region", { name: "Latest notifications" })).toBeNull(),
     );

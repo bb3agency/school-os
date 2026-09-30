@@ -11,6 +11,7 @@ import { PASSIVE_HEADER } from "@/lib/bff/fetch";
 import { ApiError, unwrap, useApiMutation, useBffClient } from "@/lib/bff/query";
 import { formatDateTime } from "@/lib/format";
 import { EASE_OUT, seconds } from "@/lib/motion";
+import { Presence } from "@/lib/presence";
 import { bellPollDelay, NOTIFICATION_KEYS, notificationHref, type Notification } from "./data";
 
 const LATEST = 8;
@@ -225,55 +226,60 @@ export function NotificationBell() {
       <LazyMotion features={domAnimation} strict>
         <AnimatePresence key={presence}>
           {open ? (
-            <m.section
-              key="panel"
-              id={panelId}
-              aria-label={t("panelLabel")}
-              initial={{ opacity: 0, transform: "scale(0.97)" }}
-              animate={{ opacity: 1, transform: "scale(1)" }}
-              exit={{ opacity: 0, transform: "scale(0.97)" }}
-              transition={{ duration: seconds("quick"), ease: POPOVER_EASE }}
-              className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-border bg-surface p-4 text-ink shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:w-auto max-sm:origin-top"
-            >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="text-base font-semibold">{t("title")}</h2>
-                {count > 0 ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => markAll.mutate(undefined)}
-                    disabled={markAll.isPending}
-                  >
-                    {t("markAllRead")}
-                  </Button>
-                ) : null}
-              </div>
-              {latest.isPending ? (
-                <p className="text-sm">{t("loading")}</p>
-              ) : latest.isError ? (
-                <ApiErrorAlert error={latest.error} namespace="notifications" />
-              ) : latest.data.length === 0 ? (
-                <p className="text-sm text-ink-muted">{t("empty")}</p>
-              ) : (
-                <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
-                  {latest.data.map((item) => (
-                    <li key={item.id} className="py-2">
-                      <NotificationItem item={item} onOpen={openItem} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <ApiErrorAlert error={markRead.error ?? markAll.error} />
-              <p className="mt-2 border-t border-border pt-2 text-sm">
-                <Link
-                  href="/notifications"
-                  onClick={() => setOpen(false)}
-                  className="font-semibold text-primary underline"
+            <Presence key="panel">
+              {(exiting) => (
+                <m.section
+                  // While it fades out it takes no focus and no clicks (docs/17 §5.5).
+                  inert={exiting}
+                  id={panelId}
+                  aria-label={t("panelLabel")}
+                  initial={{ opacity: 0, transform: "scale(0.97)" }}
+                  animate={{ opacity: 1, transform: "scale(1)" }}
+                  exit={{ opacity: 0, transform: "scale(0.97)" }}
+                  transition={{ duration: seconds("quick"), ease: POPOVER_EASE }}
+                  className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-border bg-surface p-4 text-ink shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:w-auto max-sm:origin-top"
                 >
-                  {t("seeAll")}
-                </Link>
-              </p>
-            </m.section>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h2 className="text-base font-semibold">{t("title")}</h2>
+                    {count > 0 ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => markAll.mutate(undefined)}
+                        disabled={markAll.isPending}
+                      >
+                        {t("markAllRead")}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {latest.isPending ? (
+                    <p className="text-sm">{t("loading")}</p>
+                  ) : latest.isError ? (
+                    <ApiErrorAlert error={latest.error} namespace="notifications" />
+                  ) : latest.data.length === 0 ? (
+                    <p className="text-sm text-ink-muted">{t("empty")}</p>
+                  ) : (
+                    <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
+                      {latest.data.map((item) => (
+                        <li key={item.id} className="py-2">
+                          <NotificationItem item={item} onOpen={openItem} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <ApiErrorAlert error={markRead.error ?? markAll.error} />
+                  <p className="mt-2 border-t border-border pt-2 text-sm">
+                    <Link
+                      href="/notifications"
+                      onClick={() => setOpen(false)}
+                      className="font-semibold text-primary underline"
+                    >
+                      {t("seeAll")}
+                    </Link>
+                  </p>
+                </m.section>
+              )}
+            </Presence>
           ) : null}
         </AnimatePresence>
       </LazyMotion>
