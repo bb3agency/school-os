@@ -51,6 +51,7 @@ dev: .env ## Start the local stack (postgres+pgvector, valkey, seaweedfs, api, w
 	$(COMPOSE) up -d --build --wait
 
 dev-host: .env ## Backing services in Docker; api, worker, beat and web on this machine with reload
+	$(UV) sync --locked --all-packages
 	$(UV) run python scripts/dev.py $(ARGS)
 
 dev-stop: ## Stop the dev-host backing containers (data volumes are kept)

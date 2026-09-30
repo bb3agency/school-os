@@ -82,3 +82,37 @@ def test_ADR_0029_make_dev_reapplies_bootstrap_sql_before_the_stack() -> None:
     bootstrap = next(i for i, line in enumerate(lines) if "db-bootstrap" in line)
     stack = next(i for i, line in enumerate(lines) if "--build" in line)
     assert bootstrap < stack
+
+
+def test_make_dev_host_syncs_python_packages_first() -> None:
+    # A pull that adds a dependency (google-auth, ADR-0033) left the host venv behind, so the
+    # api, worker and beat died on import. `make dev-host` now syncs every workspace package.
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = re.search(r"^dev-host: .*\n((?:\t.+\n)+)", makefile, re.M)
+    assert recipe is not None
+    lines = recipe.group(1).splitlines()
+    sync = next(i for i, line in enumerate(lines) if "sync --locked --all-packages" in line)
+    start = next(i for i, line in enumerate(lines) if "scripts/dev.py" in line)
+    assert sync < start
+
+
+def test_dev_host_checks_the_app_imports_before_starting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Run directly (`.venv/Scripts/python scripts/dev.py`), dev.py itself stops with a clear
+    # "uv sync" hint instead of four crashing processes when the venv is out of date.
+    dev = _dev()
+    labels: list[str] = []
+    commands: list[list[str]] = []
+
+    def fake_step(label: str, command: list[str], env: dict[str, str], cwd: Path = ROOT) -> bool:
+        labels.append(label)
+        commands.append(command)
+        return "packages" not in label
+
+    monkeypatch.setattr(dev, "step", fake_step)
+    assert dev.prepare({}, seed=False) is False
+    assert "packages" in labels[0]
+    assert "app.main" in commands[0][-1]
+    assert "sos_worker.celery_app" in commands[0][-1]
+    assert len(labels) == 1  # nothing else runs on a stale venv

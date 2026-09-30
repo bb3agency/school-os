@@ -16,6 +16,8 @@ Valkey, SeaweedFS, the dev OIDC stub) and the four app processes on the host wit
 
 WHAT IT DOES FIRST, all idempotent and additive (it never drops, resets or deletes anything):
 
+0. ``make dev-host`` first runs ``uv sync --locked --all-packages`` (a pull may add a dependency);
+   run directly, this script checks the api and worker import and stops with that hint if not.
 1. ``.env`` from ``.env.example`` if missing (the same as ``make dev``).
 2. ``docker compose --profile dev up -d --wait db valkey s3 oidc`` and the buckets (s3-init's
    logic, from the host).
@@ -237,7 +239,16 @@ for name in (os.environ["SOS_S3_BUCKET_FILES"], os.environ["SOS_S3_BUCKET_AUDIT"
 """
 
 
+# Every package the api, worker and beat import (a pull can add a dependency, e.g. google-auth
+# for ADR-0033): checked before anything starts, so a stale venv is one clear message.
+IMPORTS = "import app.main, sos_worker.celery_app"
+SYNC_HINT = "  Python packages are out of date: run `uv sync --locked --all-packages`, then retry."
+
+
 def prepare(env: dict[str, str], *, seed: bool) -> bool:
+    if not step("python packages", [PY, "-c", IMPORTS], env):
+        print(paint(SYNC_HINT, "1;31"))
+        return False
     ok = (
         step("buckets", [PY, "-c", BUCKETS], env)
         and step("database roles (bootstrap.sql)", BOOTSTRAP, env)
