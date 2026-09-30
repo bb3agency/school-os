@@ -124,11 +124,11 @@ def supporting_sentence(claim: str, passage: str) -> str:
     chosen: list[int] = []
     remaining = set(claim_numbers)
     while remaining and sentences:
-        best = max(range(len(sentences)), key=lambda i: (len(numbers[i] & remaining), -i))
-        if not numbers[best] & remaining:
+        pick = max(range(len(sentences)), key=lambda i: (len(numbers[i] & remaining), -i))
+        if not numbers[pick] & remaining:
             break
-        chosen.append(best)
-        remaining -= numbers[best]
+        chosen.append(pick)
+        remaining -= numbers[pick]
     if chosen:
         first, last = sentences[min(chosen)], sentences[max(chosen)]
         return passage[first.start() : last.end()].strip()
