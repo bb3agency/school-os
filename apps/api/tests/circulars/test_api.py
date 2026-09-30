@@ -68,18 +68,24 @@ def test_US_1601_inbox_and_detail_show_the_reading_with_source_chips(
 def test_ADR_0036_circular_detail_shows_no_telugu_summary_while_telugu_is_hidden(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:
+    # A reading made while Telugu was shown stores a Telugu summary; the API hides it now.
+    C.KB.install_runtime(telugu=True)
     document_id = C.read_circular(admin_engine, ai_on.a)
+    stored = C.reading_row(admin_engine, document_id)["summary_te"]
+    assert contains_telugu(stored or "")
     detail = api.call(ai_on.person("office_staff"), "GET", f"/api/v1/circulars/{document_id}")
     assert detail.status_code == 200
     reading = detail.json()["reading"]
     assert reading["summary_en"]
     assert reading["summary_te"] is None
+    assert not contains_telugu(detail.text)
 
 
 @pytest.mark.usefixtures("telugu_on")  # the stored Telugu summary is shown (ADR-0036)
 def test_ADR_0036_circular_detail_shows_the_telugu_summary_when_switched_on(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:
+    C.KB.install_runtime(telugu=True)
     document_id = C.read_circular(admin_engine, ai_on.a)
     detail = api.call(ai_on.person("office_staff"), "GET", f"/api/v1/circulars/{document_id}")
     assert contains_telugu(detail.json()["reading"]["summary_te"] or "")
