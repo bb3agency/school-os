@@ -34,3 +34,19 @@ def output_language(requested: str | None, settings: Settings | None = None) -> 
     if requested in (TELUGU, "mixed") and telugu_enabled(settings):
         return TELUGU
     return ENGLISH
+
+
+def telugu_text(value: str | None, settings: Settings | None = None) -> str | None:
+    """A Telugu-only presentation value (a ``*_te`` label, a Telugu heading): ``value`` while
+    Telugu is switched on, ``None`` while it is hidden. Stored data is not passed through here,
+    only output that exists just to show Telugu."""
+    return value if telugu_enabled(settings) else None
+
+
+def contains_telugu(text: str) -> bool:
+    """True if ``text`` has any character of the Telugu Unicode block (U+0C00-U+0C7F)."""
+    return any(_TELUGU_FIRST <= ch <= _TELUGU_LAST for ch in text)
+
+
+_TELUGU_FIRST = "ఀ"
+_TELUGU_LAST = "౿"

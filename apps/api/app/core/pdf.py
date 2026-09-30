@@ -14,6 +14,9 @@ tests may install a fake with :func:`set_renderer`. Hardening:
 - Every request the page makes is intercepted: the bundled Noto Sans Telugu font (checked
   against its SHA-256) is served from memory at :data:`FONT_URL`; everything else is aborted,
   so a template (or a value in it) can never reach the network or a local file.
+- English first (ADR-0036): while Telugu is hidden (``SOS_TELUGU_ENABLED`` off, read through
+  :mod:`app.core.languages`) the font is neither declared (:func:`font_face_css` is empty,
+  :func:`font_stack` leaves it out) nor served, so no PDF or PNG loads or embeds it.
 - The Chromium sandbox is on in staging and prod (``chromium_sandbox`` in ``app/core/pdf.yaml``);
   local and CI containers run as root, where Chromium cannot sandbox itself.
 - Templates escape every value (the callers: :mod:`app.exports.report`,
@@ -39,6 +42,7 @@ from playwright.sync_api import Page, Route, sync_playwright
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import Environment, get_settings
+from app.core.languages import telugu_enabled
 from app.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -93,8 +97,27 @@ def font_bytes() -> bytes:
     return data
 
 
+def font_face_css() -> str:
+    """The ``@font-face`` rule of the bundled Telugu font for a print template, or ``""`` while
+    Telugu is hidden (ADR-0036): the font is then never requested, loaded or embedded."""
+    if not telugu_enabled():
+        return ""
+    return (
+        f'@font-face {{ font-family: "{FONT_FAMILY}"; src: url("{FONT_URL}") format("truetype");\n'
+        "  font-weight: 100 900; font-stretch: 62.5% 100%; }\n"
+    )
+
+
+def font_stack(fallback: str = "sans-serif") -> str:
+    """A CSS ``font-family`` value: the bundled Telugu font first while Telugu is shown,
+    otherwise only ``fallback`` (ADR-0036)."""
+    return f'"{FONT_FAMILY}", {fallback}' if telugu_enabled() else fallback
+
+
 def _route(route: Route) -> None:
-    if route.request.url == FONT_URL:
+    # The font is served only while Telugu is shown (ADR-0036); otherwise it is refused like
+    # any other request, so it cannot be embedded even if a page asks for it.
+    if route.request.url == FONT_URL and telugu_enabled():
         route.fulfill(status=200, body=font_bytes(), content_type="font/ttf")
     else:
         route.abort("blockedbyclient")
@@ -214,6 +237,8 @@ __all__ = [
     "RenderError",
     "default_renderer",
     "font_bytes",
+    "font_face_css",
+    "font_stack",
     "get_image_renderer",
     "get_renderer",
     "load_config",

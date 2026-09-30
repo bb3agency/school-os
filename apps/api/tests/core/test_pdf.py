@@ -63,10 +63,52 @@ def test_core_pdf_imports_no_feature_module() -> None:
         n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module is not None
     }
     app_modules = {m for m in modules if m.startswith("app.")}
-    assert app_modules <= {"app.core.config", "app.core.logging"}, app_modules
+    # app.core.languages (ADR-0036) is core too: whether the Telugu font is declared and served.
+    assert app_modules <= {"app.core.config", "app.core.languages", "app.core.logging"}, app_modules
 
 
 def test_bundled_font_lives_next_to_the_core_renderer() -> None:
     assert core_pdf.FONT_PATH.parent == Path(core_pdf.__file__).with_name("fonts")
     assert (core_pdf.FONT_PATH.parent / "OFL.txt").is_file()
     assert core_pdf.font_bytes()[:4] == b"\x00\x01\x00\x00"
+
+
+class _Request:
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+
+class _Route:
+    """Records what the renderer's request handler did with one request."""
+
+    def __init__(self, url: str) -> None:
+        self.request = _Request(url)
+        self.fulfilled: bytes | None = None
+        self.aborted = False
+
+    def fulfill(self, *, status: int, body: bytes, content_type: str) -> None:
+        self.fulfilled = body
+
+    def abort(self, error_code: str) -> None:
+        self.aborted = True
+
+
+def test_ADR_0036_telugu_font_is_not_declared_or_served_while_telugu_is_hidden() -> None:
+    assert core_pdf.font_face_css() == ""
+    assert core_pdf.font_stack() == "sans-serif"
+    assert core_pdf.font_stack('"Noto Sans", Arial, sans-serif') == '"Noto Sans", Arial, sans-serif'
+    route = _Route(core_pdf.FONT_URL)
+    core_pdf._route(route)  # type: ignore[arg-type]
+    assert route.aborted and route.fulfilled is None
+
+
+def test_ADR_0036_telugu_font_is_declared_and_served_when_switched_on(telugu_on: None) -> None:
+    css = core_pdf.font_face_css()
+    assert "@font-face" in css and core_pdf.FONT_URL in css and core_pdf.FONT_FAMILY in css
+    assert core_pdf.font_stack() == f'"{core_pdf.FONT_FAMILY}", sans-serif'
+    route = _Route(core_pdf.FONT_URL)
+    core_pdf._route(route)  # type: ignore[arg-type]
+    assert route.fulfilled == core_pdf.font_bytes() and not route.aborted
+    other = _Route("https://example.invalid/x.css")
+    core_pdf._route(other)  # type: ignore[arg-type]
+    assert other.aborted
