@@ -1982,6 +1982,8 @@ def adopt_conversations(session: Session, *, limit: int = ADOPT_BATCH) -> int:
     questions stay in the query log only, never in anyone's history). Returns conversations made."""
     made = 0
     for session_id, user_id in repo.orphan_sessions(session, limit):
+        if repo.conversation_owner(session, session_id) is not None:
+            continue  # taken by another person's group in this batch
         rows = repo.session_questions(session, session_id, user_id)
         first = conversations.question_of(session, rows[0]) if rows else None
         if first is None:

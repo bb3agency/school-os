@@ -130,7 +130,7 @@ def followups(text: str) -> dict[str, Any]:
         folded = latest.casefold()
         for marker, lead in (("i prefer ", "Prefers "), ("i am the ", "Is the ")):
             if marker in folded:
-                rest = latest[folded.index(marker) + len(marker) :].strip(" .?!")
+                rest = latest[folded.index(marker) + len(marker) :].split(".")[0].strip(" ?!")
                 memory = f"{lead}{rest}" if rest else None
                 break
     return {"questions": out, "memory": memory}
