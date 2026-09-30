@@ -13,15 +13,15 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Toggle } from "@/components/ui/Toggle";
 import { containsAadhaarNumber } from "@/lib/aadhaar";
-import { ApiError } from "@/lib/bff/query";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { MEMORY_NOT_ALLOWED, type MemoryItem } from "./contract";
-import { ASK_PERM } from "./data";
+import { ASK_PERM, type MemoryItem } from "./data";
 import {
+  MEMORY_LIMIT,
   MEMORY_MAX,
+  memoryOn,
   useAddMemory,
   useConfirmMemory,
   useDeleteMemory,
@@ -31,30 +31,9 @@ import {
   useMemorySettings,
   useSetMemoryEnabled,
 } from "./memory";
+import { MemoryError } from "./MemoryNotes";
 import { ActionButton } from "./MessageActions";
 import { AskTabs } from "./parts";
-
-/** A refused memory (422 memory_not_allowed) is explained; other failures say it was undone. */
-function MutationError({ error }: { error: unknown }) {
-  const t = useTranslations("ask.memory");
-  if (!error) return null;
-  if (error instanceof ApiError && error.code === MEMORY_NOT_ALLOWED) {
-    return <ApiErrorAlert error={error} namespace="ask" />;
-  }
-  if (
-    error instanceof ApiError &&
-    error.status < 500 &&
-    error.status !== 409 &&
-    error.status !== 412
-  ) {
-    return <ApiErrorAlert error={error} namespace="ask" />;
-  }
-  return (
-    <Alert tone="danger" live>
-      {t("failed")}
-    </Alert>
-  );
-}
 
 function localCheck(
   text: string,
@@ -67,7 +46,11 @@ function localCheck(
   return null;
 }
 
-function MemoryRow({ item, disabled }: { item: MemoryItem; disabled: boolean }) {
+/**
+ * One item. While memory is off (the member's or the school's switch) it can be deleted but
+ * not edited or confirmed (the API answers 409 memory_off).
+ */
+function MemoryRow({ item, off }: { item: MemoryItem; off: boolean }) {
   const t = useTranslations("ask.memory");
   const tv = useTranslations("validation");
   const edit = useEditMemory();
@@ -151,7 +134,7 @@ function MemoryRow({ item, disabled }: { item: MemoryItem; disabled: boolean }) 
           <div className="flex flex-wrap gap-2 pt-1">
             <Button
               size="sm"
-              disabled={disabled || confirm.isPending}
+              disabled={off || confirm.isPending}
               aria-label={t("confirmFor", { text: item.text })}
               onClick={() => confirm.mutate(item.id)}
             >
@@ -160,7 +143,7 @@ function MemoryRow({ item, disabled }: { item: MemoryItem; disabled: boolean }) 
             <Button
               size="sm"
               variant="secondary"
-              disabled={disabled || remove.isPending}
+              disabled={remove.isPending}
               aria-label={t("dismissFor", { text: item.text })}
               onClick={() => remove.mutate(item.id)}
             >
@@ -168,13 +151,13 @@ function MemoryRow({ item, disabled }: { item: MemoryItem; disabled: boolean }) 
             </Button>
           </div>
         ) : null}
-        <MutationError error={edit.error ?? remove.error ?? confirm.error} />
+        <MemoryError error={edit.error ?? remove.error ?? confirm.error} />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <ActionButton
           icon="pencil"
           label={t("editFor", { text: item.text })}
-          disabled={temporary}
+          disabled={temporary || off}
           onClick={() => {
             setDraft(item.text);
             setError(null);
@@ -196,8 +179,9 @@ function MemoryRow({ item, disabled }: { item: MemoryItem; disabled: boolean }) 
  * Manage memory: what memory is and is not, the "Use memory in Ask" switch (off and disabled
  * with the reason when the school has switched memory off), the remembered items (edit,
  * delete, save or dismiss a suggestion), "Add something to remember" and "Forget everything".
- * Every change shows at once and is undone if the API refuses; a 422 memory_not_allowed says
- * memory is for your own preferences and work context, not facts about students or staff.
+ * Every change shows at once and is undone if the API refuses; a refused text (422 memory_*)
+ * says why and what to write instead (your own preferences and work context, not facts about
+ * students or staff). While memory is off, or holds MEMORY_LIMIT items, nothing can be added.
  */
 export function MemoryScreen() {
   const t = useTranslations("ask.memory");
@@ -248,7 +232,11 @@ export function MemoryScreen() {
   }
 
   const schoolOff = settings.data ? !settings.data.school_enabled : false;
+  // Off for this member (their own switch, or the school's): the API refuses adding, editing
+  // and confirming (409 memory_off); deleting still works.
+  const off = settings.data ? !memoryOn(settings.data) : false;
   const list = items.data ?? [];
+  const full = list.length >= MEMORY_LIMIT;
 
   return (
     <div className="space-y-6">
@@ -279,7 +267,8 @@ export function MemoryScreen() {
                 labelFirst
               />
               {schoolOff ? <Alert tone="info">{t("schoolOff")}</Alert> : null}
-              {toggle.isError ? <MutationError error={toggle.error} /> : null}
+              {off && !schoolOff ? <Alert tone="info">{t("userOff")}</Alert> : null}
+              {toggle.isError ? <MemoryError error={toggle.error} /> : null}
             </div>
           )}
         </div>
@@ -317,12 +306,12 @@ export function MemoryScreen() {
             </p>
             <ul className="divide-y divide-border">
               {list.map((item) => (
-                <MemoryRow key={item.id} item={item} disabled={schoolOff} />
+                <MemoryRow key={item.id} item={item} off={off} />
               ))}
             </ul>
           </>
         )}
-        <MutationError error={forget.error} />
+        <MemoryError error={forget.error} />
         <form
           noValidate
           className="space-y-2 border-t border-border p-4"
@@ -363,20 +352,21 @@ export function MemoryScreen() {
                 setDraft(event.target.value);
                 setAddError(null);
               }}
-              disabled={schoolOff}
+              disabled={off || full}
               className="block min-h-16 w-full flex-1 rounded-md border border-border-control bg-surface-muted px-3 py-2 text-base disabled:opacity-60"
             />
-            <Button type="submit" disabled={schoolOff || add.isPending}>
+            <Button type="submit" disabled={off || full || add.isPending}>
               <Icon name="plus" className="size-4" />
               {t("addButton")}
             </Button>
           </div>
+          {full && !off ? <p className="text-sm text-ink-muted">{t("fullHint")}</p> : null}
           {addError ? (
             <p id={addErrorId} role="alert" className="text-sm font-medium text-danger">
               {addError}
             </p>
           ) : null}
-          <MutationError error={add.error} />
+          <MemoryError error={add.error} />
         </form>
       </Card>
 

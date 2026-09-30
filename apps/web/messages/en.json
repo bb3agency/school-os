@@ -3868,6 +3868,9 @@
       "idleHint": "A whole number from 5 to 30.",
       "aiField": "AI features",
       "aiHint": "Turn off to stop AI features for everyone in the school.",
+      "memoryField": "Ask memory",
+      "memoryToggle": "Let Ask remember each person's preferences",
+      "memoryHint": "Ask can remember how each person works, such as the classes they teach or the language they prefer, never facts about students or staff. Turn off to stop it for everyone; each person can also turn it off for themselves.",
       "budgetField": "Monthly AI budget in rupees",
       "budgetHint": "A whole number from 0 to 1,00,00,000.",
       "save": "Save settings",
@@ -4478,7 +4481,11 @@
       "withheldNote": "You no longer have access to this source, so its text is hidden.",
       "openChat": "open the chat",
       "openSource": "Open",
-      "chatSource": "Your chat"
+      "chatSource": "Your chat",
+      "withheldTitle": "Answer hidden",
+      "withheldBody": "This answer is hidden because you can no longer see one of its sources. Ask the question again to get an answer from what you can see now.",
+      "incompleteTitle": "Answer not finished",
+      "incompleteBody": "This answer was still being written when the chat opened, perhaps in another window, or it was cut off. It shows here when it is ready; if it does not, ask again."
     },
     "notFound": {
       "title": "Not found in the school records you can access",
@@ -4518,13 +4525,85 @@
         "title": "Question not found",
         "body": "You can only give feedback on your own answers. Ask the question again."
       },
-      "memory_not_allowed": {
-        "title": "This can't be remembered",
-        "body": "Memory is for your own preferences and work context, not facts about students or staff, and never Aadhaar numbers. Say it about how you work instead."
-      },
       "precondition_failed": {
         "title": "Changed somewhere else",
         "body": "This was changed in another window. The page shows the latest version; try again."
+      },
+      "memory_personal_number": {
+        "title": "This can't be remembered",
+        "body": "It has a number that looks like an Aadhaar or other personal number. Memory never keeps those: remove the number and describe how you work instead."
+      },
+      "memory_date": {
+        "title": "This can't be remembered",
+        "body": "It has a date, which usually belongs to a student's or a person's record. Remove the date and keep only your own preference or work context."
+      },
+      "memory_long_number": {
+        "title": "This can't be remembered",
+        "body": "It has a long number, such as a phone, admission or account number. Remove the number and keep only how you work."
+      },
+      "memory_too_long": {
+        "title": "Too long to remember",
+        "body": "A memory can be at most 200 characters. Shorten it, or split it into two."
+      },
+      "memory_empty": {
+        "title": "Nothing to remember",
+        "body": "Type what Ask should remember about how you work, then choose Remember."
+      },
+      "memory_seen_record": {
+        "title": "This can't be remembered",
+        "body": "It names someone from the school's records. Memory is only for your own preferences and work context: say it about how you work instead."
+      },
+      "memory_others": {
+        "title": "This can't be remembered",
+        "body": "Memory is for your own preferences and work context, not facts about students, parents or staff. Say it about how you work instead."
+      },
+      "memory_unsure": {
+        "title": "This can't be remembered",
+        "body": "Ask could not tell whether this is only about you. Write it as your own preference or work context, for example “I teach Class 7 mathematics”."
+      },
+      "memory_check_unavailable": {
+        "title": "Memory check not available",
+        "body": "Every memory is checked before it is saved, and the check is not working right now, so nothing was saved. Try again in a few minutes."
+      },
+      "memory_off": {
+        "title": "Memory is off",
+        "body": "Switch on “Use memory in Ask” on the Memory page. If the school has switched memory off, the principal can switch it on in school settings."
+      },
+      "memory_full": {
+        "title": "Memory is full",
+        "body": "You can keep up to 30 items. Delete ones you no longer need, then try again."
+      },
+      "memory_not_found": {
+        "title": "This memory is gone",
+        "body": "It was deleted, or it was a suggestion that was not saved within 24 hours. To keep it, add it again on the Memory page."
+      },
+      "title_length": {
+        "title": "Title too long",
+        "body": "A chat title can be 1 to 120 characters. Shorten it and save again."
+      },
+      "title_personal_number": {
+        "title": "Remove the number from the title",
+        "body": "The title has a number that looks like an Aadhaar number. Chat titles never keep one: remove it and save again."
+      },
+      "title_control_characters": {
+        "title": "The title has hidden characters",
+        "body": "It has line breaks or other hidden characters, often from copying. Type the title again and save."
+      },
+      "message_superseded": {
+        "title": "Already replaced",
+        "body": "This question was already asked again or edited, perhaps in another window. Reload the chat to see the latest answer."
+      },
+      "message_not_revisable": {
+        "title": "This answer can't be changed now",
+        "body": "Only your latest questions can be asked again or edited. Ask it as a new question instead."
+      },
+      "conversation_not_found": {
+        "title": "Chat not found",
+        "body": "This chat is no longer there; it may have been deleted in another window. Start a new chat and ask again."
+      },
+      "if_match_required": {
+        "title": "Reload and try again",
+        "body": "The page could not tell which version you changed. Reload the page, then make the change again."
       }
     },
     "feedback": {
@@ -4766,7 +4845,7 @@
       "emptyTitle": "Nothing remembered yet",
       "emptyBody": "Add something below, or say “remember that …” in a chat.",
       "add": "Add something to remember",
-      "addHint": "For example: I teach Class 7 mathematics and prefer answers in Telugu. Up to 500 characters.",
+      "addHint": "For example: I teach Class 7 mathematics and prefer answers in Telugu. Up to 200 characters.",
       "addButton": "Remember",
       "edit": "Edit",
       "editFor": "Edit: {text}",
@@ -4797,7 +4876,9 @@
       "deleted": "Memory deleted.",
       "forgotten": "Memory cleared.",
       "edited": "Memory changed.",
-      "loadFailed": "Memory could not be loaded."
+      "loadFailed": "Memory could not be loaded.",
+      "userOff": "Memory is off for you, so Ask neither uses nor adds memories. Switch it on to add, change or save items; you can still delete them.",
+      "fullHint": "Memory is full (30 items). Delete something you no longer need to add more."
     }
   },
   "welcome": {

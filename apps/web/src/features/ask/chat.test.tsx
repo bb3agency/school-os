@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,7 @@ import {
   sseResponse,
   summary,
 } from "./chat-test-utils";
+import { STREAMING_POLL_MS } from "./conversations";
 
 const nav = vi.hoisted(() => ({
   path: "/en/ask",
@@ -371,8 +372,18 @@ describe("Ask chat: memory in the chat", () => {
         sse("memory", { action: "suggested", item_id: CHAT.memory, text: "Prefers Telugu" }),
         sse("memory", { action: "suggested", item_id: CHAT.memory2, text: "Teaches Class 7" }),
       ]);
+    // 200 MemoryOut: the suggestion is now active.
     stub.routes[`POST /bff/api/v1/knowledge/memories/${CHAT.memory}/confirm`] = () =>
-      new Response(null, { status: 204 });
+      Response.json({
+        id: CHAT.memory,
+        text: "Prefers Telugu",
+        source: "suggested",
+        status: "active",
+        created_at: "2026-09-28T05:00:00Z",
+        updated_at: "2026-09-28T05:10:00Z",
+        expires_at: null,
+        version: 2,
+      });
     stub.routes[`DELETE /bff/api/v1/knowledge/memories/${CHAT.memory2}`] = () =>
       new Response(null, { status: 204 });
     renderChat();
@@ -390,6 +401,22 @@ describe("Ask chat: memory in the chat", () => {
       1,
     );
     expect(stub.callsTo(`DELETE /bff/api/v1/knowledge/memories/${CHAT.memory2}`)).toHaveLength(1);
+  });
+
+  it("a suggestion that expired (404 after 24 hours) says so", async () => {
+    stub.routes[ASK_ROUTE] = () =>
+      sseResponse([
+        meta(),
+        ...finalAnswer,
+        sse("memory", { action: "suggested", item_id: CHAT.memory, text: "Prefers Telugu" }),
+      ]);
+    stub.routes[`POST /bff/api/v1/knowledge/memories/${CHAT.memory}/confirm`] = () =>
+      problem(404, "not_found");
+    renderChat();
+    const user = await askQuestion();
+    await user.click(await screen.findByRole("button", { name: "Save: Prefers Telugu" }));
+    expect(await screen.findByText("This memory is gone")).toBeVisible();
+    expect(screen.getByText(/not saved within 24 hours/)).toBeVisible();
   });
 
   it("the composer shows a memory indicator only when memory is on", async () => {
@@ -424,10 +451,14 @@ describe("Ask chat: an existing conversation (/ask/c/{id})", () => {
         messages: [
           message({ query_id: CHAT.query, answer: "Old answer. [1]", superseded: true }),
           message({ query_id: CHAT.query2, answer: "New answer. [1]", feedback: "helpful" }),
+          // A source the member can no longer see: the API withholds it, and with it the
+          // answer's text and follow-ups (answer_withheld).
           message({
             query_id: CHAT.query3,
             question: "And the timetable?",
-            answer: "It is on the notice board. [1]",
+            answer: null,
+            answer_withheld: true,
+            followups: [],
             summarized: true,
             citations: [
               { index: 1, source: DOC_SOURCE, title: null, snippet: null, withheld: true },
@@ -444,6 +475,14 @@ describe("Ask chat: an existing conversation (/ask/c/{id})", () => {
     expect(
       screen.getByText("You no longer have access to this source, so its text is hidden."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Answer hidden")).toBeInTheDocument();
+    expect(
+      screen.getByText(/hidden because you can no longer see one of its sources/),
+    ).toBeInTheDocument();
+    // Nothing to copy or save as verified from a hidden answer.
+    const hidden = screen.getByText("Answer hidden").closest("article") as HTMLElement;
+    expect(within(hidden).queryByRole("button", { name: "Copy answer" })).toBeNull();
+    expect(within(hidden).queryByRole("button", { name: "Save as verified answer" })).toBeNull();
     expect(
       screen.getByText("Earlier messages were summarised to keep answers focused"),
     ).toBeInTheDocument();
@@ -478,6 +517,65 @@ describe("Ask chat: an existing conversation (/ask/c/{id})", () => {
     const target = document.getElementById(`m-${CHAT.query}`);
     await waitFor(() => expect(target).toHaveClass("chat-highlight"));
     expect(target).toHaveFocus();
+  });
+
+  it("an answer still being written shows as not finished (never an error) and appears when ready", async () => {
+    const now = new Date().toISOString();
+    let ready = false;
+    stub.routes[detailRoute(CHAT.conversation)] = () =>
+      Response.json({
+        ...summary({ message_count: 1 }),
+        messages: [
+          ready
+            ? message({ created_at: now, answer: "Exams begin on 22/09/2026. [1]" })
+            : message({ created_at: now, status: "streaming", answer: null, citations: [] }),
+        ],
+      });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderChat();
+      expect(await screen.findByText("Answer not finished")).toBeVisible();
+      expect(screen.queryByText(/Something went wrong|failed/i)).toBeNull();
+      expect(screen.getByRole("button", { name: "Ask again for a new answer" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Yes, helpful" })).toBeNull();
+      ready = true;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(STREAMING_POLL_MS + 100);
+      });
+      expect(await screen.findByText("Exams begin on 22/09/2026.")).toBeVisible();
+      expect(screen.queryByText("Answer not finished")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a question in a chat deleted elsewhere (404) says so and keeps the question", async () => {
+    stub.routes[detailRoute(CHAT.conversation)] = () =>
+      Response.json({ ...summary(), messages: [message()] });
+    stub.routes[ASK_ROUTE] = () => problem(404, "not_found");
+    renderChat();
+    await screen.findByText("Exams begin on 22/09/2026.");
+    await askQuestion("And the timetable?");
+    expect(await screen.findByText(/no longer there; it may have been deleted/)).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^Your question/)).toHaveValue("And the timetable?"),
+    );
+    expect(body(0)).toEqual({ question: "And the timetable?", conversation_id: CHAT.conversation });
+  });
+
+  it("asking again an answer already replaced elsewhere (409 message_superseded) explains it and keeps the answer", async () => {
+    stub.routes[detailRoute(CHAT.conversation)] = () =>
+      Response.json({ ...summary(), messages: [message()] });
+    stub.routes[ASK_ROUTE] = () => problem(409, "message_superseded");
+    renderChat();
+    const user = userEvent.setup();
+    await screen.findByText("Exams begin on 22/09/2026.");
+    await user.click(screen.getByRole("button", { name: "Ask again for a new answer" }));
+    expect(await screen.findByText("Already replaced")).toBeVisible();
+    expect(body(0).regenerate_of).toBe(CHAT.query);
+    // The earlier answer is not marked replaced (the optimistic change is undone).
+    expect(screen.getByText("Exams begin on 22/09/2026.")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: /^Answer \d of \d$/ })).toBeNull();
   });
 
   it("says a missing (or someone else's) chat was not found", async () => {

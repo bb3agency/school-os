@@ -5,6 +5,7 @@ import {
   applyEvent,
   INITIAL_ASK,
   messageFromState,
+  outcomeOf,
   parseSource,
   sourceHref,
   stateFromMessage,
@@ -12,7 +13,8 @@ import {
 } from "./answer";
 import { buildGroups } from "./ChatScreen";
 import { shouldSend } from "./Composer";
-import { sortConversations } from "./conversations";
+import { sortConversations, writingElsewhere } from "./conversations";
+import type { ConversationMessage } from "./data";
 import { matchesFilter } from "./HistoryScreen";
 import { Markdown } from "./Markdown";
 import { parseMarkdown, stableStreamingText, toPlainText } from "./markdown";
@@ -179,7 +181,8 @@ describe("new SSE events (status, followups, memory, meta extras)", () => {
       { step: "searching_documents", count: 4 },
       { step: "searching_chats", count: null },
     ]);
-    expect(state.followups).toEqual(["A?", "B?", "C?", "D?"]);
+    // At most 3, as the API sends (FollowupsEvent: 0-3 questions).
+    expect(state.followups).toEqual(["A?", "B?", "C?"]);
     expect(state.memory).toEqual([{ action: "saved", item_id: CHAT.memory, text: "x" }]);
   });
 
@@ -203,6 +206,83 @@ describe("new SSE events (status, followups, memory, meta extras)", () => {
     expect(stateFromMessage({ ...stored!, status: "cancelled", answer: null }).phase).toBe(
       "stopped",
     );
+  });
+
+  it("reads the events exactly as the API sends them (null tool and count, summarized, cached_from null)", () => {
+    const state = fold([
+      sse("meta", {
+        query_id: CHAT.query,
+        language: "en",
+        mode: "full",
+        conversation_id: CHAT.conversation,
+        title: "Exams",
+        cached: false,
+        cached_from: null,
+        summarized: false,
+      }),
+      sse("status", { step: "understanding", tool: null, count: null }),
+      sse("status", { step: "searching_documents", tool: "search_documents", count: null }),
+      sse("status", { step: "searching_documents", tool: "search_documents", count: 4 }),
+      sse("status", { step: "writing", tool: null, count: null }),
+      sse("delta", { text: "Exams " }),
+      sse("final", {
+        text: "Exams. [1]",
+        replaced: false,
+        status: "answered",
+        mode: "full",
+        summarized: true,
+      }),
+      sse("token", { text: "Exams. [1]" }),
+      sse("citation", { index: 1, source: "sos://doc/a/v1", title: "T", snippet: "S" }),
+      sse("followups", { questions: [] }),
+      sse("done", { latency_ms: 10, cited_sources: 1, status: "answered", mode: "full" }),
+    ]);
+    expect(state).toMatchObject({
+      phase: "done",
+      text: "Exams. [1]",
+      cached: false,
+      summarized: true,
+      conversationId: CHAT.conversation,
+      followups: [],
+    });
+    expect(state.steps).toEqual([
+      { step: "understanding", count: null },
+      { step: "searching_documents", count: 4 },
+      { step: "writing", count: null },
+    ]);
+    const stored = messageFromState(state, "Q?", "2026-09-30T00:00:00Z");
+    expect(stored).toMatchObject({ answer_withheld: false, cached: false, summarized: true });
+  });
+
+  it("a stored answer still streaming is in progress, not an error; a withheld one hides its text", () => {
+    const base = message({ query_id: CHAT.query }) as unknown as ConversationMessage;
+    const streaming = stateFromMessage({ ...base, status: "streaming", answer: null });
+    expect(streaming.phase).toBe("incomplete");
+    expect(streaming.status).toBeNull();
+    expect(outcomeOf(streaming)).toBe("pending");
+
+    const withheld = stateFromMessage({
+      ...base,
+      answer: null,
+      answer_withheld: true,
+      followups: ["Next?"],
+      citations: [
+        { index: 1, source: "sos://doc/a/v1", title: null, snippet: null, withheld: true },
+      ],
+    });
+    expect(withheld).toMatchObject({ phase: "done", withheld: true, text: "", followups: [] });
+    expect(withheld.citations[0]?.withheld).toBe(true);
+    expect(stateFromMessage({ ...base, cached: true }).cached).toBe(true);
+  });
+
+  it("reads an answer being written elsewhere again, but not one left streaming long ago", () => {
+    const now = Date.parse("2026-09-30T10:00:00Z");
+    const recent = message({ status: "streaming", created_at: "2026-09-30T09:58:00Z" });
+    const old = message({ status: "streaming", created_at: "2026-09-30T09:00:00Z" });
+    expect(writingElsewhere([recent] as never, now)).toBe(true);
+    expect(writingElsewhere([old] as never, now)).toBe(false);
+    expect(writingElsewhere([{ ...recent, superseded: true }] as never, now)).toBe(false);
+    expect(writingElsewhere([message()] as never, now)).toBe(false);
   });
 
   it("parses past-chat sources to the message link", () => {

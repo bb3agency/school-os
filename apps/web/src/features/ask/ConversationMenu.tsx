@@ -3,15 +3,18 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
+import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Link, useRouter } from "@/i18n/navigation";
+import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { cn } from "@/lib/cn";
 import { ConfirmDialog } from "./ConfirmDialog";
-import type { ConversationSummary } from "./contract";
 import { titleOf, useDeleteConversation, useUpdateConversation } from "./conversations";
+import type { ConversationSummary } from "./data";
+import { askError, isExplained } from "./errors";
 
-/** Longest title the page offers (the API checks again). */
-export const TITLE_MAX = 200;
+/** Longest title the API stores (ConversationPatchIn.title: 1-120 characters). */
+export const TITLE_MAX = 120;
 
 const itemClasses =
   "flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-start text-sm text-ink hover:bg-surface-muted";
@@ -45,10 +48,15 @@ export function useConversationActions(onDeleted?: () => void) {
   const remove = useDeleteConversation();
   const [renaming, setRenaming] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState<ConversationSummary | null>(null);
+  const tv = useTranslations("validation");
   const [notice, setNotice] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
   const fieldId = useId();
+  const errorId = useId();
 
-  const failed = update.isError || remove.isError;
+  // The last refusal: a reason the API gave for a title (422 title_*) or a change made
+  // elsewhere (412) is explained; anything else says the change was undone.
+  const failure = update.error ?? remove.error;
   const dialogs = (
     <>
       <ConfirmDialog
@@ -56,13 +64,21 @@ export function useConversationActions(onDeleted?: () => void) {
         title={th("rename")}
         confirmLabel={th("save")}
         confirmVariant="primary"
-        onClose={() => setRenaming(null)}
+        onClose={() => {
+          setRenaming(null);
+          setTitleError(null);
+        }}
         onConfirm={(form) => {
           const value = String(new FormData(form).get("title") ?? "")
             .trim()
             .slice(0, TITLE_MAX);
           if (!renaming || !value) return false;
-          if (value !== (renaming.title ?? "")) {
+          // Invariant 4: a full Aadhaar number never leaves the browser (the API refuses it too).
+          if (containsAadhaarNumber(value)) {
+            setTitleError(tv("noAadhaar"));
+            return false;
+          }
+          if (value !== renaming.title) {
             update.mutate(
               { conversation: renaming, patch: { title: value } },
               { onSuccess: () => setNotice(th("renamed")) },
@@ -80,8 +96,16 @@ export function useConversationActions(onDeleted?: () => void) {
           defaultValue={renaming ? (titleOf(renaming) ?? "") : ""}
           maxLength={TITLE_MAX}
           required
+          aria-invalid={titleError ? true : undefined}
+          aria-describedby={titleError ? errorId : undefined}
+          onChange={() => setTitleError(null)}
           className="block min-h-10 w-full rounded-md border border-border-control bg-surface-muted px-3 text-base"
         />
+        {titleError ? (
+          <p id={errorId} role="alert" className="text-sm font-medium text-danger">
+            {titleError}
+          </p>
+        ) : null}
       </ConfirmDialog>
       <ConfirmDialog
         open={deleting !== null}
@@ -99,10 +123,14 @@ export function useConversationActions(onDeleted?: () => void) {
       <p role="status" className="sr-only">
         {notice}
       </p>
-      {failed ? (
-        <Alert tone="danger" live>
-          {th("failed")}
-        </Alert>
+      {failure ? (
+        isExplained(failure, "conversation_not_found") ? (
+          <ApiErrorAlert error={askError(failure, "conversation_not_found")} namespace="ask" />
+        ) : (
+          <Alert tone="danger" live>
+            {th("failed")}
+          </Alert>
+        )
       ) : null}
     </>
   );

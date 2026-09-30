@@ -10,15 +10,15 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError } from "@/lib/bff/query";
-import {
-  useAskContractApi,
-  type ConversationDetail,
-  type ConversationMessage,
-  type ConversationPage,
-  type ConversationPatch,
-  type ConversationSummary,
-} from "./contract";
+import { ApiError, NotAvailableError, unwrap, useBffClient } from "@/lib/bff/query";
+import { ifMatch } from "./data";
+import type {
+  ConversationDetail,
+  ConversationMessage,
+  ConversationPage,
+  ConversationPatch,
+  ConversationSummary,
+} from "./data";
 
 /**
  * Ask conversations (FR-KB-012): the list (sidebar recents and the history page share one
@@ -78,10 +78,15 @@ export interface ConversationList {
 
 /** GET /knowledge/conversations with cursor paging (one cache for sidebar and history). */
 export function useConversationList(enabled = true): ConversationList {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const query = useInfiniteQuery({
     queryKey: CONVERSATION_KEYS.list,
-    queryFn: ({ pageParam }) => api.listConversations(pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam }): Promise<ConversationPage> =>
+      unwrap(
+        api.GET("/api/v1/knowledge/conversations", {
+          params: { query: { limit: PAGE_SIZE, ...(pageParam ? { cursor: pageParam } : {}) } },
+        }),
+      ),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled,
@@ -105,15 +110,46 @@ export function useConversationList(enabled = true): ConversationList {
   };
 }
 
-/** GET /knowledge/conversations/{id}. */
+/** How often a conversation with an answer still being written is read again. */
+export const STREAMING_POLL_MS = 10_000;
+/** A message `streaming` for longer than this has stopped (its stream ended unrecorded). */
+export const STREAMING_STALE_MS = 5 * 60_000;
+
+/**
+ * An answer being written elsewhere (another window or device): a current message that is
+ * still `streaming` and recent. An older one ended without being recorded; it stays as is.
+ */
+export function writingElsewhere(
+  messages: readonly ConversationMessage[],
+  now: number = Date.now(),
+): boolean {
+  return messages.some(
+    (m) =>
+      m.status === "streaming" &&
+      !m.superseded &&
+      now - Date.parse(m.created_at) < STREAMING_STALE_MS,
+  );
+}
+
+/**
+ * GET /knowledge/conversations/{id}. While one of its answers is being written elsewhere it is
+ * read again every STREAMING_POLL_MS, so the answer appears when it is ready.
+ */
 export function useConversation(id: string | null) {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   return useQuery({
     queryKey: CONVERSATION_KEYS.detail(id ?? "none"),
-    queryFn: () => api.getConversation(id ?? ""),
+    queryFn: (): Promise<ConversationDetail> =>
+      unwrap(
+        api.GET("/api/v1/knowledge/conversations/{conversation_id}", {
+          params: { path: { conversation_id: id ?? "" } },
+        }),
+      ),
     enabled: id !== null,
     retry,
     staleTime: 60_000,
+    refetchInterval: (query) =>
+      query.state.data && writingElsewhere(query.state.data.messages) ? STREAMING_POLL_MS : false,
   });
 }
 
@@ -199,22 +235,54 @@ export interface UpdateInput {
   patch: ConversationPatch;
 }
 
-/** Rename or pin/unpin (PATCH with If-Match), shown at once, undone if the API refuses. */
+/**
+ * The newest version the page knows of a conversation. A chat started here is seeded from
+ * `meta` without one; the list read after its first answer has it.
+ */
+function latestVersion(client: QueryClient, conversation: ConversationSummary): number {
+  const listed = client
+    .getQueryData<ListData>(CONVERSATION_KEYS.list)
+    ?.pages.flatMap((page) => page.data)
+    .find((item) => item.id === conversation.id);
+  return Math.max(conversation.version, listed?.version ?? 0);
+}
+
+/** The fields a patch sets (null or absent: unchanged). */
+function changesOf(patch: ConversationPatch): Partial<ConversationSummary> {
+  return {
+    ...(patch.title != null ? { title: patch.title } : {}),
+    ...(patch.pinned != null ? { pinned: patch.pinned } : {}),
+  };
+}
+
+/**
+ * Rename or pin/unpin (PATCH with If-Match), shown at once, undone if the API refuses (422
+ * `title_*`, 412 when it changed elsewhere: the chat is then read again for its new version).
+ */
 export function useUpdateConversation() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ conversation, patch }: UpdateInput) =>
-      api.patchConversation(conversation.id, conversation.version, patch),
+    mutationFn: ({ conversation, patch }: UpdateInput): Promise<ConversationSummary> =>
+      unwrap(
+        api.PATCH("/api/v1/knowledge/conversations/{conversation_id}", {
+          params: { path: { conversation_id: conversation.id } },
+          headers: { "If-Match": ifMatch(latestVersion(client, conversation)) },
+          body: patch,
+        }),
+      ),
     onMutate: async ({ conversation, patch }) => {
       await client.cancelQueries({ queryKey: CONVERSATION_KEYS.all });
       const saved = snapshot(client, conversation.id);
-      patchSummary(client, conversation.id, patch);
+      patchSummary(client, conversation.id, changesOf(patch));
       return saved;
     },
-    onError: (_error, { conversation }, saved) => restore(client, conversation.id, saved),
+    onError: (_error, { conversation }, saved) => {
+      restore(client, conversation.id, saved);
+      void client.invalidateQueries({ queryKey: CONVERSATION_KEYS.detail(conversation.id) });
+    },
     onSuccess: (updated, { conversation }) => {
-      if (updated) patchSummary(client, conversation.id, updated);
+      patchSummary(client, conversation.id, updated);
     },
     onSettled: () => client.invalidateQueries({ queryKey: CONVERSATION_KEYS.list }),
   });
@@ -222,10 +290,16 @@ export function useUpdateConversation() {
 
 /** Delete (204), removed at once, put back if the API refuses. */
 export function useDeleteConversation() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (conversation: ConversationSummary) => api.deleteConversation(conversation.id),
+    mutationFn: async (conversation: ConversationSummary): Promise<void> => {
+      await unwrap(
+        api.DELETE("/api/v1/knowledge/conversations/{conversation_id}", {
+          params: { path: { conversation_id: conversation.id } },
+        }),
+      );
+    },
     onMutate: async (conversation) => {
       await client.cancelQueries({ queryKey: CONVERSATION_KEYS.all });
       const saved = snapshot(client, conversation.id);
@@ -240,10 +314,13 @@ export function useDeleteConversation() {
   });
 }
 
-/** A conversation's title for display: its own, else the first question, else "New chat". */
+/**
+ * A conversation's title for display, or null when it has none yet (the API sends "" then;
+ * the screens say "New chat").
+ */
 export function titleOf(
   summary: Pick<ConversationSummary, "title"> | null | undefined,
 ): string | null {
-  const title = summary?.title?.trim();
+  const title = summary?.title.trim();
   return title ? title : null;
 }

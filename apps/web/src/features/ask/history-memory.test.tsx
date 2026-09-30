@@ -58,7 +58,8 @@ describe("All chats (FR-KB-012)", () => {
           pinned: true,
           updated_at: "2026-09-01T05:00:00Z",
         }),
-        summary({ id: C, title: null, message_count: 3, updated_at: "2026-09-28T05:00:00Z" }),
+        // No title yet: the API sends "" (ConversationOut.title is a string).
+        summary({ id: C, title: "", message_count: 3, updated_at: "2026-09-28T05:00:00Z" }),
       );
   });
 
@@ -130,6 +131,51 @@ describe("All chats (FR-KB-012)", () => {
       expect(screen.queryByRole("link", { name: "Half-yearly exams" })).toBeNull(),
     );
     expect(stub.callsTo(`DELETE ${conv(A)}`)).toHaveLength(1);
+  });
+
+  it("a refused title (422 title_personal_number) is explained and the old title comes back", async () => {
+    stub.routes[`PATCH ${conv(A)}`] = () =>
+      problem(422, "validation_error", {
+        errors: [
+          {
+            field: "title",
+            code: "title_personal_number",
+            message_key: "errors.title_personal_number",
+          },
+        ],
+      });
+    renderWithIntl(<AskHistoryPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Rename Exam dates" }));
+    const field = within(await screen.findByRole("dialog", { name: "Rename" })).getByLabelText(
+      "Chat title",
+    );
+    await user.clear(field);
+    await user.type(field, "Roll 1234 5678");
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText("Remove the number from the title")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Exam dates" })).toBeInTheDocument();
+  });
+
+  it("a full Aadhaar number in a title never leaves the browser (invariant 4)", async () => {
+    renderWithIntl(<AskHistoryPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Rename Exam dates" }));
+    const dialog = await screen.findByRole("dialog", { name: "Rename" });
+    const field = within(dialog).getByLabelText("Chat title");
+    await user.clear(field);
+    await user.type(field, `Student ${fakeAadhaar()}`);
+    await user.keyboard("{Enter}");
+    expect(await within(dialog).findByText(/looks like a full Aadhaar number/)).toBeVisible();
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(stub.callsTo(`PATCH ${conv(A)}`)).toHaveLength(0);
+  });
+
+  it("a chat changed in another window (412) says so", async () => {
+    stub.routes[`PATCH ${conv(A)}`] = () => problem(412, "precondition_failed");
+    renderWithIntl(<AskHistoryPage />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Pin Exam dates" }));
+    expect(await screen.findByText("Changed somewhere else")).toBeInTheDocument();
   });
 
   it("a refused delete puts the chat back", async () => {
@@ -239,25 +285,41 @@ describe("recent chats in the one sidebar (FR-KB-012, docs/17 §5.2)", () => {
 });
 
 describe("Manage memory", () => {
+  // MemoryOut: `active` (in use) or `pending` (suggested in a chat, expires unless saved).
   const item = (id: string, text: string, extra: Record<string, unknown> = {}) => ({
     id,
     text,
     source: "explicit",
-    status: "saved",
+    status: "active",
     created_at: "2026-09-28T05:00:00Z",
     updated_at: "2026-09-28T05:00:00Z",
+    expires_at: null,
     version: 1,
     ...extra,
   });
+  const suggested = (id: string, text: string) =>
+    item(id, text, {
+      source: "suggested",
+      status: "pending",
+      expires_at: "2026-09-29T05:00:00Z",
+    });
+  // GET /knowledge/memories is Page[MemoryOut] (one page).
+  const pageOf = (...items: Array<Record<string, unknown>>) =>
+    Response.json({ data: items, next_cursor: null });
+  // A refused text: 422 validation_error with the reason as the field error's code.
+  const refused = (code: string) =>
+    problem(422, "validation_error", {
+      errors: [{ field: "text", code, message_key: `errors.${code}` }],
+    });
 
   beforeEach(() => {
     nav.path = "/en/ask/memory";
     stub.routes[`GET ${SETTINGS}`] = () => Response.json({ enabled: true, school_enabled: true });
     stub.routes[`GET ${MEM}`] = () =>
-      Response.json([
+      pageOf(
         item(CHAT.memory, "I teach Class 7 mathematics"),
-        item(CHAT.memory2, "Prefers answers in Telugu", { source: "suggested", status: "pending" }),
-      ]);
+        suggested(CHAT.memory2, "Prefers answers in Telugu"),
+      );
   });
 
   it("explains memory, lists items and switches memory off (PUT)", async () => {
@@ -288,10 +350,7 @@ describe("Manage memory", () => {
   it("edits (If-Match), saves a suggestion and deletes, each at once", async () => {
     let text = "I teach Class 7 mathematics";
     stub.routes[`GET ${MEM}`] = () =>
-      Response.json([
-        item(CHAT.memory, text),
-        item(CHAT.memory2, "Prefers answers in Telugu", { source: "suggested", status: "pending" }),
-      ]);
+      pageOf(item(CHAT.memory, text), suggested(CHAT.memory2, "Prefers answers in Telugu"));
     stub.routes[`PATCH ${MEM}/${CHAT.memory}`] = () => {
       text = "I teach Class 8 mathematics";
       return Response.json(item(CHAT.memory, text, { version: 2 }));
@@ -332,8 +391,8 @@ describe("Manage memory", () => {
     expect(await screen.findByText("I teach Class 7 mathematics")).toBeInTheDocument();
   });
 
-  it("explains a refused memory (422 memory_not_allowed) and keeps the text", async () => {
-    stub.routes[`POST ${MEM}`] = () => problem(422, "memory_not_allowed");
+  it("explains a refused memory (422 memory_others) and keeps the text", async () => {
+    stub.routes[`POST ${MEM}`] = () => refused("memory_others");
     renderWithIntl(<AskMemoryPage />);
     const user = userEvent.setup();
     const field = await screen.findByLabelText("Add something to remember");
@@ -341,9 +400,98 @@ describe("Manage memory", () => {
     await user.click(screen.getByRole("button", { name: "Remember" }));
     expect(await screen.findByText("This can't be remembered")).toBeInTheDocument();
     expect(
-      screen.getByText(/not facts about students or staff/, { selector: "p" }),
+      screen.getByText(/not facts about students, parents or staff/, { selector: "p" }),
     ).toBeInTheDocument();
     await waitFor(() => expect(field).toHaveValue("Ravi in Class 6 has asthma"));
+  });
+
+  it.each([
+    ["memory_personal_number", /looks like an Aadhaar or other personal number/],
+    ["memory_date", /It has a date/],
+    ["memory_long_number", /It has a long number/],
+    ["memory_too_long", /at most 200 characters/],
+    ["memory_empty", /Type what Ask should remember/],
+    ["memory_seen_record", /names someone from the school's records/],
+    ["memory_unsure", /could not tell whether this is only about you/],
+  ])("says why %s was refused and what to write instead", async (code, body) => {
+    stub.routes[`POST ${MEM}`] = () => refused(code);
+    renderWithIntl(<AskMemoryPage />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Add something to remember"), "Something");
+    await user.click(screen.getByRole("button", { name: "Remember" }));
+    expect(await screen.findByText(body)).toBeInTheDocument();
+  });
+
+  it("keeps the text when the memory check is not available (503 memory_check_unavailable)", async () => {
+    stub.routes[`POST ${MEM}`] = () => problem(503, "memory_check_unavailable");
+    renderWithIntl(<AskMemoryPage />);
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText("Add something to remember");
+    await user.type(field, "I prefer short answers");
+    await user.click(screen.getByRole("button", { name: "Remember" }));
+    expect(await screen.findByText("Memory check not available")).toBeInTheDocument();
+    expect(screen.getByText(/nothing was saved\. Try again in a few minutes/)).toBeInTheDocument();
+    await waitFor(() => expect(field).toHaveValue("I prefer short answers"));
+    // The temporary row is gone again.
+    expect(screen.queryByText("I prefer short answers", { selector: "li p" })).toBeNull();
+  });
+
+  it("explains a full memory (409 memory_full) and stops adding at 30 items", async () => {
+    stub.routes[`POST ${MEM}`] = () => problem(409, "memory_full");
+    const { unmount } = renderWithIntl(<AskMemoryPage />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Add something to remember"), "One more");
+    await user.click(screen.getByRole("button", { name: "Remember" }));
+    expect(await screen.findByText("Memory is full")).toBeInTheDocument();
+    expect(screen.getByText(/up to 30 items\. Delete ones you no longer need/)).toBeInTheDocument();
+    unmount();
+
+    stub.routes[`GET ${MEM}`] = () =>
+      pageOf(
+        ...Array.from({ length: 30 }, (_, i) =>
+          item(
+            `0192f3a4-0000-7000-8000-${(0xe700 + i).toString(16).padStart(12, "0")}`,
+            `Item ${i}`,
+          ),
+        ),
+      );
+    renderWithIntl(<AskMemoryPage />);
+    expect(await screen.findByText("30 items")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add something to remember")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remember" })).toBeDisabled();
+    expect(screen.getByText(/Memory is full \(30 items\)/)).toBeInTheDocument();
+  });
+
+  it("while memory is off for the member: add, edit and save are off, delete still works; 409 memory_off rereads the switch", async () => {
+    stub.routes[`GET ${SETTINGS}`] = () => Response.json({ enabled: false, school_enabled: true });
+    stub.routes[`DELETE ${MEM}/${CHAT.memory2}`] = () => new Response(null, { status: 204 });
+    renderWithIntl(<AskMemoryPage />);
+    const user = userEvent.setup();
+    expect(await screen.findByText(/Memory is off for you/)).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Use memory in Ask" })).not.toBeDisabled();
+    expect(screen.getByLabelText("Add something to remember")).toBeDisabled();
+    expect(
+      await screen.findByRole("button", { name: "Edit: I teach Class 7 mathematics" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save: Prefers answers in Telugu" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Dismiss: Prefers answers in Telugu" }));
+    await waitFor(() => expect(stub.callsTo(`DELETE ${MEM}/${CHAT.memory2}`)).toHaveLength(1));
+  });
+
+  it("a memory_off refusal explains how to switch memory on and reads the switch again", async () => {
+    let school = true;
+    stub.routes[`GET ${SETTINGS}`] = () => Response.json({ enabled: true, school_enabled: school });
+    stub.routes[`POST ${MEM}/${CHAT.memory2}/confirm`] = () => {
+      school = false; // switched off by the principal meanwhile
+      return problem(409, "memory_off");
+    };
+    renderWithIntl(<AskMemoryPage />);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: "Save: Prefers answers in Telugu" }),
+    );
+    expect(await screen.findByText("Memory is off")).toBeInTheDocument();
+    expect(await screen.findByText(/Your school has switched memory off/)).toBeInTheDocument();
   });
 
   it("refuses an Aadhaar number before sending (invariant 4)", async () => {
@@ -359,7 +507,7 @@ describe("Manage memory", () => {
   });
 
   it("shows the empty state, and works in Telugu", async () => {
-    stub.routes[`GET ${MEM}`] = () => Response.json([]);
+    stub.routes[`GET ${MEM}`] = () => pageOf();
     const { unmount } = renderWithIntl(<AskMemoryPage />);
     expect(await screen.findByText("Nothing remembered yet")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Forget everything" })).toBeNull();

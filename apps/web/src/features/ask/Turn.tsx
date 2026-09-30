@@ -19,6 +19,7 @@ import {
 } from "./answer";
 import { CitationChip, SourceCard, sourceCardId } from "./Citations";
 import { MAX_QUESTION, shouldSend } from "./Composer";
+import { askError } from "./errors";
 import { stableStreamingText } from "./markdown";
 import { MemoryNotes } from "./MemoryNotes";
 import {
@@ -302,6 +303,7 @@ function AssistantMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnH
   const queryId = state.queryId;
   const fromVerified =
     outcome === "answered" &&
+    !state.withheld &&
     state.citations.some((c) => parseSource(c.source)?.kind === "verified");
   const finished = state.phase === "done" || state.phase === "stopped";
   const showText = (outcome === "answered" || outcome === "pending") && state.text !== "";
@@ -377,6 +379,16 @@ function AssistantMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnH
         {outcome === "search_only" && state.phase === "done" && state.citations.length === 0 ? (
           <p>{t("searchOnly.none")}</p>
         ) : null}
+        {state.withheld ? (
+          <Alert tone="info" title={tanswer("withheldTitle")}>
+            {tanswer("withheldBody")}
+          </Alert>
+        ) : null}
+        {state.phase === "incomplete" ? (
+          <Alert tone="info" title={tanswer("incompleteTitle")}>
+            {tanswer("incompleteBody")}
+          </Alert>
+        ) : null}
         <Sources state={state} prefix={prefix} />
         {state.phase === "stopped" ? (
           <Alert tone="info">{stoppedPreview ? ta("stoppedNote") : tanswer("stoppedNote")}</Alert>
@@ -386,7 +398,9 @@ function AssistantMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnH
             {tanswer("interruptedBody")}
           </Alert>
         ) : null}
-        {state.phase === "failed" ? <ApiErrorAlert error={state.error} namespace="ask" /> : null}
+        {state.phase === "failed" ? (
+          <ApiErrorAlert error={askError(state.error, "conversation_not_found")} namespace="ask" />
+        ) : null}
         {state.phase === "interrupted" || state.phase === "failed" ? (
           <Button
             variant="secondary"
@@ -493,7 +507,10 @@ function ActionsRow({
               onChange={(index) => handlers.onVersion(turn.versions?.group ?? turn.key, index)}
             />
           ) : null}
-          {handlers.canVerify && outcome === "answered" && state.phase === "done" ? (
+          {handlers.canVerify &&
+          outcome === "answered" &&
+          state.phase === "done" &&
+          !state.withheld ? (
             <span className="ms-1">
               <VerifiedAnswerDialog
                 draft={draftFrom(state, turn.question)}

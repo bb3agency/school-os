@@ -1,23 +1,21 @@
+import type { ConversationMessage } from "./data";
 import {
-  followupsEventSchema,
-  memoryEventSchema,
-  metaExtrasSchema,
-  statusEventSchema,
+  MAX_FOLLOWUPS,
+  parseAskEvent,
   type AskStep,
-  type ConversationMessage,
   type MemoryEvent,
-} from "./contract";
-import type { SseMessage } from "./sse";
+  type SseMessage,
+} from "./sse";
 
 /**
  * The Ask answer as the page builds it from the SSE events of `POST /knowledge/ask`
- * (docs/06 §5.1, docs/09 Knowledge), in this order: `meta`, `delta`*, `error`?, `final`,
- * `token`*, `citation`*, `done`, then `followups`? and `memory`*. `status` events (the step the
- * server is on: understanding, searching documents, reading records, writing) may come at any
- * time before `final`. Unknown event types and fields are ignored, so the API may add them
- * without breaking this page. Nothing here is rendered as HTML: answer text is shown as
- * text, and the only links are the ones this module builds from validated `sos://` sources
- * (never from the model's prose).
+ * (docs/06 §5.1, docs/09 Knowledge), in this order: `meta`, `status`*, `delta`*, `error`?,
+ * `final`, `token`*, `citation`*, `followups`, `memory`?, `done` (payloads typed and checked in
+ * sse.ts). `status` events report the step the server is on (understanding, searching
+ * documents, reading records, searching your chats, writing). Unknown event types and fields
+ * are ignored, so the API may add them without breaking this page. Nothing here is rendered as
+ * HTML: answer text is shown as text, and the only links are the ones this module builds from
+ * validated `sos://` sources (never from the model's prose).
  *
  * `meta.mode` is always `full` now (it is sent before anything is known); the real outcome is
  * in `final` and, as the source of truth, `done` (`status`, `mode`). `delta` is an unchecked
@@ -42,7 +40,12 @@ export type AskPhase =
   /** The stream ended (or broke) before `done`. */
   | "interrupted"
   /** The request itself failed (HTTP problem, offline). */
-  | "failed";
+  | "failed"
+  /**
+   * A stored message still `streaming`: its answer is being written in another window, or its
+   * stream ended without being recorded. In progress or unfinished, never an error.
+   */
+  | "incomplete";
 
 export interface AskCitation {
   index: number;
@@ -106,6 +109,11 @@ export interface AskState {
   summarized: boolean;
   /** `meta.cached`: reused from an identical earlier question on the same documents. */
   cached: boolean;
+  /**
+   * A stored answer the member may no longer read (`answer_withheld`): a source it cited is
+   * no longer visible to them, so its text and follow-ups are withheld too.
+   */
+  withheld: boolean;
 }
 
 export const INITIAL_ASK: AskState = {
@@ -130,6 +138,7 @@ export const INITIAL_ASK: AskState = {
   memory: [],
   summarized: false,
   cached: false,
+  withheld: false,
 };
 
 /** `kb.errors.budget` → `budget`; unknown keys read as "AI answers unavailable". */
@@ -140,17 +149,6 @@ export function kbMessage(messageKey: unknown): KbMessage {
     if (known) return known;
   }
   return "unavailable";
-}
-
-function record(data: string): Record<string, unknown> | null {
-  try {
-    const value: unknown = JSON.parse(data);
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -164,43 +162,20 @@ export function joinToken(previous: string, next: string): string {
   return `${previous} ${next}`;
 }
 
-const MODES = new Set<string>(["full", "search_only"]);
-const LANGUAGES = new Set<string>(["en", "te", "mixed"]);
-const FINAL_STATUSES = new Set<string>(["answered", "not_found", "refused", "search_only"]);
-const DONE_STATUSES = new Set<string>([...FINAL_STATUSES, "error"]);
-
-function modeOf(value: unknown, fallback: AskMode | null): AskMode | null {
-  return typeof value === "string" && MODES.has(value) ? (value as AskMode) : fallback;
-}
-
-function statusOf(
-  value: unknown,
-  allowed: ReadonlySet<string>,
-  fallback: AskStatus | null,
-): AskStatus | null {
-  return typeof value === "string" && allowed.has(value) ? (value as AskStatus) : fallback;
-}
-
 /** Fold one SSE event into the answer. Malformed or unknown events change nothing. */
 export function applyEvent(state: AskState, message: SseMessage): AskState {
-  const data = record(message.data);
-  if (!data) return state;
-  switch (message.event) {
+  const parsed = parseAskEvent(message);
+  if (!parsed) return state;
+  switch (parsed.event) {
     case "meta": {
-      const queryId = typeof data.query_id === "string" ? data.query_id : state.queryId;
-      const language =
-        typeof data.language === "string" && LANGUAGES.has(data.language)
-          ? (data.language as AskLanguage)
-          : state.language;
-      const extras = metaExtrasSchema.safeParse(data);
-      const meta = extras.success ? extras.data : {};
+      const meta = parsed.data;
       // Provisional only: the API says `full` here and gives the real mode in final/done.
       return {
         ...state,
         phase: "streaming",
-        queryId,
-        mode: modeOf(data.mode, state.mode),
-        language,
+        queryId: meta.query_id,
+        mode: meta.mode ?? state.mode,
+        language: meta.language ?? state.language,
         conversationId: meta.conversation_id ?? state.conversationId,
         title: meta.title ?? state.title,
         summarized: state.summarized || meta.summarized === true,
@@ -208,10 +183,10 @@ export function applyEvent(state: AskState, message: SseMessage): AskState {
       };
     }
     case "status": {
-      const parsed = statusEventSchema.safeParse(data);
-      if (!parsed.success || state.finalized) return state;
+      if (state.finalized) return state;
       const { step, count } = parsed.data;
       const last = state.steps[state.steps.length - 1];
+      // `count` is null until the step's tool has run; a repeated step keeps the last count.
       const steps =
         last && last.step === step
           ? [...state.steps.slice(0, -1), { step, count: count ?? last.count }]
@@ -219,61 +194,42 @@ export function applyEvent(state: AskState, message: SseMessage): AskState {
       return { ...state, phase: "streaming", steps };
     }
     case "followups": {
-      const parsed = followupsEventSchema.safeParse(data);
-      if (!parsed.success) return state;
       const followups = parsed.data.questions
         .map((question) => question.trim())
         .filter((question) => question.length > 0 && question.length <= 1000)
-        .slice(0, 4);
+        .slice(0, MAX_FOLLOWUPS);
       return { ...state, followups };
     }
     case "memory": {
-      const parsed = memoryEventSchema.safeParse(data);
-      if (!parsed.success) return state;
-      const memory = [
-        ...state.memory.filter((item) => item.item_id !== parsed.data.item_id),
-        parsed.data,
-      ];
+      const item = parsed.data;
+      const memory = [...state.memory.filter((m) => m.item_id !== item.item_id), item];
       return { ...state, memory };
     }
     case "delta": {
-      if (state.finalized || typeof data.text !== "string") return state;
-      return { ...state, phase: "streaming", preview: state.preview + data.text };
+      if (state.finalized) return state;
+      return { ...state, phase: "streaming", preview: state.preview + parsed.data.text };
     }
     case "final": {
-      if (typeof data.text !== "string") return state;
+      const final = parsed.data;
       return {
         ...state,
         phase: "streaming",
-        text: data.text,
+        text: final.text,
         preview: "",
         finalized: true,
-        replaced: data.replaced === true,
-        status: statusOf(data.status, FINAL_STATUSES, state.status),
-        mode: modeOf(data.mode, state.mode),
-        summarized: state.summarized || data.summarized === true,
+        replaced: final.replaced === true,
+        status: final.status ?? state.status,
+        mode: final.mode ?? state.mode,
+        summarized: state.summarized || final.summarized === true,
       };
     }
     case "token": {
-      if (state.finalized || typeof data.text !== "string") return state;
-      return { ...state, phase: "streaming", text: joinToken(state.text, data.text) };
+      if (state.finalized) return state;
+      return { ...state, phase: "streaming", text: joinToken(state.text, parsed.data.text) };
     }
     case "citation": {
-      const { index, source, title, snippet } = data;
-      if (
-        typeof index !== "number" ||
-        !Number.isInteger(index) ||
-        index < 1 ||
-        typeof source !== "string"
-      ) {
-        return state;
-      }
-      const citation: AskCitation = {
-        index,
-        source,
-        title: typeof title === "string" ? title : "",
-        snippet: typeof snippet === "string" ? snippet : "",
-      };
+      const { index, source, title, snippet } = parsed.data;
+      const citation: AskCitation = { index, source, title: title ?? "", snippet: snippet ?? "" };
       const citations = [...state.citations.filter((c) => c.index !== index), citation].sort(
         (a, b) => a.index - b.index,
       );
@@ -283,20 +239,20 @@ export function applyEvent(state: AskState, message: SseMessage): AskState {
       return {
         ...state,
         phase: "streaming",
-        notice: kbMessage(data.message_key),
-        errorType: typeof data.type === "string" ? data.type : state.errorType,
+        notice: kbMessage(parsed.data.message_key),
+        errorType: parsed.data.type ?? state.errorType,
       };
-    case "done":
+    case "done": {
+      const done = parsed.data;
       return {
         ...state,
         phase: "done",
         preview: "",
-        status: statusOf(data.status, DONE_STATUSES, state.status),
-        mode: modeOf(data.mode, state.mode),
-        latencyMs: typeof data.latency_ms === "number" ? data.latency_ms : null,
+        status: done.status ?? state.status,
+        mode: done.mode ?? state.mode,
+        latencyMs: done.latency_ms ?? null,
       };
-    default:
-      return state;
+    }
   }
 }
 
@@ -448,25 +404,35 @@ export interface AnswerExtras {
   cached: boolean;
 }
 
+function phaseOf(status: ConversationMessage["status"]): AskPhase {
+  if (status === "cancelled") return "stopped";
+  if (status === "streaming") return "incomplete";
+  return "done";
+}
+
 /**
  * A stored message (GET /knowledge/conversations/{id}) as the same state the stream builds,
- * so one component shows both. `cancelled` reads as a stopped answer.
+ * so one component shows both. `cancelled` reads as a stopped answer; `streaming` as an answer
+ * in progress or unfinished (`incomplete`); `answer_withheld` hides the text and follow-ups.
  */
 export function stateFromMessage(
   message: ConversationMessage,
   extras?: AnswerExtras | null,
 ): AskState {
-  const cancelled = message.status === "cancelled";
+  const phase = phaseOf(message.status);
+  const withheld = message.answer_withheld;
+  const answer = withheld ? null : message.answer;
   return {
     ...INITIAL_ASK,
-    phase: cancelled ? "stopped" : "done",
+    phase,
     queryId: message.query_id,
     language: message.language,
     mode: message.mode,
-    text: message.answer ?? "",
-    finalized: message.answer !== null,
+    text: answer ?? "",
+    finalized: answer !== null,
     replaced: extras?.replaced ?? false,
-    status: message.status === "cancelled" ? null : message.status,
+    status:
+      message.status === "cancelled" || message.status === "streaming" ? null : message.status,
     citations: message.citations.map((c) => ({
       index: c.index,
       source: c.source,
@@ -477,17 +443,19 @@ export function stateFromMessage(
     notice: extras?.notice ?? null,
     latencyMs: extras?.latencyMs ?? null,
     steps: extras?.steps ?? [],
-    followups: message.followups,
+    followups: withheld ? [] : message.followups,
     memory: extras?.memory ?? [],
-    summarized: message.summarized === true,
-    preview: cancelled && message.answer === null ? (extras?.preview ?? "") : "",
-    cached: extras?.cached ?? false,
+    summarized: message.summarized,
+    preview: phase === "stopped" && answer === null && !withheld ? (extras?.preview ?? "") : "",
+    cached: message.cached || (extras?.cached ?? false),
+    withheld,
   };
 }
 
 /** The stored status of a finished live answer. */
 function storedStatus(state: AskState): ConversationMessage["status"] {
   if (state.phase === "stopped" || state.phase === "interrupted") return "cancelled";
+  if (state.phase === "incomplete") return "streaming";
   const outcome = outcomeOf(state);
   return outcome === "pending" ? "error" : outcome;
 }
@@ -503,6 +471,7 @@ export function messageFromState(
     query_id: state.queryId,
     question,
     answer: state.finalized || state.text ? state.text : null,
+    answer_withheld: state.withheld,
     status: storedStatus(state),
     mode: state.mode ?? "full",
     language: state.language,
@@ -511,13 +480,14 @@ export function messageFromState(
       source: c.source,
       title: c.title || null,
       snippet: c.snippet || null,
-      ...(c.withheld ? { withheld: true } : {}),
+      withheld: c.withheld === true,
     })),
     feedback: null,
     followups: state.followups,
     created_at: createdAt,
     superseded: false,
-    ...(state.summarized ? { summarized: true } : {}),
+    cached: state.cached,
+    summarized: state.summarized,
   };
 }
 
