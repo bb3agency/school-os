@@ -2897,7 +2897,9 @@
       "timelineLabel": "ఈ సమస్య చరిత్ర",
       "stillOpen": "ఇంకా తెరిచి ఉంది",
       "problem": "సమస్య",
-      "relatedLabel": "సంబంధిత పేజీలు"
+      "relatedLabel": "సంబంధిత పేజీలు",
+      "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
+      "waiveConsequence": "Nothing on the student's record changes."
     },
     "rules": {
       "title": "SchoolOS ఏమి తనిఖీ చేస్తుంది",
@@ -3186,7 +3188,10 @@
       "waitingDecision": "నిర్ణయం కోసం వేచి ఉంది",
       "decideHint": "సాక్ష్యాన్ని చూసి, ఈ అభ్యర్థనను ఆమోదించండి లేదా తిరస్కరించండి.",
       "timelineLabel": "ఈ అభ్యర్థన దశలు",
-      "relatedLabel": "సంబంధిత పేజీలు"
+      "relatedLabel": "సంబంధిత పేజీలు",
+      "approveConsequence": "The student's record changes as soon as you approve. The old value stays in the history.",
+      "rejectConsequence": "Nothing on the student's record changes.",
+      "cancelConsequence": "Nothing on the student's record changes."
     },
     "crumbHome": "హోమ్"
   },

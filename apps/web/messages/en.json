@@ -2897,7 +2897,9 @@
       "timelineLabel": "History of this problem",
       "stillOpen": "Still open",
       "problem": "Problem",
-      "relatedLabel": "Related pages"
+      "relatedLabel": "Related pages",
+      "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
+      "waiveConsequence": "Nothing on the student's record changes."
     },
     "rules": {
       "title": "What SchoolOS checks",
@@ -3186,7 +3188,10 @@
       "waitingDecision": "Waiting for a decision",
       "decideHint": "Check the evidence, then approve or reject this request.",
       "timelineLabel": "Steps of this request",
-      "relatedLabel": "Related pages"
+      "relatedLabel": "Related pages",
+      "approveConsequence": "The student's record changes as soon as you approve. The old value stays in the history.",
+      "rejectConsequence": "Nothing on the student's record changes.",
+      "cancelConsequence": "Nothing on the student's record changes."
     },
     "crumbHome": "Home"
   },

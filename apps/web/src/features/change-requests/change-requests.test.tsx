@@ -4,7 +4,7 @@ import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { verhoeffValid } from "@/lib/aadhaar";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
-import { intlErrors, renderWithIntl } from "@/test/render";
+import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { changeRequest, me, ME_MEMBERSHIP, STUDENT } from "@/test/school-fixtures";
 import { ChangeRequestDetailScreen } from "./ChangeRequestDetailScreen";
 import { ChangeRequestsScreen } from "./ChangeRequestsScreen";
@@ -129,6 +129,25 @@ describe("change request detail (US-601 AC1–AC4, FR-CR-002, FR-CR-004)", () =>
     const call = stub.callsTo(`POST /bff/api/v1/change-requests/${CR}/approve`)[0];
     expect(call?.headers.get("if-match")).toBe('W/"1"');
     expect(JSON.parse(call?.body ?? "{}")).toEqual({ note: null });
+  });
+
+  it("says the consequence just above each decision button, and the button is described by it", async () => {
+    detail([APPROVE]);
+    renderWithIntl(<ChangeRequestDetailScreen changeRequestId={CR} />);
+    const cases = [
+      ["Approve", "Approve this correction", messages.en.changeRequests.detail.approveConsequence],
+      ["Reject", "Reject this correction", messages.en.changeRequests.detail.rejectConsequence],
+    ] as const;
+    for (const [button, title, consequence] of cases) {
+      await userEvent.click(await screen.findByRole("button", { name: button }));
+      const dialog = screen.getByRole("dialog", { name: title });
+      const line = within(dialog).getByText(consequence);
+      const confirm = within(dialog).getByRole("button", { name: button });
+      expect(confirm).toHaveAccessibleDescription(consequence);
+      // The line sits in the footer, before the buttons.
+      expect(line.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    }
   });
 
   it("puts the checker's decision in its own card and shows the steps as a timeline", async () => {
