@@ -19,13 +19,15 @@ const ROWS: { key: CompareKey; shared: Cell; dedicated: Cell }[] = [
   { key: "key", shared: "keyShared", dedicated: "keyDedicated" },
   { key: "domain", shared: "domainShared", dedicated: "domainDedicated" },
 ];
-const BASIS: { key: Exclude<keyof Pricing["basis"], "eyebrow" | "title" | "intro">; icon: IconName }[] =
-  [
-    { key: "size", icon: "users" },
-    { key: "campuses", icon: "building" },
-    { key: "tier", icon: "layers" },
-    { key: "ai", icon: "sparkles" },
-  ];
+const BASIS: {
+  key: Exclude<keyof Pricing["basis"], "eyebrow" | "title" | "intro">;
+  icon: IconName;
+}[] = [
+  { key: "size", icon: "users" },
+  { key: "campuses", icon: "building" },
+  { key: "tier", icon: "layers" },
+  { key: "ai", icon: "sparkles" },
+];
 const EVERYONE = ["features", "security", "india", "managed", "export", "support"] as const;
 const IMPLEMENTATION = [
   "audit",

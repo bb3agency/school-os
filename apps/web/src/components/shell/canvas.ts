@@ -40,7 +40,5 @@ export function canvasFor(theme: SidebarTheme, pathname: string): ShellCanvas {
     // Every platform page but the dashboard is a table of records.
     return path === "/platform" || path === "" || path === "/" ? "gradient" : "neutral";
   }
-  return NEUTRAL_CANVAS_PATHS.school.some((prefix) => under(path, prefix))
-    ? "neutral"
-    : "gradient";
+  return NEUTRAL_CANVAS_PATHS.school.some((prefix) => under(path, prefix)) ? "neutral" : "gradient";
 }

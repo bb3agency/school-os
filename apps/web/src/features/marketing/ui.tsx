@@ -241,10 +241,7 @@ export function CtaGroup({
       ) : null}
       {secondary && !contactEmail ? (
         // An in-page anchor: a plain link (no locale handling needed).
-        <a
-          href={secondary.href}
-          className={cn(buttonClasses(quiet, "lg"), "mk-press")}
-        >
+        <a href={secondary.href} className={cn(buttonClasses(quiet, "lg"), "mk-press")}>
           {secondary.label}
         </a>
       ) : null}

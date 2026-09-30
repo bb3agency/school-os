@@ -373,7 +373,12 @@ describe("marketing settings (SOS_PUBLIC_*)", () => {
         SOS_PUBLIC_COMPANY_ADDRESS: "|",
         SOS_PUBLIC_WHATSAPP_NUMBER: " ",
       }),
-    ).toEqual({ contactEmail: null, companyName: null, companyAddress: null, whatsappNumber: null });
+    ).toEqual({
+      contactEmail: null,
+      companyName: null,
+      companyAddress: null,
+      whatsappNumber: null,
+    });
   });
 
   it("an address that could break out of the mailto link is refused", () => {

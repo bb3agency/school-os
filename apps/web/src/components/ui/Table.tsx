@@ -227,7 +227,11 @@ export function DataTable<T>({
             {state.data.map((row) => (
               <Tr key={rowKey(row)}>
                 {columns.map((column) => (
-                  <Td key={column.key} className={column.className} numeric={column.numeric === true}>
+                  <Td
+                    key={column.key}
+                    className={column.className}
+                    numeric={column.numeric === true}
+                  >
                     {column.cell(row)}
                   </Td>
                 ))}
