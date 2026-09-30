@@ -47,7 +47,7 @@ from app.knowledge.gateway.transport import MessagesRequest, TransportError
 FIXTURES = Path(__file__).with_name("gemini_fixtures")
 CONFIG = load_llm_config()
 PROJECT = "sos-ai-test"
-TOKEN = "ya29.synthetic-access-token"
+TOKEN = "synthetic-access-token-not-a-real-google-token"
 BASE = "https://asia-south1-aiplatform.googleapis.com/v1"
 MODEL_URL = f"{BASE}/projects/{PROJECT}/locations/asia-south1/publishers/google/models"
 CACHE_CONFIG_URL = f"{BASE}/projects/{PROJECT}/cacheConfig"
