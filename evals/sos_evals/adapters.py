@@ -8,7 +8,7 @@ the harness never imports application code and never calls an LLM itself.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,6 +45,14 @@ class AskResult(_Model):
     provided_sources: tuple[str, ...]
     """Sources the tool results gave the model in this request (docs/06 §9 rule 1)."""
     latency_ms: float | None = Field(default=None, ge=0)
+    mode: Literal["full", "search_only"] = "full"
+    """``search_only``: the segments are the cited passages themselves (no written answer)."""
+    language: str | None = None
+    """The answer's language as the system reports it (SSE ``meta.language``; ADR-0036)."""
+    followups: tuple[str, ...] = ()
+    """Follow-up suggestions shown after the answer."""
+    title: str | None = None
+    """The conversation title shown for the question."""
 
     @property
     def text(self) -> str:

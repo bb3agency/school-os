@@ -49,6 +49,7 @@ def build_report(
         ctx_fast=suite == "fast",
         conversation=stub,
         conversation_cases=data.conversations,
+        english=stub,
     )
     gate_results = gates.evaluate(gates.load_gates(gates_file), result.metrics)
     code = gates.exit_code(gate_results, fail_on_soft=fail_on_soft)

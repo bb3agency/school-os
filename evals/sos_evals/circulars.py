@@ -103,12 +103,17 @@ class SuggestedDeadline(_Model):
     due_on: date
     quote: str
     title: str = ""
+    details: str | None = None
 
 
 class CircularResult(_Model):
     deadlines: tuple[SuggestedDeadline, ...] = ()
     reference_no: str | None = None
     issued_on: date | None = None
+    issuer: str | None = None
+    subject: str | None = None
+    summary_en: str | None = None
+    summary_te: str | None = None
     failed: bool = False
     """The system could not read it (manual review): counts as nothing found."""
 

@@ -9,7 +9,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import circulars, contextual, conversations, fees, metrics
+from sos_evals import circulars, contextual, conversations, english_first, fees, metrics
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
@@ -96,6 +96,12 @@ class Metrics(_Model):
     conversation_context_accuracy: float | None = None
     followup_language_match: float | None = None
     memory_preference_applied: float | None = None
+    # English first (sos_evals.english_first; ADR-0036): the pass with Telugu switched OFF. None
+    # when not measured (their gates fail).
+    english_first_items: int = 0
+    english_first_fields: int = 0
+    english_first_telugu_outputs: int | None = None
+    english_first_english_answer_rate: float | None = None
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -224,6 +230,7 @@ class RunResult(_Model):
     fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
     contextual_outcomes: tuple[contextual.CtxOutcome, ...] = ()
     conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
+    english_first_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
 
 
 def run(
@@ -241,7 +248,10 @@ def run(
     ctx_fast: bool = False,
     conversation: conversations.ConversationAdapter | None = None,
     conversation_cases: Sequence[conversations.ConversationCase] = (),
+    english: english_first.EnglishFirstAdapter | None = None,
 ) -> RunResult:
+    """Every pass with the Telugu switch ON (the dormant Telugu gates keep running), then, with
+    ``english``, the English-first pass with it OFF (the product default, ADR-0036)."""
     outcomes = []
     for item in items:
         retrieved, retrieval_ms = _timed(partial(retrieval.retrieve, item.question, item.asker, K))
@@ -271,6 +281,15 @@ def run(
     if conversation is not None and conversation_cases:
         talk, conversation_outcomes = conversations.run(conversation_cases, conversation)
         overall = overall.model_copy(update=talk.model_dump())
+    english_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
+    if english is not None:
+        first, english_outcomes = english_first.run(
+            english,
+            items=items,
+            circular_cases=circular_cases,
+            conversation_cases=conversation_cases,
+        )
+        overall = overall.model_copy(update=first.model_dump())
     return RunResult(
         metrics=overall,
         by_category=by_category,
@@ -279,4 +298,5 @@ def run(
         fee_outcomes=fee_outcomes,
         contextual_outcomes=ctx_outcomes,
         conversation_outcomes=conversation_outcomes,
+        english_first_outcomes=english_outcomes,
     )
