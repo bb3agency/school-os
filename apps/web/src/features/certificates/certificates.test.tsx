@@ -649,7 +649,10 @@ describe("certificate letterhead (US-1108, FR-CERT-013)", () => {
 
   it("a manager saves the letterhead with If-Match", async () => {
     stub.routes["PATCH /bff/api/v1/tenant"] = () => Response.json(tenant);
-    renderWithIntl(<LetterheadCard tenant={tenant} manage tenantKey={["staff", "tenant"]} />);
+    // Telugu switched on explicitly (ADR-0036): the Telugu fields are shown only then.
+    renderWithIntl(<LetterheadCard tenant={tenant} manage tenantKey={["staff", "tenant"]} />, {
+      telugu: true,
+    });
     await userEvent.type(screen.getByLabelText("Place"), "Guntur");
     await userEvent.type(screen.getByLabelText("School name in Telugu"), "కృత్రిమ మోడల్ పాఠశాల");
     await userEvent.click(screen.getByRole("button", { name: "Save letterhead" }));
@@ -668,6 +671,49 @@ describe("certificate letterhead (US-1108, FR-CERT-013)", () => {
     expect(
       await screen.findByText("Letterhead saved. New certificates use it."),
     ).toBeInTheDocument();
+  });
+
+  it("with Telugu switched off, shows English fields only and keeps the stored Telugu ones (ADR-0036)", async () => {
+    const stored = {
+      ...tenant,
+      settings: {
+        ...tenant.settings,
+        certificate_letterhead: {
+          school_name_te: "కృత్రిమ మోడల్ పాఠశాల",
+          address_en: "",
+          address_te: "గుంటూరు",
+          affiliation: "",
+          place: "",
+        },
+      },
+    } as typeof tenant;
+    stub.routes["PATCH /bff/api/v1/tenant"] = () => Response.json(stored);
+    const { container } = renderWithIntl(
+      <LetterheadCard tenant={stored} manage tenantKey={["staff", "tenant"]} />,
+    );
+    expect(screen.queryByLabelText("School name in Telugu")).toBeNull();
+    expect(screen.queryByLabelText("Address in Telugu")).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    expect(container.querySelector("[lang='te']")).toBeNull();
+    await userEvent.type(screen.getByLabelText("Place"), "Guntur");
+    await userEvent.click(screen.getByRole("button", { name: "Save letterhead" }));
+    await waitFor(() => expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(1));
+    expect(JSON.parse(stub.callsTo("PATCH /bff/api/v1/tenant")[0]?.body ?? "{}")).toEqual({
+      certificate_letterhead: {
+        school_name_te: "కృత్రిమ మోడల్ పాఠశాల",
+        address_en: "",
+        address_te: "గుంటూరు",
+        affiliation: "",
+        place: "Guntur",
+      },
+    });
+  });
+
+  it("with Telugu switched off, the read-only letterhead lists no Telugu fields (ADR-0036)", () => {
+    const { container } = renderWithIntl(
+      <LetterheadCard tenant={tenant} manage={false} tenantKey={["staff", "tenant"]} />,
+    );
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
   });
 
   it("everyone else sees it read-only", () => {

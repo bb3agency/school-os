@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { Value } from "@/components/ui/Value";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useApiForm } from "@/lib/forms";
 
@@ -29,7 +30,14 @@ export const letterheadSchema = z.object({
   place: line(80),
 });
 
+/** ADR-0036: while Telugu is switched off its fields are not shown and may be absent. */
+const letterheadEnglishSchema = letterheadSchema.extend({
+  school_name_te: line(200).optional(),
+  address_te: line(300).optional(),
+});
+
 const FIELDS = ["school_name_te", "address_en", "address_te", "affiliation", "place"] as const;
+const ENGLISH_FIELDS = FIELDS.filter((field) => !field.endsWith("_te"));
 const MAX: Record<(typeof FIELDS)[number], number> = {
   school_name_te: 200,
   address_en: 300,
@@ -41,8 +49,9 @@ const MAX: Record<(typeof FIELDS)[number], number> = {
 /**
  * Certificate letterhead (US-1108, FR-CERT-013): the Telugu school name, address in both
  * languages, recognition line and place printed on every certificate. The English name is the
- * school's name. Holders of `tenant.settings.manage` save it (If-Match; the API may ask for a
- * fresh MFA sign-in); everyone else sees it read-only.
+ * school's name. While Telugu is switched off (ADR-0036) only the English fields are shown;
+ * the stored Telugu ones are sent back unchanged. Holders of `tenant.settings.manage` save it
+ * (If-Match; the API may ask for a fresh MFA sign-in); everyone else sees it read-only.
  */
 export function LetterheadCard({
   tenant,
@@ -58,8 +67,10 @@ export function LetterheadCard({
   const api = useBffClient("staff");
   const [saved, setSaved] = useState(false);
   const head = tenant.settings.certificate_letterhead;
+  const telugu = useTeluguEnabled();
+  const fields = telugu ? FIELDS : ENGLISH_FIELDS;
   const form = useApiForm({
-    schema: letterheadSchema,
+    schema: telugu ? letterheadSchema : letterheadEnglishSchema,
     invalidate: [tenantKey],
     fieldMap: (field) => field.replace(/^certificate_letterhead\./, ""),
     submit: (data) => {
@@ -67,7 +78,13 @@ export function LetterheadCard({
       return unwrap(
         api.PATCH("/api/v1/tenant", {
           headers: { "If-Match": `W/"${tenant.version}"` },
-          body: { certificate_letterhead: data },
+          body: {
+            certificate_letterhead: {
+              ...data,
+              school_name_te: telugu ? (data.school_name_te ?? "") : (head?.school_name_te ?? ""),
+              address_te: telugu ? (data.address_te ?? "") : (head?.address_te ?? ""),
+            },
+          },
         }),
       );
     },
@@ -78,7 +95,7 @@ export function LetterheadCard({
       <Card title={t("title")} description={t("description")}>
         <p className="text-sm text-ink-muted">{t("nameEnNote", { name: tenant.name })}</p>
         <dl className="divide-y divide-border">
-          {FIELDS.map((field) => (
+          {fields.map((field) => (
             <div key={field} className="grid gap-1 py-3 sm:grid-cols-[16rem_1fr] sm:gap-4">
               <dt className="text-sm text-ink-muted">{t(`fields.${field}`)}</dt>
               <dd className="font-medium break-words">
@@ -96,7 +113,7 @@ export function LetterheadCard({
         <div className="space-y-4">
           <p className="text-sm text-ink-muted">{t("nameEnNote", { name: tenant.name })}</p>
           <div className="grid gap-4 md:grid-cols-2">
-            {FIELDS.map((field) => (
+            {fields.map((field) => (
               <TextField
                 key={field}
                 name={field}
