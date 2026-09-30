@@ -71,6 +71,9 @@
   --color-canvas-from: #dbe9fa; /* ink-muted 6.1:1, ink-subtle 4.8:1, primary 5.4:1 */
   --color-canvas-via: #ecf5fc; /* ink-subtle 5.3:1 */
   --color-canvas-to: #dcf2f0; /* ink-muted 6.5:1, ink-subtle 5.1:1, primary 5.7:1 */
+  /* Near-neutral canvas behind dense record screens (docs/17 §3.2): calm, so status colour
+     inside the tables is the only colour that means something. */
+  --color-canvas-neutral: #f4f6f9; /* ink 16.3:1, ink-muted 6.9:1, ink-subtle 5.4:1, primary 6.2:1 */
 
   /* Surfaces */
   --color-surface: #ffffff;
@@ -123,15 +126,6 @@
   --color-teal-ink: #115e59; /* 6.9:1 on teal-soft */
   --color-teal-soft: #e6f7f5;
   --color-teal: #0f766e; /* 5.5:1 on white */
-
-  /* Status pills (white text): gradients from the darker to the lighter stop.
-     The ratio is for white text on the LIGHTER stop, i.e. the worst case. */
-  --color-pill-blue-from: #1d4ed8;
-  --color-pill-blue-to: #2563eb; /* white 5.2:1 */
-  --color-pill-violet-from: #4f46e5;
-  --color-pill-violet-to: #7c3aed; /* white 5.7:1 (and 6.3:1 on the first stop) */
-  --color-pill-teal-from: #0f766e;
-  --color-pill-teal-to: #0e7a6f; /* white 5.2:1 */
 
   /* AI panel: white text; lightest stop brand #2563eb (5.2:1). */
   --color-ai-from: #1e3a8a; /* white 10.4:1 */
@@ -454,35 +448,6 @@
       var(--color-surface-sunken) 80%
     );
     background-size: 200% 100%;
-  }
-
-  /* Status pills: gradient fill, white text; a transparent border becomes visible in
-     forced-colors mode, where backgrounds are removed. */
-  .pill-gradient-blue {
-    background-color: var(--color-pill-blue-from);
-    background-image: linear-gradient(
-      135deg,
-      var(--color-pill-blue-from),
-      var(--color-pill-blue-to)
-    );
-  }
-
-  .pill-gradient-violet {
-    background-color: var(--color-pill-violet-from);
-    background-image: linear-gradient(
-      135deg,
-      var(--color-pill-violet-from),
-      var(--color-pill-violet-to)
-    );
-  }
-
-  .pill-gradient-teal {
-    background-color: var(--color-pill-teal-from);
-    background-image: linear-gradient(
-      135deg,
-      var(--color-pill-teal-from),
-      var(--color-pill-teal-to)
-    );
   }
 
   /* AI panel: dark stop at the top left with a soft light over it; the lightest point is
@@ -919,9 +884,6 @@
 
 /* Windows high contrast: gradients and shadows disappear, so borders carry the shapes. */
 @media (forced-colors: active) {
-  .pill-gradient-blue,
-  .pill-gradient-violet,
-  .pill-gradient-teal,
   .ai-gradient {
     border-color: CanvasText;
   }
@@ -954,9 +916,6 @@
   }
 
   .ai-gradient,
-  .pill-gradient-blue,
-  .pill-gradient-violet,
-  .pill-gradient-teal,
   .quote-gradient {
     background: #ffffff !important;
     color: #000000 !important;

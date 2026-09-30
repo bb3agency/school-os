@@ -74,13 +74,21 @@ const CONTRAST_PAIRS: ReadonlyArray<readonly [string, string, number, string]> =
   ["info-ink", "info-soft", 4.5, "info alert"],
   ["violet-ink", "violet-soft", 4.5, "violet chip"],
   ["teal-ink", "teal-soft", 4.5, "teal chip"],
-  // Gradient pills: white text on the lighter stop is the worst case
-  ["white", "pill-blue-from", 4.5, "In progress pill (dark stop)"],
-  ["white", "pill-blue-to", 4.5, "In progress pill (light stop)"],
-  ["white", "pill-violet-from", 4.5, "Review pill (dark stop)"],
-  ["white", "pill-violet-to", 4.5, "Review pill (light stop)"],
-  ["white", "pill-teal-from", 4.5, "Done pill (dark stop)"],
-  ["white", "pill-teal-to", 4.5, "Done pill (light stop)"],
+  // Status pills: solid tints with strong text (docs/17 §4, no gradients)
+  ["info-ink", "info-soft", 4.5, "In progress pill"],
+  ["violet-ink", "violet-soft", 4.5, "Review pill"],
+  ["teal-ink", "teal-soft", 4.5, "Done pill"],
+  ["positive-ink", "positive-soft", 4.5, "Positive pill"],
+  ["danger", "danger-soft", 4.5, "Negative pill"],
+  ["primary", "info-soft", 4.5, "Date pill"],
+  ["ink-muted", "surface-muted", 4.5, "Tag pill"],
+  ["ink-muted", "surface", 4.5, "Sample pill"],
+  // Neutral canvas behind dense record screens (docs/17 §3.2)
+  ["ink", "canvas-neutral", 4.5, "text on the neutral canvas"],
+  ["ink-muted", "canvas-neutral", 4.5, "secondary text on the neutral canvas"],
+  ["ink-subtle", "canvas-neutral", 4.5, "notes on the neutral canvas"],
+  ["primary", "canvas-neutral", 4.5, "links and breadcrumbs on the neutral canvas"],
+  ["focus", "canvas-neutral", 3, "focus ring on the neutral canvas"],
   ["white", "ai-from", 4.5, "AI panel text (dark stop)"],
   ["white", "ai-to", 4.5, "AI panel text (light stop)"],
   // Platform chrome

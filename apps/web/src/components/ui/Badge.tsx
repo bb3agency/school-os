@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 
 export type BadgeTone =
   "neutral" | "info" | "success" | "warning" | "danger" | "platform" | "violet" | "teal";
@@ -40,8 +40,10 @@ export function Badge({
 }
 
 /**
- * Pill variants from the reference look:
- * - `progress` / `review` / `done`: gradient status pills, white text (≥ 5.2:1 at the light stop)
+ * Pill variants (docs/17 §4). Solid, calm chips: a soft tint, strong text and a hairline, so
+ * colour only repeats what the text says (WCAG 1.4.1) and every pair is AA (tokens.test.ts).
+ * - `progress` / `review` / `done`: workflow states (blue / violet / teal tints) with a small
+ *   decorative icon (clock / eye / check); pass `icon={null}` to leave it out
  * - `dark`: near-black pill (delta badges, counters)
  * - `date`: outlined light-blue chip ("18 Jun")
  * - `tag`: soft grey chip · `sample`: neutral "Sample data" chip
@@ -61,9 +63,9 @@ export type PillVariant =
   | "command";
 
 const pills: Record<PillVariant, string> = {
-  progress: "pill-gradient-blue border-transparent text-white",
-  review: "pill-gradient-violet border-transparent text-white",
-  done: "pill-gradient-teal border-transparent text-white",
+  progress: "border-info-border bg-info-soft text-info-ink",
+  review: "border-violet-ink/25 bg-violet-soft text-violet-ink",
+  done: "border-teal-ink/25 bg-teal-soft text-teal-ink",
   dark: "border-action bg-action text-on-action",
   date: "border-info-border bg-info-soft text-primary",
   tag: "border-border bg-surface-muted text-ink-muted",
@@ -73,18 +75,29 @@ const pills: Record<PillVariant, string> = {
   command: "border-border bg-surface-muted text-ink",
 };
 
+/** The workflow states carry an icon by default, so the state never rests on colour alone. */
+const STATUS_ICONS: Partial<Record<PillVariant, IconName>> = {
+  progress: "clock",
+  review: "eye",
+  done: "check",
+};
+
 export function Pill({
   variant = "tag",
   size = "sm",
+  icon,
   children,
   className,
 }: {
   variant?: PillVariant;
   /** `sm` (default) 12px text; `md` 14px text for hero or header chips. */
   size?: "sm" | "md";
+  /** Leading decorative icon. Status variants have one by default; `null` removes it. */
+  icon?: IconName | null;
   children: ReactNode;
   className?: string;
 }) {
+  const iconName = icon === undefined ? STATUS_ICONS[variant] : icon;
   return (
     <span
       className={cn(
@@ -96,6 +109,9 @@ export function Pill({
         className,
       )}
     >
+      {iconName ? (
+        <Icon name={iconName} className={cn("shrink-0", size === "md" ? "size-4" : "size-3")} />
+      ) : null}
       {children}
     </span>
   );

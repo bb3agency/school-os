@@ -168,7 +168,38 @@ describe("pills, avatars and timeline", () => {
 
   it("status pills always carry text", () => {
     renderWithIntl(<Pill variant="done">Done</Pill>);
-    expect(screen.getByText("Done")).toHaveClass("pill-gradient-teal");
+    expect(screen.getByText("Done")).toHaveTextContent("Done");
+  });
+
+  it.each([
+    ["progress", "In progress", "bg-info-soft", "text-info-ink", "border-info-border"],
+    ["review", "Review", "bg-violet-soft", "text-violet-ink", "border-violet-ink/25"],
+    ["done", "Done", "bg-teal-soft", "text-teal-ink", "border-teal-ink/25"],
+  ] as const)(
+    "the %s pill is a solid tint with strong text, a hairline and an icon (NFR-A11Y-001)",
+    (variant, label, fill, ink, hairline) => {
+      renderWithIntl(<Pill variant={variant}>{label}</Pill>);
+      const pill = screen.getByText(label);
+      expect(pill).toHaveClass(fill, ink, hairline);
+      expect(pill.className).not.toMatch(/gradient|text-white/);
+      // Meaning never relies on colour: the text names the state and a decorative icon repeats it.
+      const icon = pill.querySelector("svg");
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+    },
+  );
+
+  it("a status pill's icon can be switched off; other pills have none by default", () => {
+    renderWithIntl(
+      <>
+        <Pill variant="done" icon={null}>
+          Current
+        </Pill>
+        <Pill variant="tag">Class 7</Pill>
+      </>,
+    );
+    expect(screen.getByText("Current").querySelector("svg")).toBeNull();
+    expect(screen.getByText("Class 7").querySelector("svg")).toBeNull();
   });
 
   it("initials work for Latin and Telugu names", () => {
