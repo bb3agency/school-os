@@ -1,4 +1,4 @@
-"""Per-user Ask memory (ADR-0034; docs/06 §5, docs/08 §4). Used by :mod:`app.knowledge.service`.
+"""Per-user Ask memory (ADR-0034; docs/06 §5, docs/08 §7, §8). Used by :mod:`app.knowledge.service`.
 
 A memory item is one user's own preference or work context in one school ("prefers answers in
 Telugu", "is the class teacher of IX-A"), never data about anyone else. Items are ciphertext

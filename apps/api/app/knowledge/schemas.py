@@ -188,7 +188,7 @@ class ConversationOut(_Out):
     version: int
 
 
-class CitationOut(_Out):
+class MessageCitationOut(_Out):
     index: int = Field(description="The [n] marker in the answer.")
     source: str = Field(description="sos:// source (ids only).")
     title: str | None
@@ -215,7 +215,7 @@ class MessageOut(_Out):
     status: MessageStatus
     mode: Literal["full", "search_only"]
     language: Locale | None
-    citations: list[CitationOut]
+    citations: list[MessageCitationOut]
     feedback: Literal["helpful", "not_helpful"] | None
     followups: list[str]
     created_at: dt.datetime
@@ -277,7 +277,6 @@ class MemorySettingsIn(_In):
 
 __all__ = [
     "AskIn",
-    "CitationOut",
     "Code",
     "ConversationDetailOut",
     "ConversationOut",
@@ -291,6 +290,7 @@ __all__ = [
     "MemoryPatchIn",
     "MemorySettingsIn",
     "MemorySettingsOut",
+    "MessageCitationOut",
     "MessageOut",
     "MessageStatus",
     "SearchIn",

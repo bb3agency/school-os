@@ -141,7 +141,6 @@ from app.knowledge.keys import (
 )
 from app.knowledge.models import Conversation, Query, UserMemory, VerifiedAnswer
 from app.knowledge.schemas import (
-    CitationOut,
     ConversationDetailOut,
     ConversationOut,
     ConversationPatchIn,
@@ -152,6 +151,7 @@ from app.knowledge.schemas import (
     MemoryPatchIn,
     MemorySettingsIn,
     MemorySettingsOut,
+    MessageCitationOut,
     MessageOut,
     SearchResultOut,
     VerifiedAnswerIn,
@@ -795,13 +795,13 @@ class SchoolKnowledgeService:
     def _message_out(
         self, session: Session, row: Query, visibility: SourceVisibility
     ) -> MessageOut:
-        citations: list[CitationOut] = []
+        citations: list[MessageCitationOut] = []
         withheld_any = False
         for c in conversations.stored_citations(session, row):
             shown = visibility.visible(c.source)
             withheld_any |= not shown
             citations.append(
-                CitationOut(
+                MessageCitationOut(
                     index=c.index,
                     source=c.source,
                     title=c.title if shown else None,

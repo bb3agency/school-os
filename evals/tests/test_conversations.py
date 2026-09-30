@@ -14,7 +14,7 @@ from sos_evals import conversations as conv
 from sos_evals import datasets, gates
 from sos_evals.conversation_cases import CASES
 from sos_evals.conversations import ConversationRun, TurnResult
-from sos_evals.stubs import PerfectStub
+from sos_evals.stubs import LeakyStub, PerfectStub
 
 
 def _case(case_id: str) -> conv.ConversationCase:
@@ -165,3 +165,11 @@ def test_a_case_expecting_a_source_its_asker_cannot_see_is_refused() -> None:
     )
     with pytest.raises(ValueError, match="cannot see"):
         conv.validate_cases([bad])
+
+
+def test_FR_KB_012_a_history_shared_across_people_trips_the_leakage_gate() -> None:
+    metrics, _ = conv.run(CASES, LeakyStub({}, ()))
+    assert metrics.conversation_leakage_count
+    assert metrics.conversation_leakage_count > 0
+    hard = [g for g in gates.load_gates() if g.metric == "conversation_leakage_count"]
+    assert [g.severity for g in hard] == ["hard"]

@@ -292,12 +292,24 @@ Document errors: 413 `file_too_large`; 415 `unsupported_file_type` / `polyglot_s
 ### Knowledge
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/knowledge/ask` (SSE; body `question` 1-1000 characters, `session_id`) | `kb.ask`. `text/event-stream`, contract in docs/06 §5.1: `meta` first and at once (`query_id`, `language`, `mode`), `delta` (streamed preview; exact text incl. whitespace, not yet validated), `error` (`type`, `message_key`; see Knowledge error codes below), `final` (the validated answer that REPLACES the preview: `text`, `replaced`, `status`, `mode`), `token` (validated segments without surrounding whitespace, joined by one space = `final.text`; kept for older clients), `citation` (`index`, `source`, `title`, `snippet`), `done` (`latency_ms`, `cited_sources`, `status` `answered`/`not_found`/`refused`/`search_only`/`error`, `mode`). The question log row (`streaming`) and `kb.query.asked` commit before the response starts; the stream completes the row (`kb.query.completed`) or, when the client disconnects, records it `cancelled` (`kb.query.cancelled`). The same user's earlier questions in the same `session_id` (at most 3, 30 minutes) are follow-up context; never another user's. Budget, switch-off or outage is not an HTTP error: `error` + `mode: search_only` with cited passages and no prose. 429 `ai_rate_limited` when one user asks more than 10 questions a minute (`models.yaml`); 422 for an empty or too long question (**built**; docs/06 §5 as built) |
+| POST | `/knowledge/ask` (SSE; body `question` 1-1000 characters, optional `conversation_id`, `session_id` (older alias), `regenerate_of`, `edit_of`) | `kb.ask`. `text/event-stream`, contract in docs/06 §5.1: `meta` first and at once (`query_id`, `language`, `mode`, `conversation_id`, `title`, `cached`, `cached_from`, `summarized`), `status` (`step` `understanding`/`searching_documents`/`reading_records`/`searching_chats`/`writing`, `tool`, `count`), `delta` (streamed preview; exact text incl. whitespace, not yet validated), `error` (`type`, `message_key`; see Knowledge error codes below), `final` (the validated answer that REPLACES the preview: `text`, `replaced`, `status`, `mode`, `summarized`), `token` (validated segments without surrounding whitespace, joined by one space = `final.text`; kept for older clients), `citation` (`index`, `source`, `title`, `snippet`), `followups` (`questions`, 0-3), `memory` (optional: `action` `saved`/`suggested`, `item_id`, `text`), `done` (`latency_ms`, `cited_sources`, `status` `answered`/`not_found`/`refused`/`search_only`/`error`, `mode`). The question log row (`streaming`) and `kb.query.asked` commit before the response starts; the stream completes the row (`kb.query.completed`) or, when the client disconnects, records it `cancelled` (`kb.query.cancelled`). **Conversations (ADR-0034):** without `conversation_id` (and `session_id`) a new conversation starts; read its id from `meta.conversation_id` and send it with the next question. `conversation_id` must be one of your own, not deleted (404 otherwise, as for another school's). A `session_id` that nobody owns yet becomes your conversation; one that names someone else's starts a new one. Context is only your own conversation's recent turns (earlier answers only where every cited source is still visible to you), its rolling summary and your confirmed memory items; never another user's. `regenerate_of` (question optional and ignored; never answered from the cache) or `edit_of` (with `question`; not both: 422) supersedes that message and every later one; only one of your latest 10 current messages: 409 `message_superseded` / `message_not_revisable`, 404 for anyone else's. A question starting with "remember that ..." saves a memory item (fixed reply, no answer model; `memory.action` `saved`). An exact repeat that used documents only may be answered from the answer cache (`meta.cached`, docs/06 §12.1). Budget, switch-off or outage is not an HTTP error: `error` + `mode: search_only` with cited passages and no prose. 429 `ai_rate_limited` when one user asks more than 10 questions a minute (`models.yaml`); 422 for an empty or too long question (**built**; docs/06 §5 as built) |
 | POST | `/knowledge/search` (body `query`, optional `doc_types`, `from_date`, `limit` ≤ 50) | `document.read`. Search-only ranked passages you can read (`source`, `document_id`, `version_no`, pages, `doc_type`, `title`, `issued_on`, `snippet`, `score`); the text never goes in the URL (SEC-008) (**built**) |
 | POST | `/knowledge/queries/{query_id}/feedback` (body `feedback`: `helpful`/`not_helpful`, optional `reason`: `wrong_source`, `outdated`, `incomplete`, `not_found_but_exists`, `wrong_language`; anything else 422) | `kb.ask`, own questions only (anyone else's, or another school's, is 404); audited `kb.query.feedback` (**built**) |
 | GET/POST | `/knowledge/verified-answers` | read: `kb.ask` (cursor list, `status` filter; only answers whose cited documents you can all read); write: `kb.verified_answer.manage` (`Idempotency-Key`; `question`, `language`, `answer_text`, `citations` [`sos://doc/{id}/v{n}#p{page}` + `cited_text`], optional `review_due`; each citation must quote the current version of an active document you can read: 422 `citation_not_found`, `citation_not_current`, `citation_text_not_found`, `citation_source_unsupported`); audited `kb.verified_answer.created`; each answer carries `verified_by` (membership id) and `verified_by_name` (display name, never an email); a C3 document can be cited or seen only with `student.read_sensitive`; active answers are also offered to Ask as `sos://verified/{id}` sources; flagged `needs_review` when a cited document gets a new version or is deleted (**built**; FR-KB-030) |
 | POST | `/knowledge/verified-answers/{id}/review` (`If-Match`; optional `answer_text`, `citations`, `review_due`) | `kb.verified_answer.manage`. Confirms an answer (typically `needs_review`) again: citations (new, else stored) are re-checked against the current versions (422 as on create); becomes `active`, verified by the caller now; `ETag` of the new version. 404 when you cannot read a cited document; 409 `verified_answer_retired`; 412 stale `If-Match`. Audited `kb.verified_answer.reviewed` (previous status, changed field names) (**built**; FR-KB-030) |
 | POST | `/knowledge/verified-answers/{id}/retire` (`If-Match`) | `kb.verified_answer.manage`. `retired`: never used by Ask again, kept for the record; 409 `verified_answer_retired` when it already is; 404/412 as for review. Audited `kb.verified_answer.retired` (**built**; FR-KB-030) |
+| GET | `/knowledge/conversations` (`limit` ≤ 200, default 50; `cursor`) | `kb.ask`, your own only. `Page[ConversationOut]`: `id`, `title` (decrypted for you), `pinned`, `created_at`, `updated_at` (last message, rename or pin), `message_count` (current messages), `version`; pinned first, then newest activity (**built**; ADR-0034) |
+| GET | `/knowledge/conversations/{id}` | `kb.ask`, your own only (anyone else's, another school's or a deleted one: 404). `ETag`. The conversation plus `messages[]`, oldest first: `query_id`, `question`, `answer` (null while `streaming`, for a cancelled question without text, or when withheld), `answer_withheld`, `status` (`streaming`/`answered`/`not_found`/`refused`/`search_only`/`cancelled`/`error`), `mode`, `language`, `citations[]` (`index`, `source`, `title`, `snippet`, `withheld`), `feedback`, `followups[]`, `created_at`, `superseded`, `cached`, `summarized`. Every cited source is re-checked under your current access; one you can no longer see is `withheld` (no title or snippet) and then that answer and its follow-ups are withheld too (**built**) |
+| PATCH | `/knowledge/conversations/{id}` (`If-Match`; `title` 1-120 characters and/or `pinned`) | `kb.ask`, your own only. 422 `title_length`, `title_personal_number` (an Aadhaar-like number), `title_control_characters`; 400 `if_match_required`; 412 stale; 404. `ETag`. Audited `kb.conversation.updated` (`changed`, `pinned`, `title_chars`; never the title) (**built**) |
+| DELETE | `/knowledge/conversations/{id}` | `kb.ask`, your own only. 204; hidden at once everywhere (list, context, chat search) and its title and summary erased; its questions stay in the encrypted query log until the 180-day purge (docs/08 §7). 404 for anyone else's or one already deleted. Audited `kb.conversation.deleted` (`messages` count) (**built**) |
+| GET | `/knowledge/memories` | `kb.ask`, your own only. `Page[MemoryOut]` (one page, `next_cursor` null): `id`, `text`, `source` (`explicit`/`suggested`), `status` (`active`/`pending`), `created_at`, `updated_at`, `expires_at` (pending only), `version`; newest first (**built**; ADR-0034) |
+| POST | `/knowledge/memories` (`text` 1-200 characters) | `kb.ask`. 201 `MemoryOut` (`active`, `explicit`). Screened before it is stored: 422 `memory_personal_number`, `memory_date`, `memory_long_number`, `memory_too_long`, `memory_empty`, `memory_seen_record`, `memory_others`, `memory_unsure`; 503 `memory_check_unavailable` (the check cannot run: not stored); 409 `memory_off` (your or the school's switch is off), `memory_full` (30 items). Audited `kb.memory.created` (`source`, `via`, `chars`) (**built**) |
+| DELETE | `/knowledge/memories` | `kb.ask`. Forget everything: 204, all your items in this school deleted. Audited `kb.memory.forgotten` (`count`) (**built**) |
+| PATCH | `/knowledge/memories/{id}` (`If-Match`; `text`) | `kb.ask`, your own only. Screened again as on create (same 422/503/409); `ETag`; 412 stale; 404. Audited `kb.memory.updated` (**built**) |
+| DELETE | `/knowledge/memories/{id}` | `kb.ask`, your own only. 204; 404. Audited `kb.memory.deleted` (**built**) |
+| POST | `/knowledge/memories/{id}/confirm` | `kb.ask`, your own only. A pending suggestion becomes `active` (used from now on); 404 for one expired (24 hours) or anyone else's; 409 `memory_off`. Audited `kb.memory.confirmed` (**built**) |
+| GET | `/knowledge/memory-settings` | `kb.ask`. `{enabled, school_enabled}`: your own switch (on unless you turned it off) and the school's (`ai_memory_enabled` in tenant settings, default on) (**built**) |
+| PUT | `/knowledge/memory-settings` (`enabled`) | `kb.ask`. Your own switch; off: nothing saved, suggested or used, items stay listed. Audited `kb.memory.settings_changed` (**built**) |
 | GET | `/knowledge/resolve?source=sos://…` | permission of the underlying resource (not built) |
 
 #### Knowledge error codes (`kb.errors.*`)
@@ -536,11 +548,23 @@ If-Match: W/"1"
 ```http
 POST /api/v1/knowledge/ask
 Accept: text/event-stream
-{ "question": "DEO circular lo exam timings enti?", "session_id": "0192…" }
+{ "question": "DEO circular lo exam timings enti?", "conversation_id": "0192…" }
 ```
 ```
 event: meta
-data: {"query_id":"0192…","language":"mixed","mode":"full"}
+data: {"query_id":"0192…","language":"mixed","mode":"full","conversation_id":"0192…","title":"DEO circular lo exam timings enti?","cached":false,"cached_from":null,"summarized":false}
+
+event: status
+data: {"step":"understanding","tool":null,"count":null}
+
+event: status
+data: {"step":"searching_documents","tool":"search_documents","count":null}
+
+event: status
+data: {"step":"searching_documents","tool":"search_documents","count":4}
+
+event: status
+data: {"step":"writing","tool":null,"count":null}
 
 event: delta
 data: {"text":"12 Aug 2026 DEO circular prakaram, "}
@@ -549,7 +573,7 @@ event: delta
 data: {"text":"exams 09:30 ki modalavutayi."}
 
 event: final
-data: {"text":"12 Aug 2026 DEO circular prakaram, exams 09:30 ki modalavutayi. [1]","replaced":false,"status":"answered","mode":"full"}
+data: {"text":"12 Aug 2026 DEO circular prakaram, exams 09:30 ki modalavutayi. [1]","replaced":false,"status":"answered","mode":"full","summarized":false}
 
 event: token
 data: {"text":"12 Aug 2026 DEO circular prakaram, exams 09:30 ki modalavutayi. [1]"}
@@ -557,10 +581,13 @@ data: {"text":"12 Aug 2026 DEO circular prakaram, exams 09:30 ki modalavutayi. [
 event: citation
 data: {"index":1,"source":"sos://doc/0192…/v1#p2","title":"Circular · DEO Guntur · Exam timings · 12 Aug 2026 (p.2)","snippet":"…"}
 
+event: followups
+data: {"questions":["Hall tickets eppudu istharu?"]}
+
 event: done
 data: {"latency_ms":4120,"cited_sources":1,"status":"answered","mode":"full"}
 ```
-Show `delta` text as it arrives; on `final`, replace it with `final.text` and ignore the `token` events (docs/06 §5.1).
+Show `delta` text as it arrives; on `final`, replace it with `final.text` and ignore the `token` events (docs/06 §5.1). Show the latest `status` step while waiting, the `followups` as buttons that ask in the same conversation, and a `memory` event with `action: suggested` as a prompt to keep (`POST /knowledge/memories/{item_id}/confirm`) or delete it.
 
 ### 5.5 Start a pre-check export
 ```http

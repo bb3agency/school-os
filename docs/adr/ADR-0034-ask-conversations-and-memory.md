@@ -109,5 +109,5 @@ question's path; exact repeats that used documents only are reused under the rul
 ## Related requirements
 
 FR-KB-005, FR-KB-008, FR-KB-009, FR-KB-011, FR-KB-012 (amended), SEC-012, SEC-018, SEC-019,
-invariants 3, 5, 7, 8, 9, 13; docs/03, docs/05 §6.4, docs/06 §5, §7, §13.5, docs/08 §4, §7,
+invariants 3, 5, 7, 8, 9, 13; docs/03, docs/05 §6.4, docs/06 §5, §7, §13.5, docs/08 §7, §8, §11,
 docs/09 Knowledge.

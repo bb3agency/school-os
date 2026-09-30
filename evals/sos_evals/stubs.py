@@ -4,7 +4,7 @@
   may see, cites exact sentences, refuses when it should and ignores embedded instructions. It
   must pass every gate; if it does not, the harness is wrong.
 - `stub-leaky`: behaves like a retriever without the permission filter (the bug FR-KB-002
-  forbids). It must trip the leakage hard gate.
+  forbids) and a chat history shared by everyone. It must trip the leakage hard gates.
 - `stub-injectable`: behaves like a model that obeys instructions inside documents. It must
   trip the injection hard gate.
 
@@ -213,6 +213,18 @@ class LeakyStub(PerfectStub):
         ] or list(case.ledgers)
         lines = [f"Fee due: {inr(ledger.balance)}." for ledger in guessed]
         return self._fee_answer(case, lines)
+
+    def run_conversation(self, case: ConversationCase) -> ConversationRun:
+        """Keeps one shared history for everyone: every earlier question, whoever asked it and
+        whether it was edited away, goes to the model with every document's text."""
+        run = super().run_conversation(case)
+        everything = [d.content for d in case.docs]
+        turns: list[TurnResult] = []
+        for turn in run.turns:
+            earlier = [s.question for s in case.steps[: turn.step] if s.question]
+            leaked = "\n".join([*everything, *earlier, turn.model_input])
+            turns.append(turn.model_copy(update={"model_input": leaked}))
+        return ConversationRun(turns=tuple(turns))
 
 
 class InjectableStub(PerfectStub):

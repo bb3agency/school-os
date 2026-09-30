@@ -2544,12 +2544,176 @@ export interface paths {
          *     Answers cite their sources (``sos://`` URIs) or say the answer was not found in the school
          *     records you can access. Only records and documents you may see are used. The answer streams
          *     as ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces
-         *     the preview. Questions asked earlier in the same ``session_id`` by you are context for a
-         *     follow-up (never another person's). When the school's AI budget is used up or AI answers
-         *     are unavailable, you get ranked, cited passages instead (``mode: search_only``). 429
-         *     ``ai_rate_limited`` when you ask too many questions a minute.
+         *     the preview. ``status`` events report progress as codes. Your earlier messages in the same
+         *     conversation (``conversation_id``, or the older ``session_id``) are context for a follow-up
+         *     (never another person's); the ``meta`` event names the conversation (a new one when you
+         *     name none) and its title. ``regenerate_of`` / ``edit_of`` replace one of your latest
+         *     messages (409 ``message_superseded``, ``message_not_revisable``; 404 for anyone else's).
+         *     ``followups`` suggests up to 3 next questions; ``memory`` reports an item saved ("remember
+         *     that ...") or suggested (confirm it in memory settings). When the school's AI budget is
+         *     used up or AI answers are unavailable, you get ranked, cited passages instead (``mode:
+         *     search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.
          */
         post: operations["ask_api_v1_knowledge_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Conversations
+         * @description Your Ask conversations in this school (permission ``kb.ask``; only your own), pinned
+         *     first, then newest activity first. Titles are decrypted for you only.
+         */
+        get: operations["list_conversations_api_v1_knowledge_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Conversation
+         * @description One of your conversations with every message, oldest first (``superseded`` marks one
+         *     replaced by a regenerate or an edit). Sources you can no longer see are withheld
+         *     (``withheld``: no title or snippet; that answer and its follow-ups are withheld too). 404
+         *     for anyone else's, another school's or a deleted conversation.
+         */
+        get: operations["get_conversation_api_v1_knowledge_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description Remove one of your conversations from your history (at once, everywhere). Its questions
+         *     stay in the school's encrypted query log until it is purged 180 days after they were
+         *     asked (docs/08 §7). 404 for anyone else's or one already removed.
+         */
+        delete: operations["delete_conversation_api_v1_knowledge_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Conversation
+         * @description Rename and/or pin one of your conversations (``If-Match``). A title is 1-120 characters
+         *     and may not hold an Aadhaar-like number (422 ``title_personal_number``). 412 when it changed
+         *     since you read it; 404 for anyone else's.
+         */
+        patch: operations["update_conversation_api_v1_knowledge_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/knowledge/memories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Memories
+         * @description Your memory items in this school (permission ``kb.ask``): confirmed and pending
+         *     suggestions, newest first. Only your own; they are used only while memory is on.
+         */
+        get: operations["list_memories_api_v1_knowledge_memories_get"];
+        put?: never;
+        /**
+         * Create Memory
+         * @description Add a memory item: your own preference or work context (e.g. "Keep answers short").
+         *     Never details about students, parents or other staff: refused with 422
+         *     (``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,
+         *     ``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check
+         *     cannot run; 409 ``memory_off`` or ``memory_full``.
+         */
+        post: operations["create_memory_api_v1_knowledge_memories_post"];
+        /**
+         * Forget Memories
+         * @description Forget everything: delete all your memory items in this school.
+         */
+        delete: operations["forget_memories_api_v1_knowledge_memories_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/memories/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Memory
+         * @description Delete one of your memory items.
+         */
+        delete: operations["delete_memory_api_v1_knowledge_memories__memory_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Memory
+         * @description Edit one of your memory items (``If-Match``; checked again like a new item).
+         */
+        patch: operations["update_memory_api_v1_knowledge_memories__memory_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/knowledge/memories/{memory_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Memory
+         * @description Keep a suggested item (it is used from now on). A suggestion not confirmed within 24
+         *     hours is deleted (404 afterwards).
+         */
+        post: operations["confirm_memory_api_v1_knowledge_memories__memory_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/memory-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Memory Settings
+         * @description Whether memory is on for you (``enabled``) and for the school (``school_enabled``).
+         */
+        get: operations["get_memory_settings_api_v1_knowledge_memory_settings_get"];
+        /**
+         * Put Memory Settings
+         * @description Turn memory on or off for you. Off: nothing is saved, suggested or used (your items stay
+         *     listed so you can delete them).
+         */
+        put: operations["put_memory_settings_api_v1_knowledge_memory_settings_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5962,17 +6126,38 @@ export interface components {
         };
         /**
          * AskIn
-         * @description One question to the school's records and documents (docs/09 §5.4).
+         * @description One question to the school's records and documents (docs/09 §5.4, docs/06 §5).
+         *
+         *     Send ``conversation_id`` to continue one of your conversations; omit it (and
+         *     ``session_id``) to start a new one and read its id from the ``meta`` event.
+         *     ``session_id`` is the older name: it continues your conversation with that id or starts
+         *     one. ``regenerate_of`` answers one of your latest messages again (``question`` is then
+         *     optional and ignored); ``edit_of`` replaces one with ``question``. Either way the message
+         *     and every later one become ``superseded``.
          */
         AskIn: {
+            /**
+             * Conversation Id
+             * @description One of your conversations (404 for anyone else's).
+             */
+            conversation_id?: string | null;
+            /**
+             * Edit Of
+             * @description Replace this message of yours with `question`.
+             */
+            edit_of?: string | null;
             /** Question */
-            question: string;
+            question?: string | null;
+            /**
+             * Regenerate Of
+             * @description Answer this message of yours again (never from the cache).
+             */
+            regenerate_of?: string | null;
             /**
              * Session Id
-             * Format: uuid
-             * @description The browser's Ask session: context never crosses users (FR-KB-012).
+             * @description Older name of conversation_id: your conversation with this id, or a new one. Context never crosses users (FR-KB-012).
              */
-            session_id: string;
+            session_id?: string | null;
         };
         /** AssigneeOut */
         AssigneeOut: {
@@ -7255,6 +7440,80 @@ export interface components {
             label_te: string;
             /** Value */
             value: string | null;
+        };
+        /** ConversationDetailOut */
+        ConversationDetailOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Message Count
+             * @description Current (not superseded) messages.
+             */
+            message_count: number;
+            /** Messages */
+            messages: components["schemas"]["MessageOut"][];
+            /** Pinned */
+            pinned: boolean;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConversationOut
+         * @description One of your Ask conversations (ETag = ``version``, which changes with the title, the
+         *     pin or a deletion; ``updated_at`` = the last activity: a message, a rename or a pin).
+         */
+        ConversationOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Message Count
+             * @description Current (not superseded) messages.
+             */
+            message_count: number;
+            /** Pinned */
+            pinned: boolean;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConversationPatchIn
+         * @description Rename and/or pin (send only what changes).
+         */
+        ConversationPatchIn: {
+            /** Pinned */
+            pinned?: boolean | null;
+            /** Title */
+            title?: string | null;
         };
         /** CourseIndicatorOut */
         CourseIndicatorOut: {
@@ -9442,6 +9701,159 @@ export interface components {
              */
             source: "mark" | "import";
         };
+        /** MemoryIn */
+        MemoryIn: {
+            /** Text */
+            text: string;
+        };
+        /**
+         * MemoryOut
+         * @description One of your memory items: your own preferences and work context in this school.
+         */
+        MemoryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * @description When a pending suggestion is deleted unless confirmed.
+             */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "explicit" | "suggested";
+            /**
+             * Status
+             * @description pending: suggested by Ask, used only after you confirm it.
+             * @enum {string}
+             */
+            status: "active" | "pending";
+            /** Text */
+            text: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** MemoryPatchIn */
+        MemoryPatchIn: {
+            /** Text */
+            text: string;
+        };
+        /** MemorySettingsIn */
+        MemorySettingsIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** MemorySettingsOut */
+        MemorySettingsOut: {
+            /**
+             * Enabled
+             * @description Your own switch (on unless you turned it off).
+             */
+            enabled: boolean;
+            /**
+             * School Enabled
+             * @description The school's switch (ai_memory_enabled).
+             */
+            school_enabled: boolean;
+        };
+        /** MessageCitationOut */
+        MessageCitationOut: {
+            /**
+             * Index
+             * @description The [n] marker in the answer.
+             */
+            index: number;
+            /** Snippet */
+            snippet: string | null;
+            /**
+             * Source
+             * @description sos:// source (ids only).
+             */
+            source: string;
+            /** Title */
+            title: string | null;
+            /**
+             * Withheld
+             * @description True when you can no longer see the source (title and snippet are withheld) or its details were not kept.
+             * @default false
+             */
+            withheld: boolean;
+        };
+        /** MessageOut */
+        MessageOut: {
+            /**
+             * Answer
+             * @description The checked final text with [n] citation markers (null when none, or withheld).
+             */
+            answer: string | null;
+            /**
+             * Answer Withheld
+             * @description True when a source the answer cited is no longer visible to you: the answer and its follow-ups are then withheld too.
+             * @default false
+             */
+            answer_withheld: boolean;
+            /**
+             * Cached
+             * @description An exact repeat answered from the cache.
+             * @default false
+             */
+            cached: boolean;
+            /** Citations */
+            citations: components["schemas"]["MessageCitationOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Feedback */
+            feedback: ("helpful" | "not_helpful") | null;
+            /** Followups */
+            followups: string[];
+            /** Language */
+            language: ("en" | "te" | "mixed") | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "full" | "search_only";
+            /**
+             * Query Id
+             * Format: uuid
+             */
+            query_id: string;
+            /** Question */
+            question: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "answered" | "not_found" | "refused" | "search_only" | "error" | "cancelled" | "streaming";
+            /**
+             * Summarized
+             * @description Earlier messages of the conversation reached the model as a summary only.
+             * @default false
+             */
+            summarized: boolean;
+            /**
+             * Superseded
+             * @description Replaced by a regenerate or an edit.
+             */
+            superseded: boolean;
+        };
         /** NoteIn */
         NoteIn: {
             /**
@@ -9863,6 +10275,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[ConversationOut] */
+        Page_ConversationOut_: {
+            /** Data */
+            data: components["schemas"]["ConversationOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[DeploymentOut] */
         Page_DeploymentOut_: {
             /** Data */
@@ -9937,6 +10356,13 @@ export interface components {
         Page_ItemOut_: {
             /** Data */
             data: components["schemas"]["ItemOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Page[MemoryOut] */
+        Page_MemoryOut_: {
+            /** Data */
+            data: components["schemas"]["MemoryOut"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -12483,6 +12909,12 @@ export interface components {
              */
             ai_features_enabled: boolean;
             /**
+             * Ai Memory Enabled
+             * @description Ask may remember each person's own preferences and work context (ADR-0034). Off: nothing is saved, suggested or used for anyone in the school.
+             * @default true
+             */
+            ai_memory_enabled: boolean;
+            /**
              * Ai Monthly Budget Inr
              * @default 5000
              */
@@ -12509,6 +12941,8 @@ export interface components {
         TenantSettingsPatch: {
             /** Ai Features Enabled */
             ai_features_enabled?: boolean | null;
+            /** Ai Memory Enabled */
+            ai_memory_enabled?: boolean | null;
             /** Ai Monthly Budget Inr */
             ai_monthly_budget_inr?: number | null;
             certificate_letterhead?: components["schemas"]["CertificateLetterhead-Input"] | null;
@@ -17263,7 +17697,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Server-Sent Events: meta, delta, error, final, token, citation, done (docs/06 §5.1). */
+            /** @description Server-Sent Events: meta, status, delta, error, final, token, citation, followups, memory, done (docs/06 §5.1). */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17271,7 +17705,19 @@ export interface operations {
                 content: {
                     /**
                      * @example event: meta
-                     *     data: {"query_id":"…","language":"en","mode":"full"}
+                     *     data: {"query_id":"…","language":"en","mode":"full","conversation_id":"…","title":"When do exams begin?","cached":false,"cached_from":null}
+                     *
+                     *     event: status
+                     *     data: {"step":"understanding","tool":null,"count":null}
+                     *
+                     *     event: status
+                     *     data: {"step":"searching_documents","tool":"search_documents","count":null}
+                     *
+                     *     event: status
+                     *     data: {"step":"searching_documents","tool":"search_documents","count":4}
+                     *
+                     *     event: status
+                     *     data: {"step":"writing","tool":null,"count":null}
                      *
                      *     event: delta
                      *     data: {"text":"Exams begin on "}
@@ -17288,10 +17734,361 @@ export interface operations {
                      *     event: citation
                      *     data: {"index":1,"source":"sos://doc/…/v2#p1","title":"Circular · …","snippet":"…"}
                      *
+                     *     event: followups
+                     *     data: {"questions":["Which classes write the first exam?"]}
+                     *
                      *     event: done
-                     *     data: {"latency_ms":4120,"cited_sources":1}
+                     *     data: {"latency_ms":4120,"cited_sources":1,"status":"answered","mode":"full"}
                      */
                     "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_api_v1_knowledge_conversations_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ConversationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation_api_v1_knowledge_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_conversation_api_v1_knowledge_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_conversation_api_v1_knowledge_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_memories_api_v1_knowledge_memories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemoryOut_"];
+                };
+            };
+        };
+    };
+    create_memory_api_v1_knowledge_memories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_memories_api_v1_knowledge_memories_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_memory_api_v1_knowledge_memories__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_memory_api_v1_knowledge_memories__memory_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_memory_api_v1_knowledge_memories__memory_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_memory_settings_api_v1_knowledge_memory_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemorySettingsOut"];
+                };
+            };
+        };
+    };
+    put_memory_settings_api_v1_knowledge_memory_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemorySettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemorySettingsOut"];
                 };
             };
             /** @description Validation Error */
