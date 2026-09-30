@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from "motion/react";
+import { AnimatePresence, LazyMotion, MotionConfig, m } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { BrandMark } from "@/components/shell/Brand";
@@ -8,7 +8,7 @@ import { buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
-import { EASE_OUT, seconds } from "@/lib/motion";
+import { EASE_OUT, loadMotionFeatures, seconds } from "@/lib/motion";
 import { Presence } from "@/lib/presence";
 import { MARKETING_PAGES, PAGE_HREF, SIGN_IN_HREF, mailtoHref, type MarketingPage } from "./links";
 
@@ -106,7 +106,7 @@ export function SiteHeader({
   );
 
   return (
-    <LazyMotion features={domAnimation} strict>
+    <LazyMotion features={loadMotionFeatures} strict>
       <MotionConfig reducedMotion="user">
         <header
           ref={headerRef}

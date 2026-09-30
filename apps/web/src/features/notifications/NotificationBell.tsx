@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
+import { AnimatePresence, LazyMotion, m } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -10,7 +10,7 @@ import { Link } from "@/i18n/navigation";
 import { PASSIVE_HEADER } from "@/lib/bff/fetch";
 import { ApiError, unwrap, useApiMutation, useBffClient } from "@/lib/bff/query";
 import { formatDateTime } from "@/lib/format";
-import { EASE_OUT, seconds } from "@/lib/motion";
+import { EASE_OUT, loadMotionFeatures, seconds } from "@/lib/motion";
 import { Presence } from "@/lib/presence";
 import { bellPollDelay, NOTIFICATION_KEYS, notificationHref, type Notification } from "./data";
 
@@ -223,7 +223,7 @@ export function NotificationBell() {
           It exists only after a click, so Motion never server-renders a style attribute
           (CSP, SEC-010). */}
       {/* Self-contained (the console's MotionProvider already loaded these features). */}
-      <LazyMotion features={domAnimation} strict>
+      <LazyMotion features={loadMotionFeatures} strict>
         <AnimatePresence key={presence}>
           {open ? (
             <Presence key="panel">

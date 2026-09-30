@@ -1,8 +1,8 @@
 "use client";
 
-import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
+import { LazyMotion, MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
-import { EASE_OUT, seconds } from "@/lib/motion";
+import { EASE_OUT, loadMotionFeatures, seconds } from "@/lib/motion";
 
 const DEFAULT_TRANSITION = {
   duration: seconds("enter"),
@@ -12,8 +12,9 @@ const DEFAULT_TRANSITION = {
 /**
  * Motion for the consoles (docs/17 §5.5), mounted once by AppShell.
  *
- * - `LazyMotion` with the small `domAnimation` bundle, `strict`: only the light `m.*`
- *   components are allowed (a stray `motion.*` import throws in development).
+ * - `LazyMotion` with the small `domAnimation` bundle, loaded as its own chunk after
+ *   hydration (`loadMotionFeatures`), `strict`: only the light `m.*` components are allowed
+ *   (a stray `motion.*` import throws in development).
  * - `MotionConfig reducedMotion="user"`: with prefers-reduced-motion, transforms and layout
  *   changes jump to their end and only opacity still fades.
  * - Default transition: the shared 200ms strong ease-out (`lib/motion.ts`).
@@ -25,7 +26,7 @@ const DEFAULT_TRANSITION = {
  */
 export function MotionProvider({ children }: { children: ReactNode }) {
   return (
-    <LazyMotion features={domAnimation} strict>
+    <LazyMotion features={loadMotionFeatures} strict>
       <MotionConfig reducedMotion="user" transition={DEFAULT_TRANSITION}>
         {children}
       </MotionConfig>

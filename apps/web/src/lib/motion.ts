@@ -10,6 +10,8 @@
  * use `seconds()`).
  */
 
+import type { FeatureBundle } from "motion/react";
+
 export type Bezier = readonly [number, number, number, number];
 
 /** Strong ease-out for anything that enters or exits (dialogs, popovers, alerts). */
@@ -49,4 +51,13 @@ export function prefersReducedMotion(): boolean {
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
+}
+
+/**
+ * `LazyMotion features={loadMotionFeatures}`: Motion's `domAnimation` features load as a chunk
+ * of their own after hydration, off the critical path of every page (`m.*` is only used for UI
+ * that appears after a user action, docs/17 §5.5).
+ */
+export function loadMotionFeatures(): Promise<FeatureBundle> {
+  return import("./motion-features").then((module) => module.default);
 }
