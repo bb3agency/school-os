@@ -220,7 +220,12 @@ describe("app shells", () => {
 
   it("platform shell is visibly marked as the platform admin panel", () => {
     renderWithIntl(<PlatformShell>content</PlatformShell>, "en");
-    expect(screen.getByText(messages.en.platform.badge)).toBeVisible();
+    // In the sidebar (lg and up) and beside the wordmark in the top bar (below lg only).
+    const badges = screen.getAllByText(messages.en.platform.badge);
+    expect(badges).toHaveLength(2);
+    for (const badge of badges) expect(badge).toBeVisible();
+    expect(badges[0]?.closest("[data-sidebar-mode='inline']")).not.toBeNull();
+    expect(badges[1]?.closest(".lg\\:hidden")).not.toBeNull();
     const nav = screen.getByRole("navigation", { name: messages.en.platform.nav.label });
     expect(
       within(nav).getByRole("link", { name: messages.en.platform.nav.schools }),

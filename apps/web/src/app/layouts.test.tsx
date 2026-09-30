@@ -138,8 +138,11 @@ describe("school layout", () => {
     const tokens = (await h.runtime.store.tokens(session.id))!.tokens;
 
     const { container } = renderWithIntl(await SchoolLayout({ children: <p>page</p>, params: en }));
-    expect(screen.getByRole("button", { name: messages.en.auth.lockNow })).toBeVisible();
-    expect(screen.getByText("Signed in as Office Clerk")).toBeInTheDocument();
+    // Account area at the foot of the one sidebar (docs/17 §5.2); the school's name from
+    // GET /me/schools is covered by layouts.node.test.tsx.
+    const account = screen.getByRole("region", { name: messages.en.shell.account });
+    expect(within(account).getByRole("button", { name: messages.en.auth.lockNow })).toBeVisible();
+    expect(within(account).getByText("Signed in as Office Clerk")).toBeInTheDocument();
 
     const html = container.innerHTML;
     for (const secret of [
@@ -264,8 +267,13 @@ describe("platform layout", () => {
   it("renders for an operator", async () => {
     await signInDirect("operator", { sub: "op-1", name: "Ops One" });
     renderWithIntl(await PlatformLayout({ children: <p>panel</p> }));
-    expect(screen.getByText(messages.en.platform.badge)).toBeVisible();
-    expect(screen.getByRole("button", { name: messages.en.auth.signOut })).toBeInTheDocument();
+    expect(screen.getAllByText(messages.en.platform.badge)[0]).toBeVisible();
+    // The account area at the foot of the sidebar: who is signed in and "Sign out".
+    const account = screen.getByRole("region", { name: messages.en.shell.account });
+    expect(within(account).getByText("Signed in as Ops One")).toBeInTheDocument();
+    expect(
+      within(account).getByRole("button", { name: messages.en.auth.signOut }),
+    ).toBeInTheDocument();
   });
 
   it("is switched off on dedicated hosts", async () => {

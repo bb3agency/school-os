@@ -112,6 +112,33 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
     expect(JSON.stringify(element.props)).not.toContain("access-token-synthetic");
   });
 
+  it("names the active school in the sidebar and passes who is signed in (docs/17 §5.2)", async () => {
+    await signInDirect("staff", HARNESS_TENANT);
+    type Props = ShellProps & {
+      schoolName: string | null;
+      account: { kind: string; displayName: string | null; roles: readonly string[] | null };
+    };
+    const element = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Props>;
+    expect(element.props.schoolName).toBe("Sample School");
+    expect(element.props.account).toEqual({
+      kind: "staff",
+      displayName: HARNESS_ME.display_name,
+      roles: HARNESS_ME.roles,
+    });
+    const call = h.apiCalls.find((r) => new URL(r.url).pathname === "/api/v1/me/schools");
+    expect(call?.headers.get("authorization")).toBe("Bearer access-token-synthetic");
+
+    // The list cannot be read: no name, the console still works.
+    h.setApi((request) =>
+      new URL(request.url).pathname === "/api/v1/me/schools"
+        ? json({ status: 503, code: "unavailable" }, 503)
+        : defaultApi(request),
+    );
+    const without = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Props>;
+    expect(without.props.schoolName).toBeNull();
+    expect(without.props.permissions).toEqual(HARNESS_ME.permissions);
+  });
+
   it("offers 'Switch school' to people in several schools", async () => {
     await signInDirect("staff", HARNESS_TENANT);
     h.setApi((request) =>
@@ -183,8 +210,14 @@ describe("platform layout reads /platform/me", () => {
           })
         : defaultApi(request),
     );
-    const element = (await PlatformLayout({ children: "x" })) as ReactElement<ShellProps>;
+    const element = (await PlatformLayout({ children: "x" })) as ReactElement<
+      ShellProps & { account: { displayName: string | null; roles: readonly string[] | null } }
+    >;
     expect(element.props.permissions).toEqual(["platform.invoices.read"]);
+    expect(element.props.account).toEqual({
+      displayName: "Synthetic User",
+      roles: ["billing_admin"],
+    });
     const call = h.apiCalls.find((r) => new URL(r.url).pathname === "/api/v1/platform/me");
     expect(call?.headers.has("x-active-tenant")).toBe(false);
   });

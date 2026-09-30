@@ -90,6 +90,17 @@ const CONTRAST_PAIRS: ReadonlyArray<readonly [string, string, number, string]> =
   ["platform-accent", "platform", 3, "platform focus ring and active marker"],
   ["platform-accent-ink", "platform-accent", 4.5, "platform badge"],
   ["platform", "platform-soft", 4.5, "active platform nav item"],
+  // The one sidebar (docs/17 §5.2)
+  ["ink-muted", "surface", 4.5, "sidebar item text and icon"],
+  ["ink", "surface-muted", 4.5, "sidebar item hover"],
+  ["primary", "primary-soft", 3, "sidebar active bar on the active row"],
+  ["ink-subtle", "surface", 4.5, "sidebar section heading, role line"],
+  ["ink-subtle", "surface-muted", 4.5, "'Current school' label"],
+  ["primary", "surface-muted", 4.5, "'Switch school' link on the school block"],
+  ["platform-muted", "platform", 4.5, "platform sidebar item text, headings"],
+  ["platform-ink", "platform-hover", 4.5, "platform sidebar active and hover row"],
+  ["platform-accent", "platform-hover", 3, "platform sidebar active bar"],
+  ["on-action", "action", 4.5, "compact sidebar label (tooltip)"],
   // UI boundaries and graphics (WCAG 1.4.11: 3:1)
   ["border-control", "surface", 3, "input and switch boundary on cards"],
   ["border-control", "surface-muted", 3, "input boundary against its fill"],

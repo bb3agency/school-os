@@ -1,11 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
-import { NextIntlClientProvider } from "next-intl";
-import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { AppShell } from "@/components/shell/AppShell";
-import { messages, renderWithIntl } from "@/test/render";
+import { renderWithIntl } from "@/test/render";
 import { AiPanel, QuoteBlock } from "./AiPanel";
 import { Avatar, AvatarStack, initials } from "./Avatar";
 import { DeltaPill, Pill } from "./Badge";
@@ -15,7 +12,7 @@ import { SearchInput } from "./Input";
 import { PageHeader } from "./PageHeader";
 import { ProgressRing } from "./ProgressRing";
 import { SegmentedControl } from "./SegmentedControl";
-import { SidebarNav, activeSectionId, type NavSection } from "./SidebarNav";
+import { SidebarNav, type NavSection } from "./SidebarNav";
 import { Sparkline, sparklinePoints } from "./Sparkline";
 import { KpiCard } from "./StatCard";
 import { Timeline } from "./Timeline";
@@ -290,139 +287,72 @@ const SECTIONS: NavSection[] = [
   {
     id: "overview",
     label: "Overview",
-    icon: "home",
-    items: [{ href: "/", label: "Home", exact: true }],
+    items: [{ href: "/", label: "Home", exact: true, icon: "home" }],
   },
   {
     id: "records",
     label: "Records",
-    icon: "users",
     items: [
       { href: "/students", label: "Students", icon: "users" },
       { href: "/imports", label: "Imports" },
+      { href: "/imports/history", label: "History", nested: true },
     ],
   },
-  { id: "empty", label: "Empty", icon: "flag", items: [] },
 ];
 
-describe("grouped navigation and the app shell", () => {
-  it("sections are lists named by their headings; one current page", () => {
+describe("grouped sidebar navigation (the AppShell tests are in shell/AppShell.test.tsx)", () => {
+  it("sections are lists named by their headings; one current page with an accent bar", () => {
     path.current = "/en/students/abc";
     renderWithIntl(<SidebarNav label="Main" sections={SECTIONS} />);
     const nav = screen.getByRole("navigation", { name: "Main" });
     const records = within(nav).getByRole("list", { name: "Records" });
-    expect(within(records).getByRole("link", { name: "Students" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    const students = within(records).getByRole("link", { name: "Students" });
+    expect(students).toHaveAttribute("aria-current", "page");
     expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
-    expect(activeSectionId("/students/abc", SECTIONS)).toBe("records");
-    expect(activeSectionId("/nowhere", SECTIONS)).toBeNull();
+    // The accent bar (decorative) marks the current item only, so the state is not colour
+    // alone; the row is also bolder.
+    expect(students.querySelectorAll("span.absolute[aria-hidden='true']")).toHaveLength(1);
+    expect(students).toHaveClass("font-semibold");
+    for (const other of within(nav)
+      .getAllByRole("link")
+      .filter((link) => link !== students)) {
+      expect(other.querySelector("span.absolute[aria-hidden='true']")).toBeNull();
+    }
+    // Every item has a compact-mode tooltip text equal to its label.
+    for (const link of within(nav).getAllByRole("link")) {
+      expect(link).toHaveAttribute("data-tooltip", link.textContent);
+    }
   });
 
-  it("AppShell: skip link, rail, main landmark; the menu button opens and Escape closes", async () => {
-    path.current = "/en/imports";
-    const user = userEvent.setup();
-    renderWithIntl(
-      <AppShell brand={<p>SchoolOS</p>} homeHref="/" navLabel="Main" sections={SECTIONS}>
-        <h1>Page</h1>
-      </AppShell>,
-    );
-    expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute(
-      "href",
-      "#main",
-    );
-    expect(screen.getByRole("main")).toHaveAttribute("id", "main");
-    const rail = screen.getByRole("navigation", { name: "Sections" });
-    // Empty sections are dropped; the section of the current page is marked.
-    expect(
-      within(rail)
-        .getAllByRole("link")
-        .map((link) => link.getAttribute("aria-label")),
-    ).toEqual(["Overview", "Records"]);
-    expect(within(rail).getByRole("link", { name: "Records" })).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
-    const menu = screen.getByRole("button", { name: "Menu" });
-    expect(menu).toHaveAttribute("aria-expanded", "false");
-    await user.click(menu);
-    expect(menu).toHaveAttribute("aria-expanded", "true");
-    await user.keyboard("{Escape}");
-    expect(menu).toHaveAttribute("aria-expanded", "false");
-    expect(menu).toHaveFocus();
+  it("rows are at least 40px tall (WCAG 2.5.8) and labels wrap instead of clipping", () => {
+    path.current = "/en";
+    renderWithIntl(<SidebarNav label="Main" sections={SECTIONS} />);
+    for (const link of screen.getAllByRole("link")) {
+      expect(link).toHaveClass("min-h-10");
+      const label = link.querySelector("span:not([aria-hidden])");
+      expect(label).not.toHaveClass("truncate");
+      expect(label).toHaveClass("break-words");
+      // In the compact sidebar the label is hidden visually but stays the accessible name.
+      expect(label).toHaveClass("collapsed:sr-only");
+    }
   });
 
-  it("AppShell drawer: a named modal dialog with the grouped menu; focus moves in and comes back (NFR-A11Y-001)", async () => {
+  it("a sub-entry without its own icon gets the corner arrow, so compact mode shows it", () => {
+    path.current = "/en/imports/history";
+    renderWithIntl(<SidebarNav label="Main" sections={SECTIONS} />);
+    const history = screen.getByRole("link", { name: "History" });
+    expect(history).toHaveAttribute("aria-current", "page");
+    expect(history.querySelector("svg")).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Imports" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Imports" }).querySelector("svg")).toBeNull();
+  });
+
+  it("platform theme: the active marker is the yellow accent on the dark chrome", () => {
     path.current = "/en/students";
-    const user = userEvent.setup();
-    renderWithIntl(
-      <AppShell brand={<p>SchoolOS</p>} homeHref="/" navLabel="Main" sections={SECTIONS}>
-        <h1>Page</h1>
-      </AppShell>,
-    );
-    const menu = screen.getByRole("button", { name: "Menu" });
-    const drawer = document.getElementById(menu.getAttribute("aria-controls") ?? "");
-    expect(drawer?.tagName).toBe("DIALOG");
-    expect(menu).toHaveAttribute("aria-haspopup", "dialog");
-    // Closed: no second "Main" navigation (only the lg panel's) and nothing to tab into.
-    expect(screen.getAllByRole("navigation", { name: "Main" })).toHaveLength(1);
-    expect(drawer).not.toHaveAttribute("open");
-
-    // Keyboard: Enter on the menu button opens the drawer and puts focus inside it.
-    menu.focus();
-    await user.keyboard("{Enter}");
-    const dialog = screen.getByRole("dialog", { name: "Menu" });
-    expect(dialog).toBe(drawer);
-    expect(dialog).toHaveAttribute("open");
-    const close = within(dialog).getByRole("button", { name: "Close menu" });
-    expect(close).toHaveFocus();
-    const nav = within(dialog).getByRole("navigation", { name: "Main" });
-    expect(within(nav).getByRole("link", { name: "Students" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    // Touch target: the close button is 44px (size-11), above the 24px minimum (WCAG 2.5.8).
-    expect(close).toHaveClass("size-11");
-
-    // The close button closes it and focus goes back to the menu button.
-    await user.click(close);
-    expect(dialog).not.toHaveAttribute("open");
-    expect(menu).toHaveAttribute("aria-expanded", "false");
-    expect(menu).toHaveFocus();
-    expect(within(dialog).queryByRole("navigation")).toBeNull();
-
-    // A tap on the dimmed page (the <dialog> box itself, outside the sheet) closes it too.
-    await user.click(menu);
-    expect(dialog).toHaveAttribute("open");
-    await user.click(dialog);
-    expect(dialog).not.toHaveAttribute("open");
-    expect(menu).toHaveFocus();
-  });
-
-  it("AppShell drawer: following a link closes it (NFR-A11Y-001)", async () => {
-    path.current = "/en/students";
-    const user = userEvent.setup();
-    const shell = () => (
-      <AppShell brand={<p>SchoolOS</p>} homeHref="/" navLabel="Main" sections={SECTIONS}>
-        <h1>Page</h1>
-      </AppShell>
-    );
-    // Providers as a wrapper, so a re-render keeps them.
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <NextIntlClientProvider locale="en" messages={messages.en} timeZone="Asia/Kolkata">
-        {children}
-      </NextIntlClientProvider>
-    );
-    const { rerender } = render(shell(), { wrapper });
-    const menu = screen.getByRole("button", { name: "Menu" });
-    await user.click(menu);
-    const dialog = screen.getByRole("dialog", { name: "Menu" });
-    expect(dialog).toHaveAttribute("open");
-    // The router changes the path (same tree, new pathname).
-    path.current = "/en/imports";
-    rerender(shell());
-    expect(dialog).not.toHaveAttribute("open");
-    expect(menu).toHaveAttribute("aria-expanded", "false");
+    renderWithIntl(<SidebarNav label="Platform" sections={SECTIONS} theme="platform" />);
+    const current = screen.getByRole("link", { current: "page" });
+    expect(current).toHaveClass("bg-platform-hover", "text-platform-ink");
+    expect(current.querySelector("span.absolute")).toHaveClass("bg-platform-accent");
+    expect(screen.getByRole("link", { name: "Home" })).toHaveClass("text-platform-muted");
   });
 });
