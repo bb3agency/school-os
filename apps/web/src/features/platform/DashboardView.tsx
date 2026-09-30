@@ -270,10 +270,10 @@ export function DashboardView({
               {attention.map((item) => (
                 <li
                   key={item.key}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  className="flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0"
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet-ink">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-soft text-violet-ink">
                       <Icon name={item.icon} className="size-4.5" />
                     </span>
                     <span className="text-ink">{item.text}</span>

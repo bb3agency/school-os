@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import type { Loadable } from "@/lib/loadable";
 import { Alert } from "./Alert";
 import { EmptyState } from "./EmptyState";
+import { LoadFade } from "./LoadFade";
 import { LoadingState } from "./LoadingState";
 
 /**
@@ -42,7 +43,8 @@ export function Table({
     <table
       data-density={density}
       className={cn(
-        "group/table w-full border-collapse text-left text-sm",
+        // Tabular figures: digits line up in columns (counts, amounts, dates).
+        "group/table w-full border-collapse text-left text-sm tabular-nums",
         stickyFirstColumn && stickyFirst,
         className,
       )}
@@ -173,50 +175,53 @@ export function DataTable<T>({
   const t = useTranslations("common");
   const te = useTranslations("errors");
 
-  if (state.status === "loading") return <LoadingState label={t("loading")} />;
-  if (state.status === "error") {
-    return (
+  let body: ReactNode;
+  if (state.status === "loading") {
+    body = <LoadingState label={t("loading")} />;
+  } else if (state.status === "error") {
+    body = (
       <Alert tone="danger" title={t("loadErrorTitle")}>
         {state.reason ? te(`load.${state.reason}`) : t("loadErrorBody")}
       </Alert>
     );
-  }
-  if (state.status === "unavailable") {
-    return <EmptyState title={t("notAvailableYetTitle")} body={t("notAvailableYetBody")} />;
-  }
-  if (state.data.length === 0) {
-    return <EmptyState title={emptyTitle} body={emptyBody} action={emptyAction} />;
-  }
-
-  return (
-    <TableScroll label={t("scrollableTable", { caption })} framed>
-      <Table density={density} stickyFirstColumn={stickyFirstColumn}>
-        <caption
-          className={cn("px-4 py-3 text-left font-medium text-ink", captionHidden && "sr-only")}
-        >
-          {caption}
-        </caption>
-        <THead>
-          <Tr>
-            {columns.map((column) => (
-              <Th key={column.key} className={column.className}>
-                {column.header}
-              </Th>
-            ))}
-          </Tr>
-        </THead>
-        <TBody>
-          {state.data.map((row) => (
-            <Tr key={rowKey(row)}>
+  } else if (state.status === "unavailable") {
+    body = <EmptyState title={t("notAvailableYetTitle")} body={t("notAvailableYetBody")} />;
+  } else if (state.data.length === 0) {
+    body = <EmptyState title={emptyTitle} body={emptyBody} action={emptyAction} />;
+  } else {
+    body = (
+      <TableScroll label={t("scrollableTable", { caption })} framed>
+        <Table density={density} stickyFirstColumn={stickyFirstColumn}>
+          <caption
+            className={cn("px-4 py-3 text-left font-semibold text-ink", captionHidden && "sr-only")}
+          >
+            {caption}
+          </caption>
+          <THead>
+            <Tr>
               {columns.map((column) => (
-                <Td key={column.key} className={column.className}>
-                  {column.cell(row)}
-                </Td>
+                <Th key={column.key} className={column.className}>
+                  {column.header}
+                </Th>
               ))}
             </Tr>
-          ))}
-        </TBody>
-      </Table>
-    </TableScroll>
-  );
+          </THead>
+          <TBody>
+            {state.data.map((row) => (
+              <Tr key={rowKey(row)}>
+                {columns.map((column) => (
+                  <Td key={column.key} className={column.className}>
+                    {column.cell(row)}
+                  </Td>
+                ))}
+              </Tr>
+            ))}
+          </TBody>
+        </Table>
+      </TableScroll>
+    );
+  }
+
+  // Whatever replaces the skeleton fades in; a first render with data shows at once.
+  return <LoadFade loading={state.status === "loading"}>{body}</LoadFade>;
 }

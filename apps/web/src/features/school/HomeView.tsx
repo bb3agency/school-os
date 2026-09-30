@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { LoadFade } from "@/components/ui/LoadFade";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard } from "@/components/ui/StatCard";
@@ -64,25 +65,34 @@ function numberOf(value: unknown): number | null {
 function WorkCard({
   title,
   icon,
+  loading,
   children,
   action,
 }: {
   title: string;
   icon: IconName;
+  /** The card's numbers are still loading (the text fades in when they arrive). */
+  loading: boolean;
   children: ReactNode;
   action: ReactNode;
 }) {
   return (
     <Card
       title={
-        <span className="inline-flex items-center gap-2">
-          <Icon name={icon} className="size-5 text-ink-muted" />
+        <span className="inline-flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+            <Icon name={icon} className="size-4.5" />
+          </span>
           {title}
         </span>
       }
       className="flex flex-col"
     >
-      <div className="flex-1 space-y-3 text-sm text-ink-muted">{children}</div>
+      <div className="flex-1 space-y-3 text-sm text-ink-muted">
+        <LoadFade loading={loading} className="space-y-3">
+          {children}
+        </LoadFade>
+      </div>
       <div className="mt-5" data-print="hide">
         {action}
       </div>
@@ -163,9 +173,11 @@ export function HomeView({ data }: { data: HomeData }) {
         key="checks"
         title={t("checksToReview")}
         icon="shieldCheck"
+        loading={data.checks.status === "loading"}
         action={
-          <ButtonLink href="/findings" size="sm">
+          <ButtonLink href="/findings" size="sm" variant="secondary">
             {t("work.checksAction")}
+            <Icon name="arrowRight" className="size-4" />
           </ButtonLink>
         }
       >
@@ -201,9 +213,11 @@ export function HomeView({ data }: { data: HomeData }) {
         key="changes"
         title={t("changesWaiting")}
         icon="clipboard"
+        loading={data.pending.status === "loading"}
         action={
-          <ButtonLink href="/change-requests" size="sm">
+          <ButtonLink href="/change-requests" size="sm" variant="secondary">
             {t("work.changesAction")}
+            <Icon name="arrowRight" className="size-4" />
           </ButtonLink>
         }
       >
@@ -228,9 +242,11 @@ export function HomeView({ data }: { data: HomeData }) {
         key="imports"
         title={t("recentImports")}
         icon="upload"
+        loading={data.imports.status === "loading"}
         action={
-          <ButtonLink href="/imports" size="sm">
+          <ButtonLink href="/imports" size="sm" variant="secondary">
             {t("work.importsAction")}
+            <Icon name="arrowRight" className="size-4" />
           </ButtonLink>
         }
       >
@@ -312,7 +328,7 @@ export function HomeView({ data }: { data: HomeData }) {
       ) : null}
       {work.length > 0 ? (
         <section aria-labelledby="home-work" className="space-y-3">
-          <h2 id="home-work" className="text-lg font-medium text-ink">
+          <h2 id="home-work" className="text-lg font-semibold text-ink">
             {t("work.title")}
           </h2>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{work}</div>

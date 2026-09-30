@@ -17,17 +17,19 @@ export type ButtonVariant =
 export type ButtonSize = "lg" | "md" | "sm";
 
 /*
- * Colour fades only while the pointer is over the button (`hover:transition-colors`) and
- * only without reduced motion. A variant change (e.g. "Preview" becoming secondary when
- * "Promote" takes over) or a keyboard press repaints at once, so there is never a
- * half-faded, low-contrast frame (WCAG 1.4.3; axe used to catch one mid-fade).
+ * `.pressable` (globals.css, docs/17 §5.5): the button shrinks to 0.97 while pressed
+ * (140ms, strong ease-out), and its colour fades only while a fine pointer hovers it, only
+ * without reduced motion. A variant change (e.g. "Preview" becoming secondary when "Promote"
+ * takes over) or a keyboard press repaints at once, so there is never a half-faded,
+ * low-contrast frame (WCAG 1.4.3; axe used to catch one mid-fade).
  * Labels stay on one line from sm; on phones a long (Telugu) label wraps inside the button
  * instead of pushing it past the screen edge.
  */
 const base =
-  "inline-flex max-w-full items-center justify-center gap-2 rounded-md border text-center font-medium " +
-  "whitespace-normal sm:whitespace-nowrap motion-safe:hover:transition-colors " +
-  "disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60";
+  "pressable inline-flex max-w-full items-center justify-center gap-2 rounded-md border text-center font-semibold " +
+  "whitespace-normal select-none sm:whitespace-nowrap " +
+  "disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 " +
+  "aria-busy:cursor-progress";
 
 const dark =
   "border-action bg-action text-on-action shadow-raised hover:bg-action-hover hover:border-action-hover";
@@ -57,6 +59,28 @@ export function buttonClasses(variant: ButtonVariant = "primary", size: ButtonSi
 export interface ButtonProps extends ComponentProps<"button"> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /**
+   * Work in progress: a small spinner before the label and `aria-busy`. Pair it with
+   * `disabled` and a label that says so ("Working…"); the spinner is decorative and stands
+   * still under reduced motion.
+   */
+  loading?: boolean;
+}
+
+/** Decorative spinner for `loading` buttons (a quarter arc turning; CSS only). */
+export function Spinner({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={cn("size-4 shrink-0 motion-safe:animate-spin", className)}
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth={3} />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth={3} strokeLinecap="round" />
+    </svg>
+  );
 }
 
 /** Defaults to type="button" so a button never submits a form by accident. */
@@ -64,10 +88,22 @@ export function Button({
   variant = "primary",
   size = "md",
   type = "button",
+  loading = false,
   className,
+  children,
   ...props
 }: ButtonProps) {
-  return <button type={type} className={cn(buttonClasses(variant, size), className)} {...props} />;
+  return (
+    <button
+      type={type}
+      aria-busy={loading || undefined}
+      className={cn(buttonClasses(variant, size), className)}
+      {...props}
+    >
+      {loading ? <Spinner /> : null}
+      {children}
+    </button>
+  );
 }
 
 export interface ButtonLinkProps {
@@ -115,7 +151,7 @@ export function iconButtonClasses(
   size: IconButtonSize = "md",
 ): string {
   return cn(
-    "relative inline-flex shrink-0 items-center justify-center rounded-full border motion-safe:hover:transition-colors",
+    "pressable relative inline-flex shrink-0 items-center justify-center rounded-full border",
     "disabled:cursor-not-allowed disabled:opacity-60",
     iconVariants[variant],
     iconSizes[size],

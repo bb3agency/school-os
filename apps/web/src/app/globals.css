@@ -177,6 +177,33 @@
   --font-serif: var(--font-display);
   --font-mono: "JetBrains Mono", ui-monospace, Consolas, "Liberation Mono", monospace;
 
+  /* Type scale (docs/17 §3.1): size / line height pairs for a dense work tool. PP Mori ships
+     200/400/600 only (font-medium renders as 400): emphasis is font-semibold. It has no
+     tabular figures, so tabular-nums matters only for Inter/serif/mono fallbacks and
+     figures. Hierarchy comes from weight and size, not tracking: headings may hold Telugu-script data (a
+     student's name as a page title), where letter-spacing breaks shaping (docs/17 §2.2).
+     xs 12/18 captions, table headers · sm 14/20 UI, tables, sidebar · base 16/24 body ·
+     lg 18/26 card and dialog titles · xl 20/28 page titles on phones · 2xl 24/32 page
+     titles · 4xl 36/40 StatCard numbers · 5xl 48/48 KPI numbers (serif display). */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1;
+
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 
   @keyframes shimmer {
@@ -220,6 +247,24 @@
   --shell-gutter: 1rem;
   --content-max: 108rem;
   --sticky-offset: 1rem;
+}
+
+/*
+ * Motion tokens (docs/17 §5.5), shared with Motion through src/lib/motion.ts (the test
+ * lib/motion.test.ts keeps both in step). A crisp work tool: few motions, all short, only
+ * transform and opacity. Entering and exiting use --ease-out, on-screen movement
+ * --ease-in-out, the menu drawer --ease-drawer. Exits are faster than entrances.
+ * Under prefers-reduced-motion nothing moves (the rules below sit in no-preference queries,
+ * and the reduce query at the end cuts any remaining transition to 0.01ms).
+ */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-press: 140ms;
+  --duration-quick: 150ms;
+  --duration-enter: 200ms;
+  --duration-drawer: 260ms;
 }
 
 @media (width >= 48rem) {
@@ -376,7 +421,13 @@
     text-transform: none;
   }
 
-  /* Serif display (KPI numbers, hero headline accents): Latin only. */
+  /* Serif display (KPI numbers, hero headline accents): Latin only. Big serif figures
+     read better slightly tightened (optical tracking); Telugu resets it below. */
+  .font-display,
+  .font-serif {
+    letter-spacing: -0.01em;
+  }
+
   .font-display:lang(te),
   .font-serif:lang(te) {
     font-family: var(--font-sans);
@@ -525,14 +576,13 @@
  *   --motion-enter 180ms  messages, notes, the chat itself (fade + 6px rise)
  *   --motion-quick 120ms  popovers, the send/stop morph, dialogs
  *   --motion-stagger 50ms between follow-up chips and suggestion cards
- *   --ease-out            decelerating curve for everything that enters
+ *   --ease-out            the shared decelerating curve (motion tokens above)
  * Under prefers-reduced-motion everything below is instant and still (see the media query).
  */
 :root {
   --motion-enter: 180ms;
   --motion-quick: 120ms;
   --motion-stagger: 50ms;
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @layer components {
@@ -737,11 +787,108 @@
   }
 }
 
-/* The drawer slides in from the left (160ms), only when the viewer has not asked for less
-   motion; under reduced motion it simply appears. */
+/*
+ * Console motion (docs/17 §5.5). Every rule here runs only without prefers-reduced-motion;
+ * under it the element simply appears. CSS only (no style attributes, SEC-010); exits are
+ * played by src/lib/dialog-motion.ts with the Web Animations API, then the dialog closes.
+ *
+ * - Press feedback: `.pressable` (Button, IconButton, top-bar controls) shrinks to 0.97 while
+ *   pressed. Colour fades only while a fine pointer hovers, so a variant change or a keyboard
+ *   press repaints at once (no half-faded, low-contrast frame; WCAG 1.4.3).
+ * - Modal dialogs (`.dialog-motion`): fade and scale from 0.97, centred (modals are not
+ *   anchored to a trigger); the backdrop fades with them.
+ * - Menu drawer: slides in from the left on the drawer curve; its backdrop fades.
+ * - Live alerts (`.alert-in`, a result after an action) and a changed KPI number
+ *   (`.value-tick`) rise 4px while fading in; content that replaces a skeleton fades in
+ *   (`.content-in`). None of these play on the first paint of a page.
+ */
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    .pressable {
+      transition: transform var(--duration-press) var(--ease-out);
+    }
+
+    .pressable:active:not(:disabled, [aria-disabled="true"]) {
+      transform: scale(0.97);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+    .pressable:hover {
+      transition:
+        transform var(--duration-press) var(--ease-out),
+        color var(--duration-quick) ease,
+        background-color var(--duration-quick) ease,
+        border-color var(--duration-quick) ease;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  dialog.dialog-motion[open] {
+    animation:
+      fade-in var(--duration-quick) var(--ease-out),
+      modal-in var(--duration-enter) var(--ease-out);
+  }
+
+  dialog.dialog-motion[open]::backdrop,
+  dialog.drawer[open]::backdrop {
+    animation: fade-in var(--duration-enter) var(--ease-out);
+  }
+
+  dialog[data-closing]::backdrop {
+    animation: fade-out var(--duration-quick) var(--ease-out) forwards;
+  }
+
   .drawer[open] {
-    animation: drawer-in 160ms ease-out;
+    animation: drawer-in var(--duration-drawer) var(--ease-drawer);
+  }
+
+  .alert-in,
+  .value-tick {
+    animation: rise-in var(--duration-enter) var(--ease-out);
+  }
+
+  .content-in {
+    animation: fade-in var(--duration-enter) var(--ease-out);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

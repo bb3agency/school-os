@@ -2,7 +2,9 @@
 
 import { useCallback, useId, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useDialogClose } from "@/lib/dialog-motion";
 import { Button, type ButtonVariant } from "./Button";
+import { DialogCloseButton } from "./DialogCloseButton";
 
 export interface DialogProps {
   title: ReactNode;
@@ -41,9 +43,8 @@ export function Dialog({
     dialogRef.current?.showModal();
   }, []);
 
-  const close = useCallback(() => {
-    dialogRef.current?.close();
-  }, []);
+  // Fades out before it closes (Escape too); instant under reduced motion.
+  const close = useDialogClose(dialogRef, "modal");
 
   return (
     <>
@@ -56,13 +57,13 @@ export function Dialog({
         aria-describedby={description ? descriptionId : undefined}
         onClose={() => triggerRef.current?.focus()}
         className={cn(
-          "m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover",
+          "dialog-motion m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover",
           className,
         )}
       >
         <div className="flex items-start justify-between gap-4 p-4 pb-2 sm:p-6 sm:pb-2">
-          <div className="space-y-1">
-            <h2 id={titleId} className="text-lg font-medium">
+          <div className="min-w-0 space-y-1">
+            <h2 id={titleId} className="text-lg font-semibold">
               {title}
             </h2>
             {description ? (
@@ -71,23 +72,7 @@ export function Dialog({
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label={closeLabel}
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="size-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
+          <DialogCloseButton label={closeLabel} onClick={close} />
         </div>
         {children ? <div className="space-y-4 px-4 py-4 sm:px-6">{children}</div> : null}
         {footer ? (

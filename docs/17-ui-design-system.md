@@ -2,8 +2,8 @@
 
 | Field            | Value                                                                                                                                                                                                                                                                                                                                              |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Version          | 0.5 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
-| Changes          | 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
+| Version          | 0.6 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
+| Changes          | 0.6: §5.5 motion (tokens shared with Motion, CSP-safe pattern, what moves and what never does, reduced motion), §3.1 type scale and weights for PP Mori, §2 rule 6, component states (Button loading, dialog exits). 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
 | Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English; Telugu hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                   |
 | Related          | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10                                                                                                                                                                                                                                                                     |
 | Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                           |
@@ -46,11 +46,13 @@ know they are in the control plane.
    container queries, `appearance: base-select`.
 5. **Print.** Gradients, shadows and tints disappear; cards print as plain bordered boxes; chrome
    (`data-print="hide"`) is hidden; A4 margins; Telugu line height 1.8.
-6. **Motion.** Only colour transitions, the skeleton shimmer, the menu drawer's 160ms slide-in and
-   the Ask chat's motion tokens (§5.3: transform and opacity only, CSS only); under
-   `prefers-reduced-motion` the shimmer is a flat block, the drawer simply appears and the chat is
-   still (streamed text appears at once). The sidebar's compact switch is instant (no width
-   animation).
+6. **Motion.** Few, short motions on transform and opacity only, from the shared tokens (§5.5):
+   press feedback, dialog and drawer enter/exit, the notification panel, live alerts, a changed
+   KPI number, content replacing a skeleton, the skeleton shimmer and the Ask chat (§5.3).
+   Never on page load, keyboard navigation, tables or high-frequency actions. Under
+   `prefers-reduced-motion` nothing moves (Motion keeps opacity fades only). No `style`
+   attribute is ever server-rendered (§5.5, CSP). The sidebar's compact switch is instant (no
+   width animation).
 7. **`cn()` joins classes, it does not merge them.** A `className` can add spacing, width or
    layout, but it cannot reliably override a colour, padding or radius the component already sets
    (CSS order decides, not class order). Use the variant, size, `tone` or `padding` props instead,
@@ -83,7 +85,32 @@ Use them as Tailwind utilities (`bg-surface`, `text-ink-muted`, `border-border`,
 
 Component classes (in `@layer components`): `.eyebrow`, `.select-chevron`, `.skeleton`,
 `.pill-gradient-blue|violet|teal`, `.ai-gradient`, `.ai-chrome` (white focus ring),
-`.quote-gradient`, `.platform-chrome` (yellow focus ring).
+`.quote-gradient`, `.platform-chrome` (yellow focus ring), `.pressable` (press feedback, §5.5).
+Motion classes: `.dialog-motion`, `.alert-in`, `.value-tick`, `.content-in` (§5.5).
+
+### 3.1 Type scale
+
+Sizes are `@theme` tokens with their line heights (`--text-*--line-height`), used as the normal
+Tailwind utilities. Hierarchy comes from **size and weight**, never from tracking: page titles
+and table cells can hold Telugu-script data (a student's name), where letter-spacing breaks
+shaping. Only the serif display figures get optical tracking (`-0.01em`, reset by
+`:lang(te)`).
+
+| Token  | Size / line height | Use                                                         |
+| ------ | ------------------ | ----------------------------------------------------------- |
+| `xs`   | 12 / 18            | captions, table headers, badges, timestamps                 |
+| `sm`   | 14 / 20            | UI text: buttons, inputs, sidebar, tables, card body        |
+| `base` | 16 / 24            | reading text, page descriptions                             |
+| `lg`   | 18 / 26            | card, dialog and section titles (`font-semibold`)           |
+| `xl`   | 20 / 28            | page title on phones                                        |
+| `2xl`  | 24 / 32            | page title (`PageHeader` `h1`, `font-semibold`)             |
+| `4xl`  | 36 / 40            | `StatCard` number (serif)                                   |
+| `5xl`  | 48 / 48            | `KpiCard` number (serif)                                    |
+
+Weights: PP Mori has 200/400/600 only, so **emphasis is `font-semibold`** (`font-medium`
+renders as 400; do not use it for emphasis). Numbers: tables, KPI and stat cards and the
+unread badge set `tabular-nums` (PP Mori itself has no tabular figures; the serif display,
+mono and Inter fallback do).
 
 UI text: PP Mori (Pangram Pangram, commercial web licence; `src/app/fonts/pp-mori/`, `@font-face` in `globals.css`; weights 200/400/600, so `font-medium` renders as 400; no tabular figures). Open fonts (all OFL-1.1, pinned exact in `apps/web/package.json`): `@fontsource-variable/inter`
 (variable weights), `@fontsource/instrument-serif` (400), `@fontsource/jetbrains-mono` (500),
@@ -100,7 +127,7 @@ marked (client).
 
 | Component                                                                         | Props (beyond children/className)                                                                                                                                                                           | Notes                                                                                                                                              |
 | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Button`                                                                          | `variant`: `primary` (near-black, default) · `primary-dark` (alias) · `brand` (blue) · `secondary` · `ghost` · `danger` · `inverse` (white, on dark/blue); `size`: `sm` · `md` · `lg`; all `<button>` props | `type="button"` by default                                                                                                                         |
+| `Button`                                                                          | `variant`: `primary` (near-black, default) · `primary-dark` (alias) · `brand` (blue) · `secondary` · `ghost` · `danger` · `inverse` (white, on dark/blue); `size`: `sm` · `md` · `lg`; `loading` (spinner + `aria-busy`); all `<button>` props | `type="button"` by default; press feedback (§5.5)                                                                                                                         |
 | `ButtonLink`, `buttonClasses(variant, size)`                                      | `href`, `variant`, `size`                                                                                                                                                                                   | Links that look like buttons (`buttonClasses` for plain `<a>` to BFF routes)                                                                       |
 | `IconButton`, `iconButtonClasses`                                                 | `label` (required accessible name), `variant`: `secondary` · `ghost` · `primary` · `danger`; `size`: `sm` 32 · `md` 40 · `lg` 48; `dot`                                                                     | Round, hairline border. Put the unread count in `label` too                                                                                        |
 | `Icon`, `ICON_NAMES`                                                              | `name`                                                                                                                                                                                                      | Decorative 24×24 stroke icons; a size class replaces the 20px default                                                                              |
@@ -192,9 +219,10 @@ sweeps ten viewports with screenshots (`make e2e-audit`, nightly).
   and the footer buttons share the row on phones. The native modal keeps them inside the
   viewport and scrolls a tall body.
 - **Buttons** wrap a long (Telugu) label below sm instead of overflowing.
-- **Motion**: buttons fade colour only on hover and only without `prefers-reduced-motion`;
-  under it every transition and animation is cut to 0.01ms (`globals.css`). The drawer slides
-  in (160ms) only without reduced motion.
+- **Motion**: see §5.5. Buttons fade colour only on fine-pointer hover and only without
+  `prefers-reduced-motion`; under it every transition and animation is cut to 0.01ms
+  (`globals.css`). The drawer slides in (260ms, drawer curve) and out (150ms) only without
+  reduced motion.
 - **Print** is unchanged by all of this: chrome is hidden, scroll regions print in full, table
   headers wrap and A4 content stays inside the page (checked in `e2e/responsive.spec.ts`).
 
@@ -458,6 +486,75 @@ server from the same build with the switch on and re-runs the tests tagged `@tel
 **Bringing Telugu back.** Set `SOS_TELUGU_ENABLED=true` (API and web), review the Telugu catalog,
 templates and prompts, run the `@telugu` e2e and the Telugu evals, and record it in a new ADR.
 
+### 5.5 Motion
+
+SchoolOS is a crisp work tool used all day on office PCs: motion is **rare, short and
+functional** (feedback, spatial consistency, preventing a jarring change). Rules follow the
+design-engineering skills in `.claude/skills/` (Emil Kowalski); this section wins on conflict.
+
+**Tokens** (`globals.css` `:root`, mirrored in `src/lib/motion.ts`; `lib/motion.test.ts` fails
+when they drift):
+
+| Token               | Value                              | Use                                              |
+| ------------------- | ---------------------------------- | ------------------------------------------------ |
+| `--ease-out`        | `cubic-bezier(0.23, 1, 0.32, 1)`   | everything that enters or exits                  |
+| `--ease-in-out`     | `cubic-bezier(0.77, 0, 0.175, 1)`  | movement on screen                               |
+| `--ease-drawer`     | `cubic-bezier(0.32, 0.72, 0, 1)`   | the menu drawer                                  |
+| `--duration-press`  | 140ms                              | button press (scale 0.97)                        |
+| `--duration-quick`  | 150ms                              | popovers, every exit                             |
+| `--duration-enter`  | 200ms                              | dialogs, alerts, a changed number, content fade  |
+| `--duration-drawer` | 260ms                              | drawer slide-in                                  |
+
+Never `ease-in`, `transition: all` or `scale(0)`; UI motion stays under 300ms; exits are faster
+than entrances. The Ask chat keeps its own `--motion-*` durations (§5.3) on the shared curve.
+
+**What moves**
+
+| Where                                   | Motion                                                                                     | Tool                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------- |
+| `Button`, `IconButton`, top-bar controls | `.pressable`: scale 0.97 while pressed; colour fades only on fine-pointer hover             | CSS                           |
+| `Dialog`, `ActionDialog`, `FormDialog`, `FlagSwitch` | enter: fade 150ms + scale 0.97→1 200ms, centred, backdrop fades; exit: 150ms fade + scale 0.97, then `close()` | CSS (`.dialog-motion`) + WAAPI (`lib/dialog-motion.ts`) |
+| Menu drawer (below lg)                  | slides in 260ms on the drawer curve, leaves the same way in 150ms; backdrop fades          | CSS + WAAPI                   |
+| Notification panel                      | grows out of the bell (origin top right): fade + scale 0.97, 150ms; Escape closes at once | Motion (`m`, `AnimatePresence`) |
+| `Alert live`                            | rises 4px while fading in, 200ms                                                           | CSS (`.alert-in`)             |
+| `KpiCard` / `StatCard` value            | a change from one real value to another rises in (`TickValue`); first value and "—"→value do not | CSS (`.value-tick`)      |
+| `DataTable`, home work cards            | content that replaces a skeleton fades in (`LoadFade`); cached/server data does not       | CSS (`.content-in`)           |
+| Skeleton                                | shimmer (flat under reduced motion)                                                        | CSS                           |
+
+**Deliberately not animated** (the skills' frequency and keyboard gates): sidebar navigation,
+active item and compact switch; tabs and segmented controls (arrow keys move the selection,
+so a sliding indicator would animate keyboard input); `<details>` (often opened from the
+keyboard; no Baseline height animation); table rows, sorting and keyboard movement in grids;
+page and route loads; the Escape close of the notification panel. No toasts: results stay
+inline next to the form as `Alert live` (Sonner was considered and rejected: it injects a
+`<style>` element at run time, which the nonce CSP without `'unsafe-inline'` blocks, and
+inline results suit office users better).
+
+**Reduced motion.** Every rule sits in `@media (prefers-reduced-motion: no-preference)`; the
+reduce query still cuts any leftover transition to 0.01ms. `closeDialog()` closes at once.
+`MotionProvider` sets `reducedMotion="user"`: transforms jump, opacity may still fade.
+
+**Motion library and CSP (SEC-010).** `MotionProvider` (`components/shell/MotionProvider.tsx`)
+is mounted once by `AppShell`: `LazyMotion features={domAnimation} strict` (only the light
+`m.*` components; `motion.*` throws) and `MotionConfig reducedMotion="user"` with the 200ms
+ease-out default. The CSP has no `'unsafe-inline'` for styles, and a Motion element writes its
+`initial` values into a `style` **attribute** when it is server-rendered, which the browser
+would block. The pattern: use `m.*` only for UI that exists after a user action (a panel that
+opens, an item that appears), never in the server HTML; everything visible on first paint
+animates through CSS classes or the Web Animations API, which set styles through the CSSOM
+(allowed). Content is never hidden waiting for JavaScript. `MotionProvider.test.tsx` renders
+the console to HTML and fails on any `style=` attribute.
+
+**Checks.** `lib/motion.test.ts` (tokens, gating, no `ease-in`/`transition: all`/`scale(0)`),
+`lib/dialog-motion.test.tsx`, `components/ui/motion-states.test.tsx`,
+`components/shell/MotionProvider.test.tsx`, the bell tests in
+`features/notifications/notifications.test.tsx`; the CSP-violation checks of the e2e specs.
+
+**Component states** (polished in this pass): `Button` `loading` (spinner + `aria-busy`, pair it
+with `disabled` and a "Working…" label), press feedback, `aria-busy` cursor; dialogs share
+`DialogCloseButton`, a muted footer and a semibold title; `Table` uses tabular figures;
+`Alert` wraps long text (`min-w-0`).
+
 ## 6. Do and don't
 
 | Do                                                                                      | Don't                                                                                                         |
@@ -540,6 +637,13 @@ icon itself identifies the control, so WCAG 1.4.11 does not require a 3:1 bounda
 and the switch have no text inside when empty, so they use `border-control` (3:1).
 
 ## 8. Open points
+
+- Motion (§5.5), for the product owner: the owner asked for a sliding tab/segmented indicator,
+  an animated accordion and toasts; they were left out on purpose (keyboard-driven, no Baseline
+  height animation, Sonner blocked by the CSP). The e2e axe checks run without waiting for
+  animations; a fade is at most 200ms, but a slow CI machine could catch one mid-fade.
+- Signed-in feature screens still use `font-medium` in places, which PP Mori renders as 400;
+  primitives were moved to `font-semibold`, screens adopt it in their own changes.
 
 - English first (§5.4, ADR-0036), for the product owner: while Telugu is off, a new class and a
   platform banner store their English text in the Telugu fields because the API still requires

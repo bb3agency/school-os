@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { DeltaPill, type DeltaDirection } from "./Badge";
 import { cardClasses } from "./Card";
+import { TickValue } from "./TickValue";
 
 function Unavailable({ label }: { label: string }) {
   return (
@@ -31,7 +32,7 @@ export function StatCard({
     <div className={cardClasses({ padding: "sm" })}>
       <dt className="text-sm text-ink-muted">{label}</dt>
       <dd className="mt-1 font-display text-4xl leading-tight text-ink tabular-nums">
-        {value ?? <Unavailable label={unavailableLabel} />}
+        <TickValue value={value}>{value ?? <Unavailable label={unavailableLabel} />}</TickValue>
       </dd>
       {hint ? <dd className="mt-1 text-xs text-ink-subtle">{hint}</dd> : null}
     </div>
@@ -84,14 +85,14 @@ export function KpiCard({
       className={cn(cardClasses({ padding: "md" }), "flex flex-col gap-3", className)}
     >
       <div className="flex items-start justify-between gap-3">
-        <p id={labelId} className="text-sm font-medium text-ink-muted">
+        <p id={labelId} className="text-sm text-ink-muted">
           {label}
         </p>
         {aside}
       </div>
       <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
         <p className="font-display text-5xl leading-none text-ink tabular-nums">
-          {value ?? <Unavailable label={unavailableLabel} />}
+          <TickValue value={value}>{value ?? <Unavailable label={unavailableLabel} />}</TickValue>
         </p>
         {delta && value !== null ? (
           <DeltaPill
