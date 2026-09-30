@@ -311,6 +311,18 @@ export const classEditSchema = z.object({
 });
 
 /**
+ * ADR-0036: the class forms ask for the Telugu name only while Telugu is switched on. With it
+ * off the field is not shown, so it may be absent.
+ */
+export function classCreateSchemaFor(telugu: boolean) {
+  return classCreateSchema.extend({ display_te: telugu ? className : className.optional() });
+}
+
+export function classEditSchemaFor(telugu: boolean) {
+  return classEditSchema.extend({ display_te: telugu ? className : className.optional() });
+}
+
+/**
  * The class teacher picker: "" means no class teacher (null); absent (undefined) means the
  * picker was not shown, so the field is left as it is.
  */
