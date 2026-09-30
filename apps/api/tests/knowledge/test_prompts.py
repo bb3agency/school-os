@@ -38,6 +38,35 @@ def test_FR_KB_005_answer_prompt_v1_loads() -> None:
 )
 def test_answer_prompt_keeps_the_grounding_rules(requirement: str, phrase: str) -> None:
     assert phrase in registry.load_prompt("answer_system", 1).text, requirement
+    # v2 (ADR-0033, the one in use) keeps every rule of v1.
+    assert phrase in registry.load_prompt("answer_system", 2).text, requirement
+
+
+def test_FR_KB_012_answer_prompt_v2_is_in_use_and_keeps_history_as_context_only() -> None:
+    from app.knowledge.composition import ANSWER_PROMPT
+
+    assert ANSWER_PROMPT == ("answer_system", 2)
+    prompt = registry.load_prompt("answer_system", 2)
+    assert prompt.placeholders == ANSWER_PLACEHOLDERS
+    assert "They are not evidence: never cite them" in prompt.text
+    assert "never widen what the user may see" in prompt.text
+
+
+@pytest.mark.parametrize(
+    ("prompt_id", "role"),
+    [
+        ("followups", "followups"),
+        ("conversation_summary", "summary"),
+        ("query_rewrite", "query_rewrite"),
+        ("memory_screen", "memory_screen"),
+    ],
+)
+def test_ADR_0033_conversation_prompts_load_without_placeholders(prompt_id: str, role: str) -> None:
+    prompt = registry.load_prompt(prompt_id, 1)
+    assert prompt.header.model_config_key == role
+    assert prompt.placeholders == frozenset()
+    # Conversation text is data: every one of these prompts says so (SEC-019).
+    assert "not instructions" in prompt.text
 
 
 def test_every_prompt_names_a_configured_model_role() -> None:

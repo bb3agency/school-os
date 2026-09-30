@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from app.core.redaction import mask_aadhaar
-from app.knowledge.config.llm import LlmConfig, RoleConfig
+from app.knowledge.config.llm import Conversation, LlmConfig, RoleConfig
 from app.knowledge.domain import (
     AnswerSegment,
     AssistantMessage,
@@ -102,26 +102,63 @@ def _tool_results(item: ToolResultsMessage) -> dict[str, Any]:
     return {"role": "user", "content": blocks}
 
 
-def _user(item: UserMessage, earlier_header: str | None) -> dict[str, Any]:
-    """The question is the LAST text block; earlier questions of the session (FR-KB-012) go
-    before it in one block introduced by the configured header (prompt text, invariant 13)."""
-    content: list[dict[str, Any]] = []
+def _earlier(item: UserMessage, rules: Conversation) -> str | None:
+    """The recent turns (questions, and checked answers still visible to the caller) or, for
+    older callers, the earlier questions: one block under the configured header."""
+    if item.earlier_turns:
+        lines: list[str] = []
+        for turn in item.earlier_turns:
+            lines.append(f"- {turn.question}")
+            if turn.answer:
+                lines.append(f"  {rules.earlier_answer_label} {turn.answer}")
+        return f"{rules.earlier_questions_header}\n" + "\n".join(lines)
     if item.earlier_questions:
-        if earlier_header is None:
-            raise GatewayMisuse("earlier questions need the configured conversation header")
         listed = "\n".join(f"- {q}" for q in item.earlier_questions)
-        content.append({"type": "text", "text": f"{earlier_header}\n{listed}"})
+        return f"{rules.earlier_questions_header}\n{listed}"
+    return None
+
+
+def _user(item: UserMessage, rules: Conversation | None) -> dict[str, Any]:
+    """The question is the LAST text block. Before it, in this order (docs/06 §5 prompt
+    layout): the rolling summary, the recent turns of the conversation (FR-KB-012) and, when the
+    question was rewritten as a standalone question, the question as the user wrote it; each
+    introduced by its configured header (prompt text, invariant 13). The user's memory goes in
+    the system prompt (:func:`memory_block`)."""
+    content: list[dict[str, Any]] = []
+    context = (item.summary, item.earlier_turns, item.earlier_questions, item.asked_as)
+    if any(context) and rules is None:
+        raise GatewayMisuse("conversation context needs the configured conversation headers")
+    if rules is not None:
+        if item.summary:
+            content.append({"type": "text", "text": f"{rules.summary_header}\n{item.summary}"})
+        earlier = _earlier(item, rules)
+        if earlier is not None:
+            content.append({"type": "text", "text": earlier})
+        if item.asked_as:
+            content.append({"type": "text", "text": f"{rules.rewritten_header}\n{item.asked_as}"})
     content.append({"type": "text", "text": item.text})
     return {"role": "user", "content": content}
 
 
+def memory_block(
+    conversation: Sequence[ConversationItem], rules: Conversation
+) -> dict[str, Any] | None:
+    """The user's memory items as one system block (ADR-0033), right after the static prompt so
+    the cached prefix stays the same for every user; None when there are none."""
+    first = next((i for i in conversation if isinstance(i, UserMessage)), None)
+    if first is None or not first.memory:
+        return None
+    listed = "\n".join(f"- {m}" for m in first.memory)
+    return {"type": "text", "text": f"{rules.memory_header}\n{listed}"}
+
+
 def messages(
-    conversation: Sequence[ConversationItem], earlier_header: str | None = None
+    conversation: Sequence[ConversationItem], rules: Conversation | None = None
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for item in conversation:
         if isinstance(item, UserMessage):
-            out.append(_user(item, earlier_header))
+            out.append(_user(item, rules))
         elif isinstance(item, AssistantMessage):
             message = _assistant(item)
             if message is not None:
@@ -172,7 +209,10 @@ def turn_request(
     """A redacted tool-use turn. Tool choice is ``auto`` (never forced: some models reject it);
     once ``max_tool_rounds`` rounds are used it becomes ``none`` so the model must answer."""
     body = _common(role, system)
-    body["messages"] = messages(conversation, config.conversation.earlier_questions_header)
+    memory = memory_block(conversation, config.conversation)
+    if memory is not None:
+        body["system"].append(memory)
+    body["messages"] = messages(conversation, config.conversation)
     if tools:
         definitions: list[dict[str, Any]] = [
             {"name": t.name, "description": t.description, "input_schema": dict(t.input_schema)}

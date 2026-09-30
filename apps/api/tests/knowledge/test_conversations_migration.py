@@ -244,15 +244,18 @@ def test_invariant_12_0038_round_trips_on_a_populated_database(
     )
     _exec(
         admin,
-        "UPDATE kb.queries SET revises = :f, revision = 'regenerate' WHERE id = :i",
+        "UPDATE kb.queries SET revises = :f, revision = 'regenerate', cached_from = :f, "
+        "access_fingerprint = :fp WHERE id = :i",
         f=first,
         i=second,
+        fp=bytes(32),
     )
     _exec(
         admin,
         "INSERT INTO kb.llm_calls (id, tenant_id, feature, role, provider, model, outcome, "
         "attempts, latency_ms, input_tokens, output_tokens, cost_usd) VALUES "
-        "(:i, :t, 'ask', 'followups', 'fake', 'claude-haiku-4-5-20251001', 'ok', 1, 5, 10, 2, 0)",
+        "(:i, :t, 'ask', 'query_rewrite', 'fake', 'claude-haiku-4-5-20251001', 'ok', 1, 5, "
+        "10, 2, 0)",
         i=uuid.uuid4(),
         t=tid,
     )

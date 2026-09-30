@@ -31,9 +31,16 @@ that column), ``revises`` + ``revision`` (``regenerate|edit``: which question th
 records and documents) and ``followups_ciphertext`` (the suggested follow-up questions). ``route``
 also allows ``memory`` (a "remember that ..." instruction answered without the model).
 
-``kb.llm_calls.role`` also allows ``followups``, ``summary`` and ``memory`` (metered gateway
-calls of Ask: follow-up suggestions with an optional memory suggestion, the rolling summary and
-the memory screen).
+``kb.llm_calls.role`` also allows ``followups``, ``summary``, ``memory_screen`` and
+``query_rewrite`` (the cheap metered gateway calls of Ask: follow-up suggestions with an optional
+memory suggestion, the rolling summary, the memory safety screen and the standalone rewrite of a
+follow-up question).
+
+``kb.queries`` also gains ``access_fingerprint`` (SHA-256 of the asker's document-visibility keys:
+roles, sections, classes, school-wide and C3 flags; no person) and ``cached_from`` (the answer an
+exact repeat reused; composite self-FK, ON DELETE SET NULL of that column) and
+``cache_invalidated_at`` (set when a cited document gets a new version, an ACL change, is
+archived or deleted), for the documents-only answer cache (docs/06 cost and performance).
 
 Grants: the ``kb`` default privileges give ``sos_app`` DML and ``sos_readonly`` SELECT; reporting
 has no use for memories, so ``sos_readonly`` gets nothing on the two memory tables.
@@ -65,7 +72,7 @@ depends_on = None
 OLD_ROLES = (
     "'answer','router','metadata','translation','extraction','eval_judge','circular','notice'"
 )
-NEW_ROLES = OLD_ROLES + ",'followups','summary','memory'"
+NEW_ROLES = OLD_ROLES + ",'followups','summary','memory_screen','query_rewrite'"
 OLD_ROUTES = "'tools','documents','both','refused'"
 NEW_ROUTES = OLD_ROUTES + ",'memory'"
 
@@ -108,12 +115,17 @@ ALTER TABLE kb.queries
   ADD COLUMN revision             text CHECK (revision IN ('regenerate','edit')),
   ADD COLUMN citations_ciphertext bytea CHECK (octet_length(citations_ciphertext) > 0),
   ADD COLUMN followups_ciphertext bytea CHECK (octet_length(followups_ciphertext) > 0),
+  ADD COLUMN access_fingerprint   bytea CHECK (octet_length(access_fingerprint) = 32),
+  ADD COLUMN cached_from          uuid,
+  ADD COLUMN cache_invalidated_at timestamptz,
   ADD CONSTRAINT queries_conversation_fk FOREIGN KEY (tenant_id, conversation_id)
     REFERENCES kb.conversations (tenant_id, id),
   ADD CONSTRAINT queries_superseded_by_fk FOREIGN KEY (tenant_id, superseded_by)
     REFERENCES kb.queries (tenant_id, id) ON DELETE SET NULL (superseded_by),
   ADD CONSTRAINT queries_revises_fk FOREIGN KEY (tenant_id, revises)
     REFERENCES kb.queries (tenant_id, id) ON DELETE SET NULL (revises),
+  ADD CONSTRAINT queries_cached_from_fk FOREIGN KEY (tenant_id, cached_from)
+    REFERENCES kb.queries (tenant_id, id) ON DELETE SET NULL (cached_from),
   ADD CONSTRAINT queries_conversation_is_session
     CHECK (conversation_id IS NULL OR conversation_id = session_id),
   ADD CONSTRAINT queries_revision_complete CHECK (revises IS NULL OR revision IS NOT NULL),
@@ -122,6 +134,10 @@ ALTER TABLE kb.queries
   ADD CONSTRAINT queries_not_superseded_by_itself CHECK (superseded_by IS DISTINCT FROM id);
 CREATE INDEX queries_conversation ON kb.queries (tenant_id, conversation_id, created_at)
   WHERE conversation_id IS NOT NULL;
+-- Exact repeats (answer cache): same question HMAC and access fingerprint, newest first.
+CREATE INDEX queries_answer_cache ON kb.queries
+  (tenant_id, question_hmac, access_fingerprint, created_at DESC)
+  WHERE access_fingerprint IS NOT NULL AND cache_invalidated_at IS NULL;
 
 CREATE TABLE kb.user_memories (
   id               uuid PRIMARY KEY,
@@ -207,6 +223,7 @@ def downgrade() -> None:
     _checks(OLD_ROLES, OLD_ROUTES, not_valid=True)
     op.execute("DROP TABLE IF EXISTS kb.user_memory_settings")
     op.execute("DROP TABLE IF EXISTS kb.user_memories")
+    op.execute("DROP INDEX IF EXISTS kb.queries_answer_cache")
     op.execute("DROP INDEX IF EXISTS kb.queries_conversation")
     op.execute(
         "ALTER TABLE kb.queries "
@@ -214,9 +231,13 @@ def downgrade() -> None:
         "DROP CONSTRAINT IF EXISTS queries_revision_in_conversation, "
         "DROP CONSTRAINT IF EXISTS queries_revision_complete, "
         "DROP CONSTRAINT IF EXISTS queries_conversation_is_session, "
+        "DROP CONSTRAINT IF EXISTS queries_cached_from_fk, "
         "DROP CONSTRAINT IF EXISTS queries_revises_fk, "
         "DROP CONSTRAINT IF EXISTS queries_superseded_by_fk, "
         "DROP CONSTRAINT IF EXISTS queries_conversation_fk, "
+        "DROP COLUMN IF EXISTS cache_invalidated_at, "
+        "DROP COLUMN IF EXISTS cached_from, "
+        "DROP COLUMN IF EXISTS access_fingerprint, "
         "DROP COLUMN IF EXISTS followups_ciphertext, "
         "DROP COLUMN IF EXISTS citations_ciphertext, "
         "DROP COLUMN IF EXISTS revision, "

@@ -25,6 +25,7 @@ _FIELD: Final = re.compile(
     r"\?src=(?P<src>[a-z][a-z0-9_]{0,63})$"
 )
 _SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified|count|fee)/(?P<id>{_UUID})$")
+_CONVERSATION: Final = re.compile(rf"^sos://conversation/(?P<id>{_UUID})#q(?P<q>{_UUID})$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +36,8 @@ class SourceRef:
     page: int | None = None
     attribute: str | None = None
     source: str | None = None
+    query_id: uuid.UUID | None = None
+    """``conversation`` sources: the earlier question within the conversation."""
 
 
 def _key(value: str, what: str) -> str:
@@ -87,6 +90,12 @@ def fee_dues(fee_id: uuid.UUID) -> str:
     return f"sos://fee/{fee_id}"
 
 
+def conversation_question(conversation_id: uuid.UUID, query_id: uuid.UUID) -> str:
+    """One of the caller's own earlier questions and its answer (``search_my_conversations``,
+    ADR-0033). Ids only; the text is the caller's own and is re-read under their access."""
+    return f"sos://conversation/{conversation_id}#q{query_id}"
+
+
 def parse(uri: str) -> SourceRef:
     """Parse a URI built by this module; anything else raises ``ValueError``."""
     if m := _DOC.fullmatch(uri):
@@ -102,6 +111,10 @@ def parse(uri: str) -> SourceRef:
             attribute=m["attr"],
             source=m["src"],
         )
+    elif m := _CONVERSATION.fullmatch(uri):
+        return SourceRef(
+            kind="conversation", object_id=uuid.UUID(m["id"]), query_id=uuid.UUID(m["q"])
+        )
     elif m := _SIMPLE.fullmatch(uri):
         kind: SourceKind = m["kind"]  # type: ignore[assignment]
         return SourceRef(kind=kind, object_id=uuid.UUID(m["id"]))
@@ -111,6 +124,7 @@ def parse(uri: str) -> SourceRef:
 __all__ = [
     "SourceRef",
     "change_request",
+    "conversation_question",
     "document_page",
     "fee_dues",
     "finding",
