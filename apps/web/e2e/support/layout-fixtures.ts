@@ -1853,6 +1853,86 @@ const INSIGHT_FLAGS: Schemas["InsightFlagOut"][] = STUDENT_NAMES.map((name, i) =
 
 /* ------------------------------------------------------------------ routing */
 
+// Ask chat (FR-KB-012): long titles in both scripts, a long answer with a table, many
+// sources (one withheld), versions, follow-ups and memory items.
+const ASK_CHAT = "0192f3a4-0000-7000-8000-00000000e9a1";
+const ASK_DOC_SOURCE = "sos://doc/0192f3a4-0000-7000-8000-00000000d001/v1#p12";
+const ASK_TITLES = [
+  "Admission register mismatches for Class 6 to Class 10 before the UDISE+ deadline next week",
+  "పదవ తరగతి బోర్డు రిజిస్ట్రేషన్ కోసం కావలసిన పత్రాలు మరియు చివరి తేదీలు",
+  "Dasara holidays",
+  "Transfer certificate steps for students leaving mid-year with pending fee dues",
+];
+const ASK_CHATS = Array.from({ length: 12 }, (_, i) => ({
+  id: i === 0 ? ASK_CHAT : uid("00000000e9", 0xb0 + i),
+  title: ASK_TITLES[i % ASK_TITLES.length] ?? null,
+  pinned: i < 2,
+  created_at: at(20 - i),
+  updated_at: at(28 - i),
+  message_count: 3 + i,
+  version: 1,
+}));
+const ASK_ANSWER = [
+  `The admission register and the Aadhaar-as-printed details differ for ${pick(STUDENT_NAMES, 0)} and two more students. [1] [2]`,
+  "",
+  "| Student | Register | Aadhaar as printed | Source |",
+  "|---|---|:-:|--:|",
+  `| ${pick(STUDENT_NAMES, 0)} | 12/06/2014 | 21/06/2014 | [1] |`,
+  `| ${TE_GUARDIAN} | సుబ్రహ్మణ్యేశ్వర | Subrahmanyeswara | [2] |`,
+  "",
+  "- Check the **admission register** first: it is the legal record. [1]",
+  "- Then raise a correction request with the evidence document. [3]",
+].join("\n");
+const askCitation = (index: number, title: string, withheld = false) => ({
+  index,
+  source: ASK_DOC_SOURCE,
+  title: withheld ? null : title,
+  snippet: withheld
+    ? null
+    : "Synthetic passage: the date of birth in the admission register is the legal anchor (BR-01) and must match the documents before the portal upload.",
+  ...(withheld ? { withheld: true } : {}),
+});
+const askMessage = (i: number, superseded = false) => ({
+  query_id: uid("00000000ea", 0xa0 + i),
+  question:
+    i === 1
+      ? "పదవ తరగతి విద్యార్థుల బోర్డు రిజిస్ట్రేషన్ కోసం ఏ పత్రాలు కావాలి, చివరి తేదీ ఎప్పుడు?"
+      : "Which students in Class 6 to Class 10 have a date of birth in the admission register that differs from the Aadhaar as printed, and what should the office do before the UDISE+ upload?",
+  answer: ASK_ANSWER,
+  status: "answered",
+  mode: "full",
+  language: i === 1 ? "te" : "en",
+  citations: [
+    askCitation(1, "Admission register 2014-15, page 12 (scanned copy uploaded by the office)"),
+    askCitation(2, "Aadhaar as printed · synthetic record"),
+    askCitation(3, "", true),
+  ],
+  feedback: i === 0 ? "helpful" : null,
+  followups:
+    i === 2
+      ? [
+          "Show me only the Class 10 students whose names differ between the register and Aadhaar",
+          "ఈ విద్యార్థుల కోసం సవరణ అభ్యర్థన ఎలా పెట్టాలి?",
+        ]
+      : [],
+  created_at: at(28, 5 + i),
+  superseded,
+  ...(i === 2 ? { summarized: true } : {}),
+});
+const ASK_MEMORIES = [
+  "I am the office clerk and prepare the UDISE+ upload for Classes 6 to 10 every September.",
+  "సమాధానాలు తెలుగులో కావాలి, కానీ తేదీలు DD/MM/YYYY రూపంలో ఉండాలి.",
+  "Prefers short answers with the source first.",
+].map((text, i) => ({
+  id: uid("00000000e8", 0xa0 + i),
+  text,
+  source: i === 2 ? "suggested" : "explicit",
+  status: i === 2 ? "pending" : "saved",
+  created_at: at(10 + i),
+  updated_at: at(10 + i),
+  version: 1,
+}));
+
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
 const re = (pattern: string) => new RegExp(`^/api/v1${pattern.replace(/\{id\}/g, UUID)}$`);
 
@@ -1955,6 +2035,16 @@ const ROUTES: Array<[RegExp, Handler]> = [
   [re("/tenant/billing/invoices"), () => page(TENANT_INVOICES)],
   // Admin console (US-1201): retention settings.
   [re("/admin/retention"), () => RETENTION],
+  [re("/knowledge/conversations"), () => page(ASK_CHATS)],
+  [
+    re("/knowledge/conversations/{id}"),
+    ([, id = ASK_CHAT]) => ({
+      ...(ASK_CHATS.find((c) => c.id === id) ?? ASK_CHATS[0]),
+      messages: [askMessage(0, true), askMessage(0), askMessage(1), askMessage(2)],
+    }),
+  ],
+  [re("/knowledge/memories"), () => ASK_MEMORIES],
+  [re("/knowledge/memory-settings"), () => ({ enabled: true, school_enabled: true })],
   [
     re("/knowledge/verified-answers"),
     (_, q) => page(by(VERIFIED_ANSWERS, q, "status", (r) => r.status)),
