@@ -25,6 +25,7 @@ from PIL import Image
 from pydantic import SecretStr
 
 from app.core.config import Environment, KeyWrapperKind, Settings
+from app.core.languages import contains_telugu
 from app.core.redaction import contains_full_aadhaar, verhoeff_valid
 from app.devtools import dq_eval
 from app.devtools import seed_synthetic as cli
@@ -175,6 +176,32 @@ def test_dates_of_birth_fit_the_class_band_and_are_unique() -> None:
     duplicates = {d for d, n in seen.items() if n > 1}
     # Only a moved date of birth (DQ-007) may land on another child's date.
     assert len(duplicates) <= len([s for s in school.students if s.injection in band_breakers])
+
+
+# --- English first (ADR-0036) --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("profile", ["small", "full"])
+def test_ADR_0036_seeded_names_on_screens_are_english(profile: str) -> None:
+    """Telugu-script names stay in the synthetic data to exercise matching (an Aadhaar name
+    printed in Telugu, DQ-001) and the name-format check (a register name written in Telugu,
+    DQ-006, the only case where the canonical name is Telugu). Every other student's register
+    names and every guardian name are in English, so screens show English."""
+    school = _school(profile)
+    telugu_script = [s for s in school.students if s.injection == "name_in_telugu_script"]
+    assert len(telugu_script) == school.counts["name_in_telugu_script"]
+    for s in school.students:
+        for guardian in s.guardians:
+            assert not contains_telugu(guardian.full_name), s.admission_no
+        if s.injection == "name_in_telugu_script":
+            continue
+        for key in ("full_name", "father_name", "mother_name"):
+            value = s.value(key, st.REG)
+            assert value is None or not contains_telugu(value), (s.admission_no, key)
+    aadhaar_script = [s for s in school.students if s.injection == "aadhaar_name_script"]
+    assert all(
+        contains_telugu(s.value("aadhaar_name_as_printed", st.AAD) or "") for s in aadhaar_script
+    ), "matching still sees Telugu-script Aadhaar names"
 
 
 # --- rates --------------------------------------------------------------------------------------
