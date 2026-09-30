@@ -315,8 +315,13 @@ opens a popover (title, page, quote, "Open"), lazy-loaded, fixed-positioned by s
 CSSOM, flipped above when there is no room, closed by Escape (focus stays on the chip), by
 focus leaving or by scrolling (WCAG 1.4.13). Source cards: number, title link, page, the quote (at most 300 characters),
 "Download version n" for documents. A source the member can no longer open reads "Source you can
-no longer open", without text. Past-chat sources (`sos://conversation/{id}#q{query}`) open that
-message.
+no longer open", without text; the API then withholds that answer too (`answer_withheld`), which
+reads "Answer hidden: … because you can no longer see one of its sources" with no copy or "Save as
+verified answer". Past-chat sources (`sos://conversation/{id}#q{query}`) open that message.
+
+**Stored answers still `streaming`** (being written in another window, or cut off unrecorded)
+read "Answer not finished" with "Ask again", never as an error; while one is under five minutes
+old the chat is read again every 10 seconds, so it appears when ready.
 
 **Actions** (32px icon buttons with names and tooltips; always shown on the latest answer and on
 touch screens, on hover and focus elsewhere; while streaming the row keeps its height but is
@@ -331,9 +336,18 @@ quiet divider when the API says so.
 this?") that saves only on Save (confirm) and deletes on Dismiss. The composer shows "Memory on"
 (link to Manage memory, with a tooltip) when the school and the member have it on. Manage memory:
 what memory is and is not, the switch (disabled with the reason when the school switched it
-off), items with edit/delete and save/dismiss for suggestions, add, "Forget everything" (confirm).
-Refused text (422 `memory_not_allowed`) says memory is for your own preferences and work context,
-not facts about students or staff.
+off in school settings, `ai_memory_enabled`), items with edit/delete and save/dismiss for
+suggestions, add (1-200 characters), "Forget everything" (confirm). While memory is off for the
+member, adding, editing and saving are disabled with the reason (deleting still works); at 30
+items adding is disabled ("Memory is full"). Every refusal says why and what to do, from the
+API's codes: a 422 field code (`memory_personal_number`, `memory_date`, `memory_long_number`,
+`memory_too_long`, `memory_empty`, `memory_seen_record`, `memory_others`, `memory_unsure`: "This
+can't be remembered" with the reason), 503 `memory_check_unavailable` (nothing saved, the text
+stays in the box), 409 `memory_off` (the switch is read again) and `memory_full`, 404 for a
+suggestion that expired after 24 hours. Renaming a chat refuses a full Aadhaar number before
+sending and explains 422 `title_*`; a changed chat (412) says so; a question in a deleted chat
+(404) and ask-again of a replaced answer (409 `message_superseded`, `message_not_revisable`) are
+explained and the question stays in the box.
 
 **Keyboard.** Enter sends, Shift+Enter adds a line, Ctrl+Enter always sends; never while an input
 method composes (`isComposing`, keyCode 229: Telugu keyboards); on touch-first screens Enter adds
@@ -469,7 +483,8 @@ and the switch have no text inside when empty, so they use `border-control` (3:1
   menu stays short elsewhere; one click more from other pages); example cards fill the box
   instead of sending; `/` is a single-character shortcut (WCAG 2.1.4 asks for a way to turn it
   off; it only moves focus); a stream keeps going when you open another conversation but stops
-  when you leave Ask; the conversation and memory endpoints are coded against a contract module
-  (`features/ask/contract.ts`) until the generated client has them.
+  when you leave Ask. The conversation and memory endpoints use the generated client; the SSE
+  event payloads, which OpenAPI does not describe, are typed in `features/ask/sse.ts` from
+  `knowledge/domain.py` and must be changed together with it.
 - `Sparkline` and `ProgressRing` cover small inline charts only; a chart library decision (if
   full charts are needed) needs an ADR (licence, bundle size, CSP).
