@@ -1,0 +1,275 @@
+/*
+ * Public marketing pages only (docs/17 §5.5). Scoped under `.mk` so nothing leaks into the
+ * console; the shared tokens stay in globals.css. CSP (SEC-010): every style lives here or in
+ * Tailwind classes, never in a style attribute. Motion: transform and opacity only, custom
+ * curves from the design-engineering skills, and nothing moves under prefers-reduced-motion
+ * (globals.css also cuts every duration to 0.01ms there).
+ */
+
+.mk {
+  --mk-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --mk-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  /* Dark band: text colours checked against --color-action #111827. */
+  --mk-night: #0b1220; /* white 18.9:1, --mk-night-muted 11.2:1 */
+  --mk-night-muted: #c3cbd8; /* 10.9:1 on #111827 */
+  --mk-night-line: rgb(255 255 255 / 0.1);
+  --mk-grid-line: rgb(30 64 175 / 0.07);
+  --mk-header-h: 4rem;
+
+  /* Anchored headings clear the sticky header. */
+  scroll-padding-top: calc(var(--mk-header-h) + 1rem);
+}
+
+/* Display type: tight tracking as it grows (Latin only; Telugu keeps normal spacing). */
+.mk-display {
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.mk-title {
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.mk-display:lang(te),
+.mk-title:lang(te) {
+  letter-spacing: normal;
+  line-height: 1.5;
+}
+
+.mk-lede {
+  text-wrap: pretty;
+}
+
+/* Hero backdrop: a faint grid fading out from the centre plus two soft lights. Decorative. */
+.mk-hero-bg {
+  background-image:
+    radial-gradient(60% 50% at 75% 20%, rgb(96 165 250 / 0.22), transparent 70%),
+    radial-gradient(40% 40% at 10% 10%, rgb(45 212 191 / 0.14), transparent 70%);
+}
+
+.mk-grid {
+  background-image:
+    linear-gradient(to right, var(--mk-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--mk-grid-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+}
+
+/* Dark contrast band (security). */
+.mk-night {
+  background-color: var(--mk-night);
+  background-image:
+    radial-gradient(50% 60% at 85% 0%, rgb(37 99 235 / 0.28), transparent 70%),
+    radial-gradient(40% 50% at 0% 100%, rgb(13 148 136 / 0.18), transparent 70%);
+  color: #ffffff;
+  --color-focus: #ffffff;
+}
+
+.mk-night-muted {
+  color: var(--mk-night-muted);
+}
+
+.mk-night-card {
+  background-color: rgb(255 255 255 / 0.04);
+  border: 1px solid var(--mk-night-line);
+}
+
+/* A hairline that fades at both ends (section dividers). */
+.mk-rule {
+  height: 1px;
+  background-image: linear-gradient(
+    to right,
+    transparent,
+    var(--color-border-soft) 20%,
+    var(--color-border-soft) 80%,
+    transparent
+  );
+}
+
+/* Mock window chrome. */
+.mk-window {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow:
+    0 1px 2px rgb(16 24 40 / 0.05),
+    0 24px 60px -24px rgb(30 64 175 / 0.35),
+    0 0 0 6px rgb(255 255 255 / 0.5);
+}
+
+.mk-float {
+  box-shadow:
+    0 1px 2px rgb(16 24 40 / 0.06),
+    0 20px 40px -16px rgb(15 23 42 / 0.28);
+}
+
+/* Header: transparent over the hero, a white bar with a hairline once the page scrolls
+   (state indication; colour only, 200ms). */
+.mk-header {
+  height: var(--mk-header-h);
+  border-bottom: 1px solid transparent;
+}
+
+.mk-header[data-scrolled="true"],
+.mk-header[data-open="true"] {
+  background-color: rgb(255 255 255 / 0.96);
+  border-bottom-color: var(--color-border);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-header {
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease;
+  }
+}
+
+/* Press feedback on every pressable element: instant confirmation (160ms, strong ease-out). */
+.mk-press {
+  transition: transform 160ms var(--mk-ease-out);
+}
+
+.mk-press:active {
+  transform: scale(0.97);
+}
+
+/* Cards that link somewhere lift a little under a real pointer (hover gated for touch). */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .mk-lift {
+    transition:
+      transform 200ms var(--mk-ease-out),
+      box-shadow 200ms var(--mk-ease-out),
+      border-color 200ms ease;
+  }
+
+  .mk-lift:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-border-soft);
+    box-shadow: var(--shadow-popover);
+  }
+
+  .mk-arrow {
+    transition: transform 200ms var(--mk-ease-out);
+  }
+
+  .mk-lift:hover .mk-arrow,
+  a:hover > .mk-arrow {
+    transform: translateX(3px);
+  }
+}
+
+/* Hero illustration: the three layers settle in once on load (explanation, rare), 60ms apart.
+   CSS only, so it runs without JavaScript and always ends visible; the headline and the calls
+   to action never wait for it. */
+@media (prefers-reduced-motion: no-preference) {
+  .mk-settle {
+    animation: mk-settle 700ms var(--mk-ease-out) both;
+  }
+
+  .mk-settle-2 {
+    animation-delay: 120ms;
+  }
+
+  .mk-settle-3 {
+    animation-delay: 240ms;
+  }
+
+  .mk-settle-4 {
+    animation-delay: 360ms;
+  }
+
+  /* The mismatch row draws the eye once: a soft ring that fades (state, not a loop). */
+  .mk-flag::after {
+    animation: mk-flag 1600ms var(--mk-ease-out) 700ms both;
+  }
+}
+
+@keyframes mk-settle {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The ring is a pseudo-element whose opacity animates (GPU only). */
+.mk-flag {
+  position: relative;
+}
+
+.mk-flag::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px rgb(180 35 24 / 0.35);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes mk-flag {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* FAQ chevron turns with the disclosure (native <details>). */
+.mk-faq .mk-chevron {
+  transition: transform 200ms var(--mk-ease-out);
+}
+
+.mk-faq[open] .mk-chevron {
+  transform: rotate(180deg);
+}
+
+.mk-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Windows high contrast: the decorative backdrops vanish; borders carry the shapes. */
+@media (forced-colors: active) {
+  .mk-grid,
+  .mk-hero-bg {
+    background-image: none;
+  }
+
+  .mk-night-card,
+  .mk-window,
+  .mk-float {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* Print must not break: everything visible, no chrome, no dark bands. */
+@media print {
+  [data-reveal],
+  [data-reveal] > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .mk-header,
+  .mk-grid {
+    display: none !important;
+  }
+
+  .mk-night {
+    background: #ffffff !important;
+  }
+
+  .mk-night,
+  .mk-night * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+  }
+}
