@@ -135,6 +135,7 @@ def _confirm(api: Api, op: Operator, tid: uuid.UUID) -> Any:
     )
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_PLT_005_shared_school_is_deleted_certified_and_marked_deleted(  # noqa: PLR0915, PLR0917
     api: Api,
     owners: tuple[Operator, Operator],

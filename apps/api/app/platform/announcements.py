@@ -1,4 +1,5 @@
-"""Bilingual announcements (FR-PLT-026; docs/16 §5.13, §14).
+"""Bilingual announcements (FR-PLT-026; docs/16 §5.13, §14); English only while Telugu is
+hidden (ADR-0036: the Telugu text is optional, kept, and not shown).
 
 Delivery: ``sos_app`` cannot read ``platform.announcements``. A platform job publishes the
 active announcements (no personal data) to a cache key; the school app reads the cache through
@@ -20,8 +21,9 @@ from sqlalchemy import and_, select
 
 from app.core.config import get_settings
 from app.core.db import platform_session
-from app.core.errors import Conflict, NotFound, PreconditionFailed
+from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
+from app.core.languages import telugu_enabled
 from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
@@ -84,7 +86,38 @@ def get_cache() -> AnnouncementCache:
 
 
 def _out(row: Any) -> AnnouncementOut:
-    return AnnouncementOut.model_validate(dict(row))
+    out = AnnouncementOut.model_validate(dict(row))
+    if telugu_enabled():
+        return out
+    # English first (ADR-0036): the Telugu text stays stored but is not shown.
+    return out.model_copy(update={"title_te": "", "body_te": ""})
+
+
+def _brief(item: Any) -> AnnouncementBrief:
+    """What a school sees: the Telugu text only while Telugu is shown (ADR-0036)."""
+    brief = AnnouncementBrief.model_validate(item)
+    if telugu_enabled():
+        return brief
+    return brief.model_copy(update={"title_te": "", "body_te": ""})
+
+
+_TELUGU_FIELDS = (("title_te", "title_en"), ("body_te", "body_en"))
+
+
+def _values(data: AnnouncementIn, row: Any = None) -> dict[str, Any]:
+    """The columns to store. The database needs the Telugu text (NOT NULL, 1+ characters); while
+    Telugu is hidden an empty one keeps the stored text on an update or takes the English text
+    on a new announcement, and is never shown. While Telugu is shown it is required."""
+    values = data.model_dump()
+    missing = [te for te, _ in _TELUGU_FIELDS if not values[te].strip()]
+    if missing and telugu_enabled():
+        raise ValidationFailed(
+            [{"field": f, "code": "missing", "message_key": "errors.missing"} for f in missing]
+        )
+    for te, en in _TELUGU_FIELDS:
+        if te in missing:
+            values[te] = row[te] if row is not None else values[en]
+    return values
 
 
 def list_announcements() -> list[AnnouncementOut]:
@@ -108,7 +141,7 @@ def create(actor: Actor, data: AnnouncementIn) -> AnnouncementOut:
         row = repo.insert_row(
             s,
             m.announcements,
-            {**data.model_dump(), "id": new_id(), "created_by": actor.operator_id},
+            {**_values(data), "id": new_id(), "created_by": actor.operator_id},
         )
         audit_platform(
             s,
@@ -132,7 +165,7 @@ def update(
             raise Conflict("A cancelled announcement cannot change.", code="invalid_state")
         if expected_version is not None and row["version"] != expected_version:
             raise PreconditionFailed()
-        values = data.model_dump()
+        values = _values(data, row)
         changed = sorted(k for k, v in values.items() if row[k] != v)
         row = repo.update_row(s, m.announcements, announcement_id, values)
         audit_platform(
@@ -219,7 +252,7 @@ def active_announcements(
         starts = dt.datetime.fromisoformat(item["starts_at"])
         ends = dt.datetime.fromisoformat(item["ends_at"])
         if starts <= current < ends and _visible_to(item, tenant_id, tier):
-            result.append(AnnouncementBrief.model_validate(item))
+            result.append(_brief(item))
     return result
 
 

@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.core.db import platform_session
+from app.core.languages import contains_telugu
 from app.platform import announcements, billing, support
 from app.platform.announcements import InMemoryAnnouncementCache
 from app.platform.schemas import TicketCreateSchool
@@ -71,6 +72,7 @@ def test_FR_PLT_030_school_billing_page_shows_only_own_subscription(
     assert other not in res.text
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_PLT_026_announcements_bilingual_audience_and_cache(  # noqa: PLR0917 - fixtures
     api: Api,
     make_operator: MakeOperator,
@@ -119,6 +121,52 @@ def test_FR_PLT_026_announcements_bilingual_audience_and_cache(  # noqa: PLR0917
     ids = {a["id"] for a in _school_get(api, subject, "/api/v1/announcements").json()}
     assert everyone.json()["id"] not in ids
     assert announcements.for_deployment(uuid.UUID(tid), "dedicated")  # heartbeat delivery
+
+
+def test_ADR_0036_announcements_need_no_telugu_and_show_none_while_telugu_is_hidden(  # noqa: PLR0917 - fixtures
+    api: Api,
+    make_operator: MakeOperator,
+    owner: Operator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cache = InMemoryAnnouncementCache()
+    monkeypatch.setattr(announcements, "get_cache", lambda: cache)
+    agent = make_operator("support_agent")
+    _tid, subject = _live_school(api, owner, make_plan(), admin_engine)
+    now = dt.datetime.now(dt.UTC)
+    english_only = {
+        "title_en": "Maintenance tonight",
+        "body_en": "SchoolOS will be unavailable from 22:00 to 22:30 IST.",
+        "severity": "maintenance",
+        "starts_at": (now - dt.timedelta(minutes=1)).isoformat(),
+        "ends_at": (now + dt.timedelta(hours=2)).isoformat(),
+    }
+    created = api.call("POST", "/announcements", agent, json=english_only)
+    assert created.status_code == 201, created.text
+    assert created.json()["title_te"] == ""
+    with platform_session() as s:
+        stored = (
+            s.execute(
+                text("SELECT title_te, body_te FROM platform.announcements WHERE id = :i"),
+                {"i": created.json()["id"]},
+            )
+            .mappings()
+            .one()
+        )
+    assert stored["title_te"] == english_only["title_en"], "the NOT NULL column holds English"
+    with_telugu = api.call(
+        "POST", "/announcements", agent, json={**english_only, "title_te": "ఈ రాత్రి నిర్వహణ"}
+    )
+    assert with_telugu.status_code == 201
+    assert not contains_telugu(with_telugu.text)
+    seen = _school_get(api, subject, "/api/v1/announcements")
+    assert {a["id"] for a in seen.json()} >= {created.json()["id"], with_telugu.json()["id"]}
+    assert all(a["title_te"] == "" and a["body_te"] == "" for a in seen.json())
+    assert not contains_telugu(seen.text)
+    listed = api.call("GET", "/announcements", agent)
+    assert not contains_telugu(listed.text)
 
 
 def test_FR_PLT_027_school_tickets_are_redacted_scoped_and_answered(
