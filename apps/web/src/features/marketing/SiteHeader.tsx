@@ -10,6 +10,7 @@ import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { EASE_OUT, loadMotionFeatures, seconds } from "@/lib/motion";
 import { Presence } from "@/lib/presence";
+import { WhatsAppLink } from "./WhatsAppLink";
 import { MARKETING_PAGES, PAGE_HREF, SIGN_IN_HREF, mailtoHref, type MarketingPage } from "./links";
 
 const WIDE = "(min-width: 64rem)";
@@ -36,9 +37,12 @@ const serverSnapshot = () => false;
 export function SiteHeader({
   current,
   contactEmail,
+  whatsappNumber = null,
 }: {
   current: MarketingPage;
   contactEmail: string | null;
+  /** "Ask on WhatsApp": in the bar from xl (room beside the page links), always in the menu. */
+  whatsappNumber?: string | null;
 }) {
   const t = useTranslations("marketing");
   const tc = useTranslations("common");
@@ -139,6 +143,11 @@ export function SiteHeader({
               >
                 {t("cta.signIn")}
               </a>
+              {whatsappNumber ? (
+                <span className="hidden xl:contents">
+                  <WhatsAppLink number={whatsappNumber} size="md" />
+                </span>
+              ) : null}
               {contactEmail ? (
                 <span className="hidden sm:contents">
                   <a
@@ -197,6 +206,9 @@ export function SiteHeader({
                           >
                             {t("cta.talk")}
                           </a>
+                        ) : null}
+                        {whatsappNumber ? (
+                          <WhatsAppLink number={whatsappNumber} className="w-full" />
                         ) : null}
                         <a
                           href={SIGN_IN_HREF}

@@ -6,7 +6,7 @@ import { Value } from "@/components/ui/Value";
 import { formatDateTime } from "@/lib/format";
 
 /**
- * Platform status pills (docs/17 §5: gradient pills for workflow states, soft badges for
+ * Platform status pills (docs/17 §5: solid tinted pills for workflow states, soft badges for
  * record states). The text always names the state; the colour only repeats it.
  */
 const SCHOOL_PILL: Record<TenantStatus, PillVariant> = {
