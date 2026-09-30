@@ -9,6 +9,7 @@ import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Toggle } from "@/components/ui/Toggle";
 import { unwrap, useBffClient } from "@/lib/bff/query";
+import { useDialogClose } from "@/lib/dialog-motion";
 import { useApiForm } from "@/lib/forms";
 import { PK } from "./data";
 
@@ -29,6 +30,8 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
   const switchId = `flag-switch-${useId()}`;
   const [open, setOpen] = useState(false);
   const next = !flag.enabled;
+  // Fades out before it closes (Escape too); instant under reduced motion (docs/17 §5.5).
+  const close = useDialogClose(dialogRef, "modal");
 
   const form = useApiForm({
     schema: z.object({}),
@@ -44,7 +47,7 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
           },
         }),
       ),
-    onSuccess: () => dialogRef.current?.close(),
+    onSuccess: () => close(),
   });
 
   if (!manage) {
@@ -80,12 +83,12 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
           setOpen(false);
           document.getElementById(switchId)?.focus();
         }}
-        className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
+        className="dialog-motion m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
       >
         {open ? (
           <form noValidate onSubmit={form.onSubmit}>
             <div className="space-y-2 p-6 pb-2">
-              <h2 id={titleId} className="text-lg font-medium">
+              <h2 id={titleId} className="text-lg font-semibold">
                 {next ? t("turnOnTitle", { key: flag.key }) : t("turnOffTitle", { key: flag.key })}
               </h2>
               <p id={bodyId} className="text-sm text-ink-muted">
@@ -97,7 +100,7 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
               <ApiErrorAlert error={form.error} />
             </div>
             <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-6 py-4">
-              <Button variant="secondary" onClick={() => dialogRef.current?.close()}>
+              <Button variant="secondary" onClick={close}>
                 {tc("cancel")}
               </Button>
               <Button
@@ -105,6 +108,7 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
                 variant={next ? "primary" : "danger"}
                 disabled={form.pending}
                 aria-disabled={form.pending || undefined}
+                loading={form.pending}
               >
                 {form.pending ? tc("working") : next ? t("turnOn") : t("turnOff")}
               </Button>

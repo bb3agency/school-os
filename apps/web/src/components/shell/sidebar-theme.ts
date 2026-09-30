@@ -27,7 +27,7 @@ export const sidebarThemes: Record<
 /** Square 40px (or 44px) icon button for the sidebar header (collapse toggle, drawer close). */
 export function sidebarControlClasses(theme: SidebarTheme, size: "md" | "lg" = "md"): string {
   return cn(
-    "inline-flex shrink-0 items-center justify-center rounded-md transition-colors",
+    "pressable inline-flex shrink-0 items-center justify-center rounded-md",
     size === "lg" ? "size-11" : "size-10",
     sidebarThemes[theme].control,
   );

@@ -8,9 +8,9 @@ import { buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { EASE_OUT, seconds } from "@/lib/motion";
 import { MARKETING_PAGES, PAGE_HREF, SIGN_IN_HREF, mailtoHref, type MarketingPage } from "./links";
 
-const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 const WIDE = "(min-width: 64rem)";
 
 /** "Has the page scrolled?" without an effect that sets state (server snapshot: no). */
@@ -22,7 +22,7 @@ const scrolledSnapshot = () => window.scrollY > 8;
 const serverSnapshot = () => false;
 
 /**
- * Sticky header of the public pages (docs/17 §5.5): wordmark, the four pages, "Sign in" and,
+ * Sticky header of the public pages (docs/17 §5.6): wordmark, the four pages, "Sign in" and,
  * when a contact address is configured, "Talk to us". From lg the links sit in the bar; below
  * lg a "Menu" button opens them as a disclosure panel: focus moves to the first link, Escape
  * or a second press closes it and focus returns to the button; following a link or widening
@@ -157,9 +157,9 @@ export function SiteHeader({
                 exit={{
                   opacity: 0,
                   transform: "translateY(-4px) scale(0.98)",
-                  transition: { duration: 0.15, ease: EASE_OUT },
+                  transition: { duration: seconds("quick"), ease: EASE_OUT },
                 }}
-                transition={{ duration: 0.2, ease: EASE_OUT }}
+                transition={{ duration: seconds("enter"), ease: EASE_OUT }}
               >
                 <div className="mx-auto max-w-7xl rounded-xl border border-border bg-surface p-3 shadow-popover">
                   <nav aria-label={t("nav.label")}>

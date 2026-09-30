@@ -1,5 +1,5 @@
 /*
- * Public marketing pages only (docs/17 §5.5). Scoped under `.mk` so nothing leaks into the
+ * Public marketing pages only (docs/17 §5.6). Scoped under `.mk` so nothing leaks into the
  * console; the shared tokens stay in globals.css. CSP (SEC-010): every style lives here or in
  * Tailwind classes, never in a style attribute. Motion: transform and opacity only, custom
  * curves from the design-engineering skills, and nothing moves under prefers-reduced-motion
@@ -7,8 +7,8 @@
  */
 
 .mk {
-  --mk-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --mk-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --mk-ease-out: var(--ease-out); /* shared motion token (docs/17 §5.5) */
+  --mk-ease-in-out: var(--ease-in-out);
   /* Dark band: text colours checked against --color-action #111827. */
   --mk-night: #0b1220; /* white 18.9:1, --mk-night-muted 11.2:1 */
   --mk-night-muted: #c3cbd8; /* 10.9:1 on #111827 */
@@ -136,7 +136,7 @@
 
 /* Press feedback on every pressable element: instant confirmation (160ms, strong ease-out). */
 .mk-press {
-  transition: transform 160ms var(--mk-ease-out);
+  transition: transform var(--duration-press) var(--mk-ease-out);
 }
 
 .mk-press:active {

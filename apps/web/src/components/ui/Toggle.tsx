@@ -85,7 +85,7 @@ export function Toggle({
       <label
         id={labelId}
         htmlFor={switchId}
-        className={cn("block text-sm font-medium text-ink", !disabled && "cursor-pointer")}
+        className={cn("block text-sm font-semibold text-ink", !disabled && "cursor-pointer")}
       >
         {label}
       </label>

@@ -66,7 +66,7 @@ export function Timeline({
             </span>
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <p className="font-medium text-ink">
+                <p className="font-semibold text-ink">
                   {item.statusLabel ? <span className="sr-only">{item.statusLabel} </span> : null}
                   {item.title}
                 </p>

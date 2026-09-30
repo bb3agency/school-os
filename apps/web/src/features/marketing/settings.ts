@@ -2,7 +2,7 @@ import "server-only";
 import { platformEnabled } from "@/server/session/rsc";
 
 /**
- * Public-site settings (docs/17 §5.5), read on the server at request time, never inlined into a
+ * Public-site settings (docs/17 §5.6), read on the server at request time, never inlined into a
  * browser bundle. Contact details are not known yet: when a value is unset (or invalid) the
  * part of the page that needs it is simply not shown. There is no placeholder anywhere.
  *

@@ -42,7 +42,7 @@ function Illustration({ feature }: { feature: FeatureSection }): ReactNode {
 }
 
 /**
- * /features: one page with an anchored section per capability (docs/17 §5.5), each with its
+ * /features: one page with an anchored section per capability (docs/17 §5.6), each with its
  * illustrated mockup, alternating sides on wide screens. Certificates are marked Planned.
  */
 export function FeaturesView({ settings }: { settings: MarketingSettings }) {

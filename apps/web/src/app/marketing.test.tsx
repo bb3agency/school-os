@@ -265,7 +265,7 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
   });
 });
 
-describe("dedicated host: no marketing, a plain sign-in (docs/17 §5.5)", () => {
+describe("dedicated host: no marketing, a plain sign-in (docs/17 §5.6)", () => {
   it.each(["features", "security", "pricing", "about"] as const)("/%s answers 404", (name) => {
     vi.stubEnv("SOS_DEPLOYMENT_MODE", "dedicated");
     withContact();

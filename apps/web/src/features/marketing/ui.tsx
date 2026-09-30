@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { SIGN_IN_HREF, mailtoHref } from "./links";
 
 /**
- * Layout pieces of the public pages (docs/17 §5.5). One spacing scale: sections are
+ * Layout pieces of the public pages (docs/17 §5.6). One spacing scale: sections are
  * py-20/md:py-28, section intros mb-12/md:mb-16, card grids gap-4/md:gap-5; the content
  * column is max-w-7xl (80rem) inside the page gutter.
  */

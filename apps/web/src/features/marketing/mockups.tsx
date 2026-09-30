@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { SampleTag } from "./ui";
 
 /**
- * Illustrated product mockups (docs/17 §5.5): HTML, CSS and inline SVG only, so they are crisp
+ * Illustrated product mockups (docs/17 §5.6): HTML, CSS and inline SVG only, so they are crisp
  * at any DPI, need no image requests and carry no style attributes (CSP). Every one is sample
  * data, labelled "Sample data", and hidden from screen readers behind a one-sentence caption.
  * Sample values (not UI text) are kept here; labels come from the `marketing.mock` messages.

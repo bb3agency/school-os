@@ -3,15 +3,15 @@
 import { useAnimate, useReducedMotion, inView } from "motion/react";
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { EASE_OUT } from "@/lib/motion";
 
-/** Strong ease-out (design-engineering skills): starts fast, settles softly. */
-const EASE_OUT = [0.23, 1, 0.32, 1] as const;
+/** Marketing reveals may run longer than console UI (explanatory, once per visit). */
 const DURATION = 0.6;
 /** 30–80ms between items of a group. */
 const STAGGER = 0.06;
 
 /**
- * Scroll reveal for marketing sections (docs/17 §5.5), CSP-safe and progressive:
+ * Scroll reveal for marketing sections (docs/17 §5.6), CSP-safe and progressive:
  *
  * - The server renders the content **visible**, with no style attribute (a server-rendered
  *   `style` would be blocked by the nonce CSP, which has no 'unsafe-inline' for styles).

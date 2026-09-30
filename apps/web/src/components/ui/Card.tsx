@@ -64,7 +64,7 @@ export function CardHeader({
       <div className="min-w-0 flex-1 basis-60 space-y-1">
         {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
         {title ? (
-          <Heading id={headingId} className="text-lg font-medium text-ink">
+          <Heading id={headingId} className="text-lg font-semibold text-ink">
             {title}
           </Heading>
         ) : null}

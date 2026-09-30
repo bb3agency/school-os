@@ -13,7 +13,7 @@ const FOOTER_LINK =
   "inline-flex min-h-11 items-center text-ink-muted underline-offset-4 hover:text-ink hover:underline sm:min-h-8";
 
 /**
- * Shared layout of the public pages (docs/17 §5.5): skip link, sticky header, `<main id="main">`
+ * Shared layout of the public pages (docs/17 §5.6): skip link, sticky header, `<main id="main">`
  * and the footer with every page link. A Server Component; only the header is a client
  * component (scroll state and the phone menu).
  */

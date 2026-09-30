@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -9,9 +10,11 @@ import { Link } from "@/i18n/navigation";
 import { PASSIVE_HEADER } from "@/lib/bff/fetch";
 import { ApiError, unwrap, useApiMutation, useBffClient } from "@/lib/bff/query";
 import { formatDateTime } from "@/lib/format";
+import { EASE_OUT, seconds } from "@/lib/motion";
 import { bellPollDelay, NOTIFICATION_KEYS, notificationHref, type Notification } from "./data";
 
 const LATEST = 8;
+const POPOVER_EASE = [...EASE_OUT] as [number, number, number, number];
 
 /** One notification line: title, body, time, unread marker, and a link when it has one. */
 export function NotificationItem({
@@ -140,9 +143,15 @@ export function NotificationBell() {
   const markRead = useMarkRead();
   const markAll = useMarkAllRead();
 
+  // Escape (keyboard) closes at once, never animated (docs/17 §5.5): a new presence key
+  // unmounts the panel without its exit. A click elsewhere or on the bell lets it fade out.
+  const [presence, setPresence] = useState(0);
   const close = useCallback((returnFocus: boolean) => {
     setOpen(false);
-    if (returnFocus) buttonRef.current?.focus();
+    if (returnFocus) {
+      setPresence((value) => value + 1);
+      buttonRef.current?.focus();
+    }
   }, []);
 
   useEffect(() => {
@@ -182,7 +191,7 @@ export function NotificationBell() {
           if (!open) void queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.latest });
           setOpen((value) => !value);
         }}
-        className="relative inline-flex size-10 items-center justify-center rounded-full border border-border-soft bg-surface text-ink hover:bg-surface-muted"
+        className="pressable relative inline-flex size-10 items-center justify-center rounded-full border border-border-soft bg-surface text-ink hover:bg-surface-muted"
       >
         <svg
           aria-hidden="true"
@@ -199,7 +208,7 @@ export function NotificationBell() {
         {count > 0 ? (
           <span
             aria-hidden="true"
-            className="absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-danger px-1 text-center text-xs leading-5 font-bold text-white"
+            className="absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-danger px-1 text-center text-xs leading-5 font-bold text-white tabular-nums"
           >
             {count > 99 ? "99+" : count}
           </span>
@@ -209,52 +218,65 @@ export function NotificationBell() {
       <span className="sr-only" role="status" aria-live="polite">
         {unread.data ? t("unreadCount", { count: unread.data }) : ""}
       </span>
-      {open ? (
-        <section
-          id={panelId}
-          aria-label={t("panelLabel")}
-          className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-4 text-ink shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:w-auto"
-        >
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">{t("title")}</h2>
-            {count > 0 ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => markAll.mutate(undefined)}
-                disabled={markAll.isPending}
-              >
-                {t("markAllRead")}
-              </Button>
-            ) : null}
-          </div>
-          {latest.isPending ? (
-            <p className="text-sm">{t("loading")}</p>
-          ) : latest.isError ? (
-            <ApiErrorAlert error={latest.error} namespace="notifications" />
-          ) : latest.data.length === 0 ? (
-            <p className="text-sm text-ink-muted">{t("empty")}</p>
-          ) : (
-            <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
-              {latest.data.map((item) => (
-                <li key={item.id} className="py-2">
-                  <NotificationItem item={item} onOpen={openItem} />
-                </li>
-              ))}
-            </ul>
-          )}
-          <ApiErrorAlert error={markRead.error ?? markAll.error} />
-          <p className="mt-2 border-t border-border pt-2 text-sm">
-            <Link
-              href="/notifications"
-              onClick={() => setOpen(false)}
-              className="font-semibold text-primary underline"
+      {/* The panel grows out of the bell (origin top right): 150ms fade and scale from 0.97.
+          It exists only after a click, so Motion never server-renders a style attribute
+          (CSP, SEC-010). */}
+      {/* Self-contained (the console's MotionProvider already loaded these features). */}
+      <LazyMotion features={domAnimation} strict>
+        <AnimatePresence key={presence}>
+          {open ? (
+            <m.section
+              key="panel"
+              id={panelId}
+              aria-label={t("panelLabel")}
+              initial={{ opacity: 0, transform: "scale(0.97)" }}
+              animate={{ opacity: 1, transform: "scale(1)" }}
+              exit={{ opacity: 0, transform: "scale(0.97)" }}
+              transition={{ duration: seconds("quick"), ease: POPOVER_EASE }}
+              className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-border bg-surface p-4 text-ink shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:w-auto max-sm:origin-top"
             >
-              {t("seeAll")}
-            </Link>
-          </p>
-        </section>
-      ) : null}
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">{t("title")}</h2>
+                {count > 0 ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => markAll.mutate(undefined)}
+                    disabled={markAll.isPending}
+                  >
+                    {t("markAllRead")}
+                  </Button>
+                ) : null}
+              </div>
+              {latest.isPending ? (
+                <p className="text-sm">{t("loading")}</p>
+              ) : latest.isError ? (
+                <ApiErrorAlert error={latest.error} namespace="notifications" />
+              ) : latest.data.length === 0 ? (
+                <p className="text-sm text-ink-muted">{t("empty")}</p>
+              ) : (
+                <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
+                  {latest.data.map((item) => (
+                    <li key={item.id} className="py-2">
+                      <NotificationItem item={item} onOpen={openItem} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <ApiErrorAlert error={markRead.error ?? markAll.error} />
+              <p className="mt-2 border-t border-border pt-2 text-sm">
+                <Link
+                  href="/notifications"
+                  onClick={() => setOpen(false)}
+                  className="font-semibold text-primary underline"
+                >
+                  {t("seeAll")}
+                </Link>
+              </p>
+            </m.section>
+          ) : null}
+        </AnimatePresence>
+      </LazyMotion>
     </div>
   );
 }

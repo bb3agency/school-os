@@ -27,7 +27,7 @@ export function EmptyState({
       <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">
         <Icon name={icon} className="size-6" />
       </span>
-      <p className="font-medium text-ink">{title}</p>
+      <p className="font-semibold text-ink">{title}</p>
       {body ? <p className="max-w-prose text-sm text-ink-muted">{body}</p> : null}
       {action ? (
         <div className="mt-2" data-print="hide">
