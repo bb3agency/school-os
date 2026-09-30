@@ -7,6 +7,7 @@ import dataclasses
 import datetime as dt
 import hashlib
 import json
+import re
 import sys
 import uuid
 from typing import Any
@@ -28,6 +29,17 @@ SW = AD.SW
 D = AD.D
 
 NAME = "Synthetica Pallavi Varanasi"
+_NOISE = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    r"|[0-9a-fA-F]{16,}|[0-9]{5,}"
+)
+
+
+def _without_noise(text_: str) -> str:
+    """The archive text without ids, hashes and long numbers (see the last4 check)."""
+    return _NOISE.sub(" ", text_)
+
+
 PRINTED = "Synthetica Printed Varanasi"
 NOTE = "Synthetic inhaler note for Pallavi"
 PHONE = "9876501234"
@@ -234,8 +246,13 @@ def test_US_1201_AC1_archive_holds_records_and_documents_masked_by_default(
     assert "aadhaar_as_printed_withheld" in as_json["notes"]
 
     everything = b"".join(zf.read(n) for n in names if not n.startswith("documents/"))
-    for secret in (NOTE, PRINTED, PHONE, ADDRESS, "4821"):
+    for secret in (NOTE, PRINTED, PHONE, ADDRESS):
         assert secret.encode() not in everything, secret
+    # The last four Aadhaar digits never appear, in any form ("4821", "XXXX XXXX 4821"). Four
+    # digits also turn up by chance inside ids, hashes, microseconds and byte sizes, so those
+    # tokens (UUIDs, hex runs of 16+, digit runs of 5+) are removed before looking: a leaked
+    # last4 is a 4-digit run of its own and is still found.
+    assert "4821" not in _without_noise(everything.decode("utf-8", errors="replace"))
     # Other schools' records never reach the archive (RLS, invariant 1).
     assert b"Otherschool" not in everything
     assert str(records["other"]).encode() not in everything
