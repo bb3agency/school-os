@@ -19,7 +19,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/students",
+    usePathname: () => "/students",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -34,7 +34,7 @@ vi.mock("next/navigation", async (importOriginal) => {
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined, getAll: () => [] }),
-  headers: async () => new Headers({ "x-sos-path": "/en" }),
+  headers: async () => new Headers({ "x-sos-path": "/" }),
 }));
 
 const UUID = "0192f3a4-0000-7000-8000-00000000c101";
@@ -143,4 +143,60 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
     );
     expect(offenders(container).length).toBeGreaterThan(0);
   });
+});
+
+/** Links, forms and resources whose address names a locale (`/en`, `/te`, `/en/...`). */
+function localePrefixed(root: HTMLElement): string[] {
+  const PREFIXED = /^\/(en|te)(\/|$|\?|#)/i;
+  const found: string[] = [];
+  for (const node of root.querySelectorAll("[href], [action], [src]")) {
+    for (const attr of ["href", "action", "src"]) {
+      const value = node.getAttribute(attr);
+      if (value && PREFIXED.test(value)) {
+        found.push(`${node.tagName.toLowerCase()} ${attr}=${value}`);
+      }
+    }
+  }
+  return found;
+}
+
+describe("no locale in any URL (product owner 2026-09-30, ADR-0036 note)", () => {
+  it.each([
+    ["Telugu off", { telugu: false }],
+    ["Telugu on, English", { telugu: true }],
+    ["Telugu on, Telugu", { locale: "te", telugu: true }],
+  ] as const)(
+    "no page links to a /en or /te address (%s)",
+    async (_label, options) => {
+      const paths = Object.keys(modules).sort();
+      const failures: Record<string, string[]> = {};
+      let scanned = 0;
+      let links = 0;
+      for (const path of paths) {
+        const page = await element(path);
+        if (!page) continue;
+        const shell = path.includes("/platform/") ? (
+          <PlatformShell permissions={null}>{page}</PlatformShell>
+        ) : (
+          <SchoolShell permissions={null} languages={["te", "en"]}>
+            {page}
+          </SchoolShell>
+        );
+        const { container } = renderWithIntl(shell, options);
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        const found = localePrefixed(container);
+        if (found.length > 0) failures[path] = found;
+        links += container.querySelectorAll("a[href^='/']").length;
+        scanned += 1;
+        cleanup();
+      }
+      expect(failures).toEqual({});
+      expect(scanned).toBeGreaterThan(75);
+      // The menus alone link every page: the scan really looked at in-app links.
+      expect(links).toBeGreaterThan(1000);
+    },
+    180_000,
+  );
 });

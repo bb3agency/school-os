@@ -1,7 +1,7 @@
 import createIntlMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
-import { englishPathFor, teluguEnabled } from "@/i18n/languages";
-import { englishRouting, routing } from "@/i18n/routing";
+import { legacyLocalePath, teluguEnabled, uiLocale } from "@/i18n/languages";
+import { englishRouting, LOCALE_COOKIE, routing } from "@/i18n/routing";
 import {
   applySecurityHeaders,
   buildContentSecurityPolicy,
@@ -40,24 +40,40 @@ function isNonLocalised(pathname: string): boolean {
 }
 
 /**
- * Locale routing (NFR-I18N-001). With Telugu switched off (ADR-0036) a `/te/...` URL is
- * redirected to the same `/en/...` page (307: temporary, Telugu may come back by
- * configuration) and only English is negotiated.
+ * An old URL with a locale prefix (`/en/x`, `/te/x`): 308 to the same path without it, query
+ * kept (product owner 2026-09-30: no URL carries a locale; ADR-0036 note). While Telugu is on
+ * the old prefix still names a language, so it is stored in the language cookie first; while
+ * it is off the redirect sets nothing (English whatever the old link said). The target is
+ * built on this request's own URL with a single leading slash (`legacyLocalePath`), so
+ * `/en//evil.example` stays on this site.
+ */
+function redirectLegacyPrefix(request: NextRequest): NextResponse | null {
+  const legacy = legacyLocalePath(request.nextUrl.pathname);
+  if (!legacy) return null;
+  const target = request.nextUrl.clone();
+  target.pathname = legacy.pathname;
+  const response = NextResponse.redirect(target, 308);
+  if (teluguEnabled()) {
+    const { name, ...options } = LOCALE_COOKIE;
+    response.cookies.set(name, uiLocale(legacy.locale), { ...options, path: "/" });
+  }
+  return response;
+}
+
+/**
+ * Locale routing (NFR-I18N-001) with no prefix in any URL: next-intl rewrites `/x` to the
+ * internal `/<locale>/x`, the language taken from the NEXT_LOCALE cookie, then
+ * Accept-Language. With Telugu switched off (ADR-0036) only English is negotiated.
  */
 function localise(request: NextRequest): NextResponse {
-  if (teluguEnabled()) return handleBilingualRouting(request);
-  const english = englishPathFor(request.nextUrl.pathname);
-  if (english) {
-    const target = request.nextUrl.clone();
-    target.pathname = english;
-    return NextResponse.redirect(target, 307);
-  }
-  return handleEnglishRouting(request);
+  const legacy = redirectLegacyPrefix(request);
+  if (legacy) return legacy;
+  return teluguEnabled() ? handleBilingualRouting(request) : handleEnglishRouting(request);
 }
 
 /**
  * Next.js 16 proxy (formerly middleware): per-request CSP nonce + security headers
- * (SEC-010) and locale negotiation/prefix routing (NFR-I18N-001).
+ * (SEC-010) and locale negotiation without URL prefixes (NFR-I18N-001).
  */
 export function proxy(request: NextRequest): NextResponse {
   const nonce = generateNonce();

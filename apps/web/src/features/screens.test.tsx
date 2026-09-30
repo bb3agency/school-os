@@ -149,13 +149,13 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
       Response.json(
         {
           code: "step_up_required",
-          step_up_url: "/bff/auth/step-up?next=%2Fen%2Fsettings%2Fusers",
+          step_up_url: "/bff/auth/step-up?next=%2Fsettings%2Fusers",
         },
         { status: 428 },
       );
     renderWithIntl(<UsersScreen />);
     await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fen%2Fsettings%2Fusers"),
+      expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fsettings%2Fusers"),
     );
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
@@ -284,10 +284,7 @@ describe("platform screens wired to the BFF (FR-PLT-001)", () => {
       <SchoolsScreen filters={{ q: " saraswati ", status: "active", pastDue: true }} />,
     );
     const link = await screen.findByRole("link", { name: "Sri Saraswati High School" });
-    expect(link).toHaveAttribute(
-      "href",
-      "/en/platform/schools/0192f3a4-0000-7000-8000-000000000001",
-    );
+    expect(link).toHaveAttribute("href", "/platform/schools/0192f3a4-0000-7000-8000-000000000001");
     expect(
       within(screen.getByRole("table")).getByText(messages.en.status.subscription.past_due),
     ).toBeInTheDocument();

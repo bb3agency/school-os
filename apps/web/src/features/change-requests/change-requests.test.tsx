@@ -17,7 +17,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/change-requests",
+    usePathname: () => "/change-requests",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -336,7 +336,7 @@ describe("new change request (US-601 AC1, FR-CR-001, BR-04)", () => {
     expect(await screen.findByText("Request sent")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to the problem" })).toHaveAttribute(
       "href",
-      "/en/findings/0192f3a4-0000-7000-8000-00000000f001",
+      "/findings/0192f3a4-0000-7000-8000-00000000f001",
     );
     setStorageSendForTesting(undefined);
     expect(stored).toEqual(["POST https://files.schoolos.example/bucket"]);

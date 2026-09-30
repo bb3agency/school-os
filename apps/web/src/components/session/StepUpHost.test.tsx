@@ -51,12 +51,12 @@ describe("StepUpHost (ADR-0018, SEC-005)", () => {
     expect(handler).toBeDefined();
     let answer: Promise<boolean> = Promise.resolve(false);
     await act(async () => {
-      answer = handler?.("/bff/auth/step-up?next=%2Fen%2Ffindings") ?? answer;
+      answer = handler?.("/bff/auth/step-up?next=%2Ffindings") ?? answer;
     });
     const dialog = await screen.findByRole("dialog", { name: "Confirm it's you" });
     expect(dialog).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Sign in again" }));
-    expect(open).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fen%2Fstep-up-complete");
+    expect(open).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fstep-up-complete");
     expect(await screen.findByText(/Finish signing in in the other window/)).toBeInTheDocument();
     announceComplete();
     await expect(answer).resolves.toBe(true);
@@ -79,12 +79,12 @@ describe("StepUpHost (ADR-0018, SEC-005)", () => {
     const navigate = vi.fn();
     renderWithIntl(<StepUpHost open={() => null} navigate={navigate} />);
     await act(async () => {
-      void stepUpHandler("staff")?.("/bff/auth/step-up?next=%2Fen%2Ffindings");
+      void stepUpHandler("staff")?.("/bff/auth/step-up?next=%2Ffindings");
     });
     await userEvent.click(await screen.findByRole("button", { name: "Sign in again" }));
     expect(await screen.findByText("The sign-in window was blocked")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Continue in this tab" }));
-    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fen%2Ffindings");
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Ffindings");
   });
 
   it("never replays the action when someone else signed in at the prompt", async () => {
@@ -98,7 +98,7 @@ describe("StepUpHost (ADR-0018, SEC-005)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Sign in again" }));
     await userEvent.click(await screen.findByRole("button", { name: "I have signed in" }));
     await expect(answer).resolves.toBe(false);
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/en"));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
   });
 
   it("unregisters when the page unmounts", () => {

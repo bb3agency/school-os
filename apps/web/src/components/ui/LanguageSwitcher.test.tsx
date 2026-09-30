@@ -1,21 +1,28 @@
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SchoolShell } from "@/components/shell/SchoolShell";
+import { localeCookieString } from "@/i18n/locale-cookie";
 import { renderWithIntl } from "@/test/render";
 import { LanguageSwitcher, offeredLanguages } from "./LanguageSwitcher";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
-  return { ...actual, usePathname: () => "/en/students" };
+  return { ...actual, usePathname: () => "/students" };
+});
+
+afterEach(() => {
+  document.cookie = "NEXT_LOCALE=; path=/; max-age=0";
+  vi.clearAllMocks();
 });
 
 function offered(): (string | null)[] {
   const nav = screen.queryByRole("navigation", { name: "Language" });
   if (!nav) return [];
   return within(nav)
-    .getAllByRole("link")
-    .map((link) => link.getAttribute("lang"));
+    .getAllByRole("button")
+    .map((button) => button.getAttribute("lang"));
 }
 
 /** Telugu switched on explicitly (ADR-0036): the switcher exists only then. */
@@ -63,6 +70,53 @@ describe("language switcher follows the school's languages (FR-TEN-012, NFR-I18N
       telugu,
     );
     expect(offered()).toEqual(["te"]);
+  });
+});
+
+describe("the switcher keeps the URL free of a locale (ADR-0036 note, 2026-09-30)", () => {
+  it("renders buttons, not links: no href and no /te or /en anywhere", () => {
+    renderWithIntl(<LanguageSwitcher />, telugu);
+    const nav = screen.getByRole("navigation", { name: "Language" });
+    expect(within(nav).queryAllByRole("link")).toEqual([]);
+    expect(nav.querySelector("[href], [hreflang]")).toBeNull();
+    expect(within(nav).getByRole("button", { name: "English" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(nav).getByRole("button", { name: "తెలుగు" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("stores the choice in the NEXT_LOCALE cookie and reloads the same page", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    const before = window.location.href;
+    renderWithIntl(<LanguageSwitcher reload={reload} />, telugu);
+    await user.click(screen.getByRole("button", { name: "తెలుగు" }));
+    expect(document.cookie).toContain("NEXT_LOCALE=te");
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(window.location.href).toBe(before);
+  });
+
+  it("does nothing for the language already in use (keyboard too)", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    renderWithIntl(<LanguageSwitcher reload={reload} />, telugu);
+    screen.getByRole("button", { name: "English" }).focus();
+    await user.keyboard("{Enter}");
+    expect(reload).not.toHaveBeenCalled();
+    expect(document.cookie).not.toContain("NEXT_LOCALE");
+  });
+
+  it("writes a site-wide, year-long, SameSite=Lax cookie (Secure over https)", () => {
+    expect(localeCookieString("te", false)).toBe(
+      "NEXT_LOCALE=te; path=/; max-age=31536000; samesite=lax",
+    );
+    expect(localeCookieString("en", true)).toBe(
+      "NEXT_LOCALE=en; path=/; max-age=31536000; samesite=lax; secure",
+    );
   });
 });
 

@@ -236,7 +236,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
     });
     expect(screen.getByRole("link", { name: m.openSchool })).toHaveAttribute(
       "href",
-      "/en/platform/schools/0192f3a4-0000-7000-8000-000000000001",
+      "/platform/schools/0192f3a4-0000-7000-8000-000000000001",
     );
   });
 
@@ -313,7 +313,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
   it("step-up required (428) sends the operator to re-authenticate", async () => {
     stub.routes["POST /bff/api/v1/platform/tenants"] = () =>
       problem(428, "step_up_required", {
-        step_up_url: "/bff/auth/platform/step-up?next=%2Fen%2Fplatform%2Fprovision",
+        step_up_url: "/bff/auth/platform/step-up?next=%2Fplatform%2Fprovision",
       });
     const user = userEvent.setup({ delay: null });
     renderWithIntl(<ProvisionSchoolForm />, "en");
@@ -322,7 +322,7 @@ describe("provision wizard (FR-PLT-001..003)", () => {
 
     await waitFor(() =>
       expect(stub.navigate).toHaveBeenCalledWith(
-        "/bff/auth/platform/step-up?next=%2Fen%2Fplatform%2Fprovision",
+        "/bff/auth/platform/step-up?next=%2Fplatform%2Fprovision",
       ),
     );
     expect(await screen.findByText(messages.en.errors.api.redirecting)).toBeInTheDocument();

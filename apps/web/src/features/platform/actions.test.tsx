@@ -240,7 +240,7 @@ describe("school detail actions (FR-PLT-004..005, SEC-027)", () => {
   it("step-up required (428) leaves for re-authentication", async () => {
     stub.routes[`POST /bff/api/v1/platform/tenants/${T}/offboarding`] = () =>
       problem(428, "step_up_required", {
-        step_up_url: "/bff/auth/platform/step-up?next=%2Fen%2Fplatform",
+        step_up_url: "/bff/auth/platform/step-up?next=%2Fplatform",
       });
     const user = userEvent.setup();
     renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
@@ -253,9 +253,7 @@ describe("school detail actions (FR-PLT-004..005, SEC-027)", () => {
     );
     await user.click(within(dialog).getByRole("button", { name: pm.schoolDetail.offboardConfirm }));
     await waitFor(() =>
-      expect(stub.navigate).toHaveBeenCalledWith(
-        "/bff/auth/platform/step-up?next=%2Fen%2Fplatform",
-      ),
+      expect(stub.navigate).toHaveBeenCalledWith("/bff/auth/platform/step-up?next=%2Fplatform"),
     );
   });
 
@@ -407,7 +405,7 @@ describe("school provisioning state and resume (FR-PLT-002, docs/16 §5.4)", () 
   it("step-up required (428) on resume leaves for re-authentication", async () => {
     stub.routes[RESUME] = () =>
       problem(428, "step_up_required", {
-        step_up_url: "/bff/auth/platform/step-up?next=%2Fen%2Fplatform",
+        step_up_url: "/bff/auth/platform/step-up?next=%2Fplatform",
       });
     const user = userEvent.setup();
     renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
@@ -415,9 +413,7 @@ describe("school provisioning state and resume (FR-PLT-002, docs/16 §5.4)", () 
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: sd.provisioning.resume }));
     await waitFor(() =>
-      expect(stub.navigate).toHaveBeenCalledWith(
-        "/bff/auth/platform/step-up?next=%2Fen%2Fplatform",
-      ),
+      expect(stub.navigate).toHaveBeenCalledWith("/bff/auth/platform/step-up?next=%2Fplatform"),
     );
   });
 

@@ -16,7 +16,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/settings/structure/years/x/promotions",
+    usePathname: () => "/settings/structure/years/x/promotions",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -523,7 +523,7 @@ describe("promotions screen (FR-TEN-011, US-202 AC2)", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open school structure" })).toHaveAttribute(
       "href",
-      "/en/settings/structure",
+      "/settings/structure",
     );
   });
 
@@ -604,9 +604,9 @@ describe("promotions menu entry (FR-TEN-011, US-202 AC2)", () => {
     renderWithIntl(<PromotionsIndexScreen />);
     const links = await screen.findAllByRole("link", { name: /Promote students/ });
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      `/en/settings/structure/years/${FROM.id}/promotions`,
-      `/en/settings/structure/years/${NEXT.id}/promotions`,
-      `/en/settings/structure/years/${OLD.id}/promotions`,
+      `/settings/structure/years/${FROM.id}/promotions`,
+      `/settings/structure/years/${NEXT.id}/promotions`,
+      `/settings/structure/years/${OLD.id}/promotions`,
     ]);
     expect(links[0]).toHaveAccessibleName("Promote students (academic year 2026-27)");
   });
