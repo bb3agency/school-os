@@ -21,7 +21,7 @@ import { outcomeOf, stateFromMessage, type AnswerExtras, type AskState } from ".
 import { NEW_CHAT_EVENT, useChat, type LiveTurn } from "./chat";
 import { Composer, MAX_QUESTION, type ComposerHandle } from "./Composer";
 import { ConversationMenu } from "./ConversationMenu";
-import { toPlainText } from "./markdown";
+import { toPlainText } from "./markdown-parse";
 import { titleOf, useConversation } from "./conversations";
 import { ASK_PERM, type ConversationMessage } from "./data";
 import { memoryOn, useMemorySettings } from "./memory";

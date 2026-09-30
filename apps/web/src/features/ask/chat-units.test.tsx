@@ -17,7 +17,7 @@ import { sortConversations, writingElsewhere } from "./conversations";
 import type { ConversationMessage } from "./data";
 import { matchesFilter } from "./HistoryScreen";
 import { Markdown } from "./Markdown";
-import { parseMarkdown, stableStreamingText, toPlainText } from "./markdown";
+import { parseMarkdown, stableStreamingText, toPlainText } from "./markdown-parse";
 import { copyText } from "./MessageActions";
 import { nextRevealLength, prefersReducedMotion, useReducedMotion, useSmoothText } from "./motion";
 import { isNearBottom, stickReducer } from "./scroll";

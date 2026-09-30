@@ -5,7 +5,7 @@ import { Fragment, useMemo, type ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { parseSource, sourceHref } from "./answer";
-import { parseMarkdown, type Align, type Block, type Inline } from "./markdown";
+import { parseMarkdown, type Align, type Block, type Inline } from "./markdown-parse";
 
 const ALIGN: Record<Exclude<Align, null>, string> = {
   left: "text-start",
@@ -163,7 +163,7 @@ function renderBlock(block: Block, key: number, ctx: RenderContext): ReactNode {
 }
 
 /**
- * An answer's restricted markdown (markdown.ts) as React elements: never HTML, links only to
+ * An answer's restricted markdown (markdown-parse.ts) as React elements: never HTML, links only to
  * the screens of `sos://` sources, `[n]` markers of known citations rendered by `cite`.
  */
 export function Markdown({
