@@ -76,5 +76,16 @@
     "import": {
       "subjectA": "English"
     }
+  },
+  "schoolSettings": {
+    "settings": {
+      "description": "Date format, sign-out time and AI features."
+    },
+    "groups": {
+      "languages": {
+        "title": "Dates",
+        "description": "How dates are written."
+      }
+    }
   }
 }
