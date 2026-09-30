@@ -36,6 +36,9 @@ NOT_SETTINGS: dict[str, str] = {
     "SOS_DB_PORT": "docker compose / scripts/dev.py host port",
     "SOS_VALKEY_PORT": "docker compose / scripts/dev.py host port",
     "SOS_INSTALL_PSQL": "docker compose build argument INSTALL_PSQL",
+    "SOS_PUBLIC_CONTACT_EMAIL": "web only: apps/web/src/features/marketing/settings.ts",
+    "SOS_PUBLIC_COMPANY_NAME": "web only: apps/web/src/features/marketing/settings.ts",
+    "SOS_PUBLIC_COMPANY_ADDRESS": "web only: apps/web/src/features/marketing/settings.ts",
 }
 
 SECRET_NAME = re.compile(r"(SECRET|PASSWORD|_KEY$|MASTER_KEY|TOKEN_KEY)")
