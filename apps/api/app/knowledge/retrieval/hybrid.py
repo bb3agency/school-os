@@ -18,11 +18,14 @@ version number. Adjacent chunks from the same page are merged. Tenant isolation 
 
 from __future__ import annotations
 
+import math
+import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
+from opentelemetry import trace
 from sqlalchemy import (
     ARRAY,
     Float,
@@ -37,12 +40,15 @@ from sqlalchemy import (
     text,
     union_all,
 )
-from sqlalchemy.dialects.postgresql import REGCONFIG, TSQUERY
+from sqlalchemy.dialects.postgresql import REGCONFIG, TSQUERY, TSVECTOR
 from sqlalchemy.orm import Session
 
+from app.core.logging import get_logger
+from app.core.redaction import mask_aadhaar
 from app.knowledge import sources
 from app.knowledge.config.retrieval import RetrievalConfig, load_retrieval_config
 from app.knowledge.domain import AclKeys, RankedChunk, RetrievalQuery, SearchFilters
+from app.knowledge.interfaces import Reranker
 from app.knowledge.models import EMBEDDING_DIMENSIONS, DocumentChunk, HalfVector
 from app.knowledge.retrieval.acl import acl_predicate
 from app.knowledge.retrieval.fusion import (
@@ -50,6 +56,7 @@ from app.knowledge.retrieval.fusion import (
     Scored,
     adjacent_groups,
     apply_boosts,
+    apply_rerank,
     diversify,
     reciprocal_rank_fusion,
 )
@@ -57,6 +64,9 @@ from app.knowledge.retrieval.fusion import (
 BranchName = Literal["vector", "full_text", "trigram"]
 BRANCHES: Final[tuple[BranchName, ...]] = ("vector", "full_text", "trigram")
 MAX_K: Final = 100
+
+log = get_logger(__name__)
+tracer = trace.get_tracer("app.knowledge.retrieval")
 
 _C = DocumentChunk
 _CANDIDATE_COLUMNS = (
@@ -135,10 +145,14 @@ def branch_statements(
     )
 
     tsq = cast(bindparam(f"tsquery_{index}", query.tsquery, type_=Text), TSQUERY)
-    ts_rank = func.ts_rank_cd(_C.content_tsv, tsq)
+    # Contextual retrieval (docs/06 §4.11): the chunk's context is searched with its text.
+    tsv: Any = _C.content_tsv
+    if config.contextual:
+        tsv = _C.content_tsv.op("||", return_type=TSVECTOR)(_C.context_tsv)
+    ts_rank = func.ts_rank_cd(tsv, tsq)
     fts_inner = (
         select(*_CANDIDATE_COLUMNS, ts_rank.label("score"))
-        .where(acl_predicate(acl, filters), _C.content_tsv.op("@@")(tsq))
+        .where(acl_predicate(acl, filters), tsv.op("@@")(tsq))
         .order_by(ts_rank.desc(), _C.id)
         .limit(b.full_text.limit)
         .subquery(f"full_text_{index}")
@@ -149,10 +163,13 @@ def branch_statements(
     )
 
     qtext = bindparam(f"qtext_{index}", query.text, type_=Text)
-    similarity = func.word_similarity(qtext, _C.context_header)
+    keyword: Any = _C.context_header
+    if config.contextual:
+        keyword = func.concat_ws(" ", _C.context_header, _C.chunk_context)
+    similarity = func.word_similarity(qtext, keyword)
     trg_inner = (
         select(*_CANDIDATE_COLUMNS, similarity.label("score"))
-        .where(acl_predicate(acl, filters), qtext.op("<%")(_C.context_header))
+        .where(acl_predicate(acl, filters), qtext.op("<%")(keyword))
         .order_by(similarity.desc(), _C.id)
         .limit(b.trigram.limit)
         .subquery(f"trigram_{index}")
@@ -179,14 +196,30 @@ def apply_session_settings(session: Session, config: RetrievalConfig) -> None:
 
 
 class HybridRetriever:
-    """:class:`app.knowledge.interfaces.Retriever` over ``kb.document_chunks``."""
+    """:class:`app.knowledge.interfaces.Retriever` over ``kb.document_chunks``.
 
-    def __init__(self, config: RetrievalConfig | None = None) -> None:
+    ``reranker`` (optional, docs/06 §6): used only while ``rerank.provider`` is not ``off``;
+    it receives the question and the text of the best ``rerank.candidates`` fused candidates,
+    read again under the caller's ACL predicate and Aadhaar-masked again (invariants 4, 8)."""
+
+    def __init__(
+        self,
+        config: RetrievalConfig | None = None,
+        *,
+        reranker: Reranker | None = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._config = config or load_retrieval_config()
+        self._reranker = reranker if self._config.rerank.enabled else None
+        self._clock = clock
 
     @property
     def config(self) -> RetrievalConfig:
         return self._config
+
+    @property
+    def reranker(self) -> Reranker | None:
+        return self._reranker
 
     def query_texts(self, session: Session, query: RetrievalQuery) -> list[QueryText]:
         if not query.texts or len(query.texts) != len(query.vectors):
@@ -240,8 +273,83 @@ class HybridRetriever:
             self.candidates(session, acl, query.filters, texts), config.fusion.k
         )
         boosted = apply_boosts(fused, config.boosts, prefer_latest=query.prefer_latest)
+        if self._reranker is not None and boosted:
+            reranked = self._rerank(session, acl, query, boosted)
+            if reranked is not None:
+                boosted, k = reranked, min(k, config.rerank.keep)
         chosen = diversify(boosted, config.diversity, k)
         return self._materialise(session, acl, query.filters, chosen)
+
+    def _passages(
+        self, session: Session, acl: AclKeys, filters: SearchFilters, head: Sequence[Scored]
+    ) -> dict[uuid.UUID, str]:
+        """The reranker's input for ``head``: read again UNDER the ACL predicate (a candidate
+        whose visibility changed meanwhile is dropped), Aadhaar-masked again, capped."""
+        rerank = self._config.rerank
+        rows = session.execute(
+            select(_C.id, _C.context_header, _C.chunk_context, _C.content).where(
+                _C.id.in_([c.chunk_id for c in head]), acl_predicate(acl, filters)
+            )
+        ).all()
+        out = {}
+        for row in rows:
+            parts = [row.context_header, row.chunk_context] if rerank.include_context else []
+            head_text = "\n".join(p for p in parts if p)
+            text_ = f"{head_text}\n\n{row.content}" if head_text else row.content
+            out[row.id] = mask_aadhaar(text_)[: rerank.max_passage_chars]
+        return out
+
+    def _rerank(
+        self, session: Session, acl: AclKeys, query: RetrievalQuery, boosted: Sequence[Scored]
+    ) -> list[Scored] | None:
+        """Rerank the best ``rerank.candidates``; None (keep the fused order) on any failure or
+        a call slower than ``rerank.latency_budget_ms`` (docs/06 §15: never block an answer)."""
+        reranker = self._reranker
+        if reranker is None:
+            return None
+        rerank = self._config.rerank
+        texts = self._passages(session, acl, query.filters, boosted[: rerank.candidates])
+        head = [c for c in boosted[: rerank.candidates] if c.chunk_id in texts]
+        tail = [c for c in boosted[: rerank.candidates] if c.chunk_id not in texts]
+        tail += boosted[rerank.candidates :]
+        budget_s = rerank.latency_budget_ms / 1000
+        started = self._clock()
+        outcome, error_type = "ok", None
+        scores: list[float] = []
+        with tracer.start_as_current_span("retrieval.rerank") as span:
+            try:
+                scores = reranker.rerank(
+                    mask_aadhaar(query.texts[0]),
+                    [texts[c.chunk_id] for c in head],
+                    timeout_s=budget_s,
+                )
+                if len(scores) != len(head) or not all(math.isfinite(s) for s in scores):
+                    outcome, error_type = "invalid", "InvalidScores"
+            except Exception as exc:  # any provider failure: keep the fused order
+                outcome, error_type = "failed", type(exc).__name__
+            elapsed_ms = max(0, int((self._clock() - started) * 1000))
+            if outcome == "ok" and elapsed_ms > rerank.latency_budget_ms:
+                outcome = "over_budget"
+            span.set_attributes(
+                {
+                    "retrieval.rerank.provider": reranker.name,
+                    "retrieval.rerank.model": reranker.model,
+                    "retrieval.rerank.candidates": len(head),
+                    "retrieval.rerank.latency_ms": elapsed_ms,
+                    "retrieval.rerank.outcome": outcome,
+                }
+            )
+        fields: dict[str, object] = {
+            "action": reranker.name,
+            "outcome": outcome,
+            "count": len(head),
+            "duration_ms": elapsed_ms,
+        }
+        if outcome != "ok":
+            log.warning("knowledge.rerank.fallback", error_type=error_type, **fields)
+            return None
+        log.info("knowledge.rerank", **fields)
+        return apply_rerank([*head, *tail], scores, self._config.fusion.k)
 
     def _materialise(
         self, session: Session, acl: AclKeys, filters: SearchFilters, chosen: Sequence[Scored]
