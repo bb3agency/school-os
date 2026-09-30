@@ -14,6 +14,7 @@ from app.knowledge.retrieval.fusion import (
     Scored,
     adjacent_groups,
     apply_boosts,
+    apply_rerank,
     diversify,
     reciprocal_rank_fusion,
 )
@@ -80,6 +81,17 @@ def _scored(n: int, score: float, *, doc: uuid.UUID = DOC_A, **kw: object) -> Sc
     }
     fields.update(kw)
     return Scored(chunk_id=chunk_id(n), document_id=doc, score=score, **fields)  # type: ignore[arg-type]
+
+
+def test_FR_KB_001_rerank_reorders_the_head_keeps_the_tail_and_the_rrf_scale() -> None:
+    items = [_scored(n, 0.05 - n / 1000) for n in range(1, 6)]
+    out = apply_rerank(items, [0.1, 0.9, 0.9], fusion_k=60)
+    # Ties keep the fused order (2 before 3); items beyond the head follow in fused order.
+    assert [s.chunk_no for s in out] == [2, 3, 1, 4, 5]
+    assert [s.score for s in out] == [1 / 61, 1 / 62, 1 / 63, 1 / 64, 1 / 65]
+    assert {s.chunk_id for s in out} == {s.chunk_id for s in items}  # never adds or drops
+    with pytest.raises(ValueError, match="one rerank score"):
+        apply_rerank(items[:1], [0.1, 0.2], fusion_k=60)
 
 
 def test_shipped_boosts_are_neutral() -> None:
