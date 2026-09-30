@@ -93,6 +93,23 @@ class EmbeddedChunk:
 
     chunk: Chunk
     embedding: Sequence[float]
+    context: str = ""
+    """Model-written context (docs/06 §4.11); non-empty exactly when ``context_status`` is ok."""
+    context_status: str = "none"
+    context_model: str | None = None
+    context_prompt: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkContextRow:
+    """A stored chunk's context and a digest of its content (reuse on re-indexing)."""
+
+    chunk_no: int
+    content_sha256: bytes
+    context: str
+    status: str
+    model: str | None
+    prompt: str | None
 
 
 def current_tenant_id(session: Session) -> uuid.UUID:
@@ -149,6 +166,10 @@ def replace_version_chunks(
             "is_table": c.chunk.is_table,
             "embedding": list(c.embedding),
             "embedding_model": embedding_model,
+            "chunk_context": c.context,
+            "context_status": c.context_status,
+            "context_model": c.context_model,
+            "context_prompt": c.context_prompt,
             "is_latest": False,
             **shared,
         }
@@ -156,6 +177,36 @@ def replace_version_chunks(
     ]
     session.execute(insert(DocumentChunk), rows)
     return len(rows)
+
+
+def version_chunk_contexts(session: Session, version_id: uuid.UUID) -> list[ChunkContextRow]:
+    """Contexts of a version's chunks with ``sha256(content)`` (computed by PostgreSQL)."""
+    c = DocumentChunk
+    rows = session.execute(
+        select(
+            c.chunk_no,
+            func.sha256(func.convert_to(c.content, "UTF8")),
+            c.chunk_context,
+            c.context_status,
+            c.context_model,
+            c.context_prompt,
+        ).where(c.version_id == version_id)
+    ).all()
+    return [ChunkContextRow(r[0], bytes(r[1]), r[2], r[3], r[4], r[5]) for r in rows]
+
+
+def documents_needing_context(session: Session, *, limit: int) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """``(document_id, version_id)`` of searchable versions with chunks still ``none`` or
+    ``deferred`` (partial index ``document_chunks_context_pending``), oldest first."""
+    c = DocumentChunk
+    rows = session.execute(
+        select(c.document_id, c.version_id)
+        .where(c.is_latest, c.context_status.in_(("none", "deferred")))
+        .group_by(c.document_id, c.version_id)
+        .order_by(func.min(c.created_at), c.document_id)
+        .limit(limit)
+    ).all()
+    return [(r[0], r[1]) for r in rows]
 
 
 def promote_version(session: Session, *, document_id: uuid.UUID, version_id: uuid.UUID) -> int:
