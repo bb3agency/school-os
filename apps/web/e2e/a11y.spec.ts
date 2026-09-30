@@ -35,7 +35,25 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("link", { name: "Support" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Switch school" })).toHaveCount(0);
+    // One sidebar (docs/17 §5.2): one Main navigation, the account area at its foot.
+    await expect(page.getByRole("navigation", { name: "Main" })).toHaveCount(1);
+    await expect(page.getByRole("navigation", { name: "Sections" })).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Your account" }).getByRole("button", { name: "Lock now" }),
+    ).toBeVisible();
     await expectNoAxeViolations(page, "billing en");
+    await expectNoHorizontalOverflow(page, "billing en");
+
+    // Compact sidebar: still no violations (icon-only links keep their names), then back.
+    await page.getByRole("button", { name: "Collapse menu" }).click();
+    await expect(page.getByRole("button", { name: "Expand menu" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Support" })).toBeVisible();
+    await expectNoAxeViolations(page, "billing en, compact sidebar");
+    await expectNoHorizontalOverflow(page, "billing en, compact sidebar");
+    await page.getByRole("button", { name: "Expand menu" }).click();
+    // A fresh load starts expanded again (remembered) with focus at the top of the page.
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Collapse menu" })).toBeVisible();
 
     // Keyboard: the first Tab reaches the skip link, which moves focus to <main>.
     await page.keyboard.press("Tab");
@@ -198,7 +216,12 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     ]) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      // The dark violet sidebar: one Platform navigation, yellow focus ring (platform-chrome).
+      await expect(page.getByRole("navigation", { name: /^(Platform|ప్లాట్‌ఫామ్)$/ })).toHaveCount(
+        1,
+      );
       await expectNoAxeViolations(page, path);
+      await expectNoHorizontalOverflow(page, path);
     }
 
     // Provision wizard, keyboard only: type, Tab, and Enter on "Next".

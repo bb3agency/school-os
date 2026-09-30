@@ -63,7 +63,10 @@ for (const [width, height] of REQUIRED_VIEWPORTS) {
   });
 }
 
-test.describe("app shell on a phone: keyboard-only menu drawer (NFR-A11Y-001)", () => {
+/** The wide-screen sidebar (hidden below lg); the drawer is the open <dialog>. */
+const INLINE_SIDEBAR = "[data-sidebar-mode='inline']";
+
+test.describe("app shell on a phone: the one sidebar as a keyboard-only drawer (NFR-A11Y-001)", () => {
   test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
   test.use({ viewport: { width: 375, height: 812 } });
 
@@ -77,9 +80,12 @@ test.describe("app shell on a phone: keyboard-only menu drawer (NFR-A11Y-001)", 
       await settle(page);
       const menuName = locale === "en" ? "Menu" : "మెనూ";
       const closeName = locale === "en" ? "Close menu" : "మెనూ మూసివేయండి";
+      const mainName = locale === "en" ? "Main" : "ప్రధాన మెనూ";
+      const accountName = locale === "en" ? "Your account" : "మీ ఖాతా";
 
-      // Below lg there is no list panel; the icon rail is hidden below md.
-      await expect(page.locator("aside nav")).toBeHidden();
+      // Below lg the wide sidebar is hidden: no navigation landmark until the drawer opens.
+      await expect(page.locator(INLINE_SIDEBAR)).toBeHidden();
+      await expect(page.getByRole("navigation", { name: mainName })).toHaveCount(0);
       const menu = page.getByRole("button", { name: menuName, exact: true });
       await expect(menu).toHaveAttribute("aria-expanded", "false");
 
@@ -96,9 +102,14 @@ test.describe("app shell on a phone: keyboard-only menu drawer (NFR-A11Y-001)", 
       await expect(menu).toHaveAttribute("aria-expanded", "true");
       await expect(drawer.getByRole("button", { name: closeName })).toBeFocused();
       await expect(drawer.locator("a[aria-current='page']")).toBeVisible();
-      // The drawer fits the phone and leaves a strip of the dimmed page to tap.
+      // The same sidebar: one Main navigation (inside the drawer) and the account area.
+      await expect(page.getByRole("navigation", { name: mainName })).toHaveCount(1);
+      await expect(drawer.getByRole("navigation", { name: mainName })).toBeVisible();
+      await expect(drawer.getByRole("region", { name: accountName })).toBeVisible();
+      // The drawer fits the phone and leaves a strip of the dimmed page to tap (after its
+      // short slide-in, which reduced motion skips).
+      await expect.poll(async () => (await drawer.boundingBox())?.x).toBe(0);
       const box = await drawer.boundingBox();
-      expect(box?.x).toBe(0);
       expect((box?.width ?? 0) <= 375 - 48).toBe(true);
       // The page behind does not scroll while the drawer is open.
       expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe(
@@ -132,7 +143,7 @@ test.describe("app shell on a phone: keyboard-only menu drawer (NFR-A11Y-001)", 
     });
   }
 
-  test("platform console: the drawer on the dark chrome and the list panel from lg", async ({
+  test("platform console: the drawer on the dark chrome and the sidebar from lg", async ({
     page,
   }) => {
     await installFixtures(page);
@@ -141,15 +152,84 @@ test.describe("app shell on a phone: keyboard-only menu drawer (NFR-A11Y-001)", 
     await settle(page);
     await page.getByRole("button", { name: "Menu", exact: true }).click();
     const drawer = page.getByRole("dialog", { name: "Menu" });
-    await expect(drawer.getByRole("navigation")).toBeVisible();
+    await expect(drawer.getByRole("navigation", { name: "Platform" })).toBeVisible();
+    await expect(drawer).toHaveClass(/bg-platform/);
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
 
-    // Growing the window to lg shows the list panel instead, and no menu button.
+    // Growing the window to lg shows the sidebar instead, and no menu button; still exactly
+    // one Platform navigation.
     await page.setViewportSize({ width: 1366, height: 768 });
     await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeHidden();
-    await expect(page.locator("aside nav")).toBeVisible();
+    await expect(page.locator(`${INLINE_SIDEBAR} nav`)).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Platform" })).toHaveCount(1);
   });
+});
+
+test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-001)", () => {
+  test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
+  test.use({ viewport: { width: 1366, height: 768 } });
+
+  for (const locale of LOCALES) {
+    test(`school console [${locale}]: sticky sidebar, own scroll, collapse remembered without a shift`, async ({
+      page,
+    }) => {
+      await installFixtures(page);
+      await signInAs(page, "/en/support", "clerk");
+      await page.goto(`/${locale}/students`);
+      await settle(page);
+      const mainName = locale === "en" ? "Main" : "ప్రధాన మెనూ";
+      const collapseName = locale === "en" ? "Collapse menu" : "మెనూను కుదించండి";
+      const expandName = locale === "en" ? "Expand menu" : "మెనూను విస్తరించండి";
+      const sidebar = page.locator(INLINE_SIDEBAR);
+
+      // One sidebar, one Main navigation, no menu button; the sidebar fills the height and
+      // stays put while the page scrolls.
+      await expect(sidebar).toBeVisible();
+      await expect(page.getByRole("navigation", { name: mainName })).toHaveCount(1);
+      await expect(page.getByRole("button", { name: /^(Menu|మెనూ)$/ })).toBeHidden();
+      const box = await sidebar.boundingBox();
+      expect(box?.x).toBe(0);
+      expect(box?.height).toBe(768);
+      await page.mouse.wheel(0, 600);
+      expect((await sidebar.boundingBox())?.y).toBe(0);
+      // The menu scrolls inside the sidebar, never the page sideways.
+      const nav = sidebar.getByRole("navigation", { name: mainName });
+      expect(await nav.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
+      await expect(nav.locator("a[aria-current='page']")).toHaveCount(1);
+      expect(problems(await measure(page))).toEqual([]);
+
+      // Collapse with the keyboard: compact width, labels gone visually, names kept.
+      const toggle = sidebar.getByRole("button", { name: collapseName });
+      await toggle.focus();
+      await page.keyboard.press("Enter");
+      await expect(sidebar.getByRole("button", { name: expandName })).toBeFocused();
+      expect((await sidebar.boundingBox())?.width).toBe(72);
+      const current = nav.locator("a[aria-current='page']");
+      await expect(current).toHaveAccessibleName(locale === "en" ? "Students" : /.+/);
+      // Its label shows beside it on focus (visual only), and Escape dismisses it.
+      await current.focus();
+      const tip = page.locator(".sidebar-tip");
+      await expect(tip).toBeVisible();
+      expect(await tip.getAttribute("aria-hidden")).toBe("true");
+      const tipBox = await tip.locator(".sidebar-tip-bubble").boundingBox();
+      expect(tipBox?.x ?? 0).toBeGreaterThanOrEqual(72);
+      await page.keyboard.press("Escape");
+      await expect(tip).toBeHidden();
+      expect(problems(await measure(page))).toEqual([]);
+
+      // Remembered on this computer and applied before the first paint: compact already
+      // when the HTML has been parsed, before the app's scripts run.
+      await page.goto(`/${locale}/findings`, { waitUntil: "domcontentloaded" });
+      expect(await page.evaluate(() => document.documentElement.getAttribute("data-sidebar"))).toBe(
+        "collapsed",
+      );
+      expect((await sidebar.boundingBox())?.width).toBe(72);
+      await settle(page);
+      await sidebar.getByRole("button", { name: expandName }).click();
+      expect((await sidebar.boundingBox())?.width).toBe(272);
+    });
+  }
 });
 
 test.describe("dialogs on a phone (NFR-A11Y-001)", () => {
@@ -201,6 +281,8 @@ test.describe("print: A4 pages (CLAUDE.md §10)", () => {
       await settle(page);
       // Navigation chrome is not printed.
       await expect(page.getByRole("button", { name: /^(Menu|మెనూ)$/ })).toBeHidden();
+      await expect(page.locator(INLINE_SIDEBAR)).toBeHidden();
+      await expect(page.getByRole("banner")).toBeHidden();
       const report = await measure(page);
       // Target sizes and phone gutters are screen concerns (the @page margins frame the
       // paper); overflow, bleeding and clipping apply on paper too.
