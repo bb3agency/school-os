@@ -198,7 +198,8 @@ button and wordmark) and `<main id="main">`. See §5.2. `MinimalShell` (`wide` f
 
 Every screen must work at **1366×768** (office PC, the design baseline) and **375×812** (phone),
 in English (and in Telugu while it is switched on, §5.4): no horizontal page scroll, nothing past the screen or its card edge, no
-clipped text, touch targets of at least 24×24 px (WCAG 2.5.8; inline links in a sentence and
+clipped text (a decorative, `aria-hidden` sample-data illustration with a caption may be
+cropped, §5.6), touch targets of at least 24×24 px (WCAG 2.5.8; inline links in a sentence and
 well-spaced small targets are the exceptions). `e2e/responsive.spec.ts` checks all of it for
 every screen (`make e2e` with `E2E_STAND_IN=1`, on every pull request); `e2e/audit/responsive.audit.ts`
 sweeps ten viewports with screenshots (`make e2e-audit`, nightly).
@@ -611,7 +612,10 @@ dedicated host is one school's own address, not a sales site.
 **Illustrations.** HTML, CSS and inline SVG only (`mockups.tsx`): crisp at any DPI, no image
 requests, no style attributes. Each carries a "Sample data" tag, uses made-up values ("Sample
 student A"), sits in a `<figure>` whose picture is `aria-hidden` and whose `figcaption` (sr-only)
-describes it, and keeps AA contrast like real UI.
+describes it, and keeps AA contrast like real UI. Mockups and the home tile vignettes are
+cropped on purpose (truncated lines, a fixed-height tile window): the responsive e2e skips
+its clipped-text check inside `aria-hidden` content only; page overflow and screen edges are
+still checked.
 
 **Motion** (design-engineering skills in `.claude/skills/`; purpose first, transform and opacity
 only, strong ease-out `cubic-bezier(0.23, 1, 0.32, 1)`):
