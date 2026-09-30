@@ -382,3 +382,45 @@ def test_FR_TALLY_008_fee_cases_pass_the_hard_gates_through_the_application(brid
     assert metrics.fee_refusal_correctness == 1.0
     fee_gates = [g for g in gates.load_gates() if g.metric.startswith("fee_")]
     assert len(fee_gates) == 5
+
+
+# --- live evaluation (make eval-live; docs/06 §13.5; ADR-0033) ------------------------------------
+
+
+def test_ADR_0033_the_live_run_needs_the_synthetic_only_acknowledgement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.knowledge.config.llm import load_llm_config
+
+    monkeypatch.delenv("SOS_EVAL_LIVE_ACK", raising=False)
+    with pytest.raises(SystemExit, match="SOS_EVAL_LIVE_ACK"):
+        B.live_gateway(load_llm_config())
+    with pytest.raises(SystemExit, match="SOS_EVAL_LIVE_ACK"):
+        B.build_live({}, [])
+
+
+def test_ADR_0033_the_live_run_uses_the_live_provider_of_every_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    from app.knowledge.config.llm import load_llm_config
+    from app.knowledge.gateway.gemini_transport import GeminiTransport
+
+    federation = {
+        "type": "external_account",
+        "audience": "//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/"
+        "providers/aws",
+        "subject_token_type": "urn:ietf:params:aws:token-type:aws4_request",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/"
+        "-/serviceAccounts/sos-vertex@sos-ai-eval.iam.gserviceaccount.com:generateAccessToken",
+        "credential_source": {"environment_id": "aws1"},
+    }
+    monkeypatch.setenv("SOS_EVAL_LIVE_ACK", "synthetic-only")
+    monkeypatch.setenv("SOS_LLM_GCP_PROJECT", "sos-ai-eval")
+    monkeypatch.setenv("SOS_LLM_GCP_CREDENTIALS_SOURCE", "workload-identity")
+    monkeypatch.setenv("SOS_LLM_GCP_CREDENTIALS_JSON", json.dumps(federation))
+    gateway = B.live_gateway(load_llm_config())
+    assert isinstance(gateway._routes["gemini"].transport, GeminiTransport)
+    assert set(gateway._routes) == {"gemini"}
