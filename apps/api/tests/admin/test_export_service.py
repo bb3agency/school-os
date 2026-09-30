@@ -172,6 +172,9 @@ EXPECTED_TABLES = {
     "tally_syncs",
     "tally_parties",
     "tally_party_links",
+    # Ask memory (0038_ask_conversations, ADR-0034): each person's own items and switch.
+    "ask_memories",
+    "ask_memory_settings",
     "retention_settings",
 }
 

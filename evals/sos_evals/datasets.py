@@ -11,6 +11,8 @@ from typing import Literal
 
 from sos_evals.acl import CLASSES, SECTIONS, can_ask, retrievable, visible
 from sos_evals.circulars import CircularCase, validate_cases
+from sos_evals.conversations import ConversationCase
+from sos_evals.conversations import validate_cases as validate_conversation_cases
 from sos_evals.fees import FeeCase
 from sos_evals.fees import validate_cases as validate_fee_cases
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
@@ -20,6 +22,7 @@ DATASETS_DIR = EVALS_DIR / "datasets"
 CORPUS_FILE = "corpus.jsonl"
 CIRCULARS_FILE = "circulars.jsonl"
 FEES_FILE = "fees.jsonl"
+CONVERSATIONS_FILE = "conversations.jsonl"
 
 Suite = Literal["fast", "full"]
 
@@ -38,6 +41,8 @@ class Dataset:
     """Synthetic circulars for the M4 reading eval (every suite runs all of them)."""
     fees: tuple[FeeCase, ...] = ()
     """Synthetic fee cases for the M6 Tally eval (every suite runs all of them)."""
+    conversations: tuple[ConversationCase, ...] = ()
+    """Scripted Ask conversations (ADR-0034; every suite runs all of them)."""
 
     def select(self, suite: Suite) -> tuple[EvalItem, ...]:
         if suite == "full":
@@ -66,6 +71,7 @@ def dataset_files(directory: Path) -> list[Path]:
         *(directory / f"{c}.jsonl" for c in CATEGORIES),
         directory / CIRCULARS_FILE,
         directory / FEES_FILE,
+        directory / CONVERSATIONS_FILE,
     ]
 
 
@@ -94,11 +100,13 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
                 raise DatasetError(f"{question.id} is in {path.name} but has {question.category}")
             items.append(question)
     validate(corpus, items)
-    circulars = tuple(CircularCase.model_validate(row) for row in _read_jsonl(files[-2]))
-    fees = tuple(FeeCase.model_validate(row) for row in _read_jsonl(files[-1]))
+    circulars = tuple(CircularCase.model_validate(row) for row in _read_jsonl(files[-3]))
+    fees = tuple(FeeCase.model_validate(row) for row in _read_jsonl(files[-2]))
+    conversations = tuple(ConversationCase.model_validate(row) for row in _read_jsonl(files[-1]))
     try:
         validate_cases(circulars)
         validate_fee_cases(fees)
+        validate_conversation_cases(conversations)
     except ValueError as exc:
         raise DatasetError(str(exc)) from exc
     return Dataset(
@@ -107,6 +115,7 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
         sha256=digest.hexdigest(),
         circulars=circulars,
         fees=fees,
+        conversations=conversations,
     )
 
 

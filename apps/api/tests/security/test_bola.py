@@ -140,6 +140,12 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/knowledge/queries/{query_id}/feedback"): {"feedback": "helpful"},
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): {},
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): None,
+    # ADR-0034: another school's (or a random) conversation or memory item is 404.
+    ("PATCH", "/api/v1/knowledge/conversations/{conversation_id}"): {"pinned": True},
+    ("DELETE", "/api/v1/knowledge/conversations/{conversation_id}"): None,
+    ("PATCH", "/api/v1/knowledge/memories/{memory_id}"): {"text": "Keep answers short"},
+    ("DELETE", "/api/v1/knowledge/memories/{memory_id}"): None,
+    ("POST", "/api/v1/knowledge/memories/{memory_id}/confirm"): None,
     # Certificates (US-1101..US-1105): valid bodies so the request reaches the object lookup.
     ("POST", "/api/v1/students/{student_id}/certificates"): {
         "certificate_type": "bonafide",
@@ -494,6 +500,37 @@ def _b_query(w: Any) -> uuid.UUID:
     return value
 
 
+def _ask_support() -> ModuleType:
+    name = "sos_test_ask_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "knowledge" / "ask_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_conversation(w: Any) -> uuid.UUID:
+    """A conversation of school B's owner (ADR-0034; tests/knowledge/ask_support.py)."""
+    if "bola_conversation" not in w.b.ids:
+        w.b.ids["bola_conversation"] = _ask_support().conversation_row(w.b, w.b.people["owner"])
+    value: uuid.UUID = w.b.ids["bola_conversation"]
+    return value
+
+
+def _b_memory(w: Any) -> uuid.UUID:
+    """A pending memory item of school B's owner (ADR-0034)."""
+    if "bola_memory" not in w.b.ids:
+        w.b.ids["bola_memory"] = _ask_support().memory_row(
+            w.b, w.b.people["owner"], status="pending"
+        )
+    value: uuid.UUID = w.b.ids["bola_memory"]
+    return value
+
+
 def _b_tenant_export(w: Any) -> uuid.UUID:
     """A ready full export of school B made by its owner (tests/admin/support.py)."""
     name = "sos_test_admin_support"
@@ -686,6 +723,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "tenant_export_id": _b_tenant_export,
     # Knowledge (FR-KB-012): a logged question of school B.
     "query_id": _b_query,
+    "conversation_id": _b_conversation,
+    "memory_id": _b_memory,
     # Knowledge (FR-KB-030): a verified answer of school B.
     "answer_id": _b_verified_answer,
     # Certificates (US-1101): an issued certificate of school B.
@@ -1242,3 +1281,49 @@ def test_SEC_001_tally_lists_never_show_other_school(
     assert "Synthetic Other School Ledger" not in parties.text + dues.text
     # The status counts exactly the ledgers school A can list (none of school B).
     assert status.json()["parties"] == len(parties.json()["data"])
+
+
+# --- ADR-0034: one person's conversations and memory are theirs alone (FR-KB-012, SEC-015) ------
+
+
+def test_SEC_015_another_persons_conversation_and_memory_in_the_same_school_are_404(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    kb = _ask_support()
+    owner, other = world.person("principal"), world.person("office_staff")
+    cid = kb.conversation_row(world.a, owner)
+    item = kb.memory_row(world.a, owner)
+    before = W.audit_events(admin_engine, world.a.tenant_id)
+    for method, path, body in (
+        ("GET", f"/api/v1/knowledge/conversations/{cid}", None),
+        ("PATCH", f"/api/v1/knowledge/conversations/{cid}", {"pinned": True}),
+        ("DELETE", f"/api/v1/knowledge/conversations/{cid}", None),
+        ("PATCH", f"/api/v1/knowledge/memories/{item}", {"text": "Keep answers short"}),
+        ("DELETE", f"/api/v1/knowledge/memories/{item}", None),
+        ("POST", f"/api/v1/knowledge/memories/{item}/confirm", None),
+    ):
+        res = api.call(other, method, path, json=body, headers={"If-Match": 'W/"1"'})
+        assert res.status_code == 404, (method, path, res.text)
+    listed = api.call(other, "GET", "/api/v1/knowledge/conversations").json()["data"]
+    assert str(cid) not in {c["id"] for c in listed}
+    memories = api.call(other, "GET", "/api/v1/knowledge/memories").json()["data"]
+    assert str(item) not in {m["id"] for m in memories}
+    assert W.audit_events(admin_engine, world.a.tenant_id) == before, "nothing changed"
+    # The owner still sees both.
+    assert api.call(owner, "GET", f"/api/v1/knowledge/conversations/{cid}").status_code == 200
+    assert str(item) in {
+        m["id"] for m in api.call(owner, "GET", "/api/v1/knowledge/memories").json()["data"]
+    }
+
+
+def test_SEC_001_conversation_and_memory_lists_never_show_other_school(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    b_conversation, b_memory = _b_conversation(world), _b_memory(world)
+    owner = world.person("owner")
+    conversations = api.call(owner, "GET", "/api/v1/knowledge/conversations")
+    assert conversations.status_code == 200
+    assert str(b_conversation) not in {c["id"] for c in conversations.json()["data"]}
+    memories = api.call(owner, "GET", "/api/v1/knowledge/memories")
+    assert memories.status_code == 200
+    assert str(b_memory) not in {m["id"] for m in memories.json()["data"]}

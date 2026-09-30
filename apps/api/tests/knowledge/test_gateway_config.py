@@ -46,6 +46,11 @@ def test_SEC_020_output_caps_per_role() -> None:
         "extraction": 2000,
         "circular": 2000,
         "notice": 1200,
+        # ADR-0034: the cheap Ask conversation roles.
+        "followups": 400,
+        "summary": 600,
+        "memory_screen": 150,
+        "query_rewrite": 200,
         "eval_judge": 2000,
     }
 

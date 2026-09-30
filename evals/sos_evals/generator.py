@@ -19,6 +19,8 @@ from pathlib import Path
 
 from sos_evals.circular_cases import CASES as CIRCULAR_CASES
 from sos_evals.circulars import CircularCase
+from sos_evals.conversation_cases import CASES as CONVERSATION_CASES
+from sos_evals.conversations import ConversationCase
 from sos_evals.fee_cases import CASES as FEE_CASES
 from sos_evals.fees import FeeCase
 from sos_evals.schema import CATEGORIES, Asker, Category, CorpusItem, EvalItem, Locale, Role
@@ -786,7 +788,11 @@ def build_questions() -> list[EvalItem]:
 
 
 def _jsonl(
-    rows: Sequence[CorpusItem] | Sequence[EvalItem] | Sequence[CircularCase] | Sequence[FeeCase],
+    rows: Sequence[CorpusItem]
+    | Sequence[EvalItem]
+    | Sequence[CircularCase]
+    | Sequence[FeeCase]
+    | Sequence[ConversationCase],
 ) -> str:
     return "".join(
         json.dumps(row.model_dump(mode="json"), ensure_ascii=False, sort_keys=True) + "\n"
@@ -802,6 +808,7 @@ def render() -> dict[str, str]:
         files[f"{category}.jsonl"] = _jsonl([i for i in items if i.category == category])
     files["circulars.jsonl"] = _jsonl(CIRCULAR_CASES)
     files["fees.jsonl"] = _jsonl(FEE_CASES)
+    files["conversations.jsonl"] = _jsonl(CONVERSATION_CASES)
     return files
 
 

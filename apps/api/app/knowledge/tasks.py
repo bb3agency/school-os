@@ -9,9 +9,16 @@
 - ``knowledge.remove_document`` (queue ``ingest``): delete a document's chunks; no producer yet
   (see :mod:`app.knowledge.ingestion.hooks`).
 - ``knowledge.purge_queries`` (daily, queue ``maintenance``): per school, delete the query log
-  (``kb.queries``) older than its retention (180 days; docs/05 §13), each school in its own
-  ``tenant_session``; a failing school does not stop the others (logged with ids only, counted
-  in ``failed``, retried on the next run). Counts only in the result and the log.
+  (``kb.queries``) older than its retention (180 days; docs/05 §13) with the conversations and
+  summaries that rested on it, each school in its own ``tenant_session``; a failing school does
+  not stop the others (logged with ids only, counted in ``failed``, retried on the next run).
+  Counts only in the result and the log.
+- ``knowledge.tidy_conversations`` (daily, queue ``maintenance``; ADR-0034): per school, the
+  memory retention (unconfirmed suggestions after 24 hours, people who left the school) and a
+  conversation for questions asked before conversations existed (``adopt_conversations``).
+- ``knowledge.summarise_conversation`` (queue ``ingest``, explicit route): consumer of the outbox
+  event ``kb.conversation.summary_requested`` queued with an answer; the rolling summary of a
+  conversation's older turns through the gateway (docs/06 §5). Ids only in the payload.
 
 Every task is idempotent and retries with exponential backoff (max 5, docs/04 §6); after the
 last attempt it logs ``error_code`` and gives up (the next event for the document repairs it).
@@ -39,6 +46,8 @@ log = get_logger(__name__)
 
 MAX_RETRIES: Final = 5
 PURGE_QUERIES_TASK: Final = "knowledge.purge_queries"
+SUMMARY_TASK: Final = service.SUMMARY_TASK
+TIDY_CONVERSATIONS_TASK: Final = "knowledge.tidy_conversations"
 # Schools whose query log is still kept (an offboarded school's rows go with the whole purge).
 PURGE_TENANT_STATUSES: Final = ("active", "suspended", "offboarding")
 
@@ -152,9 +161,70 @@ def purge_queries_all() -> dict[str, int]:
     return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
 
 
+def tidy_conversations_all() -> dict[str, int]:
+    """Per school (one ``tenant_session`` each; a failing school is logged and retried on the
+    next run): the memory retention (expired suggestions, people who left the school) and a
+    conversation for questions asked before conversations existed (ADR-0034)."""
+    with context_free_session() as session:
+        tenant_ids = tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
+    memories = adopted = failed = 0
+    for tenant_id in tenant_ids:
+        try:
+            with tenant_session(tenant_id) as session:
+                memories += service.purge_memories(session)
+                adopted += service.adopt_conversations(session)
+        except Exception as exc:  # database: this school only, retried next run
+            failed += 1
+            log.warning(
+                "knowledge.conversations.tidy_failed",
+                tenant_id=tenant_id,
+                error_type=type(exc).__name__,
+            )
+    log.info("knowledge.conversations.tidied", count=memories + adopted, failed=failed)
+    return {
+        "tenants": len(tenant_ids),
+        "memories_deleted": memories,
+        "conversations_adopted": adopted,
+        "failed": failed,
+    }
+
+
+@shared_task(
+    name=SUMMARY_TASK,
+    bind=True,
+    queue="ingest",
+    acks_late=True,
+    max_retries=MAX_RETRIES,
+    ignore_result=True,
+)
+def summarise_conversation(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> str:
+    """Rolling summary of one conversation (ADR-0034); a failed provider call is not retried
+    (the next answer asks again), a database error is."""
+    del event_id
+    try:
+        return service.summarise_conversation(_uuid(tenant_id), payload)
+    except Exception as exc:
+        if self.request.retries >= MAX_RETRIES:
+            log.error(
+                "knowledge.task.gave_up",
+                error_code="retries_exhausted",
+                error_type=type(exc).__name__,
+                action=SUMMARY_TASK,
+            )
+            return "failed"
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 900)) from exc
+
+
 @shared_task(name=PURGE_QUERIES_TASK, queue="maintenance", acks_late=True)
 def purge_queries() -> dict[str, int]:
     return purge_queries_all()
+
+
+@shared_task(name=TIDY_CONVERSATIONS_TASK, queue="maintenance", acks_late=True)
+def tidy_conversations() -> dict[str, int]:
+    return tidy_conversations_all()
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:
@@ -163,5 +233,9 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
         "knowledge-purge-queries": {
             "task": PURGE_QUERIES_TASK,
             "schedule": crontab(minute=25, hour=21),  # 02:55 IST
+        },
+        "knowledge-tidy-conversations": {
+            "task": TIDY_CONVERSATIONS_TASK,
+            "schedule": crontab(minute=40, hour=21),  # 03:10 IST
         },
     }
