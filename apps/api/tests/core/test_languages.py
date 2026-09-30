@@ -41,7 +41,8 @@ def test_telugu_text_is_hidden_by_default_and_kept_when_switched_on() -> None:
 
 def test_contains_telugu_spots_any_character_of_the_block() -> None:
     assert languages.contains_telugu("Name: రాము")
-    assert languages.contains_telugu("ఀ") and languages.contains_telugu("౿")
+    assert languages.contains_telugu("ఀ")
+    assert languages.contains_telugu("౿")
     assert not languages.contains_telugu("Transfer certificate, 2026-27")
     assert not languages.contains_telugu("௿ಀ")  # Tamil / Kannada neighbours
     assert not languages.contains_telugu("")

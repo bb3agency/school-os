@@ -99,16 +99,20 @@ def test_ADR_0036_telugu_font_is_not_declared_or_served_while_telugu_is_hidden()
     assert core_pdf.font_stack('"Noto Sans", Arial, sans-serif') == '"Noto Sans", Arial, sans-serif'
     route = _Route(core_pdf.FONT_URL)
     core_pdf._route(route)  # type: ignore[arg-type]
-    assert route.aborted and route.fulfilled is None
+    assert route.aborted
+    assert route.fulfilled is None
 
 
 def test_ADR_0036_telugu_font_is_declared_and_served_when_switched_on(telugu_on: None) -> None:
     css = core_pdf.font_face_css()
-    assert "@font-face" in css and core_pdf.FONT_URL in css and core_pdf.FONT_FAMILY in css
+    assert "@font-face" in css
+    assert core_pdf.FONT_URL in css
+    assert core_pdf.FONT_FAMILY in css
     assert core_pdf.font_stack() == f'"{core_pdf.FONT_FAMILY}", sans-serif'
     route = _Route(core_pdf.FONT_URL)
     core_pdf._route(route)  # type: ignore[arg-type]
-    assert route.fulfilled == core_pdf.font_bytes() and not route.aborted
+    assert route.fulfilled == core_pdf.font_bytes()
+    assert not route.aborted
     other = _Route("https://example.invalid/x.css")
     core_pdf._route(other)  # type: ignore[arg-type]
     assert other.aborted

@@ -97,6 +97,7 @@ def test_US_102_status_change_of_another_member_still_allowed(
     assert [(e["summary"]["from"], e["summary"]["to"]) for e in events] == [("active", "suspended")]
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_102_own_profile_and_unchanged_status_are_not_refused(
     api: Any, admin_engine: Engine
 ) -> None:
