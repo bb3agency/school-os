@@ -261,7 +261,7 @@ export function AppShell({
                     setOpen(true);
                   }}
                   className={cn(
-                    "pressable inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-medium",
+                    "pressable inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-semibold",
                     topbar.menuButton,
                   )}
                 >

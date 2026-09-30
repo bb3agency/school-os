@@ -29,7 +29,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap",
         tones[tone],
         className,
       )}
@@ -88,7 +88,7 @@ export function Pill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border font-medium",
+        "inline-flex items-center gap-1 rounded-full border font-semibold",
         // md chips carry sentences (hero, headers): they may wrap on phones.
         size === "md" ? "px-3 py-1 text-sm" : "px-2.5 py-0.5 text-xs whitespace-nowrap",
         variant === "command" ? "font-mono" : "font-sans",

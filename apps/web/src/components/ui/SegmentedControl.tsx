@@ -58,7 +58,7 @@ export function SegmentedControl({
 
   return (
     <fieldset className={cn("min-w-0", className)}>
-      <legend className={legendVisible ? "mb-1 text-sm font-medium text-ink" : "sr-only"}>
+      <legend className={legendVisible ? "mb-1 text-sm font-semibold text-ink" : "sr-only"}>
         {legend}
       </legend>
       <div

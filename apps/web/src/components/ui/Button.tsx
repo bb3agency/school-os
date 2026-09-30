@@ -26,7 +26,7 @@ export type ButtonSize = "lg" | "md" | "sm";
  * instead of pushing it past the screen edge.
  */
 const base =
-  "pressable inline-flex max-w-full items-center justify-center gap-2 rounded-md border text-center font-medium " +
+  "pressable inline-flex max-w-full items-center justify-center gap-2 rounded-md border text-center font-semibold " +
   "whitespace-normal select-none sm:whitespace-nowrap " +
   "disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 " +
   "aria-busy:cursor-progress";

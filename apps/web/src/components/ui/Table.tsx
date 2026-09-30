@@ -193,7 +193,7 @@ export function DataTable<T>({
       <TableScroll label={t("scrollableTable", { caption })} framed>
         <Table density={density} stickyFirstColumn={stickyFirstColumn}>
           <caption
-            className={cn("px-4 py-3 text-left font-medium text-ink", captionHidden && "sr-only")}
+            className={cn("px-4 py-3 text-left font-semibold text-ink", captionHidden && "sr-only")}
           >
             {caption}
           </caption>

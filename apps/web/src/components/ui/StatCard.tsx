@@ -85,7 +85,7 @@ export function KpiCard({
       className={cn(cardClasses({ padding: "md" }), "flex flex-col gap-3", className)}
     >
       <div className="flex items-start justify-between gap-3">
-        <p id={labelId} className="text-sm font-medium text-ink-muted">
+        <p id={labelId} className="text-sm text-ink-muted">
           {label}
         </p>
         {aside}
