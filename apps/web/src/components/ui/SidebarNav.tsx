@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "./Icon";
@@ -19,6 +19,16 @@ export interface NavItem {
   activePattern?: string;
   /** Leading icon (name from `Icon`, serialisable); the compact sidebar shows only this. */
   icon?: IconName;
+  /**
+   * A nested sub-list under the item with its own links and actions (e.g. Ask the school's
+   * "New chat" and recent chats). A client component element; hidden in the compact sidebar.
+   */
+  sub?: ReactNode;
+  /**
+   * Paths whose current page is marked inside `sub` (source text of a regular expression):
+   * there the item itself is not the current page, so exactly one link is.
+   */
+  subActivePattern?: string;
 }
 
 /** A titled group of items in the sidebar ("RECORDS", "CHECKS"). */
@@ -32,6 +42,7 @@ export type SidebarTheme = "school" | "platform";
 
 /** How well `item` matches `pathname`: -1 not at all; longer prefixes and patterns win. */
 function matchScore(pathname: string, item: NavItem): number {
+  if (item.subActivePattern && new RegExp(item.subActivePattern).test(pathname)) return -1;
   if (item.activePattern && new RegExp(item.activePattern).test(pathname)) {
     return Number.MAX_SAFE_INTEGER;
   }
@@ -122,6 +133,7 @@ function ItemList({
               {icon ? <Icon name={icon} className={item.nested ? "size-4" : "size-5"} /> : null}
               <span className="min-w-0 flex-1 break-words collapsed:sr-only">{item.label}</span>
             </Link>
+            {item.sub ? <div className="collapsed:hidden">{item.sub}</div> : null}
           </li>
         );
       })}
