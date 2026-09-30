@@ -109,11 +109,21 @@ def test_default_renderer_sandbox_follows_environment() -> None:
     assert pdf.default_renderer().sandbox is False  # type: ignore[attr-defined]
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_EXP_002_real_render_telugu_pdf(renderer: ChromiumRenderer) -> None:
     out = renderer.render(_report_html("te"))
     assert out.startswith(b"%PDF-")
     assert len(out) > 1000
     assert b"NotoSansTelugu" in out, "the bundled Telugu font is embedded"
+
+
+def test_ADR_0036_precheck_pdf_does_not_embed_the_telugu_font_while_telugu_is_hidden(
+    renderer: ChromiumRenderer,
+) -> None:
+    out = renderer.render(_report_html("te"))
+    assert out.startswith(b"%PDF-")
+    assert b"NotoSansTelugu" not in out
+    assert b"Noto Sans Telugu" not in out
 
 
 def test_docs_07_10_render_makes_no_network_requests(
