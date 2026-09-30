@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
@@ -75,10 +76,16 @@ export function InviteUserScreen() {
   const allowed = !me || me.permissions.includes(USER_PERM.manage);
   const roles = useRoles(allowed);
   const languageErrorId = useId();
+  const telugu = useTeluguEnabled();
 
   const form = useApiForm({
     schema: inviteSchema,
-    extra: (element) => ({ roles: formList(element, "roles"), ...scopeExtra(element) }),
+    extra: (element) => ({
+      roles: formList(element, "roles"),
+      ...scopeExtra(element),
+      // ADR-0036: while Telugu is switched off nobody is asked; everyone works in English.
+      ...(telugu ? {} : { preferred_language: "en" }),
+    }),
     fieldMap: userFieldMap,
     invalidate: [USER_KEYS.all],
     submit: (data, key): Promise<StaffUser> =>
@@ -155,35 +162,37 @@ export function InviteUserScreen() {
               autoComplete="off"
               spellCheck={false}
             />
-            <fieldset
-              className="space-y-1"
-              aria-describedby={errors.preferred_language ? languageErrorId : undefined}
-            >
-              <legend className="text-sm font-medium text-ink">{t("language")}</legend>
-              <p className="text-sm text-ink-muted">{t("languageHint")}</p>
-              <div className="flex flex-wrap gap-2">
-                {USER_LANGUAGES.map((value) => (
-                  <label
-                    key={value}
-                    className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm has-checked:border-primary has-checked:bg-primary-soft"
-                  >
-                    <input
-                      type="radio"
-                      name="preferred_language"
-                      value={value}
-                      defaultChecked={value === initialLanguage}
-                      className="size-4 accent-primary"
-                    />
-                    {tl(value)}
-                  </label>
-                ))}
-              </div>
-              {errors.preferred_language ? (
-                <p id={languageErrorId} className="text-sm font-semibold text-danger">
-                  {errors.preferred_language}
-                </p>
-              ) : null}
-            </fieldset>
+            {telugu ? (
+              <fieldset
+                className="space-y-1"
+                aria-describedby={errors.preferred_language ? languageErrorId : undefined}
+              >
+                <legend className="text-sm font-medium text-ink">{t("language")}</legend>
+                <p className="text-sm text-ink-muted">{t("languageHint")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {USER_LANGUAGES.map((value) => (
+                    <label
+                      key={value}
+                      className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm has-checked:border-primary has-checked:bg-primary-soft"
+                    >
+                      <input
+                        type="radio"
+                        name="preferred_language"
+                        value={value}
+                        defaultChecked={value === initialLanguage}
+                        className="size-4 accent-primary"
+                      />
+                      {tl(value)}
+                    </label>
+                  ))}
+                </div>
+                {errors.preferred_language ? (
+                  <p id={languageErrorId} className="text-sm font-semibold text-danger">
+                    {errors.preferred_language}
+                  </p>
+                ) : null}
+              </fieldset>
+            ) : null}
           </div>
         </Card>
 
