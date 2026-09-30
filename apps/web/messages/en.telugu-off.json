@@ -33,24 +33,6 @@
       "addHint": "For example: I teach Class 7 mathematics and prefer short answers. Up to 200 characters."
     }
   },
-  "welcome": {
-    "hero": {
-      "note": "For staff of schools that use SchoolOS."
-    },
-    "features": {
-      "certificates": {
-        "body": "Printable certificates and registers in your school's familiar formats. This is the next module we are building."
-      },
-      "ask": {
-        "body": "Ask in plain English. Answers come from your school's own records and documents and show their sources, or say that nothing was found in the school records."
-      }
-    },
-    "faq": {
-      "language": {
-        "a": "English."
-      }
-    }
-  },
   "certificates": {
     "registers": {
       "description": "Print the registers in their familiar A4 format to keep the paper registers complete."
