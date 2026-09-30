@@ -11,7 +11,8 @@ ink scale, near-black primary, brand blue, status and chart colours, radii, shad
 primitives in `src/components/ui/` (exported from `index.ts`) and the console layout in
 `src/components/shell/` (`AppShell`: one collapsible sidebar, top bar; docs/17 §5.2). Fonts are
 self-hosted `@fontsource` packages (Inter, Instrument Serif for big numbers, JetBrains Mono
-for eyebrow labels, Noto Sans Telugu for Telugu). `docs/17-ui-design-system.md` has the
+for eyebrow labels; Noto Sans Telugu only while Telugu is switched on, served by
+`/fonts/telugu`). `docs/17-ui-design-system.md` has the
 component API, do/don't and the contrast table; `src/components/ui/tokens.test.ts` recomputes
 every documented contrast pair. Under `next dev` with the local stub issuer,
 `/en/dev/ui` shows every primitive and variant with synthetic content (a 404 anywhere else,
@@ -134,6 +135,8 @@ and `<APP_BASE_URL>/bff/auth/platform/callback` (operator client); post-logout U
 `APP_BASE_URL`, `SESSION_SECRET` (≥ 32 bytes), `SOS_SERVICE_TOKEN_KEY` (same value as the
 API), `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`,
 `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional
+`SOS_TELUGU_ENABLED` (default `false`: English only, Telugu hidden; the same variable as the
+API's, read at run time by `src/i18n/languages.ts`; ADR-0036, docs/17 §5.4),
 `SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`, and for break-glass support sign-in (ADR-0023)
 `SUPPORT_OIDC_CLIENT_ID`, `SUPPORT_OIDC_CLIENT_SECRET` (the support app client of the operator
 pool; unset = off) and `SUPPORT_OIDC_ISSUER` (default `PLATFORM_OIDC_ISSUER`). See the root
@@ -159,8 +162,12 @@ docker run --rm -d --name sos-valkey-test -p 127.0.0.1:6390:6379 valkey/valkey:8
 SOS_WEB_TEST_REDIS_URL=redis://127.0.0.1:6390/15 npm test -w @schoolos/web
 ```
 
-`npm run e2e -w @schoolos/web` (Playwright, after `npm run build`) checks the redirect to
-sign-in, the signed-out page (CSP, Telugu), the health check, axe-core (WCAG 2.2 AA) on
+`npm run e2e -w @schoolos/web` (Playwright, after `npm run build`) starts two servers from the
+build: Telugu off (port `E2E_PORT`, the product default, project `chromium`) and Telugu on
+(`E2E_PORT + 1`, project `chromium-telugu`, which runs only the tests tagged `@telugu`;
+ADR-0036). It checks the redirect to sign-in, English only with Telugu off
+(`e2e/english-only.spec.ts`: `/te` redirects, a Telugu browser, no Telugu font), the
+signed-out page (CSP, and Telugu with it on), the health check, axe-core (WCAG 2.2 AA) on
 the signed-out page, and the public welcome page (`e2e/welcome.spec.ts`: home redirect,
 CSP, axe at 1366×768 and 375 px in both languages, keyboard tab-through), without an IdP.
 
@@ -187,8 +194,8 @@ Chromium build is missing, the newest `chromium_headless_shell-*` under
 `PLAYWRIGHT_BROWSERS_PATH` is used automatically (`e2e/support/browser.ts`).
 
 The same stand-in run includes the responsive layout checks (`e2e/responsive.spec.ts`,
-docs/17 §5.1): every school and platform screen at 1366×768 and 375×812 in English and
-Telugu must have no horizontal page scroll, nothing past the screen or its card, no clipped
+docs/17 §5.1): every school and platform screen at 1366×768 and 375×812 in English (and in
+Telugu in the Telugu-on project) must have no horizontal page scroll, nothing past the screen or its card, no clipped
 text and no touch target under 24px; the menu drawer is driven keyboard-only on a phone, a
 form dialog must fit a phone, and four screens are checked in print at A4 width.
 `e2e/support/layout-fixtures.ts` answers the browser's API reads with long, mixed-script
