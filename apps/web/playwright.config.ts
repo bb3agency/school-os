@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { chromiumLaunchOptions } from "./e2e/support/browser";
+import { E2E_PUBLIC_SETTINGS } from "./e2e/support/public-settings";
 
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
@@ -12,6 +13,20 @@ const TELUGU_PORT = Number(process.env.E2E_TELUGU_PORT ?? PORT + 1);
 const teluguBaseURL =
   process.env.E2E_TELUGU_BASE_URL ??
   (process.env.E2E_BASE_URL ? undefined : `http://localhost:${TELUGU_PORT}`);
+/**
+ * Public-site variants (docs/17 §5.6), one more server each from the same build: tests tagged
+ * @contact run against every SOS_PUBLIC_* setting set to synthetic values
+ * (e2e/support/public-settings.ts), tests tagged @dedicated against
+ * SOS_DEPLOYMENT_MODE=dedicated (the marketing pages answer 404; /welcome is a sign-in card).
+ * Against a running stack, set E2E_CONTACT_BASE_URL / E2E_DEDICATED_BASE_URL to servers started
+ * that way, or the project is left out.
+ */
+const CONTACT_PORT = Number(process.env.E2E_CONTACT_PORT ?? PORT + 2);
+const DEDICATED_PORT = Number(process.env.E2E_DEDICATED_PORT ?? PORT + 3);
+const localVariant = (port: number) =>
+  process.env.E2E_BASE_URL ? undefined : `http://localhost:${port}`;
+const contactBaseURL = process.env.E2E_CONTACT_BASE_URL ?? localVariant(CONTACT_PORT);
+const dedicatedBaseURL = process.env.E2E_DEDICATED_BASE_URL ?? localVariant(DEDICATED_PORT);
 /** Sign-in e2e with the scripted stand-in IdP and canned API (needs Valkey at REDIS_URL). */
 const standIn = process.env.E2E_STAND_IN === "1";
 const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -19,6 +34,8 @@ const API_PORT = Number(process.env.E2E_API_PORT ?? 8099);
 
 /** Obvious placeholder (>= 32 bytes); accepted by the BFF only for http://localhost. */
 const devOnly = (name: string) => `dev-only-e2e-${name}-${"x".repeat(32)}`;
+
+const desktop = { ...devices["Desktop Chrome"], viewport: { width: 1366, height: 768 } };
 
 /**
  * End-to-end tests (`make e2e`). Not part of the CI unit stage.
@@ -48,10 +65,12 @@ export default defineConfig({
   },
   projects: [
     {
-      // The product default: Telugu switched off (ADR-0036).
+      // The product default: Telugu switched off (ADR-0036), shared tier, no SOS_PUBLIC_*.
       name: "chromium",
       metadata: { telugu: false },
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1366, height: 768 } },
+      // The public-site variants run only in their own projects below.
+      grepInvert: /@contact|@dedicated/,
+      use: desktop,
     },
     ...(teluguBaseURL
       ? [
@@ -60,11 +79,27 @@ export default defineConfig({
             name: "chromium-telugu",
             metadata: { telugu: true },
             grep: /@telugu/,
-            use: {
-              ...devices["Desktop Chrome"],
-              viewport: { width: 1366, height: 768 },
-              baseURL: teluguBaseURL,
-            },
+            use: { ...desktop, baseURL: teluguBaseURL },
+          },
+        ]
+      : []),
+    ...(contactBaseURL
+      ? [
+          {
+            name: "chromium-contact",
+            metadata: { telugu: false, contact: true },
+            grep: /@contact/,
+            use: { ...desktop, baseURL: contactBaseURL },
+          },
+        ]
+      : []),
+    ...(dedicatedBaseURL
+      ? [
+          {
+            name: "chromium-dedicated",
+            metadata: { telugu: false, dedicated: true },
+            grep: /@dedicated/,
+            use: { ...desktop, baseURL: dedicatedBaseURL },
           },
         ]
       : []),
@@ -73,9 +108,21 @@ export default defineConfig({
     ? {}
     : {
         webServer: [
-          { port: PORT, base: baseURL, telugu: false },
-          { port: TELUGU_PORT, base: `http://localhost:${TELUGU_PORT}`, telugu: true },
-        ].map(({ port, base, telugu }) => ({
+          { port: PORT, base: baseURL, telugu: false, extra: {} },
+          { port: TELUGU_PORT, base: `http://localhost:${TELUGU_PORT}`, telugu: true, extra: {} },
+          {
+            port: CONTACT_PORT,
+            base: `http://localhost:${CONTACT_PORT}`,
+            telugu: false,
+            extra: E2E_PUBLIC_SETTINGS,
+          },
+          {
+            port: DEDICATED_PORT,
+            base: `http://localhost:${DEDICATED_PORT}`,
+            telugu: false,
+            extra: { SOS_DEPLOYMENT_MODE: "dedicated" },
+          },
+        ].map(({ port, base, telugu, extra }) => ({
           command: `npx next start --port ${port}`,
           url: `${base}/healthz`,
           reuseExistingServer: !process.env.CI,
@@ -100,6 +147,7 @@ export default defineConfig({
               : (process.env.PLATFORM_OIDC_ISSUER ?? "http://localhost:8080/platform"),
             PLATFORM_OIDC_CLIENT_ID: "schoolos-platform",
             PLATFORM_OIDC_CLIENT_SECRET: devOnly("operator-client"),
+            ...extra,
           },
         })),
       }),
