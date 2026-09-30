@@ -149,13 +149,16 @@
   --color-platform-accent-ink: #3b0764;
   --color-platform-soft: #f5f0ff; /* platform ink on it 13.4:1 */
 
+  /* Radii: the calm app scale (docs/17 §3). Cards, dialogs and panels in the signed-in app
+     are 10-14px, controls a step smaller. The public marketing pages restore their larger
+     scale under `.mk` (features/marketing/marketing.css); tokens.test.ts checks both. */
   --radius-*: initial;
-  --radius-xs: 0.25rem;
-  --radius-sm: 0.5rem; /* 8px */
-  --radius-md: 0.625rem; /* 10px: buttons, inputs */
-  --radius-lg: 0.875rem; /* 14px */
-  --radius-xl: 1.25rem; /* 20px: cards */
-  --radius-2xl: 1.5rem;
+  --radius-xs: 0.25rem; /* 4px */
+  --radius-sm: 0.375rem; /* 6px: small chips, focus targets inside controls */
+  --radius-md: 0.5rem; /* 8px: buttons, inputs, selects, nav rows */
+  --radius-lg: 0.625rem; /* 10px: alerts, segmented track, small panels */
+  --radius-xl: 0.75rem; /* 12px: cards, dialogs, panels, the drawer */
+  --radius-2xl: 0.875rem; /* 14px: large panels */
   --radius-full: 9999px;
 
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 12px 32px -12px rgb(30 64 175 / 0.12);

@@ -15,6 +15,13 @@
   --mk-night-line: rgb(255 255 255 / 0.1);
   --mk-grid-line: rgb(30 64 175 / 0.07);
   --mk-header-h: 4rem;
+  /* The marketing radius scale: larger, softer corners than the app (docs/17 §3). Tailwind's
+     rounded-* utilities read these variables, so they apply to everything inside `.mk`. */
+  --radius-sm: 0.5rem; /* 8px */
+  --radius-md: 0.625rem; /* 10px: buttons, inputs */
+  --radius-lg: 0.875rem; /* 14px */
+  --radius-xl: 1.25rem; /* 20px: cards */
+  --radius-2xl: 1.5rem; /* 24px: plan cards, tiles */
 }
 
 /* Anchored headings and focused controls clear the sticky header (WCAG 2.4.11). Scroll

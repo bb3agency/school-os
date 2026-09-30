@@ -132,3 +132,43 @@ describe("design tokens meet WCAG 2.2 AA (NFR-A11Y-001)", () => {
     expect(contrast("#ffffff", "#ffffff")).toBeCloseTo(1, 5);
   });
 });
+
+/** `--radius-<name>` values in px from a block of CSS (rem × 16). */
+function radii(block: string): Map<string, number> {
+  const found = new Map<string, number>();
+  for (const match of block.matchAll(/--radius-([a-z0-9]+):\s*([\d.]+)(rem|px)\b/g)) {
+    const value = Number(match[2]) * (match[3] === "rem" ? 16 : 1);
+    found.set(match[1] as string, value);
+  }
+  return found;
+}
+
+describe("radius tokens: calm app corners, larger marketing corners (docs/17 §3)", () => {
+  const app = radii(theme);
+  const marketingCss = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), "../../features/marketing/marketing.css"),
+    "utf8",
+  );
+  const mkStart = marketingCss.indexOf(".mk {");
+  const marketing = radii(marketingCss.slice(mkStart, marketingCss.indexOf("}", mkStart)));
+
+  it("cards, dialogs and panels in the app are 10-14px (rounded-xl, rounded-2xl)", () => {
+    for (const name of ["lg", "xl", "2xl"]) {
+      expect(app.get(name), name).toBeGreaterThanOrEqual(10);
+      expect(app.get(name), name).toBeLessThanOrEqual(14);
+    }
+  });
+
+  it("inputs and buttons (rounded-md) are scaled to match: smaller than the cards", () => {
+    expect(app.get("md")).toBeGreaterThanOrEqual(6);
+    expect(app.get("md")).toBeLessThan(app.get("xl") ?? 0);
+    expect(app.get("sm")).toBeLessThanOrEqual(app.get("md") ?? 0);
+  });
+
+  it("the marketing pages (.mk) keep their larger radii", () => {
+    expect(marketing.get("md")).toBe(10);
+    expect(marketing.get("lg")).toBe(14);
+    expect(marketing.get("xl")).toBe(20);
+    expect(marketing.get("2xl")).toBe(24);
+  });
+});
