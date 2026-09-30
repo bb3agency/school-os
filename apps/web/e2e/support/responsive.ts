@@ -44,7 +44,15 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
   public: {
     subject: null,
     signInPath: "",
-    pages: ["/welcome", "/signed-out", "/signed-out?error=signin_failed"],
+    pages: [
+      "/welcome",
+      "/features",
+      "/security",
+      "/pricing",
+      "/about",
+      "/signed-out",
+      "/signed-out?error=signin_failed",
+    ],
   },
   multi: { subject: "multi", signInPath: "/en/support", pages: ["/choose-school"] },
   school: {
@@ -269,11 +277,27 @@ export function detectLayout({ vw }: { vw: number }): LayoutReport {
       const fullTextKept =
         s.textOverflow === "ellipsis" &&
         el.closest("[title]")?.getAttribute("title") === (el.textContent ?? "").trim();
-      if (/(hidden|clip)/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && !fullTextKept)
+      // Second exception (docs/17 §5.6): on the public marketing pages (`.mk`), a decorative
+      // sample-data illustration, hidden from assistive technology and described by a
+      // caption, is cropped on purpose. Only its clipping is exempt; it still must not widen
+      // the page or overflow the screen.
+      const decorative =
+        el.closest(".mk") !== null &&
+        (el.closest('[aria-hidden="true"]') !== null ||
+          (el.children.length > 0 &&
+            Array.from(el.children).every(
+              (child) => child.getAttribute("aria-hidden") === "true",
+            )));
+      if (
+        !decorative &&
+        /(hidden|clip)/.test(s.overflowX) &&
+        el.scrollWidth > el.clientWidth + 1 &&
+        !fullTextKept
+      )
         out.clipped.push(
           `${s.textOverflow === "ellipsis" ? "ellipsis " : ""}x ${el.scrollWidth}>${el.clientWidth} ${desc(el)}`,
         );
-      if (/(hidden|clip)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1)
+      if (!decorative && /(hidden|clip)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1)
         out.clipped.push(`y ${el.scrollHeight}>${el.clientHeight} ${desc(el)}`);
     }
     if (el.matches(TARGETS)) {

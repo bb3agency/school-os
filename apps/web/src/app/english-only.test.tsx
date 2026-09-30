@@ -122,6 +122,14 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
     expect(failures).toEqual({});
     // Most pages render without a session; pinned so a broken import cannot empty the scan.
     expect(scanned.length).toBeGreaterThan(75);
+    // The public marketing pages (docs/17 §5.6) are always part of the scan.
+    expect(scanned).toEqual(
+      expect.arrayContaining(
+        ["welcome", "features", "security", "pricing", "about"].map(
+          (page) => `./[locale]/${page}/page.tsx`,
+        ),
+      ),
+    );
   }, 120_000);
 
   it("the scan finds Telugu when it is switched on (the check itself works)", async () => {

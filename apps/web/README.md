@@ -39,7 +39,7 @@ same guard as `/dev/sign-in`).
 | `src/features/ask/`                | Ask the school (US-801..803): `/ask` streams SSE via the BFF (Stop aborts), text answers with source chips, feedback; `/ask/search`, `/ask/verified`                                                                                                                                                       |
 | `src/features/auth/`               | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                                                                                                                                                                                |
 | `src/features/dev-ui/`             | Dev-only design-system reference (`/[locale]/dev/ui`, guarded by `isDevSignInEnabled`)                                                                                                                                                                                                                     |
-| `src/features/welcome/`            | Public product page (`/welcome`): header, hero with a CSS/SVG mock on sample data, features, how it works, security, plans, FAQ; no session                                                                                                                                                                |
+| `src/features/marketing/`          | Public marketing site (docs/17 §5.6): `/welcome` home, `/features`, `/security`, `/pricing`, `/about`; `MarketingShell`, `SiteHeader`, `Reveal`, sample-data mockups, settings (`settings.ts`, server only); no session                                                                                    |
 | `src/lib/forms.ts`                 | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                                                                                                                                                                                      |
 | `src/lib/api-errors.ts`            | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                                                                                                                                                                                   |
 | `src/lib/date-format.ts`           | Display dates in the school's `date_format` from GET /me (FR-TEN-012); `formatDate`/`formatDateTime` in `lib/format.ts` use it (browser only; the server renders DD/MM/YYYY). Typed dates too: `useDateInput` (placeholder, hint values, starting value) and `typedDateToIso` (reads D/M/YYYY or YYYY-M-D) |
@@ -103,15 +103,17 @@ answers `active_tenant_required`), hides menu items the user lacks (from `/me` e
 permissions; UX only, the API checks every call) and shows "Switch school" when `/me`
 lists more than one school. Platform menus are filtered the same way from `/platform/me`.
 
-**Public welcome page (`/[locale]/welcome`, `src/features/welcome/`).** A signed-out visitor
-to the bare school home (`/`, `/en`, `/te`) is sent to the public product page instead of
-the IdP (`requireStaff` → `isSchoolHomePath` in `src/server/session/rsc.ts`); every deep link
+**Public marketing pages (`src/features/marketing/`, docs/17 §5.6).** A signed-out visitor
+to the bare school home (`/`, `/en`, `/te`) is sent to the public home page `/welcome` instead
+of the IdP (`requireStaff` → `isSchoolHomePath` in `src/server/session/rsc.ts`); every deep link
 still goes straight to `/bff/auth/login?next=…`, a SchoolOS support session still opens the
-console, and the operator panel is unchanged. The page needs no session, is a Server
-Component with no client JS of its own (only the language switch), stays `noindex` like the
-rest of the app, and links to sign-in; the signed-out page links back to it. Its claims come
-from docs/01, docs/07 and docs/08 (no prices, counts or customer names; certificates are
-marked planned until M3).
+console, and the operator panel is unchanged. `/welcome`, `/features`, `/security`, `/pricing`
+and `/about` need no session, are Server Components (client JS only for the header's phone
+menu and the scroll reveal), stay `noindex` like the rest of the app, and link to sign-in; the
+signed-out page links back to `/welcome`. Their claims come from docs/01, 07, 08, 14 and 16 (no
+prices, counts or customer names; certificates are marked planned until M3). On a dedicated
+host (`SOS_DEPLOYMENT_MODE=dedicated`) `/welcome` is a plain sign-in card and the other four
+answer 404.
 
 ## BFF routes
 
@@ -137,7 +139,12 @@ API), `REDIS_URL`, `API_INTERNAL_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CL
 `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, optional
 `SOS_TELUGU_ENABLED` (default `false`: English only, Telugu hidden; the same variable as the
 API's, read at run time by `src/i18n/languages.ts`; ADR-0036, docs/17 §5.4),
-`SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`, and for break-glass support sign-in (ADR-0023)
+`SOS_DEPLOYMENT_MODE`, `FILES_ORIGIN`, the optional public-site settings
+`SOS_PUBLIC_CONTACT_EMAIL` ("Talk to us" mailto link; a plain address, else ignored),
+`SOS_PUBLIC_COMPANY_NAME` (footer and About, up to 200 characters) and
+`SOS_PUBLIC_COMPANY_ADDRESS` (About; lines split on `|` or `\n`), read at run time on the server
+by `src/features/marketing/settings.ts` (unset or invalid: that part is not shown, no
+placeholder; docs/17 §5.6), and for break-glass support sign-in (ADR-0023)
 `SUPPORT_OIDC_CLIENT_ID`, `SUPPORT_OIDC_CLIENT_SECRET` (the support app client of the operator
 pool; unset = off) and `SUPPORT_OIDC_ISSUER` (default `PLATFORM_OIDC_ISSUER`). See the root
 `.env.example`.
@@ -168,8 +175,12 @@ build: Telugu off (port `E2E_PORT`, the product default, project `chromium`) and
 ADR-0036). It checks the redirect to sign-in, English only with Telugu off
 (`e2e/english-only.spec.ts`: `/te` redirects, a Telugu browser, no Telugu font), the
 signed-out page (CSP, and Telugu with it on), the health check, axe-core (WCAG 2.2 AA) on
-the signed-out page, and the public welcome page (`e2e/welcome.spec.ts`: home redirect,
-CSP, axe at 1366×768 and 375 px in both languages, keyboard tab-through), without an IdP.
+the signed-out page, the public home page (`e2e/welcome.spec.ts`: home redirect, CSP, axe at
+1366×768 and 375 px in both languages, keyboard tab-through) and every public marketing page
+(`e2e/marketing.spec.ts`: CSP and console errors, axe and no sideways scroll at 1366×768 and
+375 px with and without reduced motion, the scroll reveal never leaving content hidden, also at
+400% zoom, focus not hidden under the sticky header, links, the phone menu by keyboard, print),
+without an IdP.
 
 With `E2E_STAND_IN=1` (and Valkey at `REDIS_URL`) it also signs in through a scripted
 stand-in IdP and canned API (`e2e/support/stand-in.ts`; synthetic data only) and runs axe

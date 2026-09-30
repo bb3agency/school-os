@@ -272,6 +272,13 @@ describe("dedicated host: no marketing, a plain sign-in (docs/17 §5.6)", () => 
     expect(() => PAGES[name].Page()).toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
   });
 
+  it("the mode is read with surrounding spaces trimmed", () => {
+    vi.stubEnv("SOS_DEPLOYMENT_MODE", " dedicated ");
+    expect(() => PAGES.pricing.Page()).toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
+    vi.stubEnv("SOS_DEPLOYMENT_MODE", "shared");
+    expect(() => PAGES.pricing.Page()).not.toThrow();
+  });
+
   it("/welcome is a branded sign-in page with no marketing links or contact", () => {
     vi.stubEnv("SOS_DEPLOYMENT_MODE", "dedicated");
     withContact();
@@ -314,6 +321,26 @@ describe("marketing settings (SOS_PUBLIC_*)", () => {
     expect(
       readMarketingSettings({ SOS_PUBLIC_CONTACT_EMAIL: " hello@schoolos.example " }).contactEmail,
     ).toBe("hello@schoolos.example");
+  });
+
+  it("a name or address longer than 200 characters is ignored, not cut", () => {
+    const long = "A".repeat(201);
+    expect(readMarketingSettings({ SOS_PUBLIC_COMPANY_NAME: long }).companyName).toBeNull();
+    expect(readMarketingSettings({ SOS_PUBLIC_COMPANY_ADDRESS: long }).companyAddress).toBeNull();
+    expect(readMarketingSettings({ SOS_PUBLIC_COMPANY_NAME: "A".repeat(200) }).companyName).toBe(
+      "A".repeat(200),
+    );
+  });
+
+  it("invalid settings render the pages without the parts they would fill", () => {
+    vi.stubEnv("SOS_PUBLIC_CONTACT_EMAIL", "x@y.com?subject=hi");
+    vi.stubEnv("SOS_PUBLIC_COMPANY_NAME", "A".repeat(201));
+    for (const name of NAMES) {
+      const { container, unmount } = render(name);
+      expect(container.querySelector('a[href^="mailto:"]'), name).toBeNull();
+      expect(container.textContent, name).not.toMatch(/©|AAAA/);
+      unmount();
+    }
   });
 
   it("the address splits into lines on | or \\n", () => {
