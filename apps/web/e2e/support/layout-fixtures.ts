@@ -1865,7 +1865,7 @@ const ASK_TITLES = [
 ];
 const ASK_CHATS = Array.from({ length: 12 }, (_, i) => ({
   id: i === 0 ? ASK_CHAT : uid("00000000e9", 0xb0 + i),
-  title: ASK_TITLES[i % ASK_TITLES.length] ?? null,
+  title: ASK_TITLES[i % ASK_TITLES.length] ?? "",
   pinned: i < 2,
   created_at: at(20 - i),
   updated_at: at(28 - i),
@@ -1883,6 +1883,7 @@ const ASK_ANSWER = [
   "- Check the **admission register** first: it is the legal record. [1]",
   "- Then raise a correction request with the evidence document. [3]",
 ].join("\n");
+// MessageCitationOut: a source the member can no longer see has no title or snippet.
 const askCitation = (index: number, title: string, withheld = false) => ({
   index,
   source: ASK_DOC_SOURCE,
@@ -1890,46 +1891,66 @@ const askCitation = (index: number, title: string, withheld = false) => ({
   snippet: withheld
     ? null
     : "Synthetic passage: the date of birth in the admission register is the legal anchor (BR-01) and must match the documents before the portal upload.",
-  ...(withheld ? { withheld: true } : {}),
+  withheld,
 });
-const askMessage = (i: number, superseded = false) => ({
-  query_id: uid("00000000ea", 0xa0 + i),
-  question:
-    i === 1
-      ? "పదవ తరగతి విద్యార్థుల బోర్డు రిజిస్ట్రేషన్ కోసం ఏ పత్రాలు కావాలి, చివరి తేదీ ఎప్పుడు?"
-      : "Which students in Class 6 to Class 10 have a date of birth in the admission register that differs from the Aadhaar as printed, and what should the office do before the UDISE+ upload?",
-  answer: ASK_ANSWER,
-  status: "answered",
-  mode: "full",
-  language: i === 1 ? "te" : "en",
-  citations: [
-    askCitation(1, "Admission register 2014-15, page 12 (scanned copy uploaded by the office)"),
-    askCitation(2, "Aadhaar as printed · synthetic record"),
-    askCitation(3, "", true),
-  ],
-  feedback: i === 0 ? "helpful" : null,
-  followups:
-    i === 2
+// MessageOut. The Telugu question's answer cited a source the member can no longer see, so the
+// API withholds that answer and its follow-ups too (answer_withheld).
+const askMessage = (i: number, superseded = false) => {
+  const withheld = i === 1;
+  return {
+    query_id: uid("00000000ea", 0xa0 + i),
+    question:
+      i === 1
+        ? "పదవ తరగతి విద్యార్థుల బోర్డు రిజిస్ట్రేషన్ కోసం ఏ పత్రాలు కావాలి, చివరి తేదీ ఎప్పుడు?"
+        : "Which students in Class 6 to Class 10 have a date of birth in the admission register that differs from the Aadhaar as printed, and what should the office do before the UDISE+ upload?",
+    answer: withheld ? null : ASK_ANSWER,
+    answer_withheld: withheld,
+    status: "answered",
+    mode: "full",
+    language: i === 1 ? "te" : "en",
+    citations: withheld
       ? [
-          "Show me only the Class 10 students whose names differ between the register and Aadhaar",
-          "ఈ విద్యార్థుల కోసం సవరణ అభ్యర్థన ఎలా పెట్టాలి?",
+          askCitation(
+            1,
+            "Admission register 2014-15, page 12 (scanned copy uploaded by the office)",
+          ),
+          askCitation(2, "", true),
         ]
-      : [],
-  created_at: at(28, 5 + i),
-  superseded,
-  ...(i === 2 ? { summarized: true } : {}),
-});
+      : [
+          askCitation(
+            1,
+            "Admission register 2014-15, page 12 (scanned copy uploaded by the office)",
+          ),
+          askCitation(2, "Aadhaar as printed · synthetic record"),
+          askCitation(3, "Correction requests: evidence documents · synthetic guide"),
+        ],
+    feedback: i === 0 ? "helpful" : null,
+    followups:
+      i === 2
+        ? [
+            "Show me only the Class 10 students whose names differ between the register and Aadhaar",
+            "ఈ విద్యార్థుల కోసం సవరణ అభ్యర్థన ఎలా పెట్టాలి?",
+          ]
+        : [],
+    created_at: at(28, 5 + i),
+    superseded,
+    cached: false,
+    summarized: i === 2,
+  };
+};
 const ASK_MEMORIES = [
   "I am the office clerk and prepare the UDISE+ upload for Classes 6 to 10 every September.",
   "సమాధానాలు తెలుగులో కావాలి, కానీ తేదీలు DD/MM/YYYY రూపంలో ఉండాలి.",
   "Prefers short answers with the source first.",
 ].map((text, i) => ({
+  // MemoryOut: a suggestion is pending until saved and expires after 24 hours.
   id: uid("00000000e8", 0xa0 + i),
   text,
   source: i === 2 ? "suggested" : "explicit",
-  status: i === 2 ? "pending" : "saved",
+  status: i === 2 ? "pending" : "active",
   created_at: at(10 + i),
   updated_at: at(10 + i),
+  expires_at: i === 2 ? at(11 + i) : null,
   version: 1,
 }));
 
@@ -2043,7 +2064,7 @@ const ROUTES: Array<[RegExp, Handler]> = [
       messages: [askMessage(0, true), askMessage(0), askMessage(1), askMessage(2)],
     }),
   ],
-  [re("/knowledge/memories"), () => ASK_MEMORIES],
+  [re("/knowledge/memories"), () => page(ASK_MEMORIES)],
   [re("/knowledge/memory-settings"), () => ({ enabled: true, school_enabled: true })],
   [
     re("/knowledge/verified-answers"),

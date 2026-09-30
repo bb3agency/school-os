@@ -363,7 +363,7 @@ const DOCUMENT = {
 /**
  * Ask the school (docs/06 §5.1): a synthetic cited answer about the holiday circular. The events
  * (meta with the conversation, status steps, preview deltas, the validated final, citation,
- * done, follow-ups) and the stored conversations and memory live in ask-api.ts.
+ * follow-ups, done) and the stored conversations and memory live in ask-api.ts.
  */
 const ASK_QUERY_ID = "0192f3a4-0000-7000-8000-00000000e001";
 const ASK_SOURCE = `sos://doc/${DOC_ID}/v1#p1`;
@@ -789,8 +789,13 @@ async function startApi(): Promise<Server> {
     }
     if (url.pathname === "/api/v1/knowledge/ask" && method === "POST") {
       const question = typeof body.question === "string" ? body.question : "";
-      const { events, commit } = askEvents(body, ASK_CITATION, question.includes("budget"));
-      return streamAnswer(response, events, question.includes("slowly"), commit);
+      const answer = askEvents(body, ASK_CITATION, question.includes("budget"));
+      if (!answer) {
+        // A conversation that is not (or no longer) there: 404, as the API answers.
+        const problem = { type: "about:blank", title: "Not found", status: 404, code: "not_found" };
+        return send(response, 404, problem, "application/problem+json");
+      }
+      return streamAnswer(response, answer.events, question.includes("slowly"), answer.commit);
     }
     const subject = subjectOf(request);
     const [status, answer] =
