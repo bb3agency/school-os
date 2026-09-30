@@ -10884,6 +10884,7 @@
                 "type": "null"
               }
             ],
+            "description": "The answer's language: en unless Telugu is switched on for the deployment.",
             "title": "Language"
           },
           "mode": {
@@ -28863,7 +28864,7 @@
     },
     "/api/v1/knowledge/ask": {
       "post": {
-        "description": "Ask a question of the school's records and documents (permission ``kb.ask``).\n\nAnswers cite their sources (``sos://`` URIs) or say the answer was not found in the school\nrecords you can access. Only records and documents you may see are used. The answer streams\nas ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces\nthe preview. ``status`` events report progress as codes. Your earlier messages in the same\nconversation (``conversation_id``, or the older ``session_id``) are context for a follow-up\n(never another person's); the ``meta`` event names the conversation (a new one when you\nname none) and its title. ``regenerate_of`` / ``edit_of`` replace one of your latest\nmessages (409 ``message_superseded``, ``message_not_revisable``; 404 for anyone else's).\n``followups`` suggests up to 3 next questions; ``memory`` reports an item saved (\"remember\nthat ...\") or suggested (confirm it in memory settings). When the school's AI budget is\nused up or AI answers are unavailable, you get ranked, cited passages instead (``mode:\nsearch_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.",
+        "description": "Ask a question of the school's records and documents (permission ``kb.ask``).\n\nAnswers cite their sources (``sos://`` URIs) or say the answer was not found in the school\nrecords you can access. Only records and documents you may see are used. The answer streams\nas ``delta`` events (a preview); the ``final`` event carries the checked answer and replaces\nthe preview. ``status`` events report progress as codes. Your earlier messages in the same\nconversation (``conversation_id``, or the older ``session_id``) are context for a follow-up\n(never another person's); the ``meta`` event names the conversation (a new one when you\nname none) and its title. ``regenerate_of`` / ``edit_of`` replace one of your latest\nmessages (409 ``message_superseded``, ``message_not_revisable``; 404 for anyone else's).\n``followups`` suggests up to 3 next questions; ``memory`` reports an item saved (\"remember\nthat ...\") or suggested (confirm it in memory settings). When the school's AI budget is\nused up or AI answers are unavailable, you get ranked, cited passages instead (``mode:\nsearch_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.\nA question may be written in English, Telugu or both; the answer, follow-ups and title are\nin English (``meta.language`` is ``en``) unless Telugu is switched on for the deployment.",
         "operationId": "ask_api_v1_knowledge_ask_post",
         "requestBody": {
           "content": {

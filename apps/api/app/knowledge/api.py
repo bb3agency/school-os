@@ -164,6 +164,8 @@ def ask(ctx: Asker, db: TenantDB, body: AskIn) -> StreamingResponse:
     that ...") or suggested (confirm it in memory settings). When the school's AI budget is
     used up or AI answers are unavailable, you get ranked, cited passages instead (``mode:
     search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.
+    A question may be written in English, Telugu or both; the answer, follow-ups and title are
+    in English (``meta.language`` is ``en``) unless Telugu is switched on for the deployment.
     """
     svc = service.get_service()
     svc.admit(ctx)

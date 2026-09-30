@@ -214,7 +214,9 @@ class MessageOut(_Out):
     )
     status: MessageStatus
     mode: Literal["full", "search_only"]
-    language: Locale | None
+    language: Locale | None = Field(
+        description="The answer's language: en unless Telugu is switched on for the deployment."
+    )
     citations: list[MessageCitationOut]
     feedback: Literal["helpful", "not_helpful"] | None
     followups: list[str]

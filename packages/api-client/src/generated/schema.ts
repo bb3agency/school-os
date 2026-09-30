@@ -2553,6 +2553,8 @@ export interface paths {
          *     that ...") or suggested (confirm it in memory settings). When the school's AI budget is
          *     used up or AI answers are unavailable, you get ranked, cited passages instead (``mode:
          *     search_only``). 429 ``ai_rate_limited`` when you ask too many questions a minute.
+         *     A question may be written in English, Telugu or both; the answer, follow-ups and title are
+         *     in English (``meta.language`` is ``en``) unless Telugu is switched on for the deployment.
          */
         post: operations["ask_api_v1_knowledge_ask_post"];
         delete?: never;
@@ -9823,7 +9825,10 @@ export interface components {
             feedback: ("helpful" | "not_helpful") | null;
             /** Followups */
             followups: string[];
-            /** Language */
+            /**
+             * Language
+             * @description The answer's language: en unless Telugu is switched on for the deployment.
+             */
             language: ("en" | "te" | "mixed") | null;
             /**
              * Mode
