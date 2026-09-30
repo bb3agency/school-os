@@ -129,6 +129,7 @@ export function FeaturesView({ settings }: { settings: MarketingSettings }) {
           </h2>
           <CtaGroup
             contactEmail={settings.contactEmail}
+            whatsappNumber={settings.whatsappNumber}
             talkLabel={t("cta.talk")}
             signInLabel={t("cta.signIn")}
           />

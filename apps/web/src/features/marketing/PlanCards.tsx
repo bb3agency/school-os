@@ -3,6 +3,7 @@ import { buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { mailtoHref } from "./links";
+import { WhatsAppLink } from "./WhatsAppLink";
 
 export const PLANS = ["shared", "dedicated"] as const;
 const POINTS = ["one", "two", "three", "four"] as const;
@@ -16,10 +17,12 @@ export function PlanCards({
   headingLevel = 2,
   compact = false,
   contactEmail = null,
+  whatsappNumber = null,
 }: {
   headingLevel?: 2 | 3;
   compact?: boolean;
   contactEmail?: string | null;
+  whatsappNumber?: string | null;
 }) {
   const t = useTranslations("marketing");
   const Heading = headingLevel === 2 ? "h2" : "h3";
@@ -95,14 +98,29 @@ export function PlanCards({
                 <p className={cn("font-medium", dark ? "text-white" : "text-ink")}>
                   {t("pricing.priceNote")}
                 </p>
-                {contactEmail ? (
-                  <a
-                    href={mailtoHref(contactEmail)}
-                    className={cn(buttonClasses(dark ? "inverse" : "primary", "md"), "mk-press")}
-                  >
-                    {t("cta.talk")}
-                    <span className="sr-only">: {t(`pricing.${plan}.name`)}</span>
-                  </a>
+                {contactEmail || whatsappNumber ? (
+                  <div className="flex flex-wrap gap-2">
+                    {contactEmail ? (
+                      <a
+                        href={mailtoHref(contactEmail)}
+                        className={cn(
+                          buttonClasses(dark ? "inverse" : "primary", "md"),
+                          "mk-press",
+                        )}
+                      >
+                        {t("cta.talk")}
+                        <span className="sr-only">: {t(`pricing.${plan}.name`)}</span>
+                      </a>
+                    ) : null}
+                    {whatsappNumber ? (
+                      <WhatsAppLink
+                        number={whatsappNumber}
+                        variant={dark ? "inverse" : "secondary"}
+                        size="md"
+                        context={t(`pricing.${plan}.name`)}
+                      />
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}
