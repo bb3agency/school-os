@@ -10,7 +10,8 @@ from pydantic import BaseModel, ConfigDict
 
 
 class NotificationOut(BaseModel):
-    """One notification, rendered in the reader's language (``Accept-Language``: en or te)."""
+    """One notification, rendered in the reader's language (``Accept-Language``: en or te;
+    always en while Telugu is hidden, ADR-0036)."""
 
     model_config = ConfigDict(frozen=True)
 

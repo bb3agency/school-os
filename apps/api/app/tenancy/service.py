@@ -36,6 +36,7 @@ from app.core.crypto import (
 from app.core.db import platform_session, tenant_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
+from app.core.languages import enabled_languages, telugu_enabled
 from app.core.logging import get_context
 from app.tenancy import offboarding
 from app.tenancy import repository as repo
@@ -638,7 +639,12 @@ def get_class(session: Session, class_id: uuid.UUID) -> ClassOut:
 
 
 def create_class(session: Session, data: ClassCreate) -> ClassOut:
-    """Audit: ``class.created``."""
+    """Audit: ``class.created``. ``display_te`` is required only while Telugu is shown
+    (ADR-0036; 422 ``missing``)."""
+    if data.display_te is None and telugu_enabled():
+        raise ValidationFailed(
+            [{"field": "display_te", "code": "missing", "message_key": "errors.missing"}]
+        )
     tenant_id = repo.current_tenant_id(session)
     with _db_errors():
         klass = repo.insert_class(
@@ -647,7 +653,9 @@ def create_class(session: Session, data: ClassCreate) -> ClassOut:
             tenant_id=tenant_id,
             code=data.code,
             display_en=data.display_en,
-            display_te=data.display_te,
+            # Optional while Telugu is hidden (ADR-0036); the column needs a value, so a class
+            # without a Telugu name keeps its English name there (never shown as Telugu).
+            display_te=data.display_te or data.display_en,
             sort_order=data.sort_order,
         )
     _audit(
@@ -905,13 +913,32 @@ def archive_section(
 # --- school profile and settings (tenant_session; FR-TEN-012) ---------------------------------
 
 
-def _tenant_out(tenant: Any) -> TenantOut:
+_LETTERHEAD_TE = ("school_name_te", "address_te")
+
+
+def _stored_settings(tenant: Any) -> TenantSettings:
     stored: dict[str, Any] = dict(tenant.settings or {})
     known = {k: v for k, v in stored.items() if k in TenantSettings.model_fields}
     try:
-        settings = TenantSettings.model_validate(known)
+        return TenantSettings.model_validate(known)
     except ValidationError:
-        settings = TenantSettings()  # unreadable legacy values fall back to defaults
+        return TenantSettings()  # unreadable legacy values fall back to defaults
+
+
+def _shown_settings(settings: TenantSettings) -> TenantSettings:
+    """The settings as shown and applied. While Telugu is hidden (ADR-0036) the school's
+    languages are the enabled ones (English) and the Telugu letterhead lines are empty; the
+    stored values are kept for when Telugu comes back."""
+    if telugu_enabled():
+        return settings
+    enabled = enabled_languages()
+    languages = [lang for lang in settings.languages if lang in enabled] or list(enabled)
+    head = settings.certificate_letterhead.model_copy(update=dict.fromkeys(_LETTERHEAD_TE, ""))
+    return settings.model_copy(update={"languages": languages, "certificate_letterhead": head})
+
+
+def _tenant_out(tenant: Any) -> TenantOut:
+    settings = _shown_settings(_stored_settings(tenant))
     return TenantOut(
         id=tenant.id,
         code=tenant.code,
@@ -944,8 +971,15 @@ def update_tenant_settings(
     tenant = repo.get_own_tenant(session)
     if tenant is None:
         raise NotFound("School not found")
-    current = _tenant_out(tenant).settings.model_dump(mode="json")
+    current = _stored_settings(tenant).model_dump(mode="json")
     changes = data.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    head = changes.get("certificate_letterhead")
+    if head is not None and not telugu_enabled():
+        # The form shows no Telugu lines while Telugu is hidden (ADR-0036): an empty one keeps
+        # what is stored instead of erasing it.
+        for key in _LETTERHEAD_TE:
+            if not head.get(key):
+                head[key] = current["certificate_letterhead"][key]
     try:
         merged = TenantSettings.model_validate({**current, **changes})
     except ValidationError as exc:

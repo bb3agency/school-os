@@ -91,7 +91,8 @@ def _student_headers(item: StudentOut) -> dict[str, str]:
 @router.get("/attributes", response_model=list[AttributeOut])
 def list_attributes(ctx: Reader, db: TenantDB) -> list[AttributeOut]:
     """Student attributes with classification (C2/C3), identity flag, allowed sources and
-    English/Telugu labels (permission ``student.read_basic``)."""
+    English labels (``label_te`` empty while Telugu is hidden, ADR-0036; permission
+    ``student.read_basic``)."""
     return students.attribute_catalog(db)
 
 

@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from app.core.languages import contains_telugu
 from app.core.pdf import FONT_URL, ChromiumRenderer
 from app.platform.deletion_certificate import (
     CATEGORY_ORDER,
@@ -131,6 +132,7 @@ def test_FR_PLT_005_hash_is_over_canonical_json() -> None:
     assert re.fullmatch(r"[0-9a-f]{64}", content_sha256(content))
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_PLT_005_page_escapes_values_and_is_bilingual() -> None:
     cfg = offboarding_config().certificate
     content = build_content(
@@ -150,6 +152,17 @@ def test_FR_PLT_005_page_escapes_values_and_is_bilingual() -> None:
     assert urls == {FONT_URL}
     assert pdf_filename("s-synthetic") == "certificate-of-deletion-s-synthetic.pdf"
     assert offboarding_config().certificate.telugu_review == "pending"
+
+
+def test_ADR_0036_deletion_certificate_is_english_without_a_font_while_telugu_is_hidden() -> None:
+    cfg = offboarding_config().certificate
+    content = _content()
+    page = render_html(content, content_sha256(content), cfg)
+    assert cfg.title.en in page
+    assert cfg.categories["staff_sign_in_accounts"].en in page
+    assert not contains_telugu(page)
+    assert set(re.findall(r"https?://[^\"')\s]+", page)) == set()
+    assert "@font-face" not in page
 
 
 def _chromium_available() -> bool:

@@ -73,7 +73,8 @@ def create_precheck_export(
     profiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and
     ``dq.findings.read``) with a recent sign-in with MFA (428 ``step_up_required``). Choose
     sections or classes (empty = every student you can see), the formats (``xlsx``, ``pdf``)
-    and the language (``en``, ``te``). The students are checked again and the files are made
+    and the language (``en``; ``te`` is accepted but gives English while Telugu is hidden,
+    ADR-0036). The students are checked again and the files are made
     in the background (202); you are notified when they are ready. Restricted (C3) values such
     as the UDISE+ ``category`` are hidden unless ``include_sensitive`` is true (needs
     ``student.read_sensitive``, else 403 ``sensitive_not_allowed``); the audit log then lists

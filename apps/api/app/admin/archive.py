@@ -20,6 +20,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, cast
 
+from app.core.languages import telugu_enabled
 from app.core.records import RecordTable
 from app.core.redaction import mask_aadhaar
 from app.core.spreadsheet import write_csv
@@ -142,6 +143,10 @@ def manifest(
 
 
 def readme(en: str, te: str) -> bytes:
+    """README.txt of a data export: English, then Telugu only while Telugu is shown
+    (ADR-0036)."""
+    if not telugu_enabled():
+        return (en.rstrip() + "\n").encode("utf-8")
     return (en.rstrip() + "\n\n" + "-" * 72 + "\n\n" + te.rstrip() + "\n").encode("utf-8")
 
 

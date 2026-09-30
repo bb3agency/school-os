@@ -26,6 +26,7 @@ from typing import Any, Final
 import yaml
 from openpyxl import Workbook
 
+from app.core.languages import shown_texts
 from app.core.redaction import mask_aadhaar
 from app.core.spreadsheet import (
     Cell,
@@ -59,7 +60,13 @@ class SheetConfig:
     limits: SheetLimits
     max_edit_cells: int
     max_value_chars: int
-    watermark: str
+    watermark_texts: Mapping[str, str]
+
+    @property
+    def watermark(self) -> str:
+        """The download watermark in the languages shown (English only while Telugu is
+        hidden, ADR-0036)."""
+        return shown_texts(self.watermark_texts)
 
 
 @lru_cache(maxsize=1)
@@ -72,7 +79,7 @@ def sheet_config() -> SheetConfig:
         limits=SheetLimits(**{k: int(v) for k, v in raw["limits"].items()}),
         max_edit_cells=int(edits["max_cells"]),
         max_value_chars=int(edits["max_value_chars"]),
-        watermark=" · ".join(str(v) for v in raw["export_watermark"].values()),
+        watermark_texts={str(k): str(v) for k, v in raw["export_watermark"].items()},
     )
 
 

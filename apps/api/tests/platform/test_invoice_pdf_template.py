@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+from app.core.languages import contains_telugu
 from app.core.pdf import FONT_URL, ChromiumRenderer
 from app.platform import invoice_pdf as ip
 from app.platform.invoice_storage import MemoryInvoiceStore, object_key
@@ -182,6 +183,7 @@ def test_SEC_017_every_value_is_escaped() -> None:
     assert "&lt;img src=x onerror=alert(1)&gt; PO 42" in page
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_docs_07_10_page_references_no_url_but_the_bundled_font() -> None:
     page = _html(notes="see https://example.invalid/pay")
     urls = set(re.findall(r'url\("([^"]+)"\)', page))
@@ -189,6 +191,15 @@ def test_docs_07_10_page_references_no_url_but_the_bundled_font() -> None:
     assert "<link" not in page
     assert "<script" not in page
     assert "src=" not in page
+    assert "@page { size: A4 portrait" in page
+
+
+def test_ADR_0036_invoice_page_asks_for_no_font_while_telugu_is_hidden() -> None:
+    page = _html(notes="see https://example.invalid/pay")
+    assert set(re.findall(r'url\("([^"]+)"\)', page)) == set()
+    assert "@font-face" not in page
+    assert "Noto Sans Telugu" not in page
+    assert not contains_telugu(page)
     assert "@page { size: A4 portrait" in page
 
 

@@ -88,9 +88,9 @@ def list_findings(
     limit: Limit = 50,
     cursor: Cursor = None,
 ) -> Page[FindingOut]:
-    """Findings, most severe first, with masked values, English/Telugu explanations and
-    correction routes (permission ``dq.findings.read``). ``status`` defaults to unresolved
-    (``open``, ``reopened``)."""
+    """Findings, most severe first, with masked values, English explanations (``te`` empty while
+    Telugu is hidden, ADR-0036) and correction routes (permission ``dq.findings.read``).
+    ``status`` defaults to unresolved (``open``, ``reopened``)."""
     filters = FindingFilters(
         severity=severity,
         rule_id=rule_id,
@@ -147,8 +147,8 @@ def waive_finding(
 
 @router.get("/rules", response_model=list[RuleOut])
 def list_rules(ctx: Reader) -> list[RuleOut]:
-    """The rule catalog DQ-001..DQ-012 with English/Telugu texts (permission
-    ``dq.findings.read``)."""
+    """The rule catalog DQ-001..DQ-012 with English texts (``te`` empty while Telugu is
+    hidden, ADR-0036; permission ``dq.findings.read``)."""
     return dq.rules_catalog()
 
 

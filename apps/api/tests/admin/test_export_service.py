@@ -20,6 +20,7 @@ from app.admin.config import load_config
 from app.admin.schemas import TenantExportCreate
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, StepUpRequired
+from app.core.languages import contains_telugu
 from app.documents import service as documents_service
 from app.students.schemas import ValueIn
 
@@ -258,10 +259,20 @@ def test_US_1201_AC1_archive_holds_records_and_documents_masked_by_default(
     assert str(records["other"]).encode() not in everything
 
 
-def test_US_1201_AC1_archive_holds_the_audit_log_a_manifest_and_a_bilingual_readme(
-    school: Any, masked_export: uuid.UUID, admin_engine: Engine
+def test_ADR_0036_archive_readme_is_english_while_telugu_is_hidden(
+    school: Any, masked_export: uuid.UUID
 ) -> None:
-    export_id = masked_export
+    readme = AD.archive(school, masked_export).read("README.txt").decode("utf-8")
+    assert "SchoolOS full data export" in readme
+    assert not contains_telugu(readme)
+
+
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
+def test_US_1201_AC1_archive_holds_the_audit_log_a_manifest_and_a_bilingual_readme(
+    school: Any, admin_engine: Engine
+) -> None:
+    # Its own export (the module's shared one is made with Telugu hidden, the default).
+    export_id = AD.ready_export(admin_engine, school)
     row = AD.row(admin_engine, export_id)
     zf = AD.archive(school, export_id)
     audit_csv = zf.read("audit/audit-log.csv").decode("utf-8")

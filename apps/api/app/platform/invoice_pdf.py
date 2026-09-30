@@ -26,7 +26,7 @@ from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.pdf import FONT_FAMILY, FONT_URL
+from app.core.pdf import font_face_css, font_stack
 from app.platform.common import config
 
 PAISE: Final = Decimal("0.01")
@@ -319,13 +319,14 @@ def _e(value: object) -> str:
     return html.escape(str(value), quote=True)
 
 
-STYLE: Final = f"""
-@font-face {{ font-family: "{FONT_FAMILY}"; src: url("{FONT_URL}") format("truetype");
-  font-weight: 100 900; font-stretch: 62.5% 100%; }}
+def style() -> str:
+    """The print CSS. The bundled (Telugu) font is declared only while Telugu is shown
+    (ADR-0036); invoices are English either way."""
+    return f"""{font_face_css()}
 @page {{ size: A4 portrait; margin: 14mm 14mm 18mm; }}
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; padding: 0; }}
-body {{ color: #111; background: #fff; font-family: "{FONT_FAMILY}", sans-serif;
+body {{ color: #111; background: #fff; font-family: {font_stack()};
   font-size: 9pt; line-height: 1.5; }}
 h1 {{ font-size: 15pt; margin: 0 0 2mm; letter-spacing: 0.02em; }}
 h2 {{ font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #444;
@@ -444,7 +445,7 @@ def render_invoice_html(doc: InvoiceDocument) -> str:
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         f"<title>{_e(doc.title)} {_e(doc.invoice_number)}</title>"
-        f"<style>{STYLE}</style></head><body>"
+        f"<style>{style()}</style></head><body>"
         f'<header class="top"><div><h1>{_e(doc.title)}</h1>'
         f'<p class="name">{_e(doc.supplier.legal_name)}</p></div>{meta}</header>'
         '<div class="parties">'

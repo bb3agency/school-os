@@ -224,3 +224,20 @@ def coverage_paused() -> Callable[[], contextlib.AbstractContextManager[None]]:
 def execute_admin(engine: Engine, sql: str) -> None:
     with engine.begin() as conn:
         conn.execute(text(sql))
+
+
+@pytest.fixture
+def telugu_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Switch Telugu back on for one test (ADR-0036: ``SOS_TELUGU_ENABLED``, default off).
+
+    The Telugu paths stay dormant, not deleted, so they keep their tests: a test that asserts
+    Telugu output asks for this fixture. Every module reads the switch through
+    ``app.core.languages``, so patching the settings that module sees is enough
+    (``get_settings()`` itself is cached and shared).
+    """
+    from app.core import config, languages
+
+    def settings_with_telugu() -> config.Settings:
+        return config.get_settings().model_copy(update={"telugu_enabled": True})
+
+    monkeypatch.setattr(languages, "get_settings", settings_with_telugu)

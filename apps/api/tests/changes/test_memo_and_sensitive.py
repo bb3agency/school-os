@@ -16,6 +16,7 @@ from app.changes import memo as memo_page
 from app.changes import service as changes
 from app.changes.schemas import ApproveIn
 from app.core.db import tenant_session
+from app.core.languages import contains_telugu
 from app.students import crypto
 from app.students import service as students
 
@@ -39,6 +40,7 @@ def _approve(school: Any, rid: uuid.UUID) -> None:
 # --- memo ----------------------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CR_005_memo_is_a_print_ready_bilingual_page(
     school: Any, api: Any, admin_engine: Engine
 ) -> None:
@@ -90,6 +92,34 @@ def test_FR_CR_005_memo_is_a_print_ready_bilingual_page(
     viewed = [a for a in actions if a["action"] == "change_request.memo_viewed"]
     assert len(viewed) == 2
     assert viewed[-1]["summary"]["sensitive_shown"] is False
+
+
+def test_ADR_0036_memo_and_request_are_english_while_telugu_is_hidden(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    sid = CR.student(school)
+    req = CR.submit(
+        admin_engine, school, school.people["office_admin"], "office_admin", student_id=sid
+    )
+    res = api.call(school.people["office_admin"], "GET", f"{BASE}/{req.id}/memo")
+    assert res.status_code == 200
+    body = res.text
+    assert "Correction memo for the student record" in body
+    assert "Memo reference: " in body
+    assert "Date of birth" in body
+    assert memo_page.NOT_APPROVED_EN in body
+    assert not contains_telugu(body)
+    assert "<p></p>" not in body
+    assert res.headers["content-security-policy"] == memo_page.STYLE_CSP
+    listed = api.call(school.people["office_admin"], "GET", f"{BASE}/{req.id}")
+    assert listed.status_code == 200
+    assert listed.json()["attribute_label_te"] == ""
+    assert not contains_telugu(listed.text)
+    _approve(school, req.id)
+    approved = api.call(school.people["office_admin"], "GET", f"{BASE}/{req.id}/memo").text
+    assert memo_page.INSTRUCTIONS_EN in approved
+    assert "Approved" in approved
+    assert not contains_telugu(approved)
 
 
 def test_FR_CR_005_memo_escapes_every_value(school: Any, api: Any, admin_engine: Engine) -> None:

@@ -43,6 +43,7 @@ from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import Conflict, NotFound, RateLimited, ValidationFailed
 from app.core.ids import new_id
+from app.core.languages import output_language
 from app.core.logging import get_context, get_logger
 from app.identity import service as identity
 from app.identity.schemas import UserOut
@@ -411,7 +412,8 @@ def send_requested_email(
     expires = _invitation_expires(user).astimezone(IST)
     params: dict[str, Any] = {
         "school": school.name,
-        "sign_in_url": _app_url(f"/{user.preferred_language}"),
+        # English while Telugu is hidden (ADR-0036); the web app also sends /te to /en.
+        "sign_in_url": _app_url(f"/{output_language(user.preferred_language)}"),
         "expires_on": expires.strftime(_DATE_FORMATS[school.settings.date_format]),
     }
     content = email.render_email(template_key, params, user.preferred_language)

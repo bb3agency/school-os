@@ -44,6 +44,7 @@ from app.core import purge as purging
 from app.core.config import get_settings
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
+from app.core.languages import output_language, telugu_text
 from app.core.logging import get_context
 from app.identity import repository as repo
 from app.identity.models import Membership, Role
@@ -156,7 +157,7 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
         membership_id=membership.id,
         display_name=user.display_name,
         email=user.email,
-        preferred_language=user.preferred_language,
+        preferred_language=output_language(user.preferred_language),  # ADR-0036
         status=membership.status,
         expires_at=membership.expires_at,
         roles=[r.key for r in repo.list_roles_for_membership(session, membership.id)],
@@ -432,7 +433,7 @@ def me(session: Session, ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -
         tenant_id=ctx.tenant_id,
         membership_id=ctx.membership_id,
         display_name=user.display_name,
-        preferred_language=user.preferred_language,
+        preferred_language=output_language(user.preferred_language),  # ADR-0036
         roles=sorted(ctx.roles),
         permissions=sorted(ctx.permissions),
         scopes=scopes,
@@ -808,7 +809,7 @@ def list_roles(session: Session, ctx: UserContext | None = None) -> list[RoleOut
             id=r.id,
             key=r.key,
             name_en=r.name_en,
-            name_te=r.name_te,
+            name_te=telugu_text(r.name_te) or "",  # empty while Telugu is hidden (ADR-0036)
             is_system=r.is_system,
             permissions=sorted(perms[r.id]),
             grantable=ctx is not None and _role_grantable(ctx, r, perms[r.id]),

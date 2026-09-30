@@ -19,6 +19,7 @@ from sqlalchemy import Engine, text
 from app.circulars import service
 from app.core.db import tenant_session
 from app.core.errors import Forbidden
+from app.core.languages import contains_telugu
 
 from .conftest import C
 
@@ -62,6 +63,32 @@ def test_US_1601_inbox_and_detail_show_the_reading_with_source_chips(
     assert reading["summary_sources"]
     assert all(s["citation"]["source"].startswith("sos://doc/") for s in reading["suggestions"])
     assert detail.headers["ETag"] == f'W/"{reading["version"]}"'
+
+
+def test_ADR_0036_circular_detail_shows_no_telugu_summary_while_telugu_is_hidden(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    # A reading made while Telugu was shown stores a Telugu summary; the API hides it now.
+    C.KB.install_runtime(telugu=True)
+    document_id = C.read_circular(admin_engine, ai_on.a)
+    stored = C.reading_row(admin_engine, document_id)["summary_te"]
+    assert contains_telugu(stored or "")
+    detail = api.call(ai_on.person("office_staff"), "GET", f"/api/v1/circulars/{document_id}")
+    assert detail.status_code == 200
+    reading = detail.json()["reading"]
+    assert reading["summary_en"]
+    assert reading["summary_te"] is None
+    assert not contains_telugu(detail.text)
+
+
+@pytest.mark.usefixtures("telugu_on")  # the stored Telugu summary is shown (ADR-0036)
+def test_ADR_0036_circular_detail_shows_the_telugu_summary_when_switched_on(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    C.KB.install_runtime(telugu=True)
+    document_id = C.read_circular(admin_engine, ai_on.a)
+    detail = api.call(ai_on.person("office_staff"), "GET", f"/api/v1/circulars/{document_id}")
+    assert contains_telugu(detail.json()["reading"]["summary_te"] or "")
 
 
 def test_FR_CIR_006_reading_follows_document_visibility(
@@ -343,6 +370,7 @@ def _source_text(admin: Engine, notice_id: Any) -> str | None:
     return value
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_1605_notice_from_a_circular_is_bilingual_and_never_sees_students(
     ai_on: Any, api: Any, admin_engine: Engine, installed: Any
 ) -> None:
@@ -575,6 +603,7 @@ def test_FR_NOTICE_002_personal_circulars_and_numbers_are_refused(
     assert phone.json()["errors"][0]["code"] == "notice_personal_data"
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_NOTICE_005_approve_render_and_download(
     ai_on: Any, api: Any, admin_engine: Engine, installed: Any
 ) -> None:
@@ -626,6 +655,78 @@ def test_FR_NOTICE_005_approve_render_and_download(
     assert {e["summary"]["format"] for e in downloads} >= {"pdf", "png"}
 
 
+def test_ADR_0036_english_notice_is_approved_and_rendered_without_telugu(
+    ai_on: Any, api: Any, installed: Any
+) -> None:
+    """Telugu hidden (the default): only the English title and body are needed, the page and
+    the API carry no Telugu (even if a Telugu text was sent) and no Telugu font."""
+    school = ai_on.a
+    _store, _transport, fake_pdf = installed
+    office = school.people["office_staff"]
+    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    path = f"/api/v1/notices/{blank['id']}"
+    edited = api.call(
+        office,
+        "PATCH",
+        path,
+        json={
+            "title_en": "Sports day",
+            "body_en": "Sports day is on 14/11/2026 at 9:00.",
+            "title_te": "క్రీడా దినోత్సవం",
+        },
+        headers=_if(1),
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["title_te"] == ""
+    assert not contains_telugu(edited.text)
+    approved = api.call(
+        school.people["principal"], "POST", f"{path}/approve", json={}, headers=_if(2)
+    )
+    assert approved.status_code == 200, approved.text
+    assert C.render_all(school, uuid.UUID(blank["id"])) == "ready"
+    page = fake_pdf.pages[-1]
+    assert "Sports day" in page
+    assert not contains_telugu(page)
+    assert "@font-face" not in page
+    assert '<section lang="te"' not in page
+    listed = api.call(office, "GET", "/api/v1/notices")
+    assert not contains_telugu(listed.text)
+
+
+@pytest.mark.usefixtures("telugu_on")
+def test_ADR_0036_notice_needs_its_telugu_texts_while_telugu_is_shown(ai_on: Any, api: Any) -> None:
+    school = ai_on.a
+    office = school.people["office_staff"]
+    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    path = f"/api/v1/notices/{blank['id']}"
+    english = {"title_en": "Sports day", "body_en": "Sports day is on 14/11/2026 at 9:00."}
+    assert api.call(office, "PATCH", path, json=english, headers=_if(1)).status_code == 200
+    refused = api.call(
+        school.people["principal"], "POST", f"{path}/approve", json={}, headers=_if(2)
+    )
+    assert refused.status_code == 422
+    assert {e["field"] for e in refused.json()["errors"]} == {"title_te", "body_te"}
+
+
+@pytest.mark.usefixtures("telugu_on")
+def test_ADR_0036_english_text_in_the_telugu_columns_is_not_printed_twice() -> None:
+    """A notice approved while Telugu was hidden holds its English text in the Telugu columns
+    (the database needs both filled); switched on again, the page does not repeat it."""
+    from app.circulars.rendering import notice_html
+
+    page = notice_html(
+        school_name="Synthetic Model School",
+        approved_on=dt.date(2026, 11, 1),
+        title_en="Sports day",
+        body_en="On 14/11/2026.",
+        title_te="Sports day",
+        body_te="On 14/11/2026.",
+    )
+    assert page.count("Sports day</h1>") == 1
+    assert '<section lang="te"' not in page
+
+
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_NOTICE_006_rendered_html_escapes_everything() -> None:
     from app.circulars.rendering import notice_html
 
