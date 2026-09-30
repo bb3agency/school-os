@@ -8,6 +8,7 @@ import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { AnnouncementBanner } from "@/features/school/AnnouncementBanner";
 import { SuspendedBanner, type SchoolStatus } from "@/features/school-status/SuspendedBanner";
 import { SupportAccessBanner } from "@/features/support-access/SupportAccessBanner";
+import { uiLocale } from "@/i18n/languages";
 import { apiGetAsSession, PATH_HEADER, requireStaff } from "@/server/session/rsc";
 
 /** Permissions that use the Tally connector screens (M6); nobody else needs its status. */
@@ -33,7 +34,7 @@ export default async function SchoolLayout({
 }) {
   const session = await requireStaff();
   const support = session.kind === "support";
-  const locale = (await params).locale === "te" ? "te" : "en";
+  const locale = uiLocale((await params).locale);
   const path = (await headers()).get(PATH_HEADER) ?? `/${locale}`;
   const picker = `/${locale}/choose-school?next=${encodeURIComponent(path)}`;
   const supportEnded = `/${locale}/signed-out?kind=support&error=support_ended`;

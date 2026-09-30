@@ -1,5 +1,7 @@
 import "server-only";
 import * as oauth from "openid-client";
+import { ENGLISH, TELUGU, uiLocale } from "@/i18n/languages";
+import type { Locale } from "@/i18n/routing";
 import { requestIdFrom } from "@/lib/problem";
 import {
   csrfFailed,
@@ -366,9 +368,12 @@ export async function handleSupportLogin(request: Request, runtime: AuthRuntime)
   });
 }
 
-/** The UI language of a `next` path (`/te/...`), English otherwise. */
-function localeOf(path: string): "en" | "te" {
-  return /^\/te(\/|$|\?)/.test(path) ? "te" : "en";
+/**
+ * The UI language of a `next` path (`/te/...` while Telugu is switched on), English otherwise
+ * (ADR-0036: with Telugu off the proxy sends `/te` pages to `/en` anyway).
+ */
+function localeOf(path: string): Locale {
+  return /^\/te(\/|$|\?)/.test(path) ? uiLocale(TELUGU) : ENGLISH;
 }
 
 async function revokeAtIdp(runtime: AuthRuntime, session: Session): Promise<void> {

@@ -5,6 +5,7 @@ import { SessionControls } from "@/components/session/SessionControls";
 import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
 import { ChooseSchoolView } from "@/features/auth/ChooseSchoolView";
+import { uiLocale } from "@/i18n/languages";
 import { pageMetadata } from "@/lib/metadata";
 import { safeNext } from "@/server/auth/redirect";
 import { apiGetAsSession, requireStaff } from "@/server/session/rsc";
@@ -32,7 +33,7 @@ type Props = {
  */
 export default async function ChooseSchoolPage({ params, searchParams }: Props) {
   const session = await requireStaff();
-  const locale = (await params).locale === "te" ? "te" : "en";
+  const locale = uiLocale((await params).locale);
   const raw = (await searchParams).next;
   let next = safeNext(typeof raw === "string" ? raw : null, "staff");
   if (next === "/" || /^\/(en|te)\/(choose-school|no-access)(\/|\?|$)/.test(next)) {

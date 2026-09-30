@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
   // No next/image optimisation: avoids shipping sharp/libvips (LGPL) in the image and an
   // image-proxy endpoint we do not need. Files are served via presigned S3 URLs.
   images: { unoptimized: true },
+  // ADR-0036: the Telugu font files, read by the /fonts/telugu route only while Telugu is on.
+  outputFileTracingIncludes: {
+    "/fonts/telugu/[file]": [
+      "../../node_modules/@fontsource/noto-sans-telugu/files/noto-sans-telugu-telugu-*-normal.woff2",
+    ],
+  },
   outputFileTracingExcludes: {
     "*": ["../../node_modules/sharp/**", "../../node_modules/@img/**"],
   },

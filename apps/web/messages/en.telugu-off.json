@@ -1,0 +1,80 @@
+{
+  "platform": {
+    "announcements": {
+      "description": "Banners shown to school staff."
+    }
+  },
+  "students": {
+    "list": {
+      "description": "Find a student by name, admission number, class and section, or a parent's name."
+    }
+  },
+  "imports": {
+    "detail": {
+      "mappingDescription": "Suggestions come from the column headings. Check each one, then check the rows."
+    }
+  },
+  "changeRequests": {
+    "detail": {
+      "memoBody": "A printable memo to file with the paper admission register."
+    }
+  },
+  "academicStructure": {
+    "classes": {
+      "addDescription": "Add a class with its name.",
+      "defaultsBody": "This adds any missing classes from Nursery to Class XII. Classes you already have stay as they are."
+    }
+  },
+  "ask": {
+    "form": {
+      "hint": "Write up to 1000 characters. Do not type Aadhaar numbers."
+    },
+    "memory": {
+      "addHint": "For example: I teach Class 7 mathematics and prefer short answers. Up to 200 characters."
+    }
+  },
+  "welcome": {
+    "hero": {
+      "note": "For staff of schools that use SchoolOS."
+    },
+    "features": {
+      "certificates": {
+        "body": "Printable certificates and registers in your school's familiar formats. This is the next module we are building."
+      },
+      "ask": {
+        "body": "Ask in plain English. Answers come from your school's own records and documents and show their sources, or say that nothing was found in the school records."
+      }
+    },
+    "faq": {
+      "language": {
+        "a": "English."
+      }
+    }
+  },
+  "certificates": {
+    "registers": {
+      "description": "Print the registers in their familiar A4 format to keep the paper registers complete."
+    }
+  },
+  "circulars": {
+    "summaryEn": "Summary",
+    "noticeDescription": "Draft a short notice from this circular. Only the circular's text is used, never student records."
+  },
+  "notices": {
+    "description": "Short notices for your parents' groups. Staff edit them and an approver approves them; SchoolOS never sends them itself.",
+    "new": {
+      "description": "Write what parents need to know; AI drafts the notice. Or start empty."
+    },
+    "editor": {
+      "incomplete": "Fill in the title and the notice before approving."
+    },
+    "drafting": {
+      "title": "AI is drafting this notice…"
+    }
+  },
+  "marks": {
+    "import": {
+      "subjectA": "English"
+    }
+  }
+}

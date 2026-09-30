@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHarness, defaultApi, type Harness } from "@/test/bff-harness";
 import {
   handleActiveTenant,
@@ -18,6 +18,10 @@ let h: Harness;
 
 beforeEach(async () => {
   h = await createHarness();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 function locationOf(response: Response): URL {
@@ -573,6 +577,8 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
   });
 
   it("several schools: go to the picker; the login is audited once the school is chosen", async () => {
+    // Telugu switched on explicitly (ADR-0036): the picker keeps the Telugu UI language.
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     h.setApi((request) =>
       request.url.endsWith("/api/v1/me/schools")
         ? json({ data: [school(TENANT), school(OTHER_TENANT, "suspended")] })
@@ -605,12 +611,22 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
   });
 
   it("no school at all: the 'no access yet' page in the user's language", async () => {
+    // Telugu switched on explicitly (ADR-0036).
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     h.setApi((request) =>
       request.url.endsWith("/api/v1/me/schools") ? json({ data: [] }) : defaultApi(request),
     );
     const response = await h.signIn("staff", clerk, "/te/settings/structure");
     expect(response.headers.get("location")).toBe("https://office.school.example/te/no-access");
     expect(h.jar.has("__Host-sos_session")).toBe(true);
+  });
+
+  it("with Telugu switched off, a /te return path lands on the English pages (ADR-0036)", async () => {
+    h.setApi((request) =>
+      request.url.endsWith("/api/v1/me/schools") ? json({ data: [] }) : defaultApi(request),
+    );
+    const response = await h.signIn("staff", clerk, "/te/settings/structure");
+    expect(response.headers.get("location")).toBe("https://office.school.example/en/no-access");
   });
 
   it("one suspended school: the picker explains it; the denial is audited", async () => {
