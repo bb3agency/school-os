@@ -64,6 +64,7 @@ export async function askQuestion(question = "When do exams begin?", buttonName 
   return user;
 }
 
+/** A conversation in the API's shape (ConversationOut; `title` is "" until it has one). */
 export function summary(overrides: Record<string, unknown> = {}) {
   return {
     id: CHAT.conversation,
@@ -77,11 +78,13 @@ export function summary(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** A stored message in the API's shape (MessageOut). */
 export function message(overrides: Record<string, unknown> = {}) {
   return {
     query_id: CHAT.query,
     question: "When do exams begin?",
     answer: "Exams begin on 22/09/2026. [1]",
+    answer_withheld: false,
     status: "answered",
     mode: "full",
     language: "en",
@@ -91,12 +94,15 @@ export function message(overrides: Record<string, unknown> = {}) {
         source: "sos://doc/0192f3a4-0000-7000-8000-00000000c701/v2#p1",
         title: "Circular · Exam timings",
         snippet: "Exams begin on 22/09/2026 at 9 am …",
+        withheld: false,
       },
     ],
     feedback: null,
     followups: [],
     created_at: "2026-09-28T05:10:00Z",
     superseded: false,
+    cached: false,
+    summarized: false,
     ...overrides,
   };
 }

@@ -2,12 +2,36 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Link } from "@/i18n/navigation";
-import type { MemoryEvent } from "./contract";
+import { ApiError } from "@/lib/bff/query";
+import { askError, isExplained } from "./errors";
 import { useConfirmMemory, useDeleteMemory } from "./memory";
+import type { MemoryEvent } from "./sse";
+
+/**
+ * Why a memory change was refused, when the API said (422 memory_* with the reason, 503
+ * memory_check_unavailable, 409 memory_off / memory_full, 412, 404 for an item already gone,
+ * e.g. a suggestion not saved within 24 hours); any other failure says it was undone.
+ */
+export function MemoryError({ error }: { error: unknown }) {
+  const t = useTranslations("ask.memory");
+  if (!error) return null;
+  if (isExplained(error, "memory_not_found")) {
+    return <ApiErrorAlert error={askError(error, "memory_not_found")} namespace="ask" />;
+  }
+  if (error instanceof ApiError && error.status < 500) {
+    return <ApiErrorAlert error={error} namespace="ask" />;
+  }
+  return (
+    <Alert tone="danger" live>
+      {t("failed")}
+    </Alert>
+  );
+}
 
 /** "Remember this? '…'" with Save (confirm) and Dismiss (delete), under the answer. */
 function Suggestion({ item }: { item: MemoryEvent }) {
@@ -65,7 +89,7 @@ function Suggestion({ item }: { item: MemoryEvent }) {
           {t("dismiss")}
         </Button>
       </div>
-      <ApiErrorAlert error={failed ?? undefined} namespace="ask" />
+      <MemoryError error={failed} />
     </div>
   );
 }

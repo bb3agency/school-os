@@ -14,6 +14,20 @@ export type VerifiedAnswerBody = Schemas["VerifiedAnswerIn"];
 export type VerifiedReviewBody = Schemas["VerifiedAnswerReviewIn"];
 export type VerifiedStatus = VerifiedAnswer["status"];
 
+// Ask conversations and memory (FR-KB-012, ADR-0034; docs/09 Knowledge).
+/** `POST /knowledge/ask` body (the older `session_id` is accepted but never sent). */
+export type AskBody = Schemas["AskIn"];
+export type ConversationSummary = Schemas["ConversationOut"];
+export type ConversationPage = Schemas["Page_ConversationOut_"];
+export type ConversationDetail = Schemas["ConversationDetailOut"];
+export type ConversationMessage = Schemas["MessageOut"];
+export type MessageCitation = Schemas["MessageCitationOut"];
+/** `streaming`: still being written (or its stream ended without being recorded). */
+export type MessageStatus = ConversationMessage["status"];
+export type ConversationPatch = Schemas["ConversationPatchIn"];
+export type MemoryItem = Schemas["MemoryOut"];
+export type MemorySettings = Schemas["MemorySettingsOut"];
+
 /** Permissions (docs/09 Knowledge). Hiding is UX only: the API checks every call. */
 export const ASK_PERM = {
   ask: "kb.ask",

@@ -14,10 +14,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "@/i18n/navigation";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatDate } from "@/lib/format";
-import type { ConversationSummary } from "./contract";
 import { useConversationActions } from "./ConversationMenu";
 import { titleOf, useConversationList } from "./conversations";
-import { ASK_PERM } from "./data";
+import { ASK_PERM, type ConversationSummary } from "./data";
 import { ActionButton } from "./MessageActions";
 import { AskTabs } from "./parts";
 

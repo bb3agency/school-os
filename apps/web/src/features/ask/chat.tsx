@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "@/i18n/navigation";
-import { ApiError } from "@/lib/bff/query";
+import { unwrap, useBffClient } from "@/lib/bff/query";
 import {
   applyEvent,
   extrasOf,
@@ -21,8 +21,8 @@ import {
   type AnswerExtras,
   type AskState,
 } from "./answer";
-import { useAskContractApi, type AskBody, type ConversationMessage } from "./contract";
 import { CONVERSATION_KEYS, updateMessages, upsertConversation } from "./conversations";
+import type { AskBody, ConversationMessage, ConversationSummary } from "./data";
 import { MEMORY_KEYS } from "./memory";
 import { createSseParser } from "./sse";
 
@@ -100,16 +100,12 @@ function nextFrame(callback: () => void): () => void {
   return () => clearTimeout(handle);
 }
 
-function asProblem(error: unknown): { code?: string } {
-  return error && typeof error === "object" ? (error as { code?: string }) : {};
-}
-
 function markSuperseded(messages: ConversationMessage[], queryId: string, value: boolean) {
   return messages.map((m) => (m.query_id === queryId ? { ...m, superseded: value } : m));
 }
 
 export function AskChatProvider({ children }: { children: ReactNode }) {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   const router = useRouter();
   const pathname = usePathname() ?? "";
@@ -217,9 +213,9 @@ export function AskChatProvider({ children }: { children: ReactNode }) {
         if (!id || turn.conversationId === id) return;
         turn = { ...turn, conversationId: id };
         const now = new Date().toISOString();
-        const summary = {
+        const summary: ConversationSummary = {
           id,
-          title: state.title ?? null,
+          title: state.title ?? "",
           pinned: false,
           created_at: now,
           updated_at: now,
@@ -261,29 +257,20 @@ export function AskChatProvider({ children }: { children: ReactNode }) {
           ...(options.editOf ? { edit_of: options.editOf } : {}),
         };
         try {
-          const response = await api.ask(body, run.controller.signal);
+          // The typed client sends the body and reads the problem of a refused request
+          // (ApiError: 404 for a deleted chat, 409 message_superseded ...); the event stream
+          // itself is read here (openapi-fetch does not parse SSE).
+          const stream = await unwrap(
+            api.POST("/api/v1/knowledge/ask", {
+              body,
+              parseAs: "stream",
+              headers: { Accept: "text/event-stream" },
+              signal: run.controller.signal,
+            }),
+          );
           if (current.current !== run) return;
-          if (!response.ok || !response.body) {
-            let problem: { code?: string } = {};
-            try {
-              problem = asProblem(await response.json());
-            } catch {
-              problem = {};
-            }
-            unsupersede();
-            state = {
-              ...state,
-              phase: "failed",
-              error: new ApiError(response.status, problem.code, problem),
-            };
-            turn = { ...turn, state };
-            if (current.current === run) {
-              current.current = null;
-              setLive(turn);
-            }
-            return;
-          }
-          const reader = response.body.getReader();
+          if (!stream || !("getReader" in stream)) throw new TypeError("no event stream");
+          const reader = stream.getReader();
           run.reader = reader;
           const decoder = new TextDecoder();
           const parser = createSseParser();

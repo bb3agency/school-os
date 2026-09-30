@@ -1,5 +1,78 @@
 import { describe, expect, it } from "vitest";
-import { createSseParser } from "./sse";
+import { createSseParser, parseAskEvent } from "./sse";
+
+const msg = (event: string, data: unknown) => ({ event, data: JSON.stringify(data) });
+
+describe("parseAskEvent: the Ask event payloads (docs/06 §5.1, FR-KB-008, FR-KB-012)", () => {
+  it("reads every event exactly as the API sends it", () => {
+    const events = [
+      msg("meta", {
+        query_id: "q1",
+        language: "te",
+        mode: "full",
+        conversation_id: "c1",
+        title: "పరీక్షలు",
+        cached: true,
+        cached_from: "q0",
+        summarized: false,
+      }),
+      msg("status", { step: "searching_chats", tool: "search_chats", count: null }),
+      msg("delta", { text: " Exams " }),
+      msg("error", { type: "ai_budget_exhausted", message_key: "kb.errors.budget" }),
+      msg("final", {
+        text: "x",
+        replaced: true,
+        status: "search_only",
+        mode: "search_only",
+        summarized: true,
+      }),
+      msg("token", { text: "x" }),
+      msg("citation", { index: 2, source: "sos://doc/a/v1#p1", title: "T", snippet: "S" }),
+      msg("followups", { questions: ["A?"] }),
+      msg("memory", { action: "suggested", item_id: "m1", text: "Prefers Telugu" }),
+      msg("done", { latency_ms: 10, cited_sources: 1, status: "error", mode: "search_only" }),
+    ].map(parseAskEvent);
+    expect(events.map((e) => e?.event)).toEqual([
+      "meta",
+      "status",
+      "delta",
+      "error",
+      "final",
+      "token",
+      "citation",
+      "followups",
+      "memory",
+      "done",
+    ]);
+    expect(events[0]?.data).toMatchObject({ conversation_id: "c1", cached_from: "q0" });
+    expect(events[1]?.data).toEqual({ step: "searching_chats", tool: "search_chats", count: null });
+    expect(events[2]?.data).toEqual({ text: " Exams " });
+  });
+
+  it("drops unknown events and payloads without their defining fields", () => {
+    expect(parseAskEvent(msg("tool", { name: "x" }))).toBeNull();
+    expect(parseAskEvent(msg("toString", {}))).toBeNull();
+    expect(parseAskEvent({ event: "meta", data: "not json" })).toBeNull();
+    expect(parseAskEvent(msg("meta", { language: "en" }))).toBeNull();
+    expect(parseAskEvent(msg("status", { step: "teleporting" }))).toBeNull();
+    expect(parseAskEvent(msg("citation", { index: 0, source: "x" }))).toBeNull();
+    expect(
+      parseAskEvent(msg("memory", { action: "forgotten", item_id: "m", text: "" })),
+    ).toBeNull();
+  });
+
+  it("ignores a field with an unexpected value, not the whole event", () => {
+    expect(parseAskEvent(msg("done", { latency_ms: 5, status: "new" }))?.data).toEqual({
+      latency_ms: 5,
+      cited_sources: undefined,
+      status: undefined,
+      mode: undefined,
+    });
+    expect(
+      parseAskEvent(msg("status", { step: "writing", tool: 3, count: -1 }))?.data,
+    ).toMatchObject({ step: "writing", tool: undefined, count: undefined });
+  });
+});
 
 describe("createSseParser edge cases (FR-KB-008)", () => {
   it("defaults the event name to message and strips one leading space only", () => {

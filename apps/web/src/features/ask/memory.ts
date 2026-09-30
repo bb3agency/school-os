@@ -2,12 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError } from "@/lib/bff/query";
-import { useAskContractApi, type MemoryItem, type MemorySettings } from "./contract";
+import { ApiError, asList, NotAvailableError, unwrap, useBffClient } from "@/lib/bff/query";
+import { ifMatch, type MemoryItem, type MemorySettings } from "./data";
 
 /**
- * Ask memory (the signed-in member's own preferences and work context, never facts about
- * students or staff): the list, the on/off setting, and add / edit / delete / confirm /
+ * Ask memory (ADR-0034: the signed-in member's own preferences and work context, never facts
+ * about students or staff): the list, the on/off setting, and add / edit / delete / confirm /
  * forget everything with optimistic updates that roll back when the API refuses.
  */
 
@@ -17,8 +17,10 @@ export const MEMORY_KEYS = {
   settings: ["staff", "knowledge", "memory", "settings"] as const,
 };
 
-/** Longest memory the page offers to save (the API checks again). */
-export const MEMORY_MAX = 500;
+/** Longest memory the API stores (MemoryIn.text: 1-200 characters; it checks again). */
+export const MEMORY_MAX = 200;
+/** Most items one member may keep in a school, pending suggestions included (409 memory_full). */
+export const MEMORY_LIMIT = 30;
 
 const retry = (count: number, error: unknown) =>
   count < 1 &&
@@ -26,12 +28,12 @@ const retry = (count: number, error: unknown) =>
   !(error instanceof AuthRedirectError) &&
   !(error instanceof ApiError && error.status < 500);
 
-/** GET /knowledge/memory-settings (`school_enabled` is read-only). */
+/** GET /knowledge/memory-settings (`school_enabled` is read-only here). */
 export function useMemorySettings(enabled = true) {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   return useQuery({
     queryKey: MEMORY_KEYS.settings,
-    queryFn: () => api.getMemorySettings(),
+    queryFn: (): Promise<MemorySettings> => unwrap(api.GET("/api/v1/knowledge/memory-settings")),
     enabled,
     retry,
     staleTime: 60_000,
@@ -43,12 +45,13 @@ export function memoryOn(settings: MemorySettings | undefined): boolean {
   return Boolean(settings?.school_enabled && settings.enabled);
 }
 
-/** GET /knowledge/memories. */
+/** GET /knowledge/memories: one page with every item (confirmed and pending), newest first. */
 export function useMemories(enabled = true) {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   return useQuery({
     queryKey: MEMORY_KEYS.items,
-    queryFn: () => api.listMemories(),
+    queryFn: async (): Promise<MemoryItem[]> =>
+      asList((await unwrap(api.GET("/api/v1/knowledge/memories"))).data),
     enabled,
     retry,
   });
@@ -63,8 +66,15 @@ async function begin(client: QueryClient): Promise<MemoryItem[] | undefined> {
   return client.getQueryData<MemoryItem[]>(MEMORY_KEYS.items);
 }
 
-function rollback(client: QueryClient, saved: MemoryItem[] | undefined): void {
+/**
+ * Undo an optimistic change. When the API said memory is off (409 memory_off: the school may
+ * have switched it off meanwhile) the switch is read again so the page shows why.
+ */
+function rollback(client: QueryClient, saved: MemoryItem[] | undefined, error: unknown): void {
   client.setQueryData(MEMORY_KEYS.items, saved);
+  if (error instanceof ApiError && error.code === "memory_off") {
+    void client.invalidateQueries({ queryKey: MEMORY_KEYS.settings });
+  }
 }
 
 function settle(client: QueryClient) {
@@ -73,10 +83,11 @@ function settle(client: QueryClient) {
 
 /** PUT /knowledge/memory-settings, switched at once, undone if refused. */
 export function useSetMemoryEnabled() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (enabled: boolean) => api.putMemorySettings(enabled),
+    mutationFn: (enabled: boolean): Promise<MemorySettings> =>
+      unwrap(api.PUT("/api/v1/knowledge/memory-settings", { body: { enabled } })),
     onMutate: async (enabled) => {
       await client.cancelQueries({ queryKey: MEMORY_KEYS.settings });
       const saved = client.getQueryData<MemorySettings>(MEMORY_KEYS.settings);
@@ -88,12 +99,13 @@ export function useSetMemoryEnabled() {
   });
 }
 
-/** POST /knowledge/memories: shown at once as a temporary row. */
+/** POST /knowledge/memories (201): shown at once as a temporary row. */
 export function useAddMemory() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (text: string) => api.addMemory(text),
+    mutationFn: (text: string): Promise<MemoryItem> =>
+      unwrap(api.POST("/api/v1/knowledge/memories", { body: { text } })),
     onMutate: async (text) => {
       const saved = await begin(client);
       const now = new Date().toISOString();
@@ -102,35 +114,42 @@ export function useAddMemory() {
           id: `pending-${now}`,
           text,
           source: "explicit",
-          status: "saved",
+          status: "active",
           created_at: now,
           updated_at: now,
+          expires_at: null,
           version: 0,
         },
         ...items,
       ]);
       return saved;
     },
-    onError: (_error, _text, saved) => rollback(client, saved),
+    onError: (error, _text, saved) => rollback(client, saved, error),
     onSettled: () => settle(client),
   });
 }
 
-/** PATCH /knowledge/memories/{id} (If-Match). */
+/** PATCH /knowledge/memories/{id} (If-Match; the text is checked again like a new item). */
 export function useEditMemory() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ item, text }: { item: MemoryItem; text: string }) => api.editMemory(item, text),
+    mutationFn: ({ item, text }: { item: MemoryItem; text: string }): Promise<MemoryItem> =>
+      unwrap(
+        api.PATCH("/api/v1/knowledge/memories/{memory_id}", {
+          params: { path: { memory_id: item.id } },
+          headers: { "If-Match": ifMatch(item.version) },
+          body: { text },
+        }),
+      ),
     onMutate: async ({ item, text }) => {
       const saved = await begin(client);
       setItems(client, (items) => items.map((m) => (m.id === item.id ? { ...m, text } : m)));
       return saved;
     },
-    onError: (_error, _input, saved) => rollback(client, saved),
+    onError: (error, _input, saved) => rollback(client, saved, error),
     onSuccess: (updated) => {
-      if (updated)
-        setItems(client, (items) => items.map((m) => (m.id === updated.id ? updated : m)));
+      setItems(client, (items) => items.map((m) => (m.id === updated.id ? updated : m)));
     },
     onSettled: () => settle(client),
   });
@@ -138,50 +157,66 @@ export function useEditMemory() {
 
 /** DELETE /knowledge/memories/{id} (also "Dismiss" on a suggestion). */
 export function useDeleteMemory() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.deleteMemory(id),
+    mutationFn: async (id: string): Promise<void> => {
+      await unwrap(
+        api.DELETE("/api/v1/knowledge/memories/{memory_id}", {
+          params: { path: { memory_id: id } },
+        }),
+      );
+    },
     onMutate: async (id) => {
       const saved = await begin(client);
       setItems(client, (items) => items.filter((m) => m.id !== id));
       return saved;
     },
-    onError: (_error, _id, saved) => rollback(client, saved),
+    onError: (error, _id, saved) => rollback(client, saved, error),
     onSettled: () => settle(client),
   });
 }
 
-/** POST /knowledge/memories/{id}/confirm ("Save" on a suggestion). */
+/**
+ * POST /knowledge/memories/{id}/confirm ("Save" on a suggestion: pending → active). A
+ * suggestion not confirmed within 24 hours is gone (404).
+ */
 export function useConfirmMemory() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.confirmMemory(id),
+    mutationFn: (id: string): Promise<MemoryItem> =>
+      unwrap(
+        api.POST("/api/v1/knowledge/memories/{memory_id}/confirm", {
+          params: { path: { memory_id: id } },
+        }),
+      ),
     onMutate: async (id) => {
       const saved = await begin(client);
       setItems(client, (items) =>
-        items.map((m) => (m.id === id ? { ...m, status: "saved" as const } : m)),
+        items.map((m) => (m.id === id ? { ...m, status: "active" as const, expires_at: null } : m)),
       );
       return saved;
     },
-    onError: (_error, _id, saved) => rollback(client, saved),
+    onError: (error, _id, saved) => rollback(client, saved, error),
     onSettled: () => settle(client),
   });
 }
 
-/** DELETE /knowledge/memories: forget everything. */
+/** DELETE /knowledge/memories: forget everything (204). */
 export function useForgetAllMemories() {
-  const api = useAskContractApi();
+  const api = useBffClient("staff");
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => api.forgetAllMemories(),
+    mutationFn: async (): Promise<void> => {
+      await unwrap(api.DELETE("/api/v1/knowledge/memories"));
+    },
     onMutate: async () => {
       const saved = await begin(client);
       client.setQueryData<MemoryItem[]>(MEMORY_KEYS.items, []);
       return saved;
     },
-    onError: (_error, _input, saved) => rollback(client, saved),
+    onError: (error, _input, saved) => rollback(client, saved, error),
     onSettled: () => settle(client),
   });
 }
