@@ -49,7 +49,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
       <section aria-label={t("pricing.headline")} className="-mt-6 pb-20 md:-mt-10 md:pb-28">
         <Container>
           <Reveal stagger className="grid gap-4 md:grid-cols-2 md:gap-5">
-            <PlanCards contactEmail={settings.contactEmail} />
+            <PlanCards contactEmail={settings.contactEmail} whatsappNumber={settings.whatsappNumber} />
           </Reveal>
         </Container>
       </section>
@@ -110,6 +110,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
             <CheckList items={HOW.map((item) => t(`pricing.how.${item}`))} />
             <CtaGroup
               contactEmail={settings.contactEmail}
+              whatsappNumber={settings.whatsappNumber}
               talkLabel={t("cta.talk")}
               signInLabel={t("cta.signIn")}
             />

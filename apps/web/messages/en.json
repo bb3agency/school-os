@@ -4897,7 +4897,10 @@
       "talk": "Talk to us",
       "talkEmail": "Talk to us by email",
       "learnMore": "Learn more",
-      "existing": "Already using SchoolOS? Sign in with your school account."
+      "existing": "Already using SchoolOS? Sign in with your school account.",
+      "whatsapp": "Ask on WhatsApp",
+      "whatsappOpens": "(opens WhatsApp)",
+      "whatsappMessage": "Hello, I'd like to see SchoolOS for our school."
     },
     "sample": "Sample data",
     "planned": "Planned",

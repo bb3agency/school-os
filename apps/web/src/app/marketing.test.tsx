@@ -297,14 +297,16 @@ describe("marketing settings (SOS_PUBLIC_*)", () => {
       contactEmail: null,
       companyName: null,
       companyAddress: null,
+      whatsappNumber: null,
     });
     expect(
       readMarketingSettings({
         SOS_PUBLIC_CONTACT_EMAIL: "  ",
         SOS_PUBLIC_COMPANY_NAME: " ",
         SOS_PUBLIC_COMPANY_ADDRESS: "|",
+        SOS_PUBLIC_WHATSAPP_NUMBER: " ",
       }),
-    ).toEqual({ contactEmail: null, companyName: null, companyAddress: null });
+    ).toEqual({ contactEmail: null, companyName: null, companyAddress: null, whatsappNumber: null });
   });
 
   it("an address that could break out of the mailto link is refused", () => {
@@ -348,6 +350,119 @@ describe("marketing settings (SOS_PUBLIC_*)", () => {
       readMarketingSettings({ SOS_PUBLIC_COMPANY_ADDRESS: "Line 1\\nLine 2| Line 3 " })
         .companyAddress,
     ).toEqual(["Line 1", "Line 2", "Line 3"]);
+  });
+});
+
+describe("WhatsApp call to action (SOS_PUBLIC_WHATSAPP_NUMBER, docs/17 §5.6)", () => {
+  // A synthetic number: never a real person's.
+  const NUMBER = "+919000000000";
+  const DIGITS = "919000000000";
+  const MESSAGE = "Hello, I'd like to see SchoolOS for our school.";
+  const HREF = `https://wa.me/${DIGITS}?text=${encodeURIComponent(MESSAGE)}`;
+  const whatsappLinks = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLAnchorElement>("a")].filter((a) =>
+      (a.getAttribute("href") ?? "").startsWith("https://wa.me/"),
+    );
+
+  it("accepts only an international number of digits with an optional leading +", () => {
+    expect(readMarketingSettings({ SOS_PUBLIC_WHATSAPP_NUMBER: NUMBER }).whatsappNumber).toBe(
+      DIGITS,
+    );
+    expect(
+      readMarketingSettings({ SOS_PUBLIC_WHATSAPP_NUMBER: ` ${DIGITS} ` }).whatsappNumber,
+    ).toBe(DIGITS);
+    for (const bad of [
+      "not-a-number",
+      "+91 90000 00000",
+      "+91-9000000000",
+      "(91) 9000000000",
+      "++919000000000",
+      "0919000000000",
+      "+1234567",
+      "+1234567890123456",
+      "919000000000?text=hi",
+      "919000000000/extra",
+      "javascript:alert(1)",
+      "+٩١٩٠٠٠٠٠٠٠٠",
+    ]) {
+      expect(
+        readMarketingSettings({ SOS_PUBLIC_WHATSAPP_NUMBER: bad }).whatsappNumber,
+        bad,
+      ).toBeNull();
+    }
+  });
+
+  it("the prefilled message is the agreed text and names no student", () => {
+    expect(m.cta.whatsappMessage).toBe(MESSAGE);
+  });
+
+  it("the link is built from the digits and the URL-encoded message", () => {
+    expect(HREF).toBe(
+      "https://wa.me/919000000000?text=Hello%2C%20I'd%20like%20to%20see%20SchoolOS%20for%20our%20school.",
+    );
+  });
+
+  for (const name of NAMES) {
+    it(`${name}: hidden when the number is unset or invalid`, () => {
+      withContact();
+      const { container, unmount } = render(name);
+      expect(whatsappLinks(container)).toHaveLength(0);
+      expect(container.textContent).not.toContain(m.cta.whatsapp);
+      unmount();
+      vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", "+91 90000 00000");
+      const second = render(name);
+      expect(whatsappLinks(second.container)).toHaveLength(0);
+    });
+
+    it(`${name}: when set, "Ask on WhatsApp" is a plain wa.me link with the encoded message`, () => {
+      withContact();
+      vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", NUMBER);
+      const { container } = render(name);
+      const links = whatsappLinks(container);
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        expect(link).toHaveAttribute("href", HREF);
+        expect(link).toHaveAttribute("rel", "noopener noreferrer");
+        // The name starts with the visible label and says it opens WhatsApp (WCAG 2.5.3).
+        expect(link.textContent).toMatch(new RegExp(`^${m.cta.whatsapp}`));
+        expect(link.textContent).toContain(m.cta.whatsappOpens);
+      }
+      // The header carries it too.
+      expect(whatsappLinks(screen.getByRole("banner")).length).toBeGreaterThan(0);
+      // Still CSP-safe: wa.me is the only address outside the site.
+      for (const link of container.querySelectorAll("a")) {
+        expect(link.getAttribute("href") ?? "").toMatch(
+          /^(#|\/(?!\/)|mailto:|https:\/\/wa\.me\/\d+\?text=)/,
+        );
+      }
+      expect(container.querySelectorAll("[style]")).toHaveLength(0);
+    });
+  }
+
+  it("sits beside 'Talk to us' in the hero and the closing band, and on each plan", () => {
+    withContact();
+    vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", NUMBER);
+    const home = render("welcome");
+    const hero = screen.getByRole("heading", { level: 1 }).closest("section");
+    expect(whatsappLinks(hero as HTMLElement)).toHaveLength(1);
+    const closing = screen.getByRole("heading", { level: 2, name: m.home.closing.title });
+    expect(whatsappLinks(closing.closest("section") as HTMLElement)).toHaveLength(1);
+    home.unmount();
+    render("pricing");
+    for (const plan of ["shared", "dedicated"] as const) {
+      const card = screen.getByRole("article", { name: m.pricing[plan].name });
+      expect(whatsappLinks(card), plan).toHaveLength(1);
+    }
+  });
+
+  it("shows even without an email address, and never on the dedicated sign-in page", () => {
+    vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", NUMBER);
+    const { container, unmount } = render("welcome");
+    expect(whatsappLinks(container).length).toBeGreaterThan(0);
+    unmount();
+    vi.stubEnv("SOS_DEPLOYMENT_MODE", "dedicated");
+    const dedicated = render("welcome");
+    expect(whatsappLinks(dedicated.container)).toHaveLength(0);
   });
 });
 
