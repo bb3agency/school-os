@@ -158,10 +158,6 @@ class Gateway:
     def breaker_for(self, provider: Provider) -> CircuitBreaker:
         return self._routes[provider].breaker
 
-    @property
-    def _transport(self) -> Transport:
-        return self._default.transport
-
     # --- LlmGateway ---------------------------------------------------------------------------
 
     def run_turn(
