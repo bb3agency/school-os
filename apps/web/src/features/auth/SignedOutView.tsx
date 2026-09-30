@@ -4,6 +4,7 @@ import { Alert } from "@/components/ui/Alert";
 import { buttonClasses } from "@/components/ui/Button";
 import { cardClasses } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 
 export const SIGN_IN_ERRORS = [
@@ -40,12 +41,12 @@ export function SignedOutView({
   return (
     <MinimalShell
       headerActions={
-        <a
-          href={`/${locale}/welcome`}
+        <Link
+          href="/welcome"
           className="inline-flex min-h-10 items-center rounded-full px-3 text-sm font-medium text-primary underline underline-offset-4 hover:bg-primary-soft"
         >
           {t("signedOut.homeLink")}
-        </a>
+        </Link>
       }
     >
       <div className={cn(cardClasses({ padding: "lg" }), "mx-auto max-w-xl space-y-5")}>

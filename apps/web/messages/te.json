@@ -4881,178 +4881,477 @@
       "fullHint": "జ్ఞాపకం నిండిపోయింది (30 అంశాలు). మరిన్ని చేర్చడానికి ఇక అవసరం లేనిదాన్ని తొలగించండి."
     }
   },
-  "welcome": {
-    "title": "పాఠశాల కార్యాలయ రికార్డులు, సరిచూసినవి",
+  "marketing": {
     "nav": {
-      "label": "ఈ పేజీలో",
-      "features": "సౌకర్యాలు",
-      "how": "ఇది ఎలా పనిచేస్తుంది",
-      "security": "భద్రత",
-      "plans": "ప్లాన్లు",
-      "faq": "తరచూ అడిగే ప్రశ్నలు"
+      "label": "Main",
+      "features": "Features",
+      "security": "Security",
+      "pricing": "Pricing",
+      "about": "About",
+      "home": "SchoolOS home",
+      "menu": "Menu",
+      "closeMenu": "Close menu"
     },
-    "signIn": "సైన్ ఇన్ చేయండి",
-    "hero": {
-      "eyebrow": "ఆంధ్రప్రదేశ్‌లోని పాఠశాల కార్యాలయాల కోసం",
-      "headline": "విద్యార్థి వివరాలను ఒక్కసారే నమోదు చేయండి. పోర్టల్ కంటే ముందే తేడాలను పట్టుకోండి.",
-      "body": "SchoolOS ప్రతి విద్యార్థికి సరిచూసిన ఒకే రికార్డును ఉంచుతుంది, దాన్ని ప్రవేశ రిజిస్టర్, ఆధార్‌లో ముద్రించిన వివరాలు, UDISE+ మరియు బోర్డు నమోదుతో పోల్చుతుంది, మీ పాఠశాల సొంత రికార్డుల నుండి ఆధారాలతో సహా ప్రశ్నలకు సమాధానాలు ఇస్తుంది.",
-      "primary": "సైన్ ఇన్ చేయండి",
-      "secondary": "ఇది ఎలా పనిచేస్తుందో చూడండి",
-      "note": "SchoolOS వాడే పాఠశాలల సిబ్బంది కోసం. ఇంగ్లీష్ మరియు తెలుగులో."
+    "cta": {
+      "signIn": "Sign in",
+      "talk": "Talk to us",
+      "talkEmail": "Talk to us by email",
+      "learnMore": "Learn more",
+      "existing": "Already using SchoolOS? Sign in with your school account."
     },
-    "visual": {
-      "description": "కల్పిత వివరాలతో ఉదాహరణ తెరలు: ప్రవేశ రిజిస్టర్‌కు, ఆధార్‌లో ముద్రించిన వివరాలకు మధ్య పుట్టిన తేదీలో తేడా, మరియు ఆధారాలను చూపించే పాఠశాల రికార్డుల నుండి వచ్చిన సమాధానం.",
-      "sample": "నమూనా వివరాలు",
-      "findingBadge": "తేడా",
-      "findingTitle": "పుట్టిన తేదీ వేరుగా ఉంది",
-      "findingStudent": "నమూనా విద్యార్థి A · 7-B తరగతి",
-      "register": "ప్రవేశ రిజిస్టర్",
-      "aadhaar": "ఆధార్‌లో ముద్రించినది",
-      "udise": "UDISE+",
-      "matches": "సరిపోలింది",
-      "differs": "వేరుగా ఉంది",
-      "findingRoute": "రిజిస్టరే చట్టబద్ధమైన రికార్డు. ఆధారంతో సవరణ అభ్యర్థన ద్వారా సరిచేయండి.",
-      "askLabel": "పాఠశాలను అడగండి",
-      "askQuestion": "నమూనా విద్యార్థి B పాఠశాలలో ఎప్పుడు చేరారు?",
-      "askAnswer": "నమూనా విద్యార్థి B 2019 జూన్ 12న 1వ తరగతిలో చేరారు.",
-      "sources": "ఆధారాలు",
-      "sourceRegister": "ప్రవేశ రిజిస్టర్, పేజీ 18",
-      "sourceRecord": "విద్యార్థి రికార్డు"
+    "sample": "Sample data",
+    "planned": "Planned",
+    "footer": {
+      "tagline": "Student records for Indian school offices, checked against the sources that matter.",
+      "product": "Product",
+      "company": "Company",
+      "account": "For schools",
+      "contact": "Contact",
+      "location": "Data stored in India: AWS Mumbai, backups in Hyderabad.",
+      "sampleNote": "Names, dates and numbers in the illustrations are made-up samples.",
+      "legal": "{company}. All rights reserved."
     },
-    "features": {
-      "title": "SchoolOS మీ కార్యాలయానికి ఏమి చేస్తుంది",
-      "intro": "కార్యాలయం ఇప్పటికే చేసే పని చుట్టూ రూపొందించాం, కాబట్టి సిబ్బంది తక్కువ టైప్ చేస్తారు, తక్కువ సరిచేస్తారు.",
-      "planned": "రాబోతోంది",
-      "import": {
-        "title": "ఒక్కసారి నమోదు, మిగతావి దిగుమతి",
-        "body": "మీ దగ్గర ఇప్పటికే ఉన్న Excel లేదా Google Sheets జాబితాలను తీసుకురండి, లేదా రిజిస్టర్ పేజీలను ఫోటో తీసి ప్రతి వరుసను నిర్ధారించండి. దిగుమతిని 24 గంటల్లో రద్దు చేయవచ్చు."
+    "home": {
+      "title": "School office records, checked",
+      "eyebrow": "For school offices in Andhra Pradesh",
+      "headlineLead": "Enter student details once.",
+      "headlineAccent": "Catch mismatches before the portal does.",
+      "body": "SchoolOS keeps one checked record for every student, compares it with the admission register, Aadhaar as printed, UDISE+ and board registration, and answers questions from your school's own records, with sources.",
+      "secondary": "See how it works",
+      "note": "For private schools. Your staff keep submitting on the portals as today.",
+      "sourcesLabel": "Every record is checked against",
+      "sources": {
+        "register": "Admission register",
+        "aadhaar": "Aadhaar as printed",
+        "udise": "UDISE+",
+        "board": "Board registration"
       },
-      "checks": {
-        "title": "తేడాలను ముందే పట్టుకోండి",
-        "body": "ప్రతి విద్యార్థి వివరాలను ప్రవేశ రిజిస్టర్, ఆధార్‌లో ముద్రించిన వివరాలు, UDISE+ మరియు బోర్డు నమోదుతో పోల్చుతుంది. పోర్టల్‌కు సమర్పించే ముందే తేడాలు గుర్తింపులుగా కనిపిస్తాయి."
+      "how": {
+        "eyebrow": "How it works",
+        "title": "Three steps, using the records you already keep",
+        "step": "Step {number}",
+        "import": {
+          "title": "Bring in what you have",
+          "body": "Import the Excel or Google Sheets lists you keep today, or photograph register pages. Staff confirm each row before it becomes a record."
+        },
+        "check": {
+          "title": "See every mismatch",
+          "body": "Each student's details are compared across the four sources. Differences and missing fields become findings, with the record that likely needs fixing."
+        },
+        "submit": {
+          "title": "Submit with confidence",
+          "body": "Fix findings through approved corrections, then download pre-check sheets in the portal's field order. Your staff submit as they do now."
+        }
       },
-      "changes": {
-        "title": "రెండో తనిఖీతో సవరణలు",
-        "body": "SchoolOS అధికారిక రికార్డులను తనంతట తాను ఎప్పుడూ సరిచేయదు. పేరు, పుట్టిన తేదీ లేదా తల్లిదండ్రుల పేర్ల మార్పులకు ఆధార పత్రం, మరొక వ్యక్తి ఆమోదం అవసరం."
+      "highlights": {
+        "eyebrow": "What it does",
+        "title": "Built around the work the office already does",
+        "intro": "Less typing, fewer corrections, and an answer when someone asks what the records say.",
+        "records": {
+          "title": "Enter once, import the rest",
+          "body": "Excel and Google Sheets imports with a preview. Changed your mind? Undo a whole import within 24 hours."
+        },
+        "checks": {
+          "title": "Mismatches found early",
+          "body": "Four sources compared field by field, before a board or UDISE+ deadline finds them for you."
+        },
+        "corrections": {
+          "title": "A second pair of eyes",
+          "body": "Changes to a name or date of birth need evidence and approval by another person. Nothing is corrected on its own."
+        },
+        "ask": {
+          "title": "Ask the school",
+          "body": "Questions answered from your own records and documents, with the sources shown, or a plain \"not found\"."
+        },
+        "audit": {
+          "title": "Every change on record",
+          "body": "An audit log that cannot be edited, with a check that shows it has not been tampered with."
+        },
+        "certificates": {
+          "title": "Certificates and registers",
+          "body": "Transfer, bonafide, study and conduct certificates, and the registers that go with them."
+        }
       },
-      "certificates": {
-        "title": "సర్టిఫికేట్లు మరియు రిజిస్టర్లు",
-        "body": "మీ పాఠశాలకు అలవాటైన ఫార్మాట్లలో, ఇంగ్లీష్ మరియు తెలుగులో ముద్రించదగిన సర్టిఫికేట్లు, రిజిస్టర్లు. మేము తర్వాత తయారు చేస్తున్న భాగం ఇదే."
+      "security": {
+        "eyebrow": "Security and privacy",
+        "title": "Children's records deserve more than a password",
+        "intro": "SchoolOS is built for student data from the first line of code.",
+        "india": "Stored in India: AWS Mumbai, encrypted backups in Hyderabad",
+        "isolation": "Each school separated in the database itself",
+        "aadhaar": "No Aadhaar numbers stored, only the last 4 digits",
+        "ai": "AI sees only what the person asking may see",
+        "support": "No standing access for SchoolOS staff",
+        "audit": "Every change and every question recorded",
+        "link": "How SchoolOS protects your data"
       },
-      "ask": {
-        "title": "పాఠశాలను అడగండి",
-        "body": "ఇంగ్లీష్ లేదా తెలుగులో అడగండి. సమాధానాలు మీ పాఠశాల సొంత రికార్డులు, పత్రాల నుండే వస్తాయి, వాటి ఆధారాలను చూపిస్తాయి; లేకపోతే పాఠశాల రికార్డులలో ఏమీ కనబడలేదని చెబుతాయి."
+      "plans": {
+        "eyebrow": "Plans",
+        "title": "One product, two ways to run it",
+        "intro": "The same features and the same security on both. Prices are agreed with each school before it starts.",
+        "link": "Compare the plans"
       },
-      "audit": {
-        "title": "ప్రతి మార్పుకూ నమోదు",
-        "body": "విద్యార్థి వివరాల మార్పులు, పాత్రల మార్పులు, ఎగుమతులు, సైన్ ఇన్‌లు, అడిగిన ప్రశ్నలు అన్నీ మార్చలేని ఆడిట్ లాగ్‌లో నమోదవుతాయి; అందులో ఎవరైనా జోక్యం చేసుకున్నారేమో మీరు తనిఖీ చేయవచ్చు."
+      "faq": {
+        "title": "Questions schools ask",
+        "portal": {
+          "q": "Does SchoolOS submit to UDISE+ or board portals for us?",
+          "a": "No. The portals do not offer a way to do that. SchoolOS checks your data and prepares sheets in the portal's field order; your staff submit as they do today."
+        },
+        "register": {
+          "q": "Will SchoolOS change our admission register?",
+          "a": "No. The admission register stays the legal record. SchoolOS points out differences, and any correction goes through a change request with evidence, approved by a second person."
+        },
+        "tools": {
+          "q": "Do we have to stop using Excel, Tally or paper registers?",
+          "a": "No. SchoolOS works alongside them. It imports and reads what you already keep."
+        },
+        "training": {
+          "q": "Is our student data used to train AI?",
+          "a": "No. Your school's data is not used to train AI models."
+        },
+        "exit": {
+          "q": "Can we take our data with us?",
+          "a": "Yes. Your school owns its data. The owner can export every record, document and the audit log at any time. If you leave, your data is deleted and its encryption keys are destroyed."
+        }
+      },
+      "closing": {
+        "title": "See your own records, checked",
+        "body": "Tell us about your school and we will show you SchoolOS on sample data.",
+        "bodyNoContact": "If your school already uses SchoolOS, sign in with your school account."
       }
     },
-    "how": {
-      "title": "ఇది ఎలా పనిచేస్తుంది",
-      "intro": "మీ దగ్గర ఇప్పటికే ఉన్న రికార్డులతో, మూడు దశల్లో.",
-      "step": "దశ {number}",
-      "import": {
-        "title": "దిగుమతి",
-        "body": "మీరు ఇప్పటికే ఉంచుతున్న జాబితాలను అప్‌లోడ్ చేయండి, లేదా ప్రవేశ రిజిస్టర్ పేజీలను ఫోటో తీయండి. ఏదైనా విద్యార్థి రికార్డుగా మారే ముందు, చదివిన వివరాలను సిబ్బంది నిర్ధారిస్తారు."
+    "features": {
+      "title": "Features",
+      "eyebrow": "Features",
+      "headline": "Everything the office needs to keep student records right",
+      "intro": "From the first import to the portal deadline: records you can trust, corrections you can trace and answers you can check.",
+      "jumpLabel": "Jump to a feature",
+      "records": {
+        "nav": "Records and imports",
+        "title": "Enter once, import the rest",
+        "body": "Start from the lists your office already keeps. SchoolOS shows a preview of every import, flags rows it cannot read, and creates records only when you confirm.",
+        "points": {
+          "one": "Excel, CSV and Google Sheets imports with a row-by-row preview",
+          "two": "Photograph admission register pages and confirm what was read",
+          "three": "Undo a whole import within 24 hours"
+        }
       },
-      "check": {
-        "title": "తనిఖీ",
-        "body": "SchoolOS ప్రతి విద్యార్థి వివరాలను అన్ని మూలాలతో పోల్చి, ప్రతి తేడాను, లేని ప్రతి వివరాన్ని జాబితా చేస్తుంది; ఏ రికార్డును సరిచేయాల్సి రావచ్చో కూడా చెబుతుంది."
+      "checks": {
+        "nav": "Data-quality checks",
+        "title": "Four sources, one checked record",
+        "body": "Every student's name, date of birth, gender and parents' names are compared with the admission register, Aadhaar as printed, UDISE+ and board registration. Each difference becomes a finding your office can work through.",
+        "points": {
+          "one": "Name matching that understands initials and spelling variants",
+          "two": "Missing fields listed before a portal deadline",
+          "three": "Pre-check sheets for UDISE+ and board registration"
+        }
       },
-      "submit": {
-        "title": "నమ్మకంతో సమర్పించండి",
-        "body": "ఆమోదించిన మార్పుల ద్వారా తేడాలను సరిచేసి, UDISE+ మరియు బోర్డు నమోదు కోసం ముందస్తు తనిఖీ షీట్లను డౌన్‌లోడ్ చేయండి. పోర్టల్‌లో సమర్పణ మాత్రం ఇప్పటిలాగే మీ సిబ్బందే చేస్తారు."
+      "corrections": {
+        "nav": "Corrections",
+        "title": "Corrections with evidence and a second check",
+        "body": "SchoolOS never corrects official records on its own. A change to an identity field needs an evidence document and approval by a different person, and both are kept with the record.",
+        "points": {
+          "one": "The person who asks can never approve their own change",
+          "two": "Old and new values shown side by side with the evidence",
+          "three": "The admission register stays the legal record"
+        }
+      },
+      "ask": {
+        "nav": "Ask the school",
+        "title": "Answers from your own records, with sources",
+        "body": "Ask a question in plain words. SchoolOS answers only from the records and documents the person asking may see, shows where each part of the answer came from, and says so when the answer is not in the school records.",
+        "points": {
+          "one": "Every answer shows its sources",
+          "two": "\"Not found in school records\" instead of a guess",
+          "three": "Read-only: AI never changes a record"
+        }
+      },
+      "audit": {
+        "nav": "Audit trail",
+        "title": "A record of every change that cannot be edited",
+        "body": "Changes to student details, role changes, exports, sign-ins and questions asked are written to an append-only audit log. Each entry is chained to the one before, so any change to the log shows up when it is checked.",
+        "points": {
+          "one": "Who did what, and when, for every important action",
+          "two": "A tamper check your school can run",
+          "three": "Support access by SchoolOS staff is recorded too"
+        }
+      },
+      "certificates": {
+        "nav": "Certificates and registers",
+        "title": "Certificates and registers",
+        "body": "Transfer, bonafide, study and conduct certificates from the checked record, with serial numbers and the registers that go with them. This module is being prepared for schools.",
+        "points": {
+          "one": "Serial numbers without gaps",
+          "two": "Transfer certificates approved by a second person",
+          "three": "Register print views in familiar formats"
+        }
       }
     },
     "security": {
-      "title": "భద్రత మరియు గోప్యత",
-      "intro": "విద్యార్థుల రికార్డులు పిల్లల సమాచారం. వాటిని సురక్షితంగా, గోప్యంగా ఉంచేలా SchoolOS మొదటి నుండే రూపొందించబడింది.",
-      "india": {
-        "title": "సమాచారం భారతదేశంలోనే",
-        "body": "మీ పాఠశాల సమాచారం AWS ముంబైలో నిల్వ అవుతుంది, ఎన్‌క్రిప్ట్ చేసిన బ్యాకప్‌లు హైదరాబాద్‌లో ఉంటాయి."
+      "title": "Security and privacy",
+      "eyebrow": "Security and privacy",
+      "headline": "Built for children's data from the first line of code",
+      "intro": "Student records are some of the most sensitive data a school holds. Here is how SchoolOS keeps them safe, private and in India.",
+      "where": {
+        "title": "Where your data lives",
+        "body": "Your school's records and files are stored in Amazon Web Services in Mumbai. Encrypted backups are copied to Hyderabad. Data is stored in India on both plans.",
+        "primary": "AWS Mumbai",
+        "primaryNote": "Records, files, audit log",
+        "backup": "AWS Hyderabad",
+        "backupNote": "Encrypted backups"
       },
-      "isolation": {
-        "title": "ప్రతి పాఠశాల విడిగా",
-        "body": "ప్రతి పాఠశాల రికార్డులు డేటాబేస్ స్థాయిలోనే వేరుగా ఉంటాయి, కాబట్టి ఒక పాఠశాల మరో పాఠశాల సమాచారాన్ని ఎప్పటికీ చూడలేదు."
-      },
-      "aadhaar": {
-        "title": "ఆధార్ సంఖ్యలు ఉండవు",
-        "body": "SchoolOS ఆధార్ సంఖ్యలను ఎప్పుడూ నిల్వ చేయదు: చివరి 4 అంకెలు, కార్డుపై ముద్రించిన వివరాలు మాత్రమే ఉంచుతుంది."
-      },
-      "audit": {
-        "title": "ప్రతి మార్పు, ప్రతి ప్రశ్న నమోదవుతుంది",
-        "body": "విద్యార్థి వివరాల మార్పులు, AIని అడిగే ప్రతి ప్రశ్న పాఠశాల ఆడిట్ లాగ్‌లో నమోదవుతాయి."
+      "controls": {
+        "title": "How SchoolOS protects your records",
+        "isolation": {
+          "title": "Each school kept apart",
+          "body": "Every school's records are separated in the database itself, so a request for one school can never read another school's data. On the Dedicated plan your school also has its own server, storage and key."
+        },
+        "encryption": {
+          "title": "Encrypted in transit and at rest",
+          "body": "Connections use TLS. Databases, files and backups are encrypted with managed keys, and the most sensitive fields are encrypted again with your school's own key."
+        },
+        "aadhaar": {
+          "title": "No Aadhaar numbers",
+          "body": "SchoolOS stores only the last 4 digits and the details as printed on the card. A full Aadhaar number found in an upload or in text is masked."
+        },
+        "access": {
+          "title": "The right people, the right records",
+          "body": "Roles and scopes decide who sees what: a class teacher sees their own sections. Sensitive actions such as exports ask for a fresh sign-in with a second factor."
+        },
+        "audit": {
+          "title": "An audit log that cannot be edited",
+          "body": "Changes to student details, role changes, exports, sign-ins and questions asked are recorded in a hash-chained log that your school can check for tampering."
+        },
+        "logs": {
+          "title": "No personal data in logs",
+          "body": "Our system logs carry IDs and codes, not names, dates of birth or phone numbers."
+        }
       },
       "ai": {
-        "title": "మీరు చూడగలిగేదే AI చూస్తుంది",
-        "body": "అడుగుతున్న వ్యక్తికి చూడటానికి అనుమతి ఉన్న రికార్డులు, పత్రాలను మాత్రమే సమాధానాలు ఉపయోగిస్తాయి. AI ఏదైనా చదవడానికి ముందే మిగతావన్నీ తొలగించబడతాయి."
+        "title": "AI that stays inside the lines",
+        "body": "Ask the school uses AI to write answers, under strict rules.",
+        "filter": "Records the person asking may not see are filtered out before the AI reads anything.",
+        "sources": "Every answer cites the passages it used, or says it was not found in the school records.",
+        "readOnly": "AI tools are read-only. Any change still needs a person, through the normal screens.",
+        "training": "Your school's data is not used to train AI models, and AI requests are processed in India."
       },
       "support": {
-        "title": "మా సిబ్బందికి శాశ్వత యాక్సెస్ లేదు",
-        "body": "మీ యజమాని లేదా ప్రిన్సిపాల్ పరిమిత సమయానికి ఆమోదిస్తే తప్ప SchoolOS సిబ్బంది మీ పాఠశాల రికార్డులను తెరవలేరు; వారు తెరిచే ప్రతి తెర నమోదవుతుంది."
+        "title": "No standing access for SchoolOS staff",
+        "body": "Our staff cannot open your school's records on their own. When we need to look at something to help you, your school decides.",
+        "steps": {
+          "request": {
+            "title": "We ask",
+            "body": "A request names the reason, what we need to see and for how long, up to 8 hours."
+          },
+          "approve": {
+            "title": "Your school approves",
+            "body": "Your owner or principal approves it with a fresh sign-in, or does not."
+          },
+          "access": {
+            "title": "Read-only, for a limited time",
+            "body": "Access is read-only, ends on its own and can be revoked by your school at any time."
+          },
+          "record": {
+            "title": "Every screen recorded",
+            "body": "Everything our staff open is written to your school's audit log."
+          }
+        },
+        "emergency": "The only exception is a legal obligation or an active security incident: two SchoolOS staff must confirm it, and your school is told straight away."
+      },
+      "privacy": {
+        "title": "Your school decides, SchoolOS processes",
+        "body": "Under India's Digital Personal Data Protection Act, your school decides why student data is used and SchoolOS processes it only on your school's instructions, under a data processing agreement.",
+        "purpose": "Student data is used for school administration, education and safety only: no advertising, no selling, no marketing.",
+        "export": "The owner can export every record, document and the audit log at any time.",
+        "exit": "If you leave, your data is deleted within 30 days, its keys are destroyed and you receive a certificate of deletion."
       }
     },
-    "plans": {
-      "title": "SchoolOS ను వాడే రెండు విధానాలు",
-      "intro": "రెండింటిలోనూ అవే సౌకర్యాలు, అదే భద్రత, సమాచారం భారతదేశంలోనే. ధర ప్రతి పాఠశాలతో మొదలుపెట్టే ముందే నిర్ణయించబడుతుంది.",
+    "pricing": {
+      "title": "Pricing",
+      "eyebrow": "Pricing",
+      "headline": "Two ways to run SchoolOS",
+      "intro": "The same features, the same security and your data in India on both. We agree the price with each school before it starts.",
+      "forLabel": "Who it is for",
+      "includedLabel": "What is included",
+      "priceNote": "Price agreed with your school",
       "shared": {
-        "name": "షేర్డ్",
-        "summary": "AWS ముంబైలోని SchoolOS ప్లాట్‌ఫామ్‌పై మీ పాఠశాల విడిగా, వేరుచేయబడిన పాఠశాలగా ఉంటుంది. చాలా పాఠశాలలకు ఇదే సులభమైన ఎంపిక.",
-        "point1": "SchoolOS నిర్వహిస్తుంది, అప్‌డేట్ చేస్తుంది, బ్యాకప్ తీస్తుంది",
-        "point2": "మీ పాఠశాలకు IT పని ఏమీ లేదు",
-        "point3": "మీ ఆఫీస్ కంప్యూటర్లలో బ్రౌజర్‌లోనే పనిచేస్తుంది"
+        "name": "Shared",
+        "summary": "Your school runs as a separate, isolated school on the SchoolOS platform in AWS Mumbai.",
+        "for": "Most schools. No servers to think about and nothing to install.",
+        "points": {
+          "one": "Every SchoolOS feature",
+          "two": "Managed, updated and backed up by SchoolOS",
+          "three": "Works in a browser on your office PCs",
+          "four": "Web address on the SchoolOS domain"
+        }
       },
       "dedicated": {
-        "name": "డెడికేటెడ్",
-        "summary": "అదే సాఫ్ట్‌వేర్ నడిచే, AWS ముంబైలో మీకే సొంతమైన వేరు సర్వర్; దానికి సొంత నిల్వ, సొంత ఎన్‌క్రిప్షన్ కీ ఉంటాయి.",
-        "point1": "ప్రతి రాత్రి హైదరాబాద్‌కు ఎన్‌క్రిప్ట్ చేసిన బ్యాకప్‌లు",
-        "point2": "కావాలంటే మీ పాఠశాల సొంత డొమైన్‌పై వెబ్ చిరునామా",
-        "point3": "పెద్ద పాఠశాలలు, పాఠశాలల సమూహాలు లేదా సొంత సర్వర్ కావాలనుకునే పాఠశాలల కోసం"
+        "name": "Dedicated",
+        "summary": "Your own isolated server in AWS Mumbai, running the same software, with its own storage and encryption key.",
+        "for": "Larger schools, school groups and schools that want their own server.",
+        "points": {
+          "one": "Every SchoolOS feature",
+          "two": "Your own server, storage and encryption key",
+          "three": "Encrypted backups to AWS Hyderabad",
+          "four": "Optional web address on your school's own domain"
+        }
+      },
+      "compare": {
+        "title": "Compare the plans",
+        "caption": "Shared and Dedicated plans compared",
+        "feature": "What you get",
+        "features": "All features",
+        "security": "Security controls and audit log",
+        "location": "Data stored in India",
+        "server": "Server",
+        "serverShared": "Shared platform, your school isolated",
+        "serverDedicated": "Your own server",
+        "key": "Encryption key",
+        "keyShared": "Your school's own key for sensitive fields",
+        "keyDedicated": "Your own key for the whole server",
+        "domain": "Web address",
+        "domainShared": "SchoolOS domain",
+        "domainDedicated": "SchoolOS domain or your own",
+        "yes": "Included"
+      },
+      "how": {
+        "title": "How pricing works",
+        "subscription": "SchoolOS is a recurring subscription. We agree the price with your school before it starts.",
+        "invoices": "You receive GST invoices from SchoolOS.",
+        "noSurprises": "No setup is needed on your side for the Shared plan."
+      },
+      "faq": {
+        "title": "Pricing questions",
+        "price": {
+          "q": "Why are there no prices on this page?",
+          "a": "Schools differ in size and needs, so we agree the price with each school before it starts. Talk to us and we will explain it plainly."
+        },
+        "switch": {
+          "q": "What does a school need to get started?",
+          "a": "A browser on your office PCs and the student lists you already keep. On the Shared plan there is nothing to install."
+        },
+        "features": {
+          "q": "Does Dedicated have more features?",
+          "a": "No. Both plans have every feature and the same security. Dedicated adds your own server, storage and key, and an optional web address on your own domain."
+        },
+        "data": {
+          "q": "Where is our data on each plan?",
+          "a": "In India on both: AWS Mumbai, with encrypted backups in Hyderabad."
+        }
       }
     },
-    "faq": {
-      "title": "తరచూ అడిగే ప్రశ్నలు",
-      "portal": {
-        "q": "SchoolOS మా తరఫున UDISE+ లేదా బోర్డు పోర్టళ్లలో సమర్పిస్తుందా?",
-        "a": "లేదు. పోర్టళ్లు అందుకు అవకాశం ఇవ్వవు. SchoolOS మీ వివరాలను తనిఖీ చేసి, పోర్టల్ వివరాల క్రమంలో షీట్లు సిద్ధం చేస్తుంది; సమర్పణ మీ సిబ్బంది ఇప్పటిలాగే చేస్తారు."
+    "about": {
+      "title": "About",
+      "eyebrow": "About SchoolOS",
+      "headline": "Software for the school office, built with the office",
+      "intro": "SchoolOS is a managed service for private schools in India, starting in Andhra Pradesh. We run it, keep it secure and keep it up to date, so your office can get on with the work.",
+      "who": {
+        "title": "Who it is for",
+        "body": "Office clerks, principals, management, accountants, exam coordinators and teachers: busy people on shared office PCs, often with patchy internet. SchoolOS is designed for them, in plain language."
       },
-      "register": {
-        "q": "SchoolOS మా ప్రవేశ రిజిస్టర్‌ను మారుస్తుందా?",
-        "a": "లేదు. ప్రవేశ రిజిస్టరే చట్టబద్ధమైన రికార్డుగా ఉంటుంది. SchoolOS తేడాలను చూపిస్తుంది; ఏ సవరణ అయినా ఆధారంతో సవరణ అభ్యర్థన ద్వారా, మరొక వ్యక్తి ఆమోదంతోనే జరుగుతుంది."
+      "principles": {
+        "title": "What we hold to",
+        "register": {
+          "title": "The register is the legal record",
+          "body": "SchoolOS points out differences. It never corrects an official record on its own."
+        },
+        "evidence": {
+          "title": "Every change can be traced",
+          "body": "Corrections need evidence and a second person, and they are recorded for good."
+        },
+        "grounded": {
+          "title": "Answers show their sources",
+          "body": "If an answer is not in your school's records, SchoolOS says so."
+        },
+        "children": {
+          "title": "Children's data is for education",
+          "body": "Student data is used for school administration, education and safety. Never for advertising or marketing."
+        }
       },
-      "tools": {
-        "q": "మేము Excel, Tally లేదా కాగితపు రిజిస్టర్లు వాడటం మానేయాలా?",
-        "a": "అవసరం లేదు. SchoolOS వాటితో పాటే పనిచేస్తుంది. మీ దగ్గర ఇప్పటికే ఉన్నవాటిని దిగుమతి చేసి చదువుతుంది."
-      },
-      "ai": {
-        "q": "పాఠశాలను అడగండిలో సమాధానాలు ఎక్కడి నుండి వస్తాయి?",
-        "a": "అడుగుతున్న వ్యక్తి చూడగలిగే మీ పాఠశాల సొంత రికార్డులు, పత్రాల నుండి మాత్రమే. ప్రతి సమాధానం తన ఆధారాలను చూపిస్తుంది, లేదా పాఠశాల రికార్డులలో కనబడలేదని చెబుతుంది."
-      },
-      "training": {
-        "q": "మా విద్యార్థుల సమాచారాన్ని AI శిక్షణకు వాడతారా?",
-        "a": "లేదు. మీ పాఠశాల సమాచారాన్ని AI మోడళ్ల శిక్షణకు ఎప్పుడూ వాడరు."
-      },
-      "exit": {
-        "q": "మా సమాచారాన్ని మాతో తీసుకెళ్లవచ్చా?",
-        "a": "అవును. మీ సమాచారం మీ పాఠశాలదే; ఎప్పుడైనా అంతా ఓపెన్ ఫార్మాట్లలో ఎగుమతి చేసుకోవచ్చు. మీరు వదిలి వెళ్తే, మీ సమాచారం తొలగించబడుతుంది, దాని ఎన్‌క్రిప్షన్ కీలు నాశనం చేయబడతాయి."
-      },
-      "language": {
-        "q": "SchoolOS ఏ భాషల్లో ఉంటుంది?",
-        "a": "ఇంగ్లీష్ మరియు తెలుగు. పేజీ పైభాగం నుండి ఎప్పుడైనా భాష మార్చుకోవచ్చు."
+      "contact": {
+        "title": "Contact",
+        "company": "Company",
+        "address": "Address",
+        "email": "Email",
+        "body": "Questions about SchoolOS, a demonstration on sample data or pricing: write to us."
       }
     },
-    "cta": {
-      "title": "మీ పాఠశాల రికార్డులు, సరిచూసి సిద్ధంగా",
-      "body": "మీ పాఠశాల ఇప్పటికే SchoolOS వాడుతుంటే, మీ పాఠశాల ఖాతాతో సైన్ ఇన్ చేయండి.",
-      "button": "పాఠశాల కార్యాలయంలోకి సైన్ ఇన్ చేయండి"
+    "dedicated": {
+      "title": "Sign in",
+      "headline": "Sign in to your school office",
+      "body": "This is your school's own SchoolOS. Sign in with the account your school gave you.",
+      "help": "Can't sign in? Ask your school office to send the invitation again."
     },
-    "footer": {
-      "tagline": "పాఠశాల కార్యాలయ రికార్డులు, సరిచూసినవి.",
-      "sampleNote": "ఈ పేజీలో చూపిన పేర్లు, తేదీలు కల్పిత నమూనాలు.",
-      "location": "సమాచారం భారతదేశంలో నిల్వ (AWS ముంబై).",
-      "top": "పైకి వెళ్లండి",
-      "signIn": "సైన్ ఇన్ చేయండి"
+    "mock": {
+      "label": "Illustration with sample data",
+      "window": "SchoolOS · Findings",
+      "hero": "Illustration with made-up data: a date of birth that differs between the admission register and Aadhaar as printed, an import waiting for confirmation, and an answer from school records that shows its sources.",
+      "finding": {
+        "badge": "Mismatch",
+        "title": "Date of birth differs",
+        "student": "Sample student A · Class 7-B",
+        "register": "Admission register",
+        "aadhaar": "Aadhaar as printed",
+        "udise": "UDISE+",
+        "board": "Board registration",
+        "matches": "Matches",
+        "differs": "Differs",
+        "route": "Register is the legal record. Fix it with a change request and evidence.",
+        "missing": "Missing field",
+        "missingTitle": "Board registration number",
+        "missingStudent": "Sample student C · Class 7-B"
+      },
+      "import": {
+        "title": "Class 7 list.xlsx",
+        "steps": {
+          "upload": "Upload",
+          "preview": "Preview",
+          "confirm": "Confirm"
+        },
+        "rows": "42 rows ready · 2 need a look",
+        "undo": "Undo within 24 hours"
+      },
+      "ask": {
+        "label": "Ask the school",
+        "question": "When did Sample student B join the school?",
+        "answer": "Sample student B joined Class 1 on 12 June 2019.",
+        "sources": "Sources",
+        "sourceRegister": "Admission register, page 18",
+        "sourceRecord": "Student record",
+        "notFound": "Not found in school records"
+      },
+      "change": {
+        "title": "Change request",
+        "field": "Date of birth",
+        "old": "Old",
+        "new": "New",
+        "evidence": "Evidence: Birth certificate.pdf",
+        "requested": "Requested by Office clerk",
+        "approve": "Waiting for the principal",
+        "rule": "The requester cannot approve"
+      },
+      "audit": {
+        "title": "Audit log",
+        "check": "Chain checked · no changes found",
+        "e1": "Change request approved",
+        "e2": "Export created",
+        "e3": "Question asked",
+        "e4": "Signed in"
+      },
+      "certificate": {
+        "title": "Transfer certificate",
+        "serial": "Serial TC/2026/0041",
+        "name": "Name of the pupil",
+        "class": "Class last studied",
+        "draft": "Draft · needs approval"
+      },
+      "access": {
+        "title": "Support access request",
+        "reason": "Reason: import problem",
+        "scope": "Scope: Class 7-B, read-only",
+        "time": "Up to 8 hours",
+        "approve": "Approve",
+        "decline": "Decline"
+      }
     }
   },
   "devUi": {
