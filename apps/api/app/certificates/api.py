@@ -269,8 +269,9 @@ def retry_certificate_pdf(
     responses=_PAGE_RESPONSES,
 )
 def print_certificate(ctx: Reader, db: TenantDB, certificate_id: uuid.UUID) -> HTMLResponse:
-    """The certificate as a print-ready A4 page in English and Telugu (a DRAFT while it waits
-    for approval; read, issue or approve permission). The view is audited."""
+    """The certificate as a print-ready A4 page in English (and Telugu only while Telugu is
+    shown, ADR-0036; a DRAFT while it waits for approval; read, issue or approve permission).
+    The view is audited."""
     page = service.print_page(db, ctx, certificate_id)
     return _html(page, f"certificate-{str(certificate_id)[:8]}.html")
 

@@ -9,6 +9,10 @@ block is allowed by hash in :data:`STYLE_CSP` when served to a browser. For the 
 gets the bundled Noto Sans Telugu (``@font-face`` served in memory by :mod:`app.core.pdf`); in a
 browser the system's Telugu font is used (Nirmala UI on Windows, Noto Sans Telugu on Android).
 Line heights stay at 1.6 or more so Telugu vowel signs are never clipped.
+
+English first (ADR-0036): while Telugu is hidden (``app.core.languages``) pages are English
+only: no Telugu headings, labels, statements, watermarks or footers, no Telugu font in the
+font stack and no ``@font-face`` for the bundled font. The Telugu paths stay, dormant.
 """
 
 from __future__ import annotations
@@ -23,7 +27,8 @@ from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
 from app.certificates.schemas import CertificateContent, ContentLine
-from app.core.pdf import FONT_FAMILY, FONT_URL
+from app.core.languages import contains_telugu, telugu_enabled
+from app.core.pdf import FONT_FAMILY, font_face_css
 from app.core.redaction import mask_aadhaar
 
 IST: Final = ZoneInfo("Asia/Kolkata")
@@ -31,19 +36,20 @@ TEMPLATE_VERSION: Final = "v1"
 
 Mark = Literal["draft", "cancelled"] | None
 
-_FONTS: Final = (
+# English first (ADR-0036): the default stack names no Telugu font; the Telugu one is used only
+# while Telugu is shown.
+_FONTS: Final = '"Noto Sans", Arial, sans-serif'
+_FONTS_TE: Final = (
     f'"{FONT_FAMILY}", "Noto Sans Telugu", "Nirmala UI", "Gautami", "Noto Sans", Arial, sans-serif'
 )
-_FONT_FACE: Final = (
-    f'@font-face {{ font-family: "{FONT_FAMILY}"; src: url("{FONT_URL}") format("truetype"); '
-    "font-weight: 100 900; font-stretch: 62.5% 100%; }\n"
-)
 
-CERTIFICATE_STYLE: Final = f"""
+
+def _certificate_style(fonts: str) -> str:
+    return f"""
 @page {{ size: A4; margin: 14mm 14mm 18mm; }}
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; padding: 0; }}
-body {{ color: #111; background: #fff; font-family: {_FONTS}; font-size: 11pt;
+body {{ color: #111; background: #fff; font-family: {fonts}; font-size: 11pt;
   line-height: 1.7; }}
 main {{ position: relative; border: 3px double #222; padding: 7mm 8mm; min-height: 250mm; }}
 .watermark {{ position: absolute; top: 38%; left: 0; right: 0; text-align: center;
@@ -79,11 +85,13 @@ footer {{ margin-top: 6mm; font-size: 8.5pt; color: #444; line-height: 1.7; }}
   background: #fff; }} }}
 """
 
-REGISTER_STYLE: Final = f"""
+
+def _register_style(fonts: str) -> str:
+    return f"""
 @page {{ size: A4 landscape; margin: 12mm 10mm 14mm; }}
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; padding: 0; }}
-body {{ color: #111; background: #fff; font-family: {_FONTS}; font-size: 8.5pt;
+body {{ color: #111; background: #fff; font-family: {fonts}; font-size: 8.5pt;
   line-height: 1.7; }}
 header {{ margin-bottom: 3mm; }}
 .school {{ font-size: 13pt; font-weight: 700; margin: 0; line-height: 1.6; }}
@@ -104,17 +112,36 @@ footer {{ margin-top: 4mm; font-size: 8pt; color: #444; }}
 """
 
 
+# English (the default, ADR-0036) and Telugu variants of the two print styles.
+CERTIFICATE_STYLE: Final = _certificate_style(_FONTS)
+REGISTER_STYLE: Final = _register_style(_FONTS)
+CERTIFICATE_STYLE_TE: Final = _certificate_style(_FONTS_TE)
+REGISTER_STYLE_TE: Final = _register_style(_FONTS_TE)
+
+
+def certificate_style() -> str:
+    """The certificate style in use: Telugu font stack only while Telugu is shown."""
+    return CERTIFICATE_STYLE_TE if telugu_enabled() else CERTIFICATE_STYLE
+
+
+def register_style() -> str:
+    """The register style in use: Telugu font stack only while Telugu is shown."""
+    return REGISTER_STYLE_TE if telugu_enabled() else REGISTER_STYLE
+
+
 def _style_hash(style: str) -> str:
     digest = hashlib.sha256(style.encode("utf-8")).digest()
     return "'sha256-" + base64.b64encode(digest).decode("ascii") + "'"
 
 
-# Content-Security-Policy for the print views served to browsers: nothing but the style blocks.
+# Content-Security-Policy for the print views served to browsers: nothing but the style blocks
+# (both variants are pinned, so turning Telugu on or off needs no other change).
 STYLE_CSP: Final = (
     "default-src 'none'; style-src "
-    + _style_hash(CERTIFICATE_STYLE)
-    + " "
-    + _style_hash(REGISTER_STYLE)
+    + " ".join(
+        _style_hash(s)
+        for s in (CERTIFICATE_STYLE, REGISTER_STYLE, CERTIFICATE_STYLE_TE, REGISTER_STYLE_TE)
+    )
     + "; img-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'; "
     "frame-ancestors 'none'"
 )
@@ -314,6 +341,58 @@ def _statement(content: CertificateContent) -> tuple[str, str]:
     return en, te
 
 
+def _te(fragment: str) -> str:
+    """A Telugu-only fragment of a page: kept while Telugu is shown, dropped otherwise
+    (ADR-0036)."""
+    return fragment if telugu_enabled() else ""
+
+
+def _slash(en: str, te: str) -> str:
+    """``English / Telugu`` while Telugu is shown, ``English`` otherwise (ADR-0036)."""
+    return f"{en} / {te}" if telugu_enabled() else en
+
+
+def _english_value(value: str | None) -> str | None:
+    """A printed value made by SchoolOS as ``English / Telugu`` (a gender, a choice, a class)
+    keeps its English part. Other values (names as recorded, even in Telugu script) are data
+    and stay as they are."""
+    if value is None or not contains_telugu(value) or " / " not in value:
+        return value
+    english = value.split(" / ", 1)[0]
+    return value if contains_telugu(english) else english
+
+
+def _english_lines(lines: Sequence[ContentLine]) -> list[ContentLine]:
+    return [
+        line.model_copy(update={"label_te": "", "value": _english_value(line.value)})
+        for line in lines
+        if not line.key.endswith("_te")
+    ]
+
+
+def english_only(content: CertificateContent) -> CertificateContent:
+    """``content`` without its Telugu-only parts, as shown while Telugu is hidden (ADR-0036):
+    Telugu titles, labels, school name and address emptied, the Telugu statement lines
+    (``*_te``) dropped and the Telugu half of ``English / Telugu`` values removed. The frozen
+    record itself is not changed (its hash still verifies)."""
+    return content.model_copy(
+        update={
+            "title_te": "",
+            "school_name_te": "",
+            "school_address_te": "",
+            "class_label_te": None,
+            "fields": _english_lines(content.fields),
+            "details": _english_lines(content.details),
+            "blanks": _english_lines(content.blanks),
+        }
+    )
+
+
+def shown(content: CertificateContent) -> CertificateContent:
+    """The content as shown now: whole while Telugu is shown, :func:`english_only` otherwise."""
+    return content if telugu_enabled() else english_only(content)
+
+
 def _rows(lines: Sequence[ContentLine], start: int) -> tuple[str, int]:
     out = []
     n = start
@@ -326,7 +405,8 @@ def _rows(lines: Sequence[ContentLine], start: int) -> tuple[str, int]:
         )
         out.append(
             f'<tr><td class="no">{n}</td><th>{_e(line.label_en)}'
-            f'<span class="te">{_e(line.label_te)}</span></th><td>{value}</td></tr>'
+            + _te(f'<span class="te">{_e(line.label_te)}</span>')
+            + f"</th><td>{value}</td></tr>"
         )
     return "".join(out), n
 
@@ -341,14 +421,16 @@ def render_certificate(
 ) -> str:
     """The A4 certificate page. ``reference``: short record reference printed in the footer;
     ``mark``: ``draft`` (awaiting approval, not valid) or ``cancelled``; ``duplicate``: the
-    copy number and date of a duplicate (FR-CERT-007)."""
+    copy number and date of a duplicate (FR-CERT-007). English only while Telugu is hidden
+    (ADR-0036)."""
+    content = shown(content)
     watermark = ""
     if mark == "draft":
-        watermark = "DRAFT · NOT VALID<br>ముసాయిదా · చెల్లదు"
+        watermark = "DRAFT · NOT VALID" + _te("<br>ముసాయిదా · చెల్లదు")
     elif mark == "cancelled":
-        watermark = "CANCELLED<br>రద్దు చేయబడింది"
+        watermark = "CANCELLED" + _te("<br>రద్దు చేయబడింది")
     elif duplicate is not None:
-        watermark = "DUPLICATE<br>నకలు"
+        watermark = "DUPLICATE" + _te("<br>నకలు")
     school = [f'<p class="school">{_e(content.school_name_en)}</p>']
     if content.school_name_te:
         school.append(f'<p class="school-te">{_e(content.school_name_te)}</p>')
@@ -363,15 +445,21 @@ def render_certificate(
             f'<p class="duplicate">DUPLICATE (copy {duplicate.copy_no}) issued on '
             f"{_e(format_date(duplicate.issued_on))} in place of the original serial number "
             f"{_e(content.serial)} dated {_e(format_date(content.issued_on))}."
-            f'<span class="te">నకలు (ప్రతి {duplicate.copy_no}) '
-            f"{_e(format_date(duplicate.issued_on))} న, అసలు క్రమ సంఖ్య {_e(content.serial)} "
-            f"(తేదీ {_e(format_date(content.issued_on))}) స్థానంలో ఇవ్వబడింది.</span></p>"
+            + _te(
+                f'<span class="te">నకలు (ప్రతి {duplicate.copy_no}) '
+                f"{_e(format_date(duplicate.issued_on))} న, అసలు క్రమ సంఖ్య {_e(content.serial)} "
+                f"(తేదీ {_e(format_date(content.issued_on))}) స్థానంలో ఇవ్వబడింది.</span>"
+            )
+            + "</p>"
         )
     meta = (
         '<div class="meta">'
-        f"<span>Serial no. / క్రమ సంఖ్య: <strong>{_e(content.serial or '—')}</strong></span>"
-        f"<span>Admission no. / ప్రవేశ సంఖ్య: <strong>{_e(content.admission_no)}</strong></span>"
-        f"<span>Date / తేదీ: <strong>{_e(format_date(content.issued_on))}</strong></span>"
+        f"<span>{_slash('Serial no.', 'క్రమ సంఖ్య')}: "
+        f"<strong>{_e(content.serial or '—')}</strong></span>"
+        f"<span>{_slash('Admission no.', 'ప్రవేశ సంఖ్య')}: "
+        f"<strong>{_e(content.admission_no)}</strong></span>"
+        f"<span>{_slash('Date', 'తేదీ')}: "
+        f"<strong>{_e(format_date(content.issued_on))}</strong></span>"
         "</div>"
     )
     if content.certificate_type == "transfer":
@@ -381,20 +469,22 @@ def render_certificate(
         body = f"<table><tbody>{body_rows}{detail_rows}{blank_rows}</tbody></table>"
     else:
         en, te = _statement(content)
-        body = f'<p class="statement">{en}</p><p class="statement">{te}</p>'
+        body = f'<p class="statement">{en}</p>' + _te(f'<p class="statement">{te}</p>')
         if content.blanks:
             blank_rows, _ = _rows(content.blanks, 0)
             body += f"<table><tbody>{blank_rows}</tbody></table>"
     place = _e(content.school_place)
     signatures = (
         '<div class="signatures">'
-        '<div>Prepared by (office)<span class="te">తయారు చేసినవారు (కార్యాలయం)</span></div>'
-        '<div>Checked by<span class="te">తనిఖీ చేసినవారు</span></div>'
-        "<div>Principal (signature and seal)"
-        '<span class="te">ప్రధానోపాధ్యాయుల సంతకం, ముద్ర</span></div>'
-        "</div>"
+        "<div>Prepared by (office)"
+        + _te('<span class="te">తయారు చేసినవారు (కార్యాలయం)</span>')
+        + "</div><div>Checked by"
+        + _te('<span class="te">తనిఖీ చేసినవారు</span>')
+        + "</div><div>Principal (signature and seal)"
+        + _te('<span class="te">ప్రధానోపాధ్యాయుల సంతకం, ముద్ర</span>')
+        + "</div></div>"
     )
-    style = (_FONT_FACE if for_pdf else "") + CERTIFICATE_STYLE
+    style = (font_face_css() if for_pdf else "") + certificate_style()
     csp = f'<meta http-equiv="Content-Security-Policy" content="{_PDF_CSP}">' if for_pdf else ""
     return (
         "<!doctype html>"
@@ -405,13 +495,14 @@ def render_certificate(
         f"<style>{style}</style></head><body><main>"
         + (f'<div class="watermark" aria-hidden="true">{watermark}</div>' if watermark else "")
         + f"<header>{''.join(school)}</header>"
-        f'<h1>{_e(content.title_en.upper())}<span class="title-te">{_e(content.title_te)}</span>'
-        f"</h1>{meta}{dup}<section>{body}</section>"
-        f"<section><p>Place / స్థలం: {place}</p></section>{signatures}"
+        f"<h1>{_e(content.title_en.upper())}"
+        + _te(f'<span class="title-te">{_e(content.title_te)}</span>')
+        + f"</h1>{meta}{dup}<section>{body}</section>"
+        f"<section><p>{_slash('Place', 'స్థలం')}: {place}</p></section>{signatures}"
         f"<footer>Generated from the school's records by SchoolOS · record reference "
         f"{_e(reference)} · template {TEMPLATE_VERSION}"
-        '<span class="te">పాఠశాల రికార్డుల నుండి SchoolOS తయారు చేసింది</span></footer>'
-        "</main></body></html>"
+        + _te('<span class="te">పాఠశాల రికార్డుల నుండి SchoolOS తయారు చేసింది</span>')
+        + "</footer></main></body></html>"
     )
 
 
@@ -434,9 +525,13 @@ class RegisterPage:
 
 
 def render_register(page: RegisterPage) -> str:
-    """An A4 landscape register page (FR-REG-001..004): bilingual headings, one row per line,
-    cancelled lines marked, headings repeated on every printed page."""
-    head = "".join(f'<th>{_e(en)}<span class="te">{_e(te)}</span></th>' for en, te in page.header)
+    """An A4 landscape register page (FR-REG-001..004): bilingual headings (English only while
+    Telugu is hidden, ADR-0036), one row per line, cancelled lines marked, headings repeated on
+    every printed page."""
+    head = "".join(
+        f"<th>{_e(en)}" + _te(f'<span class="te">{_e(te)}</span>') + "</th>"
+        for en, te in page.header
+    )
     if page.rows:
         body = "".join(
             ('<tr class="cancelled">' if cancelled else "<tr>")
@@ -447,39 +542,52 @@ def render_register(page: RegisterPage) -> str:
         table = f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
     else:
         table = (
-            f'<p class="empty">{_e(page.empty_en)}<span class="te">{_e(page.empty_te)}</span></p>'
+            f'<p class="empty">{_e(page.empty_en)}'
+            + _te(f'<span class="te">{_e(page.empty_te)}</span>')
+            + "</p>"
         )
     printed = page.printed_at.astimezone(IST).strftime("%d/%m/%Y %H:%M")
-    school_te = f'<span class="te">{_e(page.school_name_te)}</span>' if page.school_name_te else ""
+    school_te = (
+        _te(f'<span class="te">{_e(page.school_name_te)}</span>') if page.school_name_te else ""
+    )
+    footer = "Printed from SchoolOS for the school's paper register" + _te(
+        " · కాగితపు రిజిస్టర్ కోసం SchoolOS నుండి ముద్రించబడింది"
+    )
     return (
         "<!doctype html>"
         '<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<meta name="robots" content="noindex, nofollow">'
         f"<title>{_e(page.title_en)} {_e(page.academic_year_label)}</title>"
-        f"<style>{REGISTER_STYLE}</style></head><body><main>"
+        f"<style>{register_style()}</style></head><body><main>"
         f'<header><p class="school">{_e(page.school_name)}{school_te}</p>'
-        f'<h1>{_e(page.title_en)}<span class="te">{_e(page.title_te)}</span></h1>'
-        f'<p class="meta">Academic year / విద్యా సంవత్సరం: '
-        f"<strong>{_e(page.academic_year_label)}</strong> · Printed / ముద్రించిన తేదీ: "
-        f"{_e(printed)} IST · Rows / వరుసలు: {len(page.rows)}</p></header>"
+        f"<h1>{_e(page.title_en)}" + _te(f'<span class="te">{_e(page.title_te)}</span>') + "</h1>"
+        f'<p class="meta">{_slash("Academic year", "విద్యా సంవత్సరం")}: '
+        f"<strong>{_e(page.academic_year_label)}</strong> · "
+        f"{_slash('Printed', 'ముద్రించిన తేదీ')}: "
+        f"{_e(printed)} IST · {_slash('Rows', 'వరుసలు')}: {len(page.rows)}</p></header>"
         f"<section>{table}</section>"
-        "<footer>Printed from SchoolOS for the school's paper register · "
-        "కాగితపు రిజిస్టర్ కోసం SchoolOS నుండి ముద్రించబడింది</footer>"
+        f"<footer>{footer}</footer>"
         "</main></body></html>"
     )
 
 
 __all__ = [
     "CERTIFICATE_STYLE",
+    "CERTIFICATE_STYLE_TE",
     "REGISTER_STYLE",
+    "REGISTER_STYLE_TE",
     "STYLE_CSP",
     "TEMPLATE_VERSION",
     "DuplicateMark",
     "Mark",
     "RegisterPage",
+    "certificate_style",
     "date_in_words",
+    "english_only",
     "format_date",
+    "register_style",
     "render_certificate",
     "render_register",
+    "shown",
 ]

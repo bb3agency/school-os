@@ -22,6 +22,7 @@ from app.certificates.config import (
     load_config,
 )
 from app.certificates.schemas import CertificateContent, ContentLine
+from app.core.languages import contains_telugu as templates_contain_telugu
 from app.core.redaction import verhoeff_check_digit
 
 ATTRIBUTES = Path(__file__).resolve().parents[2] / "app" / "students" / "attributes.yaml"
@@ -144,6 +145,7 @@ def test_FR_CERT_001_date_of_birth_in_words(day: dt.date, words: str) -> None:
     assert templates.date_in_words(day) == words
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_011_certificate_page_is_bilingual_escaped_and_masked() -> None:
     body = "34567890123"
     aadhaar = body + verhoeff_check_digit(body)
@@ -171,6 +173,7 @@ def test_FR_CERT_011_certificate_page_is_bilingual_escaped_and_masked() -> None:
     assert "<script" not in page.replace("&lt;script", "")
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_011_marks_draft_cancelled_and_duplicate() -> None:
     content = _content()
     assert "DRAFT" in templates.render_certificate(content, reference="R", mark="draft")
@@ -186,6 +189,7 @@ def test_FR_CERT_011_marks_draft_cancelled_and_duplicate() -> None:
 
 
 @pytest.mark.parametrize("certificate_type", ["bonafide", "study", "conduct"])
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_001_statement_certificates_are_bilingual(certificate_type: str) -> None:
     details = [
         ContentLine(key="purpose", label_en="Purpose", label_te="ప్రయోజనం", value="Bus pass"),
@@ -217,6 +221,95 @@ def test_FR_REG_004_print_css_is_a4_telugu_safe_and_csp_pins_the_styles() -> Non
     assert "default-src 'none'" in templates.STYLE_CSP
 
 
+def test_ADR_0036_telugu_style_variants_keep_the_print_rules_and_are_pinned_too() -> None:
+    for style in (templates.CERTIFICATE_STYLE_TE, templates.REGISTER_STYLE_TE):
+        heights = [float(h) for h in re.findall(r"line-height: ([0-9.]+)", style)]
+        assert min(heights) >= 1.6
+        assert "Noto Sans Telugu" in style
+        digest = base64.b64encode(hashlib.sha256(style.encode()).digest()).decode()
+        assert f"'sha256-{digest}'" in templates.STYLE_CSP
+    for style in (templates.CERTIFICATE_STYLE, templates.REGISTER_STYLE):
+        assert "Telugu" not in style
+        assert "Nirmala" not in style
+        assert "Gautami" not in style
+    assert templates.certificate_style() == templates.CERTIFICATE_STYLE
+    assert templates.register_style() == templates.REGISTER_STYLE
+
+
+@pytest.mark.parametrize("certificate_type", ["transfer", "bonafide", "study", "conduct"])
+@pytest.mark.parametrize("mark", [None, "draft", "cancelled"])
+def test_ADR_0036_certificate_page_is_english_only_while_telugu_is_hidden(
+    certificate_type: str, mark: templates.Mark
+) -> None:
+    details = [
+        ContentLine(key="purpose", label_en="Purpose", label_te="ప్రయోజనం", value="Bus pass"),
+        ContentLine(key="purpose_te", label_en="", label_te="", value="బస్ పాస్"),
+        ContentLine(key="study_from", label_en="", label_te="", value="Class V (2021-22)"),
+        ContentLine(key="study_to", label_en="", label_te="", value="Class IX (2026-27)"),
+        ContentLine(key="conduct", label_en="", label_te="", value="good"),
+        ContentLine(key="conduct_te", label_en="", label_te="", value="మంచిది"),
+        ContentLine(
+            key="leaving_reason",
+            label_en="Reason for leaving",
+            label_te="విడిచిపెట్టడానికి కారణం",
+            value="Parent transferred / తల్లిదండ్రుల బదిలీ",
+        ),
+    ]
+    content = _content(certificate_type=certificate_type, details=details)
+    for duplicate in (None, templates.DuplicateMark(copy_no=2, issued_on=dt.date(2026, 10, 1))):
+        for for_pdf in (False, True):
+            page = templates.render_certificate(
+                content, reference="R", mark=mark, duplicate=duplicate, for_pdf=for_pdf
+            )
+            assert not templates_contain_telugu(page), (certificate_type, mark, duplicate)
+            assert "@font-face" not in page
+            assert "Noto Sans Telugu" not in page
+            assert "Synthetic Model School" in page
+    shown = templates.shown(content)
+    assert shown == templates.english_only(content)
+    assert not templates_contain_telugu(shown.model_dump_json())
+    assert {d.key: d.value for d in shown.details}["leaving_reason"] == "Parent transferred"
+    assert templates.english_only(content).student_name == content.student_name
+
+
+def test_ADR_0036_telugu_script_names_are_data_and_stay() -> None:
+    """A name recorded in Telugu script is data, not presentation: it is printed as recorded."""
+    content = _content(
+        student_name="రాము",
+        fields=[
+            ContentLine(key="full_name", label_en="Full name", label_te="పూర్తి పేరు", value="రాము")
+        ],
+    )
+    shown = templates.english_only(content)
+    assert shown.student_name == "రాము"
+    assert shown.fields[0].value == "రాము"
+    assert shown.fields[0].label_te == ""
+
+
+def test_ADR_0036_register_page_is_english_only_while_telugu_is_hidden() -> None:
+    for rows in ([["TC/2026-27/0001", "Issued"]], []):
+        page = templates.render_register(
+            templates.RegisterPage(
+                title_en="Transfer certificate register (counterfoil)",
+                title_te="బదిలీ ధృవీకరణ పత్రాల రిజిస్టర్",
+                school_name="Synthetic Model School",
+                school_name_te="కృత్రిమ మోడల్ పాఠశాల",
+                academic_year_label="2026-27",
+                printed_at=dt.datetime(2026, 9, 29, 6, 0, tzinfo=dt.UTC),
+                header=[("Serial no.", "క్రమ సంఖ్య"), ("Remarks", "వ్యాఖ్యలు")],
+                rows=rows,
+                cancelled=[False] * len(rows),
+                empty_en="None",
+                empty_te="లేవు",
+            )
+        )
+        assert "Serial no." in page or "None" in page
+        assert "Academic year: " in page
+        assert not templates_contain_telugu(page)
+        assert "Noto Sans Telugu" not in page
+
+
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_REG_004_register_page_headings_and_cancelled_rows() -> None:
     page = templates.render_register(
         templates.RegisterPage(

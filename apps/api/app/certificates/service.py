@@ -83,6 +83,7 @@ from app.core.errors import (
     ValidationFailed,
 )
 from app.core.ids import new_id
+from app.core.languages import telugu_enabled, telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.pdf import PdfRenderer, get_renderer
 from app.core.records import RecordTable
@@ -126,6 +127,12 @@ GENDER_LABELS: Final = {
     "male": "Male / పురుషుడు",
     "female": "Female / స్త్రీ",
     "transgender": "Transgender / ట్రాన్స్‌జెండర్",
+}
+# English first (ADR-0036): printed while Telugu is hidden.
+GENDER_LABELS_EN: Final = {
+    "male": "Male",
+    "female": "Female",
+    "transgender": "Transgender",
 }
 
 ops.register_outbox_route(RENDER_EVENT, RENDER_TASK)
@@ -373,7 +380,8 @@ def _format_value(key: str, value: str | None) -> str | None:
         except ValueError:
             return value
     if key == "gender":
-        return GENDER_LABELS.get(value, value)
+        labels = GENDER_LABELS if telugu_enabled() else GENDER_LABELS_EN
+        return labels.get(value, value)
     return value
 
 
@@ -438,7 +446,7 @@ def _record(
             PrintedField(
                 key=key,
                 label_en=catalog[key].label_en,
-                label_te=catalog[key].label_te,
+                label_te=telugu_text(catalog[key].label_te) or "",  # ADR-0036
                 value=_format_value(key, raw[key]),
                 source=value.source if value is not None else None,
                 verified=bool(value and value.verified),
@@ -518,7 +526,7 @@ def types_catalog() -> list[CertificateTypeOut]:
                     ChoiceOut(
                         value=c,
                         label_en=cfg.choice_labels[c].en,
-                        label_te=cfg.choice_labels[c].te,
+                        label_te=telugu_text(cfg.choice_labels[c].te) or "",
                     )
                     for c in inp.choices
                 ],
@@ -529,7 +537,7 @@ def types_catalog() -> list[CertificateTypeOut]:
             CertificateTypeOut(
                 key=key,
                 label_en=spec.label_en,
-                label_te=spec.label_te,
+                label_te=telugu_text(spec.label_te) or "",  # empty while hidden (ADR-0036)
                 requires_approval=spec.requires_approval,
                 ends_enrolment=spec.ends_enrolment,
                 printed=list(spec.printed),
@@ -619,7 +627,8 @@ def _letterhead(session: Session) -> dict[str, str]:
 
 
 def _both(en: str, te: str) -> str:
-    return en if not te or te == en else f"{en} / {te}"
+    """``English / Telugu``; English only while Telugu is hidden (ADR-0036)."""
+    return en if not te or te == en or not telugu_enabled() else f"{en} / {te}"
 
 
 def _class_and_year(record: _Record, enrolment: EnrollmentOut | None) -> tuple[str, str]:
@@ -723,7 +732,7 @@ def _build_content(
         )
         for key in spec.official_format_todo
     ]
-    return CertificateContent(
+    content = CertificateContent(
         certificate_type=record.certificate_type,
         title_en=spec.label_en,
         title_te=spec.label_te,
@@ -739,6 +748,9 @@ def _build_content(
         blanks=blanks,
         **_letterhead(session),
     )
+    # English first (ADR-0036): a certificate issued while Telugu is hidden is English only,
+    # and that is what is frozen and hashed.
+    return templates.shown(content)
 
 
 def _content_json(content: CertificateContent) -> tuple[dict[str, Any], bytes]:
@@ -799,7 +811,8 @@ def _out(
         serial=content.serial if content is not None else None,
         student_name=name,
         admission_no=adm,
-        content=content,
+        # The frozen record is kept whole; its Telugu is not shown while hidden (ADR-0036).
+        content=templates.shown(content) if content is not None else None,
         requested_by=row.requested_by,
         requested_at=row.requested_at,
         decided_by=row.decided_by,
@@ -1388,7 +1401,8 @@ def render_pdf(
             acl_roles=settings().document_acl_roles,
             issued_on=issued_on,
             academic_year_id=year_id,
-            language="mixed",
+            # Bilingual while Telugu is shown, English otherwise (ADR-0036).
+            language="mixed" if telugu_enabled() else "en",
         )
         with _db_errors():
             row = repo.update_certificate(
