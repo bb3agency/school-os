@@ -14,7 +14,7 @@ Normative keywords: **MUST / SHOULD / MAY** (RFC 2119). Every requirement has an
 
 ## 1. System summary
 
-A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on AWS ap-south-1 with PostgreSQL (pgvector) as the system of record and S3 for files. An LLM gateway calls Anthropic Claude via commercial API; an embeddings provider interface serves retrieval. It is offered as a managed SaaS in two tiers from one codebase: the **shared tier** (pooled platform) and the **dedicated tier** (one isolated host per school). A control plane (platform admin panel, billing, fleet) runs only in the shared deployment (ADR-0015, ADR-0017). See 04-Architecture §16 and 16-Platform admin panel.
+A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on AWS ap-south-1 with PostgreSQL (pgvector) as the system of record and S3 for files. An LLM gateway calls Google Gemini on Vertex AI in asia-south1 (ADR-0033; Anthropic Claude as a config-selectable fallback); an embeddings provider interface serves retrieval. It is offered as a managed SaaS in two tiers from one codebase: the **shared tier** (pooled platform) and the **dedicated tier** (one isolated host per school). A control plane (platform admin panel, billing, fleet) runs only in the shared deployment (ADR-0015, ADR-0017). See 04-Architecture §16 and 16-Platform admin panel.
 
 ## 2. Technology standards
 
@@ -435,7 +435,8 @@ Every row below is proposed from the roadmap scope (14 · M6; stories US-1801..U
 | Interface | Direction | Protocol | Notes |
 |---|---|---|---|
 | OIDC provider (Cognito reference) | Out | OIDC/OAuth 2.1 | BFF handles code exchange |
-| Anthropic Messages API | Out | HTTPS JSON, streaming | Commercial org API keys; ZDR requested; model IDs in config |
+| Vertex AI Gemini `generateContent` (asia-south1) | Out | HTTPS JSON, streaming (SSE) | Service identity (workload identity federation or service-account key); ZDR configuration checked; provider and model IDs per role in config (ADR-0033) |
+| Anthropic Messages API (fallback only) | Out | HTTPS JSON, streaming | Commercial org API keys; ZDR requested; used only for a role switched back in config |
 | Fleet heartbeat (dedicated host → control plane) | In (to shared) | HTTPS JSON, HMAC-SHA256 signed | `POST /api/v1/fleet/heartbeat`; outbound from host only; no personal data (FR-PLT-024) |
 | Payment provider (Razorpay candidate) | Out | HTTPS | **Proposed only** (ADR-0016); not built; M0 uses manual payments |
 | Email (AWS SES) | Out | AWS SDK | Invites, billing reminders, usage alerts; templates EN/TE. Built: provider interface with a local fake and SES v2, staff invitation emails (queued at invite and on resend, sent by a worker); off by default (`SOS_EMAIL_PROVIDER`) |

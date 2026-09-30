@@ -80,7 +80,7 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0002](ADR-0002-postgresql-pgvector.md) | PostgreSQL with pgvector as the single store of record | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0003](ADR-0003-pool-tenancy-rls.md) | Pool multi-tenancy with row-level security | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013, ADR-0015 |
 | [ADR-0004](ADR-0004-technology-stack.md) | Technology stack | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0014 |
-| [ADR-0005](ADR-0005-llm-gateway-and-provider.md) | LLM gateway and provider (Anthropic Claude) | Accepted (recorded retroactively 2026-09-26) |
+| [ADR-0005](ADR-0005-llm-gateway-and-provider.md) | LLM gateway and provider (Anthropic Claude) | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0033 |
 | [ADR-0006](ADR-0006-embeddings-by-evaluation.md) | Embeddings provider chosen by evaluation | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0007](ADR-0007-no-aadhaar-storage.md) | Never store Aadhaar numbers | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0008](ADR-0008-tools-not-text-to-sql.md) | Read-only typed tools instead of text-to-SQL | Accepted (recorded retroactively 2026-09-26) |
@@ -107,3 +107,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0029](ADR-0029-tenant-data-deletion-at-offboarding.md) | Deleting a school's data at offboarding (purge role, crypto-shredding, certificate) | Accepted |
 | [ADR-0030](ADR-0030-in-house-identity-and-sessions.md) | In-house sign-in, MFA and sessions (replacing the managed OIDC provider) | Proposed |
 | [ADR-0032](ADR-0032-tally-edge-agent.md) | Tally edge agent, device credentials and the `get_fee_dues` tool (M6) | Proposed |
+| [ADR-0033](ADR-0033-gemini-on-vertex-ai-for-all-llm-roles.md) | Google Gemini on Vertex AI for every LLM role (amends ADR-0005) | Accepted |

@@ -26,7 +26,7 @@ flowchart LR
   operator[Platform operator team] -->|HTTPS + MFA<br/>admin host| cp[SchoolOS control plane<br/>in shared deployment]
   sos -. heartbeat from dedicated hosts .-> cp
   sos -->|OIDC| idp[Identity provider<br/>Cognito reference]
-  sos -->|Messages API| llm[Anthropic Claude API]
+  sos -->|Vertex AI generateContent<br/>asia-south1| llm[Google Gemini on Vertex AI]
   sos -->|Embeddings API| emb[Embeddings provider]
   sos -->|OCR/extraction| ocr[OCR provider]
   agent[Edge agent on office PC<br/>M6] -->|HTTPS outbound| sos
@@ -61,7 +61,7 @@ flowchart TB
   ui --> waf
   api --> gw{{LLM gateway module}}
   worker --> gw
-  gw --> llm[(Anthropic API)]
+  gw --> llm[(Vertex AI Gemini, asia-south1)]
   worker --> emb[(Embeddings API)]
   worker --> ocr[(OCR API)]
 ```
@@ -215,8 +215,8 @@ sequenceDiagram
   A->>G: call answer model with tool definitions
   G-->>A: tool calls (e.g., find_students, search_documents)
   A->>DB: execute tools under user scope (RLS + scoped repositories)
-  A->>G: tool results as search_result blocks (max 3 tool rounds)
-  G-->>A: streamed text + citations
+  A->>G: tool results as numbered passages (max 3 tool rounds)
+  G-->>A: streamed text + [n] passage markers mapped to citations
   A->>A: validate citations against retrieved sources, redact
   A-->>W: SSE tokens + citation events
   A->>DB: kb_queries log + audit event
@@ -312,7 +312,7 @@ Never cache AI answers across users. Never build cache keys without `tenant_id`.
 | DB | PostgreSQL + pgvector | One store for relational, FTS, vectors; RLS | Separate vector DB |
 | Files | S3 | Durable, lifecycle, Object Lock | GCS, Azure Blob |
 | Identity | OIDC provider (Cognito ref.) | Managed MFA and account security | Keycloak, Auth0 |
-| LLM | Anthropic Claude via gateway | Tool use, citations via search results, ZDR option | Other providers via same gateway |
+| LLM | Google Gemini on Vertex AI via gateway (ADR-0033) | India region (asia-south1), low cost Flash/Flash-Lite, tool use, structured output, ZDR configuration | Anthropic Claude (config-selectable fallback), other providers via same gateway |
 | Embeddings | Provider interface; Voyage as default candidate | Multilingual retrieval models; chosen by eval | Open-source multilingual models self-hosted |
 | PDF | Chromium (Playwright) | Correct Telugu shaping, CSS print | WeasyPrint |
 | IaC/CI | Terraform + GitHub Actions | Standard, reviewable, OIDC to AWS | Pulumi, CDK |

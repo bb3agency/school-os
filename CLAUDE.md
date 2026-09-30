@@ -37,7 +37,7 @@ Reference requirement IDs (e.g. `FR-STU-004`, `SEC-012`) in commit messages, PR 
 - **Files:** S3 (ap-south-1), private buckets, SSE-KMS, presigned URLs (SeaweedFS locally and in CI; ADR-0014)
 - **Web:** Next.js (App Router) + TypeScript strict + Tailwind; BFF pattern (tokens never reach browser JS); i18n `en` + `te`
 - **PDF:** HTML/CSS templates rendered by headless Chromium (Playwright) in workers; bundled Noto Sans Telugu
-- **LLM:** Anthropic Claude via commercial API keys, only through `app/knowledge/gateway/` (see ADR-0005)
+- **LLM:** Google Gemini on Vertex AI (regional endpoint `asia-south1`, service identity, Zero Data Retention set-up), only through `app/knowledge/gateway/` (ADR-0005, ADR-0033); provider and model per role in `app/knowledge/config/models.yaml`; Anthropic Claude kept as a config-selectable fallback
 - **Embeddings:** provider interface in `app/knowledge/embeddings/`; model chosen by evaluation (ADR-0006)
 - **Identity:** OIDC provider behind `app/identity/` (reference: Amazon Cognito, ADR-0012; MFA and step-up per ADR-0018); operators use a separate OIDC client
 - **Infra:** Terraform, AWS ap-south-1 (Mumbai), backups copied to ap-south-2 (Hyderabad); GitHub Actions; dedicated-tier hosts run `deploy/dedicated/compose.yaml` (ADR-0015)
@@ -114,9 +114,9 @@ Also: `make down`, `make logs`, `make db-shell`, `make format`. The dev OIDC stu
 5. **No PII in logs, traces, metrics, error reports or analytics.** Use structured logging with `redact()`. IDs yes, names/DOB/phones no.
 6. **Never auto-correct official records.** Mismatches create `dq_findings`. Identity-field changes go through `changes` (maker-checker) with an evidence document. The admission register is the legal anchor (BR-01).
 7. **Audit everything that matters** (identity data changes, role/permission changes, exports, AI queries, break-glass, logins) in the **same transaction**, via `audit.record()`; control-plane actions via `audit.record_platform()`. The audit tables are append-only (DB grants + triggers, including `TRUNCATE`).
-8. **AI must be grounded.** Retrieval filters by tenant and permissions **in SQL before ranking**. The LLM never receives data the user cannot see. Answers cite sources (search_result blocks) or say "not found in school records". Citations are validated server-side.
+8. **AI must be grounded.** Retrieval filters by tenant and permissions **in SQL before ranking**. The LLM never receives data the user cannot see. Answers cite the passages they were given (validated passage markers such as `[n]`, or the provider's native citations) or say "not found in school records". Citations are validated server-side: every citation must map to a passage given in that request that the caller can see, and unsupported statements are dropped or answered search-only.
 9. **LLM tools are read-only in core.** Any write suggested by AI requires a human to confirm through normal endpoints.
-10. **Secrets** come from environment/Secrets Manager only. Product code uses **API keys**, never a personal/consumer AI subscription. Request Zero Data Retention for the production API organization.
+10. **Secrets** come from environment/Secrets Manager only. Product code authenticates to AI providers with a **service identity**: Vertex AI through workload identity federation or a service-account key from Secrets Manager (organization API keys for a fallback provider), never a personal/consumer account, login or subscription. Production uses Vertex AI with the Zero Data Retention configuration (project data caching disabled, no request-response logging, abuse-monitoring logging exception requested; docs/10 §11.1).
 11. **No real student data** in dev, test, staging, fixtures, screenshots, or AI coding sessions. Use `make seed-synthetic`.
 12. **Migrations are backward compatible** (expand → migrate → contract). Each migration has a downgrade or is marked irreversible with reason.
 13. **Model IDs, provider names, thresholds and prompts live in config/versioned files**, not inline in code.

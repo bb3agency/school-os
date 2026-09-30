@@ -54,7 +54,7 @@ only on the internal network, where the BFF calls it with the signed service tok
 | Platform host name (`domain`), optional school `custom_domain`, `acme_email` | tfvars |
 | Release `release_version` + `bundle_sha256` (from CI release notes) | tfvars |
 | Shared prod outputs: `artifacts_bucket`, `artifacts_kms_key_arn`, `control_plane_url` | tfvars |
-| Anthropic API key (ZDR organisation) and the heartbeat key ID + key (shown once by the panel) | Secrets Manager, after apply |
+| Heartbeat key ID + key (shown once by the panel); when the school has AI: the Vertex AI credential JSON `SOS_LLM_GCP_CREDENTIALS_JSON` (workload identity config, ADR-0033; docs/10 §11.1) and, only for an Anthropic fallback role, the Anthropic API key (ZDR organisation) | Secrets Manager, after apply |
 
 Terraform writes the non-secret host settings to `/etc/schoolos/host.env` under the names the app reads
 (`apps/api/app/core/config.py`; list in `.env.template`): `SOS_KMS_DATA_KEY_ARN` (the school's CMK, wraps
@@ -82,6 +82,8 @@ start-up checks. `apps/api/tests/deploy/test_env_contract.py` fails CI if a name
    aws secretsmanager put-secret-value --secret-id "$(terraform output -raw operator_secret_arn)" \
      --secret-string file://operator.json
    # operator.json: {"SOS_ANTHROPIC_API_KEY":"...","SOS_HEARTBEAT_KEY_ID":"hb-...","SOS_HEARTBEAT_KEY":"..."}
+   # with AI (ADR-0033): add "SOS_LLM_GCP_CREDENTIALS_JSON":"<jq -c of the workload identity config>" and set
+   # SOS_LLM_GCP_PROJECT, SOS_LLM_GCP_CREDENTIALS_SOURCE=workload-identity, SOS_LLM_ZDR_CONFIRMED=true in host.env
    shred -u operator.json
    ```
 4. **DNS:** `terraform output dns_instructions`. Create the platform A record, or let Route 53 do it.
