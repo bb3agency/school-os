@@ -47,6 +47,7 @@ from app.knowledge.gateway.errors import AiDisabled
 from app.knowledge.gateway.factory import ProviderModeError, build_gateway, build_transport
 from app.knowledge.gateway.fake import NOT_FOUND_EN, NOT_FOUND_TE, FakeTransport
 from app.knowledge.gateway.fake_gemini import GeminiWireFake
+from app.knowledge.gateway.fake_language import ENGLISH_ONLY, ENGLISH_STAND_IN
 from app.knowledge.gateway.gateway import Gateway
 from app.knowledge.gateway.metering import RecordingSink
 from app.knowledge.gateway.transport import MessagesRequest, Transport, TransportError
@@ -93,17 +94,19 @@ def blocks() -> tuple[Block, ...]:
     )
 
 
-def run_fake_ask(question: str, results: tuple[Block, ...]) -> tuple[Any, Any]:
+def run_fake_ask(
+    question: str, results: tuple[Block, ...], system: str = "system"
+) -> tuple[Any, Any]:
     gw = gateway_with(FakeTransport())
     metering = Metering(TENANT, "ask")
-    first = gw.run_turn(metering, "answer", "system", [UserMessage(question)], [SEARCH])
+    first = gw.run_turn(metering, "answer", system, [UserMessage(question)], [SEARCH])
     (call,) = first.tool_calls
     conversation: list[ConversationItem] = [
         UserMessage(question),
         AssistantMessage(first),
         ToolResultsMessage((ToolOutcome(call.call_id, results),)),
     ]
-    return first, gw.run_turn(metering, "answer", "system", conversation, [SEARCH])
+    return first, gw.run_turn(metering, "answer", system, conversation, [SEARCH])
 
 
 def test_FR_KB_005_fake_searches_then_answers_with_citations_from_the_given_sources() -> None:
@@ -135,6 +138,24 @@ def test_FR_KB_006_fake_says_not_found_in_the_question_script(question: str, exp
     _, answer = run_fake_ask(question, ())
     assert [s.text for s in answer.segments] == [expected]
     assert answer.segments[0].citations == ()
+
+
+@pytest.mark.parametrize("question", ["పరీక్షలు ఎప్పుడు?", "DEO circular లో exam ఎప్పుడు?"])
+def test_english_first_fake_follows_the_english_only_prompt(question: str) -> None:
+    """ADR-0036: under the English-first prompt the offline stand-in writes no Telugu: "not
+    found" in English, and a Telugu passage is described in English and cited, not copied."""
+    system = f"Rules: {ENGLISH_ONLY}."
+    _, missing = run_fake_ask(question, (), system)
+    assert [s.text for s in missing.segments] == [NOT_FOUND_EN]
+    telugu_block = Block(
+        source=f"sos://doc/{uuid.uuid4()}/v1#p1",
+        title="పరీక్షల షెడ్యూల్",
+        text="పరీక్షలు 22/09/2026న ప్రారంభమవుతాయి.",
+    )
+    _, answer = run_fake_ask(question, (telugu_block,), system)
+    (segment,) = answer.segments
+    assert segment.text == ENGLISH_STAND_IN
+    assert segment.citations[0].cited_text == telugu_block.text
 
 
 def test_FR_KB_003_fake_structured_output_satisfies_the_schema() -> None:

@@ -13,7 +13,7 @@ from typing import Final
 from pydantic import Field, field_validator
 
 from app.knowledge.config._base import CONFIG_DIR, ConfigModel, read_yaml
-from app.knowledge.config.circulars import PromptRef
+from app.knowledge.config.circulars import LanguagePrompts, PromptRef
 
 PATH: Final = CONFIG_DIR / "conversations.yaml"
 
@@ -21,6 +21,9 @@ PATH: Final = CONFIG_DIR / "conversations.yaml"
 class Titles(ConfigModel):
     derived_max_chars: int = Field(ge=20, le=120)
     max_chars: int = Field(ge=20, le=200)
+    english_fallback: str = Field(default="New conversation", min_length=3, max_length=60)
+    """English first (ADR-0036): the derived title of a question written in Telugu script
+    while Telugu is hidden (the question itself is kept as written)."""
 
 
 class Revisions(ConfigModel):
@@ -39,8 +42,7 @@ class SummaryConfig(ConfigModel):
     max_input_chars: int = Field(ge=1000, le=50_000)
 
 
-class FollowupsConfig(ConfigModel):
-    prompt: PromptRef
+class FollowupsConfig(LanguagePrompts):
     max_questions: int = Field(ge=0, le=5)
     max_chars: int = Field(ge=20, le=300)
     max_answer_chars: int = Field(ge=200, le=8000)

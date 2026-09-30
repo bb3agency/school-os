@@ -236,6 +236,24 @@ def test_ADR_0034_remember_that_saves_at_once_and_never_asks_the_answer_model(
     assert "I prefer answers in Telugu" not in str(body["messages"])
 
 
+def test_english_first_a_telugu_remember_instruction_gets_the_english_reply(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """ADR-0036: the fixed reply is English while Telugu is hidden (the note is the user's own
+    words, kept as written); the Telugu reply is used only with SOS_TELUGU_ENABLED on."""
+    who = _person(admin_engine, world)
+    events = _ask(api, who, "గుర్తుంచుకోండి: I prefer short answers")
+    final = _first(events, "final")
+    assert final is not None
+    assert final["text"] == f"{REPLIES.saved.en} I prefer short answers"
+    assert _first(events, "meta")["language"] == "en"
+    K.install_runtime(telugu=True)
+    events = _ask(api, who, "గుర్తుంచుకోండి: I teach class IX-A")
+    final = _first(events, "final")
+    assert final is not None
+    assert final["text"] == f"{REPLIES.saved.te} I teach class IX-A"
+
+
 def test_ADR_0034_remember_refuses_details_about_others(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:

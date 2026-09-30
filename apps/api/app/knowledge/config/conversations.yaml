@@ -9,6 +9,9 @@ version: 1
 titles:
   derived_max_chars: 60      # a new conversation: its first question cut at a word boundary
   max_chars: 120             # a title the user sets (PATCH)
+  # English first (ADR-0036): while SOS_TELUGU_ENABLED is off, a first question written in Telugu
+  # script gets this title instead (the question itself is kept as the user wrote it).
+  english_fallback: "New conversation"
 
 # Regenerate and edit-and-resend (POST /knowledge/ask regenerate_of / edit_of): only one of the
 # caller's own last N messages of the conversation (older ones answer 409 message_not_revisable).
@@ -31,8 +34,11 @@ summary:
 
 # Follow-up suggestions after an answered question (role followups; one call also suggests at most
 # one memory item). Not made in search-only mode, for "not found", or when the budget is used up.
+# English first (ADR-0036): `prompt` writes English follow-ups whatever the question's language;
+# `telugu_prompt` (the question's language) is used only while SOS_TELUGU_ENABLED is on.
 followups:
-  prompt: {id: followups, version: 1}
+  prompt: {id: followups, version: 2}
+  telugu_prompt: {id: followups, version: 1}
   max_questions: 3
   max_chars: 120             # a longer suggestion is dropped
   max_answer_chars: 2000     # of the checked answer sent with the recent questions
@@ -54,6 +60,7 @@ memory:
     - "గుర్తుంచుకో:"
     - "గుర్తుంచుకోండి:"
     - "gurthunchuko"
+  # Fixed replies: `en` always; `te` only while SOS_TELUGU_ENABLED is on (ADR-0036).
   replies:
     saved:
       en: "Saved to your memory:"

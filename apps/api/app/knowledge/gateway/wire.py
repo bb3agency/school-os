@@ -136,7 +136,8 @@ def user_texts(item: UserMessage, rules: Conversation | None) -> list[str]:
         if earlier is not None:
             texts.append(earlier)
         if item.asked_as:
-            texts.append(f"{rules.rewritten_header}\n{item.asked_as}")
+            header = rules.rewritten_header_english if item.english else rules.rewritten_header
+            texts.append(f"{header}\n{item.asked_as}")
     texts.append(item.text)
     return texts
 

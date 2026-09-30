@@ -4,8 +4,12 @@
 # prompt version or a limit needs a passing `make eval` (docs/06 §13; circular gates in gates.toml).
 version: 1
 
+# English first (ADR-0036): `prompt` is used while SOS_TELUGU_ENABLED is off (the default): an
+# English summary, titles and details only. `telugu_prompt` is the bilingual prompt, dormant until
+# Telugu is switched back on (still evaluated by `make eval`, which runs it with the switch on).
 reading:
-  prompt: {id: circular_reading, version: 1}
+  prompt: {id: circular_reading, version: 2}
+  telugu_prompt: {id: circular_reading, version: 1}
   # Only the circular's own indexed (Aadhaar-masked) passages are sent, in order, up to these
   # limits; a longer circular is read from its start and the reading says it was cut.
   max_passages: 60
@@ -20,9 +24,13 @@ reading:
   max_quote_chars: 400
   # Characters of a passage shown with a summary citation chip.
   snippet_chars: 240
+  # While Telugu is hidden, a deadline title written in Telugu script is shown as this instead
+  # (the suggestion's quote still shows the circular's own words).
+  english_title_fallback: "Action needed by this date (see the quoted sentence)"
 
 notice:
-  prompt: {id: parent_notice, version: 1}
+  prompt: {id: parent_notice, version: 2}          # English only (title_en, body_en)
+  telugu_prompt: {id: parent_notice, version: 1}   # EN + TE, while SOS_TELUGU_ENABLED is on
   # A notice is drafted from the circular's passages (and the deadlines staff confirmed) or from
   # staff text; never from student records (FR-NOTICE-001).
   max_input_chars: 12000

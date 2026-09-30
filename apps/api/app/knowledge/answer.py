@@ -20,6 +20,11 @@
    passages the model was given (§9 rule 3).
 4. **Output sanitising** (§9 rule 5, SEC-019): HTML tags and any link other than ``sos://``
    are removed from the model's text; Aadhaar numbers are masked (the gateway also masks).
+   **English first** (ADR-0036): while Telugu is hidden (``SOS_TELUGU_ENABLED`` off, the
+   default) the prompt asks for English whatever the question's script, the answer's
+   ``language`` is ``en``, the streamed preview stops before any Telugu script, and an answer
+   that still contains Telugu script is replaced by the search-only view (its cited passages,
+   the school's own text). A Telugu or code-mixed question is accepted and searched as written.
 5. **Fallback** (§12, §15; FR-KB-011): a gateway refusal that allows it (budget exhausted,
    school switch off, rate limit, outage) answers search-only: ranked, cited passages without
    generated prose.
@@ -105,6 +110,17 @@ def detect_language(text: str) -> Locale:
     if telugu and latin:
         return "mixed"
     return "te" if telugu else "en"
+
+
+def answer_language(question_language: Locale, *, telugu: bool) -> Locale:
+    """The answer's language (ADR-0036): the question's style only while Telugu is switched on
+    (``app.core.languages.telugu_enabled``); otherwise always English."""
+    return question_language if telugu else "en"
+
+
+def has_telugu(text: str) -> bool:
+    """True when ``text`` contains Telugu script (U+0C00-U+0C7F)."""
+    return bool(_TELUGU.search(text))
 
 
 def normalise(text: str) -> str:
@@ -257,11 +273,18 @@ class PreviewSanitiser:
     Holds back the unfinished last word, an HTML tag without its ``>`` and a markdown link
     without its ``)``, then applies :func:`sanitise` to whole words only, so a link or tag is
     never shown in pieces (the gateway has already masked Aadhaar numbers across deltas).
-    Beyond ``max_pending`` held characters it emits what it has, sanitised."""
+    Beyond ``max_pending`` held characters it emits what it has, sanitised.
 
-    def __init__(self, max_pending: int, progress: Progress | None = None) -> None:
+    With ``english_only`` (Telugu hidden, ADR-0036) the preview stops for good before the first
+    Telugu character: the validated ``final`` answer replaces the preview anyway."""
+
+    def __init__(
+        self, max_pending: int, progress: Progress | None = None, *, english_only: bool = False
+    ) -> None:
         self._max = max_pending
         self._pending = ""
+        self._english_only = english_only
+        self._stopped = False
         self.progress = progress or Progress()
 
     def feed(self, text: str) -> str:
@@ -270,11 +293,19 @@ class PreviewSanitiser:
         if cut == 0 and len(self._pending) > self._max:
             cut = len(self._pending)
         out, self._pending = self._pending[:cut], self._pending[cut:]
-        return sanitise(out) if out else ""
+        return self._shown(sanitise(out)) if out else ""
 
     def flush(self) -> str:
         out, self._pending = self._pending, ""
-        return sanitise(out) if out else ""
+        return self._shown(sanitise(out)) if out else ""
+
+    def _shown(self, text: str) -> str:
+        if self._stopped:
+            return ""
+        if self._english_only and (m := _TELUGU.search(text)):
+            self._stopped = True
+            return text[: m.start()]
+        return text
 
     @staticmethod
     def _safe_cut(text: str) -> int:
@@ -353,13 +384,22 @@ class AnswerEngine:
         config: LlmConfig,
         prompt: PromptTemplate,
         final_k: int = FALLBACK_RESULTS,
+        telugu: bool = False,
     ) -> None:
+        """``telugu``: ``app.core.languages.telugu_enabled()`` of the runtime's settings
+        (ADR-0036); with it off (the default) ``prompt`` must be the English-only prompt."""
         self._gateway = gateway
         self._tools = tools
         self._search = search
         self._config = config
         self._prompt = prompt
         self._final_k = final_k
+        self._telugu = telugu
+
+    @property
+    def telugu(self) -> bool:
+        """Whether answers may be in Telugu (``SOS_TELUGU_ENABLED``, ADR-0036)."""
+        return self._telugu
 
     # --- prompt -------------------------------------------------------------------------------
 
@@ -486,7 +526,7 @@ class AnswerEngine:
         context: AskContext | None,
         steps: bool,
     ) -> Generator[TextDelta | StepUpdate, None, Answer]:
-        language = detect_language(question)
+        language = answer_language(detect_language(question), telugu=self._telugu)
         context = context or AskContext()
         search_text = context.standalone or question
         tools = offered(self._tools, ctx, session)
@@ -506,11 +546,16 @@ class AnswerEngine:
                 summary=context.summary,
                 memory=context.memory,
                 asked_as=question if context.standalone else None,
+                english=not self._telugu,
             )
         ]
         metering = Metering(tenant_id=ctx.tenant_id, feature="ask", query_id=query_id)
         system = self.system_prompt(ctx, school_name)
-        preview = PreviewSanitiser(self._config.streaming.preview_max_pending_chars, progress)
+        preview = PreviewSanitiser(
+            self._config.streaming.preview_max_pending_chars,
+            progress,
+            english_only=not self._telugu,
+        )
         try:
             for round_no in range(limits.max_tool_rounds + 1):
                 if stream:
@@ -622,6 +667,17 @@ class AnswerEngine:
                 segments=(AnswerSegment(self._not_found(language)),),
                 uncited_factual=len(uncited),
             )
+        if not self._telugu and any(has_telugu(s.text) for s in segments):
+            # ADR-0036: Telugu is hidden, so model prose in Telugu script is never shown; the
+            # cited passages (the school's own text) are, as in search-only mode.
+            log.warning(
+                "kb.answer.not_english",
+                tenant_id=ctx.tenant_id,
+                resource_type="kb_query",
+                resource_id=query_id,
+                count=sum(1 for s in segments if has_telugu(s.text)),
+            )
+            return self._search_only_from(base, provided, uncited=len(uncited))
         threshold = self._config.answer_checks.max_uncited_factual_fraction
         if factual and len(uncited) / len(factual) > threshold:
             log.warning(
@@ -667,7 +723,9 @@ class AnswerEngine:
     # --- results ------------------------------------------------------------------------------
 
     def _not_found(self, language: Locale) -> str:
-        # Telugu for any question written with Telugu script (FR-KB-006; code-mixed accepts either).
+        # Telugu for any question written with Telugu script (FR-KB-006; code-mixed accepts
+        # either), and only while Telugu is switched on: ``language`` is the answer's language,
+        # always "en" while it is hidden (ADR-0036).
         texts = self._config.answer_checks.not_found
         return texts.en if language == "en" else texts.te
 
@@ -766,9 +824,11 @@ __all__ = [
     "PreviewSanitiser",
     "Progress",
     "ToolRun",
+    "answer_language",
     "cited_sources",
     "detect_language",
     "elapsed_ms",
+    "has_telugu",
     "is_factual",
     "normalise",
     "sanitise",
