@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { hasLocale } from "next-intl";
 import { getTranslations } from "next-intl/server";
-import { routing } from "@/i18n/routing";
+import { uiLocale } from "@/i18n/languages";
 
 type Translator = Awaited<ReturnType<typeof getTranslations<never>>>;
 
@@ -16,9 +15,8 @@ export function pageMetadata(select: (t: Translator) => string) {
     params: Promise<{ locale: string }>;
   }): Promise<Metadata> {
     const { locale } = await params;
-    const t = await getTranslations({
-      locale: hasLocale(routing.locales, locale) ? locale : routing.defaultLocale,
-    });
+    // ADR-0036: Telugu titles only while Telugu is switched on.
+    const t = await getTranslations({ locale: uiLocale(locale) });
     return { title: select(t) };
   };
 }

@@ -18,6 +18,7 @@ import { Table, TableScroll, TBody, THead, Td, Th, Tr } from "@/components/ui/Ta
 import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { CR_APPROVE, CR_REQUEST, ifMatch } from "@/features/change-requests/types";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
@@ -55,9 +56,20 @@ const resolveSchema = z
 /** API: 3–1000 characters (docs/09 data quality). */
 const waiveSchema = z.object({ reason: text(1000, 3) });
 
-/** English and Telugu side by side: the office often explains a finding to parents. */
+/**
+ * English and Telugu side by side: the office often explains a finding to parents. English
+ * only while Telugu is switched off (ADR-0036).
+ */
 function BothLanguages({ text: message }: { text: Bilingual }) {
   const locale = useLocale();
+  const telugu = useTeluguEnabled();
+  if (!telugu) {
+    return (
+      <div className="space-y-1">
+        <p lang="en">{message.en}</p>
+      </div>
+    );
+  }
   const [primary, secondary] =
     locale === "te"
       ? ([
@@ -87,9 +99,10 @@ function correctionHref(finding: Finding): string {
 }
 
 /**
- * One finding (US-502, FR-DQ-020): explanation in English and Telugu, the values per source
- * (masked where sensitive), suggested corrections, history, and resolve (note or change
- * request) or waive (reason; step-up MFA, the API answers 428 and the app re-authenticates).
+ * One finding (US-502, FR-DQ-020): explanation in English (and Telugu while it is switched
+ * on, ADR-0036), the values per source (masked where sensitive), suggested corrections,
+ * history, and resolve (note or change request) or waive (reason; step-up MFA, the API
+ * answers 428 and the app re-authenticates).
  */
 export function FindingDetailScreen({ findingId }: { findingId: string }) {
   const t = useTranslations("findings");

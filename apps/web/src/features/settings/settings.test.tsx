@@ -144,7 +144,8 @@ describe("school settings (FR-TEN-012)", () => {
         settings: { ...SETTINGS, ai_features_enabled: false },
         version: 8,
       });
-    renderWithIntl(<SchoolSettingsScreen />);
+    // Telugu switched on explicitly (ADR-0036): the languages group is titled for it only then.
+    renderWithIntl(<SchoolSettingsScreen />, { telugu: true });
     const ai = await screen.findByRole("region", { name: en.groups.ai.title });
     expect(screen.getByRole("region", { name: en.groups.languages.title })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: en.groups.session.title })).toBeInTheDocument();
@@ -181,7 +182,8 @@ describe("school settings (FR-TEN-012)", () => {
 
   it("sends nothing when nothing changed, and checks values before sending", async () => {
     school([MANAGE]);
-    renderWithIntl(<SchoolSettingsScreen />);
+    // Telugu switched on explicitly (ADR-0036): the language choice is shown only then.
+    renderWithIntl(<SchoolSettingsScreen />, { telugu: true });
     await userEvent.click(await screen.findByRole("button", { name: en.form.save }));
     expect(await screen.findByText(en.form.nothingChanged)).toBeInTheDocument();
 
@@ -195,6 +197,34 @@ describe("school settings (FR-TEN-012)", () => {
     expect(screen.getByText(messages.en.validation.chooseOption)).toBeInTheDocument();
     expect(idle).toHaveAttribute("aria-invalid", "true");
     expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(0);
+  });
+
+  it("with Telugu switched off, no language choice is shown or sent (ADR-0036)", async () => {
+    school([MANAGE]);
+    stub.routes["PATCH /bff/api/v1/tenant"] = () =>
+      Response.json({ ...TENANT, settings: { ...SETTINGS, idle_timeout_minutes: 20 }, version: 8 });
+    const { container } = renderWithIntl(<SchoolSettingsScreen />);
+    const idle = await screen.findByLabelText(en.form.idleField);
+    const off = messages.englishOnly.schoolSettings;
+    expect(screen.getByRole("region", { name: off.groups.languages.title })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: en.form.languagesField })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "English" })).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    await userEvent.clear(idle);
+    await userEvent.type(idle, "20");
+    await userEvent.click(screen.getByRole("button", { name: en.form.save }));
+    await waitFor(() => expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(1));
+    expect(JSON.parse(stub.callsTo("PATCH /bff/api/v1/tenant")[0]?.body ?? "{}")).toEqual({
+      idle_timeout_minutes: 20,
+    });
+  });
+
+  it("with Telugu switched off, the read-only settings list no languages (ADR-0036)", async () => {
+    school(["student.read_basic"]);
+    const { container } = renderWithIntl(<SchoolSettingsScreen />);
+    expect(await screen.findByText("15 minutes")).toBeInTheDocument();
+    expect(screen.queryByText(en.form.languagesField)).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
   });
 
   it("on 412 says someone else changed the settings and reloads the latest on request", async () => {

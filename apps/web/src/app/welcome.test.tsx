@@ -28,9 +28,9 @@ import WelcomePage from "./[locale]/welcome/page";
 
 const SECTIONS = ["features", "how", "security", "plans", "faq"] as const;
 
-function render(locale: Locale) {
+function render(locale: Locale, telugu = locale === "te") {
   pathname = `/${locale}/welcome`;
-  return renderWithIntl(<WelcomePage />, locale);
+  return renderWithIntl(<WelcomePage />, { locale, telugu });
 }
 
 describe("welcome page (public product page)", () => {
@@ -86,7 +86,8 @@ describe("welcome page (public product page)", () => {
   }
 
   it("has landmarks, a skip link first, and a language switch that keeps the page", () => {
-    const { container } = render("en");
+    // Telugu switched on explicitly (ADR-0036): the language switch exists only then.
+    const { container } = render("en", true);
     const first = container.querySelector("a");
     expect(first).toHaveTextContent(messages.en.common.skipToContent);
     expect(first).toHaveAttribute("href", "#main");
@@ -98,6 +99,15 @@ describe("welcome page (public product page)", () => {
       "href",
       "/te/welcome",
     );
+  });
+
+  it("with Telugu switched off: no language switch and no Telugu anywhere (ADR-0036)", () => {
+    const { container } = render("en");
+    expect(intlErrors).toEqual([]);
+    expect(screen.queryByRole("navigation", { name: messages.en.language.label })).toBeNull();
+    expect(container.querySelector("[hreflang='te'], [lang='te'], a[href^='/te']")).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/[\u0C00-\u0C7F]|Telugu/);
+    expect(screen.getByText(messages.englishOnly.welcome.faq.language.a)).toBeInTheDocument();
   });
 
   it("the FAQ uses native disclosures, closed by default", () => {

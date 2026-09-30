@@ -232,11 +232,17 @@ export function dueState(
 }
 
 /**
- * The approved notice as plain text for WhatsApp-style parent groups: English, then Telugu,
- * each title on its own line. No links, no names: exactly what the school approved.
+ * The approved notice as plain text for WhatsApp-style parent groups: English, then Telugu
+ * (only while Telugu is switched on, ADR-0036), each title on its own line. No links, no
+ * names: exactly what the school approved.
  */
-export function noticeText(notice: Pick<Notice, "title_en" | "body_en" | "title_te" | "body_te">) {
-  return [notice.title_en, notice.body_en, "", notice.title_te, notice.body_te]
+export function noticeText(
+  notice: Pick<Notice, "title_en" | "body_en" | "title_te" | "body_te">,
+  { telugu = false }: { telugu?: boolean } = {},
+) {
+  const lines = [notice.title_en, notice.body_en];
+  if (telugu) lines.push("", notice.title_te, notice.body_te);
+  return lines
     .map((line) => line.trim())
     .join("\n")
     .trim();
@@ -256,21 +262,30 @@ export const taskSchema = confirmSchema.extend({
   details: z.string().trim().max(2000, { error: "tooLong" }),
 });
 
-/** A notice's four texts (both languages must be filled before approval, FR-NOTICE-004). */
-export const noticeSchema = z.object({
+/** A notice's English texts: all a notice has while Telugu is switched off (ADR-0036). */
+export const noticeEnglishSchema = z.object({
   title_en: z.string().trim().max(120, { error: "tooLong" }),
   body_en: z.string().trim().max(1500, { error: "tooLong" }),
+});
+
+/** A notice's four texts (both languages must be filled before approval, FR-NOTICE-004). */
+export const noticeSchema = noticeEnglishSchema.extend({
   title_te: z.string().trim().max(120, { error: "tooLong" }),
   body_te: z.string().trim().max(1500, { error: "tooLong" }),
 });
 
-/** True when every title and body is filled (the API refuses approval otherwise). */
+/**
+ * True when every title and body is filled (the API refuses approval otherwise): English, and
+ * Telugu too only while Telugu is switched on (ADR-0036).
+ */
 export function noticeComplete(
-  notice: Pick<Notice, "title_en" | "body_en" | "title_te" | "body_te">,
+  notice: Pick<Notice, "title_en" | "body_en"> & Partial<Pick<Notice, "title_te" | "body_te">>,
+  { telugu = false }: { telugu?: boolean } = {},
 ): boolean {
-  return [notice.title_en, notice.body_en, notice.title_te, notice.body_te].every(
-    (value) => value.trim().length > 0,
-  );
+  const texts = telugu
+    ? [notice.title_en, notice.body_en, notice.title_te ?? "", notice.body_te ?? ""]
+    : [notice.title_en, notice.body_en];
+  return texts.every((value) => value.trim().length > 0);
 }
 
 /** Phone numbers, emails and 12-digit numbers never go into a parent notice (FR-NOTICE-002). */

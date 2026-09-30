@@ -29,6 +29,7 @@ LOWER_IS_BETTER = frozenset(
         "fee_guessed_link_count",
         "ctx_leakage_count",
         "conversation_leakage_count",
+        "english_first_telugu_outputs",
         "conversation_scope_violations",
     }
 )
@@ -172,6 +173,8 @@ def to_markdown(report: Report) -> str:
     lines += _contextual_lines(report.run) or ["Not measured."]
     lines += ["", "## Ask conversations (ADR-0034)", ""]
     lines += _conversation_lines(report.run) or ["Not measured."]
+    lines += ["", "## English first, Telugu hidden (ADR-0036)", ""]
+    lines += _english_first_lines(report.run) or ["Not measured."]
     return "\n".join(lines) + "\n"
 
 
@@ -308,6 +311,25 @@ def _conversation_lines(run: RunResult) -> list[str]:
             problems.append("memory preference not applied")
         if problems:
             lines.append(f"- `{o.id}` step {o.step} ({o.category}): " + "; ".join(problems))
+    return lines
+
+
+def _english_first_lines(run: RunResult) -> list[str]:
+    if not run.english_first_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- With SOS_TELUGU_ENABLED off: {m.english_first_items} probes, "
+        f"{m.english_first_fields} shown texts · Telugu outputs "
+        f"{fmt(m.english_first_telugu_outputs)} · English answers "
+        f"{fmt(m.english_first_english_answer_rate)}",
+    ]
+    for o in run.english_first_outcomes:
+        if o.telugu_fields or o.english_answer is False:
+            problems = list(o.telugu_fields[:5])
+            if o.english_answer is False:
+                problems.append("answer not in English")
+            lines.append(f"- `{o.id}` ({o.kind}): " + ", ".join(problems))
     return lines
 
 

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { useSectionOptions, type SectionOption } from "@/features/findings/data";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { uuid } from "@/lib/validation";
 import { profileName } from "./data";
 import {
@@ -245,7 +246,10 @@ export function LanguageField({ errors }: { errors: Record<string, string> }) {
   const tl = useTranslations("exports.language");
   const locale = useLocale();
   const errorId = useId();
+  const telugu = useTeluguEnabled();
   const initial: ExportLanguage = locale === "te" ? "te" : "en";
+  // ADR-0036: while Telugu is switched off every file is in English; nothing to choose.
+  if (!telugu) return <input type="hidden" name="language" value="en" />;
   return (
     <fieldset className="space-y-1" aria-describedby={errors.language ? errorId : undefined}>
       <legend className="text-sm font-semibold text-ink">{t("language")}</legend>

@@ -314,7 +314,7 @@ Never cache AI answers across users. Never build cache keys without `tenant_id`.
 | Identity | OIDC provider (Cognito ref.) | Managed MFA and account security | Keycloak, Auth0 |
 | LLM | Google Gemini on Vertex AI via gateway (ADR-0033) | India region (asia-south1), low cost Flash/Flash-Lite, tool use, structured output, ZDR configuration | Anthropic Claude (config-selectable fallback), other providers via same gateway |
 | Embeddings | Provider interface; Voyage as default candidate | Multilingual retrieval models; chosen by eval | Open-source multilingual models self-hosted |
-| PDF | Chromium (Playwright) | Correct Telugu shaping, CSS print | WeasyPrint |
+| PDF | Chromium (Playwright) | Correct Telugu shaping (needed again when `SOS_TELUGU_ENABLED` is on; English only by default, ADR-0036), CSS print | WeasyPrint |
 | IaC/CI | Terraform + GitHub Actions | Standard, reviewable, OIDC to AWS | Pulumi, CDK |
 | Telemetry | OpenTelemetry → CloudWatch/X-Ray (or Grafana stack) | Vendor-neutral, India region | Datadog |
 

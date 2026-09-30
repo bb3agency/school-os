@@ -9,8 +9,8 @@ prompt's (``prompts/*.v1.txt``), measured by ``make eval``.
   offline retrieval sees what it refers to; any other question is returned unchanged.
 - ``summary``: "Earlier the user asked about: ..." listing the earlier questions.
 - ``followups``: up to two generic follow-ups in the latest question's script (no names, no
-  numbers); a memory candidate only when the latest question says "I prefer ..." or
-  "I am the ..." about the user.
+  numbers; always English when the prompt is the English-only one, ADR-0036); a memory
+  candidate only when the latest question says "I prefer ..." or "I am the ..." about the user.
 - ``memory_screen``: ``others`` for anything about students, parents, marks, health or with a
   digit; ``self`` for preferences and the user's own role; else ``unsure``.
 
@@ -22,6 +22,8 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from typing import Any, Final
+
+from app.knowledge.gateway.fake_language import english_only, has_telugu
 
 _TELUGU: Final = re.compile(r"[ఀ-౿]")
 _WORD: Final = re.compile(r"[\w']+", re.UNICODE)
@@ -148,10 +150,11 @@ def summary(text: str) -> dict[str, Any]:
     return {"summary": " ".join(parts)}
 
 
-def followups(text: str) -> dict[str, Any]:
+def followups(text: str, system: str = "") -> dict[str, Any]:
     questions = [line[2:] for line in _section(text, "Recent questions (oldest first):")]
     latest = questions[-1] if questions else ""
-    if _TELUGU.search(latest):
+    english = english_only(system)
+    if _TELUGU.search(latest) and not english:
         out = ["దీని గురించి మరిన్ని వివరాలు ఉన్నాయా?", "ఇది ఏ పత్రంలో ఉంది?"]
     else:
         out = ["Are there more details about this?", "Which document says this?"]
@@ -163,6 +166,8 @@ def followups(text: str) -> dict[str, Any]:
                 rest = latest[folded.index(marker) + len(marker) :].split(".")[0].strip(" ?!")
                 memory = f"{lead}{rest}" if rest else None
                 break
+    if english and memory is not None and has_telugu(memory):
+        memory = None
     return {"questions": out, "memory": memory}
 
 
@@ -178,14 +183,19 @@ def memory_screen(text: str) -> dict[str, Any]:
 _REPLIES: Final = {
     "sos:ask.query_rewrite.v1": rewrite,
     "sos:ask.conversation_summary.v1": summary,
-    "sos:ask.followups.v1": followups,
     "sos:ask.memory_screen.v1": memory_screen,
 }
 
 
-def conversation_reply(schema: Mapping[str, Any], request_text: str) -> dict[str, Any] | None:
-    """The stand-in's JSON for an Ask conversation schema, or None for any other schema."""
-    reply = _REPLIES.get(str(schema.get("description")))
+def conversation_reply(
+    schema: Mapping[str, Any], request_text: str, system: str = ""
+) -> dict[str, Any] | None:
+    """The stand-in's JSON for an Ask conversation schema, or None for any other schema
+    (``system``: the rendered prompt, read only to follow the English-first rule)."""
+    tag = str(schema.get("description"))
+    if tag == "sos:ask.followups.v1":
+        return followups(request_text, system)
+    reply = _REPLIES.get(tag)
     return reply(request_text) if reply is not None else None
 
 

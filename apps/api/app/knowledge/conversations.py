@@ -8,7 +8,9 @@ here logs a title, question, answer, summary or suggestion (invariant 5): ids, c
 
 - **Titles**: a new conversation's title is its first question, NFC, whitespace collapsed,
   Aadhaar-like numbers masked, cut at a word boundary to ``titles.derived_max_chars`` (no model
-  call). A title the user sets is refused (422) when it holds an Aadhaar-like number.
+  call); while Telugu is hidden (ADR-0036) a first question in Telugu script is titled
+  ``titles.english_fallback`` instead. A title the user sets is refused (422) when it holds an
+  Aadhaar-like number.
 - **Context** (:func:`build_context`): the caller's own conversation only. The last
   ``max_earlier_questions`` current (not superseded), completed turns within
   ``history_token_budget``: each question, and its checked answer only when every source that
@@ -29,7 +31,9 @@ here logs a title, question, answer, summary or suggestion (invariant 5): ids, c
   0-3 short questions in the answer's language (and at most one memory suggestion, checked by
   :mod:`app.knowledge.memory`). Suggestions pass the output sanitiser; one with an Aadhaar-like,
   phone number or email, in another script, too long, or naming a number or name the
-  conversation does not contain is dropped.
+  conversation does not contain is dropped. English first (ADR-0036): while Telugu is hidden
+  the English-only prompt is used, the answer's language is ``en`` (so a Telugu-script
+  suggestion is dropped) and a memory suggestion in Telugu script is dropped too.
 """
 
 from __future__ import annotations
@@ -45,7 +49,7 @@ from typing import TYPE_CHECKING, Any, Final
 from app.core.logging import get_logger
 from app.core.redaction import contains_full_aadhaar, mask_aadhaar, redact
 from app.knowledge import repository as repo
-from app.knowledge.answer import AskContext, detect_language, sanitise
+from app.knowledge.answer import AskContext, detect_language, has_telugu, sanitise
 from app.knowledge.config.conversations import ConversationsConfig, load_conversations_config
 from app.knowledge.config.llm import LlmConfig
 from app.knowledge.domain import HistoryTurn, Locale, Metering
@@ -159,9 +163,14 @@ def cut(text: str, limit: int) -> str:
     return (head.rstrip(" ,;:") or window[: limit - 1]) + "…"
 
 
-def derive_title(question: str, limit: int | None = None) -> str:
-    """A new conversation's title: its first question, tidied, numbers masked, cut at a word."""
-    return cut(mask_numbers(tidy(question)), limit or config().titles.derived_max_chars)
+def derive_title(question: str, limit: int | None = None, *, telugu: bool) -> str:
+    """A new conversation's title: its first question, tidied, numbers masked, cut at a word.
+    While Telugu is hidden (``telugu`` false, ADR-0036) a question in Telugu script gets the
+    configured English title instead."""
+    titles = config().titles
+    if not telugu and has_telugu(question):
+        return titles.english_fallback
+    return cut(mask_numbers(tidy(question)), limit or titles.derived_max_chars)
 
 
 def title_problem(title: str) -> str | None:
@@ -575,12 +584,16 @@ def suggest(
     answer: str,
     language: Locale,
     memory_wanted: bool,
+    telugu: bool,
 ) -> Suggestions:
-    """Follow-up questions (and a memory candidate, unchecked) for an answered question."""
+    """Follow-up questions (and a memory candidate, unchecked) for an answered question.
+    ``telugu``: ``app.core.languages.telugu_enabled()`` (ADR-0036); with it off the English-only
+    prompt is used and nothing in Telugu script comes back."""
     cfg = config().followups
     if cfg.max_questions == 0 and not memory_wanted:
         return Suggestions()
-    prompt = load_prompt(cfg.prompt.id, cfg.prompt.version)
+    ref = cfg.prompt_for(telugu)
+    prompt = load_prompt(ref.id, ref.version)
     try:
         raw = gateway.generate_json(
             metering,
@@ -616,11 +629,15 @@ def suggest(
         max_chars=cfg.max_chars,
     )
     memory = raw.get("memory")
+    keep = (
+        memory_wanted
+        and isinstance(memory, str)
+        and bool(memory.strip())
+        and (telugu or not has_telugu(memory))
+    )
     return Suggestions(
         questions=cleaned,
-        memory=tidy(memory)
-        if memory_wanted and isinstance(memory, str) and memory.strip()
-        else None,
+        memory=tidy(memory) if keep and isinstance(memory, str) else None,
     )
 
 

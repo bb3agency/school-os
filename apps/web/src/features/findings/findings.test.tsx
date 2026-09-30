@@ -234,6 +234,26 @@ describe("finding detail (US-502, FR-DQ-020)", () => {
     });
   });
 
+  it("explains the finding in English only while Telugu is switched off (ADR-0036)", async () => {
+    detail(READ);
+    const { container } = renderWithIntl(
+      <FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />,
+    );
+    expect(await screen.findByText("Problem DQ-003")).toBeInTheDocument();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[ఀ-౿]/);
+    expect(container.querySelector("[lang='te']")).toBeNull();
+  });
+
+  it("shows the Telugu explanation beside the English one when Telugu is switched on (ADR-0036)", async () => {
+    detail(READ);
+    const { container } = renderWithIntl(
+      <FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />,
+      { telugu: true },
+    );
+    expect(await screen.findByText("Problem DQ-003")).toBeInTheDocument();
+    expect(container.querySelector("[lang='te']")?.textContent ?? "").toMatch(/[ఀ-౿]/);
+  });
+
   it("offers no actions without permission, and never a way to edit the record", async () => {
     detail(READ);
     renderWithIntl(<FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />);

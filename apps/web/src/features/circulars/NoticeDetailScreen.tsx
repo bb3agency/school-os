@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
@@ -24,6 +25,7 @@ import {
   isNoticeDrafting,
   looksPersonal,
   noticeComplete,
+  noticeEnglishSchema,
   noticeSchema,
   noticeText,
   startDownload,
@@ -34,12 +36,16 @@ import { AiNote, LoadGate, NoticeStatusPill } from "./parts";
 
 type Field = "title_en" | "body_en" | "title_te" | "body_te";
 const FIELDS: readonly Field[] = ["title_en", "body_en", "title_te", "body_te"];
+/** ADR-0036: while Telugu is switched off a notice is edited, checked and sent in English. */
+const ENGLISH_FIELDS: readonly Field[] = ["title_en", "body_en"];
 
 function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<void> }) {
   const t = useTranslations("notices.editor");
   const tv = useTranslations("validation");
   const can = useStaffCan();
   const api = useBffClient("staff");
+  const telugu = useTeluguEnabled();
+  const fields = telugu ? FIELDS : ENGLISH_FIELDS;
   const [values, setValues] = useState<Record<Field, string>>({
     title_en: notice.title_en,
     body_en: notice.body_en,
@@ -49,12 +55,12 @@ function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<vo
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
-  const changed = FIELDS.some((f) => values[f] !== notice[f]);
-  const personal = FIELDS.filter((f) => looksPersonal(values[f]));
+  const changed = fields.some((f) => values[f] !== notice[f]);
+  const personal = fields.filter((f) => looksPersonal(values[f]));
 
   async function save(event?: FormEvent<HTMLFormElement>): Promise<Notice | null> {
     event?.preventDefault();
-    const parsed = noticeSchema.safeParse(values);
+    const parsed = (telugu ? noticeSchema : noticeEnglishSchema).safeParse(values);
     if (!parsed.success) {
       setErrors(zodErrorKeys(parsed.error));
       return null;
@@ -109,13 +115,13 @@ function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<vo
         : undefined;
   const set = (name: Field) => (event: { target: { value: string } }) =>
     setValues({ ...values, [name]: event.target.value });
-  const complete = noticeComplete(values);
+  const complete = noticeComplete(values, { telugu });
 
   return (
     <form onSubmit={(event) => void save(event)} noValidate className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className={telugu ? "grid gap-4 lg:grid-cols-2" : "max-w-3xl"}>
         <fieldset className="space-y-3">
-          <legend className="font-semibold text-ink">{t("english")}</legend>
+          {telugu ? <legend className="font-semibold text-ink">{t("english")}</legend> : null}
           <TextField
             label={t("title")}
             lang="en"
@@ -134,27 +140,29 @@ function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<vo
             error={fieldError("body_en")}
           />
         </fieldset>
-        <fieldset className="space-y-3">
-          <legend className="font-semibold text-ink">{t("telugu")}</legend>
-          <TextField
-            label={t("title")}
-            lang="te"
-            maxLength={120}
-            value={values.title_te}
-            onChange={set("title_te")}
-            error={fieldError("title_te")}
-          />
-          <TextAreaField
-            label={t("body")}
-            lang="te"
-            rows={7}
-            maxLength={1500}
-            value={values.body_te}
-            onChange={set("body_te")}
-            error={fieldError("body_te")}
-            className="leading-loose"
-          />
-        </fieldset>
+        {telugu ? (
+          <fieldset className="space-y-3">
+            <legend className="font-semibold text-ink">{t("telugu")}</legend>
+            <TextField
+              label={t("title")}
+              lang="te"
+              maxLength={120}
+              value={values.title_te}
+              onChange={set("title_te")}
+              error={fieldError("title_te")}
+            />
+            <TextAreaField
+              label={t("body")}
+              lang="te"
+              rows={7}
+              maxLength={1500}
+              value={values.body_te}
+              onChange={set("body_te")}
+              error={fieldError("body_te")}
+              className="leading-loose"
+            />
+          </fieldset>
+        ) : null}
       </div>
       <p className="text-sm text-ink-muted">{t("noPersonal")}</p>
       <div className="flex flex-wrap gap-3">
@@ -203,14 +211,15 @@ function useSlow(since: string): boolean {
 function Drafting({ notice }: { notice: Notice }) {
   const t = useTranslations("notices.drafting");
   const slow = useSlow(notice.updated_at);
+  const telugu = useTeluguEnabled();
   return (
     <div className="space-y-4">
       <div role="status" aria-live="polite" className="space-y-1">
         <p className="font-medium text-ink">{t("title")}</p>
         <p className="text-sm text-ink-muted">{slow ? t("slow") : t("body")}</p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2" aria-hidden="true">
-        {["en", "te"].map((language) => (
+      <div className={telugu ? "grid gap-4 lg:grid-cols-2" : "max-w-3xl"} aria-hidden="true">
+        {(telugu ? ["en", "te"] : ["en"]).map((language) => (
           <div key={language} className="space-y-2">
             <Skeleton className="h-9 rounded-md" />
             <Skeleton className="h-40 rounded-md" />
@@ -272,6 +281,7 @@ function DraftFailed({ notice, onChanged }: { notice: Notice; onChanged: () => P
 function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Promise<void> }) {
   const t = useTranslations("notices.approved");
   const api = useBffClient("staff");
+  const telugu = useTeluguEnabled();
   const [copied, setCopied] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
@@ -279,7 +289,7 @@ function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Prom
   async function copy() {
     setCopied(false);
     try {
-      await navigator.clipboard.writeText(noticeText(notice));
+      await navigator.clipboard.writeText(noticeText(notice, { telugu }));
       setCopied(true);
     } catch {
       setCopied(false);
@@ -332,11 +342,15 @@ function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Prom
           <h2 className="text-xl font-semibold text-ink">{notice.title_en}</h2>
           <p className="whitespace-pre-wrap text-ink">{notice.body_en}</p>
         </section>
-        <hr className="border-border" />
-        <section lang="te" className="space-y-2">
-          <h2 className="text-xl leading-loose font-semibold text-ink">{notice.title_te}</h2>
-          <p className="leading-loose whitespace-pre-wrap text-ink">{notice.body_te}</p>
-        </section>
+        {telugu ? (
+          <>
+            <hr className="border-border" />
+            <section lang="te" className="space-y-2">
+              <h2 className="text-xl leading-loose font-semibold text-ink">{notice.title_te}</h2>
+              <p className="leading-loose whitespace-pre-wrap text-ink">{notice.body_te}</p>
+            </section>
+          </>
+        ) : null}
       </article>
       <div className="flex flex-wrap gap-3" data-print="hide">
         <Button onClick={() => void copy()}>{t("copy")}</Button>
@@ -394,7 +408,8 @@ function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Prom
 /**
  * One parent notice (US-1605, US-1606): while the AI drafts it in the background the page shows
  * progress and asks again (FR-NOTICE-003); if the AI could not draft it, try again or write it
- * yourself. Edit the English and Telugu text of a draft (an AI draft is marked as such),
+ * yourself. Edit the English (and, while Telugu is switched on, Telugu; ADR-0036) text of a
+ * draft (an AI draft is marked as such),
  * approve it (`notice.approve`), then copy the text for the parents' groups, print it on A4 or
  * download the PDF or image. Approved notices cannot change.
  */

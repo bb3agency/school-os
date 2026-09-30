@@ -123,7 +123,7 @@ Delivery: phone push + SMS/email to the on-call (founder) for P1/P2; daily diges
 4. **Notify (clocks start at T0 for security incidents):**
    - **CERT-In within 6 hours** for reportable cyber incidents (unauthorized access, data breach/leak, malware, etc.) using the prepared format.
    - **Affected schools (Data Fiduciaries) without undue delay**, target within 24 hours of confirmation, with facts they need for their own DPDP notices to parents and the Data Protection Board (Board: without delay + detailed report within 72 hours, per DPDP Rules).
-   - Provide bilingual parent-notice templates and a facts package (nature, extent, timing, likely consequences, mitigation, what families can do, contact).
+   - Provide parent-notice templates (English; bilingual only while `SOS_TELUGU_ENABLED` is on, ADR-0036) and a facts package (nature, extent, timing, likely consequences, mitigation, what families can do, contact).
 5. **Eradicate & recover:** fix root cause, restore from clean backups if needed, rotate secrets/keys, verify audit chain.
 6. **Post-incident:** blameless postmortem within 5 working days (template `docs/templates/incident-postmortem.md`), action items tracked to closure, threat model updated.
 
@@ -151,7 +151,7 @@ Snapshot affected resources, export relevant logs to the log-archive account, pr
 
 - Channels: in-app help and support tickets (tracked in the platform admin panel with SLA timers, 16 §15), a support WhatsApp Business number/email during school hours, escalation to phone for P1/P2. Tickets must not contain student data.
 - Support staff (initially the founder) cannot view school data without break-glass approval; most issues are diagnosed from IDs, job states and metrics.
-- Onboarding playbook per school: kickoff, data permissions/DPA, import session, training for office staff (EN/TE), first pre-check with support on call.
+- Onboarding playbook per school: kickoff, data permissions/DPA, import session, training for office staff (English; Telugu once `SOS_TELUGU_ENABLED` is back on, ADR-0036), first pre-check with support on call.
 - Status page for incidents and maintenance notices.
 
 ## 10. Operational reviews

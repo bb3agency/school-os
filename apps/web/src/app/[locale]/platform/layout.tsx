@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { PlatformShell } from "@/components/shell/PlatformShell";
+import { uiLocale } from "@/i18n/languages";
 import { apiGetAsSession, platformEnabled, requireOperator } from "@/server/session/rsc";
 
 export async function generateMetadata({
@@ -12,7 +13,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale: locale === "te" ? "te" : "en", namespace: "metadata" });
+  const t = await getTranslations({ locale: uiLocale(locale), namespace: "metadata" });
   return { title: { default: t("platformTitle"), template: t("pageTitle", { page: "%s" }) } };
 }
 

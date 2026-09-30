@@ -12,6 +12,10 @@ reference number, the circular's date, its issuer and ``Sub:`` line fill the met
 
 Notice drafting (schema ``sos:parent_notice.v1``): a fixed bilingual template listing the dates
 the school confirmed (or the first sentences of staff text).
+
+English first (ADR-0036): a schema without the Telugu fields (``summary_te``, ``title_te``) is
+the English-only request: then nothing Telugu is written (no Telugu summary or notice, a Telugu
+deadline sentence gets an English title, Telugu metadata is left empty), as the prompt asks.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from typing import Any, Final
 
 from app.knowledge.circulars import notice, reading
 from app.knowledge.circulars.dates import DateMention, find_dates
+from app.knowledge.gateway.fake_language import has_telugu
 
 _PASSAGE: Final = re.compile(r"^\[(?P<n>\d+)\](?: \(page \d+\))? (?P<text>.*)$")
 _SENTENCE_END: Final = re.compile(r"(?<=[.!?।])\s+(?=\S)")
@@ -88,7 +93,23 @@ def _title(sentence: str) -> str:
     return title if len(title) <= _MAX_TITLE else title[:_MAX_TITLE].rsplit(" ", 1)[0]
 
 
-def circular_reading(request_text: str) -> dict[str, Any]:
+def _english(reply: dict[str, Any]) -> dict[str, Any]:
+    """The reply to the English-only prompt: no Telugu summary, Telugu metadata left empty,
+    an English title for a deadline written in Telugu (the quote stays as written)."""
+    out = {k: v for k, v in reply.items() if k != "summary_te"}
+    for key in ("issuer", "reference_no", "subject"):
+        if out[key] is not None and has_telugu(out[key]):
+            out[key] = None
+    out["deadlines"] = [
+        {**d, "title": f"Action needed by {dt.date.fromisoformat(d['due_on']):%d/%m/%Y}"}
+        if has_telugu(d["title"])
+        else d
+        for d in reply["deadlines"]
+    ]
+    return out
+
+
+def circular_reading(request_text: str, *, english: bool = False) -> dict[str, Any]:
     passages = _passages(request_text)
     year = _year_hint(passages)
     deadlines: list[dict[str, Any]] = []
@@ -127,7 +148,7 @@ def circular_reading(request_text: str) -> dict[str, Any]:
         if topic and not _TELUGU_SCRIPT.search(topic)
         else ("This circular is written in Telugu. Open it to read the details.")
     )
-    return {
+    reply: dict[str, Any] = {
         "issuer": issuer,
         "reference_no": reference,
         "issued_on": issued,
@@ -137,12 +158,13 @@ def circular_reading(request_text: str) -> dict[str, Any]:
         "summary_passages": [n for n, _ in passages[:2]],
         "deadlines": deadlines,
     }
+    return _english(reply) if english else reply
 
 
 _CONFIRMED: Final = re.compile(r"^- (?P<date>\d{2}/\d{2}/\d{4}): (?P<title>.+)$")
 
 
-def parent_notice(request_text: str) -> dict[str, Any]:
+def parent_notice(request_text: str, *, english_only: bool = False) -> dict[str, Any]:
     dates = [m["date"] for m in map(_CONFIRMED.match, request_text.splitlines()) if m]
     staff = request_text.split("\n\n", 1)[1] if request_text.startswith("Source: text") else ""
     if dates:
@@ -158,6 +180,8 @@ def parent_notice(request_text: str) -> dict[str, Any]:
             else ("Dear parents, please read the school's notice below.")
         )
         body_te = "ప్రియమైన తల్లిదండ్రులకు, దయచేసి పాఠశాల సూచనను గమనించండి."
+    if english_only:
+        return {"title_en": "Notice for parents", "body_en": body_en}
     return {
         "title_en": "Notice for parents",
         "body_en": body_en,
@@ -169,10 +193,11 @@ def parent_notice(request_text: str) -> dict[str, Any]:
 def structured_reply(schema: Mapping[str, Any], request_text: str) -> dict[str, Any] | None:
     """The stand-in's JSON for a known schema, or None (then a minimal schema instance)."""
     tag = schema.get("description")
+    properties = schema.get("properties") or {}
     if tag == reading.SCHEMA_TAG:
-        return circular_reading(request_text)
+        return circular_reading(request_text, english="summary_te" not in properties)
     if tag == notice.SCHEMA_TAG:
-        return parent_notice(request_text)
+        return parent_notice(request_text, english_only="title_te" not in properties)
     return None
 
 

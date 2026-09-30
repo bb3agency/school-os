@@ -270,6 +270,19 @@ def test_preview_holds_at_most_the_configured_pending_characters() -> None:
     assert out == "<b " + "x" * 150  # over the limit: emitted (not a tag, so kept as text)
 
 
+def test_english_first_preview_stops_before_telugu_script() -> None:
+    """ADR-0036: while Telugu is hidden no Telugu character is ever streamed; the validated
+    ``final`` answer replaces the preview."""
+    preview = PreviewSanitiser(2000, english_only=True)
+    text = "Exams begin on 22/09/2026. పరీక్షలు 22/09/2026న. More English after."
+    shown = "".join(preview.feed(f"{piece} ") for piece in text.split(" ")) + preview.flush()
+    assert not any("\u0c00" <= ch <= "\u0c7f" for ch in shown)
+    assert shown.startswith("Exams begin on")
+    assert "More English" not in shown  # stopped for good
+    on = PreviewSanitiser(2000)
+    assert "పరీక్షలు" in on.feed(text) + on.flush()  # Telugu switched on: shown
+
+
 class _ClosingStream:
     """Stands in for ``service.AskStream`` in the route's SSE adapter."""
 

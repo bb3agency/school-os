@@ -7,6 +7,12 @@
   forbids) and a chat history shared by everyone. It must trip the leakage hard gates.
 - `stub-injectable`: behaves like a model that obeys instructions inside documents. It must
   trip the injection hard gate.
+- `stub-telugu`: ignores the Telugu switch (``SOS_TELUGU_ENABLED``, ADR-0036) and keeps writing
+  Telugu for Telugu questions, circulars and notices. It must trip the English-first hard gates.
+
+English first (ADR-0036): every stub follows ``set_telugu``. With Telugu off, `stub-perfect`
+writes English only: "not found" in English, a Telugu passage described in English (and cited,
+not copied), English follow-ups, deadline titles and summaries, an English-only notice.
 
 Contextual retrieval set (docs/06 §13.6): `stub-perfect` is perfect *within each variant's
 information*: with contexts (``contextual``, ``contextual_rerank``) it ranks the expected page
@@ -36,6 +42,7 @@ from sos_evals.contextual import (
     needs_context,
 )
 from sos_evals.conversations import ConversationCase, ConversationRun, TurnResult, script_of
+from sos_evals.english_first import NoticeResult, has_telugu
 from sos_evals.fees import FeeCase, FeeCitation, FeeResult, inr
 from sos_evals.schema import Asker, CorpusItem, EvalItem, Locale
 
@@ -45,6 +52,8 @@ REFUSALS: Mapping[Locale, str] = {
     "te": "మీరు చూడగల పాఠశాల రికార్డులలో ఇది కనబడలేదు.",
 }
 _TE_PREFIX = "సమాధానం: "
+EN_STAND_IN = "The cited passage from the school's records answers this."
+"""What an English-first answer says instead of copying a Telugu passage (it cites it)."""
 
 
 def _hash_ms(text: str, base: int, spread: int) -> float:
@@ -56,6 +65,16 @@ class _ConversationOracle:
     expected script, suggests follow-ups in the question's script, saves only what may be saved,
     reuses only an allowed exact repeat, and sends the model nothing but the step's own question
     and the asker's saved memory while it is on."""
+
+    telugu = True
+    """``SOS_TELUGU_ENABLED`` (ADR-0036): the harness runs the main pass with it on."""
+
+    def set_telugu(self, enabled: bool) -> None:
+        self.telugu = enabled
+
+    def _say(self, line: str) -> str:
+        """``line`` as shown: while Telugu is hidden a Telugu line is described in English."""
+        return EN_STAND_IN if not self.telugu and has_telugu(line) else line
 
     def run_conversation(self, case: ConversationCase) -> ConversationRun:
         docs = {d.key: d for d in case.docs}
@@ -88,9 +107,14 @@ class _ConversationOracle:
             target = case.steps[step.target] if step.target is not None else None
             question = step.question or (target.question if target else "") or ""
             script = step.expect_script or script_of(question)
+            if not self.telugu:
+                script = "latin"  # ADR-0036: English whatever the question or preference
             lines = [docs[key].content.split(". ")[0] for key in step.expect_sources]
-            text = " ".join(f"{_TE_PREFIX}{line}" if script == "te" else line for line in lines)
-            follow = "దీని గురించి మరిన్ని వివరాలు?" if script_of(question) == "te" else "Anything else?"
+            text = " ".join(
+                f"{_TE_PREFIX}{line}" if script == "te" else self._say(line) for line in lines
+            )
+            telugu_question = script_of(question) == "te" and self.telugu
+            follow = "దీని గురించి మరిన్ని వివరాలు?" if telugu_question else "Anything else?"
             used = saved[step.who] if memory_on[step.who] else []
             cached = first_asked.get(question) if step.expect_cached else None
             first_asked.setdefault(question, index)
@@ -104,6 +128,8 @@ class _ConversationOracle:
                     followups=(follow,),
                     cached_from=cached,
                     memories_after=tuple(saved[step.who]),
+                    title=None if self.telugu else "New conversation",
+                    language=None if self.telugu else "en",
                 )
             )
         return ConversationRun(turns=tuple(turns))
@@ -168,17 +194,21 @@ class PerfectStub(_ConversationOracle):
         segments = []
         for source in sources:
             lead = self._corpus[source].content.split("\n", 1)[0]
-            text = f"{_TE_PREFIX}{lead}" if locale == "te" else lead
+            text = f"{_TE_PREFIX}{lead}" if locale == "te" and self.telugu else self._say(lead)
             segments.append(
                 AnswerSegment(text=text, citations=(Citation(source=source, cited_text=lead),))
             )
         return segments
 
+    def _language(self, locale: Locale) -> str:
+        return locale if self.telugu else "en"
+
     def _refusal(self, locale: Locale, provided: Sequence[str]) -> AskResult:
         return AskResult(
-            segments=(AnswerSegment(text=REFUSALS[locale]),),
+            segments=(AnswerSegment(text=REFUSALS[locale if self.telugu else "en"]),),
             refused=True,
             provided_sources=tuple(provided),
+            language=self._language(locale),
         )
 
     def ask(self, question: str, asker: Asker) -> AskResult:
@@ -188,21 +218,46 @@ class PerfectStub(_ConversationOracle):
         if item is None or item.expect_refusal:
             locale: Locale = item.locale if item else "en"
             return self._refusal(locale, provided).model_copy(update={"latency_ms": latency})
+        english = "Anything else in the school's records about this?"
         return AskResult(
             segments=tuple(self._answer(item.expected_sources, item.locale)),
             refused=False,
             provided_sources=tuple(provided),
             latency_ms=latency,
+            language=self._language(item.locale),
+            followups=() if self.telugu else (english,),
+            title=None if self.telugu else "New conversation",
         )
 
     def read_circular(self, case: CircularCase) -> CircularResult:
-        """The answer key: each expected deadline quoting the line that writes it."""
+        """The answer key: each expected deadline quoting the line that writes it (English
+        titles and an English summary while Telugu is hidden)."""
         found = []
         for due in case.expected_deadlines:
             line = next(line for line in case.lines if due in dates_in(line))
-            found.append(SuggestedDeadline(due_on=due, quote=line, title=line[:80]))
+            title = line[:80]
+            if not self.telugu and has_telugu(title):
+                title = f"Action needed by {due:%d/%m/%Y}"
+            found.append(SuggestedDeadline(due_on=due, quote=line, title=title))
+        summary = None if self.telugu else f"The circular sets {len(found)} deadline(s)."
         return CircularResult(
-            deadlines=tuple(found), reference_no=case.reference_no, issued_on=case.issued_on
+            deadlines=tuple(found),
+            reference_no=case.reference_no,
+            issued_on=case.issued_on,
+            summary_en=summary,
+        )
+
+    def draft_notice(self, case: CircularCase) -> NoticeResult:
+        """An English notice listing the confirmed dates (bilingual while Telugu is on)."""
+        dates = ", ".join(f"{d:%d/%m/%Y}" for d in case.expected_deadlines) or "see the notice"
+        body = f"Dear parents, please note these dates: {dates}."
+        if not self.telugu:
+            return NoticeResult(title_en="Notice for parents", body_en=body)
+        return NoticeResult(
+            title_en="Notice for parents",
+            body_en=body,
+            title_te="తల్లిదండ్రులకు సూచన",
+            body_te=f"దయచేసి ఈ తేదీలను గమనించండి: {dates}.",
         )
 
     @staticmethod
@@ -302,10 +357,20 @@ class InjectableStub(PerfectStub):
         )
 
 
+class TeluguStub(PerfectStub):
+    """Ignores the Telugu switch: Telugu stays on whatever the harness sets (ADR-0036)."""
+
+    name = "stub-telugu"
+
+    def set_telugu(self, enabled: bool) -> None:
+        self.telugu = True
+
+
 StubFactory = Callable[[Mapping[str, CorpusItem], Iterable[EvalItem]], PerfectStub]
 
 STUBS: Mapping[str, StubFactory] = {
     PerfectStub.name: PerfectStub,
     LeakyStub.name: LeakyStub,
     InjectableStub.name: InjectableStub,
+    TeluguStub.name: TeluguStub,
 }

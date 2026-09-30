@@ -16,10 +16,14 @@ Valkey, SeaweedFS, the dev OIDC stub) and the four app processes on the host wit
 
 WHAT IT DOES FIRST, all idempotent and additive (it never drops, resets or deletes anything):
 
+0. ``make dev-host`` first runs ``uv sync --locked --all-packages`` (a pull may add a dependency);
+   run directly, this script checks the api and worker import and stops with that hint if not.
 1. ``.env`` from ``.env.example`` if missing (the same as ``make dev``).
 2. ``docker compose --profile dev up -d --wait db valkey s3 oidc`` and the buckets (s3-init's
    logic, from the host).
-3. ``alembic upgrade head`` + audit partitions as ``sos_migrator`` (the compose ``migrate`` job).
+3. ``infra/db/bootstrap.sql`` again (idempotent, additive: roles such as ``sos_purger`` that were
+   added after the Postgres volume was first created; ``make db-bootstrap``), then ``alembic
+   upgrade head`` + audit partitions as ``sos_migrator`` (the compose ``migrate`` job).
 4. ``python -m app.devtools.seed_synthetic``: synthetic schools only (invariant 11); the tool
    refuses outside SOS_ENV=local|ci and re-running it is idempotent. ``--no-seed`` skips it.
 
@@ -61,6 +65,11 @@ PY = sys.executable
 WINDOWS = os.name == "nt"
 
 BACKING = ["db", "valkey", "s3", "oidc"]
+COMPOSE = ["docker", "compose", "--profile", "dev"]
+# The db container's init script re-applies infra/db/bootstrap.sql (roles, schemas, extensions;
+# idempotent). Docker runs init scripts only when the volume is first created, so a role added
+# later (sos_purger, ADR-0029) would otherwise be missing from an existing volume.
+BOOTSTRAP = [*COMPOSE, "exec", "-T", "db", "bash", "/docker-entrypoint-initdb.d/10-bootstrap.sh"]
 QUEUES = "ingest,embed,ocr,dq,exports,pdf,maintenance"  # docker-compose.yml worker command
 APP_PORTS = {"api": 8000, "web": 3000}
 WAIT_S = 120
@@ -195,7 +204,7 @@ def start_backing(env: dict[str, str]) -> bool:
     if shutil.which("docker") is None:
         print(paint("  docker is not on PATH: start Docker Desktop, then retry.", "1;31"))
         return False
-    compose = ["docker", "compose", "--profile", "dev"]
+    compose = COMPOSE
     ours = container_ports(compose, env)
     taken = [
         f"{name} :{port}"
@@ -230,9 +239,19 @@ for name in (os.environ["SOS_S3_BUCKET_FILES"], os.environ["SOS_S3_BUCKET_AUDIT"
 """
 
 
+# Every package the api, worker and beat import (a pull can add a dependency, e.g. google-auth
+# for ADR-0033): checked before anything starts, so a stale venv is one clear message.
+IMPORTS = "import app.main, sos_worker.celery_app"
+SYNC_HINT = "  Python packages are out of date: run `uv sync --locked --all-packages`, then retry."
+
+
 def prepare(env: dict[str, str], *, seed: bool) -> bool:
+    if not step("python packages", [PY, "-c", IMPORTS], env):
+        print(paint(SYNC_HINT, "1;31"))
+        return False
     ok = (
         step("buckets", [PY, "-c", BUCKETS], env)
+        and step("database roles (bootstrap.sql)", BOOTSTRAP, env)
         and step(
             "alembic upgrade head",
             [PY, "-m", "alembic", "-c", str(API_DIR / "alembic.ini"), "upgrade", "head"],

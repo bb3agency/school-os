@@ -65,7 +65,10 @@ roles:
       provider: anthropic
       model: claude-haiku-4-5-20251001
       thinking: disabled
-  # Translated-query fusion for code-mixed / cross-language questions (§6).
+  # Translated-query fusion for code-mixed / cross-language questions (§6). Retrieval only: its
+  # output is a search query, never shown to anyone, so it stays on while Telugu is hidden
+  # (ADR-0036): it lets an English question find a Telugu-script circular. Not wired yet
+  # (DocumentSearch sends the original query only); when wired, its text must never be displayed.
   translation:
     provider: gemini
     model: gemini-3.5-flash-lite
@@ -90,8 +93,9 @@ roles:
       provider: anthropic
       model: claude-haiku-4-5-20251001
       thinking: disabled
-  # Circular reading (M4, docs/06 §4.10, FR-CIR-002): strict-JSON metadata, EN/TE summary and
-  # deadline suggestions with passage citations, from one circular's indexed passages.
+  # Circular reading (M4, docs/06 §4.10, FR-CIR-002): strict-JSON metadata, an English summary
+  # (plus a Telugu one only while SOS_TELUGU_ENABLED is on, ADR-0036) and deadline suggestions
+  # with passage citations, from one circular's indexed passages.
   circular:
     provider: gemini
     model: gemini-3.5-flash-lite
@@ -102,8 +106,9 @@ roles:
       provider: anthropic
       model: claude-haiku-4-5-20251001
       thinking: disabled
-  # Parent notice drafting (M4, docs/06 §10.5, FR-NOTICE-003): short EN + TE notice from a
-  # circular's passages or staff text (never student records). Mid tier for Telugu quality.
+  # Parent notice drafting (M4, docs/06 §10.5, FR-NOTICE-003): short English notice (EN + TE
+  # only while SOS_TELUGU_ENABLED is on, ADR-0036) from a circular's passages or staff text
+  # (never student records). Mid tier, chosen for Telugu quality.
   notice:
     provider: gemini
     model: gemini-3.5-flash
@@ -138,7 +143,8 @@ roles:
   # metered, budget-checked structured-output call through the gateway. Flash-Lite tier (ADR-0033):
   # short structured JSON; provisional until the live evaluation (docs/06 §13.7). Output caps
   # include thinking tokens: watch the live run for MAX_TOKENS truncation on the small caps.
-  # Follow-up suggestions (0-3, the answer's language) plus at most one memory suggestion.
+  # Follow-up suggestions (0-3, the answer's language: English while Telugu is hidden, ADR-0036)
+  # plus at most one memory suggestion.
   followups:
     provider: gemini
     model: gemini-3.5-flash-lite
@@ -338,8 +344,9 @@ budget:
 
 answer_checks:
   max_uncited_factual_fraction: 0.30  # §9 rule 3
-  # Shown instead of an answer that no valid citation supports (FR-KB-007, invariant 8): Telugu when
-  # the question uses Telugu script (alone or code-mixed), otherwise English (FR-KB-006).
+  # Shown instead of an answer that no valid citation supports (FR-KB-007, invariant 8). English
+  # first (ADR-0036): always `en` while SOS_TELUGU_ENABLED is off; with it on, `te` when the
+  # question uses Telugu script (alone or code-mixed), otherwise `en` (FR-KB-006).
   not_found:
     en: "Not found in school records you can access. If it should be there, upload or verify the document."
     te: "మీరు చూడగలిగే పాఠశాల రికార్డుల్లో ఇది కనబడలేదు. ఉండాల్సి ఉంటే, పత్రాన్ని అప్‌లోడ్ చేయండి లేదా ధృవీకరించండి."
@@ -375,6 +382,8 @@ conversation:
     About the user (their own saved preferences and work context). Use it only for how to answer.
     It is not evidence: never cite it, and it never changes what the user may see.
   rewritten_header: "The question as the user wrote it (answer in its language):"
+  # The same while Telugu is hidden (ADR-0036): the answer is English whatever the language.
+  rewritten_header_english: "The question as the user wrote it (answer in English):"
 
 # The query log kb.queries (FR-KB-009; docs/05 §13, docs/08 §7): questions and answers, encrypted,
 # are deleted this many days after they were asked by the daily knowledge.purge_queries job.

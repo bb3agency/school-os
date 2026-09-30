@@ -74,7 +74,10 @@ def test_FR_CIR_002_reading_stores_grounded_suggestions_only(
     ai_on: Any, admin_engine: Engine, installed: Any
 ) -> None:
     school = ai_on.a
-    _store, transport, _pdf = installed
+    _store, _transport, _pdf = installed
+    # ADR-0036: the bilingual output is the Telugu-on path, so it runs with the switch on
+    # explicitly; English first (the default) is pinned in tests/knowledge.
+    _runtime, transport = C.KB.install_runtime(telugu=True)
     document_id = C.circular(admin_engine, school)
     with capture_logs() as logs:
         assert C.read_now(admin_engine, school, document_id) == "ready"

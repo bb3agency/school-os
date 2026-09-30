@@ -6,14 +6,12 @@ import "@fontsource-variable/inter/wght.css";
 import "@fontsource/instrument-serif/400.css";
 // Mono eyebrow labels and codes.
 import "@fontsource/jetbrains-mono/500.css";
-// Telugu glyphs: the fallback of every stack.
-import "@fontsource/noto-sans-telugu/400.css";
-import "@fontsource/noto-sans-telugu/600.css";
-import "@fontsource/noto-sans-telugu/700.css";
+// Telugu (Noto Sans Telugu) is not bundled: while Telugu is switched on (ADR-0036) the
+// <head> links /fonts/telugu/noto-sans-telugu.css, which adds it to the stacks.
 import "../globals.css";
 
 import type { Metadata, Viewport } from "next";
-import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -21,7 +19,9 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SIDEBAR_STATE_SCRIPT } from "@/components/shell/sidebar-script";
-import { routing } from "@/i18n/routing";
+import { enabledLocales, isEnabledLocale, teluguEnabled } from "@/i18n/languages";
+import { LanguagesProvider } from "@/i18n/LanguagesProvider";
+import { TELUGU_STYLESHEET_HREF } from "@/i18n/telugu-font";
 
 type LayoutProps = {
   children: ReactNode;
@@ -32,7 +32,7 @@ export async function generateMetadata({
   params,
 }: Omit<LayoutProps, "children">): Promise<Metadata> {
   const { locale } = await params;
-  if (!hasLocale(routing.locales, locale)) return {};
+  if (!isEnabledLocale(locale)) return {};
   const t = await getTranslations({ locale, namespace: "metadata" });
   return {
     title: { default: t("schoolTitle"), template: t("pageTitle", { page: "%s" }) },
@@ -52,7 +52,8 @@ export const viewport: Viewport = {
 
 export default async function LocaleLayout({ children, params }: LayoutProps) {
   const { locale } = await params;
-  if (!hasLocale(routing.locales, locale)) notFound();
+  // ADR-0036: `te` only while Telugu is switched on (the proxy redirects /te to /en).
+  if (!isEnabledLocale(locale)) notFound();
   setRequestLocale(locale);
   // Nonce-based CSP needs every page rendered per request (SEC-010).
   await connection();
@@ -69,10 +70,13 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
         <script nonce={nonce} suppressHydrationWarning>
           {SIDEBAR_STATE_SCRIPT}
         </script>
+        {teluguEnabled() ? <link rel="stylesheet" href={TELUGU_STYLESHEET_HREF} /> : null}
       </head>
       <body>
         <NextIntlClientProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <LanguagesProvider locales={enabledLocales()}>
+            <QueryProvider>{children}</QueryProvider>
+          </LanguagesProvider>
         </NextIntlClientProvider>
       </body>
     </html>

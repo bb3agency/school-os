@@ -54,6 +54,8 @@ describe("dev UI reference (/[locale]/dev/ui)", () => {
     it(`renders every section, CSP-safe, no missing keys [${locale}]`, () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("OIDC_ISSUER", "http://localhost:8080/schoolos");
+      // The Telugu render needs Telugu switched on explicitly (ADR-0036).
+      if (locale === "te") vi.stubEnv("SOS_TELUGU_ENABLED", "true");
       const { container } = renderWithIntl(DevUiPage(), locale);
       expect(intlErrors).toEqual([]);
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -65,6 +67,18 @@ describe("dev UI reference (/[locale]/dev/ui)", () => {
       expect(new Set(ids).size).toBe(ids.length);
     });
   }
+
+  it("shows the Telugu sample only when Telugu is switched on (ADR-0036)", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("OIDC_ISSUER", "http://localhost:8080/schoolos");
+    const off = renderWithIntl(DevUiPage());
+    expect(off.container.querySelector("#ui-telugu")).toBeNull();
+    expect(off.container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    off.unmount();
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
+    const on = renderWithIntl(DevUiPage(), { telugu: true });
+    expect(on.container.querySelector("#ui-telugu")).not.toBeNull();
+  });
 
   it("nothing links to it", () => {
     const src = resolve(dirname(fileURLToPath(import.meta.url)), "..");

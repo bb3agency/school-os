@@ -16,7 +16,9 @@
 
 Private school offices in Andhra Pradesh keep the school's institutional memory on paper registers, Excel sheets and in the heads of a few senior staff. They re-type the same student details into many portals and boards (UDISE+, APAAR, state systems, board registration), fix name/date-of-birth mismatches that can take weeks, issue certificates by hand, and answer the same questions for parents and management repeatedly.
 
-SchoolOS is a **board-neutral operations and memory layer** for the admin office. It keeps one checked student record with the value from each source, catches mismatches **before** submissions, produces certificates, registers and portal-ready sheets from that record, and answers questions about the school's history in plain English or Telugu **with sources**.
+SchoolOS is a **board-neutral operations and memory layer** for the admin office. It keeps one checked student record with the value from each source, catches mismatches **before** submissions, produces certificates, registers and portal-ready sheets from that record, and answers questions about the school's history in plain English **with sources** (a question may be typed in Telugu; Telugu answers are deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036)).
+
+> **English first (ADR-0036, product owner 2026-09-30).** SchoolOS launches in English. Everything this document says about Telugu or bilingual output stays a requirement but is deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036): the Telugu code, catalogs, templates, prompts and evaluation sets are kept, dormant, and come back with one setting plus a review.
 
 It is not another ERP. It works alongside the school's existing tools (paper registers, Excel, Tally) and replaces work, not systems.
 
@@ -80,7 +82,7 @@ It is not another ERP. It works alongside the school's existing tools (paper reg
 | Accountant | Fees, Tally | Fee questions answered without re-entry | Secondary user |
 | Exam coordinator | Board registration | Clean candidate data before deadlines | Primary user (seasonal) |
 | Class teacher | Attendance, marks, student welfare | Quick student context, early warnings (M5) | Secondary user |
-| Parents | Receive notices/certificates | Correct documents, clear bilingual notices | Indirect |
+| Parents | Receive notices/certificates | Correct documents, clear notices (English; bilingual deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036)) | Indirect |
 | Boards/authorities | Receive submissions | Correct data | Indirect |
 | Platform operator team (SchoolOS) | Builds and runs SchoolOS: owner, engineers, support, billing (roles in 16 §2) | Secure, low-ops platform; provisioning, billing and support tools without access to school data (BR-09) | Operator / supplier |
 
@@ -92,10 +94,10 @@ It is not another ERP. It works alongside the school's existing tools (paper reg
 - Onboarding: Excel/Sheets import, register-photo extraction with human verification
 - Data-quality engine (mismatch rules), findings workflow, maker-checker for identity changes
 - Board/portal pre-check exports (first: CISCE registration check; UDISE+ check)
-- Document library and knowledge base; "Ask the school" with citations (English/Telugu)
+- Document library and knowledge base; "Ask the school" with citations (English; Telugu answers deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036))
 
 ### 7.2 In scope: next modules (M3–M7, see 14-Roadmap)
-Certificates & registers · circulars→tasks and bilingual notices · student timeline & early warning · Tally read connector · multi-school readiness.
+Certificates & registers · circulars→tasks and parent notices (English first, ADR-0036) · student timeline & early warning · Tally read connector · multi-school readiness.
 
 ### 7.3 Out of scope (until an explicit decision)
 Replacing Tally or doing accounting · online fee collection from parents · parent mobile app · LMS/homework · timetable · transport/GPS · biometric attendance · automated submission into government portals (no APIs; exports only) · CCTV.
@@ -110,7 +112,7 @@ Replacing Tally or doing accounting · online fee collection from parents · par
 | BR-04 | Changes to identity fields require an evidence document and approval by a second authorized person (maker-checker). Self-approval is impossible. |
 | BR-05 | Every AI answer cites its sources or says the information was not found. AI never invents official facts. |
 | BR-06 | Users see only what their role and scope allow (e.g., class teachers see their own sections). This applies equally to search and AI answers. |
-| BR-07 | Parent-facing outputs are available in English and Telugu. |
+| BR-07 | Parent-facing outputs are available in English and Telugu. **Telugu deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036)**; English now. |
 | BR-08 | The school owns its data. It can export everything in open formats at any time; on exit, data is deleted and encryption keys destroyed. |
 | BR-09 | Platform staff have no standing access to school data. Support access is time-bound, approved by the school (owner/principal), and audited. |
 | BR-10 | Student insights are used only for educational activities and child safety; never for marketing or profiling beyond that purpose. |
@@ -125,9 +127,9 @@ Replacing Tally or doing accounting · online fee collection from parents · par
 | Process | As-is | To-be with SchoolOS |
 |---|---|---|
 | Board registration (e.g., CISCE Class 9/11) | Exam coordinator types details from register/Excel into CAREERS portal; errors found later | Batch loaded once; pre-check report lists every mismatch and missing field; corrections via maker-checker before typing/upload |
-| Answering "when did X join / leave?" | Search paper registers, ask senior clerk | Ask in English/Telugu; answer cites register page / record |
+| Answering "when did X join / leave?" | Search paper registers, ask senior clerk | Ask in English (or Telugu, answered in English while Telugu is hidden, ADR-0036); answer cites register page / record |
 | Onboarding a school's history | Not possible practically | Import Excel; photograph register pages on demand; clerk confirms extracted rows |
-| Handling a DEO/board circular (M4) | Read, remember, act | Summarized bilingually, deadlines become tasks |
+| Handling a DEO/board circular (M4) | Read, remember, act | Summarized in English (bilingual while `SOS_TELUGU_ENABLED` is on), deadlines become tasks |
 | Issuing a TC or bonafide (M3) | Handwritten/typed, register updated by hand | Generated from the checked record, serial numbered, register entry automatic |
 
 ## 10. Success metrics and KPIs
@@ -176,7 +178,7 @@ Both tiers have the same features, security baseline and data-in-India commitmen
 - Solo founder, student schedule, limited budget → managed services, modular monolith, strong automation
 - DPDP Rules' substantive obligations apply from mid-May 2027; the product must be compliant-by-design before scaling
 - Portal formats change yearly → exports are versioned configurations, not code forks
-- Low digital comfort in offices → print-first, forgiving imports, bilingual UI
+- Low digital comfort in offices → print-first, forgiving imports, plain-English UI (bilingual UI deferred, ADR-0036)
 
 ## 14. Risks and mitigations
 
@@ -191,7 +193,7 @@ Both tiers have the same features, security baseline and data-in-India commitmen
 | Vendor lock-in (IdP, cloud) | Medium | Medium | Interfaces around identity, LLM, embeddings, storage; ADRs record exit paths |
 | Dedicated-tier hosts add operations work | Medium | Medium | Same images and pipeline as shared tier; heartbeat monitoring, automated backups and upgrade waves (10 §15); premium price covers the cost |
 | Unpaid invoices from schools | Medium | Medium | Clear terms before pilot; reminders; grace period; manual review before any suspension |
-| Competitors copy "AI assistant" | High | Medium | Moat = AP portal/format knowledge + clean per-source data + Telugu + office workflows |
+| Competitors copy "AI assistant" | High | Medium | Moat = AP portal/format knowledge + clean per-source data + Telugu (deferred, ADR-0036) + office workflows |
 
 ## 15. Compliance summary (details in 08)
 

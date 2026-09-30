@@ -15,7 +15,9 @@ need:
   ``kb.ask.enabled`` flag; budget from tenancy) and :class:`LedgerMeteringSink`
   (``kb.llm_calls``). Its rate-limit counters follow the process KV store (``authz.kv``).
 - **Tools and the answer loop:** the tools described in ``tools.yaml``; :class:`AnswerEngine`
-  with the ``answer_system`` prompt (v1).
+  with the ``answer_system`` prompt: :data:`ENGLISH_ANSWER_PROMPT` (English only) while Telugu
+  is hidden, :data:`ANSWER_PROMPT` (the question's language) while ``SOS_TELUGU_ENABLED`` is on
+  (ADR-0036; the switch is read through ``app.core.languages`` from the runtime's settings).
 - **Ingestion:** :func:`configure_ingestion` hands ``ingestion.runtime`` a factory for
   :class:`DocumentIngestionPipeline` over ``documents.service`` (:class:`DocumentsServiceSource`),
   the SQL chunk store, the tenant embedder and, while ``contextual_chunks`` is on, the
@@ -39,6 +41,7 @@ from typing import Final
 import app.knowledge.ingestion.hooks
 import app.knowledge.lifecycle  # noqa: F401  (installs the archive/unarchive/delete hooks)
 from app.authz.kv import KVStore, kv_store
+from app.core import languages
 from app.core.config import Settings, get_settings
 from app.knowledge.answer import AnswerEngine
 from app.knowledge.config.contextual import load_contextual_config
@@ -68,6 +71,14 @@ from app.knowledge.tools.documents import DocumentSearch
 from app.knowledge.tools.registry import OfferedTool, build_tools
 
 ANSWER_PROMPT: Final = ("answer_system", 2)
+"""The answer prompt while Telugu is switched on: the question's language (FR-KB-006)."""
+ENGLISH_ANSWER_PROMPT: Final = ("answer_system", 3)
+"""The answer prompt while Telugu is hidden (the default, ADR-0036): English only."""
+
+
+def answer_prompt(telugu: bool) -> tuple[str, int]:
+    """The ``answer_system`` prompt for the Telugu switch (ADR-0036)."""
+    return ANSWER_PROMPT if telugu else ENGLISH_ANSWER_PROMPT
 
 
 class _ProcessKV:
@@ -101,6 +112,12 @@ class Runtime:
     """Contextual chunk headers at ingestion (docs/06 §4.11); None while they are off."""
     conversations: ConversationsConfig = field(default_factory=load_conversations_config)
     """Ask conversations, memory and the answer cache (``conversations.yaml``; ADR-0034)."""
+
+    @property
+    def telugu(self) -> bool:
+        """Whether Telugu output is switched on (``SOS_TELUGU_ENABLED``, ADR-0036): read once,
+        from this runtime's settings, through ``app.core.languages``."""
+        return languages.telugu_enabled(self.settings)
 
 
 def build_runtime(
@@ -151,13 +168,15 @@ def build_runtime(
             tools_config=tools_cfg,
         )
     tools = build_tools(tools_cfg, search)
-    prompt_id, version = ANSWER_PROMPT
+    telugu = languages.telugu_enabled(settings)
+    prompt_id, version = answer_prompt(telugu)
     engine = AnswerEngine(
         gateway=gateway,
         tools=tools,
         search=search,
         config=llm,
         prompt=load_prompt(prompt_id, version),
+        telugu=telugu,
     )
     contextualizer = None
     if rcfg.contextual:

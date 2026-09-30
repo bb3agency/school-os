@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
 
 /**
  * Smoke tests without an identity provider: every console page needs a session, so a
@@ -6,10 +7,20 @@ import { expect, test } from "@playwright/test";
  * Full sign-in is verified manually against the dev OIDC stub (apps/web/README.md).
  */
 test.describe("smoke (SEC-010, NFR-I18N-001, FR-IAM-001)", () => {
-  test("console pages send visitors to sign-in, keeping the return path", async ({ request }) => {
+  test(`console pages send visitors to sign-in, keeping the return path ${TELUGU}`, async ({
+    request,
+  }, testInfo) => {
+    // ADR-0036: with Telugu off, /te first goes to the same English page.
+    const telugu = teluguOn(testInfo);
     for (const [path, login] of [
       ["/en/settings/users", "/bff/auth/login?next=%2Fen%2Fsettings%2Fusers"],
-      ["/te/platform/schools", "/bff/auth/platform/login?next=%2Fte%2Fplatform%2Fschools"],
+      ["/en/platform/schools", "/bff/auth/platform/login?next=%2Fen%2Fplatform%2Fschools"],
+      [
+        "/te/platform/schools",
+        telugu
+          ? "/bff/auth/platform/login?next=%2Fte%2Fplatform%2Fschools"
+          : "/en/platform/schools",
+      ],
     ] as const) {
       const response = await request.get(path, { maxRedirects: 0 });
       expect(response.status(), path).toBe(307);
@@ -39,7 +50,10 @@ test.describe("smoke (SEC-010, NFR-I18N-001, FR-IAM-001)", () => {
     expect(violations).toEqual([]);
   });
 
-  test("switching to Telugu keeps the page and renders Telugu text", async ({ page }) => {
+  test(`switching to Telugu keeps the page and renders Telugu text ${TELUGU}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(!teluguOn(testInfo), TELUGU_OFF_REASON);
     await page.goto("/en/signed-out?kind=operator");
     await page.getByRole("link", { name: "తెలుగు" }).click();
     await expect(page).toHaveURL(/\/te\/signed-out/);

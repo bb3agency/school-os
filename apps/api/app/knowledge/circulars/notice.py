@@ -10,6 +10,10 @@ Never from student records: the caller has no way to pass them (invariant 8, CLA
 a field, not a record"; here no student field at all). The draft comes back as four strings; the
 Telugu ones must use Telugu script, every value is cut to the configured length and passed
 through ``core.redaction.redact`` (masks phones, emails, Aadhaar numbers) before it is stored.
+
+English first (ADR-0036): while Telugu is hidden (``telugu`` false) the model is asked for the
+English part only (:data:`ENGLISH_SCHEMA`), the Telugu fields come back empty and an English
+field written in Telugu script is dropped (empty), so nothing in Telugu reaches a notice.
 """
 
 from __future__ import annotations
@@ -44,6 +48,19 @@ SCHEMA: Final[dict[str, Any]] = {
 }
 
 
+ENGLISH_SCHEMA: Final[dict[str, Any]] = {
+    **SCHEMA,
+    "required": ["title_en", "body_en"],
+    "properties": {k: v for k, v in SCHEMA["properties"].items() if k.endswith("_en")},
+}
+"""The schema while Telugu is hidden (ADR-0036): the English notice only."""
+
+
+def schema_for(telugu: bool) -> dict[str, Any]:
+    """The notice schema for the Telugu switch (``app.core.languages``)."""
+    return SCHEMA if telugu else ENGLISH_SCHEMA
+
+
 @dataclass(frozen=True, slots=True)
 class ConfirmedDeadline:
     due_on: dt.date
@@ -64,7 +81,9 @@ class NoticeDraft:
     title_en: str
     body_en: str
     title_te: str
+    """Empty while Telugu is hidden (ADR-0036)."""
     body_te: str
+    """Empty while Telugu is hidden (ADR-0036)."""
 
 
 def has_personal_numbers(text: str) -> bool:
@@ -114,26 +133,40 @@ def build_request(source: NoticeSource, config: NoticeConfig) -> str:
     return head + "".join(lines)
 
 
-def _field(raw: Mapping[str, object], key: str, limit: int, *, telugu: bool) -> str:
+def _field(
+    raw: Mapping[str, object], key: str, limit: int, *, telugu: bool, english_only: bool = False
+) -> str:
     value = raw.get(key)
     if not isinstance(value, str):
         return ""
     text = _tidy(redact(value))
     if telugu and not _TELUGU.search(text):
         return ""
+    if english_only and _TELUGU.search(text):
+        return ""
     return _cut(text, limit)
 
 
-def validate_notice(raw: Mapping[str, object], config: NoticeConfig) -> NoticeDraft:
+def validate_notice(
+    raw: Mapping[str, object], config: NoticeConfig, *, telugu: bool
+) -> NoticeDraft:
+    """The draft as stored. ``telugu``: ``app.core.languages.telugu_enabled()``; with it off
+    the Telugu fields are empty and no field holds Telugu script (ADR-0036)."""
+    english_only = not telugu
     return NoticeDraft(
-        title_en=_field(raw, "title_en", config.max_title_chars, telugu=False),
-        body_en=_field(raw, "body_en", config.max_body_chars, telugu=False),
-        title_te=_field(raw, "title_te", config.max_title_chars, telugu=True),
-        body_te=_field(raw, "body_te", config.max_body_chars, telugu=True),
+        title_en=_field(
+            raw, "title_en", config.max_title_chars, telugu=False, english_only=english_only
+        ),
+        body_en=_field(
+            raw, "body_en", config.max_body_chars, telugu=False, english_only=english_only
+        ),
+        title_te=_field(raw, "title_te", config.max_title_chars, telugu=True) if telugu else "",
+        body_te=_field(raw, "body_te", config.max_body_chars, telugu=True) if telugu else "",
     )
 
 
 __all__ = [
+    "ENGLISH_SCHEMA",
     "SCHEMA",
     "SCHEMA_TAG",
     "ConfirmedDeadline",

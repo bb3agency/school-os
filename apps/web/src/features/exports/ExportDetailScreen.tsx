@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
 import { useRetentionDays } from "@/features/admin/data";
 import { attributeLabel } from "@/features/findings/data";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
@@ -214,6 +215,7 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
   const tk = useTranslations("exports.kind");
   const tf = useTranslations("exports.format");
   const tl = useTranslations("exports.language");
+  const telugu = useTeluguEnabled();
   const tstatus = useTranslations("exports.status");
   const tc = useTranslations("common");
   const tn = useTranslations("school.nav");
@@ -301,7 +303,7 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
           <Item label={td("formats")}>
             {(row.formats ?? []).map((format) => tf(format)).join(", ")}
           </Item>
-          <Item label={td("language")}>{tl(row.language)}</Item>
+          {telugu ? <Item label={td("language")}>{tl(row.language)}</Item> : null}
           <Item label={td("restricted")}>
             {row.include_sensitive ? td("restrictedYes") : td("restrictedNo")}
           </Item>

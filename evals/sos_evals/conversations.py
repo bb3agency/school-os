@@ -121,6 +121,10 @@ class TurnResult(_Model):
     """The step whose answer was reused (exact-repeat cache), else None."""
     memories_after: tuple[str, ...] = ()
     """The asker's stored memory items after the step."""
+    title: str | None = None
+    """The conversation title shown with the step (English-first pass, ADR-0036)."""
+    language: str | None = None
+    """The answer's language the system reported (SSE ``meta.language``)."""
 
 
 class ConversationRun(_Model):

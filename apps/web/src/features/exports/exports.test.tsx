@@ -233,7 +233,8 @@ describe("new pre-check (US-501 AC4, FR-EXP-001..004, SEC-005)", () => {
   it("sends chosen sections, one file type and Telugu", async () => {
     setMe([BOARD, READ_BASIC, FINDINGS]);
     stub.routes["POST /bff/api/v1/exports"] = created;
-    renderWithIntl(<NewPrecheckScreen params={parseNewPrecheckParams({})} />);
+    // Telugu switched on explicitly (ADR-0036): the file language is offered only then.
+    renderWithIntl(<NewPrecheckScreen params={parseNewPrecheckParams({})} />, { telugu: true });
     await userEvent.click(await screen.findByRole("radio", { name: "Some sections" }));
     await userEvent.click(await screen.findByRole("checkbox", { name: "Class 9 · A" }));
     await userEvent.click(screen.getByRole("checkbox", { name: "PDF" }));
@@ -245,6 +246,20 @@ describe("new pre-check (US-501 AC4, FR-EXP-001..004, SEC-005)", () => {
       format: ["xlsx"],
       language: "te",
     });
+  });
+
+  it("with Telugu switched off, offers no file language and sends English (ADR-0036)", async () => {
+    setMe([BOARD, READ_BASIC, FINDINGS]);
+    stub.routes["POST /bff/api/v1/exports"] = created;
+    const { container } = renderWithIntl(<NewPrecheckScreen params={parseNewPrecheckParams({})} />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Some sections" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Class 9 · A" }));
+    expect(screen.queryByRole("radio", { name: "Telugu" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "English" })).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    await userEvent.click(screen.getByRole("button", { name: "Make the pre-check" }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/exports")).toHaveLength(1));
+    expect(body("POST /bff/api/v1/exports")).toMatchObject({ language: "en" });
   });
 
   it("checks the form before sending: a file type and a section are needed", async () => {

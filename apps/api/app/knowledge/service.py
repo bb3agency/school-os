@@ -43,8 +43,8 @@ from typing import TYPE_CHECKING, Final
 
 from app.audit import service as audit
 from app.authz.kv import KVUnavailable, kv_store
+from app.core import languages, retention
 from app.core import purge as purging
-from app.core import retention
 from app.core.db import tenant_session
 from app.core.errors import (
     Conflict,
@@ -76,6 +76,7 @@ from app.knowledge.answer import (
     AskContext,
     CitedSource,
     Progress,
+    answer_language,
     detect_language,
     elapsed_ms,
     normalise,
@@ -290,7 +291,7 @@ class SchoolKnowledgeService:
         cid = conversation_id or new_id()
         legacy = repo.session_questions(session, cid, ctx.user_id) if conversation_id else []
         first = (conversations.question_of(session, legacy[0]) if legacy else None) or question
-        title = conversations.derive_title(first)
+        title = conversations.derive_title(first, telugu=self.runtime.telugu)
         blob, version = conversations.seal(
             session,
             title,
@@ -430,6 +431,11 @@ class SchoolKnowledgeService:
             question = self._question(ctx, request)
             conversation, new = self._conversation_for(session, ctx, request, question, now)
         memory_on = self._memory_on(session, ctx)
+        # ADR-0036: the question is accepted in any script and searched as written; the answer's
+        # language (shown in `meta`, stored in kb.queries.language) is English while Telugu is
+        # hidden. The detected style of the question stays audit data only.
+        detected = detect_language(question)
+        language = answer_language(detected, telugu=self.runtime.telugu)
         turns: tuple[HistoryTurn, ...] = ()
         summary: str | None = None
         if not new:
@@ -466,11 +472,13 @@ class SchoolKnowledgeService:
                 visibility=visibility,
                 cfg=self.runtime.conversations.answer_cache,
                 now=now,
+                language=language,
             )
         return _Plan(
             query_id=new_id(),
             question=question,
-            language=detect_language(question),
+            language=language,
+            question_language=detected,
             conversation_id=conversation.id,
             title=conversations.title_of(session, conversation),
             new_conversation=new,
@@ -520,6 +528,7 @@ class SchoolKnowledgeService:
                 "mode": "full",
                 "status": "streaming",
                 "language": plan.language,
+                "question_language": plan.question_language,
                 "earlier_questions": len(plan.context.turns),
                 "conversation_id": str(plan.conversation_id),
                 "new_conversation": plan.new_conversation,
@@ -1426,6 +1435,9 @@ class _Plan:
     query_id: uuid.UUID
     question: str
     language: Locale
+    """The answer's language (ADR-0036: ``en`` while Telugu is hidden)."""
+    question_language: Locale
+    """The question's detected style (en, te, mixed): audit data, never the output language."""
     conversation_id: uuid.UUID
     title: str
     new_conversation: bool
@@ -1679,6 +1691,7 @@ class _Run:
                 answer=result.text,
                 language=result.language,
                 memory_wanted=plan.memory_on,
+                telugu=svc.runtime.telugu,
             )
             self.followups = found.questions
             if found.memory is not None and plan.memory_on:
@@ -1995,7 +2008,7 @@ def adopt_conversations(session: Session, *, limit: int = ADOPT_BATCH) -> int:
         first = conversations.question_of(session, rows[0]) if rows else None
         if first is None:
             continue
-        title = conversations.derive_title(first)
+        title = conversations.derive_title(first, telugu=languages.telugu_enabled())
         blob, version = conversations.seal(
             session,
             title,

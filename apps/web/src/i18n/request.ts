@@ -1,21 +1,17 @@
-import { hasLocale } from "next-intl";
 import { getRequestConfig } from "next-intl/server";
-import type enMessages from "../../messages/en.json";
-import { routing } from "./routing";
+import { loadMessages } from "./messages";
 
 export const TIME_ZONE = "Asia/Kolkata";
 
+/**
+ * Per-request locale and messages. Telugu only when it is switched on (ADR-0036,
+ * `SOS_TELUGU_ENABLED`); a `te` request with it off renders in English.
+ */
 export default getRequestConfig(async ({ requestLocale }) => {
-  const requested = await requestLocale;
-  const locale = hasLocale(routing.locales, requested) ? requested : routing.defaultLocale;
-  const messages = (await import(`../../messages/${locale}.json`)) as {
-    default: IntlMessages;
-  };
+  const { locale, messages } = await loadMessages(await requestLocale);
   return {
     locale,
-    messages: messages.default,
+    messages,
     timeZone: TIME_ZONE,
   };
 });
-
-type IntlMessages = typeof enMessages;

@@ -159,6 +159,8 @@ describe("school sidebar: school, account and top bar (docs/17 §5.2)", () => {
       <SchoolShell topbarActions={<button type="button">Notifications</button>}>
         <p>x</p>
       </SchoolShell>,
+      // Telugu switched on explicitly (ADR-0036): the language switch exists only then.
+      { telugu: true },
     );
     const bar = within(screen.getByRole("banner"));
     expect(bar.getByRole("button", { name: "Notifications" })).toBeInTheDocument();

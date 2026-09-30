@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useEnabledLocales } from "@/i18n/LanguagesProvider";
 import { Link, usePathname } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
 import { cn } from "@/lib/cn";
@@ -9,11 +10,16 @@ import { cn } from "@/lib/cn";
  * The languages to offer. Inside a school: the school's `languages` from GET /me (FR-TEN-012)
  * in its order (the first is the school's default), known codes only, English if nothing
  * usable is left. Outside a school (`undefined`/`null`): every language the app has.
+ * Only languages that are switched on count (`enabled`; ADR-0036: English only while
+ * SOS_TELUGU_ENABLED is off).
  */
-export function offeredLanguages(languages: readonly string[] | null | undefined): Locale[] {
-  if (!languages) return [...routing.locales];
+export function offeredLanguages(
+  languages: readonly string[] | null | undefined,
+  enabled: readonly Locale[] = routing.locales,
+): Locale[] {
+  if (!languages) return [...enabled];
   const known = languages.filter((code): code is Locale =>
-    (routing.locales as readonly string[]).includes(code),
+    (enabled as readonly string[]).includes(code),
   );
   const unique = [...new Set(known)];
   return unique.length > 0 ? unique : ["en"];
@@ -23,7 +29,7 @@ export function offeredLanguages(languages: readonly string[] | null | undefined
  * Switch between English and Telugu on the same page. Plain links (work without JS);
  * each language name is shown in its own script and marked with its own `lang`.
  * `languages` limits the choice to the school's languages; nothing is shown when the only
- * one offered is already in use.
+ * one offered is already in use, and never while Telugu is switched off (ADR-0036).
  */
 export function LanguageSwitcher({
   tone = "light",
@@ -35,7 +41,9 @@ export function LanguageSwitcher({
   const t = useTranslations("language");
   const locale = useLocale();
   const pathname = usePathname() ?? "/";
-  const offered = offeredLanguages(languages);
+  const enabled = useEnabledLocales();
+  if (enabled.length < 2) return null;
+  const offered = offeredLanguages(languages, enabled);
   if (offered.length === 1 && offered[0] === locale) return null;
   return (
     <nav aria-label={t("label")} data-print="hide">

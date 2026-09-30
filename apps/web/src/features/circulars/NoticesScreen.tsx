@@ -12,6 +12,7 @@ import { TextAreaField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -100,6 +101,7 @@ function NewNoticeCard() {
  */
 export function NoticesScreen() {
   const t = useTranslations("notices");
+  const telugu = useTeluguEnabled();
   const tn = useTranslations("school.nav");
   const can = useStaffCan();
   const meLoaded = useStaffMe() !== undefined;
@@ -145,7 +147,7 @@ export function NoticesScreen() {
                               >
                                 {notice.title_en || t("untitled")}
                               </Link>
-                              {notice.title_te ? (
+                              {telugu && notice.title_te ? (
                                 <p lang="te" className="text-sm text-ink-muted">
                                   {notice.title_te}
                                 </p>

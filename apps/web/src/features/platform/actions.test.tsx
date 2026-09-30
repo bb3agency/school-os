@@ -732,7 +732,8 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     stub.routes["POST /bff/api/v1/platform/announcements"] = () =>
       Response.json({}, { status: 201 });
     const user = userEvent.setup();
-    renderWithIntl(<AnnouncementsScreen />);
+    // Telugu switched on explicitly (ADR-0036): the Telugu texts are asked for only then.
+    renderWithIntl(<AnnouncementsScreen />, { telugu: true });
     const a = pm.announcements;
     const enPanel = screen.getByRole("tabpanel", { name: a.english });
     await user.type(within(enPanel).getByLabelText(a.titleLabel), "Maintenance on Sunday");
@@ -768,6 +769,35 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
       severity: "maintenance",
       starts_at: "2026-09-27T00:30:00.000Z",
       ends_at: "2026-09-27T01:30:00.000Z",
+    });
+  });
+
+  it("announcements with Telugu switched off: English only; the API's Telugu fields get the English text (ADR-0036)", async () => {
+    stub.routes["GET /bff/api/v1/platform/announcements"] = () => page([]);
+    stub.routes["POST /bff/api/v1/platform/announcements"] = () =>
+      Response.json({}, { status: 201 });
+    const user = userEvent.setup();
+    const { container } = renderWithIntl(<AnnouncementsScreen />);
+    const a = pm.announcements;
+    expect(screen.queryByRole("tab", { name: a.telugu })).toBeNull();
+    expect(screen.queryByText(a.bothLanguagesHint)).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    await user.click(screen.getByRole("button", { name: a.save }));
+    expect(await screen.findAllByText(messages.en.validation.required)).not.toHaveLength(0);
+    expect(screen.queryByText(messages.en.validation.bothLanguages)).toBeNull();
+    await user.type(screen.getByLabelText(a.titleLabel), "Maintenance on Sunday");
+    await user.type(screen.getByLabelText(a.bodyLabel), "SchoolOS is unavailable 06:00–07:00.");
+    await user.type(screen.getByLabelText(a.startsAt), "2026-09-27T06:00");
+    await user.type(screen.getByLabelText(a.endsAt), "2026-09-27T07:00");
+    await user.click(screen.getByRole("button", { name: a.save }));
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/platform/announcements")).toHaveLength(1),
+    );
+    expect(bodyOf("POST /bff/api/v1/platform/announcements")).toMatchObject({
+      title_en: "Maintenance on Sunday",
+      title_te: "Maintenance on Sunday",
+      body_en: "SchoolOS is unavailable 06:00–07:00.",
+      body_te: "SchoolOS is unavailable 06:00–07:00.",
     });
   });
 

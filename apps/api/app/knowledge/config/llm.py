@@ -260,6 +260,13 @@ class Conversation(ConfigModel):
         max_length=300,
     )
     """Introduces the original follow-up when the model is given its standalone rewrite."""
+    rewritten_header_english: str = Field(
+        default="The question as the user wrote it (answer in English):",
+        min_length=10,
+        max_length=300,
+    )
+    """The same while Telugu is hidden (ADR-0036): the answer is English whatever the
+    question's language."""
 
 
 class QueryLog(ConfigModel):

@@ -368,7 +368,10 @@ def _source_text(admin: Engine, notice_id: Any) -> str | None:
 def test_US_1605_notice_from_a_circular_is_bilingual_and_never_sees_students(
     ai_on: Any, api: Any, admin_engine: Engine, installed: Any
 ) -> None:
-    _store, transport, _pdf = installed
+    _store, _transport, _pdf = installed
+    # ADR-0036: the bilingual output is the Telugu-on path, so it runs with the switch on
+    # explicitly; English first (the default) is pinned in tests/knowledge.
+    _runtime, transport = C.KB.install_runtime(telugu=True)
     document_id = C.read_circular(admin_engine, ai_on.a)
     office = ai_on.person("office_staff")
     res = api.call(

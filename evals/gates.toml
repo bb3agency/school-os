@@ -59,6 +59,8 @@ severity = "soft"
 requirements = ["FR-KB-005"]
 
 [[gate]]
+# Telugu questions answered in Telugu: measured with SOS_TELUGU_ENABLED on (the dormant Telugu
+# path, ADR-0036); the English-first default has its own hard gates at the end of this file.
 metric = "language_match"
 op = ">="
 threshold = 0.98
@@ -241,3 +243,26 @@ op = ">="
 threshold = 0.90
 severity = "soft"
 requirements = ["ADR-0034"]
+
+# --- English first, Telugu hidden (sos_evals.english_first; ADR-0036; PO 2026-09-30) ---------------
+# Every gate above runs with SOS_TELUGU_ENABLED ON, so the dormant Telugu capability keeps its
+# datasets and gates (language_match and followup_language_match expect Telugu for Telugu
+# questions). This pass then switches Telugu OFF, the product default, and replays every Telugu
+# and code-mixed question, circular (reading and notice draft) and conversation: nothing the system
+# writes may contain Telugu script (U+0C00-U+0C7F) or report a language other than "en", and every
+# answer to a Telugu or code-mixed question must be English. Source quotes and cited passages are
+# the school's own words and are not counted. A probe that shows nothing counts as a failure.
+
+[[gate]]
+metric = "english_first_telugu_outputs"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["ADR-0036", "FR-KB-006"]
+
+[[gate]]
+metric = "english_first_english_answer_rate"
+op = ">="
+threshold = 1.0
+severity = "hard"
+requirements = ["ADR-0036", "FR-KB-006"]

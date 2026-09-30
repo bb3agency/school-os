@@ -18,7 +18,8 @@ from datetime import date
 from typing import ClassVar, Literal
 
 Locale = Literal["en", "te", "mixed"]
-"""Language style of a question, block or answer (docs/06 §11; FR-KB-006)."""
+"""Language style of a question, block or answer (docs/06 §11; FR-KB-006). An answer's is
+always ``en`` while Telugu is hidden (ADR-0036, ``app.core.languages``)."""
 
 InputType = Literal["document", "query"]
 """What an embedding is for (ADR-0006: ``embed(texts, input_type)``)."""
@@ -305,6 +306,9 @@ class UserMessage:
     asked_as: str | None = None
     """The question as the user wrote it, when ``text`` is its standalone rewrite (docs/06
     §5 query rewrite): shown to the model so it answers in the user's language."""
+    english: bool = False
+    """English first (ADR-0036): Telugu is hidden, so the answer is English whatever the
+    question's language (the header before ``asked_as`` says so)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,6 +374,8 @@ class MetaEvent:
     event: ClassVar[str] = "meta"
     query_id: uuid.UUID
     language: Locale
+    """The answer's language: ``en`` while Telugu is hidden (ADR-0036), whatever the
+    question's script; with ``SOS_TELUGU_ENABLED`` on, the question's style (FR-KB-006)."""
     mode: AskMode
     conversation_id: uuid.UUID | None = None
     """The conversation the question belongs to (a new one when none was named)."""
@@ -396,8 +402,9 @@ class StatusEvent:
 
 @dataclass(frozen=True, slots=True)
 class FollowupsEvent:
-    """Up to 3 short follow-up questions in the answer's language, after ``final`` (empty in
-    search-only mode, when the budget is used up or when the answer was not found)."""
+    """Up to 3 short follow-up questions in the answer's language (English while Telugu is
+    hidden, ADR-0036), after ``final`` (empty in search-only mode, when the budget is used up or
+    when the answer was not found)."""
 
     event: ClassVar[str] = "followups"
     questions: tuple[str, ...] = ()
@@ -450,7 +457,8 @@ class ErrorEvent:
     type: str
     """e.g. ``budget_exhausted``; a code, never free text."""
     message_key: str
-    """An i18n key (``kb.errors.budget``); the UI renders it in en/te."""
+    """An i18n key (``kb.errors.budget``); the UI renders it in the shown language (English
+    while Telugu is hidden, ADR-0036)."""
 
 
 @dataclass(frozen=True, slots=True)

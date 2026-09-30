@@ -63,4 +63,28 @@ describe("server/client boundary", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  it("only server code reads the Telugu switch; client code asks LanguagesProvider (ADR-0036)", () => {
+    const readers =
+      /from\s+"(@\/i18n\/languages|\.\/languages|@\/i18n\/messages|@\/i18n\/telugu-font(?:-files)?)"/;
+    const offenders = files(src)
+      .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+      .filter((file) => {
+        const text = readFileSync(file, "utf8");
+        return text.startsWith('"use client"') && readers.test(text);
+      })
+      .map((file) => file.slice(src.length));
+    expect(offenders).toEqual([]);
+    const direct = files(src)
+      .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+      .filter((file) => !file.endsWith(join("i18n", "languages.ts")))
+      .filter((file) => readFileSync(file, "utf8").includes("SOS_TELUGU_ENABLED"))
+      .map((file) => file.slice(src.length));
+    // Comments may name the variable; only languages.ts reads it.
+    for (const file of direct) {
+      expect(readFileSync(join(src, file), "utf8"), file).not.toMatch(
+        /process\.env(\.SOS_TELUGU_ENABLED|\[["']SOS_TELUGU_ENABLED)/,
+      );
+    }
+  });
 });

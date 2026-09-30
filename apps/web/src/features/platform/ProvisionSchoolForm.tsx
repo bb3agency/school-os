@@ -14,6 +14,7 @@ import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { formValues, useApiForm, zodErrorKeys } from "@/lib/forms";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { translateOr } from "@/lib/i18n-dynamic";
 import { BillingAccountFields } from "./BillingAccountFields";
 import { PK, planLabel, usePlanDirectory } from "./data";
@@ -37,6 +38,7 @@ const fieldId = (field: string) => `provision-${field.replace(/\./g, "-")}`;
  */
 export function ProvisionSchoolForm() {
   const t = useTranslations("platform.provision");
+  const telugu = useTeluguEnabled();
   const tv = useTranslations("validation");
   const tc = useTranslations("common");
   const tmode = useTranslations("deploymentMode");
@@ -415,16 +417,21 @@ export function ProvisionSchoolForm() {
             spellCheck={false}
             maxLength={255}
           />
-          <SelectField
-            id={fieldId("owner.language")}
-            name="owner.language"
-            label={t("fields.ownerLanguage")}
-            defaultValue="en"
-            options={[
-              { value: "en", label: "English" },
-              { value: "te", label: "తెలుగు" },
-            ]}
-          />
+          {/* ADR-0036: the owner's language is asked for only while Telugu is switched on. */}
+          {telugu ? (
+            <SelectField
+              id={fieldId("owner.language")}
+              name="owner.language"
+              label={t("fields.ownerLanguage")}
+              defaultValue="en"
+              options={[
+                { value: "en", label: "English" },
+                { value: "te", label: "తెలుగు" },
+              ]}
+            />
+          ) : (
+            <input type="hidden" name="owner.language" value="en" />
+          )}
         </fieldset>
 
         <fieldset hidden={step !== "plan"} className="space-y-4">

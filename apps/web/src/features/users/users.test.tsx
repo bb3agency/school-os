@@ -274,6 +274,23 @@ describe("invite user (US-102 AC1, FR-IAM-010..012)", () => {
     });
   });
 
+  it("with Telugu switched off, the invitation asks for no language and sends English (ADR-0036)", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    stub.routes["POST /bff/api/v1/users"] = () =>
+      Response.json(user({ id: CREATED, status: "invited" }), { status: 201 });
+    const { container } = renderWithIntl(<InviteUserScreen />);
+    await userEvent.type(await screen.findByLabelText("Name"), "Lakshmi Sample");
+    expect(screen.queryByRole("radio", { name: "English" })).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    await userEvent.type(screen.getByLabelText("Sign-in ID"), "synthetic|synth-a|teacher|9");
+    await userEvent.click(screen.getByLabelText("Class teacher"));
+    await userEvent.click(screen.getByLabelText("Only some classes or sections"));
+    await userEvent.click(await screen.findByLabelText("Class 9 · A"));
+    await userEvent.click(screen.getByRole("button", { name: "Send invitation" }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/users")).toHaveLength(1));
+    expect(body("POST /bff/api/v1/users")).toMatchObject({ preferred_language: "en" });
+  });
+
   it("greys out the roles the API marks not grantable, and explains 403 role_not_grantable", async () => {
     setMe([MANAGE, READ_BASIC], ["office_staff"]);
     serveRoles(["owner", "office_admin", "librarian"]);
@@ -622,13 +639,32 @@ describe("edit a staff member's details (US-102, FR-IAM-010)", () => {
     setMe([MANAGE, READ_BASIC]);
     serveUser(user());
     stub.routes[PATCH] = () => problem(409, "invalid_state");
-    renderWithIntl(<UserDetailScreen userId={USER} />);
+    // Telugu switched on explicitly (ADR-0036): the language is offered only then.
+    renderWithIntl(<UserDetailScreen userId={USER} />, { telugu: true });
     const dialog = await openEdit();
     await userEvent.selectOptions(within(dialog).getByLabelText(detailCopy.edit.language), "en");
     await userEvent.click(within(dialog).getByRole("button", { name: detailCopy.edit.submit }));
     expect(
       await within(dialog).findByText(messages.en.school.users.errors.invalid_state.title),
     ).toBeInTheDocument();
+  });
+
+  it("with Telugu switched off, no language is shown, asked for or sent (ADR-0036)", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    // The fixture's preferred language is Telugu: it stays stored, never shown.
+    serveUser(user());
+    stub.routes[PATCH] = () => Response.json(user({ display_name: "Lakshmi K", version: 4 }));
+    const { container } = renderWithIntl(<UserDetailScreen userId={USER} />);
+    const dialog = await openEdit();
+    expect(within(dialog).queryByLabelText(detailCopy.edit.language)).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    expect(dialog.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    const name = within(dialog).getByLabelText(detailCopy.edit.name);
+    await userEvent.clear(name);
+    await userEvent.type(name, "Lakshmi K");
+    await userEvent.click(within(dialog).getByRole("button", { name: detailCopy.edit.submit }));
+    await waitFor(() => expect(stub.callsTo(PATCH)).toHaveLength(1));
+    expect(body(PATCH, 0)).toEqual({ display_name: "Lakshmi K" });
   });
 
   it("is not offered for a removed person or without user.manage", async () => {

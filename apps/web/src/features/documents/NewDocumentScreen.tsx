@@ -11,6 +11,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { FileDropZone, fileInputClasses } from "@/features/imports/parts";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
 import { newIdempotencyKey, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
@@ -53,10 +54,16 @@ export function NewDocumentScreen() {
   const api = useBffClient("staff");
   const router = useRouter();
   const keys = useRef(createUploadKeys(newIdempotencyKey));
+  const telugu = useTeluguEnabled();
 
   const form = useApiForm({
     schema: newDocumentSchema,
-    extra: (element) => ({ ...chosenFile(element), ...aclExtra(element) }),
+    extra: (element) => ({
+      ...chosenFile(element),
+      ...aclExtra(element),
+      // ADR-0036: the language is not asked for while Telugu is switched off (unknown).
+      ...(telugu ? {} : { language: "" }),
+    }),
     fieldMap: documentFieldMap,
     invalidate: [DOCUMENT_KEYS.all],
     submit: async (data, key) => {
@@ -142,14 +149,16 @@ export function NewDocumentScreen() {
               required
               error={errors.doc_type}
             />
-            <SelectField
-              name="language"
-              label={t("language")}
-              hint={t("languageHint")}
-              placeholder={t("languageUnknown")}
-              options={DOC_LANGUAGES.map((value) => ({ value, label: tlang(value) }))}
-              error={errors.language}
-            />
+            {telugu ? (
+              <SelectField
+                name="language"
+                label={t("language")}
+                hint={t("languageHint")}
+                placeholder={t("languageUnknown")}
+                options={DOC_LANGUAGES.map((value) => ({ value, label: tlang(value) }))}
+                error={errors.language}
+              />
+            ) : null}
             <TextField
               name="issuer"
               label={t("issuer")}

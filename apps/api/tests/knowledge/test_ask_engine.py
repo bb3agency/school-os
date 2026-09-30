@@ -7,6 +7,10 @@ valid supports the answer), §9 rule 3 (too many uncited facts -> search-only), 
 SEC-019 (no external links or HTML in the answer), FR-KB-011 (budget exhausted -> search-only
 with the reason), SEC-020 (tools offered only with their permission, at most 3 rounds, the
 12k-token context budget) and invariant 9 (a failing tool is reported, nothing else happens).
+
+English first (ADR-0036): Telugu-output tests build the engine with the Telugu switch ON
+explicitly (``telugu=True``) and keep their assertions; the ``english_first`` tests pin the
+default (switch off).
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ from app.authz.context import Scopes, UserContext
 from app.core.redaction import verhoeff_check_digit
 from app.knowledge.answer import (
     AnswerEngine,
+    answer_language,
     detect_language,
     normalise,
     sanitise,
@@ -41,8 +46,10 @@ from app.knowledge.domain import (
     ToolResultsMessage,
     ToolSpec,
     Usage,
+    UserMessage,
 )
 from app.knowledge.gateway.errors import BudgetExhausted, GatewayMisuse
+from app.knowledge.gateway.fake_language import ENGLISH_ONLY
 from app.knowledge.prompts.registry import load_prompt
 from app.knowledge.tools.documents import DocumentSearch
 from app.knowledge.tools.registry import OfferedTool
@@ -94,6 +101,7 @@ class ScriptedGateway:
     turns: list[ModelTurn | Exception]
     seen_tools: list[list[str]] = field(default_factory=list)
     conversations: list[list[ConversationItem]] = field(default_factory=list)
+    systems: list[str] = field(default_factory=list)
 
     def run_turn(
         self,
@@ -108,6 +116,7 @@ class ScriptedGateway:
         assert metering.query_id is not None
         self.seen_tools.append([t.name for t in tools])
         self.conversations.append(list(conversation))
+        self.systems.append(system)
         nxt = self.turns.pop(0)
         if isinstance(nxt, Exception):
             raise nxt
@@ -175,13 +184,18 @@ def engine(
     gateway: ScriptedGateway,
     tools: Sequence[FakeTool] = (),
     search: FakeSearch | None = None,
+    *,
+    telugu: bool = False,
+    prompt: Any = PROMPT,
 ) -> AnswerEngine:
+    """The engine; ``telugu``: SOS_TELUGU_ENABLED (ADR-0036), with its prompt when on."""
     return AnswerEngine(
         gateway=gateway,
         tools={t.name: cast(OfferedTool, t) for t in tools},
         search=cast(DocumentSearch, search or FakeSearch()),
         config=CONFIG,
-        prompt=PROMPT,
+        prompt=prompt,
+        telugu=telugu,
     )
 
 
@@ -248,7 +262,7 @@ def test_FR_KB_005_cited_text_matches_after_whitespace_normalisation() -> None:
 
 def test_FR_KB_007_no_tool_results_answers_not_found_in_the_question_language() -> None:
     gw = ScriptedGateway([turn(AnswerSegment("ఈత కొలను 2026లో తెరుస్తారు."))])
-    answer = run(engine(gw, [search_tool()]), question="పాఠశాల ఈత కొలను ఎప్పుడు తెరుస్తారు?")
+    answer = run(engine(gw, [search_tool()], telugu=True), question="పాఠశాల ఈత కొలను ఎప్పుడు తెరుస్తారు?")
     assert answer.status == "not_found"
     assert answer.language == "te"
     assert answer.text == CONFIG.answer_checks.not_found.te
@@ -256,7 +270,7 @@ def test_FR_KB_007_no_tool_results_answers_not_found_in_the_question_language() 
 
 def test_FR_KB_006_code_mixed_telugu_question_gets_the_telugu_not_found() -> None:
     gw = ScriptedGateway([turn(AnswerSegment("Nothing."))])
-    answer = run(engine(gw, [search_tool()]), question="9B ఫీల్డ్ ట్రిప్ ఎప్పుడు?")
+    answer = run(engine(gw, [search_tool()], telugu=True), question="9B ఫీల్డ్ ట్రిప్ ఎప్పుడు?")
     assert answer.language == "mixed"
     assert answer.text == CONFIG.answer_checks.not_found.te
 
@@ -388,3 +402,73 @@ def test_FR_KB_006_language_by_script(text: str, expected: str) -> None:
 
 def test_normalise_is_nfc_casefold_and_collapses_whitespace() -> None:
     assert normalise("  A\n\tB  ") == "a b"
+
+
+# --- English first (ADR-0036): SOS_TELUGU_ENABLED off, the default ------------------------------
+
+TELUGU_QUESTIONS = ("పాఠశాల ఈత కొలను ఎప్పుడు తెరుస్తారు?", "9B ఫీల్డ్ ట్రిప్ ఎప్పుడు?")
+
+
+def _has_telugu(text: str) -> bool:
+    return any("\u0c00" <= ch <= "\u0c7f" for ch in text)
+
+
+@pytest.mark.parametrize("question", TELUGU_QUESTIONS, ids=["te", "mixed"])
+def test_english_first_telugu_question_gets_the_english_not_found(question: str) -> None:
+    gw = ScriptedGateway([turn(AnswerSegment("Nothing."))])
+    answer = run(engine(gw, [search_tool()]), question=question)
+    assert answer.status == "not_found"
+    assert answer.language == "en"
+    assert answer.text == CONFIG.answer_checks.not_found.en
+
+
+@pytest.mark.parametrize("question", TELUGU_QUESTIONS, ids=["te", "mixed"])
+def test_english_first_telugu_question_is_accepted_searched_and_answered_in_english(
+    question: str,
+) -> None:
+    gw = ScriptedGateway([turn(calls=[search_call()]), turn(cited("Exams begin on 22/09/2026."))])
+    english_prompt = load_prompt("answer_system", 3)
+    answer = run(engine(gw, [search_tool()], prompt=english_prompt), question=question)
+    assert answer.status == "answered"
+    assert answer.language == "en"
+    assert not _has_telugu(answer.text)
+    # The question went to the model as written, with the English-only rule and header flag.
+    first = gw.conversations[0][0]
+    assert isinstance(first, UserMessage)
+    assert first.text == question
+    assert first.english is True
+    assert ENGLISH_ONLY in gw.systems[0]
+
+
+def test_english_first_a_telugu_answer_is_never_shown() -> None:
+    """A model that ignores the English rule: its Telugu prose is replaced by the search-only
+    view of the cited passages (the school's own text)."""
+    telugu_prose = cited("పరీక్షలు 22/09/2026న ప్రారంభమవుతాయి.")
+    gw = ScriptedGateway([turn(calls=[search_call()]), turn(telugu_prose)])
+    answer = run(engine(gw, [search_tool()]), question=TELUGU_QUESTIONS[0])
+    assert answer.status == "search_only"
+    assert answer.language == "en"
+    assert answer.segments == ()
+    assert [c.source for c in answer.cited] == [SOURCE]
+    # With the switch on the same answer is kept (FR-KB-006).
+    gw_on = ScriptedGateway([turn(calls=[search_call()]), turn(telugu_prose)])
+    on = run(engine(gw_on, [search_tool()], telugu=True), question=TELUGU_QUESTIONS[0])
+    assert on.status == "answered"
+    assert on.language == "te"
+
+
+def test_english_first_composition_picks_the_english_prompt() -> None:
+    from app.knowledge import composition
+
+    assert composition.answer_prompt(False) == composition.ENGLISH_ANSWER_PROMPT
+    assert composition.answer_prompt(True) == composition.ANSWER_PROMPT
+    assert ENGLISH_ONLY in load_prompt(*composition.ENGLISH_ANSWER_PROMPT).text
+    assert ENGLISH_ONLY not in load_prompt(*composition.ANSWER_PROMPT).text
+
+
+def test_english_first_answer_language() -> None:
+    assert answer_language("te", telugu=False) == "en"
+    assert answer_language("mixed", telugu=False) == "en"
+    assert answer_language("en", telugu=False) == "en"
+    assert answer_language("te", telugu=True) == "te"
+    assert answer_language("mixed", telugu=True) == "mixed"
