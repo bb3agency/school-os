@@ -1,4 +1,4 @@
-import { act, cleanup } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import type * as Navigation from "next/navigation";
 import { isValidElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,19 +7,17 @@ import { SchoolShell } from "@/components/shell/SchoolShell";
 import { renderWithIntl } from "@/test/render";
 
 /**
- * ADR-0036 (English first, Telugu hidden): with SOS_TELUGU_ENABLED off (the default) no page
- * shows Telugu. Every page under app/[locale] is rendered inside its shell, with the school's
- * languages set to Telugu and English, the API answering 404 (empty and error states), and
- * the DOM is scanned for Telugu script (U+0C00–U+0C7F), the word "Telugu", `lang="te"`,
- * `hreflang="te"` and links to /te. Pages that need a live session (server layouts are
- * covered in layouts.node.test.tsx) are skipped here, and the count of pages scanned is pinned.
+ * No URL carries a locale, in any language (product owner 2026-09-30; ADR-0036 note). Every
+ * page under app/[locale] is rendered inside its shell (Telugu off, the product default; the
+ * API answering 404) and every link, form and resource address is checked; the shells (every
+ * menu link and the language switch) are checked again with Telugu on, in English and Telugu.
  */
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/students",
+    usePathname: () => "/students",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -52,8 +50,6 @@ const modules = import.meta.glob("./\\[locale\\]/**/page.tsx") as Record<
   () => Promise<PageModule>
 >;
 
-const TELUGU_SCRIPT = /[ఀ-౿]/;
-
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
@@ -62,7 +58,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
 
 async function element(path: string): Promise<ReactElement | null> {
@@ -77,70 +72,76 @@ async function element(path: string): Promise<ReactElement | null> {
   }
 }
 
-function offenders(root: HTMLElement): string[] {
+const PREFIXED = /^\/(en|te)(\/|$|\?|#)/i;
+
+/** Links, forms and resources whose address names a locale (`/en`, `/te`, `/en/...`). */
+function localePrefixed(root: HTMLElement): string[] {
   const found: string[] = [];
-  const text = root.textContent ?? "";
-  if (TELUGU_SCRIPT.test(text)) found.push(`script: ${text.match(/.{0,20}[ఀ-౿]+/)?.[0]}`);
-  if (/Telugu/i.test(text)) found.push(`word: ${text.match(/.{0,40}Telugu.{0,20}/i)?.[0]}`);
-  const attrs = root.querySelectorAll("[lang='te'], [hreflang='te'], a[href^='/te']");
-  if (attrs.length > 0) found.push(`attributes: ${attrs.length}`);
-  for (const input of root.querySelectorAll<HTMLInputElement>("input, textarea, option")) {
-    if (TELUGU_SCRIPT.test(input.value ?? "") || /_te$/.test(input.name ?? "")) {
-      found.push(`field: ${input.name || input.value}`);
+  for (const node of root.querySelectorAll("[href], [action], [src]")) {
+    for (const attr of ["href", "action", "src"]) {
+      const value = node.getAttribute(attr);
+      if (value && PREFIXED.test(value)) {
+        found.push(`${node.tagName.toLowerCase()} ${attr}=${value}`);
+      }
     }
   }
   return found;
 }
 
-describe("English only while Telugu is switched off (ADR-0036)", () => {
-  it("no page under app/[locale] shows Telugu, a Telugu field or a language switch", async () => {
+describe("no locale in any URL (product owner 2026-09-30, ADR-0036 note)", () => {
+  it("no page under app/[locale] links to a /en or /te address", async () => {
     const paths = Object.keys(modules).sort();
-    expect(paths.length).toBeGreaterThan(60);
-    const scanned: string[] = [];
     const failures: Record<string, string[]> = {};
+    let scanned = 0;
+    let links = 0;
     for (const path of paths) {
       const page = await element(path);
       if (!page) continue;
       const shell = path.includes("/platform/") ? (
         <PlatformShell permissions={null}>{page}</PlatformShell>
       ) : (
-        <SchoolShell permissions={null} languages={["te", "en"]}>
-          {page}
-        </SchoolShell>
+        <SchoolShell permissions={null}>{page}</SchoolShell>
       );
       const { container } = renderWithIntl(shell);
-      // Let queries settle into their error or empty states.
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
-      const found = offenders(container);
+      const found = localePrefixed(container);
       if (found.length > 0) failures[path] = found;
-      expect(container.querySelector("nav[aria-label='Language']"), path).toBeNull();
-      scanned.push(path);
+      links += container.querySelectorAll("a[href^='/']").length;
+      scanned += 1;
       cleanup();
     }
     expect(failures).toEqual({});
-    // Most pages render without a session; pinned so a broken import cannot empty the scan.
-    expect(scanned.length).toBeGreaterThan(75);
-    // The public marketing pages (docs/17 §5.6) are always part of the scan.
-    expect(scanned).toEqual(
-      expect.arrayContaining(
-        ["welcome", "features", "security", "pricing", "about"].map(
-          (page) => `./[locale]/${page}/page.tsx`,
-        ),
-      ),
-    );
+    // Pinned so a broken import cannot empty the scan, and it really looked at in-app links.
+    expect(scanned).toBeGreaterThan(75);
+    expect(links).toBeGreaterThan(50);
   }, 120_000);
 
-  it("the scan finds Telugu when it is switched on (the check itself works)", async () => {
-    const page = await element("./[locale]/welcome/page.tsx");
-    expect(page).not.toBeNull();
-    const { container } = renderWithIntl(
-      <SchoolShell permissions={null} languages={["te", "en"]}>
-        {page}
+  it.each([
+    ["English", { telugu: true }],
+    ["Telugu", { locale: "te", telugu: true }],
+  ] as const)("with Telugu on, the menus link prefix-less paths (%s)", (_label, options) => {
+    for (const shell of [
+      <SchoolShell key="school" permissions={null} languages={["te", "en"]}>
+        <a href="/students">x</a>
       </SchoolShell>,
-      { telugu: true },
-    );
-    expect(offenders(container).length).toBeGreaterThan(0);
+      <PlatformShell key="platform" permissions={null}>
+        <a href="/platform">x</a>
+      </PlatformShell>,
+    ]) {
+      const { container } = renderWithIntl(shell, options);
+      expect(localePrefixed(container)).toEqual([]);
+      expect(container.querySelectorAll("a[href^='/']").length).toBeGreaterThan(5);
+      // The language switch (shown while Telugu is on) sets a cookie: buttons, no links.
+      const choices = [...container.querySelectorAll("nav [lang]")];
+      expect(choices.map((node) => node.tagName)).toEqual(["BUTTON", "BUTTON"]);
+      cleanup();
+    }
+  });
+
+  it("the check itself finds a prefixed link", () => {
+    const { container } = render(<a href="/en/students">x</a>);
+    expect(localePrefixed(container)).toEqual(["a href=/en/students"]);
   });
 });
