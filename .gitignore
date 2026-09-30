@@ -54,3 +54,6 @@ crash.log
 # governed by the root CLAUDE.md, so these generated files are not committed.
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+
+# Owner-supplied source font files (converted to WOFF2 in apps/web/src/app/fonts/)
+/font/
