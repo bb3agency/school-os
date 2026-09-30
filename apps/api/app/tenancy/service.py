@@ -622,17 +622,10 @@ def suggested_section_names() -> tuple[str, ...]:
     return tuple(str(n) for n in raw["section_names"])
 
 
-def _class_out(klass: Any) -> ClassOut:
-    """A class as shown: ``display_te`` is kept in the database and empty while Telugu is
-    hidden (ADR-0036)."""
-    out = ClassOut.model_validate(klass)
-    return out if telugu_enabled() else out.model_copy(update={"display_te": ""})
-
-
 def list_classes(session: Session, *, include_archived: bool = True) -> list[ClassOut]:
     """Classes in display order (archived ones unless ``include_archived`` is False)."""
     return [
-        _class_out(c)
+        ClassOut.model_validate(c)
         for c in repo.list_classes(session)
         if include_archived or c.archived_at is None
     ]
@@ -642,7 +635,7 @@ def get_class(session: Session, class_id: uuid.UUID) -> ClassOut:
     klass = repo.get_class(session, class_id)
     if klass is None:
         raise NotFound("Class not found")
-    return _class_out(klass)
+    return ClassOut.model_validate(klass)
 
 
 def create_class(session: Session, data: ClassCreate) -> ClassOut:
@@ -667,7 +660,7 @@ def create_class(session: Session, data: ClassCreate) -> ClassOut:
         resource_id=klass.id,
         summary={"sort_order": klass.sort_order},
     )
-    return _class_out(klass)
+    return ClassOut.model_validate(klass)
 
 
 def ensure_default_classes(session: Session) -> list[ClassOut]:
@@ -710,7 +703,7 @@ def update_class(
         resource_id=class_id,
         summary={"fields": sorted(values)},
     )
-    return _class_out(klass)
+    return ClassOut.model_validate(klass)
 
 
 def list_sections(
@@ -899,7 +892,7 @@ def archive_class(
     row = _set_archived(
         session, "class", class_id, archived=archived, expected_version=expected_version
     )
-    return _class_out(row)
+    return ClassOut.model_validate(row)
 
 
 def archive_section(

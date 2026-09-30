@@ -20,6 +20,7 @@ from app.authz.catalog import AUTHENTICATED
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag, paginate
+from app.core.languages import telugu_enabled
 from app.students import service as students
 from app.tenancy import service as tenancy
 from app.tenancy.schemas import (
@@ -58,9 +59,15 @@ def _years_in_use(db: Session, years: list[AcademicYearOut]) -> list[AcademicYea
     return [y.model_copy(update={"in_use": y.id in used}) for y in years]
 
 
+def _shown_class(klass: ClassOut) -> ClassOut:
+    """``display_te`` stays in the database (imports still match Telugu class names) and is
+    empty in responses while Telugu is hidden (ADR-0036)."""
+    return klass if telugu_enabled() else klass.model_copy(update={"display_te": ""})
+
+
 def _classes_in_use(db: Session, classes: list[ClassOut]) -> list[ClassOut]:
     used = students.structure_in_use(db).class_ids
-    return [c.model_copy(update={"in_use": c.id in used}) for c in classes]
+    return [_shown_class(c.model_copy(update={"in_use": c.id in used})) for c in classes]
 
 
 def _sections_in_use(db: Session, sections: list[SectionOut]) -> list[SectionOut]:
@@ -233,7 +240,7 @@ def add_default_classes(ctx: Manager, db: TenantDB) -> Page[ClassOut]:
     names are stored but ``display_te`` is empty while Telugu is hidden, ADR-0036); existing
     classes are kept (permission ``tenant.structure.manage``)."""
     classes = tenancy.ensure_default_classes(db)
-    return Page[ClassOut](data=classes, next_cursor=None)
+    return Page[ClassOut](data=[_shown_class(c) for c in classes], next_cursor=None)
 
 
 @router.get("/classes/{class_id}", response_model=ClassOut)
@@ -252,7 +259,7 @@ def create_class(ctx: Manager, db: TenantDB, body: ClassCreate, idem: Idempotenc
     return idem.run(
         db,
         body,
-        lambda: tenancy.create_class(db, body),
+        lambda: _shown_class(tenancy.create_class(db, body)),
         headers=_created("classes"),
     )
 

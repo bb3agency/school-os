@@ -38,7 +38,6 @@ def year(label: str, *, current: bool = False) -> AcademicYearCreate:
     )
 
 
-@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_202_AC1_year_with_nursery_to_xii_and_sections_a_to_d(make_tenant: MakeTenant) -> None:
     tid = make_tenant()
     with tenant_session(tid) as s:
@@ -194,7 +193,6 @@ def test_FR_TEN_002_other_tenants_year_is_not_found(make_tenant: MakeTenant) -> 
         assert service.list_academic_years(s) == []
 
 
-@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_TEN_010_class_update_and_duplicate(make_tenant: MakeTenant) -> None:
     tid = make_tenant()
     with tenant_session(tid) as s:
