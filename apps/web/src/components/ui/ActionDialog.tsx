@@ -5,10 +5,12 @@ import { useTranslations } from "next-intl";
 import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
 import { cn } from "@/lib/cn";
+import { useDialogClose } from "@/lib/dialog-motion";
 import { useApiForm, type FieldErrors } from "@/lib/forms";
 import { Alert } from "./Alert";
 import { ApiErrorAlert, type ErrorNamespace } from "./ApiErrorAlert";
 import { Button, type ButtonSize, type ButtonVariant } from "./Button";
+import { DialogCloseButton } from "./DialogCloseButton";
 
 /** Renders a one-time result (e.g. a secret) with a way to close the dialog. */
 function ResultSlot<TResult>({
@@ -91,7 +93,8 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   const triggerHintId = useId();
   const [open, setOpen] = useState(false);
 
-  const close = useCallback(() => dialogRef.current?.close(), []);
+  // Fades out before it closes (Escape too); instant under reduced motion.
+  const close = useDialogClose(dialogRef, "modal");
 
   const form = useApiForm({
     schema,
@@ -140,15 +143,15 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
           triggerRef.current?.focus();
         }}
         className={cn(
-          "m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover",
+          "dialog-motion m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover",
           className,
         )}
       >
         {open ? (
           <>
             <div className="flex items-start justify-between gap-4 p-4 pb-2 sm:p-6 sm:pb-2">
-              <div className="space-y-1">
-                <h2 id={titleId} className="text-lg font-medium">
+              <div className="min-w-0 space-y-1">
+                <h2 id={titleId} className="text-lg font-semibold">
                   {title}
                 </h2>
                 {description ? (
@@ -157,23 +160,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                   </p>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={close}
-                aria-label={t("close")}
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="size-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              </button>
+              <DialogCloseButton label={t("close")} onClick={close} />
             </div>
             {renderResult !== undefined && result !== undefined ? (
               <div className="space-y-4 px-4 py-4 sm:px-6">
@@ -196,6 +183,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                     variant={confirmVariant}
                     disabled={form.pending}
                     aria-disabled={form.pending || undefined}
+                    loading={form.pending}
                   >
                     {form.pending ? t("working") : confirmLabel}
                   </Button>

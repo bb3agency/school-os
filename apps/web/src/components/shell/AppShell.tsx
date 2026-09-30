@@ -1,20 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import type { NavSection, SidebarTheme } from "@/components/ui/SidebarNav";
 import { usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { useDialogClose } from "@/lib/dialog-motion";
 import { BrandMark } from "./Brand";
+import { MotionProvider } from "./MotionProvider";
 import { Sidebar } from "./Sidebar";
 import { sidebarControlClasses, sidebarThemes } from "./sidebar-theme";
 import { useSidebarCollapsed } from "./sidebar-state";
@@ -117,10 +111,8 @@ export function AppShell({
   const topbar = topbars[theme];
   const visible = sections.filter((section) => section.items.length > 0);
 
-  const closeMenu = useCallback(() => {
-    const drawer = drawerRef.current;
-    if (drawer?.open) drawer.close();
-  }, []);
+  // The drawer slides back out the way it came in (instant under reduced motion); Escape too.
+  const closeMenu = useDialogClose(drawerRef, "drawer");
 
   // A navigation closes the drawer (the close event returns focus to the menu button).
   useEffect(() => {
@@ -211,147 +203,149 @@ export function AppShell({
   const collapseLabel = collapsed ? t("expand") : t("collapse");
 
   return (
-    <div className="flex min-h-viewport">
-      <SkipLink label={tc("skipToContent")} />
+    <MotionProvider>
+      <div className="flex min-h-viewport">
+        <SkipLink label={tc("skipToContent")} />
 
-      {/* The sidebar beside the page (lg and up). */}
-      <div
-        ref={sidebarRef}
-        data-sidebar-mode="inline"
-        data-print="hide"
-        className={cn(
-          "sticky top-0 hidden h-viewport w-68 shrink-0 lg:block collapsed:w-18",
-          theme === "school" && "border-e border-border",
-          sidebarThemes[theme].surface,
-        )}
-      >
-        <Sidebar
-          mode="inline"
-          theme={theme}
-          homeHref={homeHref}
-          navLabel={navLabel}
-          sections={visible}
-          context={context}
-          account={account}
-          control={
-            <button
-              type="button"
-              onClick={() => {
-                toggleCollapsed();
-                setTip(null);
-              }}
-              aria-label={collapseLabel}
-              data-tooltip={collapseLabel}
-              className={sidebarControlClasses(theme)}
-            >
-              <Icon name="panelLeftClose" className="size-5 collapsed:hidden" />
-              <Icon name="panelLeftOpen" className="hidden size-5 collapsed:block" />
-            </button>
-          }
-        />
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col print:block">
-        <header className={cn("shell-gutter", topbar.bar)} data-print="hide">
-          <div className="shell-frame flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
-            <div className="flex min-w-0 flex-1 items-center gap-3 lg:hidden">
+        {/* The sidebar beside the page (lg and up). */}
+        <div
+          ref={sidebarRef}
+          data-sidebar-mode="inline"
+          data-print="hide"
+          className={cn(
+            "sticky top-0 hidden h-viewport w-68 shrink-0 lg:block collapsed:w-18",
+            theme === "school" && "border-e border-border",
+            sidebarThemes[theme].surface,
+          )}
+        >
+          <Sidebar
+            mode="inline"
+            theme={theme}
+            homeHref={homeHref}
+            navLabel={navLabel}
+            sections={visible}
+            context={context}
+            account={account}
+            control={
               <button
-                ref={menuButtonRef}
                 type="button"
-                aria-expanded={open}
-                aria-controls={drawerId}
-                aria-haspopup="dialog"
                 onClick={() => {
-                  const drawer = drawerRef.current;
-                  if (!drawer || drawer.open) return;
-                  drawer.showModal();
-                  setOpen(true);
+                  toggleCollapsed();
+                  setTip(null);
                 }}
-                className={cn(
-                  "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-medium",
-                  topbar.menuButton,
-                )}
+                aria-label={collapseLabel}
+                data-tooltip={collapseLabel}
+                className={sidebarControlClasses(theme)}
               >
-                <Icon name="menu" className="size-4.5" />
-                {t("menu")}
+                <Icon name="panelLeftClose" className="size-5 collapsed:hidden" />
+                <Icon name="panelLeftOpen" className="hidden size-5 collapsed:block" />
               </button>
-              <span className="flex min-w-0 items-center gap-2.5">
-                <BrandMark tone={theme} className="max-sm:hidden" />
-                <span className="text-lg font-semibold">{tc("appName")}</span>
-                {brandBadge}
-              </span>
-            </div>
-            {topbarActions ? (
-              <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
-                {topbarActions}
+            }
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col print:block">
+          <header className={cn("shell-gutter", topbar.bar)} data-print="hide">
+            <div className="shell-frame flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3 lg:hidden">
+                <button
+                  ref={menuButtonRef}
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={drawerId}
+                  aria-haspopup="dialog"
+                  onClick={() => {
+                    const drawer = drawerRef.current;
+                    if (!drawer || drawer.open) return;
+                    drawer.showModal();
+                    setOpen(true);
+                  }}
+                  className={cn(
+                    "pressable inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-medium",
+                    topbar.menuButton,
+                  )}
+                >
+                  <Icon name="menu" className="size-4.5" />
+                  {t("menu")}
+                </button>
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <BrandMark tone={theme} className="max-sm:hidden" />
+                  <span className="text-lg font-semibold">{tc("appName")}</span>
+                  {brandBadge}
+                </span>
               </div>
+              {topbarActions ? (
+                <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+                  {topbarActions}
+                </div>
+              ) : null}
+            </div>
+          </header>
+          <div className="shell-gutter flex-1 print:p-0">
+            <main
+              id="main"
+              tabIndex={-1}
+              className="shell-frame min-w-0 pt-1 pb-8 focus:outline-none print:p-0"
+            >
+              {banner}
+              {children}
+            </main>
+          </div>
+        </div>
+
+        {/* Menu drawer below lg (native modal dialog) with the same Sidebar. Its content renders
+          only while open, so the page never has two "Main" navigation landmarks. */}
+        <dialog
+          ref={drawerRef}
+          id={drawerId}
+          aria-label={t("menu")}
+          onClose={() => {
+            setOpen(false);
+            menuButtonRef.current?.focus();
+          }}
+          className={cn("drawer", theme === "platform" && sidebarThemes.platform.surface)}
+          data-print="hide"
+        >
+          <div className="drawer-sheet">
+            {open ? (
+              <Sidebar
+                mode="drawer"
+                theme={theme}
+                homeHref={homeHref}
+                navLabel={navLabel}
+                sections={visible}
+                context={context}
+                account={account}
+                control={
+                  <button
+                    ref={closeButtonRef}
+                    type="button"
+                    onClick={closeMenu}
+                    aria-label={t("closeMenu")}
+                    className={cn(sidebarControlClasses(theme, "lg"), "rounded-full")}
+                  >
+                    <Icon name="close" className="size-5" />
+                  </button>
+                }
+              />
             ) : null}
           </div>
-        </header>
-        <div className="shell-gutter flex-1 print:p-0">
-          <main
-            id="main"
-            tabIndex={-1}
-            className="shell-frame min-w-0 pt-1 pb-8 focus:outline-none print:p-0"
-          >
-            {banner}
-            {children}
-          </main>
+        </dialog>
+
+        {/* Compact sidebar label (visual only; see the effect above). */}
+        <div
+          ref={tipRef}
+          aria-hidden="true"
+          hidden={shownTip === null}
+          className="sidebar-tip"
+          data-print="hide"
+          onPointerLeave={() => setTip(null)}
+        >
+          <span className="sidebar-tip-bubble">{shownTip?.text}</span>
         </div>
+
+        {session}
       </div>
-
-      {/* Menu drawer below lg (native modal dialog) with the same Sidebar. Its content renders
-          only while open, so the page never has two "Main" navigation landmarks. */}
-      <dialog
-        ref={drawerRef}
-        id={drawerId}
-        aria-label={t("menu")}
-        onClose={() => {
-          setOpen(false);
-          menuButtonRef.current?.focus();
-        }}
-        className={cn("drawer", theme === "platform" && sidebarThemes.platform.surface)}
-        data-print="hide"
-      >
-        <div className="drawer-sheet">
-          {open ? (
-            <Sidebar
-              mode="drawer"
-              theme={theme}
-              homeHref={homeHref}
-              navLabel={navLabel}
-              sections={visible}
-              context={context}
-              account={account}
-              control={
-                <button
-                  ref={closeButtonRef}
-                  type="button"
-                  onClick={closeMenu}
-                  aria-label={t("closeMenu")}
-                  className={cn(sidebarControlClasses(theme, "lg"), "rounded-full")}
-                >
-                  <Icon name="close" className="size-5" />
-                </button>
-              }
-            />
-          ) : null}
-        </div>
-      </dialog>
-
-      {/* Compact sidebar label (visual only; see the effect above). */}
-      <div
-        ref={tipRef}
-        aria-hidden="true"
-        hidden={shownTip === null}
-        className="sidebar-tip"
-        data-print="hide"
-        onPointerLeave={() => setTip(null)}
-      >
-        <span className="sidebar-tip-bubble">{shownTip?.text}</span>
-      </div>
-
-      {session}
-    </div>
+    </MotionProvider>
   );
 }
