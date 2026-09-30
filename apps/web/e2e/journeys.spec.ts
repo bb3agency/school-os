@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { openTelugu, TELUGU } from "./support/telugu";
+import { inTelugu, TELUGU } from "./support/telugu";
 import {
   expectFocusInsideOpenDialog,
   expectFocusRing,
@@ -62,8 +62,8 @@ async function openAndEscape(page: Page, trigger: Locator, name: string) {
   await expectFocusRing(trigger, `${name} trigger after Escape`);
 }
 
-// ADR-0036: tagged to run again with Telugu on; with it off each /te step checks the redirect
-// to the English page and that no Telugu is shown.
+// ADR-0036: tagged to run again with Telugu on; with it off each Telugu step (the NEXT_LOCALE
+// cookie; no URL carries a locale) checks that the same page stays English with no Telugu.
 test.describe
   .serial(`M1 journeys: import, findings, change request, pre-check export ${TELUGU}`, () => {
   test.skip(process.env.E2E_STAND_IN !== "1", "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
@@ -81,22 +81,23 @@ test.describe
   test("import: upload, map columns, check rows, add them (US-401, FR-IMP-001..005)", async ({
     page,
   }, testInfo) => {
-    await signIn(page, "/en/imports", MAKER);
-    await expect(page).toHaveURL(/\/en\/imports$/);
-    await checkScreen(page, "/en/imports", [
+    await signIn(page, "/imports", MAKER);
+    await expect(page).toHaveURL(/:\d+\/imports$/);
+    await checkScreen(page, "/imports", [
       "Earlier imports",
       "Class list (office format)",
       "Admission register",
     ]);
     await expect(page.getByRole("cell", { name: "42", exact: true })).toBeVisible();
 
-    if (await openTelugu(page, "/te/imports", testInfo))
-      await checkScreen(page, "/te/imports", ["గత దిగుమతులు", "Class list (office format)"], {
+    await inTelugu(page, "/imports", testInfo, async () => {
+      await checkScreen(page, "imports te", ["గత దిగుమతులు", "Class list (office format)"], {
         focusStops: false,
       });
+    });
 
     // Upload by keyboard: Space on the file input opens the chooser; Tab; Enter submits.
-    await page.goto("/en/imports");
+    await page.goto("/imports");
     const chooser = page.waitForEvent("filechooser");
     await pressOn(page.getByLabel("Spreadsheet file"), "Space", "spreadsheet file input");
     await (
@@ -116,7 +117,7 @@ test.describe
       "Enter",
       "upload button",
     );
-    await expect(page).toHaveURL(new RegExp(`/en/imports/${IDS.importNew}$`));
+    await expect(page).toHaveURL(new RegExp(`:\\d+/imports/${IDS.importNew}$`));
 
     // Mapping: suggestions from English and Telugu headings are pre-selected.
     await checkScreen(page, "import mapping", [
@@ -164,47 +165,49 @@ test.describe
       "Synthetica Anjali Devi",
     ]);
 
-    if (await openTelugu(page, `/te/imports/${IDS.importNew}`, testInfo))
+    await inTelugu(page, `/imports/${IDS.importNew}`, testInfo, async () => {
       await checkScreen(
         page,
         "import committed te",
         ["విద్యార్థి రికార్డుల్లో చేర్చబడింది", "చేర్చిన వరుసలు"],
         { focusStops: false },
       );
+    });
   });
 
   test("findings: blockers first, resolve one with a note, accept one as it is (US-501, US-502, FR-DQ-020)", async ({
     page,
   }, testInfo) => {
-    await signIn(page, "/en/findings", MAKER);
-    await expect(page).toHaveURL(/\/en\/findings$/);
+    await signIn(page, "/findings", MAKER);
+    await expect(page).toHaveURL(/:\d+\/findings$/);
     await expect(page.getByRole("heading", { level: 2, name: "1 blocker" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "2 warnings" })).toBeVisible();
-    await checkScreen(page, "/en/findings", [
+    await checkScreen(page, "/findings", [
       "Synthetica Ravi Kumar",
       "Date of birth differs. Boards and APAAR need these to match.",
       "••/••/2014",
     ]);
 
-    if (await openTelugu(page, "/te/findings", testInfo))
+    await inTelugu(page, "/findings", testInfo, async () => {
       await checkScreen(
         page,
-        "/te/findings",
+        "findings te",
         [
           "పుట్టిన తేదీ వేరుగా ఉంది. బోర్డులు, APAAR కోసం ఇవి ఒకేలా ఉండాలి.",
           "Synthetica Ravi Kumar",
         ],
         { focusStops: false },
       );
+    });
 
     // Open the parent-name finding by keyboard, then resolve it with a note.
-    await page.goto("/en/findings");
+    await page.goto("/findings");
     await pressOn(
       page.getByRole("link", { name: /^Open\s?: DQ-004 Synthetica Ravi Kumar$/ }),
       "Enter",
       "open finding link",
     );
-    await expect(page).toHaveURL(new RegExp(`/en/findings/${IDS.findingFather}$`));
+    await expect(page).toHaveURL(new RegExp(`:\\d+/findings/${IDS.findingFather}$`));
     await checkScreen(page, "finding detail", [
       "Problem DQ-004",
       "Synthetica Venkata Rao",
@@ -232,13 +235,14 @@ test.describe
       { focusStops: false },
     );
 
-    if (await openTelugu(page, `/te/findings/${IDS.findingFather}`, testInfo))
+    await inTelugu(page, `/findings/${IDS.findingFather}`, testInfo, async () => {
       await checkScreen(page, "finding resolved te", ["పరిష్కరించబడింది", "పరిష్కరించిన తేదీ"], {
         focusStops: false,
       });
+    });
 
     // Accept the gender finding as it is (reason; step-up is the server's call).
-    await page.goto(`/en/findings/${IDS.findingGender}`);
+    await page.goto(`/findings/${IDS.findingGender}`);
     await checkScreen(page, "finding gender", ["Gender differs between records."], {
       focusStops: false,
     });
@@ -256,14 +260,15 @@ test.describe
     await expect(waiveDialog).toBeHidden();
     await expect(page.getByText("Accepted on")).toBeVisible();
 
-    if (await openTelugu(page, `/te/findings/${IDS.findingGender}`, testInfo))
+    await inTelugu(page, `/findings/${IDS.findingGender}`, testInfo, async () => {
       await checkScreen(page, "finding waived te", ["అంగీకరించబడింది"], { focusStops: false });
+    });
   });
 
   test("change request: the maker asks for a correction with evidence (US-601 AC1, FR-CR-001)", async ({
     page,
   }, testInfo) => {
-    await signIn(page, `/en/findings/${IDS.findingDob}`, MAKER);
+    await signIn(page, `/findings/${IDS.findingDob}`, MAKER);
     await checkScreen(page, "finding dob", ["Problem DQ-002", "••/••/2014"], {
       focusStops: false,
     });
@@ -272,7 +277,7 @@ test.describe
       "Enter",
       "request correction link",
     );
-    await expect(page).toHaveURL(/\/en\/change-requests\/new\?/);
+    await expect(page).toHaveURL(/:\d+\/change-requests\/new\?/);
     const newUrl = page.url();
     await checkScreen(page, "new change request", [
       "Synthetica Ravi Kumar · SYN-2026-014 · Class 6 · A",
@@ -281,13 +286,14 @@ test.describe
     await expect(page.getByLabel("Field", { exact: true })).toHaveValue("dob");
     await expect(page.getByLabel("Record to correct")).toHaveValue("admission_register");
 
-    if (await openTelugu(page, newUrl.replace("/en/", "/te/"), testInfo))
+    await inTelugu(page, newUrl, testInfo, async () => {
       await checkScreen(
         page,
         "new change request te",
         ["సవరణ కోసం అభ్యర్థించండి", "Synthetica Ravi Kumar · SYN-2026-014 · Class 6 · A"],
         { focusStops: false },
       );
+    });
 
     // Keyboard only: value, Tab to the reason, the evidence file, Enter to send.
     await page.goto(newUrl);
@@ -312,7 +318,7 @@ test.describe
     await expect(page.getByText("Request sent")).toBeVisible();
     await pressOn(page.getByRole("link", { name: "Open the request" }), "Enter", "open request");
 
-    await expect(page).toHaveURL(new RegExp(`/en/change-requests/${IDS.changeRequest}$`));
+    await expect(page).toHaveURL(new RegExp(`:\\d+/change-requests/${IDS.changeRequest}$`));
     await checkScreen(page, "change request (maker)", [
       "Waiting for approval",
       "You asked for this",
@@ -327,22 +333,23 @@ test.describe
   test("change request: the checker approves it; the finding clears (US-601 AC2, FR-CR-002)", async ({
     page,
   }, testInfo) => {
-    await signIn(page, "/en/change-requests", CHECKER);
-    await expect(page).toHaveURL(/\/en\/change-requests$/);
-    await checkScreen(page, "/en/change-requests (checker)", ["Waiting for you", "Date of birth"]);
+    await signIn(page, "/change-requests", CHECKER);
+    await expect(page).toHaveURL(/:\d+\/change-requests$/);
+    await checkScreen(page, "/change-requests (checker)", ["Waiting for you", "Date of birth"]);
 
-    if (await openTelugu(page, "/te/change-requests", testInfo))
-      await checkScreen(page, "/te/change-requests", ["మీ కోసం వేచి ఉంది", "పుట్టిన తేదీ"], {
+    await inTelugu(page, "/change-requests", testInfo, async () => {
+      await checkScreen(page, "change requests te", ["మీ కోసం వేచి ఉంది", "పుట్టిన తేదీ"], {
         focusStops: false,
       });
+    });
 
-    await page.goto("/en/change-requests");
+    await page.goto("/change-requests");
     await pressOn(
       page.getByRole("link", { name: /^Open\s?: Date of birth/ }),
       "Enter",
       "open request link",
     );
-    await expect(page).toHaveURL(new RegExp(`/en/change-requests/${IDS.changeRequest}$`));
+    await expect(page).toHaveURL(new RegExp(`:\\d+/change-requests/${IDS.changeRequest}$`));
     await checkScreen(page, "change request (checker)", [
       "Birth certificate shows the twenty first of June.",
       "12/06/2014",
@@ -358,13 +365,14 @@ test.describe
     await expect(page.getByText("The new value was recorded as verified")).toBeVisible();
     await checkScreen(page, "change request approved", ["Approved"], { focusStops: false });
 
-    if (await openTelugu(page, `/te/change-requests/${IDS.changeRequest}`, testInfo))
+    await inTelugu(page, `/change-requests/${IDS.changeRequest}`, testInfo, async () => {
       await checkScreen(page, "change request approved te", ["ఆమోదించబడింది"], {
         focusStops: false,
       });
+    });
 
     // Every finding is now resolved or accepted.
-    await page.goto("/en/findings");
+    await page.goto("/findings");
     await checkScreen(page, "findings after approval", ["No problems found"], {
       focusStops: false,
     });
@@ -373,25 +381,26 @@ test.describe
   test("pre-check export: make it, wait until ready, download by keyboard (US-501 AC4, FR-EXP-001..004)", async ({
     page,
   }, testInfo) => {
-    await signIn(page, "/en/exports/new/precheck", MAKER);
-    await expect(page).toHaveURL(/\/en\/exports\/new\/precheck$/);
+    await signIn(page, "/exports/new/precheck", MAKER);
+    await expect(page).toHaveURL(/:\d+\/exports\/new\/precheck$/);
     await checkScreen(page, "new pre-check", [
       "Full name, Date of birth, Gender, Father's name, Admission number",
     ]);
     await expect(page.getByLabel("Format")).toHaveValue("cisce-registration-2026");
 
-    if (await openTelugu(page, "/te/exports/new/precheck", testInfo))
+    await inTelugu(page, "/exports/new/precheck", testInfo, async () => {
       await checkScreen(
         page,
         "new pre-check te",
         ["కొత్త ముందస్తు తనిఖీ", "పూర్తి పేరు, పుట్టిన తేదీ, లింగం"],
         { focusStops: false },
       );
+    });
 
-    await page.goto("/en/exports/new/precheck");
+    await page.goto("/exports/new/precheck");
     await expect(page.getByLabel("Format")).toHaveValue("cisce-registration-2026");
     await pressOn(page.getByRole("button", { name: "Make the pre-check" }), "Enter", "make it");
-    await expect(page).toHaveURL(new RegExp(`/en/exports/${IDS.export}$`));
+    await expect(page).toHaveURL(new RegExp(`:\\d+/exports/${IDS.export}$`));
 
     // Queued, then ready (the page polls while the worker makes the files).
     const download = page.getByRole("button", { name: /^Download Excel \(XLSX\)/ });
@@ -405,7 +414,7 @@ test.describe
     await pressOn(download, "Enter", "download xlsx");
     expect((await file).suggestedFilename()).toBe("precheck-cisce-registration-2026.xlsx");
 
-    if (await openTelugu(page, `/te/exports/${IDS.export}`, testInfo))
+    await inTelugu(page, `/exports/${IDS.export}`, testInfo, async () => {
       await checkScreen(
         page,
         "export ready te",
@@ -414,9 +423,10 @@ test.describe
           focusStops: false,
         },
       );
+    });
 
-    await page.goto("/en/exports");
-    await checkScreen(page, "/en/exports", ["Board pre-check · CISCE registration 2026"], {
+    await page.goto("/exports");
+    await checkScreen(page, "/exports", ["Board pre-check · CISCE registration 2026"], {
       focusStops: false,
     });
   });

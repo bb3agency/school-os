@@ -5,7 +5,14 @@ import {
   expectVisibleFocusOnEveryStop,
 } from "./support/a11y-helpers";
 import { cspViolations, settleAnimations } from "./support/marketing";
-import { expectNoTelugu, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
+import {
+  expectNoLocaleLinks,
+  expectNoTelugu,
+  selectLanguage,
+  TELUGU,
+  TELUGU_OFF_REASON,
+  teluguOn,
+} from "./support/telugu";
 
 /**
  * Public home page (/welcome; no session, no IdP needed): signed-out visitors to the school
@@ -17,25 +24,27 @@ import { expectNoTelugu, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/t
 test.describe("welcome page (FR-IAM-001, NFR-A11Y-001, SEC-010)", () => {
   test(`the school home sends signed-out visitors to the welcome page ${TELUGU}`, async ({
     request,
-  }, testInfo) => {
-    // ADR-0036: with Telugu off, /te goes to /en first.
-    for (const [path, target] of [
-      ["/en", "/en/welcome"],
-      ["/te", teluguOn(testInfo) ? "/te/welcome" : "/en"],
-    ] as const) {
+  }) => {
+    // No URL carries a locale (ADR-0036 note): "/" goes to "/welcome" in both settings.
+    const home = await request.get("/", { maxRedirects: 0 });
+    expect(home.status()).toBe(307);
+    expect(new URL(home.headers()["location"] ?? "", "http://x").pathname).toBe("/welcome");
+    // Old /en and /te homes lose their prefix first (308).
+    for (const path of ["/en", "/te"]) {
       const response = await request.get(path, { maxRedirects: 0 });
-      expect(response.status(), path).toBe(307);
-      expect(new URL(response.headers()["location"] ?? "", "http://x").pathname, path).toBe(target);
+      expect(response.status(), path).toBe(308);
+      expect(new URL(response.headers()["location"] ?? "", "http://x").pathname, path).toBe("/");
     }
     // Deep links keep going straight to sign-in, with the return path.
-    const deep = await request.get("/en/students", { maxRedirects: 0 });
-    expect(deep.headers()["location"]).toContain("/bff/auth/login?next=%2Fen%2Fstudents");
+    const deep = await request.get("/students", { maxRedirects: 0 });
+    expect(deep.headers()["location"]).toContain("/bff/auth/login?next=%2Fstudents");
   });
 
   test("loads without CSP violations; hero and sign-in fit above the fold", async ({ page }) => {
     const violations = cspViolations(page);
     await page.goto("/");
-    await expect(page).toHaveURL(/\/en\/welcome$/);
+    await expect(page).toHaveURL((url) => url.pathname === "/welcome");
+    await expectNoLocaleLinks(page, "welcome");
     const h1 = page.getByRole("heading", { level: 1 });
     await expect(h1).toHaveText(
       "Enter student details once. Catch mismatches before the portal does.",
@@ -60,7 +69,8 @@ test.describe("welcome page (FR-IAM-001, NFR-A11Y-001, SEC-010)", () => {
       page,
     }, testInfo) => {
       test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
-      await page.goto(`/${locale}/welcome`);
+      await selectLanguage(page, locale);
+      await page.goto("/welcome");
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await settleAnimations(page);
       await expectNoAxeViolations(page, `welcome ${locale}`);
@@ -78,7 +88,8 @@ test.describe("welcome page (FR-IAM-001, NFR-A11Y-001, SEC-010)", () => {
   }, testInfo) => {
     await page.setViewportSize({ width: 375, height: 812 });
     for (const locale of teluguOn(testInfo) ? (["en", "te"] as const) : (["en"] as const)) {
-      await page.goto(`/${locale}/welcome`);
+      await selectLanguage(page, locale);
+      await page.goto("/welcome");
       await settleAnimations(page);
       await expectNoAxeViolations(page, `welcome ${locale} 375`);
       await expectNoHorizontalOverflow(page, `welcome ${locale} 375`);
@@ -88,7 +99,7 @@ test.describe("welcome page (FR-IAM-001, NFR-A11Y-001, SEC-010)", () => {
   test("keyboard only: skip link, header links in order, how it works, FAQ, visible focus", async ({
     page,
   }) => {
-    await page.goto("/en/welcome");
+    await page.goto("/welcome");
 
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Skip to main content" })).toBeFocused();
@@ -96,7 +107,7 @@ test.describe("welcome page (FR-IAM-001, NFR-A11Y-001, SEC-010)", () => {
     await expect(page.locator("main#main")).toBeFocused();
 
     // From the top: wordmark, the four pages, then Sign in.
-    await page.goto("/en/welcome");
+    await page.goto("/welcome");
     await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
     const banner = page.getByRole("banner");
@@ -134,34 +145,38 @@ test.describe("welcome page (FR-IAM-001, NFR-A11Y-001, SEC-010)", () => {
     await page.keyboard.press("Space");
     await expect(page.locator("#faq details").first()).not.toHaveAttribute("open", "");
 
-    await page.goto("/en/welcome");
+    await page.goto("/welcome");
     await expectVisibleFocusOnEveryStop(page, "welcome", 40);
   });
 
   test(`the Telugu welcome page keeps its language ${TELUGU}`, async ({ page }, testInfo) => {
     // The language switch of the old welcome page is gone (docs/17 §5.6: no new switches);
-    // with Telugu on, /te/welcome still renders as the Telugu locale.
+    // with Telugu on and Telugu chosen (the cookie), /welcome renders as the Telugu locale.
     test.skip(!teluguOn(testInfo), TELUGU_OFF_REASON);
-    await page.goto("/te/welcome");
-    await expect(page).toHaveURL(/\/te\/welcome$/);
+    await selectLanguage(page, "te");
+    await page.goto("/welcome");
+    await expect(page).toHaveURL((url) => url.pathname === "/welcome");
     await expect(page.locator("html")).toHaveAttribute("lang", "te");
+    await expectNoLocaleLinks(page, "welcome te");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
   test("the signed-out page links back to the welcome page", async ({ page }) => {
-    await page.goto("/en/signed-out");
+    await page.goto("/signed-out");
     await page.getByRole("link", { name: "SchoolOS home", exact: true }).click();
-    await expect(page).toHaveURL(/\/en\/welcome$/);
+    await expect(page).toHaveURL((url) => url.pathname === "/welcome");
   });
 
   test("with Telugu off: English only, no language switch, no Telugu font (ADR-0036)", async ({
     page,
   }, testInfo) => {
     test.skip(teluguOn(testInfo), "checks the Telugu-off default");
-    await page.goto("/en/welcome");
+    await page.goto("/welcome");
     await expectNoTelugu(page, "welcome en");
+    // Telugu chosen in the cookie, and an old /te link: still the English /welcome.
+    await selectLanguage(page, "te");
     await page.goto("/te/welcome");
-    await expect(page).toHaveURL(/\/en\/welcome$/);
+    await expect(page).toHaveURL((url) => url.pathname === "/welcome");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expectNoTelugu(page, "/te/welcome");
     const font = await page.request.get("/fonts/telugu/noto-sans-telugu.css");
@@ -172,8 +187,10 @@ test.describe("welcome page (FR-IAM-001, NFR-A11Y-001, SEC-010)", () => {
     page,
   }, testInfo) => {
     test.skip(!teluguOn(testInfo), TELUGU_OFF_REASON);
-    await page.goto("/te/signed-out");
+    await selectLanguage(page, "te");
+    await page.goto("/signed-out");
     await page.getByRole("link", { name: "SchoolOS హోమ్ పేజీ" }).click();
-    await expect(page).toHaveURL(/\/te\/welcome$/);
+    await expect(page).toHaveURL((url) => url.pathname === "/welcome");
+    await expect(page.locator("html")).toHaveAttribute("lang", "te");
   });
 });

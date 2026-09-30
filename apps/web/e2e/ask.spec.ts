@@ -7,7 +7,17 @@ import {
   pressOn,
   signIn,
 } from "./support/a11y-helpers";
-import { expectNoTelugu, openTelugu, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
+import {
+  expectNoLocaleLinks,
+  expectNoTelugu,
+  inTelugu,
+  openIn,
+  selectLanguage,
+  TELUGU,
+  TELUGU_OFF_REASON,
+  teluguOn,
+  type UiLocale,
+} from "./support/telugu";
 
 /**
  * Ask the school as a chat (US-801, US-802, FR-KB-005..012, FR-KB-030): the synthetic SSE
@@ -27,8 +37,8 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
   test("ask by keyboard, read the streamed and checked answer with sources, follow up", async ({
     page,
   }) => {
-    await signIn(page, "/en/ask", "clerk");
-    await expect(page).toHaveURL(/\/en\/ask$/);
+    await signIn(page, "/ask", "clerk");
+    await expect(page).toHaveURL((url) => url.pathname === "/ask");
     await expect(page.getByRole("heading", { level: 1, name: "Ask the school" })).toBeVisible();
     await expect(page.getByText(/^Good (morning|afternoon|evening), /)).toBeVisible();
     const menu = page.getByRole("navigation", { name: "Main" });
@@ -49,7 +59,8 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     await page.keyboard.press("Enter");
 
     // The URL follows the new conversation; the thread shows the question and the answer.
-    await expect(page).toHaveURL(/\/en\/ask\/c\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/:\d+\/ask\/c\/[0-9a-f-]{36}$/);
+    await expectNoLocaleLinks(page, "ask conversation");
     const log = page.getByRole("log", { name: "Conversation" });
     await expect(log.getByText("When are the Dasara holidays?")).toBeVisible();
     await expect(page.getByText("The answer is ready.")).toBeAttached();
@@ -62,7 +73,7 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     ).toHaveAttribute("href", /#ask-.+-source-1$/);
     await expect(
       answer.getByRole("link", { name: "Dasara holidays circular 2026 (open the document)" }),
-    ).toHaveAttribute("href", "/en/documents/0192f3a4-0000-7000-8000-00000000d001");
+    ).toHaveAttribute("href", "/documents/0192f3a4-0000-7000-8000-00000000d001");
     await expect(answer.getByRole("button", { name: "Download version 1" })).toBeVisible();
     // The new chat is listed in the sidebar and marked as the current page.
     await expect(menu.getByRole("list", { name: "Recent" }).getByRole("link")).toHaveAttribute(
@@ -122,7 +133,7 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
   test("Stop aborts a slow answer, keeps the draft marked Stopped and returns focus", async ({
     page,
   }) => {
-    await signIn(page, "/en/ask", "clerk");
+    await signIn(page, "/ask", "clerk");
     const box = page.getByLabel(/^Your question/);
     await box.focus();
     await page.keyboard.type("Answer slowly please");
@@ -145,7 +156,7 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
   test("a search-only fallback (final/done status) shows passages, not an answer", async ({
     page,
   }) => {
-    await signIn(page, "/en/ask", "clerk");
+    await signIn(page, "/ask", "clerk");
     const box = page.getByLabel(/^Your question/);
     await box.focus();
     await page.keyboard.type("Dasara dates? (budget)");
@@ -165,15 +176,15 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
   });
 
   test("All chats: find, pin, rename and delete by keyboard", async ({ page }) => {
-    await signIn(page, "/en/ask", "clerk");
+    await signIn(page, "/ask", "clerk");
     const box = page.getByLabel(/^Your question/);
     await box.focus();
     await page.keyboard.type("When are the Dasara holidays?");
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/en\/ask\/c\//);
+    await expect(page).toHaveURL(/:\d+\/ask\/c\//);
     await expect(page.getByText("The answer is ready.")).toBeAttached();
 
-    await page.goto("/en/ask/history");
+    await page.goto("/ask/history");
     await expect(page.getByRole("heading", { level: 1, name: "All chats" })).toBeVisible();
     await expect(
       page.locator("#main").getByRole("link", { name: "Dasara holidays" }),
@@ -204,7 +215,7 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
   });
 
   test("Manage memory: add, refused text explained, forget everything", async ({ page }) => {
-    await signIn(page, "/en/ask/memory", "clerk");
+    await signIn(page, "/ask/memory", "clerk");
     await expect(page.getByRole("heading", { level: 1, name: "Memory" })).toBeVisible();
     await expect(
       page.getByText("I work in the school office and prepare circulars."),
@@ -235,13 +246,13 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
 
   test("phone (375×812): the chat, recents in the menu drawer, English", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await signIn(page, "/en/ask", "clerk");
+    await signIn(page, "/ask", "clerk");
     const box = page.getByLabel(/^Your question/);
     await expect(box).toBeVisible();
     await expectNoHorizontalOverflow(page, "ask phone en");
     await box.fill("When are the Dasara holidays?");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
-    await expect(page).toHaveURL(/\/en\/ask\/c\//);
+    await expect(page).toHaveURL(/:\d+\/ask\/c\//);
     await expect(page.getByText("The answer is ready.")).toBeAttached();
     await expectNoHorizontalOverflow(page, "ask answered phone en");
     await expectNoAxeViolations(page, "ask answered phone en");
@@ -255,15 +266,15 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     await expectNoAxeViolations(page, "drawer recents en");
   });
 
-  test("with Telugu off: Ask shows no Telugu and /te/ask lands on English (ADR-0036)", async ({
+  test("with Telugu off: Ask shows no Telugu, also with a Telugu cookie (ADR-0036)", async ({
     page,
   }, testInfo) => {
     test.skip(teluguOn(testInfo), "checks the Telugu-off default");
-    await signIn(page, "/en/ask", "clerk");
+    await signIn(page, "/ask", "clerk");
     await expect(page.getByLabel(/^Your question/)).toBeVisible();
-    await expectNoTelugu(page, "/en/ask");
-    await openTelugu(page, "/te/ask", testInfo);
-    await openTelugu(page, "/te/ask/verified", testInfo);
+    await expectNoTelugu(page, "/ask");
+    expect(await inTelugu(page, "/ask", testInfo)).toBe(false);
+    expect(await inTelugu(page, "/ask/verified", testInfo)).toBe(false);
   });
 
   test(`phone (375×812): the chat, recents in the menu drawer, Telugu ${TELUGU}`, async ({
@@ -271,13 +282,14 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
   }, testInfo) => {
     test.skip(!teluguOn(testInfo), TELUGU_OFF_REASON);
     await page.setViewportSize({ width: 375, height: 812 });
-    await signIn(page, "/te/ask", "clerk");
+    await selectLanguage(page, "te");
+    await signIn(page, "/ask", "clerk");
     const box = page.getByLabel(/^మీ ప్రశ్న/);
     await expect(box).toBeVisible();
     await expectNoHorizontalOverflow(page, "ask phone te");
     await box.fill("దసరా సెలవులు ఎప్పుడు?");
     await page.getByRole("button", { name: "అడగండి" }).click();
-    await expect(page).toHaveURL(/\/te\/ask\/c\//);
+    await expect(page).toHaveURL(/:\d+\/ask\/c\//);
     await expect(page.getByText("సమాధానం సిద్ధంగా ఉంది.")).toBeAttached();
     await expectNoHorizontalOverflow(page, "ask answered phone te");
     await expectNoAxeViolations(page, "ask answered phone te");
@@ -295,7 +307,7 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
   test(`search, verified answers and Telugu pages pass axe ${TELUGU}`, async ({
     page,
   }, testInfo) => {
-    await signIn(page, "/en/ask/search", "clerk");
+    await signIn(page, "/ask/search", "clerk");
     await expect(page.getByRole("heading", { level: 1, name: "Ask the school" })).toBeVisible();
     await page.getByLabel(/^Search for/).focus();
     await page.keyboard.type("Dasara");
@@ -304,20 +316,20 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     await expectNoAxeViolations(page, "search results");
     await expectNoHorizontalOverflow(page, "search results");
 
-    for (const [path, proof] of [
-      ["/en/ask/verified", "When are the Dasara holidays?"],
-      ["/te/ask", "మీ ప్రశ్న"],
-      ["/te/ask/verified", "When are the Dasara holidays?"],
-    ] as const) {
-      // ADR-0036: /te pages only while Telugu is on; otherwise they must land on English.
-      if (!path.startsWith("/te")) await page.goto(path);
-      else if (!(await openTelugu(page, path, testInfo))) continue;
+    const pages: Array<[UiLocale, string, string]> = [
+      ["en", "/ask/verified", "When are the Dasara holidays?"],
+      ["te", "/ask", "మీ ప్రశ్న"],
+      ["te", "/ask/verified", "When are the Dasara holidays?"],
+    ];
+    for (const [locale, path, proof] of pages) {
+      // ADR-0036: Telugu pages only while Telugu is on; otherwise they must stay English.
+      if (!(await openIn(page, locale, path, testInfo))) continue;
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.getByText(proof).first()).toBeAttached();
       await expect(page.getByText("Loading…")).toHaveCount(0);
-      await expectNoAxeViolations(page, path);
-      await expectNoHorizontalOverflow(page, path);
-      if (path.startsWith("/en/")) await expectVisibleFocusOnEveryStop(page, path);
+      await expectNoAxeViolations(page, `${path} ${locale}`);
+      await expectNoHorizontalOverflow(page, `${path} ${locale}`);
+      if (locale === "en") await expectVisibleFocusOnEveryStop(page, path);
     }
   });
 });
