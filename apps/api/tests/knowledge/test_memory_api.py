@@ -246,7 +246,9 @@ def test_english_first_a_telugu_remember_instruction_gets_the_english_reply(
     final = _first(events, "final")
     assert final is not None
     assert final["text"] == f"{REPLIES.saved.en} I prefer short answers"
-    assert _first(events, "meta")["language"] == "en"
+    meta = _first(events, "meta")
+    assert meta is not None
+    assert meta["language"] == "en"
     K.install_runtime(telugu=True)
     events = _ask(api, who, "గుర్తుంచుకోండి: I teach class IX-A")
     final = _first(events, "final")
