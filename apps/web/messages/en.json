@@ -4667,8 +4667,7 @@
       "showEarlier": "Show earlier messages",
       "summarized": "Earlier messages were summarised to keep answers focused",
       "optionsLabel": "Chat options",
-      "you": "You",
-      "highlighted": "The message you opened"
+      "you": "You"
     },
     "composer": {
       "label": "Your question",
@@ -4713,9 +4712,7 @@
       "stopped": "Stopped",
       "stoppedNote": "You stopped this answer. What you see was not checked against the sources.",
       "cached": "Answered from a recent identical question.",
-      "fresh": "Get a fresh answer",
-      "helpful": "Helpful",
-      "notHelpful": "Not helpful"
+      "fresh": "Get a fresh answer"
     },
     "history": {
       "title": "All chats",
@@ -4997,9 +4994,11 @@
       "ai": "AI panel",
       "dialog": "Dialog",
       "icons": "Icons",
-      "telugu": "Telugu"
+      "telugu": "Telugu",
+      "chat": "Ask chat"
     },
-    "sidebarNote": "The one sidebar of the school app (white) and the platform console (dark violet): brand, school or badge, grouped menu with the current page marked, signed-in account. From lg it sits beside the page and can be made compact; below lg it opens as the menu drawer. docs/17 §5.2 has the rules."
+    "sidebarNote": "The one sidebar of the school app (white) and the platform console (dark violet): brand, school or badge, grouped menu with the current page marked, signed-in account. From lg it sits beside the page and can be made compact; below lg it opens as the menu drawer. docs/17 §5.2 has the rules.",
+    "chatNote": "Ask the school as a chat (docs/17 §5.3): the question bubble, the answer with its Worked-for summary, markdown, citation chips (focus one to see its source), source cards, actions with the version switcher, follow-up chips, and the live status line of an answer still being prepared."
   },
   "admin": {
     "nav": {
