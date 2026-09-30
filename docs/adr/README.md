@@ -107,3 +107,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0029](ADR-0029-tenant-data-deletion-at-offboarding.md) | Deleting a school's data at offboarding (purge role, crypto-shredding, certificate) | Accepted |
 | [ADR-0030](ADR-0030-in-house-identity-and-sessions.md) | In-house sign-in, MFA and sessions (replacing the managed OIDC provider) | Proposed |
 | [ADR-0032](ADR-0032-tally-edge-agent.md) | Tally edge agent, device credentials and the `get_fee_dues` tool (M6) | Proposed |
+| [ADR-0035](ADR-0035-contextual-retrieval-and-reranking.md) | Contextual chunk headers and a reranker for "Ask the school" (behind switches, off) | Proposed |

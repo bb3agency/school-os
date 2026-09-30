@@ -203,6 +203,19 @@ The six `0036_tally` tables are picked up by the RLS catalog, isolation and comp
 | Fee eval (FR-TALLY-008) | `evals/tests/test_fees.py`, `evals/tests/test_gates.py`, `knowledge/test_eval_bridge.py` | Scoring, dataset keys, the five pinned hard gates (06 §13.4) and the app-fake path |
 | Web (vitest) | `apps/web/src/features/tally/tally.test.tsx` (21 tests), `SchoolShell.test.tsx`, `layouts.node.test.tsx`, `proxy.test.ts`, `answer.test.ts`, `notifications.test.tsx`; `e2e/support/responsive.ts` lists `/fees`, `/settings/tally`, `/settings/tally/ledgers` | Connector off → plain message; enrolment code shown once with step-up; revoke with `If-Match`; groups chosen by keyboard; links made by a person with names only in POST bodies; dues with totals; Telugu; menu items only while the connector answers; BFF refuses `/api/v1/edge/*`; fee chips open `/fees` |
 
+### 4.0.6 Suites added for contextual retrieval and reranking (2026-09-30; behind switches, off; ADR-0035 Proposed)
+
+No new table or route: `0040_contextual_retrieval` adds columns to `kb.document_chunks` and `kb.llm_calls`, which the RLS catalog, isolation and offboarding-purge suites already cover.
+
+| Suite | File(s) | What it proves |
+|---|---|---|
+| Output checks and request shape (FR-KB-001, invariants 4, 8, 13) | `knowledge/test_contextual.py` | New numbers or capitalised names, wrong script, links and too-short contexts are rejected; long ones cut at a word; redacted; the document goes once, first, identical per call (cacheable), passages last; batching; per-document metering; budget/switch refusal defers the rest without calls; invalid output rejects one call; reuse on re-indexing makes no call; nothing Aadhaar-like or from another document reaches the model; the display text stays the chunk |
+| Retrieval with the database (FR-KB-001, FR-KB-002, SEC-018) | `knowledge/test_retrieval_contextual_db.py` | Full-text and keyword branches find a chunk by its context only while on; the reranker never receives a forbidden best match, gets masked passages with header and context; its order and `keep` are used; failure or over-budget keeps the RRF order; off never calls it; the SQL store writes/reads contexts and the backfill query |
+| Wiring and backfill with the database (FR-KB-001, FR-KB-011) | `knowledge/test_contextual_backfill_db.py`, `worker/tests/test_knowledge_contextual_routing.py` | Off by default; `SOS_KB_CONTEXTUAL_CHUNKS`/`SOS_KB_RERANK` switch them; the backfill adds contexts, meters per document, is idempotent, stops for a school out of budget; explicit route to `ingest` and the hourly beat entry |
+| Providers (FR-KB-001, invariants 5, 10) | `knowledge/test_rerank.py` | Fake reranker deterministic (English, Telugu, near spellings); selection off / fake / live; Voyage request shape, timeout = latency budget, errors without text, no model = refuse to start |
+| Migration with data (CLAUDE.md §6.12) | `knowledge/test_contextual_migration.py`, `extraction/test_migration.py` (head list) | Generated `context_tsv`; status/context CHECKs; round trip with rows present; `contextualize` metering rows kept NOT VALID on downgrade |
+| Eval set and gates (docs/06 §13.5) | `evals/tests/test_contextual.py`, `evals/tests/test_gates.py` | The committed set is the generated one and consistent; page-range scoring; restricted or unknown pages (retrieved or reranked) are leaks; stub-perfect passes, stub-leaky trips the new hard gate `ctx_leakage_count == 0` |
+
 ### 4.1 Route enumeration
 Iterate FastAPI's route table; assert every route (except allowlisted health checks) has exactly one of: `require()` with a permission that exists in `core.permissions`; `require_platform()` with a permission whose catalog entry has `is_platform: true` in `apps/api/app/authz/permissions.yaml` (control-plane routes, which must live under `/api/v1/platform/`); or `require_fleet_signature()` (only `POST /api/v1/fleet/heartbeat`). Routes that need no resolved school are pinned by a tenantless allowlist (`/me/schools`, `/me/accept-invitations`, `/me/active-tenant`, `/me/login-event`). Also assert that with `SOS_DEPLOYMENT_MODE=dedicated` no `/api/v1/platform/*` or `/api/v1/fleet/*` route is mounted.
 
@@ -275,6 +288,7 @@ Generated from the `is_platform` entries of `apps/api/app/authz/permissions.yaml
 ## 6. RAG evaluation (details in 06 §13)
 
 - `make eval` runs on PRs touching `app/knowledge/**`, `prompts/**`, model config or retrieval SQL; full suite nightly and before releases.
+- Contextual retrieval and reranking (06 §13.5): the same run scores four variants on `contextual.jsonl`; `ctx_leakage_count == 0` is hard, the gain gates are soft and are the adoption rule for switching them on per environment (live run).
 - **Hard gates (block merge):** leakage = 0, injection resistance = 0 failures, citation precision ≥ 0.95, correct refusal ≥ 0.95.
 - **Soft gates (block release, may merge with ticket):** Recall@10 ≥ 0.90, MRR@10 ≥ 0.70, faithfulness ≥ 0.95, correctness ≥ 0.85, language match ≥ 0.98, latency/cost within budget.
 - Results stored as artifacts with per-category breakdowns (records, documents, mixed language, temporal, unanswerable, permissions, adversarial) and diffs against the last main-branch run.

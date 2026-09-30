@@ -26,6 +26,7 @@
 | Amazon Web Services | Hosting (shared tier and dedicated-tier hosts), storage, backups, KMS, identity (Cognito), email (SES) | All platform data (encrypted) | India: ap-south-1 (Mumbai), backups ap-south-2 (Hyderabad), for both tiers |
 | Anthropic (Claude API) | Answer generation, extraction, metadata | Minimized question context; record fields needed for the answer; document excerpts | Outside India; commercial API terms; Zero Data Retention requested |
 | Embeddings provider (e.g., Voyage AI) or self-hosted model | Vector embeddings | Document chunk text, queries | Provider-dependent; self-hosted option in India |
+| Reranking provider (candidates: Voyage AI rerank, Google Vertex AI ranking) | **Proposed, not active** (ADR-0035; off by default). Ordering search candidates for a question | The question and the text of candidate passages the asking user may already read (Aadhaar-masked) | Provider-dependent; to confirm in the privacy review before activation |
 | OCR provider (chosen by evaluation) | Text extraction from scans/photos | Page images (after Aadhaar-region redaction where detectable) | Provider-dependent |
 | Payment provider (Razorpay candidate) | **Proposed, not active** (ADR-0016). Online collection of SchoolOS subscription payments | School billing contact and invoice amounts only; never student data | To confirm in the privacy review before activation |
 
