@@ -693,7 +693,7 @@ def test_ADR_0036_certificate_pdf_page_has_no_telugu_or_telugu_font_by_default(
     assert "Noto Sans Telugu" not in page
     row = C.row(admin_engine, cert.id)
     with admin_engine.connect() as c:
-        language = c.execute(
+        language: str = c.execute(
             text("SELECT language FROM kb.documents WHERE id = :d"), {"d": row["document_id"]}
         ).scalar_one()
     assert language == "en"

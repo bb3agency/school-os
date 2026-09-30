@@ -386,7 +386,7 @@ def test_ADR_0036_profiles_me_and_roles_resolve_to_english_while_telugu_is_hidde
     assert res.status_code == 200, res.text
     assert res.json()["preferred_language"] == "en", "te is kept but resolves to English"
     with admin_engine.connect() as c:
-        stored = c.execute(
+        stored: str = c.execute(
             text("SELECT preferred_language FROM core.users WHERE id = :u"), {"u": staff.user_id}
         ).scalar_one()
     assert stored == "te"

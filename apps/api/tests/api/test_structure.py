@@ -316,7 +316,7 @@ def test_ADR_0036_settings_and_classes_show_no_telugu_while_telugu_is_hidden(
     )
     assert again.status_code == 200, again.text
     with admin_engine.connect() as c:
-        stored = c.execute(
+        stored: dict[str, Any] = c.execute(
             text("SELECT settings FROM core.tenants WHERE id = :t"), {"t": school.tenant_id}
         ).scalar_one()
     assert stored["languages"] == ["te"]
