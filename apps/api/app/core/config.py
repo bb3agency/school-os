@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from enum import StrEnum
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -249,6 +250,13 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    # Contextual retrieval and reranking switches per environment (docs/06 §4.11, §6; PO
+    # 2026-09-30). Unset = the value in app/knowledge/config/retrieval.yaml (both off). Sizes,
+    # budgets and model IDs stay in that file (invariant 13). Reranking with voyage reuses
+    # SOS_EMBEDDINGS_API_KEY (same organization account).
+    kb_contextual_chunks: Literal["off", "on"] | None = None
+    kb_rerank: Literal["off", "voyage", "vertex"] | None = None
 
     oidc_issuer: str = "http://localhost:8080/schoolos"
     oidc_audience: str = "schoolos-web"

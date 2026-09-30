@@ -179,13 +179,13 @@ eval: ## RAG evaluation harness with hard gates (docs/06 §13); non-zero exit wh
 	$(UV) run python -m sos_evals generate --check
 	$(UV) run python $(EVAL_RUNNER) run --adapter $(EVAL_ADAPTER) --suite $(EVAL_SUITE) $(EVAL_ARGS)
 
-# Live evaluation (docs/06 §13.6; ADR-0033): the app-fake run, but every model call goes to the live
+# Live evaluation (docs/06 §13.7; ADR-0033): the app-fake run, but every model call goes to the live
 # provider of its role in models.yaml (Vertex AI Gemini). Needs Docker (or
 # SOS_TEST_ADMIN_DATABASE_URL), SOS_LLM_GCP_PROJECT / _CREDENTIALS_SOURCE / _CREDENTIALS_JSON of a
 # NON-production project and SOS_EVAL_LIVE_ACK=synthetic-only (the synthetic corpus is sent to the
 # provider and billed). Soft gates count (--fail-on-soft): a role goes live only on a full pass.
-eval-live: ## Live model evaluation against Vertex AI (synthetic data only; docs/06 §13.6)
-	@test "$$SOS_EVAL_LIVE_ACK" = synthetic-only || { echo "set SOS_EVAL_LIVE_ACK=synthetic-only (docs/06 §13.6)"; exit 2; }
+eval-live: ## Live model evaluation against Vertex AI (synthetic data only; docs/06 §13.7)
+	@test "$$SOS_EVAL_LIVE_ACK" = synthetic-only || { echo "set SOS_EVAL_LIVE_ACK=synthetic-only (docs/06 §13.7)"; exit 2; }
 	$(UV) run python -m sos_evals generate --check
 	$(UV) run python apps/api/tests/knowledge/eval_bridge.py run --adapter app-live --suite $(EVAL_SUITE) --fail-on-soft $(EVAL_ARGS)
 

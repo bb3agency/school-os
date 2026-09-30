@@ -477,6 +477,28 @@ SCHEMA: dict[str, Any] = {
 }
 
 
+def test_ADR_0035_a_contextualize_document_is_never_context_cached() -> None:
+    """The contextualize role sends the whole document in the system instruction: tenant
+    content, so the request names no cacheable prefix however large it is (ADR-0033 decision 4),
+    and its spend is metered against the document."""
+    document = "Sub: Science exhibition 2026. " * 2000  # far above any cache minimum
+    r = rig(fixture("structured.json"))
+    doc_id = uuid.uuid4()
+    r.gateway.generate_json(
+        Metering(TENANT, "contextualize", document_id=doc_id),
+        "contextualize",
+        f"Situate each passage in this document.\n{document}",
+        "[1] Passages last.",
+        SCHEMA,
+    )
+    (request,) = r.transport.requests
+    assert request.model == "gemini-3.5-flash-lite"
+    assert request.static_prefix == ()
+    assert "Science exhibition" in request.body["systemInstruction"]["parts"][0]["text"]
+    assert r.transport.bodies[0]["contents"][0]["parts"][-1] == {"text": "[1] Passages last."}
+    assert r.sink.events[0].document_id == doc_id
+
+
 def test_FR_KB_003_structured_output_uses_the_json_schema_and_is_validated() -> None:
     r = rig(fixture("structured.json"))
     out = r.gateway.generate_json(
@@ -485,7 +507,7 @@ def test_FR_KB_003_structured_output_uses_the_json_schema_and_is_validated() -> 
     assert out == {"doc_type": "circular", "deadlines": ["2026-10-15"], "issued_on": None}
     (request,) = r.transport.requests
     assert request.model == "gemini-3.5-flash-lite"
-    assert request.static_prefix == ("systemInstruction",)
+    assert request.static_prefix == ()  # never context-cached (tenant content, e.g. a document)
     generation = request.body["generationConfig"]
     assert generation["responseMimeType"] == "application/json"
     assert generation["responseJsonSchema"] == SCHEMA

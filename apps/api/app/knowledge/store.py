@@ -4,7 +4,8 @@
   ``kb.document_chunks`` (docs/06 §4.7): ``replace_version`` -> ``replace_version_chunks``
   (hidden until promoted), ``set_latest`` -> ``promote_version``, ``hide_document`` ->
   ``demote_document``, ``update_acl`` -> ``refresh_acl``, ``delete_versions`` /
-  ``delete_document`` -> ``delete_version_chunks`` / ``delete_document_chunks``. When a new
+  ``delete_document`` -> ``delete_version_chunks`` / ``delete_document_chunks``, and the
+  optional ``ContextStore.version_contexts`` -> ``version_chunk_contexts``. When a new
   version replaces the searchable one, active verified answers citing the document are flagged
   ``needs_review`` in the same transaction (FR-KB-030, docs/06 §4.8).
 - :class:`SqlEmbeddingCache` implements :class:`app.knowledge.embeddings.EmbeddingCache` on
@@ -19,12 +20,18 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from sqlalchemy import text
 
 from app.knowledge import repository as repo
-from app.knowledge.ingestion.ports import ChunkAcl, VersionIndex
+from app.knowledge.ingestion.ports import (
+    ChunkAcl,
+    ChunkContext,
+    ContextStatus,
+    StoredContext,
+    VersionIndex,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -59,7 +66,17 @@ class SqlChunkStore:
             session,
             document_id=index.document_id,
             version_id=index.version_id,
-            chunks=[repo.EmbeddedChunk(c.chunk, c.embedding) for c in index.chunks],
+            chunks=[
+                repo.EmbeddedChunk(
+                    c.chunk,
+                    c.embedding,
+                    context=c.context.text,
+                    context_status=c.context.status,
+                    context_model=c.context.model,
+                    context_prompt=c.context.prompt,
+                )
+                for c in index.chunks
+            ],
             embedding_model=index.embedding_model,
             facets=repo.DocumentFacets(
                 doc_type=f.doc_type,
@@ -97,6 +114,22 @@ class SqlChunkStore:
 
     def delete_document(self, session: Session, document_id: uuid.UUID) -> int:
         return repo.delete_document_chunks(session, document_id)
+
+    def version_contexts(
+        self, session: Session, version_id: uuid.UUID
+    ) -> Mapping[int, StoredContext]:
+        """:class:`~app.knowledge.ingestion.ports.ContextStore`: reuse on re-indexing."""
+        out: dict[int, StoredContext] = {}
+        for row in repo.version_chunk_contexts(session, version_id):
+            status = cast(ContextStatus, row.status)
+            try:
+                context = ChunkContext(
+                    text=row.context, status=status, model=row.model, prompt=row.prompt
+                )
+            except ValueError:
+                continue  # inconsistent row: ask again
+            out[row.chunk_no] = StoredContext(row.content_sha256, context)
+        return out
 
 
 class SqlEmbeddingCache:

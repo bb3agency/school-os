@@ -11,9 +11,10 @@ breaker run exactly as in live mode, and the same inputs always give the same ou
   (``search_result_location``, docs/06 §7, §9). No results: an honest "not found" in the
   question's script (Telugu or English).
 - Structured output (``output_config.format``): circular readings and parent notices from the
-  deterministic rules of :mod:`.fake_circulars`, the Ask conversation roles (rewrite, summary,
-  follow-ups, memory screen) from :mod:`.fake_conversations`; any other schema gets a minimal
-  instance.
+  deterministic rules of :mod:`.fake_circulars`, chunk contexts from :mod:`.fake_contextual`
+  (title, subject line and nearest heading of the document in the system prompt), the Ask
+  conversation roles (rewrite, summary, follow-ups, memory screen) from
+  :mod:`.fake_conversations`; any other schema gets a minimal instance.
 
 Token counts are estimates (4 characters per token) so metering and budgets can be exercised.
 """
@@ -26,7 +27,9 @@ import re
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
+from app.knowledge.contextual.rules import SCHEMA_TAG as CONTEXT_SCHEMA_TAG
 from app.knowledge.gateway.fake_circulars import structured_reply
+from app.knowledge.gateway.fake_contextual import contextual_reply
 from app.knowledge.gateway.fake_conversations import conversation_reply
 from app.knowledge.gateway.schema_check import example
 from app.knowledge.gateway.transport import MessagesRequest
@@ -72,6 +75,15 @@ def _search_results(messages: Sequence[Mapping[str, Any]]) -> list[Mapping[str, 
     return found
 
 
+def _system(body: Mapping[str, Any]) -> str:
+    system = body.get("system")
+    if isinstance(system, str):
+        return system
+    if isinstance(system, list):
+        return "".join(str(b.get("text", "")) for b in system if isinstance(b, Mapping))
+    return ""
+
+
 def _first_sentence(text: str) -> str:
     head = re.split(r"(?<=[.!?।])\s", text.strip(), maxsplit=1)[0]
     return head[:200]
@@ -95,7 +107,11 @@ class FakeTransport:
         if isinstance(output_format, Mapping):
             schema = output_format["schema"]
             request_text = _question(messages)
-            reply = structured_reply(schema, request_text)
+            reply: dict[str, Any] | None
+            if schema.get("description") == CONTEXT_SCHEMA_TAG:
+                reply = contextual_reply(_system(body), request_text)
+            else:
+                reply = structured_reply(schema, request_text)
             if reply is None:
                 reply = conversation_reply(schema, request_text)
             value = reply if reply is not None else example(schema)

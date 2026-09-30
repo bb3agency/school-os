@@ -3,6 +3,8 @@
 - ``EmbeddingsProvider``: ``embeddings`` (offline fake) and ``gateway`` (network providers);
   used by ``embeddings``' ``TenantEmbedder``.
 - ``TenantEmbedder``: ``embeddings``; used by ``ingestion`` and ``service``.
+- ``Reranker`` (additive): ``rerank`` (offline fake) and ``gateway`` (network providers); used
+  by ``retrieval`` (optional rerank of the fused, ACL-filtered candidates).
 - ``Chunker``: ``chunking``; used by ``ingestion``.
 - ``Retriever``: ``retrieval``; used by ``tools`` (``search_documents``) and ``service``.
 - ``LlmGateway``: ``gateway``; used by ``service`` (ask loop) and ``ingestion`` (metadata).
@@ -72,6 +74,26 @@ class EmbeddingsProvider(Protocol):
 
     def embed(self, texts: Sequence[str], input_type: InputType) -> list[list[float]]:
         """One vector per text, in order. Texts are already Aadhaar-redacted."""
+        ...
+
+
+@runtime_checkable
+class Reranker(Protocol):
+    """Scores fused retrieval candidates against the question (docs/06 §6 "Optional rerank";
+    contextual retrieval, PO approval 2026-09-30). Implemented by ``rerank`` (offline fake) and
+    ``gateway`` (network providers); used by ``retrieval``. Chosen by evaluation, like
+    embeddings (ADR-0006 pattern)."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def model(self) -> str: ...
+
+    def rerank(self, query: str, passages: Sequence[str], *, timeout_s: float) -> list[float]:
+        """One relevance score per passage, in order (higher is more relevant). The passages
+        are ONLY candidates that already passed the caller's ACL filter in SQL, Aadhaar-masked
+        (invariants 4, 8). Raises on any failure; the retriever then keeps its own order."""
         ...
 
 
@@ -215,6 +237,7 @@ __all__ = [
     "KnowledgeService",
     "LlmGateway",
     "RecordTool",
+    "Reranker",
     "Retriever",
     "StreamingLlmGateway",
     "TenantEmbedder",

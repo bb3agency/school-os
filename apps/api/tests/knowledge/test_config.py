@@ -178,6 +178,56 @@ def test_FR_KB_001_retrieval_matches_docs_06_section_6() -> None:
     assert config.branches.full_text.ts_config == "simple"
     assert config.final_k <= config.branches.vector.limit
     assert config.rerank.enabled is False  # adopt only if evals show a gain
+    assert config.rerank.provider == "off"
+    assert config.contextual_chunks == "off"  # PO 2026-09-30: on only after evals show a gain
+    assert config.rerank.voyage.model is None  # chosen by evaluation, never by default
+
+
+def test_FR_KB_001_contextual_and_rerank_switches_accept_yaml_booleans_and_overrides() -> None:
+    data = raw("retrieval.yaml")
+    data["contextual_chunks"] = True  # a bare `on` in YAML 1.1
+    data["rerank"]["provider"] = False  # a bare `off`
+    config = retrieval.RetrievalConfig.model_validate(data)
+    assert config.contextual
+    assert not config.rerank.enabled
+    switched = config.with_overrides(contextual_chunks="off", rerank="voyage")
+    assert not switched.contextual
+    assert switched.rerank.provider == "voyage"
+    assert switched.rerank.candidates == config.rerank.candidates  # sizes stay from the file
+    assert config.with_overrides() is config
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "match"),
+    [
+        (("rerank", "keep"), 60, "keep"),
+        (("rerank", "candidates"), 500, "candidates"),
+        (("rerank", "provider"), "cohere", "provider"),
+        (("contextual_chunks",), "maybe", "contextual_chunks"),
+    ],
+)
+def test_FR_KB_001_rerank_and_contextual_settings_are_validated(
+    path: tuple[str, ...], value: object, match: str
+) -> None:
+    data = raw("retrieval.yaml")
+    target = data
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    with pytest.raises(ValidationError, match=match):
+        retrieval.RetrievalConfig.model_validate(data)
+
+
+def test_FR_KB_001_contextual_yaml_is_consistent() -> None:
+    from app.knowledge.config import contextual
+    from app.knowledge.prompts.registry import load_prompt
+
+    config = contextual.load_contextual_config()
+    prompt = load_prompt(config.prompt.id, config.prompt.version)
+    assert prompt.header.model_config_key == "contextualize"
+    assert prompt.placeholders == {"title", "doc_type", "document"}
+    assert config.prompt.label == "contextualize.v1"
+    assert config.max_chars <= 1000  # kb.document_chunks.chunk_context CHECK
 
 
 def test_FR_KB_001_final_k_cannot_exceed_candidate_lists() -> None:

@@ -40,6 +40,18 @@ PERFECT = Metrics(
     fee_guessed_link_count=0,
     fee_citation_validity=1.0,
     fee_refusal_correctness=1.0,
+    ctx_items=54,
+    ctx_recall_at_5_plain=0.7,
+    ctx_recall_at_5_contextual=1.0,
+    ctx_recall_at_5_rerank=0.75,
+    ctx_recall_at_5_contextual_rerank=1.0,
+    ctx_mrr_at_10_plain=0.5,
+    ctx_mrr_at_10_contextual=0.7,
+    ctx_mrr_at_10_rerank=0.5,
+    ctx_mrr_at_10_contextual_rerank=1.0,
+    ctx_recall_gain_contextual=0.3,
+    ctx_mrr_gain_rerank=0.3,
+    ctx_leakage_count=0,
     conversation_items=16,
     conversation_leakage_count=0,
     conversation_scope_violations=0,
@@ -68,6 +80,9 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         ("fee_guessed_link_count", "==", 0),
         ("fee_citation_validity", ">=", 1.0),
         ("fee_refusal_correctness", ">=", 0.95),
+        # Contextual retrieval and reranking (docs/06 §13.6): nothing restricted is retrieved
+        # or sent to a reranker, in any variant.
+        ("ctx_leakage_count", "==", 0),
         # Ask conversations and memory (ADR-0034; FR-KB-012): nothing leaks, no rule is broken.
         ("conversation_leakage_count", "==", 0),
         ("conversation_scope_violations", "==", 0),
@@ -84,6 +99,10 @@ def test_soft_gates_match_docs_06_section_13() -> None:
         ("latency_p95_ms", "<=", 10000),
         ("circular_complete_rate", ">=", 0.90),
         ("circular_metadata_accuracy", ">=", 0.90),
+        # docs/06 §13.6: the adoption rule for contextual chunks and reranking.
+        ("ctx_recall_gain_contextual", ">=", 0.10),
+        ("ctx_mrr_gain_rerank", ">=", 0.0),
+        ("ctx_recall_at_5_contextual_rerank", ">=", 0.90),
     } <= soft
 
 
@@ -117,6 +136,8 @@ def test_perfect_metrics_pass_every_gate() -> None:
         ({"circular_citation_validity": 0.99}, "circular_citation_validity"),
         ({"circular_hallucinated_deadlines": 1}, "circular_hallucinated_deadlines"),
         ({"circular_deadline_recall": None}, "circular_deadline_recall"),
+        ({"ctx_leakage_count": 1}, "ctx_leakage_count"),
+        ({"ctx_leakage_count": None}, "ctx_leakage_count"),
     ],
 )
 def test_a_failing_hard_gate_exits_1(change: dict[str, object], failed: str) -> None:

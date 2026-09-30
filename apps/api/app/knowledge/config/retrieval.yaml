@@ -33,8 +33,32 @@ boosts:
   verified_answers: true            # doc_type = 'verified_answer'
   verified_answer_factor: 1.0       # neutral until `make eval` tunes it
 
+# Contextual retrieval (docs/06 §4.11, §6 as built; PO approval 2026-09-30): "off" | "on".
+# "on": ingestion asks the `contextualize` model role (models.yaml, contextual.yaml) for a short
+# context situating each chunk in its document; it is embedded with the chunk and searched by the
+# full-text (context_tsv) and keyword branches. It is never shown to users nor sent to the answer
+# model. OFF until evals with the live providers show a gain; per environment the variable
+# SOS_KB_CONTEXTUAL_CHUNKS overrides this value.
+contextual_chunks: "off"
+
+# Reranking of the fused candidates (docs/06 §6 "Optional rerank"). provider: "off" | "voyage"
+# | "vertex" ("vertex" is a named candidate without an implementation: live mode refuses it).
+# With SOS_KB_PROVIDER_MODE=fake any provider other than "off" runs the offline deterministic
+# reranker. Per environment the variable SOS_KB_RERANK overrides `provider`. Flow: ACL filter in
+# SQL -> hybrid candidates -> RRF + boosts -> the best `candidates` go to the reranker (their text
+# read again under the ACL predicate and Aadhaar-masked again) -> at most `keep` passages. A
+# failure or a call over `latency_budget_ms` keeps the RRF order (never blocks an answer).
 rerank:
-  enabled: false                    # adopt only if evals show a gain worth the latency
+  provider: "off"
+  candidates: 50            # fused candidates sent to the reranker (<= the candidate lists)
+  keep: 12                  # passages kept after reranking (never more than the caller's k)
+  latency_budget_ms: 1500   # provider timeout; over it the RRF order is kept
+  max_passage_chars: 4000   # per passage sent (the provider counts tokens per query + passage)
+  include_context: true     # send the context header and chunk context before the passage
+  voyage:
+    endpoint: https://api.voyageai.com/v1/rerank
+    model: null             # chosen by evaluation (docs/06 §13.6); live refuses while null
+    connect_timeout_s: 3
 
 translated_query_fusion:
   enabled: true                     # original + translated query (small model), fused

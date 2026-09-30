@@ -168,6 +168,7 @@ def add_chunks(
     acl_memberships: Sequence[uuid.UUID] = (),
     pages: Sequence[int] | None = None,
     jitter: float = 0.05,
+    contexts: Sequence[str] | None = None,
 ) -> list[uuid.UUID]:
     """Insert chunks for the document's newest version (admin: bypasses RLS for setup)."""
     vid = doc.versions[-1]
@@ -186,14 +187,16 @@ def add_chunks(
         for i, content in enumerate(contents):
             cid = uuid.uuid4()
             page = pages[i] if pages is not None else i + 1
+            ctx = contexts[i] if contexts is not None else ""
             c.execute(
                 text(
                     "INSERT INTO kb.document_chunks (id, tenant_id, document_id, version_id, "
                     "chunk_no, page_from, page_to, context_header, content, token_count, "
                     "embedding, embedding_model, doc_type, issued_on, sensitivity, acl_roles, "
-                    "acl_sections, acl_classes, acl_memberships, is_latest) VALUES "
+                    "acl_sections, acl_classes, acl_memberships, is_latest, chunk_context, "
+                    "context_status, context_model, context_prompt) VALUES "
                     "(:i, :t, :d, :v, :n, :p, :p, :h, :c, 10, CAST(:e AS halfvec(1024)), :m, "
-                    ":dt, :io, :s, :ar, :asec, :acl, :am, :l)"
+                    ":dt, :io, :s, :ar, :asec, :acl, :am, :l, :cx, :cs, :cm, :cp)"
                 ),
                 {
                     "i": cid,
@@ -214,6 +217,10 @@ def add_chunks(
                     "acl": list(acl_classes),
                     "am": list(acl_memberships),
                     "l": latest,
+                    "cx": ctx,
+                    "cs": "ok" if ctx else "none",
+                    "cm": "synthetic-context-1" if ctx else None,
+                    "cp": "contextualize.v1" if ctx else None,
                 },
             )
             ids.append(cid)

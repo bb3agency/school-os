@@ -271,7 +271,9 @@ class GeminiCodec:
             inline = [{"inlineData": {"mimeType": i.mime_type, "data": i.base64}} for i in images]
             parts = redacted["contents"][0]["parts"]
             redacted["contents"][0]["parts"] = [*inline, *parts]
-        return Prepared(redacted, ("systemInstruction",))
+        # Never cached: a structured-output system instruction may carry tenant content (the
+        # contextualize role puts the whole document there; ADR-0033 decision 4, amendment).
+        return Prepared(redacted)
 
     def parse_turn(
         self,

@@ -14,10 +14,10 @@ its own transaction. Values carry IDs, codes and already-redacted text only (inv
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, Final, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Final, Literal, Protocol, runtime_checkable
 
 from app.knowledge.domain import Chunk
 
@@ -75,13 +75,53 @@ class ChunkFilters:
     sensitivity: str
 
 
+ContextStatus = Literal["none", "ok", "rejected", "deferred"]
+"""``kb.document_chunks.context_status`` (0040_contextual_retrieval; docs/06 §4.11)."""
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkContext:
+    """The model-written context of one chunk (contextual retrieval, docs/06 §4.11).
+
+    ``ok`` exactly when ``text`` is not empty, and then with ``model`` and ``prompt``
+    (``<id>.v<n>``); ``rejected`` = the output failed the checks, ``deferred`` = not asked
+    (budget, AI switched off, provider down; the backfill asks again), ``none`` = contextual
+    chunks were off. Only ever embedding/full-text input: never shown, never sent to the answer
+    model."""
+
+    text: str = ""
+    status: ContextStatus = "none"
+    model: str | None = None
+    prompt: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.status == "ok") != bool(self.text):
+            raise ValueError("a context is stored exactly when its status is ok")
+        if self.status == "ok" and (self.model is None or self.prompt is None):
+            raise ValueError("an ok context names its model and prompt")
+
+
+NO_CONTEXT: Final = ChunkContext()
+
+
+@dataclass(frozen=True, slots=True)
+class StoredContext:
+    """What a version's chunk already has, for reuse on a re-run (idempotent, no new call)."""
+
+    content_sha256: bytes
+    context: ChunkContext
+
+
 @dataclass(frozen=True, slots=True)
 class IndexedChunk:
     chunk: Chunk
     """Content, contextual header (for ``content_tsv`` = ``to_tsvector('simple', header ||
     content)``), heading path, pages, token count, language, table flag."""
     embedding: tuple[float, ...]
-    """Embedding of :func:`app.knowledge.ingestion.pipeline.embedding_text` of the chunk."""
+    """Embedding of :func:`app.knowledge.ingestion.pipeline.embedding_text` of the chunk (with
+    its context when it has one)."""
+    context: ChunkContext = NO_CONTEXT
+    """Stored in ``chunk_context`` and friends; ``context_tsv`` is generated from it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +179,19 @@ class ChunkStore(Protocol):
         ...
 
 
+@runtime_checkable
+class ContextStore(Protocol):
+    """Optional capability of a :class:`ChunkStore` (a separate Protocol so every existing store
+    and test double stays a valid ``ChunkStore``): the contexts a version's chunks already have,
+    so re-indexing the same version does not ask the model again (docs/06 §4.11)."""
+
+    def version_contexts(
+        self, session: Session, version_id: uuid.UUID
+    ) -> Mapping[int, StoredContext]:
+        """``chunk_no -> StoredContext`` for the version's chunks."""
+        ...
+
+
 # --- document source --------------------------------------------------------------------------
 
 
@@ -192,14 +245,19 @@ class DocumentSource(Protocol):
 
 
 __all__ = [
+    "NO_CONTEXT",
     "PRINCIPAL_TYPES",
     "ChunkAcl",
+    "ChunkContext",
     "ChunkFilters",
     "ChunkStore",
+    "ContextStatus",
+    "ContextStore",
     "DocumentFacts",
     "DocumentNotReady",
     "DocumentSource",
     "IndexedChunk",
+    "StoredContext",
     "VersionFacts",
     "VersionIndex",
 ]

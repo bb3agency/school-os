@@ -63,6 +63,8 @@ class MeteringEvent:
     cost_usd: Decimal
     month_spend_usd: Decimal | None
     """The tenant's IST-month spend after this call (None when the call cost nothing)."""
+    document_id: uuid.UUID | None = None
+    """The document the call served (contextual chunk headers, docs/06 §4.11), else None."""
 
 
 class MeteringSink(Protocol):

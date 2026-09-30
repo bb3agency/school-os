@@ -1,6 +1,6 @@
 {
   "adapter": "app-fake",
-  "dataset_sha256": "8437d86af1a01b5772a47e104f0d319ac6f69e401cad69b16810ba9d05ccc5c9",
+  "dataset_sha256": "d047b52e4519790fc1e2a9458eea305a04dcdc50a54320cac10acd87ac6acffc",
   "metrics": {
     "circular_citation_validity": 1.0,
     "circular_complete_rate": 0.9166666666666666,
@@ -15,6 +15,18 @@
     "conversation_items": 16,
     "conversation_leakage_count": 0,
     "conversation_scope_violations": 0,
+    "ctx_items": 15,
+    "ctx_leakage_count": 0,
+    "ctx_mrr_at_10_contextual": 0.6666666666666666,
+    "ctx_mrr_at_10_contextual_rerank": 1.0,
+    "ctx_mrr_at_10_plain": 0.5535978835978835,
+    "ctx_mrr_at_10_rerank": 0.5228571428571428,
+    "ctx_mrr_gain_rerank": 0.33333333333333337,
+    "ctx_recall_at_5_contextual": 1.0,
+    "ctx_recall_at_5_contextual_rerank": 1.0,
+    "ctx_recall_at_5_plain": 0.8,
+    "ctx_recall_at_5_rerank": 0.8,
+    "ctx_recall_gain_contextual": 0.19999999999999996,
     "false_refusal_rate": 0.0,
     "fee_citation_validity": 1.0,
     "fee_figure_accuracy": 1.0,
@@ -27,16 +39,16 @@
     "injection_success_rate": 0.0,
     "items": 69,
     "language_match": 1.0,
-    "latency_p50_ms": 81.17955200032156,
-    "latency_p95_ms": 110.15781100013555,
-    "latency_p99_ms": 129.44226200033881,
+    "latency_p50_ms": 81.99487999991106,
+    "latency_p95_ms": 109.80960699998832,
+    "latency_p99_ms": 148.75705799931893,
     "leakage_count": 0,
     "leakage_rate": 0.0,
     "memory_preference_applied": 1.0,
     "mrr_at_10": 0.9375,
     "recall_at_10": 0.9583333333333334,
     "refusal_correctness": 1.0,
-    "retrieval_latency_p95_ms": 54.18687100063835
+    "retrieval_latency_p95_ms": 48.63365499841166
   },
   "suite": "fast"
 }

@@ -4,7 +4,7 @@
 # FR-KB-008, FR-KB-009, FR-KB-011, SEC-020, NFR-AVL-004, NFR-CST-001. CLAUDE.md invariant 13: model
 # IDs, providers, limits and thresholds live here, never in code. Changing a provider, model, limit or
 # threshold needs a passing `make eval` (docs/06 §13) and, before a role goes live on a new model, the
-# live gates of docs/06 §13.6 (`make eval-live`); re-check model IDs, prices, regions and capabilities
+# live gates of docs/06 §13.7 (`make eval-live`); re-check model IDs, prices, regions and capabilities
 # against the provider's current documentation whenever they change.
 version: 2
 # ADR-0033: every product role runs on Gemini (Vertex AI, SOS_LLM_GCP_LOCATION = asia-south1).
@@ -26,7 +26,7 @@ prices_checked_on: 2026-09-30
 #
 # PROVISIONAL (2026-09-30): these Gemini model choices are the cheapest candidates that are served in
 # asia-south1 as far as could be checked without Vertex credentials; live model selection per role
-# (cheapest model that passes every hard gate, docs/06 §13.6) is pending credentials (docs/14 M2).
+# (cheapest model that passes every hard gate, docs/06 §13.7) is pending credentials (docs/14 M2).
 # Gemini 2.5 Flash / Flash-Lite were NOT chosen: Vertex retires them on 2026-10-16. Candidates to try
 # first in the live run: gemini-3.8-flash (introductory $0.75/$3.75 to 2026-12-31) for answer/notice
 # if Vertex serves it from asia-south1; gemini-3.1-flash-lite ($0.25/$1.50) for the lite roles if it
@@ -114,9 +114,29 @@ roles:
       provider: anthropic
       model: claude-sonnet-5
       thinking: disabled
+  # Contextual retrieval (docs/06 §4.11; PO approval 2026-09-30, behind retrieval.yaml
+  # `contextual_chunks`): a 50-100 token context situating each chunk in its document, written at
+  # ingestion from the document's already-masked text (document first and stable, chunks last,
+  # so the provider's prompt cache serves every call of one document). Provider-neutral: the
+  # model is the small tier of whichever provider the gateway runs (ADR-0033), chosen by the
+  # docs/06 §13.6 live evaluation (cost per million document tokens is the driver); the entry
+  # below is today's small-tier default. Output cap: `contextual.yaml` chunks_per_call contexts.
+  # Gemini (ADR-0033): Flash-Lite tier, thinking low; the whole document goes in the system
+  # instruction, so this role's requests are never put in an explicit Vertex cache (tenant
+  # content; implicit caching is off for ZDR): each call pays the document's input tokens.
+  contextualize:
+    provider: gemini
+    model: gemini-3.5-flash-lite
+    max_output_tokens: 2000
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # Ask conversations (docs/06 §5, cost and performance design; ADR-0034): cheap roles, each a
   # metered, budget-checked structured-output call through the gateway. Flash-Lite tier (ADR-0033):
-  # short structured JSON; provisional until the live evaluation (docs/06 §13.6). Output caps
+  # short structured JSON; provisional until the live evaluation (docs/06 §13.7). Output caps
   # include thinking tokens: watch the live run for MAX_TOKENS truncation on the small caps.
   # Follow-up suggestions (0-3, the answer's language) plus at most one memory suggestion.
   followups:

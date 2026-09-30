@@ -6,12 +6,19 @@ tenant, standing in for RLS), replace-by-version, ``is_latest`` flip, ACL rewrit
 
 from __future__ import annotations
 
+import hashlib
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-from app.knowledge.ingestion.ports import ChunkAcl, ChunkFilters, IndexedChunk, VersionIndex
+from app.knowledge.ingestion.ports import (
+    ChunkAcl,
+    ChunkFilters,
+    IndexedChunk,
+    StoredContext,
+    VersionIndex,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +142,17 @@ class InMemoryChunkStore:
             r for r in self.rows if not (r.tenant_id == tenant_id and r.document_id == document_id)
         ]
         return before - len(self.rows)
+
+    def version_contexts(self, session: Any, version_id: uuid.UUID) -> Mapping[int, StoredContext]:
+        """:class:`~app.knowledge.ingestion.ports.ContextStore` (docs/06 §4.11)."""
+        tenant_id = self._tenant(session)
+        return {
+            r.item.chunk.chunk_no: StoredContext(
+                hashlib.sha256(r.item.chunk.content.encode("utf-8")).digest(), r.item.context
+            )
+            for r in self.rows
+            if r.tenant_id == tenant_id and r.version_id == version_id
+        }
 
 
 __all__ = ["InMemoryChunkStore", "StoredChunk"]

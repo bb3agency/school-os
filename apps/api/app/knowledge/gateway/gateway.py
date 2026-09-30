@@ -529,6 +529,7 @@ class Gateway:
             cache_read_tokens=usage.cache_read_tokens,
             cost_usd=cost,
             month_spend_usd=month_spend,
+            document_id=metering.document_id,
         )
         (call.span or trace.get_current_span()).set_attributes(
             {

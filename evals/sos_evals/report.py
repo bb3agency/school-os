@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from sos_evals import contextual
 from sos_evals.gates import GateResult
 from sos_evals.runner import ItemOutcome, Metrics, RunResult
 
@@ -26,11 +27,13 @@ LOWER_IS_BETTER = frozenset(
         "circular_hallucinated_deadlines",
         "fee_leakage_count",
         "fee_guessed_link_count",
+        "ctx_leakage_count",
         "conversation_leakage_count",
         "conversation_scope_violations",
     }
 )
 _MAX_LISTED = 20
+_LOCALES = ("en", "te", "mixed")
 
 
 class _Model(BaseModel):
@@ -134,7 +137,7 @@ def to_markdown(report: Report) -> str:
         n
         for n in Metrics.model_fields
         if n != "items"
-        and not n.startswith(("circular_", "fee_", "conversation_", "followup_", "memory_"))
+        and not n.startswith(("circular_", "fee_", "ctx_", "conversation_", "followup_", "memory_"))
     ]
     lines += [
         "",
@@ -165,6 +168,8 @@ def to_markdown(report: Report) -> str:
     lines += _circular_lines(report.run) or ["Not measured."]
     lines += ["", "## Fee dues from Tally (M6)", ""]
     lines += _fee_lines(report.run) or ["Not measured."]
+    lines += ["", "## Contextual retrieval and reranking (docs/06 §13.6)", ""]
+    lines += _contextual_lines(report.run) or ["Not measured."]
     lines += ["", "## Ask conversations (ADR-0034)", ""]
     lines += _conversation_lines(report.run) or ["Not measured."]
     return "\n".join(lines) + "\n"
@@ -249,6 +254,33 @@ def _fee_lines(run: RunResult) -> list[str]:
             problems.append(f"{o.stated - o.valid_amounts} uncited amount(s)")
         if problems:
             lines.append(f"- `{o.id}` ({o.locale}): " + "; ".join(problems))
+    return lines
+
+
+def _contextual_lines(run: RunResult) -> list[str]:
+    if not run.contextual_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- Questions: {m.ctx_items} ({sum(o.needs_context for o in run.contextual_outcomes)} "
+        f"about a page that does not name its subject) · leakage {fmt(m.ctx_leakage_count)} · "
+        f"recall gain from contexts {fmt(m.ctx_recall_gain_contextual)} · MRR gain from "
+        f"reranking {fmt(m.ctx_mrr_gain_rerank)}",
+        "",
+        "| Variant | Recall@5 | MRR@10 | "
+        + " | ".join(f"Recall@5 {loc}" for loc in _LOCALES)
+        + " |",
+        "|---|---|---|" + "---|" * len(_LOCALES),
+    ]
+    table = contextual.by_locale(run.contextual_outcomes)
+    for variant in contextual.VARIANTS:
+        per_locale = " | ".join(fmt(table.get(loc, {}).get(variant)) for loc in _LOCALES)
+        lines.append(
+            f"| {variant} | {fmt(getattr(m, f'ctx_recall_at_5_{variant}'))} | "
+            f"{fmt(getattr(m, f'ctx_mrr_at_10_{variant}'))} | {per_locale} |"
+        )
+    leaks = [o for o in run.contextual_outcomes if o.leaks]
+    lines += [f"- `{o.id}` leak: " + ", ".join(o.leaks[:3]) for o in leaks]
     return lines
 
 

@@ -162,6 +162,45 @@ threshold = 0.95
 severity = "hard"
 requirements = ["FR-TALLY-008", "FR-KB-007"]
 
+# --- Contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.6; PO 2026-09-30) ---
+# Multi-page synthetic circulars whose titles are reference numbers and whose later pages never
+# name their subject, in English, Telugu script and code-mixed Telugu, plus restricted memos that
+# are the best lexical match. Four variants of the same retrieval: plain, contextual, rerank,
+# contextual_rerank. Leakage (a restricted page retrieved or its text sent to a reranker, in any
+# variant) is a hard gate. The soft gates are the adoption rule: contextual chunks and reranking
+# are switched on in an environment only when a LIVE run (real contextualize model, real
+# embeddings, real reranker) meets them; offline numbers use deterministic stand-ins.
+
+[[gate]]
+metric = "ctx_leakage_count"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["FR-KB-002", "SEC-018"]
+
+[[gate]]
+# Contexts must lift recall@5 by at least 10 points over plain retrieval on this set.
+metric = "ctx_recall_gain_contextual"
+op = ">="
+threshold = 0.10
+severity = "soft"
+requirements = ["FR-KB-001"]
+
+[[gate]]
+# Reranking must not make the contextual ranking worse (MRR@10).
+metric = "ctx_mrr_gain_rerank"
+op = ">="
+threshold = 0.0
+severity = "soft"
+requirements = ["FR-KB-001"]
+
+[[gate]]
+metric = "ctx_recall_at_5_contextual_rerank"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["FR-KB-001", "FR-KB-006"]
+
 # --- Ask conversations and memory (sos_evals.conversations; docs/06 §13.5; ADR-0034) -------------
 # Scripted conversations in tiny synthetic schools: follow-ups, long conversations, permission
 # changes, regenerate/edit, follow-up suggestions, per-user memory, the answer cache and chat
