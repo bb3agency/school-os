@@ -132,7 +132,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Dev-only living reference of the design system (rendered only when dev sign-in is on). */
-export function UiReference() {
+export function UiReference({ telugu = false }: { telugu?: boolean }) {
   const t = useTranslations("devUi");
   return (
     <MinimalShell wide>
@@ -602,20 +602,23 @@ export function UiReference() {
           </ul>
         </Section>
 
-        <Section id="telugu" title={t("sections.telugu")}>
-          <div lang="te" className="space-y-3">
-            <Eyebrow>తనిఖీ సారాంశం</Eyebrow>
-            <p className="font-display text-4xl text-ink">విద్యార్థుల సంఖ్య</p>
-            <p className="text-ink">
-              విద్యార్థి వివరాలను ఒకసారి నమోదు చేయండి. పోర్టల్ కంటే ముందే తేడాలను పట్టుకోండి.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Pill variant="progress">పురోగతిలో ఉంది</Pill>
-              <Pill variant="done">పూర్తయింది</Pill>
-              <Button size="sm">మార్పులను సేవ్ చేయండి</Button>
+        {/* ADR-0036: the Telugu sample only while Telugu is switched on. */}
+        {telugu ? (
+          <Section id="telugu" title={t("sections.telugu")}>
+            <div lang="te" className="space-y-3">
+              <Eyebrow>తనిఖీ సారాంశం</Eyebrow>
+              <p className="font-display text-4xl text-ink">విద్యార్థుల సంఖ్య</p>
+              <p className="text-ink">
+                విద్యార్థి వివరాలను ఒకసారి నమోదు చేయండి. పోర్టల్ కంటే ముందే తేడాలను పట్టుకోండి.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Pill variant="progress">పురోగతిలో ఉంది</Pill>
+                <Pill variant="done">పూర్తయింది</Pill>
+                <Button size="sm">మార్పులను సేవ్ చేయండి</Button>
+              </div>
             </div>
-          </div>
-        </Section>
+          </Section>
+        ) : null}
       </div>
     </MinimalShell>
   );
