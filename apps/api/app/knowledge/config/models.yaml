@@ -1,57 +1,119 @@
-# Model roles, prices, limits and budget thresholds for the knowledge module.
-# Sources: docs/06 §4.4, §5, §6, §9, §10.2, §12; ADR-0005 (Anthropic via the gateway only); FR-KB-008,
-# FR-KB-009, FR-KB-011, SEC-020, NFR-AVL-004, NFR-CST-001. CLAUDE.md invariant 13: model IDs, limits
-# and thresholds live here, never in code. Changing a model, limit or threshold needs a passing
-# `make eval` (docs/06 §13); re-check model IDs, prices and capabilities against the provider's
-# current documentation whenever they change.
-version: 1
-provider: anthropic
-# Anthropic list prices (first-party API), checked on this date.
-prices_checked_on: 2026-09-27
+# Model roles, providers, prices, limits and budget thresholds for the knowledge module.
+# Sources: docs/06 §4.4, §5, §6, §9, §10.2, §12; ADR-0005 (the gateway) as amended by ADR-0033 (Google
+# Gemini on Vertex AI for every LLM role, 2026-09-30; Anthropic kept as a config-selectable fallback);
+# FR-KB-008, FR-KB-009, FR-KB-011, SEC-020, NFR-AVL-004, NFR-CST-001. CLAUDE.md invariant 13: model
+# IDs, providers, limits and thresholds live here, never in code. Changing a provider, model, limit or
+# threshold needs a passing `make eval` (docs/06 §13) and, before a role goes live on a new model, the
+# live gates of docs/06 §13.7 (`make eval-live`); re-check model IDs, prices, regions and capabilities
+# against the provider's current documentation whenever they change.
+version: 2
+# ADR-0033: every product role runs on Gemini (Vertex AI, SOS_LLM_GCP_LOCATION = asia-south1).
+default_provider: gemini
+# List prices checked on this date. Gemini: Vertex AI regional (non-global) prices where Google
+# publishes them, else the global price plus 10 % (the published regional uplift of 3.5 Flash), so
+# per-school budgets err on the high side. Anthropic: first-party API list prices.
+prices_checked_on: 2026-09-30
 
-# Per role: model, output cap and how thinking is configured (K4 gateway, docs/06 §12).
-# thinking: `disabled` sends {"type": "disabled"}; `provider_default` omits the parameter (the model
-# then decides; models that cannot turn thinking off must use this). The answer role MUST be
-# `disabled`: a replayed tool-use turn carries no thinking blocks (ModelTurn has none), and a
-# thinking model would reject that history. effort: output_config.effort, only where supported.
+# Per role: provider (defaults to default_provider), model, output cap and thinking (K4 gateway,
+# docs/06 §12).
+# thinking: `disabled` (Anthropic {"type": "disabled"}; Gemini thinkingBudget 0), `provider_default`
+# (parameter omitted), `level` (Gemini thinkingLevel = thinking_level) or `budget` (Gemini
+# thinkingBudget = thinking_budget). max_output_tokens caps visible AND thinking tokens.
+# The answer role may think only on a model that replays thought signatures (Gemini returns one with
+# each function call and the gateway sends it back), otherwise it MUST be `disabled`.
+# fallback: the evaluated switch-back (the role's settings before ADR-0033). Applying it is a reviewed
+# config change (LlmConfig.use_fallback shows the result) plus `make eval`; never automatic.
+#
+# PROVISIONAL (2026-09-30): these Gemini model choices are the cheapest candidates that are served in
+# asia-south1 as far as could be checked without Vertex credentials; live model selection per role
+# (cheapest model that passes every hard gate, docs/06 §13.7) is pending credentials (docs/14 M2).
+# Gemini 2.5 Flash / Flash-Lite were NOT chosen: Vertex retires them on 2026-10-16. Candidates to try
+# first in the live run: gemini-3.8-flash (introductory $0.75/$3.75 to 2026-12-31) for answer/notice
+# if Vertex serves it from asia-south1; gemini-3.1-flash-lite ($0.25/$1.50) for the lite roles if it
+# is served from asia-south1 (listed global/us/eu only when checked).
 roles:
   # kb.answer_model: tool-use loop and cited answer (mid tier, docs/06 §5 step 3, §12).
   answer:
-    model: claude-sonnet-5
+    provider: gemini
+    model: gemini-3.5-flash
     max_output_tokens: 1500
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-sonnet-5
+      thinking: disabled
   # kb.router_model: optional fast path for trivial cases; enable only if evals show no loss (§5).
   router:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 300
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # kb.metadata_model: strict-JSON document metadata (§4.4).
   metadata:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 500
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # Translated-query fusion for code-mixed / cross-language questions (§6).
   translation:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 1500
-    thinking: disabled
-  # Register-row extraction from page images (§10.2; FR-IMP-024 provider via the gateway).
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
+  # Register-row extraction from page images (§10.2; FR-IMP-024 provider via the gateway). Flash, not
+  # Flash-Lite: handwritten Telugu and English registers are the hardest reading task; every row is
+  # still verified by a person. Images must be Aadhaar-redacted before they are sent (ADR-0033, PO).
   extraction:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash
     max_output_tokens: 2000
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    accepts_images: true
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # Circular reading (M4, docs/06 §4.10, FR-CIR-002): strict-JSON metadata, EN/TE summary and
   # deadline suggestions with passage citations, from one circular's indexed passages.
   circular:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 2000
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # Parent notice drafting (M4, docs/06 §10.5, FR-NOTICE-003): short EN + TE notice from a
   # circular's passages or staff text (never student records). Mid tier for Telugu quality.
   notice:
-    model: claude-sonnet-5
+    provider: gemini
+    model: gemini-3.5-flash
     max_output_tokens: 1200
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-sonnet-5
+      thinking: disabled
   # Contextual retrieval (docs/06 §4.11; PO approval 2026-09-30, behind retrieval.yaml
   # `contextual_chunks`): a 50-100 token context situating each chunk in its document, written at
   # ingestion from the document's already-masked text (document first and stable, chunks last,
@@ -59,43 +121,95 @@ roles:
   # model is the small tier of whichever provider the gateway runs (ADR-0033), chosen by the
   # docs/06 §13.6 live evaluation (cost per million document tokens is the driver); the entry
   # below is today's small-tier default. Output cap: `contextual.yaml` chunks_per_call contexts.
+  # Gemini (ADR-0033): Flash-Lite tier, thinking low; the whole document goes in the system
+  # instruction, so this role's requests are never put in an explicit Vertex cache (tenant
+  # content; implicit caching is off for ZDR): each call pays the document's input tokens.
   contextualize:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 2000
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # Ask conversations (docs/06 §5, cost and performance design; ADR-0034): cheap roles, each a
-  # metered, budget-checked structured-output call through the gateway.
+  # metered, budget-checked structured-output call through the gateway. Flash-Lite tier (ADR-0033):
+  # short structured JSON; provisional until the live evaluation (docs/06 §13.7). Output caps
+  # include thinking tokens: watch the live run for MAX_TOKENS truncation on the small caps.
   # Follow-up suggestions (0-3, the answer's language) plus at most one memory suggestion.
   followups:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 400
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # Rolling summary of the older turns of a conversation (a worker job after the answer).
   summary:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 600
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # Memory safety screen: is a memory item about the user themselves, or about other people?
   memory_screen:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 150
-    thinking: disabled
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
   # A follow-up question rewritten as a standalone question before retrieval.
   query_rewrite:
-    model: claude-haiku-4-5-20251001
+    provider: gemini
+    model: gemini-3.5-flash-lite
     max_output_tokens: 200
-    thinking: disabled
-  # Offline evaluation judge (top tier, §12, §13). Never used for product traffic. Opus 5.5 cannot
-  # turn thinking off and rejects forced tool_choice: thinking left to the model, effort kept low
-  # (its default is medium), JSON through structured outputs, never a forced tool.
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      thinking: disabled
+  # Offline evaluation judge (§12, §13). Never used for product traffic, only on synthetic eval data.
+  # A stronger model than the answer model (a Pro model grading Flash answers; ADR-0033 notes the
+  # remaining same-family bias); on the global endpoint because the Pro preview is not served from a
+  # single India region, which is acceptable only because the judge never sees real data.
   eval_judge:
-    model: claude-opus-5-5
+    provider: gemini
+    model: gemini-3.1-pro-preview
     offline_only: true
+    location: global
     max_output_tokens: 2000
-    thinking: provider_default
-    effort: low
+    thinking: level
+    thinking_level: low
+    fallback:
+      provider: anthropic
+      model: claude-opus-5-5
+      thinking: provider_default
+      effort: low
 
 prices:
+  gemini-3.5-flash:
+    input_usd_per_mtok: "1.65"         # regional (non-global) price; global is $1.50 / $9.00
+    output_usd_per_mtok: "9.90"
+  gemini-3.5-flash-lite:
+    input_usd_per_mtok: "0.33"         # global $0.30 / $2.50 plus 10 % (regional price not published)
+    output_usd_per_mtok: "2.75"
+  gemini-3.1-pro-preview:
+    input_usd_per_mtok: "2.00"         # prompts <= 200k tokens (global endpoint)
+    output_usd_per_mtok: "12.00"
   claude-sonnet-5:
     input_usd_per_mtok: "2.00"
     output_usd_per_mtok: "10.00"
@@ -106,26 +220,88 @@ prices:
     input_usd_per_mtok: "4.00"
     output_usd_per_mtok: "20.00"
 
-# Prompt-cache writes and reads, as multiples of the model's input price (5-minute entries).
+# Anthropic prompt-cache writes and reads, as multiples of the model's input price (5-minute entries).
 cache_price_multipliers:
   write: "1.25"
   read: "0.10"
 
 # What each model accepts (provider docs, checked on prices_checked_on). The loader refuses a role
-# that asks a model for something it rejects with a 400.
+# that asks a model for something it rejects with a 400. Gemini thinking levels: MINIMAL is left out
+# because Vertex rejected it on some Gemini 3 Flash models when checked; re-check in the live run.
 capabilities:
+  gemini-3.5-flash:
+    provider: gemini
+    can_disable_thinking: false        # Gemini 3 models think at least a little
+    forced_tool_choice: true           # functionCallingConfig ANY exists; the gateway never uses it
+    thinking_levels: [low, medium, high]
+    replays_thought_signatures: true   # every functionCall part carries a thoughtSignature
+    vision: true
+    explicit_cache_min_tokens: 4096    # Gemini 3 family minimum for explicit caches
+  gemini-3.5-flash-lite:
+    provider: gemini
+    can_disable_thinking: false
+    forced_tool_choice: true
+    thinking_levels: [low, medium, high]
+    replays_thought_signatures: true
+    vision: true
+    explicit_cache_min_tokens: 4096
+  gemini-3.1-pro-preview:
+    provider: gemini
+    can_disable_thinking: false
+    forced_tool_choice: true
+    thinking_levels: [low, high]
+    replays_thought_signatures: true
+    vision: true
+    explicit_cache_min_tokens: 4096
   claude-sonnet-5:
+    provider: anthropic
     can_disable_thinking: true
     forced_tool_choice: true
     effort: true
+    vision: true
   claude-haiku-4-5-20251001:
+    provider: anthropic
     can_disable_thinking: true
     forced_tool_choice: true
     effort: false
+    vision: true
   claude-opus-5-5:
+    provider: anthropic
     can_disable_thinking: false        # {"type": "disabled"} is a 400 at every effort level
     forced_tool_choice: false          # tool_choice any/tool is a 400; the gateway never forces
     effort: true
+    vision: true
+
+# Google Gemini on Vertex AI (ADR-0033). Project, location (asia-south1) and credentials are settings
+# (SOS_LLM_GCP_*, docs/10 §11); the endpoint shape and API version are versioned here.
+gemini:
+  api_version: v1
+  regional_endpoint: https://{location}-aiplatform.googleapis.com
+  global_endpoint: https://aiplatform.googleapis.com
+  # Cached input (explicit caches) is billed at 10 % of the input price; creating a cache bills its
+  # tokens once at the input price, and storage per token-hour goes to the platform project.
+  cache_price_multipliers:
+    write: "1.00"
+    read: "0.10"
+  # Explicit context caches hold ONLY the static system instruction and tool definitions of a role
+  # (no personal data), used when that prefix reaches the model's minimum. Implicit caching must be
+  # disabled on the Vertex project for Zero Data Retention (docs/08 §8, docs/10 §11 ops step).
+  explicit_cache:
+    enabled: true
+    ttl_s: 3600
+    refresh_margin_s: 300
+    failure_backoff_s: 300
+    max_entries: 64
+
+# Provider-neutral citations (docs/06 §7, §9; ADR-0033). Providers without native search-result
+# citations get tool results as numbered passages and must mark each statement with [n].
+citations:
+  require_numbers_in_passage: true
+  marker_instructions: >-
+    Tool results are numbered passages, for example [3]. After every sentence that states a fact
+    from them, write the number of each passage that states it in square brackets, like [3] or
+    [2][5]. Use only numbers of passages you were given in this conversation. Never add a marker to
+    a sentence the passage does not support, and never write passage numbers anywhere else.
 
 limits:
   max_tool_rounds: 3                  # ADR-0008, §5 step 3
@@ -135,9 +311,10 @@ limits:
   full_answer_p95_ms: 10000           # FR-KB-008
 
 # Provider client behaviour (ADR-0005: timeouts, retries with jitter, circuit breaker; NFR-AVL-004).
-# Chosen by the lead on 2026-09-27 (docs/06 §12 as built); tune with production metrics.
+# Chosen by the lead on 2026-09-27 (docs/06 §12 as built); tune with production metrics. The same
+# values apply to every provider; each provider has its own circuit breaker.
 client:
-  api_base_url: https://api.anthropic.com   # explicit, so ANTHROPIC_BASE_URL can never redirect
+  api_base_url: https://api.anthropic.com   # Anthropic fallback; explicit, so ANTHROPIC_BASE_URL can never redirect
   request_timeout_s: 60
   max_retries: 2                      # only on 429, 5xx and 529 overloaded
   backoff_base_s: 0.5                 # delay = min(max, base * 2^attempt) + jitter(0..base)

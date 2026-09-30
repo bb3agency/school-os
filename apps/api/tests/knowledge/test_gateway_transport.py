@@ -46,6 +46,7 @@ from app.knowledge.gateway.budget import InMemorySpendLedger, StaticAiPolicy
 from app.knowledge.gateway.errors import AiDisabled
 from app.knowledge.gateway.factory import ProviderModeError, build_gateway, build_transport
 from app.knowledge.gateway.fake import NOT_FOUND_EN, NOT_FOUND_TE, FakeTransport
+from app.knowledge.gateway.fake_gemini import GeminiWireFake
 from app.knowledge.gateway.gateway import Gateway
 from app.knowledge.gateway.metering import RecordingSink
 from app.knowledge.gateway.transport import MessagesRequest, Transport, TransportError
@@ -64,6 +65,10 @@ SEARCH = ToolSpec(
 )
 
 
+ANTHROPIC = load_llm_config().use_fallback()
+"""Every role on its evaluated Anthropic fallback (ADR-0033): the Messages-API transports here."""
+
+
 def gateway_with(transport: Transport, **settings: Any) -> Gateway:
     return build_gateway(
         Settings(env=Environment.LOCAL, kb_enabled=True, **settings),
@@ -72,6 +77,7 @@ def gateway_with(transport: Transport, **settings: Any) -> Gateway:
         transport=transport,
         ledger=InMemorySpendLedger(),
         counters=InMemoryKV(),
+        config=ANTHROPIC,
     )
 
 
@@ -153,7 +159,10 @@ def test_FR_KB_003_fake_structured_output_satisfies_the_schema() -> None:
 
 def test_SEC_020_local_default_is_the_offline_fake() -> None:
     transport = build_transport(Settings(env=Environment.LOCAL), load_llm_config())
-    assert isinstance(transport, FakeTransport)
+    assert isinstance(transport, GeminiWireFake)  # the Gemini wire, offline (ADR-0033)
+    assert isinstance(transport.inner, FakeTransport)
+    fallback = build_transport(Settings(env=Environment.LOCAL), ANTHROPIC)
+    assert isinstance(fallback, FakeTransport)
 
 
 @pytest.mark.parametrize("env", [Environment.STAGING, Environment.PROD])
@@ -170,7 +179,7 @@ def test_invariant_10_live_needs_the_organization_key_from_settings(key: SecretS
         env=Environment.LOCAL, kb_provider_mode=KnowledgeProviderMode.LIVE, anthropic_api_key=key
     )
     with pytest.raises(ProviderModeError, match="SOS_ANTHROPIC_API_KEY"):
-        build_transport(settings, load_llm_config())
+        build_transport(settings, ANTHROPIC)  # a role on the Anthropic fallback needs the key
 
 
 def test_invariant_10_live_with_a_key_uses_the_anthropic_transport() -> None:
@@ -179,7 +188,7 @@ def test_invariant_10_live_with_a_key_uses_the_anthropic_transport() -> None:
         kb_provider_mode=KnowledgeProviderMode.LIVE,
         anthropic_api_key=SecretStr(TEST_KEY),
     )
-    assert isinstance(build_transport(settings, load_llm_config()), AnthropicTransport)
+    assert isinstance(build_transport(settings, ANTHROPIC), AnthropicTransport)
 
 
 def test_SEC_020_kb_enabled_setting_is_the_kill_switch() -> None:
@@ -336,24 +345,41 @@ def test_invariant_5_sdk_loggers_are_capped() -> None:
 
 # --- CLAUDE.md §11: the SDK stays inside the gateway ---------------------------------------------
 
-_SDK = re.compile(r"^(anthropic|openai|voyageai)(\..+)?$")
-_DYNAMIC = re.compile(r"""(import_module|__import__)\(\s*["'](anthropic|openai|voyageai)""")
+_SDK_NAMES = (
+    r"anthropic|openai|voyageai|vertexai"
+    r"|google\.genai|google\.generativeai|google\.cloud\.aiplatform|google\.auth|google\.oauth2"
+)
+_SDK = re.compile(rf"^({_SDK_NAMES})(\..+)?$")
+_DYNAMIC = re.compile(rf"""(import_module|__import__)\(\s*["']({_SDK_NAMES})""")
+_GOOGLE_FROM = frozenset({"genai", "generativeai", "auth", "oauth2"})
 
 
 def _sdk_imports(path: Path) -> set[str]:
+    """Provider SDKs a file imports (``google.*`` as its two-part name)."""
     source = path.read_text(encoding="utf-8")
     found: set[str] = {m.group(2) for m in _DYNAMIC.finditer(source)}
     for node in ast.walk(ast.parse(source, filename=str(path))):
         if isinstance(node, ast.Import):
-            found |= {a.name.split(".")[0] for a in node.names if _SDK.match(a.name)}
-        elif (
-            isinstance(node, ast.ImportFrom)
-            and node.module
-            and node.level == 0
-            and _SDK.match(node.module)
-        ):
-            found.add(node.module.split(".")[0])
+            found |= {m.group(1) for a in node.names if (m := _SDK.match(a.name))}
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            if match := _SDK.match(node.module):
+                found.add(match.group(1))
+            elif node.module in ("google", "google.cloud"):
+                names = {a.name for a in node.names}
+                found |= {f"google.{n}" for n in names & _GOOGLE_FROM}
+                if node.module == "google.cloud" and "aiplatform" in names:
+                    found.add("google.cloud.aiplatform")
     return found
+
+
+def test_the_sdk_scan_sees_google_imports(tmp_path: Path) -> None:
+    sample = tmp_path / "sample.py"
+    sample.write_text(
+        "from google import genai\nimport google.auth.transport\nfrom google.oauth2 import x\n"
+        "import vertexai\nimport google.protobuf\n",
+        encoding="utf-8",
+    )
+    assert _sdk_imports(sample) == {"google.genai", "google.auth", "google.oauth2", "vertexai"}
 
 
 def _python_files() -> Iterator[Path]:
@@ -376,6 +402,16 @@ def test_SEC_020_provider_sdks_are_imported_only_in_the_gateway() -> None:
 def test_SEC_020_within_the_gateway_only_the_live_transport_imports_anthropic() -> None:
     importers = sorted(p.name for p in GATEWAY.rglob("*.py") if "anthropic" in _sdk_imports(p))
     assert importers == ["anthropic_transport.py"]
+
+
+def test_ADR_0033_within_the_gateway_only_gemini_auth_imports_google_auth() -> None:
+    """Vertex AI is plain REST over httpx; google-auth only mints service-identity tokens."""
+    importers = {
+        p.name: found
+        for p in GATEWAY.rglob("*.py")
+        if (found := _sdk_imports(p) - {"anthropic", "voyageai"})
+    }
+    assert importers == {"gemini_auth.py": {"google.auth", "google.oauth2"}}
 
 
 def test_ADR_0005_platform_and_knowledge_use_the_same_usd_inr_rate() -> None:

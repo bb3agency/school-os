@@ -24,7 +24,8 @@
 | Sub-processor | Purpose | Data | Location |
 |---|---|---|---|
 | Amazon Web Services | Hosting (shared tier and dedicated-tier hosts), storage, backups, KMS, identity (Cognito), email (SES) | All platform data (encrypted) | India: ap-south-1 (Mumbai), backups ap-south-2 (Hyderabad), for both tiers |
-| Anthropic (Claude API) | Answer generation, extraction, metadata | Minimized question context; record fields needed for the answer; document excerpts | Outside India; commercial API terms; Zero Data Retention requested |
+| Google Cloud (Vertex AI, Gemini models) (ADR-0033, from 2026-09-30) | All AI features: answers to staff questions (Ask the school), query translation, document metadata, circular reading, parent notice drafts, register-row extraction (when enabled) | Per call: the staff question (and the same user's earlier questions of the session), the record fields and document passages the user may see and the question needs, one circular's passages, staff notice text; page images only for extraction and only after Aadhaar redaction; never Aadhaar numbers (masked before sending). Static system prompts and tool definitions (no personal data) may be held in an explicit context cache for up to 1 hour | **India: asia-south1 (Mumbai)** regional endpoint (asia-south2 allowed); Google Cloud commercial terms (no training on customer data); Zero Data Retention set-up: project data caching disabled (checked by the gateway before every session), no request-response logging, abuse-monitoring prompt-logging exception requested (until granted Google may keep prompts for abuse detection for a limited period; PO/DPIA item) |
+| Anthropic (Claude API) | **Fallback only** (ADR-0033): used for a role only after a reviewed configuration switch-back; none configured on 2026-09-30 | As above for the switched role | Outside India; commercial API terms; Zero Data Retention requested for the production organization. Remove from the register once the fallback is retired |
 | Embeddings provider (e.g., Voyage AI) or self-hosted model | Vector embeddings | Document chunk text, queries | Provider-dependent; self-hosted option in India |
 | Reranking provider (candidates: Voyage AI rerank, Google Vertex AI ranking) | **Proposed, not active** (ADR-0035; off by default). Ordering search candidates for a question | The question and the text of candidate passages the asking user may already read (Aadhaar-masked) | Provider-dependent; to confirm in the privacy review before activation |
 | OCR provider (chosen by evaluation) | Text extraction from scans/photos | Page images (after Aadhaar-region redaction where detectable) | Provider-dependent |
@@ -125,7 +126,7 @@ How it works (built; ADR-0029, docs/16 §5.5.1; decisions of 2026-09-29):
 ## 8. AI-specific transparency
 
 - Staff are told that answers are AI-generated from school records and documents, with sources shown; answers without valid sources are flagged or withheld.
-- Prompts and outputs are not used to train models (commercial API terms; ZDR requested for the production organization).
+- Prompts and outputs are not used to train models (Google Cloud Vertex AI terms; Anthropic commercial terms for the fallback). Processing stays in India (Vertex AI asia-south1). Zero Data Retention on Vertex AI: the project's in-memory data caching is disabled and the gateway refuses to send anything until it has confirmed that; request-response logging is never enabled; the abuse-monitoring logging exception is requested (docs/10 §11.1). Explicit context caches hold only static instructions without personal data and expire after 1 hour. Operator-held credentials are service identities only (invariant 10).
 - Only the fields needed for a question are sent; C3 fields only when the user is permitted and asked for them; never Aadhaar data.
 - Parents' notices (template) mention that the school uses a software provider, including AI-assisted search, under a data processing agreement.
 - Circulars and parent notices (M4, 05 §6.3, 06 §4.10): the reading sends only one circular version's own Aadhaar-masked passages; AI deadline suggestions and notice drafts are marked as AI output and change nothing until a person confirms or approves them. A notice is drafted only from a C1 circular or staff text, never from student records; staff text or notice text with a phone number, email address or Aadhaar-like number is refused; the staff text is not stored. SchoolOS does not send notices to parents: the school posts the approved text itself.
@@ -186,7 +187,7 @@ Describe processing → necessity and proportionality → risks to children and 
 
 | When | Task |
 |---|---|
-| Before first real data | DPA signed; school notice issued; DPIA done; sub-processor list shared; ZDR request submitted |
+| Before first real data | DPA signed; school notice issued; DPIA done (incl. the AI data flow to Vertex AI, asia-south1); sub-processor list shared (Google Cloud Vertex AI); Vertex ZDR set-up done and confirmed (`SOS_LLM_ZDR_CONFIRMED`), abuse-monitoring exception requested and its answer recorded |
 | Before first dedicated-tier school | Confirm DPA annex describes the dedicated host (location, backups, custom domain); restore test done |
 | Before activating any payment provider | Privacy review, sub-processor register update, advance notice to schools (ADR-0016) |
 | Quarterly | Access reviews per tenant; restore drill; incident drill; sub-processor review |
@@ -199,7 +200,9 @@ Describe processing → necessity and proportionality → risks to children and 
 - DPDP Rules 2025, Rule 12 and Fourth Schedule (children's data exemptions): https://dpdpa.com/dpdparules/rule12.html · https://dpdp.myndsolution.com/wiki/rules/schedule-4-classes-of-data-fiduciaries-in-respect-of-whom-provisions-of/
 - DPDP Rules explained (Rules 6–8 incl. 72-hour Board report, 1-year logs): https://dpdp.myndsolution.com/wiki/guides/the-dpdp-rules-2025-explained/
 - CERT-In Directions 2022 overview (6-hour reporting, 180-day logs in India): https://www.mondaq.com/india/security/1191962/an-overview-on-the-cert-in-cyber-security-directions-2022
-- Anthropic API and data retention (ZDR): https://platform.claude.com/docs/en/manage-claude/api-and-data-retention
+- Google Cloud: Vertex AI zero data retention: https://cloud.google.com/vertex-ai/generative-ai/docs/vertex-ai-zero-data-retention
+- Google Cloud: Vertex AI data residency: https://docs.cloud.google.com/gemini-enterprise-agent-platform/resources/data-residency
+- Anthropic API and data retention (ZDR; fallback provider): https://platform.claude.com/docs/en/manage-claude/api-and-data-retention
 
 ## 14. Platform, billing and support data
 

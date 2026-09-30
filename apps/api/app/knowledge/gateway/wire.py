@@ -118,25 +118,31 @@ def _earlier(item: UserMessage, rules: Conversation) -> str | None:
     return None
 
 
-def _user(item: UserMessage, rules: Conversation | None) -> dict[str, Any]:
-    """The question is the LAST text block. Before it, in this order (docs/06 §5 prompt
+def user_texts(item: UserMessage, rules: Conversation | None) -> list[str]:
+    """The texts of a user turn, the question LAST. Before it, in this order (docs/06 §5 prompt
     layout): the rolling summary, the recent turns of the conversation (FR-KB-012) and, when the
     question was rewritten as a standalone question, the question as the user wrote it; each
     introduced by its configured header (prompt text, invariant 13). The user's memory goes in
-    the system prompt (:func:`memory_block`)."""
-    content: list[dict[str, Any]] = []
+    the system prompt (:func:`memory_block`). Shared by every wire format (ADR-0033), so the
+    layout is the same on every provider."""
+    texts: list[str] = []
     context = (item.summary, item.earlier_turns, item.earlier_questions, item.asked_as)
     if any(context) and rules is None:
         raise GatewayMisuse("conversation context needs the configured conversation headers")
     if rules is not None:
         if item.summary:
-            content.append({"type": "text", "text": f"{rules.summary_header}\n{item.summary}"})
+            texts.append(f"{rules.summary_header}\n{item.summary}")
         earlier = _earlier(item, rules)
         if earlier is not None:
-            content.append({"type": "text", "text": earlier})
+            texts.append(earlier)
         if item.asked_as:
-            content.append({"type": "text", "text": f"{rules.rewritten_header}\n{item.asked_as}"})
-    content.append({"type": "text", "text": item.text})
+            texts.append(f"{rules.rewritten_header}\n{item.asked_as}")
+    texts.append(item.text)
+    return texts
+
+
+def _user(item: UserMessage, rules: Conversation | None) -> dict[str, Any]:
+    content = [{"type": "text", "text": t} for t in user_texts(item, rules)]
     return {"role": "user", "content": content}
 
 
@@ -432,4 +438,5 @@ __all__ = [
     "tool_rounds_used",
     "turn_request",
     "usage",
+    "user_texts",
 ]

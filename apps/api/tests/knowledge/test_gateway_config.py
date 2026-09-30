@@ -62,7 +62,17 @@ def test_FR_KB_011_budget_is_converted_at_the_billing_rate() -> None:
 
 def test_opus_5_5_cannot_have_thinking_disabled() -> None:
     data = raw()
-    data["roles"]["eval_judge"]["thinking"] = "disabled"
+    assert data["roles"]["eval_judge"]["fallback"]["model"] == "claude-opus-5-5"
+    data["roles"]["eval_judge"]["fallback"]["thinking"] = "disabled"
+    with pytest.raises(ValidationError, match="cannot disable thinking"):
+        llm.LlmConfig.model_validate(data)
+
+
+def test_gemini_3_cannot_have_thinking_disabled() -> None:
+    data = raw()
+    role = data["roles"]["eval_judge"]
+    role["thinking"] = "disabled"
+    del role["thinking_level"]
     with pytest.raises(ValidationError, match="cannot disable thinking"):
         llm.LlmConfig.model_validate(data)
 
@@ -72,13 +82,110 @@ def test_effort_only_on_models_that_take_it() -> None:
     data["roles"]["metadata"]["effort"] = "low"
     with pytest.raises(ValidationError, match="effort"):
         llm.LlmConfig.model_validate(data)
+    data = raw()
+    data["roles"]["metadata"]["fallback"]["effort"] = "low"  # Haiku 4.5 has no effort level
+    with pytest.raises(ValidationError, match="effort"):
+        llm.LlmConfig.model_validate(data)
 
 
 def test_answer_role_keeps_thinking_disabled_for_tool_use_replay() -> None:
+    """Anthropic: a replayed tool-use turn carries no thinking blocks, so no thinking."""
     data = raw()
-    data["roles"]["answer"]["thinking"] = "provider_default"
-    with pytest.raises(ValidationError, match=r"roles\.answer"):
+    data["roles"]["answer"]["fallback"]["thinking"] = "provider_default"
+    with pytest.raises(ValidationError, match=r"roles\.answer: thinking must be disabled"):
         llm.LlmConfig.model_validate(data)
+
+
+def test_answer_role_may_think_only_on_a_model_that_replays_thought_signatures() -> None:
+    """Gemini: thinking in the tool loop is allowed only because thought signatures are
+    replayed (ToolCall.signature); a model without them must disable thinking."""
+    data = raw()
+    assert data["roles"]["answer"]["thinking"] == "level"
+    llm.LlmConfig.model_validate(data)
+    model = data["roles"]["answer"]["model"]
+    data["capabilities"][model]["replays_thought_signatures"] = False
+    with pytest.raises(ValidationError, match=r"roles\.answer: thinking must be disabled"):
+        llm.LlmConfig.model_validate(data)
+
+
+def test_ADR_0033_a_role_model_must_belong_to_its_provider() -> None:
+    data = raw()
+    data["roles"]["answer"]["model"] = "claude-sonnet-5"  # provider stays gemini
+    with pytest.raises(ValidationError, match="is a anthropic model, not gemini"):
+        llm.LlmConfig.model_validate(data)
+
+
+def test_ADR_0033_a_role_without_provider_gets_the_default_provider() -> None:
+    data = raw()
+    role = data["roles"]["router"]
+    del role["provider"]
+    assert llm.LlmConfig.model_validate(data).roles["router"].provider == "gemini"
+
+
+def test_ADR_0033_thinking_levels_only_where_the_model_takes_them() -> None:
+    data = raw()
+    data["roles"]["router"]["thinking_level"] = "minimal"  # unverified on Vertex: not listed
+    with pytest.raises(ValidationError, match="thinking level minimal"):
+        llm.LlmConfig.model_validate(data)
+    data = raw()
+    data["roles"]["router"]["fallback"]["thinking"] = "level"
+    data["roles"]["router"]["fallback"]["thinking_level"] = "low"
+    with pytest.raises(ValidationError, match="gemini setting"):
+        llm.LlmConfig.model_validate(data)
+
+
+def test_ADR_0033_only_the_offline_judge_may_leave_the_india_region() -> None:
+    config = llm.load_llm_config()
+    assert [r for r, c in config.roles.items() if c.location is not None] == ["eval_judge"]
+    data = raw()
+    data["roles"]["answer"]["location"] = "global"
+    with pytest.raises(ValidationError, match="only an offline role may set location"):
+        llm.LlmConfig.model_validate(data)
+
+
+def test_ADR_0033_images_only_for_a_vision_role() -> None:
+    config = llm.load_llm_config()
+    assert [r for r, c in config.roles.items() if c.accepts_images] == ["extraction"]
+    data = raw()
+    model = data["roles"]["extraction"]["model"]
+    data["capabilities"][model]["vision"] = False
+    with pytest.raises(ValidationError, match="does not take images"):
+        llm.LlmConfig.model_validate(data)
+
+
+def test_ADR_0033_every_role_has_an_evaluated_anthropic_fallback() -> None:
+    """The switch-back is config only: the pre-ADR-0033 models and settings, unchanged."""
+    fallback = llm.load_llm_config().use_fallback()
+    assert {r: (c.provider, c.model, c.thinking) for r, c in fallback.roles.items()} == {
+        "answer": ("anthropic", "claude-sonnet-5", "disabled"),
+        "router": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "metadata": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "translation": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "extraction": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "circular": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "notice": ("anthropic", "claude-sonnet-5", "disabled"),
+        # ADR-0035 contextual chunk headers: the model the feature was built and tested with.
+        "contextualize": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        # ADR-0034 conversation roles: the models the backend was built and tested with.
+        "followups": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "summary": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "memory_screen": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "query_rewrite": ("anthropic", "claude-haiku-4-5-20251001", "disabled"),
+        "eval_judge": ("anthropic", "claude-opus-5-5", "provider_default"),
+    }
+    assert fallback.roles["eval_judge"].effort == "low"
+    assert fallback.roles["eval_judge"].location is None
+    one = llm.load_llm_config().use_fallback(["notice"])
+    assert one.roles["notice"].provider == "anthropic"
+    assert one.roles["answer"].provider == "gemini"
+
+
+def test_ADR_0033_the_judge_is_stronger_than_the_answer_model() -> None:
+    """Avoid self-grading as far as possible: a different, higher-priced model grades."""
+    config = llm.load_llm_config()
+    judge, answer = config.roles["eval_judge"].model, config.roles["answer"].model
+    assert judge != answer
+    assert config.prices[judge].output_usd_per_mtok > config.prices[answer].output_usd_per_mtok
 
 
 def test_every_role_model_has_capabilities() -> None:

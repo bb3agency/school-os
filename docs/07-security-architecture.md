@@ -76,7 +76,7 @@ flowchart LR
 | TB2 BFF → API | mTLS or signed service token on internal network; user access token forwarded; API re-validates everything |
 | TB3 API → DB | Least-privileged role, RLS FORCE, parameterized SQL, statement timeouts, no superuser |
 | TB4 App → AWS services | Task IAM roles scoped per resource, VPC endpoints, KMS key policies |
-| TB5 App → third parties | Egress allowlist, API keys in Secrets Manager, minimal data, no Aadhaar, ZDR where available, timeouts/circuit breakers |
+| TB5 App → third parties | Egress allowlist, credentials in Secrets Manager (Vertex AI: workload identity federation or a service-account key, never a person's login; API keys for other providers), minimal data, no Aadhaar, ZDR set-up verified by the gateway (Vertex AI project caching off, ADR-0033), India-region AI endpoint, timeouts/circuit breakers |
 | TB6 Operator browser → control plane (`admin.<domain>`) | Separate OIDC client, MFA for every operator, step-up for ᴿ permissions, own `__Host-` session cookie, WAF, CSP; control plane connects to the DB as `sos_platform` only |
 | TB7 Dedicated host → control plane (heartbeat) | Outbound only; HMAC-SHA256 per deployment, ±5 min timestamp window, nonce replay cache, strict schema without free text, rate limit; the control plane never connects into a host |
 | TB8 Internet → dedicated host | Caddy TLS (ACME), security headers, only 80/443 open, no SSH (SSM), same app controls as the shared tier |
@@ -98,7 +98,7 @@ flowchart LR
 | T10 | Prompt injection in documents causes data exfiltration or misleading answers | I/T | Content treated as data (prompt), no network/write tools, no external links in output, citation validation, injection eval set | Low–medium |
 | T11 | PII leaks into logs, traces, error reports | I | Structured logging with allowlisted fields, `redact()`, log tests, no request-body logging; no personal data in URLs (edge access logs keep them; §11) | Low |
 | T12 | Backup/snapshot exposure | I | KMS encryption, restricted IAM, separate backup vault account (Stage 1), crypto-shredding | Low |
-| T13 | LLM provider retains/uses prompts | I | Commercial API terms, ZDR requested, data minimization, sub-processor disclosure in DPA | Low–medium |
+| T13 | LLM provider retains/uses prompts | I | Google Cloud Vertex AI terms (no training), processing in asia-south1, ZDR configuration (project data caching disabled and checked by the gateway before sending, no request-response logging, abuse-monitoring logging exception requested), explicit caches hold only static prompt text, data minimization, sub-processor disclosure in DPA (ADR-0033) | Low–medium |
 | T14 | Resource exhaustion (bulk uploads, OCR floods) | D | Per-tenant quotas, queue fairness, size/page limits, WAF rate rules | Low |
 | T15 | AI cost abuse ("denial of wallet") | D | Per-user/tenant rate limits, monthly budgets, max tokens, anomaly alerts | Low |
 | T16 | Privilege escalation via role changes | E | `role.assign` limited to owner/principal, step-up MFA, alerts on privileged grants; holders may only grant roles whose permissions they hold, except `owner` (root of trust, `assign_any_role`); the last active owner cannot be suspended or demoted | Low |
@@ -318,7 +318,7 @@ Workers never run "for all tenants" in one transaction; batch jobs get tenant ID
 - DB credentials rotated ≤ 90 days (managed rotation); API keys rotated ≤ 180 days or on staff/device change.
 - Separate secrets per environment; staging never holds production keys.
 - `gitleaks` in pre-commit and CI; GitHub secret scanning with push protection enabled.
-- Product runtime uses **organization API keys** only. Developers' personal/consumer AI subscriptions are never used for product traffic.
+- Product runtime authenticates to AI providers with **service identities** only: Vertex AI through AWS -> Google workload identity federation (no stored secret; restricted to the API/worker task roles and dedicated host roles) or a service-account key in Secrets Manager rotated ≤ 90 days; organization API keys for a fallback provider. A person's Google login (`authorized_user`), consumer accounts, Gemini Developer API keys and developers' personal/consumer AI subscriptions are never used for product traffic; the settings guard refuses them at start-up (ADR-0033, invariant 10).
 
 ## 10. Input, file and output security
 
@@ -375,14 +375,14 @@ Therefore: **No personal data in URLs.** Names (student, parent, staff), phone n
 | Risk | Controls in SchoolOS |
 |---|---|
 | LLM01 Prompt injection | System prompt states tool content is data; documents can't trigger tools with side effects (all tools read-only, no network); output limited to text + internal citations; injection red-team set is a hard eval gate |
-| LLM02 Sensitive information disclosure | Filter-before-rank; tools under user scope; C3 minimization; no Aadhaar anywhere; ZDR requested; logs store encrypted Q/A only |
-| LLM03 Supply chain | Providers behind gateway/interfaces; model IDs pinned in config; dependency scanning |
+| LLM02 Sensitive information disclosure | Filter-before-rank; tools under user scope; C3 minimization; no Aadhaar anywhere (masked before any provider call; images only after redaction); Vertex AI ZDR set-up verified before sending; logs store encrypted Q/A only |
+| LLM03 Supply chain | Providers behind gateway/interfaces; provider and model per role pinned in config (`models.yaml`); plain REST to Vertex AI (no provider SDK in the request path; `google-auth` only for tokens); dependency scanning |
 | LLM04 Data and model poisoning | No model training/fine-tuning on school data; knowledge base changes are authenticated, versioned and audited; verified answers require authorized approval |
 | LLM05 Improper output handling | Output rendered as restricted markdown; no HTML; citations validated; AI output never executed or used in SQL |
 | LLM06 Excessive agency | Read-only whitelisted tools; max tool rounds; writes only through human-confirmed endpoints |
 | LLM07 System prompt leakage | System prompt contains no secrets or other tenants' data; treat as public |
 | LLM08 Vector and embedding weaknesses | Per-tenant filters and RLS on chunks; embedding cache per tenant; ACL copies updated on change; no cross-tenant similarity search |
-| LLM09 Misinformation | Grounding + citations + "not found" behaviour; faithfulness and correctness gates; "as of" dates; verified answers |
+| LLM09 Misinformation | Grounding + citations + "not found" behaviour; `[n]` passage markers mapped server-side to this request's passages, dropped when the passage lacks the statement's numbers (ADR-0033); faithfulness and correctness gates; "as of" dates; verified answers |
 | LLM10 Unbounded consumption | Rate limits, token caps per request, per-tenant budgets, anomaly alerts |
 
 ## 13. Infrastructure security (AWS)

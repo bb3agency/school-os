@@ -30,6 +30,10 @@ role and scope.
 What is fake (offline, deterministic; SOS_KB_PROVIDER_MODE=fake):
 
 - embeddings: ``FakeEmbeddingsProvider`` (hashed words and trigrams, no meaning, no translation);
+- the wire: every role is on Gemini (ADR-0033), so the stand-in is reached through
+  :class:`app.knowledge.gateway.fake_gemini.GeminiWireFake`: requests and answers go through the
+  Gemini codec (numbered passages, ``[n]`` markers mapped back and checked server-side, thought
+  signatures replayed), exactly as a live Vertex AI call would;
 - the model: :class:`EvalFakeTransport`, a stand-in. A question naming an admission number and a
   record field (date of birth, father's/mother's name, date of admission; English, Telugu or
   Latin-script Telugu words) calls ``find_students`` with the number, then
@@ -539,11 +543,13 @@ class AppFakeAdapter:
         *,
         engines: Engines | None = None,
         check_parity: bool = True,
+        live: bool = False,
     ) -> None:
         self._admin = engines.admin if engines is not None else _Stack().engines.admin
         self.K = _load("sos_test_ask_support", TESTS / "knowledge" / "ask_support.py")
         from app.knowledge import service
         from app.knowledge.config.llm import load_llm_config
+        from app.knowledge.gateway.fake_gemini import GeminiWireFake
 
         llm = load_llm_config()
         relaxed = llm.model_copy(
@@ -554,7 +560,14 @@ class AppFakeAdapter:
             }
         )
         self.transport = EvalFakeTransport()
-        self.K.install_runtime(transport=self.transport, llm_config=relaxed)
+        if live:
+            self.K.install_runtime(gateway=live_gateway(relaxed), llm_config=relaxed)
+        else:
+            # ADR-0033: every role is on Gemini, so the stand-in speaks the Gemini wire through
+            # GeminiWireFake: the run measures the Gemini codec, its [n] passage markers and
+            # their mapping back to this request's passages (plus thought-signature replay),
+            # not the Messages API shape.
+            self.K.install_runtime(transport=GeminiWireFake(self.transport), llm_config=relaxed)
         self._service = service.get_service()
         self.corpus = dict(corpus)
         self._schools: dict[str, Any] = {}
@@ -1576,10 +1589,50 @@ def build(corpus: Mapping[str, Any], items: Iterable[Any]) -> AppFakeAdapter:
     return AppFakeAdapter(corpus, items)
 
 
+LIVE_ADAPTER: Final = "app-live"
+
+
+def live_gateway(config: Any) -> Any:
+    """The real gateway on the live providers of ``models.yaml`` (``make eval-live``; docs/06
+    §13.7). Settings come from the environment (``SOS_LLM_GCP_*``; ``SOS_ANTHROPIC_API_KEY``
+    only for a fallback role); everything else stays local and synthetic (testcontainers
+    database, fake embeddings, the synthetic corpus). Refused against staging/prod settings and
+    without an explicit ``SOS_EVAL_LIVE_ACK=synthetic-only``: a live run sends the synthetic
+    corpus to the provider and costs money."""
+    from app.authz.kv import InMemoryKV
+    from app.core.config import KnowledgeProviderMode, Settings
+    from app.knowledge.gateway.budget import InMemorySpendLedger, StaticAiPolicy
+    from app.knowledge.gateway.factory import build_gateway
+    from app.knowledge.gateway.metering import RecordingSink
+
+    if os.environ.get("SOS_EVAL_LIVE_ACK") != "synthetic-only":
+        raise SystemExit("set SOS_EVAL_LIVE_ACK=synthetic-only to run the live evaluation")
+    settings = Settings(kb_enabled=True, kb_provider_mode=KnowledgeProviderMode.LIVE)
+    if settings.is_production_like:
+        raise SystemExit("the live evaluation never runs with staging/prod settings")
+    return build_gateway(
+        settings,
+        policy=StaticAiPolicy(),
+        sink=RecordingSink(),
+        ledger=InMemorySpendLedger(),
+        counters=InMemoryKV(),
+        config=config,
+    )
+
+
+def build_live(corpus: Mapping[str, Any], items: Iterable[Any]) -> AppFakeAdapter:
+    if os.environ.get("SOS_EVAL_LIVE_ACK") != "synthetic-only":  # before any database starts
+        raise SystemExit("set SOS_EVAL_LIVE_ACK=synthetic-only to run the live evaluation")
+    adapter = AppFakeAdapter(corpus, items, live=True)
+    adapter.name = LIVE_ADAPTER
+    return adapter
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     from sos_evals import cli, stubs
 
     cast(dict[str, Any], stubs.STUBS)[AppFakeAdapter.name] = build
+    cast(dict[str, Any], stubs.STUBS)[LIVE_ADAPTER] = build_live
     return cli.main(argv)
 
 

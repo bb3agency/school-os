@@ -1,0 +1,11 @@
+{
+  "candidates": [
+    {
+      "content": {"role": "model", "parts": []},
+      "finishReason": "MALFORMED_FUNCTION_CALL",
+      "finishMessage": "synthetic: malformed function call"
+    }
+  ],
+  "usageMetadata": {"promptTokenCount": 700, "candidatesTokenCount": 30, "totalTokenCount": 730},
+  "modelVersion": "gemini-3.5-flash"
+}

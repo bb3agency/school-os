@@ -5,7 +5,8 @@
 1. **Tool-use loop** on the ``answer`` role through the :class:`LlmGateway` (at most
    ``max_tool_rounds`` rounds, ADR-0008). Only the tools the caller may use are offered; each runs
    under the caller's ``UserContext`` in the request's ``tenant_session`` (RLS, scopes, C3
-   rules). Tool results reach the model only as ``search_result`` blocks, trimmed to the
+   rules). Tool results reach the model only as citable passages (``search_result`` blocks on
+   Anthropic, numbered passages cited with ``[n]`` markers on Gemini; ADR-0033), trimmed to the
    docs/06 §12 context budget. A failing tool is reported to the model as an error result.
 2. **Citation validation** (§9 rules 1-2, FR-KB-005): a citation is kept only when its
    ``source`` is one of the blocks given to the model in THIS request (so it is visible to the

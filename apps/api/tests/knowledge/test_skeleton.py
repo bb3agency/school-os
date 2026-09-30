@@ -31,7 +31,8 @@ SUBPACKAGES = (
     "config",
 )
 
-PROVIDER_SDKS = ("anthropic", "openai", "voyageai")
+PROVIDER_SDKS = ("anthropic", "openai", "voyageai", "vertexai", "google")
+"""Top-level packages; ``google`` covers google-genai, google.auth and google.oauth2 (ADR-0033)."""
 
 
 @pytest.mark.parametrize("name", SUBPACKAGES)

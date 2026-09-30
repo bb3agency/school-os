@@ -30,7 +30,7 @@ E2E_ARGS ?=
 # e2e-audit: report and screenshot directory, relative to apps/web.
 AUDIT_OUT ?= audit-out
 
-.PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic sync-system-roles test test-api test-web test-security \
+.PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic sync-system-roles test test-api test-web test-security eval-live \
         migration-check e2e e2e-audit lint format typecheck security eval check db-shell openapi tf-validate
 
 help: ## List targets
@@ -178,5 +178,15 @@ EVAL_RUNNER  := $(if $(filter app-fake,$(EVAL_ADAPTER)),apps/api/tests/knowledge
 eval: ## RAG evaluation harness with hard gates (docs/06 §13); non-zero exit when a gate fails
 	$(UV) run python -m sos_evals generate --check
 	$(UV) run python $(EVAL_RUNNER) run --adapter $(EVAL_ADAPTER) --suite $(EVAL_SUITE) $(EVAL_ARGS)
+
+# Live evaluation (docs/06 §13.7; ADR-0033): the app-fake run, but every model call goes to the live
+# provider of its role in models.yaml (Vertex AI Gemini). Needs Docker (or
+# SOS_TEST_ADMIN_DATABASE_URL), SOS_LLM_GCP_PROJECT / _CREDENTIALS_SOURCE / _CREDENTIALS_JSON of a
+# NON-production project and SOS_EVAL_LIVE_ACK=synthetic-only (the synthetic corpus is sent to the
+# provider and billed). Soft gates count (--fail-on-soft): a role goes live only on a full pass.
+eval-live: ## Live model evaluation against Vertex AI (synthetic data only; docs/06 §13.7)
+	@test "$$SOS_EVAL_LIVE_ACK" = synthetic-only || { echo "set SOS_EVAL_LIVE_ACK=synthetic-only (docs/06 §13.7)"; exit 2; }
+	$(UV) run python -m sos_evals generate --check
+	$(UV) run python apps/api/tests/knowledge/eval_bridge.py run --adapter app-live --suite $(EVAL_SUITE) --fail-on-soft $(EVAL_ARGS)
 
 check: lint typecheck test security ## Everything CI runs

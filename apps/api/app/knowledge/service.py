@@ -17,7 +17,8 @@ What other modules and the routes use:
 Rules every call keeps (docs/06, CLAUDE.md §6): routes check ``kb.ask`` (``document.read`` for
 search, ``kb.verified_answer.manage`` for writes) and the service checks again; retrieval
 filters by tenant and permissions in SQL before ranking (invariant 8, FR-KB-002); the model sees
-only ``search_result`` blocks built from what the caller may read; citations are validated
+only passages built from what the caller may read (``search_result`` blocks or numbered
+passages, ADR-0033); citations are validated
 server-side (FR-KB-005) and an unsupported answer says "not found in school records"; tools are
 read-only (invariant 9, ADR-0008); every provider call goes through ``knowledge.gateway``
 (ADR-0005). Each question writes one ``kb.queries`` row (question and answer encrypted under the

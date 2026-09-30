@@ -168,7 +168,7 @@ Both tiers have the same features, security baseline and data-in-India commitmen
 - A1: Offices can export or photograph their registers and lists; the design partner grants written permission.
 - A2: No government/board portal offers APIs for vendors; SchoolOS produces check reports and formatted sheets, and staff submit.
 - A3: At least one office PC with a modern browser and internet access exists per school.
-- A4: Anthropic API (commercial terms) and an embeddings provider are available; ZDR can be requested.
+- A4: Google Gemini on Vertex AI (commercial terms, India region asia-south1, Zero Data Retention configuration) and an embeddings provider are available (ADR-0033; Anthropic API kept as a fallback).
 - A5: The founder can provide on-site onboarding for early schools in AP.
 
 ## 13. Constraints

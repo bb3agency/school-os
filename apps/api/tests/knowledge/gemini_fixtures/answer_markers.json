@@ -1,0 +1,24 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {"text": "Checked the circular.", "thought": true},
+          {"text": "Exams for Class 9 start at 09:30 on 12/10/2026 [1]. The venue is the main hall [2]. Bring the hall ticket [7]."}
+        ]
+      },
+      "finishReason": "STOP"
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 5200,
+    "cachedContentTokenCount": 4200,
+    "candidatesTokenCount": 60,
+    "thoughtsTokenCount": 40,
+    "totalTokenCount": 5300,
+    "cacheTokensDetails": [{"modality": "TEXT", "tokenCount": 4200}]
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "responseId": "synthetic-response-2"
+}

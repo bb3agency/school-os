@@ -65,7 +65,8 @@
 | **RLS** | PostgreSQL Row-Level Security: per-row access policies enforced by the database |
 | **RPO / RTO** | Recovery point objective (max data loss) / recovery time objective (max downtime) |
 | **RRF** | Reciprocal Rank Fusion: combining ranked lists by summing 1/(k + rank) |
-| **Search result block** | Claude Messages API content block used to pass retrieved content with source/title so answers can cite it |
+| **Search result block** | Claude Messages API content block used to pass retrieved content with source/title so answers can cite it (Anthropic fallback only) |
+| **Passage marker** | `[n]` written by the model after a statement to cite the n-th passage it was given; the gateway maps it back to the passage's source and checks it (ADR-0033, docs/06 §9) |
 | **SLO** | Service level objective |
 | **Step-up authentication** | Requiring fresh MFA before a sensitive action |
 | **Tenant** | One school's isolated space in SchoolOS |

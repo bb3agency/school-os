@@ -35,6 +35,27 @@ sdk = importlib.import_module("anthropic")
 # ruleid: sos-llm-sdk-outside-gateway
 sdk2 = __import__("voyageai.client")
 
+# ruleid: sos-llm-sdk-outside-gateway
+from google import genai
+
+# ruleid: sos-llm-sdk-outside-gateway
+import google.genai.types
+
+# ruleid: sos-llm-sdk-outside-gateway
+import vertexai
+
+# ruleid: sos-llm-sdk-outside-gateway
+from google.cloud import aiplatform
+
+# ruleid: sos-llm-sdk-outside-gateway
+from google.oauth2 import service_account
+
+# ruleid: sos-llm-sdk-outside-gateway
+import google.auth
+
+# ok: sos-llm-sdk-outside-gateway
+from google.protobuf import json_format
+
 # ok: sos-llm-sdk-outside-gateway
 from app.knowledge.gateway import service as gateway
 
