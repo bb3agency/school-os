@@ -4,23 +4,26 @@ Pure: builds escaped HTML from the approved notice (English then Telugu), the sc
 the approval date. The worker hands it to ``core.pdf`` (headless Chromium with the bundled Noto
 Sans Telugu; JavaScript off, every request except the font refused). Line heights and padding
 leave room for Telugu vowel signs above and below the line, so no glyph is clipped.
+
+English first (ADR-0036): while Telugu is hidden (``app.core.languages``) the page is English
+only: no Telugu section and no Telugu font.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import html
-from typing import Final
 
-from app.core.pdf import FONT_FAMILY, FONT_URL
+from app.core.languages import telugu_enabled
+from app.core.pdf import font_face_css, font_stack
 
-_STYLE: Final = f"""
-@font-face {{ font-family: "{FONT_FAMILY}"; src: url("{FONT_URL}") format("truetype");
-  font-weight: 100 900; font-stretch: 62.5% 100%; }}
+
+def _style() -> str:
+    return f"""{font_face_css()}
 @page {{ size: A4 portrait; margin: 18mm 16mm 20mm; }}
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; padding: 0; background: #fff; }}
-body {{ color: #111; font-family: "{FONT_FAMILY}", sans-serif; font-size: 12pt;
+body {{ color: #111; font-family: {font_stack()}; font-size: 12pt;
   line-height: 1.8; }}
 .card {{ padding: 28px 32px; border: 2px solid #1d4ed8; border-radius: 10px; }}
 .school {{ font-size: 11pt; font-weight: 600; color: #1e3a8a; margin: 0 0 4px; }}
@@ -48,16 +51,24 @@ def notice_html(
     title_te: str,
     body_te: str,
 ) -> str:
-    """The notice page (every value escaped; no scripts, links or external resources)."""
+    """The notice page (every value escaped; no scripts, links or external resources). The
+    Telugu section is printed only while Telugu is shown (ADR-0036)."""
     date = approved_on.strftime("%d/%m/%Y")
+    # A notice approved while Telugu was hidden carries its English text in the Telugu columns
+    # (see circulars.service.approve_notice): that is not printed a second time.
+    repeated = (title_te, body_te) == (title_en, body_en)
+    telugu = (
+        f'<hr><section lang="te"><h1>{_e(title_te)}</h1><p class="body">{_e(body_te)}</p></section>'
+        if telugu_enabled() and not repeated
+        else ""
+    )
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        f"<title>{_e(title_en)}</title><style>{_STYLE}</style></head><body>"
+        f"<title>{_e(title_en)}</title><style>{_style()}</style></head><body>"
         '<div class="card">'
         f'<p class="school">{_e(school_name)}</p><p class="date">{date}</p>'
         f'<section lang="en"><h1>{_e(title_en)}</h1><p class="body">{_e(body_en)}</p></section>'
-        "<hr>"
-        f'<section lang="te"><h1>{_e(title_te)}</h1><p class="body">{_e(body_te)}</p></section>'
+        f"{telugu}"
         '<p class="footer">SchoolOS</p>'
         "</div></body></html>"
     )

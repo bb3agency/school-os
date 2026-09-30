@@ -79,7 +79,8 @@ def get_circular(
     ctx: Reader, db: TenantDB, document_id: uuid.UUID, response: Response
 ) -> CircularDetail:
     """One circular with the reading of its current version: issuer, reference, date,
-    subject, English and Telugu summary with source chips, and suggested deadlines, each
+    subject, English summary (``summary_te`` stays null while Telugu is hidden, ADR-0036)
+    with source chips, and suggested deadlines, each
     citing the sentence it comes from. Suggestions are not tasks until confirmed. The ETag is
     the reading's version (for ``/review``). 404 when you cannot see the document."""
     return _reading_etag(response, service.get_circular(db, ctx, document_id))
@@ -257,7 +258,8 @@ def _notice_headers(out: NoticeOut) -> dict[str, str]:
 def create_notice(
     ctx: NoticeDrafter, db: TenantDB, body: NoticeCreate, idem: IdempotencyDep
 ) -> Response:
-    """Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a
+    """Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;
+    ``notice.draft``): AI-drafted from a
     circular (only C1, else 422 ``notice_source_personal``) or from your text (422
     ``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or
     ``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the
@@ -331,8 +333,9 @@ def approve_notice(
     version: IfMatch,
     response: Response,
 ) -> NoticeOut:
-    """Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and
-    bodies filled (422 ``notice_incomplete``) and no personal numbers (422
+    """Approve a notice (``notice.approve``; ``If-Match``): the English title and body filled
+    (and the Telugu ones only while Telugu is shown, ADR-0036; 422 ``notice_incomplete``) and
+    no personal numbers (422
     ``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and
     the image are made next."""
     out = service.approve_notice(db, ctx, notice_id, version)
