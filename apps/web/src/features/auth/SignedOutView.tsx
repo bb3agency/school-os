@@ -63,9 +63,9 @@ export function SignedOutView({
           {support ? t("signedOut.supportBody") : t("signedOut.body")}
         </p>
         {support ? (
-          <a href="/platform/break-glass" className={buttonClasses("primary")}>
+          <Link href="/platform/break-glass" className={buttonClasses("primary")}>
             {t("signedOut.supportBack")}
-          </a>
+          </Link>
         ) : (
           /* Plain link: the BFF route starts the OIDC redirect (not a client navigation). */
           <a href={signIn} className={buttonClasses("primary")}>
@@ -74,9 +74,9 @@ export function SignedOutView({
         )}
         {devSignIn && !support ? (
           <p className="text-sm">
-            <a href="/dev/sign-in" className="text-primary underline">
+            <Link href="/dev/sign-in" className="text-primary underline">
               {td("link")}
-            </a>
+            </Link>
           </p>
         ) : null}
       </div>

@@ -124,10 +124,10 @@ describe("no locale in any URL (product owner 2026-09-30, ADR-0036 note)", () =>
   ] as const)("with Telugu on, the menus link prefix-less paths (%s)", (_label, options) => {
     for (const shell of [
       <SchoolShell key="school" permissions={null} languages={["te", "en"]}>
-        <a href="/students">x</a>
+        <p>x</p>
       </SchoolShell>,
       <PlatformShell key="platform" permissions={null}>
-        <a href="/platform">x</a>
+        <p>x</p>
       </PlatformShell>,
     ]) {
       const { container } = renderWithIntl(shell, options);
@@ -141,7 +141,8 @@ describe("no locale in any URL (product owner 2026-09-30, ADR-0036 note)", () =>
   });
 
   it("the check itself finds a prefixed link", () => {
-    const { container } = render(<a href="/en/students">x</a>);
+    const prefixed = "/en/students";
+    const { container } = render(<a href={prefixed}>x</a>);
     expect(localePrefixed(container)).toEqual(["a href=/en/students"]);
   });
 });
