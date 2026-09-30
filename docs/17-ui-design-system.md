@@ -285,7 +285,7 @@ conversation on the answer's `meta`. Leaving the chat stops the answer (the API 
 
 | Part            | What it is                                                                                                                                                                                                                                                                                                                              |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Header          | The chat's title as the page's `h1` (truncated, full text in `title`), "Chat options" (disclosure: pin, rename, delete, Manage memory, All chats) and the Ask tabs                                                                                                                                                                       |
+| Header          | The chat's title as the page's `h1` (wraps, never cut off), "Chat options" (disclosure: pin, rename, delete, Manage memory, All chats) and the Ask tabs                                                                                                                                                                       |
 | Empty state     | Greeting with the first name ("Good morning, Lakshmi") and the school, the composer centred, four example cards (they only fill the box; nothing is sent until the member asks)                                                                                                                                                          |
 | Thread          | `role="log"` with `aria-live="off"`, max 48rem wide. Each turn: the question as a right-aligned bubble (`surface-sunken`), then the answer (`<article aria-label="Answer">`) full-width beside the AI mark                                                                                                                                 |
 | Answer          | Live status line → streamed preview ("Draft answer, not checked yet", caret) → the checked `final` text as restricted markdown with superscript citation chips → outcome alerts (search-only, not found, refused, error) → Sources (cards) → actions → memory notes → follow-up chips (latest answer only)                                  |
@@ -313,7 +313,7 @@ screen. Only `[n]` markers of the answer's own citations become chips.
 **Citations.** A chip is a link to its source card (`Source 1: <title>`); hover or keyboard focus
 opens a popover (title, page, quote, "Open"), lazy-loaded, fixed-positioned by script through the
 CSSOM, flipped above when there is no room, closed by Escape (focus stays on the chip), by
-focus leaving or by scrolling (WCAG 1.4.13). Source cards: number, title link, page, 3-line quote,
+focus leaving or by scrolling (WCAG 1.4.13). Source cards: number, title link, page, the quote (at most 300 characters),
 "Download version n" for documents. A source the member can no longer open reads "Source you can
 no longer open", without text. Past-chat sources (`sos://conversation/{id}#q{query}`) open that
 message.
@@ -364,7 +364,8 @@ Escape and return focus. Colours reuse §7 pairs (`ink-muted` on white 7.56:1, `
 `violet-soft` 7.96:1, `primary` on `primary-soft` 5.82:1, `on-action` on `action` 17.74:1).
 Telugu: the sans with `:lang(te)` line height; chat titles are the one place the sidebar
 truncates (single line, `leading-relaxed` so glyphs are not clipped; full title in `title` and
-the accessible name).
+the accessible name; the responsive check allows exactly this one-line ellipsis). Everything
+else wraps: the chat title, source titles and quotes.
 
 **Checks.** `features/ask/ask.test.tsx`, `chat.test.tsx`, `chat-units.test.tsx`,
 `history-memory.test.tsx` (vitest); `e2e/ask.spec.ts` (keyboard journey, Stop, search-only, All

@@ -399,10 +399,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
     <div className="chat-fade chat-canvas relative -mb-6 flex flex-col rounded-xl border border-border bg-surface shadow-card">
       {/* Header: the chat's title (the page's h1), its options, and the Ask sections. */}
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3 sm:px-6">
-        <h1
-          className="min-w-0 flex-1 truncate text-base font-semibold text-ink"
-          title={title ?? t("title")}
-        >
+        <h1 className="min-w-0 flex-1 text-base font-semibold break-anywhere text-ink">
           {title ?? t("title")}
         </h1>
         <ConversationMenu conversation={detail.data ?? null} />

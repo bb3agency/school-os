@@ -176,7 +176,7 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
           <p className="text-xs text-ink-muted">{t("noLink")}</p>
         ) : null}
         {!citation.withheld && citation.snippet ? (
-          <blockquote className="line-clamp-3 border-s-2 border-border-soft ps-2 text-sm whitespace-pre-line text-ink-muted">
+          <blockquote className="border-s-2 border-border-soft ps-2 text-sm whitespace-pre-line text-ink-muted">
             {citation.snippet}
           </blockquote>
         ) : null}
