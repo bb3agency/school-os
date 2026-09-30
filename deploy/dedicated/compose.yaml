@@ -60,6 +60,14 @@ x-app-env: &app-env
   SOS_KEY_WRAPPER: kms
   SOS_KMS_DATA_KEY_ARN: ${SOS_KMS_DATA_KEY_ARN:?}
   SOS_AUDIT_SIGNING_KEY_ARN: ${SOS_AUDIT_SIGNING_KEY_ARN:?}
+  # AI (ADR-0033): Gemini on Vertex AI in an India region. Project, source and ZDR confirmation from
+  # host.env, the credential JSON from the operator secret; empty = not configured (AI stays off).
+  SOS_LLM_GCP_PROJECT: ${SOS_LLM_GCP_PROJECT:-}
+  SOS_LLM_GCP_LOCATION: ${SOS_LLM_GCP_LOCATION:-asia-south1}
+  SOS_LLM_GCP_CREDENTIALS_SOURCE: ${SOS_LLM_GCP_CREDENTIALS_SOURCE:-}
+  SOS_LLM_GCP_CREDENTIALS_JSON: ${SOS_LLM_GCP_CREDENTIALS_JSON:-}
+  SOS_LLM_ZDR_CONFIRMED: ${SOS_LLM_ZDR_CONFIRMED:-false}
+  # Anthropic: only while a role in models.yaml uses the fallback provider.
   SOS_ANTHROPIC_API_KEY: ${SOS_ANTHROPIC_API_KEY:-}
   # Heartbeat (docs/16 §12): identity from host.env (Terraform), key from the operator secret.
   SOS_CONTROL_PLANE_URL: ${SOS_CONTROL_PLANE_URL:?}

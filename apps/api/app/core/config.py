@@ -6,11 +6,12 @@ Secrets arrive via environment variables injected from AWS Secrets Manager (or a
 
 from __future__ import annotations
 
+import json
 from enum import StrEnum
 from functools import lru_cache
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,14 +49,71 @@ class ExtractionProviderKind(StrEnum):
 
 
 class KnowledgeProviderMode(StrEnum):
-    """How the knowledge module reaches model providers (docs/06, ADR-0005, ADR-0006).
+    """How the knowledge module reaches model providers (docs/06, ADR-0005, ADR-0006, ADR-0033).
 
     ``fake`` is offline and deterministic (local/CI; refused in staging/prod). ``live`` uses the
     providers and models named in ``app/knowledge/config/*.yaml`` (invariant 13) through
-    ``knowledge/gateway`` with the API keys below."""
+    ``knowledge/gateway`` with the credentials below."""
 
     FAKE = "fake"
     LIVE = "live"
+
+
+class LlmCredentialsSource(StrEnum):
+    """How the gateway authenticates to Vertex AI (ADR-0033; invariant 10: a service identity,
+    never a person's account). ``workload-identity``: an AWS -> Google workload identity
+    federation configuration (no secret; the task/host AWS role is exchanged for a short-lived
+    token). ``service-account-key``: a service-account JSON key held in Secrets Manager."""
+
+    WORKLOAD_IDENTITY = "workload-identity"
+    SERVICE_ACCOUNT_KEY = "service-account-key"
+
+
+INDIA_GCP_LOCATIONS: frozenset[str] = frozenset({"asia-south1", "asia-south2"})
+"""Vertex AI locations product AI traffic may use in staging/prod (Mumbai, Delhi; ADR-0033)."""
+_SERVICE_ACCOUNT_DOMAIN = ".gserviceaccount.com"
+
+
+def gcp_credential_problem(  # noqa: PLR0911 - one reason per refusal
+    source: LlmCredentialsSource, raw: str
+) -> str | None:
+    """Why this Google credential JSON may not be used for product traffic (None if it may).
+
+    Checks only the ``type``, the service-account e-mail domain and the federation shape; key
+    material is never inspected or echoed. ``authorized_user`` (a person's ``gcloud`` login) is
+    always refused (invariant 10)."""
+    try:
+        info = json.loads(raw)
+    except ValueError:
+        return "is not JSON"
+    if not isinstance(info, dict):
+        return "is not a JSON object"
+    kind = info.get("type")
+    if kind == "authorized_user":
+        return "is a person's login (authorized_user); use a service identity"
+    if source is LlmCredentialsSource.SERVICE_ACCOUNT_KEY:
+        if kind != "service_account":
+            return "must be a service_account key"
+        if not str(info.get("client_email", "")).endswith(_SERVICE_ACCOUNT_DOMAIN):
+            return "must belong to a Google service account"
+        return None
+    if kind != "external_account":
+        return "must be an external_account (workload identity federation) configuration"
+    credential_source = info.get("credential_source")
+    environment = (
+        str(credential_source.get("environment_id", ""))
+        if isinstance(credential_source, dict)
+        else ""
+    )
+    if not environment.startswith("aws"):
+        return "must federate the AWS identity (credential_source.environment_id aws1)"
+    for key in ("audience", "subject_token_type", "token_url"):
+        if not isinstance(info.get(key), str) or not info[key]:
+            return f"has no {key}"
+    impersonate = str(info.get("service_account_impersonation_url", ""))
+    if not impersonate.startswith("https://iamcredentials.googleapis.com/"):
+        return "must impersonate the Vertex service account (service_account_impersonation_url)"
+    return None
 
 
 class EmailProviderKind(StrEnum):
@@ -154,15 +212,42 @@ class Settings(BaseSettings):
     extraction_provider: ExtractionProviderKind | None = None
     extraction_low_confidence_threshold: float = Field(default=0.8, gt=0, le=1)
 
-    # Knowledge / "Ask the school" (M2; docs/06, ADR-0005, ADR-0006). Off by default; a school
-    # also needs the feature flag kb.ask.enabled. Unset mode: ``fake`` in local/ci, ``live`` in
-    # staging/prod. Model IDs, budgets and thresholds are versioned files, not settings
-    # (app/knowledge/config/*.yaml, invariant 13). Keys: organization API keys only, never a
-    # personal subscription (invariant 10).
+    # Knowledge / "Ask the school" (M2; docs/06, ADR-0005, ADR-0006, ADR-0033). Off by default; a
+    # school also needs the feature flag kb.ask.enabled. Unset mode: ``fake`` in local/ci, ``live``
+    # in staging/prod. Providers, model IDs, budgets and thresholds are versioned files, not
+    # settings (app/knowledge/config/*.yaml, invariant 13). Credentials: service identities and
+    # organization API keys only, never a personal subscription or login (invariant 10).
     kb_enabled: bool = False
     kb_provider_mode: KnowledgeProviderMode | None = None
+    # Anthropic (fallback provider since ADR-0033): needed only while a role in models.yaml uses
+    # provider anthropic.
     anthropic_api_key: SecretStr | None = None
     embeddings_api_key: SecretStr | None = None
+    # Google Gemini on Vertex AI (ADR-0033; the default LLM provider). Project and location of the
+    # Vertex endpoint (product traffic only in India: asia-south1 or asia-south2 in staging/prod),
+    # the service-identity credentials (JSON from Secrets Manager: a workload identity federation
+    # configuration or a service-account key; never a person's login) and the operator's
+    # confirmation that the project is set up for Zero Data Retention (docs/08 §8, docs/10 §11).
+    llm_gcp_project: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9\-]{4,28}[a-z0-9]$")
+    llm_gcp_location: str = Field(default="asia-south1", pattern=r"^(global|[a-z]+-[a-z]+[0-9]+)$")
+    llm_gcp_credentials_source: LlmCredentialsSource | None = None
+    llm_gcp_credentials_json: SecretStr | None = None
+    # Set to true only after the ZDR steps of docs/10 §11 are done on the Vertex project (data
+    # caching disabled, request-response logging off, abuse-monitoring exception requested).
+    llm_zdr_confirmed: bool = False
+    # Before the first call, read the project's cacheConfig and refuse to send anything unless
+    # caching is disabled (fail closed). Always on in staging/prod.
+    llm_verify_cache_config: bool = True
+
+    @field_validator(
+        "llm_gcp_project", "llm_gcp_credentials_source", "llm_gcp_credentials_json", mode="before"
+    )
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        """Compose passes ``${VAR:-}`` as an empty string: that means "not set"."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     oidc_issuer: str = "http://localhost:8080/schoolos"
     oidc_audience: str = "schoolos-web"
@@ -266,18 +351,53 @@ class Settings(BaseSettings):
             return KnowledgeProviderMode.LIVE
         return KnowledgeProviderMode.FAKE
 
+    def _guard_llm_credentials(self) -> None:
+        """Everywhere: Google credentials are a service identity of the named kind."""
+        raw = self.llm_gcp_credentials_json
+        if raw is None or not raw.get_secret_value().strip():
+            return
+        if self.is_production_like and "dev-only" in raw.get_secret_value():
+            raise ValueError(f"llm_gcp_credentials_json uses a dev-only value in {self.env}")
+        if self.llm_gcp_credentials_source is None:
+            raise ValueError(
+                "SOS_LLM_GCP_CREDENTIALS_JSON needs SOS_LLM_GCP_CREDENTIALS_SOURCE "
+                "(workload-identity or service-account-key)"
+            )
+        problem = gcp_credential_problem(self.llm_gcp_credentials_source, raw.get_secret_value())
+        if problem is not None:
+            raise ValueError(f"SOS_LLM_GCP_CREDENTIALS_JSON {problem}")
+
     def _guard_knowledge(self) -> None:
-        """Staging/prod: no fake providers; live AI needs a real organization API key."""
+        """Staging/prod: no fake providers; live AI needs Vertex AI in an India region with a
+        service identity and the operator's Zero Data Retention confirmation (ADR-0033)."""
         if self.kb_provider_mode is KnowledgeProviderMode.FAKE:
             raise ValueError(f"SOS_KB_PROVIDER_MODE=fake is not allowed in {self.env}")
-        for name in ("anthropic_api_key", "embeddings_api_key"):
+        for name in ("anthropic_api_key", "embeddings_api_key", "llm_gcp_credentials_json"):
             key: SecretStr | None = getattr(self, name)
             if key is not None and "dev-only" in key.get_secret_value():
                 raise ValueError(f"{name} uses a dev-only value in {self.env}")
-        if self.kb_enabled:
-            key = self.anthropic_api_key
-            if key is None or not key.get_secret_value().strip():
-                raise ValueError(f"SOS_KB_ENABLED needs SOS_ANTHROPIC_API_KEY in {self.env}")
+        if not self.llm_verify_cache_config:
+            raise ValueError(f"SOS_LLM_VERIFY_CACHE_CONFIG must stay on in {self.env}")
+        if self.llm_gcp_location not in INDIA_GCP_LOCATIONS:
+            raise ValueError(
+                f"SOS_LLM_GCP_LOCATION must be an India region "
+                f"({', '.join(sorted(INDIA_GCP_LOCATIONS))}) in {self.env}"
+            )
+        if not self.kb_enabled:
+            return
+        if not self.llm_gcp_project:
+            raise ValueError(f"SOS_KB_ENABLED needs SOS_LLM_GCP_PROJECT in {self.env}")
+        raw = self.llm_gcp_credentials_json
+        if self.llm_gcp_credentials_source is None or raw is None or not raw.get_secret_value():
+            raise ValueError(
+                f"SOS_KB_ENABLED needs SOS_LLM_GCP_CREDENTIALS_SOURCE and "
+                f"SOS_LLM_GCP_CREDENTIALS_JSON in {self.env}"
+            )
+        if not self.llm_zdr_confirmed:
+            raise ValueError(
+                f"SOS_KB_ENABLED needs SOS_LLM_ZDR_CONFIRMED=true in {self.env} "
+                "(Vertex project set up for Zero Data Retention, docs/10 §11)"
+            )
 
     @property
     def email_enabled(self) -> bool:
@@ -302,6 +422,7 @@ class Settings(BaseSettings):
         """Fail closed: dev-only conveniences can never run in staging or production."""
         self._guard_support_client()
         self._guard_email()
+        self._guard_llm_credentials()
         if self.is_production_like:
             if self.key_wrapper is KeyWrapperKind.LOCAL_DEV:
                 raise ValueError("SOS_KEY_WRAPPER=local-dev is not allowed in staging/prod")
