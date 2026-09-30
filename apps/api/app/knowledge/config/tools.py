@@ -31,11 +31,11 @@ WHITELIST: Final = frozenset(
         # M6 Tally connector: ADR-0032 (Proposed) would amend ADR-0008 with this tool; it is
         # offered only behind the school's tally.connector.enabled flag.
         "get_fee_dues",
-        # ADR-0033 (Accepted 2026-09-30) amends ADR-0008: the caller's own conversations only.
+        # ADR-0034 (Accepted 2026-09-30) amends ADR-0008: the caller's own conversations only.
         "search_my_conversations",
     }
 )
-"""ADR-0008 / docs/06 §7 (+ ADR-0032 for get_fee_dues, ADR-0033 for
+"""ADR-0008 / docs/06 §7 (+ ADR-0032 for get_fee_dues, ADR-0034 for
 search_my_conversations). The only tools the model may call."""
 
 

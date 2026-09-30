@@ -143,7 +143,7 @@ class Streaming(ConfigModel):
 
 class Conversation(ConfigModel):
     """Context for a question inside one conversation (docs/06 §5 conversation rules; FR-KB-012
-    as amended by ADR-0033). The prompt texts here are rendered by the gateway's wire format
+    as amended by ADR-0034). The prompt texts here are rendered by the gateway's wire format
     (invariant 13); limits for summaries, titles and memory are in ``conversations.yaml``."""
 
     max_earlier_questions: int = Field(default=3, ge=0, le=10)

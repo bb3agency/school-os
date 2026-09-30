@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted (recorded retroactively 2026-09-26) |
+| Status | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0034 |
 | Date | 2026-09-26 |
 | Deciders | Founder |
 | Amends / supersedes | none |

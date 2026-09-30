@@ -1,4 +1,4 @@
-"""Ask conversations end to end (ADR-0033; docs/06 §5, docs/09 Knowledge; FR-KB-008, FR-KB-009,
+"""Ask conversations end to end (ADR-0034; docs/06 §5, docs/09 Knowledge; FR-KB-008, FR-KB-009,
 FR-KB-012): history routes, regenerate and edit, status and follow-up events, recent turns and
 the rolling summary as context, query rewrite, the documents-only answer cache and the
 caller's own chat search. Real database, real pipeline, offline fake model; every person is a
@@ -141,6 +141,8 @@ def test_FR_KB_012_a_question_without_a_conversation_starts_one_named_after_it(
     assert meta["title"] == "When is the Zebra festival?"
     assert meta["cached"] is False
     assert meta["cached_from"] is None
+    assert meta["summarized"] is False
+    assert _first(events, "final")["summarized"] is False
     cid = meta["conversation_id"]
     listed = api.call(who, "GET", "/api/v1/knowledge/conversations").json()
     assert [c["id"] for c in listed["data"]] == [cid]
@@ -556,10 +558,15 @@ def test_FR_KB_012_rolling_summary_is_queued_after_an_answer_and_used_next_time(
     assert b"Zebra" not in bytes(row.summary_ciphertext)
     assert any(s.startswith("sos://doc/") for s in row.summary_sources)
     fake.sent.clear()
-    _ask(api, who, "And the parking?", conversation_id=cid)
+    parking = _ask(api, who, "And the parking?", conversation_id=cid)
     summary = _block(_answer_requests(fake.sent)[0], CONFIG.summary_header)
     assert summary is not None
     assert "When is the Zebra festival?" in summary
+    # "Earlier messages summarised": on meta, final and the stored message (web contract).
+    assert parking[0][1]["summarized"] is True
+    assert _first(parking, "final")["summarized"] is True
+    stored = _detail(api, who, cid).json()["messages"]
+    assert [m["summarized"] for m in stored] == [False] * (keep + 1) + [True]
     # A summary resting on a source the user can no longer see is forgotten, never sent.
     with admin_engine.begin() as c:
         c.execute(

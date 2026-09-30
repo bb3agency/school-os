@@ -272,7 +272,7 @@ class SchoolKnowledgeService:
             raise ValidationFailed([_error("question", "question_length")])
         return question
 
-    # --- conversations (ADR-0033; docs/06 §5) --------------------------------------------------
+    # --- conversations (ADR-0034; docs/06 §5) --------------------------------------------------
 
     def _new_conversation(
         self,
@@ -380,7 +380,7 @@ class SchoolKnowledgeService:
         return conversation, target, thread[index:], thread[:index]
 
     def _memory_on(self, session: Session, ctx: UserContext) -> bool:
-        """The school's switch AND the user's own switch (no row = on; ADR-0033)."""
+        """The school's switch AND the user's own switch (no row = on; ADR-0034)."""
         school = tenancy.get_tenant(session).settings
         if not getattr(school, "ai_memory_enabled", True):
             return False
@@ -505,6 +505,7 @@ class SchoolKnowledgeService:
                 "revision": revision[0] if revision else None,
                 "access_fingerprint": plan.access,
                 "cached_from": plan.hit.query_id if plan.hit else None,
+                "summarized": plan.context.summary is not None,
             },
         )
         superseded = repo.supersede(session, plan.supersedes, plan.query_id)
@@ -823,6 +824,7 @@ class SchoolKnowledgeService:
             created_at=row.created_at,
             superseded=row.superseded_by is not None,
             cached=row.cached_from is not None,
+            summarized=row.summarized,
         )
 
     def get_conversation(
@@ -944,7 +946,7 @@ class SchoolKnowledgeService:
             request_id=ctx.request_id,
         )
 
-    # --- memory (ADR-0033) ------------------------------------------------------------------------
+    # --- memory (ADR-0034) ------------------------------------------------------------------------
 
     def _memory_out(self, item: memory.Item) -> MemoryOut:
         r = item.row
@@ -1461,6 +1463,7 @@ class _Run:
             title=plan.title,
             cached=plan.hit is not None,
             cached_from=plan.hit.query_id if plan.hit else None,
+            summarized=plan.context.summary is not None,
         )
 
     def _metering(self) -> Metering:
@@ -1557,7 +1560,7 @@ class _Run:
         )
 
     def _remember(self, session: Session) -> Answer:
-        """A "remember that ..." instruction (ADR-0033): screened and saved at once (explicit,
+        """A "remember that ..." instruction (ADR-0034): screened and saved at once (explicit,
         active), answered with a fixed reply; never a model answer."""
         plan, ctx = self.plan, self.ctx
         cfg = memory.config()
@@ -1640,12 +1643,15 @@ class _Run:
 
     # --- after the answer ---------------------------------------------------------------------
 
-    @staticmethod
-    def closing_events(result: Answer, replaced: bool) -> Iterator[AskEvent]:
+    def closing_events(self, result: Answer, replaced: bool) -> Iterator[AskEvent]:
         if result.error_code is not None and result.message_key is not None:
             yield ErrorEvent(type=result.error_code, message_key=result.message_key)
         yield FinalEvent(
-            text=result.text, replaced=replaced, status=result.status, mode=result.mode
+            text=result.text,
+            replaced=replaced,
+            status=result.status,
+            mode=result.mode,
+            summarized=self.plan.context.summary is not None,
         )
         for segment in result.segments:
             if segment.text.strip():
@@ -1922,7 +1928,7 @@ __all__ = [
 ]
 
 
-# DEK rotation (SEC-012) covers the query log, conversations and memory items (ADR-0033):
+# DEK rotation (SEC-012) covers the query log, conversations and memory items (ADR-0034):
 # rotation batches re-encrypt kb.queries, kb.conversations and kb.user_memories too.
 key_rotation.register_reencryptor("kb_queries", reencrypt_queries_batch)
 key_rotation.register_reencryptor("kb_conversations", keys.reencrypt_conversations_batch)
@@ -1932,7 +1938,7 @@ key_rotation.register_reencryptor("kb_memories", keys.reencrypt_memories_batch)
 # --- query log retention (docs/05 §13, docs/08 §7; FR-ADM-002 shows it) -------------------------
 
 SUMMARY_TASK: Final = conversations.SUMMARY_TASK
-# The rolling summary job consumes this outbox event (queue ingest; ADR-0033).
+# The rolling summary job consumes this outbox event (queue ingest; ADR-0034).
 ops.register_outbox_route(conversations.SUMMARY_EVENT, SUMMARY_TASK)
 
 QUERY_RETENTION_CATEGORY: Final = "kb_queries"
@@ -1947,7 +1953,7 @@ def purge_old_queries(session: Session, *, now: dt.datetime | None = None) -> in
     ``tenant_session``; returns the number of rows deleted. Audit events of the questions stay
     (ids and counts only); the metering ledger ``kb.llm_calls`` keeps its own rows.
 
-    Conversations follow their questions (ADR-0033): a rolling summary that covers a deleted
+    Conversations follow their questions (ADR-0034): a rolling summary that covers a deleted
     question is forgotten (rebuilt from the questions kept), and a conversation with no question
     left (deleted from the history or not) is deleted."""
     keep = retention.days(
@@ -1961,7 +1967,7 @@ def purge_old_queries(session: Session, *, now: dt.datetime | None = None) -> in
 
 
 def purge_memories(session: Session, *, now: dt.datetime | None = None) -> int:
-    """Memory retention (ADR-0033), in the school's ``tenant_session``: suggestions nobody
+    """Memory retention (ADR-0034), in the school's ``tenant_session``: suggestions nobody
     confirmed within ``memory.pending_ttl_hours`` are deleted, and so is every item and setting
     of a person who is no longer an active member of the school. Returns items deleted."""
     at = now or dt.datetime.now(dt.UTC)
@@ -2024,7 +2030,7 @@ def summarise_conversation(tenant_id: uuid.UUID, payload: dict[str, object]) -> 
     )
 
 
-# --- full data export (FR-ADM-001; ADR-0033) --------------------------------------------------
+# --- full data export (FR-ADM-001; ADR-0034) --------------------------------------------------
 
 
 def export_records(session: Session) -> list[RecordTable]:

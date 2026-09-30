@@ -1,4 +1,4 @@
-"""Sealed (encrypted) Ask texts: one place that reads and writes them (docs/05 §9, ADR-0033).
+"""Sealed (encrypted) Ask texts: one place that reads and writes them (docs/05 §9, ADR-0034).
 
 Every Ask text a person or the model wrote is AES-256-GCM ciphertext under the school's data key
 with associated data ``tenant|<table>|<column>|<row id>`` (``app.students.crypto``): questions,

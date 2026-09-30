@@ -3,7 +3,7 @@ id: memory_screen
 version: 1
 model_config_key: memory_screen
 changelog:
-  - "1 (2026-09-30): safety screen for Ask memory items (ADR-0033)"
+  - "1 (2026-09-30): safety screen for Ask memory items (ADR-0034)"
 ---
 You check a note a school staff member wants the records assistant to remember about them.
 

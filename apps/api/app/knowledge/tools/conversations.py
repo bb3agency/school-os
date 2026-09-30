@@ -1,4 +1,4 @@
-"""``search_my_conversations``: the caller's own earlier Ask conversations (ADR-0033; docs/06 §7).
+"""``search_my_conversations``: the caller's own earlier Ask conversations (ADR-0034; docs/06 §7).
 
 Read-only and scoped to ONE person in ONE school: the caller's own conversations that are not
 deleted, in the school of the request (RLS), the newest ``max_conversations`` by activity. Their

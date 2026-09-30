@@ -1,6 +1,6 @@
 """0038_ask_conversations: conversations, answer details, summaries and per-user memory.
 
-FR-KB-009, FR-KB-012 (ADR-0033); CLAUDE.md invariants 1 and 12 (RLS on the new tables; the
+FR-KB-009, FR-KB-012 (ADR-0034); CLAUDE.md invariants 1 and 12 (RLS on the new tables; the
 migration round-trips on a populated database, the query log itself survives the downgrade).
 Synthetic data only; ciphertext bytes are placeholders.
 """
@@ -182,7 +182,7 @@ def test_FR_KB_012_conversation_checks(fresh: tuple[Config, Engine]) -> None:
         _query(admin, tid_b, uid_b, other, conversation=other)
 
 
-def test_ADR_0033_memory_checks(fresh: tuple[Config, Engine]) -> None:
+def test_ADR_0034_memory_checks(fresh: tuple[Config, Engine]) -> None:
     _cfg, admin = fresh
     tid, uid = _school(admin)
 

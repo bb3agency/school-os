@@ -1,7 +1,7 @@
 """Ask the school: conversations, answer details, rolling summaries and per-user memory.
 
-docs/06 §5 (conversations, context, memory), docs/05 §6.4, ADR-0033; FR-KB-008, FR-KB-009,
-FR-KB-012 (as amended by ADR-0033).
+docs/06 §5 (conversations, context, memory), docs/05 §6.4, ADR-0034; FR-KB-008, FR-KB-009,
+FR-KB-012 (as amended by ADR-0034).
 
 New tables (tenant-owned: RLS ENABLE + FORCE with ``tenant_isolation``, ``UNIQUE (tenant_id,
 id)`` where referenced, composite FKs only, the ADR-0029 ``offboarding_purge`` policy and
@@ -16,7 +16,7 @@ id)`` where referenced, composite FKs only, the ADR-0029 ``offboarding_purge`` p
   (CHECK), the questions stay in the query log until the 180-day purge. ``updated_at`` is set by
   the service (new message, rename, pin), never by a trigger, so a DEK re-encryption does not
   reorder anyone's history. ``version`` changes with the title, pin or deletion (ETag).
-- ``kb.user_memories``: one user's memory items in one school (ADR-0033): ``text_ciphertext``
+- ``kb.user_memories``: one user's memory items in one school (ADR-0034): ``text_ciphertext``
   (tenant DEK), ``source`` ``explicit|suggested``, ``status`` ``active|pending`` (a pending
   suggestion always has ``expires_at``; only suggestions are ever pending). FK to the
   membership ``(tenant_id, user_id)`` ON DELETE CASCADE; the conversation and question it came
@@ -28,7 +28,9 @@ questions asked before this revision, adopted later by the service), ``supersede
 question that replaced it by a regenerate or an edit; composite self-FK, ON DELETE SET NULL of
 that column), ``revises`` + ``revision`` (``regenerate|edit``: which question this one replaces),
 ``citations_ciphertext`` (the numbered citations with title and snippet, encrypted: they quote
-records and documents) and ``followups_ciphertext`` (the suggested follow-up questions). ``route``
+records and documents), ``followups_ciphertext`` (the suggested follow-up questions) and
+``summarized`` (the question went to the model with the conversation's rolling summary of older
+turns; shown as "earlier messages summarised"). ``route``
 also allows ``memory`` (a "remember that ..." instruction answered without the model).
 
 ``kb.llm_calls.role`` also allows ``followups``, ``summary``, ``memory_screen`` and
@@ -118,6 +120,7 @@ ALTER TABLE kb.queries
   ADD COLUMN access_fingerprint   bytea CHECK (octet_length(access_fingerprint) = 32),
   ADD COLUMN cached_from          uuid,
   ADD COLUMN cache_invalidated_at timestamptz,
+  ADD COLUMN summarized           boolean NOT NULL DEFAULT false,
   ADD CONSTRAINT queries_conversation_fk FOREIGN KEY (tenant_id, conversation_id)
     REFERENCES kb.conversations (tenant_id, id),
   ADD CONSTRAINT queries_superseded_by_fk FOREIGN KEY (tenant_id, superseded_by)
@@ -143,7 +146,7 @@ CREATE TABLE kb.user_memories (
   id               uuid PRIMARY KEY,
   tenant_id        uuid NOT NULL REFERENCES core.tenants (id),
   user_id          uuid NOT NULL,
-  -- The user's own preference or work context, AES-256-GCM under the tenant DEK (ADR-0033).
+  -- The user's own preference or work context, AES-256-GCM under the tenant DEK (ADR-0034).
   text_ciphertext  bytea NOT NULL CHECK (octet_length(text_ciphertext) > 0),
   key_version      int NOT NULL CHECK (key_version >= 1),
   source           text NOT NULL CHECK (source IN ('explicit','suggested')),
@@ -235,6 +238,7 @@ def downgrade() -> None:
         "DROP CONSTRAINT IF EXISTS queries_revises_fk, "
         "DROP CONSTRAINT IF EXISTS queries_superseded_by_fk, "
         "DROP CONSTRAINT IF EXISTS queries_conversation_fk, "
+        "DROP COLUMN IF EXISTS summarized, "
         "DROP COLUMN IF EXISTS cache_invalidated_at, "
         "DROP COLUMN IF EXISTS cached_from, "
         "DROP COLUMN IF EXISTS access_fingerprint, "

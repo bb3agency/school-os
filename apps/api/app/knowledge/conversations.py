@@ -1,6 +1,6 @@
 """Ask conversations: titles, context, rolling summary, query rewrite and follow-ups.
 
-docs/06 §5 (conversation rules, prompt layout, cost and performance design); ADR-0033;
+docs/06 §5 (conversation rules, prompt layout, cost and performance design); ADR-0034;
 FR-KB-008, FR-KB-009, FR-KB-012 (as amended). Used only by :mod:`app.knowledge.service` (and the
 worker task of the rolling summary). Every stored text here is ciphertext under the school's
 key (``kb.conversations`` title and summary; ``kb.queries`` citations and follow-ups); nothing

@@ -38,7 +38,7 @@ def test_FR_KB_005_answer_prompt_v1_loads() -> None:
 )
 def test_answer_prompt_keeps_the_grounding_rules(requirement: str, phrase: str) -> None:
     assert phrase in registry.load_prompt("answer_system", 1).text, requirement
-    # v2 (ADR-0033, the one in use) keeps every rule of v1.
+    # v2 (ADR-0034, the one in use) keeps every rule of v1.
     assert phrase in registry.load_prompt("answer_system", 2).text, requirement
 
 
@@ -61,7 +61,7 @@ def test_FR_KB_012_answer_prompt_v2_is_in_use_and_keeps_history_as_context_only(
         ("memory_screen", "memory_screen"),
     ],
 )
-def test_ADR_0033_conversation_prompts_load_without_placeholders(prompt_id: str, role: str) -> None:
+def test_ADR_0034_conversation_prompts_load_without_placeholders(prompt_id: str, role: str) -> None:
     prompt = registry.load_prompt(prompt_id, 1)
     assert prompt.header.model_config_key == role
     assert prompt.placeholders == frozenset()

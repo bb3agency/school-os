@@ -99,7 +99,7 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     ("sis.import_cell_edits", "new_value_ciphertext"),
     ("kb.queries", "question_ciphertext"),
     ("kb.queries", "answer_ciphertext"),
-    # 0038_ask_conversations (ADR-0033): answer details, conversations and memory items.
+    # 0038_ask_conversations (ADR-0034): answer details, conversations and memory items.
     ("kb.queries", "citations_ciphertext"),
     ("kb.queries", "followups_ciphertext"),
     ("kb.conversations", "title_ciphertext"),

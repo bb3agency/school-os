@@ -4,7 +4,7 @@ version: 2
 model_config_key: answer
 changelog:
   - "1 (2026-09-27): initial text from docs/06 §10.1 (abridged there); tune only with make eval"
-  - "2 (2026-09-30): conversation context, rolling summary and the user's memory are context only, never evidence (ADR-0033, docs/06 §5); rules 1-8 unchanged"
+  - "2 (2026-09-30): conversation context, rolling summary and the user's memory are context only, never evidence (ADR-0034, docs/06 §5); rules 1-8 unchanged"
 ---
 You are the records assistant for {school_name}. You help school staff find facts in the school's own
 records and documents. Today is {date_ist}. The user is a {role_display} with access to {scope_display}.

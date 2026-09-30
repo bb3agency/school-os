@@ -215,6 +215,8 @@ def test_FR_TEN_012_settings_read_and_update(school: Any, api: Any, admin_engine
         "idle_timeout_minutes": 15,
         "ai_features_enabled": True,
         "ai_monthly_budget_inr": 5000,
+        # ADR-0034: Ask memory is on for the school unless it is turned off.
+        "ai_memory_enabled": True,
         # FR-CERT-013 (docs/05 §5.7): the certificate letterhead lives in the school settings;
         # empty until the office fills it in.
         "certificate_letterhead": {

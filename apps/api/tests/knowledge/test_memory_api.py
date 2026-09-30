@@ -1,4 +1,4 @@
-"""Per-user Ask memory end to end (ADR-0033; docs/06 §5, docs/08 §4; FR-KB-012 as amended).
+"""Per-user Ask memory end to end (ADR-0034; docs/06 §5, docs/08 §4; FR-KB-012 as amended).
 
 A memory item is the user's own preference or work context in one school: saved explicitly
 (settings, or "remember that ..." in Ask) or suggested by Ask and saved only after the user
@@ -133,7 +133,7 @@ def _roles(admin: Engine, query_id: str) -> list[str]:
 # --- explicit items -------------------------------------------------------------------------------
 
 
-def test_ADR_0033_an_explicit_item_is_saved_listed_edited_and_deleted(
+def test_ADR_0034_an_explicit_item_is_saved_listed_edited_and_deleted(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)
@@ -184,7 +184,7 @@ def test_ADR_0033_an_explicit_item_is_saved_listed_edited_and_deleted(
         ("Blue sky thinking", "memory_unsure"),
     ],
 )
-def test_ADR_0033_items_about_other_people_are_refused(
+def test_ADR_0034_items_about_other_people_are_refused(
     world: Any, api: Any, admin_engine: Engine, fake: Any, *, note: str, code: str
 ) -> None:
     who = _person(admin_engine, world)
@@ -194,7 +194,7 @@ def test_ADR_0033_items_about_other_people_are_refused(
     assert _items(api, who) == []
 
 
-def test_ADR_0033_when_the_screen_cannot_run_nothing_is_stored(
+def test_ADR_0034_when_the_screen_cannot_run_nothing_is_stored(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)
@@ -210,7 +210,7 @@ def test_ADR_0033_when_the_screen_cannot_run_nothing_is_stored(
 # --- in Ask ---------------------------------------------------------------------------------------
 
 
-def test_ADR_0033_remember_that_saves_at_once_and_never_asks_the_answer_model(
+def test_ADR_0034_remember_that_saves_at_once_and_never_asks_the_answer_model(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)
@@ -236,7 +236,7 @@ def test_ADR_0033_remember_that_saves_at_once_and_never_asks_the_answer_model(
     assert "I prefer answers in Telugu" not in str(body["messages"])
 
 
-def test_ADR_0033_remember_refuses_details_about_others(
+def test_ADR_0034_remember_refuses_details_about_others(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)
@@ -249,7 +249,7 @@ def test_ADR_0033_remember_refuses_details_about_others(
     assert _items(api, who) == []
 
 
-def test_ADR_0033_a_suggestion_waits_for_confirmation_and_expires(
+def test_ADR_0034_a_suggestion_waits_for_confirmation_and_expires(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)
@@ -284,7 +284,7 @@ def test_ADR_0033_a_suggestion_waits_for_confirmation_and_expires(
     assert gone.status_code == 404
 
 
-def test_ADR_0033_memory_never_crosses_users_or_schools(
+def test_ADR_0034_memory_never_crosses_users_or_schools(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     mine = _person(admin_engine, world)
@@ -310,7 +310,7 @@ def test_ADR_0033_memory_never_crosses_users_or_schools(
     assert [i["text"] for i in _items(api, mine)] == ["Keep answers in bullet lists"]
 
 
-def test_ADR_0033_memory_off_means_nothing_stored_suggested_or_used(
+def test_ADR_0034_memory_off_means_nothing_stored_suggested_or_used(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)
@@ -360,7 +360,7 @@ def test_ADR_0033_memory_off_means_nothing_stored_suggested_or_used(
             )
 
 
-def test_ADR_0033_memory_never_widens_what_the_user_may_see(
+def test_ADR_0034_memory_never_widens_what_the_user_may_see(
     world: Any, api: Any, admin_engine: Engine, fake: Any, docs: dict[str, uuid.UUID]
 ) -> None:
     who = _person(
@@ -382,7 +382,7 @@ def test_ADR_0033_memory_never_widens_what_the_user_may_see(
     assert "09/12/2026" not in str(fake.sent)
 
 
-def test_ADR_0033_the_answer_cache_is_not_used_while_memory_is_in_use(
+def test_ADR_0034_the_answer_cache_is_not_used_while_memory_is_in_use(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     question = f"When does the Owl reading club meet {uuid.uuid4().hex[:6]}?"
@@ -392,7 +392,7 @@ def test_ADR_0033_the_answer_cache_is_not_used_while_memory_is_in_use(
     assert _ask(api, who, question)[0][1]["cached"] is False
 
 
-def test_ADR_0033_forget_everything_and_people_who_leave_lose_their_memory(
+def test_ADR_0034_forget_everything_and_people_who_leave_lose_their_memory(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)

@@ -1,4 +1,4 @@
-"""Can the caller still see a ``sos://`` source NOW? (invariant 8; docs/06 §5, ADR-0033).
+"""Can the caller still see a ``sos://`` source NOW? (invariant 8; docs/06 §5, ADR-0034).
 
 Earlier answers are shown again (conversation history), sent again as context (recent turns, the
 rolling summary, chat search) and reused (the answer cache). Each of those re-checks every source

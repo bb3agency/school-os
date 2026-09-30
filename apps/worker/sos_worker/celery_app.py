@@ -135,7 +135,7 @@ def create_celery() -> Celery:
             # refresh and chunk removal (outbox consumers of the kb.* events). The daily
             # query-log purge (docs/05 §13) is maintenance, not ingestion.
             "knowledge.purge_queries": {"queue": "maintenance"},
-            # ADR-0033: the rolling summary of an Ask conversation, after the answer.
+            # ADR-0034: the rolling summary of an Ask conversation, after the answer.
             "knowledge.summarise_conversation": {"queue": "ingest"},
             "knowledge.tidy_conversations": {"queue": "maintenance"},
             "knowledge.*": {"queue": "ingest"},

@@ -1,11 +1,12 @@
-"""The offline provider's answers for the Ask conversation roles (dev and CI only; ADR-0033).
+"""The offline provider's answers for the Ask conversation roles (dev and CI only; ADR-0034).
 
 Deterministic stand-ins, so the product's plumbing (redaction, metering, validation, storage,
 events) runs end to end without a model. They are rules, not quality: the real behaviour is the
 prompt's (``prompts/*.v1.txt``), measured by ``make eval``.
 
-- ``query_rewrite``: the follow-up plus the content words of the latest earlier question (or the
-  summary) it does not already contain, so offline retrieval sees what "it" refers to.
+- ``query_rewrite``: a follow-up that points back ("it", "there", "that", అది, ...) gets the
+  content words of the latest earlier question (or the summary) it does not already contain, so
+  offline retrieval sees what it refers to; any other question is returned unchanged.
 - ``summary``: "Earlier the user asked about: ..." listing the earlier questions.
 - ``followups``: up to two generic follow-ups in the latest question's script (no names, no
   numbers); a memory candidate only when the latest question says "I prefer ..." or
@@ -76,8 +77,35 @@ _OTHERS: Final = (
 _SELF: Final = ("prefer", "i am", "i handle", "keep answers", "answers", "my ", "i teach", "telugu")
 
 
+_PUNCTUATION: Final = "?.,!:;\"'()"
+_REFERS: Final = frozenset(
+    {
+        "it",
+        "its",
+        "that",
+        "there",
+        "this",
+        "they",
+        "them",
+        "those",
+        "these",
+        "same",
+        "అది",
+        "అక్కడ",
+        "అవి",
+        "ఇది",
+    }
+)
+"""Words that point back into the conversation: only then is a follow-up rewritten."""
+
+
+def _words(text: str) -> list[str]:
+    """Whitespace words without punctuation (Telugu vowel signs stay inside their word)."""
+    return [w.strip(_PUNCTUATION) for w in text.split() if w.strip(_PUNCTUATION)]
+
+
 def _content(text: str) -> list[str]:
-    return [w for w in _WORD.findall(text) if len(w) > 2 and w.casefold() not in _STOP]
+    return [w for w in _words(text) if len(w) > 2 and w.casefold() not in _STOP]
 
 
 def _section(text: str, header: str) -> list[str]:
@@ -94,13 +122,15 @@ def _section(text: str, header: str) -> list[str]:
 
 def rewrite(text: str) -> dict[str, Any]:
     question = text.rsplit("Follow-up question:", 1)[-1].strip()
+    if not {w.casefold() for w in _words(question)} & _REFERS:
+        return {"question": question}  # it stands on its own (prompt rule 2)
     earlier = [
         line.removeprefix("- User:").strip()
         for line in _section(text, "Recent turns:")
         if line.startswith("- User:")
     ]
     source = earlier[-1] if earlier else " ".join(_section(text, "Conversation summary:"))
-    have = {w.casefold() for w in _WORD.findall(question)}
+    have = {w.casefold() for w in _words(question)}
     extra = [w for w in _content(source) if w.casefold() not in have][:6]
     return {"question": f"{question} {' '.join(extra)}".strip() if extra else question}
 

@@ -138,7 +138,7 @@ def step_for(tool: str) -> StatusStep:
 
 @dataclass(frozen=True, slots=True)
 class AskContext:
-    """What a question carries besides itself (docs/06 §5 prompt layout; ADR-0033): the recent
+    """What a question carries besides itself (docs/06 §5 prompt layout; ADR-0034): the recent
     turns of the caller's conversation (answers only where every cited source is still visible),
     the rolling summary (only when its sources are still visible), the caller's confirmed memory
     items, and the standalone rewrite of a follow-up (sent as the question; the original goes

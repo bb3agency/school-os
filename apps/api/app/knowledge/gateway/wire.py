@@ -143,7 +143,7 @@ def _user(item: UserMessage, rules: Conversation | None) -> dict[str, Any]:
 def memory_block(
     conversation: Sequence[ConversationItem], rules: Conversation
 ) -> dict[str, Any] | None:
-    """The user's memory items as one system block (ADR-0033), right after the static prompt so
+    """The user's memory items as one system block (ADR-0034), right after the static prompt so
     the cached prefix stays the same for every user; None when there are none."""
     first = next((i for i in conversation if isinstance(i, UserMessage)), None)
     if first is None or not first.memory:

@@ -4,7 +4,7 @@
   ``conversation_id``, ``title``, ``cached``), ``status`` (progress codes), ``delta`` (streamed
   preview), ``error``, ``final`` (the validated answer, replacing the preview), ``token``,
   ``citation``, ``followups``, ``memory``, ``done``. Body: ``conversation_id`` (or the older
-  ``session_id``), ``regenerate_of`` / ``edit_of`` (ADR-0033). The question's ``kb.queries``
+  ``session_id``), ``regenerate_of`` / ``edit_of`` (ADR-0034). The question's ``kb.queries``
   row (encrypted) and its audit event are written in the request's transaction, which commits
   BEFORE the first event is sent (invariant 7); the stream then completes the row
   (``kb.query.completed``) or, when the client goes away, records it ``cancelled``. Budget
@@ -19,7 +19,7 @@
 - Conversations (``kb.ask``, the caller's own only; 404 otherwise): ``GET
   /knowledge/conversations``, ``GET|PATCH|DELETE /knowledge/conversations/{id}`` (PATCH with
   ``If-Match``).
-- Memory (``kb.ask``, the caller's own only; ADR-0033): ``GET|POST|DELETE
+- Memory (``kb.ask``, the caller's own only; ADR-0034): ``GET|POST|DELETE
   /knowledge/memories``, ``PATCH|DELETE /knowledge/memories/{id}`` (PATCH with ``If-Match``),
   ``POST /knowledge/memories/{id}/confirm``, ``GET|PUT /knowledge/memory-settings``.
 
@@ -284,7 +284,7 @@ def retire_verified_answer(
     return out
 
 
-# --- conversations (ADR-0033; docs/09 Knowledge) -------------------------------------------------
+# --- conversations (ADR-0034; docs/09 Knowledge) -------------------------------------------------
 
 
 def _conversation_cursor(cursor: str | None) -> tuple[bool, dt.datetime, uuid.UUID] | None:
@@ -360,7 +360,7 @@ def delete_conversation(ctx: Asker, db: TenantDB, conversation_id: uuid.UUID) ->
     return Response(status_code=204)
 
 
-# --- memory (ADR-0033) -------------------------------------------------------------------------
+# --- memory (ADR-0034) -------------------------------------------------------------------------
 
 
 @router.get("/knowledge/memories", response_model=Page[MemoryOut])

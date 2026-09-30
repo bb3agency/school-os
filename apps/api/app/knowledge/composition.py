@@ -89,7 +89,7 @@ class Runtime:
     engine: AnswerEngine
     policy: SchoolAiPolicy | None = None
     conversations: ConversationsConfig = field(default_factory=load_conversations_config)
-    """Ask conversations, memory and the answer cache (``conversations.yaml``; ADR-0033)."""
+    """Ask conversations, memory and the answer cache (``conversations.yaml``; ADR-0034)."""
 
 
 def build_runtime(

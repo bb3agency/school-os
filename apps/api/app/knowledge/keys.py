@@ -216,7 +216,7 @@ def reencrypt_conversations_batch(
     session: Session, keyring: crypto.TenantKeyring, target_version: int, limit: int
 ) -> int:
     """DEK-rotation re-encryptor for ``kb.conversations`` (title and rolling summary): rows
-    whose ciphertext header names another version, at most ``limit`` (SEC-012, ADR-0033)."""
+    whose ciphertext header names another version, at most ``limit`` (SEC-012, ADR-0034)."""
     del target_version
     active = keyring.active_version(session)
     rows = session.execute(
@@ -244,7 +244,7 @@ def reencrypt_conversations_batch(
 def reencrypt_memories_batch(
     session: Session, keyring: crypto.TenantKeyring, target_version: int, limit: int
 ) -> int:
-    """DEK-rotation re-encryptor for ``kb.user_memories`` (SEC-012, ADR-0033)."""
+    """DEK-rotation re-encryptor for ``kb.user_memories`` (SEC-012, ADR-0034)."""
     del target_version
     active = keyring.active_version(session)
     rows = session.execute(

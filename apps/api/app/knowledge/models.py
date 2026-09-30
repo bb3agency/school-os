@@ -184,7 +184,7 @@ class Query(Base):
     feedback_reason: Mapped[str | None] = mapped_column(Text)
     feedback_at: Mapped[dt.datetime | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
-    # 0038_ask_conversations (ADR-0033): conversation, supersession, encrypted answer details.
+    # 0038_ask_conversations (ADR-0034): conversation, supersession, encrypted answer details.
     conversation_id: Mapped[uuid.UUID | None]
     superseded_by: Mapped[uuid.UUID | None]
     revises: Mapped[uuid.UUID | None]
@@ -194,6 +194,7 @@ class Query(Base):
     access_fingerprint: Mapped[bytes | None] = mapped_column(LargeBinary)
     cached_from: Mapped[uuid.UUID | None]
     cache_invalidated_at: Mapped[dt.datetime | None]
+    summarized: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
 
 
 class Conversation(Base):
@@ -219,7 +220,7 @@ class Conversation(Base):
 
 
 class UserMemory(Base):
-    """One memory item of one user in one school (0038; ADR-0033). Text is ciphertext."""
+    """One memory item of one user in one school (0038; ADR-0034). Text is ciphertext."""
 
     __tablename__ = "user_memories"
     __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
@@ -240,7 +241,7 @@ class UserMemory(Base):
 
 
 class UserMemorySettings(Base):
-    """A user's memory switch in one school (no row = on; ADR-0033)."""
+    """A user's memory switch in one school (no row = on; ADR-0034)."""
 
     __tablename__ = "user_memory_settings"
     __table_args__ = {"schema": SCHEMA}  # noqa: RUF012

@@ -13,7 +13,7 @@
   summaries that rested on it, each school in its own ``tenant_session``; a failing school does
   not stop the others (logged with ids only, counted in ``failed``, retried on the next run).
   Counts only in the result and the log.
-- ``knowledge.tidy_conversations`` (daily, queue ``maintenance``; ADR-0033): per school, the
+- ``knowledge.tidy_conversations`` (daily, queue ``maintenance``; ADR-0034): per school, the
   memory retention (unconfirmed suggestions after 24 hours, people who left the school) and a
   conversation for questions asked before conversations existed (``adopt_conversations``).
 - ``knowledge.summarise_conversation`` (queue ``ingest``, explicit route): consumer of the outbox
@@ -164,7 +164,7 @@ def purge_queries_all() -> dict[str, int]:
 def tidy_conversations_all() -> dict[str, int]:
     """Per school (one ``tenant_session`` each; a failing school is logged and retried on the
     next run): the memory retention (expired suggestions, people who left the school) and a
-    conversation for questions asked before conversations existed (ADR-0033)."""
+    conversation for questions asked before conversations existed (ADR-0034)."""
     with context_free_session() as session:
         tenant_ids = tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
     memories = adopted = failed = 0
@@ -200,7 +200,7 @@ def tidy_conversations_all() -> dict[str, int]:
 def summarise_conversation(
     self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
 ) -> str:
-    """Rolling summary of one conversation (ADR-0033); a failed provider call is not retried
+    """Rolling summary of one conversation (ADR-0034); a failed provider call is not retried
     (the next answer asks again), a database error is."""
     del event_id
     try:

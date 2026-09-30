@@ -323,7 +323,7 @@ class TenantSettings(BaseModel):
     ai_memory_enabled: bool = Field(
         default=True,
         description="Ask may remember each person's own preferences and work context "
-        "(ADR-0033). Off: nothing is saved, suggested or used for anyone in the school.",
+        "(ADR-0034). Off: nothing is saved, suggested or used for anyone in the school.",
     )
     certificate_letterhead: CertificateLetterhead = Field(default_factory=CertificateLetterhead)
 

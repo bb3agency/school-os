@@ -92,7 +92,7 @@ def fee_dues(fee_id: uuid.UUID) -> str:
 
 def conversation_question(conversation_id: uuid.UUID, query_id: uuid.UUID) -> str:
     """One of the caller's own earlier questions and its answer (``search_my_conversations``,
-    ADR-0033). Ids only; the text is the caller's own and is re-read under their access."""
+    ADR-0034). Ids only; the text is the caller's own and is re-read under their access."""
     return f"sos://conversation/{conversation_id}#q{query_id}"
 
 

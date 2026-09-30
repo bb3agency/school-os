@@ -234,7 +234,7 @@ def test_FR_KB_009_query_is_logged_encrypted_and_audited_without_text(
             text("SELECT role, feature, outcome, cost_usd FROM kb.llm_calls WHERE query_id = :q"),
             {"q": query_id},
         ).all()
-    # Two answer turns (tool round, answer) and the follow-up suggestions (ADR-0033), each
+    # Two answer turns (tool round, answer) and the follow-up suggestions (ADR-0034), each
     # metered with its role; the first question of a conversation needs no rewrite.
     assert sorted((r.role, r.feature, r.outcome) for r in calls) == [
         ("answer", "ask", "ok"),
@@ -450,7 +450,7 @@ def test_FR_KB_004_record_question_reads_named_fields_through_scoped_tools(
         "list_documents",
         "list_findings",
         "search_documents",
-        # ADR-0033: the caller's own earlier conversations (kb.ask).
+        # ADR-0034: the caller's own earlier conversations (kb.ask).
         "search_my_conversations",
     ]
     # Only the named fields reach the model: never the guardian phone or C3 values.

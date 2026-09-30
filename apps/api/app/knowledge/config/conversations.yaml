@@ -1,5 +1,5 @@
 # Ask conversations, memory and the answer cache (docs/06 §5 and "Cost and performance design";
-# ADR-0033; FR-KB-008, FR-KB-009, FR-KB-012). CLAUDE.md invariant 13: prompt ids/versions, limits,
+# ADR-0034; FR-KB-008, FR-KB-009, FR-KB-012). CLAUDE.md invariant 13: prompt ids/versions, limits,
 # thresholds and fixed reply texts live here; the models and output caps of the roles (followups,
 # summary, memory_screen, query_rewrite) in models.yaml; the prompt texts the wire format renders
 # (history, summary and memory headers) in models.yaml `conversation`. A change needs `make eval`.
@@ -37,7 +37,7 @@ followups:
   max_chars: 120             # a longer suggestion is dropped
   max_answer_chars: 2000     # of the checked answer sent with the recent questions
 
-# Per-user memory (ADR-0033): the user's own preferences and work context, never data about others.
+# Per-user memory (ADR-0034): the user's own preferences and work context, never data about others.
 memory:
   screen_prompt: {id: memory_screen, version: 1}
   max_items: 30              # active + pending per user and school

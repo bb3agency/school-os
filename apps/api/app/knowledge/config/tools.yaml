@@ -89,7 +89,7 @@ tools:
       fee figure for the student and never guess from names. Quote amounts exactly as given,
       with the Tally as-of date.
     permission: finance.read
-  # ADR-0033 (amending ADR-0008): the caller's OWN earlier Ask conversations in this school (never
+  # ADR-0034 (amending ADR-0008): the caller's OWN earlier Ask conversations in this school (never
   # another person's, never deleted ones), decrypted in memory and scored by words; no index.
   search_my_conversations:
     description: >-

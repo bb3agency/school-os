@@ -1,4 +1,4 @@
-"""``conversations.yaml``: Ask conversations, memory and the answer cache (docs/06 §5; ADR-0033).
+"""``conversations.yaml``: Ask conversations, memory and the answer cache (docs/06 §5; ADR-0034).
 
 Invariant 13: prompt ids/versions, limits, thresholds and the fixed reply texts are read from here;
 the roles' models and output caps from ``models.yaml``. Pure (no I/O beyond this package's file).

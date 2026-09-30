@@ -1,4 +1,4 @@
-"""Conversations and memory under key rotation and retention (SEC-012, FR-KB-009; ADR-0033).
+"""Conversations and memory under key rotation and retention (SEC-012, FR-KB-009; ADR-0034).
 
 - DEK rotation re-encrypts conversation titles and summaries, memory items and the new
   per-question ciphertext (citations, follow-ups), with the same associated data; the census

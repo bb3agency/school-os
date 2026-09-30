@@ -26,6 +26,8 @@ LOWER_IS_BETTER = frozenset(
         "circular_hallucinated_deadlines",
         "fee_leakage_count",
         "fee_guessed_link_count",
+        "conversation_leakage_count",
+        "conversation_scope_violations",
     }
 )
 _MAX_LISTED = 20
@@ -129,7 +131,10 @@ def to_markdown(report: Report) -> str:
             f"{', '.join(gate.requirements)} |"
         )
     names = [
-        n for n in Metrics.model_fields if n != "items" and not n.startswith(("circular_", "fee_"))
+        n
+        for n in Metrics.model_fields
+        if n != "items"
+        and not n.startswith(("circular_", "fee_", "conversation_", "followup_", "memory_"))
     ]
     lines += [
         "",
@@ -160,6 +165,8 @@ def to_markdown(report: Report) -> str:
     lines += _circular_lines(report.run) or ["Not measured."]
     lines += ["", "## Fee dues from Tally (M6)", ""]
     lines += _fee_lines(report.run) or ["Not measured."]
+    lines += ["", "## Ask conversations (ADR-0034)", ""]
+    lines += _conversation_lines(report.run) or ["Not measured."]
     return "\n".join(lines) + "\n"
 
 
@@ -242,6 +249,33 @@ def _fee_lines(run: RunResult) -> list[str]:
             problems.append(f"{o.stated - o.valid_amounts} uncited amount(s)")
         if problems:
             lines.append(f"- `{o.id}` ({o.locale}): " + "; ".join(problems))
+    return lines
+
+
+def _conversation_lines(run: RunResult) -> list[str]:
+    if not run.conversation_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- Cases: {m.conversation_items} · leakage {fmt(m.conversation_leakage_count)} · scope "
+        f"violations {fmt(m.conversation_scope_violations)} · context accuracy "
+        f"{fmt(m.conversation_context_accuracy)} · follow-up language "
+        f"{fmt(m.followup_language_match)} · memory preference {fmt(m.memory_preference_applied)}",
+    ]
+    for o in run.conversation_outcomes:
+        problems = []
+        if o.leaks:
+            problems.append("leak: " + ", ".join(o.leaks[:3]))
+        if o.violations:
+            problems.append("violation: " + ", ".join(o.violations[:3]))
+        if o.context_ok is False:
+            problems.append("follow-up not understood (expected source not cited)")
+        if o.followups_match is False:
+            problems.append("follow-ups in another language")
+        if o.preference_ok is False:
+            problems.append("memory preference not applied")
+        if problems:
+            lines.append(f"- `{o.id}` step {o.step} ({o.category}): " + "; ".join(problems))
     return lines
 
 

@@ -161,3 +161,44 @@ op = ">="
 threshold = 0.95
 severity = "hard"
 requirements = ["FR-TALLY-008", "FR-KB-007"]
+
+# --- Ask conversations and memory (sos_evals.conversations; docs/06 §13.5; ADR-0034) -------------
+# Scripted conversations in tiny synthetic schools: follow-ups, long conversations, permission
+# changes, regenerate/edit, follow-up suggestions, per-user memory, the answer cache and chat
+# search. Nothing another person or a withdrawn permission covers may reach a person, and no
+# rule of the conversation, memory or cache design may be broken.
+
+[[gate]]
+metric = "conversation_leakage_count"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["FR-KB-012", "FR-KB-010", "SEC-018"]
+
+[[gate]]
+metric = "conversation_scope_violations"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["FR-KB-012", "ADR-0034"]
+
+[[gate]]
+metric = "conversation_context_accuracy"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["FR-KB-012"]
+
+[[gate]]
+metric = "followup_language_match"
+op = ">="
+threshold = 0.98
+severity = "soft"
+requirements = ["FR-KB-006", "FR-KB-012"]
+
+[[gate]]
+metric = "memory_preference_applied"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["ADR-0034"]

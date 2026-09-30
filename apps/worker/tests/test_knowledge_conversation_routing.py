@@ -1,4 +1,4 @@
-"""Ask conversation jobs (ADR-0033; docs/06 §5): the rolling summary runs on an explicit route
+"""Ask conversation jobs (ADR-0034; docs/06 §5): the rolling summary runs on an explicit route
 ("ingest", after the answer, never on a question's path) and is fed by its outbox event; the
 daily memory retention and conversation adoption run on "maintenance"."""
 

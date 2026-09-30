@@ -52,7 +52,7 @@ roles:
     model: claude-sonnet-5
     max_output_tokens: 1200
     thinking: disabled
-  # Ask conversations (docs/06 §5, cost and performance design; ADR-0033): cheap roles, each a
+  # Ask conversations (docs/06 §5, cost and performance design; ADR-0034): cheap roles, each a
   # metered, budget-checked structured-output call through the gateway.
   # Follow-up suggestions (0-3, the answer's language) plus at most one memory suggestion.
   followups:
@@ -166,7 +166,7 @@ streaming:
   preview_max_pending_chars: 2000
 
 # Context inside one conversation (docs/06 §5 conversation rules; FR-KB-012 as amended by
-# ADR-0033). The recent turns of the SAME user's conversation go with a new question: each question
+# ADR-0034). The recent turns of the SAME user's conversation go with a new question: each question
 # and, when every source it cited is still visible to the caller now, its checked answer (cut to
 # earlier_answer_max_chars). Older turns reach the model only through the rolling summary. Every
 # question is still searched afresh under the caller's current permissions (invariant 8).

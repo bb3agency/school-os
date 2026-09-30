@@ -510,7 +510,7 @@ def insert_verified_answer(session: Session, values: Mapping[str, Any]) -> Verif
     return row
 
 
-# --- conversations (kb.conversations; 0038, ADR-0033) ------------------------------------------
+# --- conversations (kb.conversations; 0038, ADR-0034) ------------------------------------------
 
 LIVE_STATUSES = (*EARLIER_STATUSES, "error", "cancelled", "streaming")
 
@@ -826,7 +826,7 @@ def invalidate_cache_citing(session: Session, document_id: uuid.UUID) -> int:
     return _rowcount(result)
 
 
-# --- memory (kb.user_memories, kb.user_memory_settings; ADR-0033) ----------------------------
+# --- memory (kb.user_memories, kb.user_memory_settings; ADR-0034) ----------------------------
 
 
 def _live_memory(now: dt.datetime) -> Any:

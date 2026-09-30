@@ -3,7 +3,7 @@ id: followups
 version: 1
 model_config_key: followups
 changelog:
-  - "1 (2026-09-30): follow-up suggestions and at most one memory suggestion (ADR-0033, docs/06 §5)"
+  - "1 (2026-09-30): follow-up suggestions and at most one memory suggestion (ADR-0034, docs/06 §5)"
 ---
 You suggest what a school staff member might ask next in a conversation with the school's records
 assistant. You get the conversation's recent questions and the answer the user has just read.

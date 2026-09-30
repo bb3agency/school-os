@@ -107,6 +107,7 @@ from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.imports import service as imports
 from app.insights import service as insights
+from app.knowledge import service as knowledge
 from app.notifications import service as notifications
 from app.ops import service as ops
 from app.students import service as students
@@ -558,6 +559,9 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *academics.export_records(session),
         *insights.export_records(session, include_sensitive=snap.include_sensitive),
         *tally.export_records(session),
+        # ADR-0034: each person's Ask memory items and switch (their own work context; the
+        # query log and conversations are not in the archive, docs/05 §12).
+        *knowledge.export_records(session),
         repo.retention_record_table(session),
     ]
     names = [t.name for t in tables]

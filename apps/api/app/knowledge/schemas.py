@@ -167,7 +167,7 @@ class VerifiedAnswerOut(_Out):
 VerifiedStatus = Literal["active", "needs_review", "retired"]
 
 
-# --- conversations (docs/09 Knowledge; ADR-0033) ---------------------------------------------
+# --- conversations (docs/09 Knowledge; ADR-0034) ---------------------------------------------
 
 MessageStatus = Literal[
     "answered", "not_found", "refused", "search_only", "error", "cancelled", "streaming"
@@ -221,6 +221,10 @@ class MessageOut(_Out):
     created_at: dt.datetime
     superseded: bool = Field(description="Replaced by a regenerate or an edit.")
     cached: bool = Field(default=False, description="An exact repeat answered from the cache.")
+    summarized: bool = Field(
+        default=False,
+        description="Earlier messages of the conversation reached the model as a summary only.",
+    )
 
 
 class ConversationDetailOut(ConversationOut):
@@ -234,7 +238,7 @@ class ConversationPatchIn(_In):
     pinned: bool | None = None
 
 
-# --- memory (ADR-0033) -------------------------------------------------------------------------
+# --- memory (ADR-0034) -------------------------------------------------------------------------
 
 
 class MemoryOut(_Out):

@@ -277,12 +277,12 @@ class UserMessage:
     re-retrieves under the caller's current permissions (invariant 8). Superseded by
     ``earlier_turns`` when that is given."""
     earlier_turns: tuple[HistoryTurn, ...] = ()
-    """Recent turns of the SAME user's conversation, oldest first (ADR-0033): questions and
+    """Recent turns of the SAME user's conversation, oldest first (ADR-0034): questions and
     their checked, still-visible answers. Context only; every question is searched afresh."""
     summary: str | None = None
     """Rolling summary of the conversation's older turns (context only, never evidence)."""
     memory: tuple[str, ...] = ()
-    """The user's confirmed memory items (ADR-0033): how to answer, never evidence. The wire
+    """The user's confirmed memory items (ADR-0034): how to answer, never evidence. The wire
     format puts them in a system block right after the static prompt (a stable, cacheable
     prefix)."""
     asked_as: str | None = None
@@ -359,6 +359,8 @@ class MetaEvent:
     """True when this is an exact repeat answered from the answer cache (docs/06 §5)."""
     cached_from: uuid.UUID | None = None
     """The earlier question whose checked answer is reused (only when ``cached``)."""
+    summarized: bool = False
+    """Older messages of the conversation reached the model as its rolling summary only."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -383,7 +385,7 @@ class FollowupsEvent:
 
 @dataclass(frozen=True, slots=True)
 class MemoryEvent:
-    """A memory item (ADR-0033): ``saved`` (the user said "remember that ...") or
+    """A memory item (ADR-0034): ``saved`` (the user said "remember that ...") or
     ``suggested`` (pending until the user confirms it; expires after 24 hours)."""
 
     event: ClassVar[str] = "memory"
@@ -453,6 +455,8 @@ class FinalEvent:
     status: str
     """``answered``, ``not_found``, ``refused`` or ``search_only`` (the stored query status)."""
     mode: AskMode
+    summarized: bool = False
+    """As ``meta.summarized`` (repeated for clients that read only the final event)."""
 
 
 AskEvent = (

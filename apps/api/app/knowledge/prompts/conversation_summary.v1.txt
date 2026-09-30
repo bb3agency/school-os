@@ -3,7 +3,7 @@ id: conversation_summary
 version: 1
 model_config_key: summary
 changelog:
-  - "1 (2026-09-30): rolling summary of older turns of an Ask conversation (ADR-0033, docs/06 §5)"
+  - "1 (2026-09-30): rolling summary of older turns of an Ask conversation (ADR-0034, docs/06 §5)"
 ---
 You keep a short running summary of a conversation between a school staff member and the school's
 records assistant. You get the previous summary (possibly empty) and older turns that are no longer
