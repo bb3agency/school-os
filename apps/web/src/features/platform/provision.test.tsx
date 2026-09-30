@@ -240,6 +240,18 @@ describe("provision wizard (FR-PLT-001..003)", () => {
     );
   });
 
+  it("with Telugu switched off, the owner's language is English and never offered (ADR-0036)", () => {
+    const { container } = renderWithIntl(<ProvisionSchoolForm />, "en");
+    expect(container.querySelector("select[name='owner.language']")).toBeNull();
+    expect(container.querySelector("input[name='owner.language']")).toHaveValue("en");
+    expect(container.innerHTML).not.toMatch(/[ఀ-౿]/);
+  });
+
+  it("offers the owner's language when Telugu is switched on (ADR-0036)", () => {
+    const { container } = renderWithIntl(<ProvisionSchoolForm />, { telugu: true });
+    expect(container.querySelector("select[name='owner.language']")).not.toBeNull();
+  });
+
   it("shows a dedicated host's heartbeat key once, then drops it after confirmation", async () => {
     stub.routes["POST /bff/api/v1/platform/tenants"] = () =>
       Response.json(
