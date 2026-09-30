@@ -91,14 +91,19 @@ class SqlChunkStore:
         previous = repo.latest_version_of(session, document_id)
         visible = repo.promote_version(session, document_id=document_id, version_id=version_id)
         if previous is not None and previous != version_id:
-            # The cited text may have changed: a person re-checks (FR-KB-030).
+            # The cited text may have changed: a person re-checks (FR-KB-030), and cached
+            # answers given the old version are not reused (docs/06 answer cache).
             repo.flag_verified_answers_citing(session, document_id)
+            repo.invalidate_cache_citing(session, document_id)
         return visible
 
     def hide_document(self, session: Session, document_id: uuid.UUID) -> int:
+        repo.invalidate_cache_citing(session, document_id)
         return repo.demote_document(session, document_id)
 
     def update_acl(self, session: Session, document_id: uuid.UUID, acl: ChunkAcl) -> int:
+        # Who may read it changed: answers given its passages are not reused (answer cache).
+        repo.invalidate_cache_citing(session, document_id)
         return repo.refresh_acl(session, document_id=document_id, acl=_acl(acl))
 
     def delete_versions(

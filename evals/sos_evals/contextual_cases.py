@@ -1,4 +1,4 @@
-"""Synthetic documents and questions for the contextual retrieval eval (docs/06 §13.5).
+"""Synthetic documents and questions for the contextual retrieval eval (docs/06 §13.6).
 
 Deterministic (``python -m sos_evals generate`` writes ``datasets/contextual.jsonl``; ``generate
 --check`` fails on drift). Made-up schools' circulars only: no real person, office or student.

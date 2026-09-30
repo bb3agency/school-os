@@ -200,6 +200,49 @@ def _kb_manage(action: str) -> Builder:
     return build
 
 
+def _kb_ai_runtime(w: Any) -> None:
+    """Memory items are screened by the memory_screen role (ADR-0034): the offline fake
+    provider with AI on for school A, so an allowed call can succeed."""
+    KB.install_runtime()
+    KB.enable_ai(_ADMIN_ENGINE[0], w.a.tenant_id)
+
+
+_ADMIN_ENGINE: list[Engine] = []
+
+
+def _kb_conversation(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        cid = KB.conversation_row(w.a, w.person(r))
+        path = f"/api/v1/knowledge/conversations/{cid}"
+        if action == "patch":
+            return path, {"pinned": True}, _if_match(1)
+        return path, None, {}
+
+    return build
+
+
+def _kb_memory_create(w: Any, r: str, a: Engine) -> Request:
+    _ADMIN_ENGINE[:] = [a]
+    _kb_ai_runtime(w)
+    return "/api/v1/knowledge/memories", {"text": f"Keep answers short {r}"}, {}
+
+
+def _kb_memory(action: str) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        _ADMIN_ENGINE[:] = [a]
+        status = "pending" if action == "confirm" else "active"
+        item = KB.memory_row(w.a, w.person(r), status=status)
+        path = f"/api/v1/knowledge/memories/{item}"
+        if action == "patch":
+            _kb_ai_runtime(w)
+            return path, {"text": "Keep answers in bullet lists"}, _if_match(1)
+        if action == "confirm":
+            return f"{path}/confirm", None, {}
+        return path, None, {}
+
+    return build
+
+
 def _load_promotion_support() -> ModuleType:
     """tests/students/promotion_support.py (fresh year pairs and promotions, real services)."""
     name = "sos_test_promotion_support"
@@ -1539,6 +1582,35 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/knowledge/verified-answers"): _kb_verified,
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"): _kb_manage("review"),
     ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"): _kb_manage("retire"),
+    # ADR-0034: the caller's own conversations and memory (kb.ask).
+    ("GET", "/api/v1/knowledge/conversations"): lambda w, r, a: (
+        "/api/v1/knowledge/conversations",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/knowledge/conversations/{conversation_id}"): _kb_conversation("get"),
+    ("PATCH", "/api/v1/knowledge/conversations/{conversation_id}"): _kb_conversation("patch"),
+    ("DELETE", "/api/v1/knowledge/conversations/{conversation_id}"): _kb_conversation("delete"),
+    ("GET", "/api/v1/knowledge/memories"): lambda w, r, a: ("/api/v1/knowledge/memories", None, {}),
+    ("POST", "/api/v1/knowledge/memories"): _kb_memory_create,
+    ("DELETE", "/api/v1/knowledge/memories"): lambda w, r, a: (
+        "/api/v1/knowledge/memories",
+        None,
+        {},
+    ),
+    ("PATCH", "/api/v1/knowledge/memories/{memory_id}"): _kb_memory("patch"),
+    ("DELETE", "/api/v1/knowledge/memories/{memory_id}"): _kb_memory("delete"),
+    ("POST", "/api/v1/knowledge/memories/{memory_id}/confirm"): _kb_memory("confirm"),
+    ("GET", "/api/v1/knowledge/memory-settings"): lambda w, r, a: (
+        "/api/v1/knowledge/memory-settings",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/knowledge/memory-settings"): lambda w, r, a: (
+        "/api/v1/knowledge/memory-settings",
+        {"enabled": True},
+        {},
+    ),
     # Circulars, tasks and parent notices (M4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
     ("GET", "/api/v1/circulars"): lambda w, r, a: ("/api/v1/circulars", None, {}),
     ("GET", "/api/v1/circulars/{document_id}"): lambda w, r, a: (
@@ -1862,6 +1934,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/change-requests",
         "/api/v1/academic-years/{year_id}/promotions:commit",
         "/api/v1/knowledge/verified-answers",
+        "/api/v1/knowledge/memories",
         "/api/v1/students/{student_id}/certificates",
         "/api/v1/certificates/{certificate_id}/duplicates",
         "/api/v1/tasks",
@@ -1896,6 +1969,9 @@ def _success(method: str, path: str) -> int:
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "DELETE" and path in (
+        "/api/v1/knowledge/conversations/{conversation_id}",
+        "/api/v1/knowledge/memories",
+        "/api/v1/knowledge/memories/{memory_id}",
         "/api/v1/documents/{document_id}",
         "/api/v1/students/{student_id}/guardians/{guardian_id}",
         "/api/v1/tally/parties/{party_id}/links/{student_id}",

@@ -1,10 +1,21 @@
+import {
+  followupsEventSchema,
+  memoryEventSchema,
+  metaExtrasSchema,
+  statusEventSchema,
+  type AskStep,
+  type ConversationMessage,
+  type MemoryEvent,
+} from "./contract";
 import type { SseMessage } from "./sse";
 
 /**
  * The Ask answer as the page builds it from the SSE events of `POST /knowledge/ask`
  * (docs/06 §5.1, docs/09 Knowledge), in this order: `meta`, `delta`*, `error`?, `final`,
- * `token`*, `citation`*, `done`. Unknown event types and fields are ignored, so the API may add
- * them without breaking this page. Nothing here is rendered as HTML: answer text is shown as
+ * `token`*, `citation`*, `done`, then `followups`? and `memory`*. `status` events (the step the
+ * server is on: understanding, searching documents, reading records, writing) may come at any
+ * time before `final`. Unknown event types and fields are ignored, so the API may add them
+ * without breaking this page. Nothing here is rendered as HTML: answer text is shown as
  * text, and the only links are the ones this module builds from validated `sos://` sources
  * (never from the model's prose).
  *
@@ -38,6 +49,14 @@ export interface AskCitation {
   source: string;
   title: string;
   snippet: string;
+  /** From a stored conversation: the caller can no longer open this source. */
+  withheld?: boolean;
+}
+
+/** One step the server reported (`status` events), in order; a repeated step updates its count. */
+export interface AskStepRecord {
+  step: AskStep;
+  count: number | null;
 }
 
 /** `kb.errors.*` message keys the API sends in the `error` event (docs/09 Knowledge error codes). */
@@ -73,6 +92,20 @@ export interface AskState {
   latencyMs: number | null;
   /** The failed request (ApiError, AuthRedirectError, TypeError...) when phase is "failed". */
   error: unknown;
+  /** `meta.conversation_id`: the conversation this answer belongs to (new or existing). */
+  conversationId: string | null;
+  /** `meta.title`: the conversation's title (set by the server for a new conversation). */
+  title: string | null;
+  /** `status` events: what the server is doing, for the live status line. */
+  steps: AskStepRecord[];
+  /** `followups` event: suggested next questions (plain text, sent as a new question). */
+  followups: string[];
+  /** `memory` events: what the server remembered or suggests remembering. */
+  memory: MemoryEvent[];
+  /** `meta`/`final` said that earlier turns were summarised for this answer (optional). */
+  summarized: boolean;
+  /** `meta.cached`: reused from an identical earlier question on the same documents. */
+  cached: boolean;
 }
 
 export const INITIAL_ASK: AskState = {
@@ -90,6 +123,13 @@ export const INITIAL_ASK: AskState = {
   errorType: null,
   latencyMs: null,
   error: undefined,
+  conversationId: null,
+  title: null,
+  steps: [],
+  followups: [],
+  memory: [],
+  summarized: false,
+  cached: false,
 };
 
 /** `kb.errors.budget` → `budget`; unknown keys read as "AI answers unavailable". */
@@ -152,6 +192,8 @@ export function applyEvent(state: AskState, message: SseMessage): AskState {
         typeof data.language === "string" && LANGUAGES.has(data.language)
           ? (data.language as AskLanguage)
           : state.language;
+      const extras = metaExtrasSchema.safeParse(data);
+      const meta = extras.success ? extras.data : {};
       // Provisional only: the API says `full` here and gives the real mode in final/done.
       return {
         ...state,
@@ -159,7 +201,40 @@ export function applyEvent(state: AskState, message: SseMessage): AskState {
         queryId,
         mode: modeOf(data.mode, state.mode),
         language,
+        conversationId: meta.conversation_id ?? state.conversationId,
+        title: meta.title ?? state.title,
+        summarized: state.summarized || meta.summarized === true,
+        cached: state.cached || meta.cached === true || typeof meta.cached_from === "string",
       };
+    }
+    case "status": {
+      const parsed = statusEventSchema.safeParse(data);
+      if (!parsed.success || state.finalized) return state;
+      const { step, count } = parsed.data;
+      const last = state.steps[state.steps.length - 1];
+      const steps =
+        last && last.step === step
+          ? [...state.steps.slice(0, -1), { step, count: count ?? last.count }]
+          : [...state.steps, { step, count: count ?? null }];
+      return { ...state, phase: "streaming", steps };
+    }
+    case "followups": {
+      const parsed = followupsEventSchema.safeParse(data);
+      if (!parsed.success) return state;
+      const followups = parsed.data.questions
+        .map((question) => question.trim())
+        .filter((question) => question.length > 0 && question.length <= 1000)
+        .slice(0, 4);
+      return { ...state, followups };
+    }
+    case "memory": {
+      const parsed = memoryEventSchema.safeParse(data);
+      if (!parsed.success) return state;
+      const memory = [
+        ...state.memory.filter((item) => item.item_id !== parsed.data.item_id),
+        parsed.data,
+      ];
+      return { ...state, memory };
     }
     case "delta": {
       if (state.finalized || typeof data.text !== "string") return state;
@@ -176,6 +251,7 @@ export function applyEvent(state: AskState, message: SseMessage): AskState {
         replaced: data.replaced === true,
         status: statusOf(data.status, FINAL_STATUSES, state.status),
         mode: modeOf(data.mode, state.mode),
+        summarized: state.summarized || data.summarized === true,
       };
     }
     case "token": {
@@ -288,7 +364,16 @@ export type SourceRef =
   /** A student count the `count_students` tool computed: numbers only, no screen to open. */
   | { kind: "count"; id: string }
   /** A student's fee dues synced from Tally (`get_fee_dues`, M6): opens the fee dues screen. */
-  | { kind: "fee"; id: string };
+  | { kind: "fee"; id: string }
+  /** One of your own past Ask chats (`sos://conversation/{id}#q{query_id}`). */
+  | { kind: "conversation"; id: string; queryId: string | null };
+
+const CONVERSATION = new RegExp(`^sos://conversation/(${UUID})(?:#q(${UUID}))?$`);
+
+/** Element id of a message in the thread (the target of a past-chat source link). */
+export function messageAnchor(queryId: string): string {
+  return `m-${queryId}`;
+}
 
 /** Parse a `sos://` source URI; anything else (or malformed) is null and gets no link. */
 export function parseSource(source: string): SourceRef | null {
@@ -310,6 +395,8 @@ export function parseSource(source: string): SourceRef | null {
       id: other[2] as string,
     };
   }
+  const chat = CONVERSATION.exec(source);
+  if (chat) return { kind: "conversation", id: chat[1] as string, queryId: chat[2] ?? null };
   return null;
 }
 
@@ -333,6 +420,8 @@ export function sourceHref(ref: SourceRef): string | null {
       return null;
     case "fee":
       return "/fees";
+    case "conversation":
+      return `/ask/c/${ref.id}${ref.queryId ? `#${messageAnchor(ref.queryId)}` : ""}`;
   }
 }
 
@@ -343,4 +432,104 @@ export function sourceHref(ref: SourceRef): string | null {
  */
 export function quoteFromSnippet(snippet: string): string {
   return snippet.replace(/\s*…$/u, "").trim();
+}
+
+// --- stored conversations -------------------------------------------------------------------
+
+/** What only the live stream knew about an answer (kept in memory for this page view). */
+export interface AnswerExtras {
+  steps: AskStepRecord[];
+  latencyMs: number | null;
+  notice: KbMessage | null;
+  replaced: boolean;
+  memory: MemoryEvent[];
+  /** The unchecked text shown before a Stop (kept, marked "Stopped"). */
+  preview: string;
+  cached: boolean;
+}
+
+/**
+ * A stored message (GET /knowledge/conversations/{id}) as the same state the stream builds,
+ * so one component shows both. `cancelled` reads as a stopped answer.
+ */
+export function stateFromMessage(
+  message: ConversationMessage,
+  extras?: AnswerExtras | null,
+): AskState {
+  const cancelled = message.status === "cancelled";
+  return {
+    ...INITIAL_ASK,
+    phase: cancelled ? "stopped" : "done",
+    queryId: message.query_id,
+    language: message.language,
+    mode: message.mode,
+    text: message.answer ?? "",
+    finalized: message.answer !== null,
+    replaced: extras?.replaced ?? false,
+    status: message.status === "cancelled" ? null : message.status,
+    citations: message.citations.map((c) => ({
+      index: c.index,
+      source: c.source,
+      title: c.title ?? "",
+      snippet: c.snippet ?? "",
+      ...(c.withheld ? { withheld: true } : {}),
+    })),
+    notice: extras?.notice ?? null,
+    latencyMs: extras?.latencyMs ?? null,
+    steps: extras?.steps ?? [],
+    followups: message.followups,
+    memory: extras?.memory ?? [],
+    summarized: message.summarized === true,
+    preview: cancelled && message.answer === null ? (extras?.preview ?? "") : "",
+    cached: extras?.cached ?? false,
+  };
+}
+
+/** The stored status of a finished live answer. */
+function storedStatus(state: AskState): ConversationMessage["status"] {
+  if (state.phase === "stopped" || state.phase === "interrupted") return "cancelled";
+  const outcome = outcomeOf(state);
+  return outcome === "pending" ? "error" : outcome;
+}
+
+/** A finished live answer as a stored message (for the conversation cache after `done`). */
+export function messageFromState(
+  state: AskState,
+  question: string,
+  createdAt: string,
+): ConversationMessage | null {
+  if (!state.queryId) return null;
+  return {
+    query_id: state.queryId,
+    question,
+    answer: state.finalized || state.text ? state.text : null,
+    status: storedStatus(state),
+    mode: state.mode ?? "full",
+    language: state.language,
+    citations: state.citations.map((c) => ({
+      index: c.index,
+      source: c.source,
+      title: c.title || null,
+      snippet: c.snippet || null,
+      ...(c.withheld ? { withheld: true } : {}),
+    })),
+    feedback: null,
+    followups: state.followups,
+    created_at: createdAt,
+    superseded: false,
+    ...(state.summarized ? { summarized: true } : {}),
+  };
+}
+
+/** The extras of a finished live answer, to keep beside its stored message. */
+export function extrasOf(state: AskState): AnswerExtras {
+  return {
+    steps: state.steps,
+    latencyMs: state.latencyMs,
+    notice: state.notice,
+    replaced: state.replaced,
+    memory: state.memory,
+    preview: state.finalized ? "" : state.preview,
+    cached: state.cached,
+  };
 }

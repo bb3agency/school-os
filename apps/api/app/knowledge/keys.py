@@ -23,13 +23,15 @@ import it), so rotation batches cover the query log and old key versions can be 
 from __future__ import annotations
 
 import unicodedata
-from typing import TYPE_CHECKING, Final
+import uuid
+from typing import TYPE_CHECKING, Any, Final
 
-from sqlalchemy import select, update
+from sqlalchemy import ColumnElement, Integer, func, or_, select, update
 
+from app.core.crypto import ciphertext_key_version
 from app.core.logging import get_logger
 from app.knowledge import repository as repo
-from app.knowledge.models import Query
+from app.knowledge.models import Conversation, Query, UserMemory
 from app.students import crypto
 
 if TYPE_CHECKING:
@@ -40,6 +42,10 @@ log = get_logger(__name__)
 TABLE: Final = "kb.queries"
 QUESTION_COLUMN: Final = "question_ciphertext"
 ANSWER_COLUMN: Final = "answer_ciphertext"
+CITATIONS_COLUMN: Final = "citations_ciphertext"
+FOLLOWUPS_COLUMN: Final = "followups_ciphertext"
+CONVERSATIONS_TABLE: Final = "kb.conversations"
+MEMORIES_TABLE: Final = "kb.user_memories"
 QUESTION_PURPOSE: Final = "kb_question"
 DEFAULT_BATCH: Final = 200
 
@@ -70,7 +76,13 @@ def reencrypt_queries(
     while max_rows is None or done < max_rows:
         limit = batch_size if max_rows is None else min(batch_size, max_rows - done)
         rows = session.execute(
-            select(Query.id, Query.question_ciphertext, Query.answer_ciphertext)
+            select(
+                Query.id,
+                Query.question_ciphertext,
+                Query.answer_ciphertext,
+                Query.citations_ciphertext,
+                Query.followups_ciphertext,
+            )
             .where(Query.key_version != active)
             .order_by(Query.id)
             .limit(limit)
@@ -78,7 +90,7 @@ def reencrypt_queries(
         ).all()
         if not rows:
             break
-        for row_id, question_blob, answer_blob in rows:
+        for row_id, question_blob, answer_blob, citations_blob, followups_blob in rows:
             question = crypto.decrypt_value(
                 session,
                 bytes(question_blob),
@@ -113,6 +125,13 @@ def reencrypt_queries(
                     row_id=row_id,
                     keyring=keyring,
                 )
+            extra = {
+                column: _again(session, blob, TABLE, column, row_id, keyring)
+                for column, blob in (
+                    (CITATIONS_COLUMN, citations_blob),
+                    (FOLLOWUPS_COLUMN, followups_blob),
+                )
+            }
             digest, _ = crypto.blind_index(
                 session,
                 question_key(question),
@@ -128,6 +147,7 @@ def reencrypt_queries(
                     answer_ciphertext=new_answer,
                     question_hmac=digest,
                     key_version=version,
+                    **extra,
                 )
             )
         done += len(rows)
@@ -141,7 +161,14 @@ def reencrypt_queries(
     return done
 
 
-__all__ = ["DEFAULT_BATCH", "QUESTION_PURPOSE", "question_key", "reencrypt_queries"]
+__all__ = [
+    "DEFAULT_BATCH",
+    "QUESTION_PURPOSE",
+    "question_key",
+    "reencrypt_conversations_batch",
+    "reencrypt_memories_batch",
+    "reencrypt_queries",
+]
 
 
 def reencrypt_queries_batch(
@@ -153,3 +180,89 @@ def reencrypt_queries_batch(
     """
     del target_version  # the keyring's active version is the rotation target
     return reencrypt_queries(session, batch_size=limit, keyring=keyring, max_rows=limit)
+
+
+def _again(  # noqa: PLR0917 - one cell: table, column and row name its associated data
+    session: Session,
+    blob: bytes | None,
+    table: str,
+    column: str,
+    row_id: uuid.UUID,
+    keyring: crypto.TenantKeyring | None,
+) -> bytes | None:
+    """``blob`` under the active version (same associated data); None stays None."""
+    if blob is None:
+        return None
+    plain = crypto.decrypt_value(
+        session, bytes(blob), table=table, column=column, row_id=row_id, keyring=keyring
+    )
+    value, _ = crypto.encrypt_value(
+        session, plain, table=table, column=column, row_id=row_id, keyring=keyring
+    )
+    return value
+
+
+def _header_version(column: Any) -> ColumnElement[int]:
+    # Header: version(1) | key_version(2, big-endian) | ... (app.core.crypto).
+    return func.get_byte(column, 1, type_=Integer) * 256 + func.get_byte(column, 2, type_=Integer)
+
+
+def _stale(column: Any, version: int) -> ColumnElement[bool]:
+    stale: ColumnElement[bool] = column.is_not(None) & (_header_version(column) != version)
+    return stale
+
+
+def reencrypt_conversations_batch(
+    session: Session, keyring: crypto.TenantKeyring, target_version: int, limit: int
+) -> int:
+    """DEK-rotation re-encryptor for ``kb.conversations`` (title and rolling summary): rows
+    whose ciphertext header names another version, at most ``limit`` (SEC-012, ADR-0034)."""
+    del target_version
+    active = keyring.active_version(session)
+    rows = session.execute(
+        select(Conversation.id, Conversation.title_ciphertext, Conversation.summary_ciphertext)
+        .where(
+            or_(
+                _stale(Conversation.title_ciphertext, active),
+                _stale(Conversation.summary_ciphertext, active),
+            )
+        )
+        .order_by(Conversation.id)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    ).all()
+    for row_id, title, summary in rows:
+        values: dict[str, object] = {"key_version": active}
+        for column, blob in (("title_ciphertext", title), ("summary_ciphertext", summary)):
+            if blob is not None and ciphertext_key_version(bytes(blob)) != active:
+                values[column] = _again(session, blob, CONVERSATIONS_TABLE, column, row_id, keyring)
+        # Re-encryption is not activity: updated_at and the ETag version stay as they are.
+        session.execute(update(Conversation).where(Conversation.id == row_id).values(**values))
+    return len(rows)
+
+
+def reencrypt_memories_batch(
+    session: Session, keyring: crypto.TenantKeyring, target_version: int, limit: int
+) -> int:
+    """DEK-rotation re-encryptor for ``kb.user_memories`` (SEC-012, ADR-0034)."""
+    del target_version
+    active = keyring.active_version(session)
+    rows = session.execute(
+        select(UserMemory.id, UserMemory.text_ciphertext)
+        .where(_stale(UserMemory.text_ciphertext, active))
+        .order_by(UserMemory.id)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    ).all()
+    for row_id, blob in rows:
+        session.execute(
+            update(UserMemory)
+            .where(UserMemory.id == row_id)
+            .values(
+                text_ciphertext=_again(
+                    session, blob, MEMORIES_TABLE, "text_ciphertext", row_id, keyring
+                ),
+                key_version=active,
+            )
+        )
+    return len(rows)

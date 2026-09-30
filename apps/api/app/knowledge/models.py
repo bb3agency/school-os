@@ -198,6 +198,72 @@ class Query(Base):
     feedback_reason: Mapped[str | None] = mapped_column(Text)
     feedback_at: Mapped[dt.datetime | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    # 0038_ask_conversations (ADR-0034): conversation, supersession, encrypted answer details.
+    conversation_id: Mapped[uuid.UUID | None]
+    superseded_by: Mapped[uuid.UUID | None]
+    revises: Mapped[uuid.UUID | None]
+    revision: Mapped[str | None] = mapped_column(Text)
+    citations_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    followups_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    access_fingerprint: Mapped[bytes | None] = mapped_column(LargeBinary)
+    cached_from: Mapped[uuid.UUID | None]
+    cache_invalidated_at: Mapped[dt.datetime | None]
+    summarized: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+
+
+class Conversation(Base):
+    """One user's Ask conversation (0038; docs/05 §6.4). Title and summary are ciphertext."""
+
+    __tablename__ = "conversations"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    user_id: Mapped[uuid.UUID]
+    title_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    key_version: Mapped[int] = mapped_column(Integer)
+    pinned: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    summary_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    summary_oldest_at: Mapped[dt.datetime | None]
+    summary_through: Mapped[dt.datetime | None]
+    summary_sources: Mapped[list[Any]] = mapped_column(JSONB, server_default=text("'[]'"))
+    deleted_at: Mapped[dt.datetime | None]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class UserMemory(Base):
+    """One memory item of one user in one school (0038; ADR-0034). Text is ciphertext."""
+
+    __tablename__ = "user_memories"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    user_id: Mapped[uuid.UUID]
+    text_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    key_version: Mapped[int] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text)
+    conversation_id: Mapped[uuid.UUID | None]
+    query_id: Mapped[uuid.UUID | None]
+    expires_at: Mapped[dt.datetime | None]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class UserMemorySettings(Base):
+    """A user's memory switch in one school (no row = on; ADR-0034)."""
+
+    __tablename__ = "user_memory_settings"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
 
 
 class VerifiedAnswer(Base):

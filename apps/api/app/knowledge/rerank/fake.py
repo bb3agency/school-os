@@ -13,7 +13,7 @@ semantic) vectors and RRF only sees ranks. Score of a passage for a question:
   weight of the two (phrases).
 
 No meaning, no translation, no learned weights: offline numbers with it measure the pipeline
-(what is sent, fallback, ordering, leakage), not a real reranker's quality (docs/06 §13.5).
+(what is sent, fallback, ordering, leakage), not a real reranker's quality (docs/06 §13.6).
 """
 
 from __future__ import annotations

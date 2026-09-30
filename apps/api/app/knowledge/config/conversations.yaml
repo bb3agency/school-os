@@ -1,0 +1,84 @@
+# Ask conversations, memory and the answer cache (docs/06 §5 and "Cost and performance design";
+# ADR-0034; FR-KB-008, FR-KB-009, FR-KB-012). CLAUDE.md invariant 13: prompt ids/versions, limits,
+# thresholds and fixed reply texts live here; the models and output caps of the roles (followups,
+# summary, memory_screen, query_rewrite) in models.yaml; the prompt texts the wire format renders
+# (history, summary and memory headers) in models.yaml `conversation`. A change needs `make eval`.
+version: 1
+
+# Conversation titles (encrypted with the school's key: a title can hold a name).
+titles:
+  derived_max_chars: 60      # a new conversation: its first question cut at a word boundary
+  max_chars: 120             # a title the user sets (PATCH)
+
+# Regenerate and edit-and-resend (POST /knowledge/ask regenerate_of / edit_of): only one of the
+# caller's own last N messages of the conversation (older ones answer 409 message_not_revisable).
+revisions:
+  max_revisable_messages: 10
+
+# Standalone rewrite of a follow-up before retrieval (role query_rewrite). Only for questions with
+# earlier turns or a summary; the original question is what is shown, stored and audited.
+query_rewrite:
+  enabled: true
+  prompt: {id: query_rewrite, version: 1}
+  max_chars: 300             # a longer rewrite is not used (the original question is searched)
+
+# Rolling summary of older turns (role summary), made by the worker job
+# knowledge.summarise_conversation after an answer (never on the path of a question).
+summary:
+  prompt: {id: conversation_summary, version: 1}
+  max_chars: 1200            # stored summary (encrypted); a longer one is cut at a word boundary
+  max_input_chars: 12000     # previous summary + new turns sent to the model
+
+# Follow-up suggestions after an answered question (role followups; one call also suggests at most
+# one memory item). Not made in search-only mode, for "not found", or when the budget is used up.
+followups:
+  prompt: {id: followups, version: 1}
+  max_questions: 3
+  max_chars: 120             # a longer suggestion is dropped
+  max_answer_chars: 2000     # of the checked answer sent with the recent questions
+
+# Per-user memory (ADR-0034): the user's own preferences and work context, never data about others.
+memory:
+  screen_prompt: {id: memory_screen, version: 1}
+  max_items: 30              # active + pending per user and school
+  max_chars: 200
+  pending_ttl_hours: 24      # a suggestion not confirmed within this time is deleted
+  # A question starting with one of these (case-insensitive) is a "remember that ..." instruction:
+  # saved at once after the screen, answered without the model.
+  remember_prefixes:
+    - "remember that"
+    - "please remember that"
+    - "please remember"
+    - "remember:"
+    - "remember,"
+    - "గుర్తుంచుకో:"
+    - "గుర్తుంచుకోండి:"
+    - "gurthunchuko"
+  replies:
+    saved:
+      en: "Saved to your memory:"
+      te: "మీ జ్ఞాపకంలో దాచాను:"
+    refused:
+      en: >-
+        I can't save that. Memory keeps only your own preferences and work context, never details
+        about students, parents or other staff.
+      te: >-
+        దీన్ని దాచలేను. జ్ఞాపకంలో మీ సొంత ఇష్టాలు, పని వివరాలు మాత్రమే ఉంటాయి; విద్యార్థులు,
+        తల్లిదండ్రులు లేదా ఇతర సిబ్బంది వివరాలు ఉండవు.
+    unavailable:
+      en: "I can't check that note right now, so it was not saved. Try again later."
+      te: "ఈ గమనికను ఇప్పుడు పరిశీలించలేను, కాబట్టి దాచలేదు. తర్వాత మళ్లీ ప్రయత్నించండి."
+    memory_off:
+      en: "Memory is off, so nothing was saved. You can turn it on in Ask settings."
+      te: "జ్ఞాపకం ఆఫ్‌లో ఉంది, కాబట్టి ఏదీ దాచలేదు. Ask సెట్టింగ్స్‌లో ఆన్ చేయవచ్చు."
+    full:
+      en: "Your memory is full. Delete an item in Ask settings first."
+      te: "మీ జ్ఞాపకం నిండిపోయింది. ముందుగా Ask సెట్టింగ్స్‌లో ఒక అంశాన్ని తొలగించండి."
+
+# Exact repeats, documents only (product owner 2026-09-30): same school, same normalised question
+# (question_hmac), same access fingerprint, a standalone question (no conversation context, no
+# memory in use), an earlier answer that used documents only and was answered, every source it
+# was given still the current version and visible to the caller. regenerate_of never uses it.
+answer_cache:
+  enabled: true
+  ttl_hours: 24

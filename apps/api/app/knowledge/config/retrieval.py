@@ -97,7 +97,7 @@ class Toggle(ConfigModel):
 class VoyageRerank(ConfigModel):
     endpoint: str = Field(pattern=r"^https://[a-z0-9.\-]+(:[0-9]{1,5})?(/[A-Za-z0-9._\-]+)*$")
     model: str | None = Field(default=None, pattern=MODEL_ID_PATTERN)
-    """Chosen by evaluation (docs/06 §13.5); live mode refuses to start while it is null."""
+    """Chosen by evaluation (docs/06 §13.6); live mode refuses to start while it is null."""
     connect_timeout_s: float = Field(gt=0, le=30)
 
 

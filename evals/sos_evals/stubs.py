@@ -4,11 +4,11 @@
   may see, cites exact sentences, refuses when it should and ignores embedded instructions. It
   must pass every gate; if it does not, the harness is wrong.
 - `stub-leaky`: behaves like a retriever without the permission filter (the bug FR-KB-002
-  forbids). It must trip the leakage hard gate.
+  forbids) and a chat history shared by everyone. It must trip the leakage hard gates.
 - `stub-injectable`: behaves like a model that obeys instructions inside documents. It must
   trip the injection hard gate.
 
-Contextual retrieval set (docs/06 §13.5): `stub-perfect` is perfect *within each variant's
+Contextual retrieval set (docs/06 §13.6): `stub-perfect` is perfect *within each variant's
 information*: with contexts (``contextual``, ``contextual_rerank``) it ranks the expected page
 first; without them (``plain``, ``rerank``) a question about a page whose own text never names
 its subject is missed (nothing on the page can match it), any other is ranked first. So its
@@ -35,6 +35,7 @@ from sos_evals.contextual import (
     Variant,
     needs_context,
 )
+from sos_evals.conversations import ConversationCase, ConversationRun, TurnResult, script_of
 from sos_evals.fees import FeeCase, FeeCitation, FeeResult, inr
 from sos_evals.schema import Asker, CorpusItem, EvalItem, Locale
 
@@ -50,7 +51,65 @@ def _hash_ms(text: str, base: int, spread: int) -> float:
     return float(base + int(hashlib.sha256(text.encode()).hexdigest()[:8], 16) % spread)
 
 
-class PerfectStub:
+class _ConversationOracle:
+    """The answer key for scripted conversations: cites what each step expects, writes in the
+    expected script, suggests follow-ups in the question's script, saves only what may be saved,
+    reuses only an allowed exact repeat, and sends the model nothing but the step's own question
+    and the asker's saved memory while it is on."""
+
+    def run_conversation(self, case: ConversationCase) -> ConversationRun:
+        docs = {d.key: d for d in case.docs}
+        memory_on = {p.key: True for p in case.people}
+        saved: dict[str, list[str]] = {p.key: [] for p in case.people}
+        first_asked: dict[str, int] = {}
+        turns: list[TurnResult] = []
+        for index, step in enumerate(case.steps):
+            if step.action == "memory_off":
+                memory_on[step.who] = False
+                continue
+            if step.action in ("revoke", "revise", "delete_conversation"):
+                continue
+            if step.action == "remember":
+                note = (step.question or "").split(" that ", 1)[-1]
+                memory: tuple[tuple[str, str], ...] = ()
+                if step.expect_memory == "saved" and memory_on[step.who]:
+                    saved[step.who].append(note)
+                    memory = (("saved", note),)
+                turns.append(
+                    TurnResult(
+                        step=index,
+                        text="Saved to your memory." if memory else REFUSALS["en"],
+                        model_input=note,
+                        memory=memory,
+                        memories_after=tuple(saved[step.who]),
+                    )
+                )
+                continue
+            target = case.steps[step.target] if step.target is not None else None
+            question = step.question or (target.question if target else "") or ""
+            script = step.expect_script or script_of(question)
+            lines = [docs[key].content.split(". ")[0] for key in step.expect_sources]
+            text = " ".join(f"{_TE_PREFIX}{line}" if script == "te" else line for line in lines)
+            follow = "దీని గురించి మరిన్ని వివరాలు?" if script_of(question) == "te" else "Anything else?"
+            used = saved[step.who] if memory_on[step.who] else []
+            cached = first_asked.get(question) if step.expect_cached else None
+            first_asked.setdefault(question, index)
+            turns.append(
+                TurnResult(
+                    step=index,
+                    text=text or REFUSALS["en"],
+                    citations=step.expect_sources,
+                    provided=step.expect_sources,
+                    model_input="\n".join([*used, question]),
+                    followups=(follow,),
+                    cached_from=cached,
+                    memories_after=tuple(saved[step.who]),
+                )
+            )
+        return ConversationRun(turns=tuple(turns))
+
+
+class PerfectStub(_ConversationOracle):
     name = "stub-perfect"
 
     def __init__(self, corpus: Mapping[str, CorpusItem], items: Iterable[EvalItem]) -> None:
@@ -209,6 +268,18 @@ class LeakyStub(PerfectStub):
         ] or list(case.ledgers)
         lines = [f"Fee due: {inr(ledger.balance)}." for ledger in guessed]
         return self._fee_answer(case, lines)
+
+    def run_conversation(self, case: ConversationCase) -> ConversationRun:
+        """Keeps one shared history for everyone: every earlier question, whoever asked it and
+        whether it was edited away, goes to the model with every document's text."""
+        run = super().run_conversation(case)
+        everything = [d.content for d in case.docs]
+        turns: list[TurnResult] = []
+        for turn in run.turns:
+            earlier = [s.question for s in case.steps[: turn.step] if s.question]
+            leaked = "\n".join([*everything, *earlier, turn.model_input])
+            turns.append(turn.model_copy(update={"model_input": leaked}))
+        return ConversationRun(turns=tuple(turns))
 
 
 class InjectableStub(PerfectStub):

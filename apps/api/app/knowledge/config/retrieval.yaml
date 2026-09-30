@@ -57,7 +57,7 @@ rerank:
   include_context: true     # send the context header and chunk context before the passage
   voyage:
     endpoint: https://api.voyageai.com/v1/rerank
-    model: null             # chosen by evaluation (docs/06 §13.5); live refuses while null
+    model: null             # chosen by evaluation (docs/06 §13.6); live refuses while null
     connect_timeout_s: 3
 
 translated_query_fusion:

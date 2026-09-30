@@ -320,6 +320,11 @@ class TenantSettings(BaseModel):
     idle_timeout_minutes: int = Field(default=15, ge=5, le=30)
     ai_features_enabled: bool = True
     ai_monthly_budget_inr: int = Field(default=5000, ge=0, le=10_000_000)
+    ai_memory_enabled: bool = Field(
+        default=True,
+        description="Ask may remember each person's own preferences and work context "
+        "(ADR-0034). Off: nothing is saved, suggested or used for anyone in the school.",
+    )
     certificate_letterhead: CertificateLetterhead = Field(default_factory=CertificateLetterhead)
 
     @field_validator("languages")
@@ -337,6 +342,7 @@ class TenantSettingsPatch(_In):
     idle_timeout_minutes: int | None = Field(default=None, ge=5, le=30)
     ai_features_enabled: bool | None = None
     ai_monthly_budget_inr: int | None = Field(default=None, ge=0, le=10_000_000)
+    ai_memory_enabled: bool | None = None
     certificate_letterhead: CertificateLetterhead | None = None
 
     @field_validator("languages")

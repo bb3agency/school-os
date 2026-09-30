@@ -32,7 +32,7 @@ and live-mode misconfiguration fails on first use, loudly (``EmbeddingsNotConfig
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Final
 
@@ -42,6 +42,7 @@ from app.authz.kv import KVStore, kv_store
 from app.core.config import Settings, get_settings
 from app.knowledge.answer import AnswerEngine
 from app.knowledge.config.contextual import load_contextual_config
+from app.knowledge.config.conversations import ConversationsConfig, load_conversations_config
 from app.knowledge.config.embeddings import EmbeddingsConfig, load_embeddings_config
 from app.knowledge.config.llm import LlmConfig, load_llm_config
 from app.knowledge.config.retrieval import RetrievalConfig, load_retrieval_config
@@ -66,7 +67,7 @@ from app.knowledge.tools.documents import NAME as SEARCH_TOOL
 from app.knowledge.tools.documents import DocumentSearch
 from app.knowledge.tools.registry import OfferedTool, build_tools
 
-ANSWER_PROMPT: Final = ("answer_system", 1)
+ANSWER_PROMPT: Final = ("answer_system", 2)
 
 
 class _ProcessKV:
@@ -98,6 +99,8 @@ class Runtime:
     policy: SchoolAiPolicy | None = None
     contextualizer: ChunkContextualizer | None = None
     """Contextual chunk headers at ingestion (docs/06 §4.11); None while they are off."""
+    conversations: ConversationsConfig = field(default_factory=load_conversations_config)
+    """Ask conversations, memory and the answer cache (``conversations.yaml``; ADR-0034)."""
 
 
 def build_runtime(
@@ -112,6 +115,7 @@ def build_runtime(
     llm_config: LlmConfig | None = None,
     tools_config: ToolsConfig | None = None,
     retrieval: RetrievalConfig | None = None,
+    conversations_config: ConversationsConfig | None = None,
 ) -> Runtime:
     settings = settings or get_settings()
     emb = embeddings_config or load_embeddings_config()
@@ -175,6 +179,7 @@ def build_runtime(
         engine=engine,
         policy=policy,
         contextualizer=contextualizer,
+        conversations=conversations_config or load_conversations_config(),
     )
 
 

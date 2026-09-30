@@ -1,4 +1,4 @@
-"""Reranker providers and selection (docs/06 §6, §13.5; FR-KB-001; invariants 4, 8, 10, 13).
+"""Reranker providers and selection (docs/06 §6, §13.6; FR-KB-001; invariants 4, 8, 10, 13).
 
 Offline: the deterministic fake, selection by ``retrieval.yaml`` + ``SOS_KB_PROVIDER_MODE``, and
 the Voyage adapter over ``httpx.MockTransport`` only (no network, a synthetic key). Checks the

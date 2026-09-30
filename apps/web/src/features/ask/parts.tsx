@@ -80,8 +80,14 @@ export function AnswerText({
 
 type LinkedRef = Exclude<SourceRef, { kind: "count" | "fee" }>;
 
-function openLabel(ref: LinkedRef, t: ReturnType<typeof useTranslations<"ask.answer">>): string {
+/** What following a source's link opens ("open the document", "open the chat", …). */
+export function openLabel(
+  ref: LinkedRef,
+  t: ReturnType<typeof useTranslations<"ask.answer">>,
+): string {
   switch (ref.kind) {
+    case "conversation":
+      return t("openChat");
     case "doc":
       return t("openDocument");
     case "student":

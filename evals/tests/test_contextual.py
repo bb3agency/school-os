@@ -1,4 +1,4 @@
-"""Contextual retrieval and reranking eval set (docs/06 §13.5; FR-KB-001, FR-KB-002, SEC-018).
+"""Contextual retrieval and reranking eval set (docs/06 §13.6; FR-KB-001, FR-KB-002, SEC-018).
 
 The committed set matches its generator and is consistent (titles never name the subject, most
 questions are about a page that never names it, restricted memos are never expected); scoring

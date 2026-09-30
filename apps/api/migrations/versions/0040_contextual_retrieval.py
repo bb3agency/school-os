@@ -31,7 +31,7 @@ and the per-document attribution; the previous code reads neither) and restores 
 checks as ``NOT VALID`` (rows metered for ``contextualize`` stay; new ones are refused).
 
 Revision ID: 0040_contextual_retrieval
-Revises: 0037_notice_drafting
+Revises: 0038_ask_conversations
 Create Date: 2026-09-30
 """
 
@@ -40,7 +40,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "0040_contextual_retrieval"
-down_revision = "0037_notice_drafting"
+down_revision = "0038_ask_conversations"
 branch_labels = None
 depends_on = None
 
@@ -50,7 +50,8 @@ OLD_FEATURES = (
     "'ask','metadata','translation','extraction','embeddings','eval','circulars','notices'"
 )
 OLD_ROLES = (
-    "'answer','router','metadata','translation','extraction','eval_judge','circular','notice'"
+    "'answer','router','metadata','translation','extraction','eval_judge','circular','notice',"
+    "'followups','summary','memory_screen','query_rewrite'"
 )
 NEW_FEATURES = OLD_FEATURES + ",'contextualize'"
 NEW_ROLES = OLD_ROLES + ",'contextualize'"

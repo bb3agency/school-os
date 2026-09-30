@@ -26,6 +26,7 @@ import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Tabs } from "@/components/ui/Tabs";
 import { Timeline } from "@/components/ui/Timeline";
 import { Toggle } from "@/components/ui/Toggle";
+import { ChatPreview } from "@/features/ask/ChatPreview";
 
 /*
  * Synthetic fixture content for the component gallery (invariant 11: no real data).
@@ -565,6 +566,13 @@ export function UiReference() {
               <Pill variant="command">/summarise</Pill>
               <Pill variant="command">/sources</Pill>
             </div>
+          </div>
+        </Section>
+
+        <Section id="chat" title={t("sections.chat")}>
+          <p className="text-sm text-ink-muted">{t("chatNote")}</p>
+          <div className="rounded-xl border border-border p-4">
+            <ChatPreview />
           </div>
         </Section>
 

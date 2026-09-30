@@ -12,8 +12,9 @@ breaker run exactly as in live mode, and the same inputs always give the same ou
   question's script (Telugu or English).
 - Structured output (``output_config.format``): circular readings and parent notices from the
   deterministic rules of :mod:`.fake_circulars`, chunk contexts from :mod:`.fake_contextual`
-  (title, subject line and nearest heading of the document in the system prompt); any other
-  schema gets a minimal instance.
+  (title, subject line and nearest heading of the document in the system prompt), the Ask
+  conversation roles (rewrite, summary, follow-ups, memory screen) from
+  :mod:`.fake_conversations`; any other schema gets a minimal instance.
 
 Token counts are estimates (4 characters per token) so metering and budgets can be exercised.
 """
@@ -29,6 +30,7 @@ from typing import Any
 from app.knowledge.contextual.rules import SCHEMA_TAG as CONTEXT_SCHEMA_TAG
 from app.knowledge.gateway.fake_circulars import structured_reply
 from app.knowledge.gateway.fake_contextual import contextual_reply
+from app.knowledge.gateway.fake_conversations import conversation_reply
 from app.knowledge.gateway.schema_check import example
 from app.knowledge.gateway.transport import MessagesRequest
 
@@ -104,10 +106,14 @@ class FakeTransport:
         output_format = (body.get("output_config") or {}).get("format")
         if isinstance(output_format, Mapping):
             schema = output_format["schema"]
+            request_text = _question(messages)
+            reply: dict[str, Any] | None
             if schema.get("description") == CONTEXT_SCHEMA_TAG:
-                reply: dict[str, Any] | None = contextual_reply(_system(body), _question(messages))
+                reply = contextual_reply(_system(body), request_text)
             else:
-                reply = structured_reply(schema, _question(messages))
+                reply = structured_reply(schema, request_text)
+            if reply is None:
+                reply = conversation_reply(schema, request_text)
             value = reply if reply is not None else example(schema)
             text = json.dumps(value, ensure_ascii=False)
             content: list[dict[str, Any]] = [{"type": "text", "text": text}]

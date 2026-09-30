@@ -137,6 +137,9 @@ def create_celery() -> Celery:
             "knowledge.purge_queries": {"queue": "maintenance"},
             # docs/06 §4.11: re-indexing for contextual chunk headers, next to ingestion.
             "knowledge.contextualize_backfill": {"queue": "ingest"},
+            # ADR-0034: the rolling summary of an Ask conversation, after the answer.
+            "knowledge.summarise_conversation": {"queue": "ingest"},
+            "knowledge.tidy_conversations": {"queue": "maintenance"},
             "knowledge.*": {"queue": "ingest"},
             # M4 (FR-CIR-002): circular reading through the knowledge gateway, next to the
             # ingestion that triggers it; notice PDFs/PNGs on the Chromium workers

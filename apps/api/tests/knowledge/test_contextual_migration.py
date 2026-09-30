@@ -26,7 +26,7 @@ from app.knowledge.models import vector_literal
 
 pytestmark = pytest.mark.db
 REVISION = "0040_contextual_retrieval"
-PREVIOUS = "0037_notice_drafting"
+PREVIOUS = "0038_ask_conversations"
 DB = "schoolos_kb_contextual_migration"
 
 

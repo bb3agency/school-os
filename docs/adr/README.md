@@ -83,7 +83,7 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0005](ADR-0005-llm-gateway-and-provider.md) | LLM gateway and provider (Anthropic Claude) | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0006](ADR-0006-embeddings-by-evaluation.md) | Embeddings provider chosen by evaluation | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0007](ADR-0007-no-aadhaar-storage.md) | Never store Aadhaar numbers | Accepted (recorded retroactively 2026-09-26) |
-| [ADR-0008](ADR-0008-tools-not-text-to-sql.md) | Read-only typed tools instead of text-to-SQL | Accepted (recorded retroactively 2026-09-26) |
+| [ADR-0008](ADR-0008-tools-not-text-to-sql.md) | Read-only typed tools instead of text-to-SQL | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0034 |
 | [ADR-0009](ADR-0009-aws-india-hosting.md) | Host on AWS in India | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0015 |
 | [ADR-0010](ADR-0010-maker-checker.md) | Maker-checker for identity changes | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0011](ADR-0011-hash-chained-audit.md) | Hash-chained, append-only audit log | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013 |
@@ -107,4 +107,5 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0029](ADR-0029-tenant-data-deletion-at-offboarding.md) | Deleting a school's data at offboarding (purge role, crypto-shredding, certificate) | Accepted |
 | [ADR-0030](ADR-0030-in-house-identity-and-sessions.md) | In-house sign-in, MFA and sessions (replacing the managed OIDC provider) | Proposed |
 | [ADR-0032](ADR-0032-tally-edge-agent.md) | Tally edge agent, device credentials and the `get_fee_dues` tool (M6) | Proposed |
+| [ADR-0034](ADR-0034-ask-conversations-and-memory.md) | Ask conversations, context and per-user memory (amends FR-KB-012 and ADR-0008) | Accepted |
 | [ADR-0035](ADR-0035-contextual-retrieval-and-reranking.md) | Contextual chunk headers and a reranker for "Ask the school" (behind switches, off) | Proposed |

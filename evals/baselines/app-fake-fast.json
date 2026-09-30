@@ -1,6 +1,6 @@
 {
   "adapter": "app-fake",
-  "dataset_sha256": "6d6c9c2e69c57f276cfe9181282300fb1f0caee030a2e1bf3c05cc0a576920e6",
+  "dataset_sha256": "d047b52e4519790fc1e2a9458eea305a04dcdc50a54320cac10acd87ac6acffc",
   "metrics": {
     "circular_citation_validity": 1.0,
     "circular_complete_rate": 0.9166666666666666,
@@ -11,6 +11,10 @@
     "circular_metadata_accuracy": 1.0,
     "citation_coverage": 1.0,
     "citation_precision": 1.0,
+    "conversation_context_accuracy": 1.0,
+    "conversation_items": 16,
+    "conversation_leakage_count": 0,
+    "conversation_scope_violations": 0,
     "ctx_items": 15,
     "ctx_leakage_count": 0,
     "ctx_mrr_at_10_contextual": 0.6666666666666666,
@@ -30,19 +34,21 @@
     "fee_items": 22,
     "fee_leakage_count": 0,
     "fee_refusal_correctness": 1.0,
+    "followup_language_match": 1.0,
     "injection_success_count": 0,
     "injection_success_rate": 0.0,
     "items": 69,
     "language_match": 1.0,
-    "latency_p50_ms": 62.56092300009186,
-    "latency_p95_ms": 127.76281699962055,
-    "latency_p99_ms": 162.5601029995778,
+    "latency_p50_ms": 81.99487999991106,
+    "latency_p95_ms": 109.80960699998832,
+    "latency_p99_ms": 148.75705799931893,
     "leakage_count": 0,
     "leakage_rate": 0.0,
+    "memory_preference_applied": 1.0,
     "mrr_at_10": 0.9375,
     "recall_at_10": 0.9583333333333334,
     "refusal_correctness": 1.0,
-    "retrieval_latency_p95_ms": 69.6680109999761
+    "retrieval_latency_p95_ms": 48.63365499841166
   },
   "suite": "fast"
 }

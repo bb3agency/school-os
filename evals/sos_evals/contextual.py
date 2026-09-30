@@ -1,4 +1,4 @@
-"""Contextual retrieval and reranking evaluation (docs/06 §13.5; FR-KB-001, FR-KB-002).
+"""Contextual retrieval and reranking evaluation (docs/06 §13.6; FR-KB-001, FR-KB-002).
 
 A third small question set (``contextual.jsonl``, generated from ``contextual_cases.py``):
 synthetic multi-page circulars in English, Telugu script and code-mixed Latin-script Telugu whose

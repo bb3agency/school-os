@@ -1,4 +1,4 @@
-"""Voyage AI reranking over HTTPS with ``httpx`` (no SDK; docs/06 §6, §13.5; ADR-0035 Proposed).
+"""Voyage AI reranking over HTTPS with ``httpx`` (no SDK; docs/06 §6, §13.6; ADR-0035 Proposed).
 
 Disabled unless ``SOS_KB_PROVIDER_MODE=live`` AND ``retrieval.yaml`` ``rerank.provider`` (or
 ``SOS_KB_RERANK``) is ``voyage`` AND ``rerank.voyage.model`` names the model an evaluation chose:
@@ -17,7 +17,7 @@ budget. No retries (the retriever falls back to the RRF order at once), nothing 
 errors carry status codes only: never the query, passages, body or key.
 
 API shape as documented by Voyage (``/v1/rerank``, models ``rerank-2.5`` / ``rerank-2.5-lite``);
-re-check against the provider's reference before the live evaluation (docs/06 §13.5).
+re-check against the provider's reference before the live evaluation (docs/06 §13.6).
 """
 
 from __future__ import annotations

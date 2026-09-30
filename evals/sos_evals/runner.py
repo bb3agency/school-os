@@ -9,7 +9,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import circulars, contextual, fees, metrics
+from sos_evals import circulars, contextual, conversations, fees, metrics
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
@@ -75,7 +75,7 @@ class Metrics(_Model):
     fee_guessed_link_count: int | None = None
     fee_citation_validity: float | None = None
     fee_refusal_correctness: float | None = None
-    # Contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.5). None when not
+    # Contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.6). None when not
     # measured (their gates fail).
     ctx_items: int = 0
     ctx_recall_at_5_plain: float | None = None
@@ -89,6 +89,13 @@ class Metrics(_Model):
     ctx_recall_gain_contextual: float | None = None
     ctx_mrr_gain_rerank: float | None = None
     ctx_leakage_count: int | None = None
+    # Ask conversations (sos_evals.conversations; ADR-0034, FR-KB-012). None when not measured.
+    conversation_items: int = 0
+    conversation_leakage_count: int | None = None
+    conversation_scope_violations: int | None = None
+    conversation_context_accuracy: float | None = None
+    followup_language_match: float | None = None
+    memory_preference_applied: float | None = None
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -216,6 +223,7 @@ class RunResult(_Model):
     circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
     fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
     contextual_outcomes: tuple[contextual.CtxOutcome, ...] = ()
+    conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
 
 
 def run(
@@ -231,6 +239,8 @@ def run(
     ctx: contextual.ContextualAdapter | None = None,
     ctx_set: contextual.ContextualSet | None = None,
     ctx_fast: bool = False,
+    conversation: conversations.ConversationAdapter | None = None,
+    conversation_cases: Sequence[conversations.ConversationCase] = (),
 ) -> RunResult:
     outcomes = []
     for item in items:
@@ -257,6 +267,10 @@ def run(
     if ctx is not None and ctx_set is not None:
         ctx_metrics, ctx_outcomes = contextual.run(ctx_set, ctx_set.select(ctx_fast), ctx)
         overall = overall.model_copy(update=ctx_metrics.model_dump())
+    conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
+    if conversation is not None and conversation_cases:
+        talk, conversation_outcomes = conversations.run(conversation_cases, conversation)
+        overall = overall.model_copy(update=talk.model_dump())
     return RunResult(
         metrics=overall,
         by_category=by_category,
@@ -264,4 +278,5 @@ def run(
         circular_outcomes=circular_outcomes,
         fee_outcomes=fee_outcomes,
         contextual_outcomes=ctx_outcomes,
+        conversation_outcomes=conversation_outcomes,
     )

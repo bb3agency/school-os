@@ -16,9 +16,13 @@ export function testQueryClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
 }
 
-export function renderWithIntl(ui: ReactElement, locale: Locale = "en"): RenderResult {
+export function renderWithIntl(
+  ui: ReactElement,
+  locale: Locale = "en",
+  /** A client of the test's own (e.g. one that keeps unobserved cache entries). */
+  queryClient: QueryClient = testQueryClient(),
+): RenderResult {
   intlErrors.length = 0;
-  const queryClient = testQueryClient();
   return render(
     <NextIntlClientProvider
       locale={locale}
