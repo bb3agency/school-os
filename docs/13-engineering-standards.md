@@ -75,7 +75,7 @@ schoolos/
 - ESLint + Prettier; React Server Components by default; client components only when interactive.
 - Data fetching via generated API client + TanStack Query in client components; server-side fetches through BFF helpers that attach the session's token.
 - Forms: `react-hook-form` + `zod`; server errors mapped to fields by `field` + `message_key`.
-- i18n: all strings in `messages/en.json` and `messages/te.json`; ICU message format; CI fails on missing keys; no string concatenation for sentences.
+- i18n: all strings in `messages/en.json`; `messages/te.json` stays in the repository, dormant behind `SOS_TELUGU_ENABLED` (ADR-0036): new `te` keys are optional while the switch is off and existing ones are kept; ICU message format; no string concatenation for sentences. Server code asks `app.core.languages` (`telugu_enabled()`, `enabled_languages()`, `output_language()`), never the setting; Telugu behaviour keeps its tests, run with the switch on explicitly.
 - Accessibility: semantic HTML, labels for all inputs, visible focus, keyboard paths, `prefers-reduced-motion` respected.
 - UI: build screens from `components/ui` primitives and the design tokens (docs/17-ui-design-system.md); no one-off colours, no inline styles.
 - Browser support: Baseline Widely Available; check current guidance before adopting newer web platform features.

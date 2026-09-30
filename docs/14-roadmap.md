@@ -26,6 +26,21 @@ flowchart LR
 
 Order after M2 is decided by the design partner's answer to "which task takes most of the office's time?"
 
+### English first; Telugu moved to later (ADR-0036, product owner 2026-09-30)
+
+"Forget about Telugu for now; deal with English first." Every milestone below ships in **English**. Telugu output (UI, notices, notifications, certificates and registers, AI answers, summaries) is **hidden, not deleted**, behind `SOS_TELUGU_ENABLED` (default `false`); the "EN/TE" items below are done for the code but shown in English only while the switch is off. Telugu *input* still works (Telugu questions answered in English, Telugu-script search, transliteration matching, Telugu register values). Telugu tests and eval gates keep running with the switch on (docs/12 §4.0.8, docs/06 §13.8).
+
+**Bring Telugu back (checklist):**
+
+- [ ] Product owner decision recorded in a new ADR (superseding ADR-0036 in part or whole)
+- [ ] `SOS_TELUGU_ENABLED=true` in one non-production environment first (API, worker and web read the same variable)
+- [ ] `make eval EVAL_ADAPTER=app-fake EVAL_SUITE=full` green and the live Telugu run on Vertex AI (docs/06 §13.7) with the Telugu soft gates `--fail-on-soft`: language match, follow-up language, memory preference, TE and code-mixed circulars
+- [ ] A fluent Telugu reviewer signs off answers (30 proposed), notices (10), notifications, certificates and register print views; the Telugu catalog (`messages/te.json`) completed for keys added while it was off
+- [ ] Knowledge: the switch picks `answer_system` v2, `followups` v1, `circular_reading` v1 and `parent_notice` v1 (`telugu_prompt` in the configs) and the `te` not-found and memory replies; re-check these prompts against today's English versions and write new versions if the English ones gained rules
+- [ ] Print: Noto Sans Telugu loaded again; the worker's Telugu PDF smoke test (docs/10) and "no clipped glyphs" checks on real printers
+- [ ] Docs: remove the "deferred: hidden while `SOS_TELUGU_ENABLED` is off" notes from 01, 02, 03 and the "English first" notes elsewhere
+- [ ] Staff training material and parent-facing templates in Telugu; production switched on per the new ADR
+
 ## 2. Milestones
 
 ### M0 · Foundations (the core that never changes)
@@ -176,7 +191,7 @@ Not done: embeddings model chosen by evaluation on real providers (ADR-0006), li
 1. Who owns the Google Cloud organization, the Vertex AI projects (`sos-ai-staging`, `sos-ai-prod`) and their billing account? Nothing can be evaluated live until they exist.
 2. Is the prod project eligible for the abuse-monitoring prompt-logging exception, and who files the request? Until Google confirms, the DPIA must say that Google may keep prompts for abuse detection for a limited period; AI stays off for real schools until `SOS_LLM_ZDR_CONFIRMED` is set.
 3. Region: product traffic is limited to asia-south1 / asia-south2, which currently excludes the newest and cheapest models (Gemini 3.8 Flash, 3.1 Flash-Lite were listed for the global and US/EU endpoints). Keep India-only (chosen), or accept the global endpoint for some roles after a privacy review?
-4. Who signs off Telugu and code-mixed answer quality and the Telugu parent notices on the live run (a fluent reviewer; 30 answers and 10 notices proposed)?
+4. (Deferred with Telugu, ADR-0036: only when Telugu comes back.) Who signs off Telugu and code-mixed answer quality and the Telugu parent notices on the live run (a fluent reviewer; 30 answers and 10 notices proposed)?
 5. Register extraction with a vision model would send page images to Google; Aadhaar numbers on those pages must be blacked out first, which today needs the OCR geometry the vision model would provide. Use an in-region OCR pass for redaction first, or keep extraction on the non-AI path?
 6. When may the Anthropic fallback (and its sub-processor entry) be removed: after one full term on Gemini without a switch-back (proposed)?
 **Addendum 2026-09-30: Ask conversations, context and memory (backend; ADR-0034, FR-KB-012 as amended).** Built on the worktree branch: migration `0038_ask_conversations` (`kb.conversations`, `kb.user_memories`, `kb.user_memory_settings`; answer details, revisions, cache columns and `summarized` on `kb.queries`); conversation list, detail, rename/pin (`If-Match`) and delete; regenerate and edit-and-resend; SSE `status`, `followups` and `memory` events and `meta.conversation_id`, `title`, `cached`, `cached_from`, `summarized`; bounded history with a visibility re-check of every earlier answer, an async rolling summary (worker job), query rewrite before retrieval, follow-up suggestions; per-user memory with a three-step screen, pending suggestions and per-user and school switches; the documents-only answer cache; `search_my_conversations`; four new provider-neutral gateway roles (`query_rewrite`, `summary`, `followups`, `memory_screen`); DEK rotation, census, offboarding, retention and export wiring; security suites; conversation eval set with two hard gates (06 §13.5; app-fake passes all gates). The web screens are a separate change.
@@ -212,7 +227,7 @@ Built on the worktree branch, and not yet merged. The stories (US-1101..US-1108)
 
 Release notes: run `python -m app.identity.sync_system_roles --apply` after `0033_certificates`. The system-role fingerprint changed because of the four new permissions.
 
-### M4 · Circulars → tasks and bilingual notices
+### M4 · Circulars → tasks and bilingual notices (English only while Telugu is hidden, ADR-0036)
 **Scope:** circular metadata/deadline extraction · task list with owners and due dates · reminders · parent notice generator (EN/TE text + printable/image) for posting in existing groups.
 **Exit:** ≥ 90% of circulars in a term processed with deadlines captured; staff confirm fewer missed tasks.
 
@@ -306,11 +321,11 @@ Not built: the MSI installer and code signing; signed auto-update; exposure of `
 - [ ] Incident runbook rehearsed, including the CERT-In 6-hour flow; CERT-In point of contact designated
 - [ ] DPA signed with the school; school's parent/staff notice issued; DPIA completed
 - [ ] Sub-processor list shared (Google Cloud Vertex AI in asia-south1; Anthropic only while a fallback is configured); Vertex AI Zero Data Retention set-up done (project caching disabled, no request-response logging, abuse-monitoring exception requested and answered) and confirmed with `SOS_LLM_ZDR_CONFIRMED` (ADR-0033, docs/10 §11.1)
-- [ ] Live model evaluation per role passed on Vertex AI (docs/06 §13.7), Telugu quality signed off
+- [ ] Live model evaluation per role passed on Vertex AI (docs/06 §13.7), including the English-first gates (docs/06 §13.8); Telugu quality sign-off deferred until Telugu comes back (ADR-0036)
 - [ ] Production accounts: MFA on all operator access (operator pool MFA ON); break-glass tested; at least two active platform owners (two-person rules, 16 §19 Q1)
 - [ ] Invoice number format and GST registration confirmed with a CA (16 §19 Q2–Q3)
 - [ ] Data-handling permission for imports/photos documented; synthetic data purged from prod
-- [ ] Staff training done (EN/TE); support channel and escalation path defined
+- [ ] Staff training done (English; Telugu deferred, ADR-0036); support channel and escalation path defined
 
 ## 4. First build tasks for AI-assisted development (M0)
 
