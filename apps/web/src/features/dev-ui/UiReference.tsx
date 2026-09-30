@@ -211,10 +211,7 @@ export function UiReference({ telugu = false }: { telugu?: boolean }) {
           <Row label="Status pills">
             <Pill variant="progress">In progress</Pill>
             <Pill variant="review">Review</Pill>
-            <Pill variant="done">
-              <Icon name="check" className="size-3" />
-              Done
-            </Pill>
+            <Pill variant="done">Done</Pill>
           </Row>
           <Row label="Chips">
             <DeltaPill value="+2.7%" direction="up" label="up 2.7% on last month" />

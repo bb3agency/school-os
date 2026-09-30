@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { SIGN_IN_HREF, mailtoHref } from "./links";
+import { WhatsAppLink } from "./WhatsAppLink";
 
 /**
  * Layout pieces of the public pages (docs/17 §5.6). One spacing scale: sections are
@@ -194,11 +195,13 @@ export function ArrowLink({
 }
 
 /**
- * The page's calls to action: "Talk to us" (mailto, only when an address is configured) and
- * "Sign in" for existing schools. Without an address, "Sign in" becomes the primary button.
+ * The page's calls to action: "Talk to us" (mailto, only when an address is configured),
+ * "Ask on WhatsApp" beside it (only when a number is configured) and "Sign in" for existing
+ * schools. Without an address, "Sign in" becomes the primary button.
  */
 export function CtaGroup({
   contactEmail,
+  whatsappNumber = null,
   talkLabel,
   signInLabel,
   secondary,
@@ -206,6 +209,7 @@ export function CtaGroup({
   className,
 }: {
   contactEmail: string | null;
+  whatsappNumber?: string | null;
   talkLabel: string;
   signInLabel: string;
   secondary?: { href: string; label: string };
@@ -213,6 +217,7 @@ export function CtaGroup({
   className?: string;
 }) {
   const first = inverse ? "inverse" : "primary";
+  const quiet = inverse ? "inverse" : "secondary";
   return (
     <div className={cn("flex flex-wrap gap-3", className)} data-print="hide">
       {contactEmail ? (
@@ -221,21 +226,22 @@ export function CtaGroup({
           <Icon name="arrowRight" className="mk-arrow size-4.5" />
         </a>
       ) : null}
+      {/* WhatsApp sits beside "Talk to us"; without an address, after the primary "Sign in". */}
+      {whatsappNumber && contactEmail ? (
+        <WhatsAppLink number={whatsappNumber} variant={quiet} />
+      ) : null}
       <a
         href={SIGN_IN_HREF}
-        className={cn(
-          buttonClasses(contactEmail ? (inverse ? "inverse" : "secondary") : first, "lg"),
-          "mk-press",
-        )}
+        className={cn(buttonClasses(contactEmail ? quiet : first, "lg"), "mk-press")}
       >
         {signInLabel}
       </a>
+      {whatsappNumber && !contactEmail ? (
+        <WhatsAppLink number={whatsappNumber} variant={quiet} />
+      ) : null}
       {secondary && !contactEmail ? (
         // An in-page anchor: a plain link (no locale handling needed).
-        <a
-          href={secondary.href}
-          className={cn(buttonClasses(inverse ? "inverse" : "secondary", "lg"), "mk-press")}
-        >
+        <a href={secondary.href} className={cn(buttonClasses(quiet, "lg"), "mk-press")}>
           {secondary.label}
         </a>
       ) : null}

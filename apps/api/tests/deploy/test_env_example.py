@@ -39,6 +39,7 @@ NOT_SETTINGS: dict[str, str] = {
     "SOS_PUBLIC_CONTACT_EMAIL": "web only: apps/web/src/features/marketing/settings.ts",
     "SOS_PUBLIC_COMPANY_NAME": "web only: apps/web/src/features/marketing/settings.ts",
     "SOS_PUBLIC_COMPANY_ADDRESS": "web only: apps/web/src/features/marketing/settings.ts",
+    "SOS_PUBLIC_WHATSAPP_NUMBER": "web only: apps/web/src/features/marketing/settings.ts",
 }
 
 SECRET_NAME = re.compile(r"(SECRET|PASSWORD|_KEY$|MASTER_KEY|TOKEN_KEY)")
