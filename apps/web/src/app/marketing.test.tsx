@@ -241,6 +241,73 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
     expect(within(table).getByText(m.pricing.compare.domainDedicated)).toBeInTheDocument();
   });
 
+  it("pricing explains the packaging: fee basis, what everyone gets, the one-time fee, AI, GST, next steps", () => {
+    render("pricing");
+    const region = (name: string) => screen.getByRole("region", { name });
+
+    // What the fee is based on: size, campuses, Shared vs Dedicated, AI bundle.
+    const basis = region(m.pricing.basis.title);
+    for (const factor of ["size", "campuses", "tier", "ai"] as const) {
+      expect(
+        within(basis).getByRole("heading", { level: 3, name: m.pricing.basis[factor].title }),
+      ).toBeInTheDocument();
+    }
+
+    // What every school gets.
+    const everyone = region(m.pricing.everyone.title);
+    for (const item of Object.values(m.pricing.everyone.items)) {
+      expect(within(everyone).getByText(item)).toBeInTheDocument();
+    }
+
+    // The one-time implementation and data verification fee and what it covers.
+    const implementation = region(m.pricing.implementation.title);
+    const covers = within(implementation).getByRole("list", {
+      name: m.pricing.implementation.coversLabel,
+    });
+    expect(within(covers).getAllByRole("listitem")).toHaveLength(7);
+    for (const item of Object.values(m.pricing.implementation.items)) {
+      expect(within(covers).getByText(item)).toBeInTheDocument();
+    }
+
+    // AI as monthly question bundles, in words.
+    const ai = region(m.pricing.ai.title);
+    for (const bundle of ["lite", "standard", "high", "extra"] as const) {
+      expect(
+        within(ai).getByRole("heading", { level: 3, name: m.pricing.ai[bundle].name }),
+      ).toBeInTheDocument();
+    }
+
+    // Billing cycle and GST shown separately.
+    const billing = region(m.pricing.billing.title);
+    expect(within(billing).getByText(m.pricing.billing.cycle)).toBeInTheDocument();
+    expect(within(billing).getByText(m.pricing.billing.gst)).toBeInTheDocument();
+
+    // What happens after you contact us: numbered steps in order.
+    const next = region(m.pricing.next.title);
+    const steps = within(next).getByRole("list");
+    expect(steps.tagName).toBe("OL");
+    expect(
+      within(steps)
+        .getAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent),
+    ).toEqual([
+      m.pricing.next.steps.reply.title,
+      m.pricing.next.steps.demo.title,
+      m.pricing.next.steps.quote.title,
+      m.pricing.next.steps.start.title,
+    ]);
+  });
+
+  it("pricing describes Dedicated as a managed, isolated environment, never 'your own server'", () => {
+    render("pricing");
+    const dedicated = screen.getByRole("article", { name: m.pricing.dedicated.name });
+    expect(dedicated).toHaveTextContent(
+      "A managed, isolated SchoolOS environment with your own domain, a dedicated database and a documented data export",
+    );
+    const text = JSON.stringify(m);
+    expect(text).not.toMatch(/own server|your server|source code|own the (code|software)/i);
+  });
+
   it("about: the contact block appears only with settings, and shows each set line", () => {
     render("about");
     expect(screen.queryByRole("heading", { name: m.about.contact.title })).toBeNull();
@@ -473,6 +540,8 @@ describe("honest claims (docs/01, 07, 08, 14, 16)", () => {
     expect(text).not.toMatch(/★|\brating|testimonial|trusted by|customers? (love|say)|\bloved\b/i);
     expect(text).not.toMatch(/\b\d[\d,]*\+? (schools|students|users|teachers|customers)\b/i);
     expect(text).not.toMatch(/\bISO ?27001|SOC ?2|certified|HIPAA|GDPR compliant/i);
+    // AI is sold as question bundles described in words: never "unlimited", never tokens.
+    expect(text).not.toMatch(/unlimited|\btokens?\b/i);
     expect(text).not.toMatch(/Telugu/);
   });
 });
