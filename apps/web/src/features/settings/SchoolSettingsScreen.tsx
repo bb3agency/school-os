@@ -186,6 +186,11 @@ function SettingsList({ settings }: { settings: SchoolSettings }) {
             : text.ai(settings.ai_features_enabled)}
         </Value>
       </Row>
+      <Row label={t("memoryField")}>
+        <Value>
+          {settings.ai_memory_enabled === undefined ? null : text.ai(settings.ai_memory_enabled)}
+        </Value>
+      </Row>
       <Row label={t("budgetField")}>
         <Value>
           {settings.ai_monthly_budget_inr === undefined
@@ -374,6 +379,16 @@ function SettingsForm({
               label={t("form.aiToggle")}
               description={t("form.aiHint")}
               defaultChecked={settings.ai_features_enabled ?? true}
+              labelFirst
+            />
+          </div>
+          <div className="max-w-xl rounded-lg border border-border bg-surface-muted p-4">
+            {/* Ask memory for everyone (ADR-0034); each person can also turn their own off. */}
+            <Toggle
+              name="ai_memory_enabled"
+              label={t("form.memoryToggle")}
+              description={t("form.memoryHint")}
+              defaultChecked={settings.ai_memory_enabled ?? true}
               labelFirst
             />
           </div>

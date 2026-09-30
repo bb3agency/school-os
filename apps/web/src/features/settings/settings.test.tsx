@@ -30,6 +30,7 @@ const SETTINGS = {
   date_format: "DD/MM/YYYY" as const,
   idle_timeout_minutes: 15,
   ai_features_enabled: true,
+  ai_memory_enabled: true,
   ai_monthly_budget_inr: 5000,
 };
 const TENANT = {
@@ -158,6 +159,26 @@ describe("school settings (FR-TEN-012)", () => {
     });
   });
 
+  it("the school's Ask memory switch sends ai_memory_enabled when turned off (FR-KB-012, ADR-0034)", async () => {
+    school([MANAGE]);
+    stub.routes["PATCH /bff/api/v1/tenant"] = () =>
+      Response.json({
+        ...TENANT,
+        settings: { ...SETTINGS, ai_memory_enabled: false },
+        version: 8,
+      });
+    renderWithIntl(<SchoolSettingsScreen />);
+    const ai = await screen.findByRole("region", { name: en.groups.ai.title });
+    const toggle = within(ai).getByRole("switch", { name: en.form.memoryToggle });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(toggle);
+    await userEvent.click(screen.getByRole("button", { name: en.form.save }));
+    await waitFor(() => expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(1));
+    expect(JSON.parse(stub.callsTo("PATCH /bff/api/v1/tenant")[0]?.body ?? "{}")).toEqual({
+      ai_memory_enabled: false,
+    });
+  });
+
   it("sends nothing when nothing changed, and checks values before sending", async () => {
     school([MANAGE]);
     renderWithIntl(<SchoolSettingsScreen />);
@@ -213,9 +234,13 @@ describe("school settings (FR-TEN-012)", () => {
       date_format: "DD/MM/YYYY",
       idle_timeout_minutes: "15",
       ai_features_enabled: "on",
+      ai_memory_enabled: "on",
       ai_monthly_budget_inr: "5000",
     });
     expect(changedSettings(SETTINGS, parsed)).toEqual({});
+    expect(changedSettings(SETTINGS, { ...parsed, ai_memory_enabled: false })).toEqual({
+      ai_memory_enabled: false,
+    });
     expect(
       changedSettings(SETTINGS, { ...parsed, languages: ["te"], ai_features_enabled: false }),
     ).toEqual({ languages: ["te"], ai_features_enabled: false });

@@ -33,6 +33,8 @@ export const settingsSchema = z.object({
   date_format: z.enum(DATE_FORMATS, { error: "chooseOption" }),
   idle_timeout_minutes: requiredInt(IDLE_MIN, IDLE_MAX),
   ai_features_enabled: checkbox,
+  /** Ask may remember each person's own preferences and work context (ADR-0034). */
+  ai_memory_enabled: checkbox,
   ai_monthly_budget_inr: requiredInt(0, BUDGET_MAX),
 });
 
@@ -52,6 +54,9 @@ export function changedSettings(current: SchoolSettings, next: SettingsForm): Se
   }
   if (current.ai_features_enabled !== next.ai_features_enabled) {
     patch.ai_features_enabled = next.ai_features_enabled;
+  }
+  if (current.ai_memory_enabled !== next.ai_memory_enabled) {
+    patch.ai_memory_enabled = next.ai_memory_enabled;
   }
   if (current.ai_monthly_budget_inr !== next.ai_monthly_budget_inr) {
     patch.ai_monthly_budget_inr = next.ai_monthly_budget_inr;
