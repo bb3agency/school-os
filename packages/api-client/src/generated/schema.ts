@@ -344,7 +344,8 @@ export interface paths {
         /**
          * List Attributes
          * @description Student attributes with classification (C2/C3), identity flag, allowed sources and
-         *     English/Telugu labels (permission ``student.read_basic``).
+         *     English labels (``label_te`` empty while Telugu is hidden, ADR-0036; permission
+         *     ``student.read_basic``).
          */
         get: operations["list_attributes_api_v1_attributes_get"];
         put?: never;
@@ -713,8 +714,9 @@ export interface paths {
         };
         /**
          * Print Certificate
-         * @description The certificate as a print-ready A4 page in English and Telugu (a DRAFT while it waits
-         *     for approval; read, issue or approve permission). The view is audited.
+         * @description The certificate as a print-ready A4 page in English (and Telugu only while Telugu is
+         *     shown, ADR-0036; a DRAFT while it waits for approval; read, issue or approve permission).
+         *     The view is audited.
          */
         get: operations["print_certificate_api_v1_certificates__certificate_id__print_get"];
         put?: never;
@@ -913,9 +915,9 @@ export interface paths {
         };
         /**
          * Change Request Memo
-         * @description Printable correction memo for the paper register, in English and Telugu (request or
-         *     approve permission). Sensitive values appear only for ``student.read_sensitive`` holders.
-         *     The view is audited.
+         * @description Printable correction memo for the paper register, in English (Telugu too only while
+         *     Telugu is shown, ADR-0036; request or approve permission). Sensitive values appear only
+         *     for ``student.read_sensitive`` holders. The view is audited.
          */
         get: operations["change_request_memo_api_v1_change_requests__change_request_id__memo_get"];
         put?: never;
@@ -1021,7 +1023,8 @@ export interface paths {
         /**
          * Get Circular
          * @description One circular with the reading of its current version: issuer, reference, date,
-         *     subject, English and Telugu summary with source chips, and suggested deadlines, each
+         *     subject, English summary (``summary_te`` stays null while Telugu is hidden, ADR-0036)
+         *     with source chips, and suggested deadlines, each
          *     citing the sentence it comes from. Suggestions are not tasks until confirmed. The ETag is
          *     the reading's version (for ``/review``). 404 when you cannot see the document.
          */
@@ -1181,7 +1184,8 @@ export interface paths {
         put?: never;
         /**
          * Add Default Classes
-         * @description Add any missing classes from Nursery to XII with English and Telugu names; existing
+         * @description Add any missing classes from Nursery to XII with English and Telugu names (the Telugu
+         *     names are stored but ``display_te`` is empty while Telugu is hidden, ADR-0036); existing
          *     classes are kept (permission ``tenant.structure.manage``).
          */
         post: operations["add_default_classes_api_v1_classes_defaults_post"];
@@ -1470,9 +1474,9 @@ export interface paths {
         };
         /**
          * List Findings
-         * @description Findings, most severe first, with masked values, English/Telugu explanations and
-         *     correction routes (permission ``dq.findings.read``). ``status`` defaults to unresolved
-         *     (``open``, ``reopened``).
+         * @description Findings, most severe first, with masked values, English explanations (``te`` empty while
+         *     Telugu is hidden, ADR-0036) and correction routes (permission ``dq.findings.read``).
+         *     ``status`` defaults to unresolved (``open``, ``reopened``).
          */
         get: operations["list_findings_api_v1_dq_findings_get"];
         put?: never;
@@ -1575,8 +1579,8 @@ export interface paths {
         };
         /**
          * List Rules
-         * @description The rule catalog DQ-001..DQ-012 with English/Telugu texts (permission
-         *     ``dq.findings.read``).
+         * @description The rule catalog DQ-001..DQ-012 with English texts (``te`` empty while Telugu is
+         *     hidden, ADR-0036; permission ``dq.findings.read``).
          */
         get: operations["list_rules_api_v1_dq_rules_get"];
         put?: never;
@@ -1827,7 +1831,8 @@ export interface paths {
          *     profiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and
          *     ``dq.findings.read``) with a recent sign-in with MFA (428 ``step_up_required``). Choose
          *     sections or classes (empty = every student you can see), the formats (``xlsx``, ``pdf``)
-         *     and the language (``en``, ``te``). The students are checked again and the files are made
+         *     and the language (``en``; ``te`` is accepted but gives English while Telugu is hidden,
+         *     ADR-0036). The students are checked again and the files are made
          *     in the background (202); you are notified when they are ready. Restricted (C3) values such
          *     as the UDISE+ ``category`` are hidden unless ``include_sensitive`` is true (needs
          *     ``student.read_sensitive``, else 403 ``sensitive_not_allowed``); the audit log then lists
@@ -2963,7 +2968,8 @@ export interface paths {
         put?: never;
         /**
          * Create Notice
-         * @description Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a
+         * @description Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;
+         *     ``notice.draft``): AI-drafted from a
          *     circular (only C1, else 422 ``notice_source_personal``) or from your text (422
          *     ``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or
          *     ``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the
@@ -3017,8 +3023,9 @@ export interface paths {
         put?: never;
         /**
          * Approve Notice
-         * @description Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and
-         *     bodies filled (422 ``notice_incomplete``) and no personal numbers (422
+         * @description Approve a notice (``notice.approve``; ``If-Match``): the English title and body filled
+         *     (and the Telugu ones only while Telugu is shown, ADR-0036; 422 ``notice_incomplete``) and
+         *     no personal numbers (422
          *     ``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and
          *     the image are made next.
          */
@@ -3102,7 +3109,8 @@ export interface paths {
         };
         /**
          * List Notifications
-         * @description Your notifications, newest first, in your language (English or Telugu).
+         * @description Your notifications, newest first, in your language (English; Telugu only while Telugu
+         *     is shown, ADR-0036).
          */
         get: operations["list_notifications_api_v1_notifications_get"];
         put?: never;
@@ -4091,9 +4099,9 @@ export interface paths {
         };
         /**
          * Deletion Certificate Download Url
-         * @description A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English
-         *     and Telugu). ``409 certificate_pending`` until it is issued. Audited as
-         *     ``tenant.deletion_certificate_downloaded``.
+         * @description A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English;
+         *     Telugu too only while Telugu is shown, ADR-0036). ``409 certificate_pending`` until it is
+         *     issued. Audited as ``tenant.deletion_certificate_downloaded``.
          */
         get: operations["deletion_certificate_download_url_api_v1_platform_tenants__tenant_id__deletion_certificate_download_url_get"];
         put?: never;
@@ -5882,7 +5890,12 @@ export interface components {
             /** Title Te */
             title_te: string;
         };
-        /** AnnouncementIn */
+        /**
+         * AnnouncementIn
+         * @description ``title_te`` and ``body_te`` are optional while Telugu is hidden (ADR-0036): left out or
+         *     empty, the English text is stored in their place (a new announcement) or the stored text is
+         *     kept (an update). While Telugu is shown they are required (422).
+         */
         AnnouncementIn: {
             /**
              * Audience
@@ -5896,7 +5909,10 @@ export interface components {
             audience_tier?: ("shared" | "dedicated") | null;
             /** Body En */
             body_en: string;
-            /** Body Te */
+            /**
+             * Body Te
+             * @default
+             */
             body_te: string;
             /**
              * Ends At
@@ -5922,7 +5938,10 @@ export interface components {
             status: "draft" | "scheduled";
             /** Title En */
             title_en: string;
-            /** Title Te */
+            /**
+             * Title Te
+             * @default
+             */
             title_te: string;
         };
         /** AnnouncementOut */
@@ -7254,14 +7273,18 @@ export interface components {
              */
             source: string;
         };
-        /** ClassCreate */
+        /**
+         * ClassCreate
+         * @description ``display_te`` is optional (ADR-0036: Telugu is hidden); left out, the English name is
+         *     stored in its place.
+         */
         ClassCreate: {
             /** Code */
             code: string;
             /** Display En */
             display_en: string;
             /** Display Te */
-            display_te: string;
+            display_te?: string | null;
             /** Sort Order */
             sort_order: number;
         };
@@ -10016,7 +10039,8 @@ export interface components {
         };
         /**
          * NotificationOut
-         * @description One notification, rendered in the reader's language (``Accept-Language``: en or te).
+         * @description One notification, rendered in the reader's language (``Accept-Language``: en or te;
+         *     always en while Telugu is hidden, ADR-0036).
          */
         NotificationOut: {
             /** Body */
