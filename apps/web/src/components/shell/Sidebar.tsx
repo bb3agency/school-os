@@ -6,35 +6,7 @@ import { SidebarNav, type NavSection, type SidebarTheme } from "@/components/ui/
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { BrandMark } from "./Brand";
-
-/** Sidebar chrome per theme (docs/17 §5.2, contrast pairs in §7). */
-export const sidebarThemes: Record<
-  SidebarTheme,
-  { surface: string; brand: string; control: string; divider: string }
-> = {
-  school: {
-    surface: "bg-surface text-ink",
-    brand: "text-ink hover:bg-surface-muted",
-    control: "text-ink-muted hover:bg-surface-muted hover:text-ink",
-    divider: "border-border",
-  },
-  platform: {
-    // .platform-chrome switches the focus ring to yellow on the dark violet.
-    surface: "platform-chrome bg-platform text-platform-ink",
-    brand: "text-platform-ink hover:bg-platform-hover",
-    control: "text-platform-muted hover:bg-platform-hover hover:text-platform-ink",
-    divider: "border-platform-hover",
-  },
-};
-
-/** Round 40px icon button for the sidebar header (collapse toggle, drawer close). */
-export function sidebarControlClasses(theme: SidebarTheme, size: "md" | "lg" = "md"): string {
-  return cn(
-    "inline-flex shrink-0 items-center justify-center rounded-md transition-colors",
-    size === "lg" ? "size-11" : "size-10",
-    sidebarThemes[theme].control,
-  );
-}
+import { sidebarThemes } from "./sidebar-theme";
 
 export interface SidebarProps {
   /** "inline": the wide-screen sidebar (may be compact); "drawer": inside the menu dialog. */

@@ -15,7 +15,8 @@ import type { NavSection, SidebarTheme } from "@/components/ui/SidebarNav";
 import { usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { BrandMark } from "./Brand";
-import { Sidebar, sidebarControlClasses, sidebarThemes } from "./Sidebar";
+import { Sidebar } from "./Sidebar";
+import { sidebarControlClasses, sidebarThemes } from "./sidebar-theme";
 import { useSidebarCollapsed } from "./sidebar-state";
 import { SkipLink } from "./SkipLink";
 

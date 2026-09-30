@@ -425,12 +425,13 @@
   /* Label of a compact sidebar item on hover and focus (AppShell). Fixed, so the scrolling
      menu does not clip it; the script places it beside the item. Visual only (aria-hidden):
      the item's own text is its accessible name. The transparent start padding bridges the
-     gap to the item, so the pointer can move onto the label (WCAG 1.4.13). */
+     gap from the item past the sidebar edge, so the pointer can move onto the label
+     (WCAG 1.4.13). */
   .sidebar-tip {
     position: fixed;
     z-index: 40;
     transform: translateY(-50%);
-    padding-inline-start: 0.5rem;
+    padding-inline-start: 1.25rem; /* past the sidebar edge (12px menu padding) + 8px */
     max-width: 16rem;
   }
 
