@@ -57,5 +57,5 @@ def contains_telugu(text: str) -> bool:
     return any(_TELUGU_FIRST <= ch <= _TELUGU_LAST for ch in text)
 
 
-_TELUGU_FIRST = "ఀ"
-_TELUGU_LAST = "౿"
+_TELUGU_FIRST = chr(0x0C00)
+_TELUGU_LAST = chr(0x0C7F)
