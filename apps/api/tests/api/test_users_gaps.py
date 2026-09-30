@@ -33,6 +33,7 @@ def _patch(api: Any, who: Any, user_id: uuid.UUID, body: dict[str, Any], etag: s
 # --- PATCH /users/{id}: profile fields ----------------------------------------------------------
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_102_patch_profile_fields_audits_names_only(
     world: Any, api: Any, admin_engine: Engine, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -96,6 +97,7 @@ def test_US_102_patch_profile_fields_audits_names_only(
     )
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_102_patch_status_and_profile_together(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
@@ -372,6 +374,31 @@ def test_FR_TEN_010_scoped_structure_grant_cannot_read_directory(
 # --- session settings in /me (FR-TEN-012) --------------------------------------------------------
 
 
+def test_ADR_0036_profiles_me_and_roles_resolve_to_english_while_telugu_is_hidden(
+    api: Any, admin_engine: Engine
+) -> None:
+    tid = W.provision_school()
+    owner = W.add_member(admin_engine, tid, ["owner"])
+    staff = W.add_member(admin_engine, tid, ["office_staff"])
+    res = _patch(
+        api, owner, staff.user_id, {"preferred_language": "te"}, _etag(api, owner, staff.user_id)
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["preferred_language"] == "en", "te is kept but resolves to English"
+    with admin_engine.connect() as c:
+        stored: str = c.execute(
+            text("SELECT preferred_language FROM core.users WHERE id = :u"), {"u": staff.user_id}
+        ).scalar_one()
+    assert stored == "te"
+    me = api.call(staff, "GET", "/api/v1/me").json()
+    assert me["preferred_language"] == "en"
+    assert me["settings"]["languages"] == ["en"]
+    roles = api.call(owner, "GET", "/api/v1/roles", params={"limit": 200})
+    assert all(r["name_te"] == "" for r in roles.json()["data"])
+    assert not any("ఀ" <= ch <= "౿" for ch in roles.text)
+
+
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_TEN_012_me_carries_session_settings(api: Any, admin_engine: Engine) -> None:
     tid = W.provision_school()
     owner = W.add_member(admin_engine, tid, ["owner"])

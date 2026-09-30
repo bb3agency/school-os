@@ -415,9 +415,9 @@ def deletion_certificate_download_url(
     response: Response,
     ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.read"))],
 ) -> CertificateDownloadOut:
-    """A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English
-    and Telugu). ``409 certificate_pending`` until it is issued. Audited as
-    ``tenant.deletion_certificate_downloaded``."""
+    """A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English;
+    Telugu too only while Telugu is shown, ADR-0036). ``409 certificate_pending`` until it is
+    issued. Audited as ``tenant.deletion_certificate_downloaded``."""
     response.headers["Cache-Control"] = "no-store"
     return offboarding.download_url(_actor(ctx), tenant_id)
 

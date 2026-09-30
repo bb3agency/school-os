@@ -75,6 +75,27 @@ def test_FR_TEN_010_default_classes_are_idempotent(make_tenant: MakeTenant) -> N
     assert first[0].id == custom.id
 
 
+def test_ADR_0036_class_without_telugu_name_while_telugu_is_hidden(
+    make_tenant: MakeTenant,
+) -> None:
+    tid = make_tenant()
+    with tenant_session(tid) as s:
+        klass = service.create_class(
+            s, ClassCreate(code="PP2", display_en="Pre-primary 2", sort_order=6)
+        )
+    assert klass.display_te == "Pre-primary 2", "the NOT NULL column holds the English name"
+
+
+@pytest.mark.usefixtures("telugu_on")
+def test_ADR_0036_class_needs_its_telugu_name_while_telugu_is_shown(
+    make_tenant: MakeTenant,
+) -> None:
+    tid = make_tenant()
+    with pytest.raises(ValidationFailed) as exc, tenant_session(tid) as s:
+        service.create_class(s, ClassCreate(code="PP2", display_en="Pre-primary 2", sort_order=6))
+    assert exc.value.errors[0]["field"] == "display_te"
+
+
 def test_FR_TEN_010_set_current_year_switches_atomically(make_tenant: MakeTenant) -> None:
     tid = make_tenant()
     with tenant_session(tid) as s:

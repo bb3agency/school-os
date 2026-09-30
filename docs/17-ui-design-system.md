@@ -14,7 +14,7 @@
 ## 1. The look in one paragraph
 
 Content sits on **white cards** (20px radius, 1px hairline border, soft large shadow) laid on a
-**very soft sky-blue to pale-aqua gradient canvas**. Text is a clean neo-grotesk sans (Inter);
+**very soft sky-blue to pale-aqua gradient canvas**. Text is PP Mori, a licensed neo-grotesk (Inter as fallback for ₹ and missing glyphs);
 **big numbers** use a light serif (Instrument Serif); small **eyebrow labels** are mono uppercase
 (JetBrains Mono). The primary button is **near-black**; brand blue is for links, focus and the one
 brand call to action. Status uses soft chips and a few **gradient pills** (In progress, Review, Done).
@@ -37,7 +37,7 @@ know they are in the control plane.
    Telugu: data (a name copied from a register) can still be in Telugu script.
 3. **CSP (SEC-010).** No `style` attributes, no external resources. Colours come from classes;
    SVG geometry uses presentation attributes (`strokeDashoffset`, `points`), which CSP allows.
-   Fonts are self-hosted via `@fontsource` (`font-src 'self'`).
+   Fonts are self-hosted (`@fontsource` packages and the licensed PP Mori WOFF2 files; `font-src 'self'`).
 4. **Baseline Widely Available** only (CLAUDE.md §10). Used: CSS gradients, `:has()` (segmented
    control, drawer scroll lock), `:modal`, native `<dialog>`, `<details>`, `accent-color`,
    `env()`, `dvh` (after a `vh` fallback), `@media (prefers-reduced-motion)`,
@@ -79,13 +79,13 @@ Use them as Tailwind utilities (`bg-surface`, `text-ink-muted`, `border-border`,
 | Platform | `platform`, `platform-hover`, `platform-ink`, `platform-muted`, `platform-accent`, `platform-accent-ink`, `platform-soft`                 | Control-plane chrome only                                 |
 | Radii    | `xs` 4, `sm` 8, `md` 10 (buttons, inputs), `lg` 14, `xl` 20 (cards), `2xl` 24, `full`                                                     |                                                           |
 | Shadows  | `shadow-card`, `shadow-raised` (buttons, selected segment), `shadow-popover` (dialogs, menus)                                             |                                                           |
-| Fonts    | `font-sans` (Inter; → Noto Sans Telugu while Telugu is on), `font-display` / `font-serif` (Instrument Serif), `font-mono` (JetBrains Mono; → Noto Sans Telugu while on) |                                                           |
+| Fonts    | `font-sans` (PP Mori, self-hosted WOFF2 in `src/app/fonts/pp-mori/`, commercial web licence (see `LICENSE-NOTE.md`); falls back to Inter for ₹ and missing glyphs, → Noto Sans Telugu while Telugu is on), `font-display` / `font-serif` (Instrument Serif), `font-mono` (JetBrains Mono; → Noto Sans Telugu while on) |                                                           |
 
 Component classes (in `@layer components`): `.eyebrow`, `.select-chevron`, `.skeleton`,
 `.pill-gradient-blue|violet|teal`, `.ai-gradient`, `.ai-chrome` (white focus ring),
 `.quote-gradient`, `.platform-chrome` (yellow focus ring).
 
-Fonts (all OFL-1.1, pinned exact in `apps/web/package.json`): `@fontsource-variable/inter`
+UI text: PP Mori (Pangram Pangram, commercial web licence; `src/app/fonts/pp-mori/`, `@font-face` in `globals.css`; weights 200/400/600, so `font-medium` renders as 400; no tabular figures). Open fonts (all OFL-1.1, pinned exact in `apps/web/package.json`): `@fontsource-variable/inter`
 (variable weights), `@fontsource/instrument-serif` (400), `@fontsource/jetbrains-mono` (500),
 `@fontsource/noto-sans-telugu` (400/600/700, Telugu subset). Every file declares
 `unicode-range`, so a page downloads only the scripts it shows. Noto Sans Telugu is **not**
@@ -312,7 +312,7 @@ backlog (never splitting a Telugu word). The user's question appears at once and
 within a frame; a failed request puts the question back into the box. After Stop the partial
 preview stays, marked "Stopped", with "Ask again".
 
-**Markdown** (`markdown.ts`, in-house, no dependency): paragraphs, bold lines for headings,
+**Markdown** (`markdown-parse.ts`, in-house, no dependency): paragraphs, bold lines for headings,
 lists (one nested level), GFM tables (in a focusable `table-scroll` region), quotes, code,
 bold/italic/strike, inline code. No HTML is ever rendered (tags are dropped as text); link targets
 other than `sos://` are dropped and their label stays text; `sos://` links open the source's

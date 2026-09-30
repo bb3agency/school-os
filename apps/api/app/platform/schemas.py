@@ -789,10 +789,14 @@ class HeartbeatOut(Out):
 
 
 class AnnouncementIn(In):
+    """``title_te`` and ``body_te`` are optional while Telugu is hidden (ADR-0036): left out or
+    empty, the English text is stored in their place (a new announcement) or the stored text is
+    kept (an update). While Telugu is shown they are required (422)."""
+
     title_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=120)]
-    title_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=120)]
+    title_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=120)] = ""
     body_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=1000)]
-    body_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=1000)]
+    body_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=1000)] = ""
     severity: Literal["info", "maintenance", "warning", "critical"] = "info"
     audience: Literal["all", "tier", "tenants"] = "all"
     audience_tier: Tier | None = None

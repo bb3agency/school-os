@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import resources
 from typing import Any
 
 import yaml
+
+from app.core.languages import shown_texts
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +42,13 @@ class ImportConfig:
     enum_synonyms: Mapping[str, Mapping[str, tuple[str, ...]]]
     class_aliases: Mapping[str, tuple[str, ...]]
     class_noise_words: tuple[str, ...]
-    sheet_watermark: str = ""
+    sheet_watermark_texts: Mapping[str, str] = field(default_factory=dict)
+
+    @property
+    def sheet_watermark(self) -> str:
+        """The download watermark in the languages shown (English only while Telugu is
+        hidden, ADR-0036)."""
+        return shown_texts(self.sheet_watermark_texts)
 
     def max_length(self, key: str) -> int:
         return int(self.text_max_length.get(key, self.text_max_length["default"]))
@@ -72,9 +80,10 @@ def parse_config(raw: Mapping[str, Any]) -> ImportConfig:
         },
         class_aliases={str(k): _strs(v) for k, v in raw["class_aliases"].items()},
         class_noise_words=_strs(raw["class_noise_words"]),
-        sheet_watermark=" · ".join(
-            str(v) for v in ((raw.get("sheet") or {}).get("export_watermark") or {}).values()
-        ),
+        sheet_watermark_texts={
+            str(k): str(v)
+            for k, v in ((raw.get("sheet") or {}).get("export_watermark") or {}).items()
+        },
     )
 
 

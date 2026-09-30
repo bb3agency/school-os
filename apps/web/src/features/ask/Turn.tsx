@@ -20,7 +20,7 @@ import {
 import { CitationChip, SourceCard, sourceCardId } from "./Citations";
 import { MAX_QUESTION, shouldSend } from "./Composer";
 import { askError } from "./errors";
-import { stableStreamingText } from "./markdown";
+import { stableStreamingText } from "./markdown-parse";
 import { MemoryNotes } from "./MemoryNotes";
 import {
   ActionButton,

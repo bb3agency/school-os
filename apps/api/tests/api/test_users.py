@@ -334,6 +334,7 @@ def test_US_102_AC2_without_role_assign_roles_api_is_403(world: Any, api: Any) -
     assert res.status_code == 403
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_102_roles_and_permissions_catalog(world: Any, api: Any) -> None:
     owner = world.person("owner")
     roles = api.call(owner, "GET", "/api/v1/roles", params={"limit": 4})

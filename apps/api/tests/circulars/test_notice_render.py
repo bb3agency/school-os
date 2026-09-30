@@ -14,6 +14,7 @@ import pytest
 
 from app.circulars.config import rules
 from app.circulars.rendering import notice_html
+from app.core.languages import contains_telugu
 from app.core.pdf import ChromiumRenderer
 
 pytestmark = pytest.mark.chromium
@@ -38,25 +39,39 @@ def renderer() -> ChromiumRenderer:
     return ChromiumRenderer(sandbox=False, timeout_ms=60_000)
 
 
-PAGE = notice_html(
-    school_name="Synthetic Model School",
-    approved_on=dt.date(2026, 11, 1),
-    title_en="Sports day",
-    body_en="Sports day is on 14/11/2026 at 9:00 on the school ground.",
-    title_te="క్రీడా దినోత్సవం",
-    body_te="క్రీడా దినోత్సవం 14/11/2026 ఉదయం 9:00కు పాఠశాల మైదానంలో జరుగుతుంది.",
-)
+def _page() -> str:
+    """Built per test: the Telugu section depends on the switch (ADR-0036)."""
+    return notice_html(
+        school_name="Synthetic Model School",
+        approved_on=dt.date(2026, 11, 1),
+        title_en="Sports day",
+        body_en="Sports day is on 14/11/2026 at 9:00 on the school ground.",
+        title_te="క్రీడా దినోత్సవం",
+        body_te="క్రీడా దినోత్సవం 14/11/2026 ఉదయం 9:00కు పాఠశాల మైదానంలో జరుగుతుంది.",
+    )
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_NOTICE_006_a4_pdf_embeds_the_telugu_font(renderer: ChromiumRenderer) -> None:
-    out = renderer.render(PAGE)
+    out = renderer.render(_page())
     assert out.startswith(b"%PDF-")
     assert b"NotoSansTelugu" in out, "the bundled Telugu font is embedded"
 
 
+def test_ADR_0036_notice_pdf_is_english_without_the_telugu_font_while_telugu_is_hidden(
+    renderer: ChromiumRenderer,
+) -> None:
+    page = _page()
+    assert not contains_telugu(page)
+    out = renderer.render(page)
+    assert out.startswith(b"%PDF-")
+    assert b"NotoSansTelugu" not in out
+    assert b"Noto Sans Telugu" not in out
+
+
 def test_FR_NOTICE_006_png_has_the_configured_width(renderer: ChromiumRenderer) -> None:
     width = rules().notices.image_width_px
-    out = renderer.render_png(PAGE, width_px=width)
+    out = renderer.render_png(_page(), width_px=width)
     assert out.startswith(b"\x89PNG\r\n\x1a\n")
     png_width, png_height = struct.unpack(">II", out[16:24])
     assert png_width == width

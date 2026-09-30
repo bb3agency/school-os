@@ -91,7 +91,7 @@ def test_SEC_009_staging_and_prod_refuse_the_fake_and_non_https_links() -> None:
 # --- templates ------------------------------------------------------------------------------
 
 
-def test_invitation_template_renders_in_english_and_telugu() -> None:
+def test_invitation_template_renders_in_english_and_telugu(telugu_on: None) -> None:
     params = {
         "school": "Synthetic High School",
         "sign_in_url": "https://app.example.test/te",
@@ -110,6 +110,19 @@ def test_invitation_template_renders_in_english_and_telugu() -> None:
         assert content.text.endswith("\n")
     assert re.search(r"[ఀ-౿]", te.text), "Telugu script"
     assert email.render_email("invitation.staff", params, "fr").language == "en"
+
+
+def test_ADR_0036_email_is_english_while_telugu_is_hidden() -> None:
+    params = {
+        "school": "Synthetic High School",
+        "sign_in_url": "https://app.example.test/en",
+        "expires_on": "28/10/2026",
+    }
+    for template_key in email.email_catalog():
+        te = email.render_email(template_key, params, "te")
+        assert te.language == "en"
+        assert te == email.render_email(template_key, params, "en")
+        assert not re.search(r"[ఀ-౿]", te.subject + te.text), "no Telugu script"
 
 
 def test_subject_is_one_line_whatever_the_school_name() -> None:

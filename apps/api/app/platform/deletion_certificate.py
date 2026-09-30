@@ -5,7 +5,8 @@ deployment row into the certificate content (a JSON object: IDs, dates, codes an
 no student or staff personal data), :func:`content_sha256` hashes its canonical JSON, and
 :func:`render_html` prints it as one escaped A4 page with English and Telugu labels for
 :mod:`app.core.pdf`. Labels and texts come from ``billing.yaml`` → ``offboarding.certificate``;
-the Telugu wording is pending review (docs/16 §19).
+the Telugu wording is pending review (docs/16 §19) and is left out while Telugu is hidden
+(ADR-0036, ``app.core.languages``).
 """
 
 from __future__ import annotations
@@ -20,7 +21,8 @@ from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.pdf import FONT_FAMILY, FONT_URL
+from app.core.languages import telugu_enabled
+from app.core.pdf import font_face_css, font_stack
 from app.platform.common import config
 
 CATEGORY_ORDER: Final = (
@@ -198,19 +200,23 @@ def _label(cfg: CertificateConfig, category: str) -> str:
     label = cfg.categories.get(category)
     if label is None:
         return _e(category)
-    return f'{_e(label.en)}<br><span class="te">{_e(label.te)}</span>'
+    return _bi(label)
 
 
 def _bi(text: Bilingual) -> str:
+    """English, with the Telugu line under it only while Telugu is shown (ADR-0036)."""
+    if not telugu_enabled():
+        return _e(text.en)
     return f'{_e(text.en)}<br><span class="te">{_e(text.te)}</span>'
 
 
-_CSS = f"""
-@font-face {{ font-family: "{FONT_FAMILY}"; src: url("{FONT_URL}"); }}
+def _css() -> str:
+    """The page CSS; the bundled Telugu font only while Telugu is shown (ADR-0036)."""
+    return f"""{font_face_css()}
 @page {{ size: A4; margin: 16mm 14mm; }}
-body {{ font-family: "{FONT_FAMILY}", sans-serif; font-size: 10pt; color: #111; }}
+body {{ font-family: {font_stack()}; font-size: 10pt; color: #111; }}
 h1 {{ font-size: 16pt; margin: 0 0 4mm; }}
-.te {{ font-family: "{FONT_FAMILY}", sans-serif; color: #333; }}
+.te {{ font-family: {font_stack()}; color: #333; }}
 table {{ border-collapse: collapse; width: 100%; margin: 3mm 0; }}
 th, td {{ border: 0.3mm solid #999; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }}
 th {{ background: #f0f0f0; width: 45%; }}
@@ -221,7 +227,8 @@ footer {{ margin-top: 6mm; font-size: 8.5pt; color: #333; }}
 
 
 def render_html(content: Mapping[str, Any], sha256: str, cfg: CertificateConfig) -> str:
-    """One A4 page (two when long); every value is escaped; English and Telugu labels."""
+    """One A4 page (two when long); every value is escaped; English labels, with Telugu under
+    them only while Telugu is shown (ADR-0036)."""
     facts = [
         ("School", content["school_name"]),
         ("School code", content["tenant_code"]),
@@ -261,7 +268,7 @@ def render_html(content: Mapping[str, Any], sha256: str, cfg: CertificateConfig)
     )
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        f"<title>{_e(cfg.title.en)}</title><style>{_CSS}</style></head><body>"
+        f"<title>{_e(cfg.title.en)}</title><style>{_css()}</style></head><body>"
         f"<h1>{_bi(cfg.title)}</h1>"
         f"<p>{_bi(cfg.text.intro)}</p>"
         f"<table>{fact_rows}</table>"

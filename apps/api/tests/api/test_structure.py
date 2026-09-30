@@ -7,7 +7,9 @@ import uuid
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
+
+from app.core.languages import contains_telugu
 
 pytestmark = pytest.mark.db
 W = sys.modules["sos_test_api_world"]
@@ -205,6 +207,7 @@ def test_FR_AUD_001_failed_create_leaves_no_event(
     assert W.audit_events(admin_engine, school.tenant_id) == before
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_TEN_012_settings_read_and_update(school: Any, api: Any, admin_engine: Engine) -> None:
     staff = school.people["office_staff"]
     got = api.call(staff, "GET", "/api/v1/tenant")
@@ -277,6 +280,61 @@ def test_FR_TEN_012_settings_read_and_update(school: Any, api: Any, admin_engine
         headers={"If-Match": etag},
     )
     assert stale.status_code == 412
+
+
+def test_ADR_0036_settings_and_classes_show_no_telugu_while_telugu_is_hidden(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    owner = school.people["owner"]
+    got = api.call(owner, "GET", "/api/v1/tenant")
+    assert got.json()["settings"]["languages"] == ["en"], "stored default is en+te; en is shown"
+    letterhead = {
+        "school_name_te": "కృత్రిమ మోడల్ పాఠశాల",
+        "address_en": "1 Synthetic Road, Guntur",
+        "address_te": "1 సింథటిక్ రోడ్, గుంటూరు",
+        "affiliation": "",
+        "place": "Guntur",
+    }
+    ok = api.call(
+        owner,
+        "PATCH",
+        "/api/v1/tenant",
+        json={"languages": ["te"], "certificate_letterhead": letterhead},
+        headers={"If-Match": got.headers["ETag"]},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["settings"]["languages"] == ["en"], "a Telugu-only school is shown English"
+    assert ok.json()["settings"]["certificate_letterhead"]["school_name_te"] == ""
+    assert not contains_telugu(ok.text)
+    # The form shows no Telugu lines: saving it with them empty keeps what is stored.
+    again = api.call(
+        owner,
+        "PATCH",
+        "/api/v1/tenant",
+        json={"certificate_letterhead": {**letterhead, "school_name_te": "", "address_te": ""}},
+        headers={"If-Match": ok.headers["ETag"]},
+    )
+    assert again.status_code == 200, again.text
+    with admin_engine.connect() as c:
+        stored: dict[str, Any] = c.execute(
+            text("SELECT settings FROM core.tenants WHERE id = :t"), {"t": school.tenant_id}
+        ).scalar_one()
+    assert stored["languages"] == ["te"]
+    assert stored["certificate_letterhead"]["school_name_te"] == "కృత్రిమ మోడల్ పాఠశాల"
+    assert stored["certificate_letterhead"]["address_te"] == "1 సింథటిక్ రోడ్, గుంటూరు"
+    # A class needs no Telugu name, and none is shown.
+    created = api.call(
+        owner,
+        "POST",
+        "/api/v1/classes",
+        json={"code": "XI", "display_en": "Class XI", "sort_order": 1},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["display_te"] == ""
+    defaults = api.call(owner, "POST", "/api/v1/classes/defaults")
+    assert defaults.status_code == 200, defaults.text
+    assert not contains_telugu(defaults.text)
+    assert not contains_telugu(api.call(owner, "GET", "/api/v1/classes").text)
 
 
 def test_FR_IAM_012_scoped_structure_reads(world: Any, api: Any) -> None:

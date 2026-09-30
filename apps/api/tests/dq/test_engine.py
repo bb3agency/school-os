@@ -74,6 +74,7 @@ def test_FR_DQ_006_DQ_001_finding_stores_masked_values_only(
     assert "P••• L••• C•••" in dumped
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_501_api_shows_masked_c3_and_current_c2_values(world: Any) -> None:
     name = DS.unique_name()
     sid = DS.student(world.a, name=name, extra=DS.aadhaar(name=SECRET_NAME))

@@ -5,6 +5,9 @@
 ``{name, select, code {...} other {...}}``. English and Telugu both use the CLDR plural
 categories ``one`` and ``other``. Everything is validated when first loaded: both languages
 exist, every placeholder is declared in ``params`` and both languages use the same placeholders.
+
+English first (ADR-0036): the Telugu messages stay in the catalog and are still validated, but
+they are rendered only while Telugu is shown (``app.core.languages``).
 """
 
 from __future__ import annotations
@@ -17,6 +20,8 @@ from importlib import resources
 from typing import Any, Final, Literal
 
 import yaml
+
+from app.core.languages import output_language
 
 Language = Literal["en", "te"]
 LANGUAGES: Final[tuple[Language, ...]] = ("en", "te")
@@ -242,9 +247,9 @@ def check_params(template: Template, params: Mapping[str, Any]) -> None:
 
 
 def render(key: str, params: Mapping[str, Any], language: str) -> Message:
+    """The message in ``language``; English while Telugu is hidden (ADR-0036)."""
     template = get(key)
-    lang = language if language in LANGUAGES else DEFAULT_LANGUAGE
-    msg = template.messages[lang]
+    msg = template.messages[output_language(language)]
     return Message(
         title=_tidy(format_message(msg.title, params)),
         body=_tidy(format_message(msg.body, params)),
@@ -252,7 +257,12 @@ def render(key: str, params: Mapping[str, Any], language: str) -> Message:
 
 
 def negotiate_language(accept_language: str | None) -> Language:
-    """Pick ``te`` or ``en`` from an Accept-Language header (highest q wins; default en)."""
+    """Pick ``te`` or ``en`` from an Accept-Language header (highest q wins; default en).
+    Always ``en`` while Telugu is hidden (ADR-0036)."""
+    return output_language(_negotiate(accept_language))
+
+
+def _negotiate(accept_language: str | None) -> Language:
     best: tuple[float, Language] = (0.0, DEFAULT_LANGUAGE)
     for part in (accept_language or "").split(","):
         tag, _, q_part = part.strip().partition(";")

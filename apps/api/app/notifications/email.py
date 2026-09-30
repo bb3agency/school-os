@@ -29,9 +29,9 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.config import EmailProviderKind, Settings, get_settings
+from app.core.languages import output_language
 from app.core.logging import get_logger
 from app.notifications.templates import (
-    DEFAULT_LANGUAGE,
     LANGUAGES,
     TemplateError,
     format_message,
@@ -261,13 +261,14 @@ def resend_cooldown_s() -> int:
 
 
 def render_email(key: str, params: dict[str, Any], language: str) -> EmailContent:
-    """Subject and plain-text body in ``language`` (``en`` or ``te``; default ``en``)."""
+    """Subject and plain-text body in ``language`` (``en`` or ``te``; default ``en``). Always
+    English while Telugu is hidden (ADR-0036)."""
     template = email_catalog().get(key)
     if template is None:
         raise TemplateError(f"unknown email template {key!r}")
     if set(params) != template.params:
         raise TemplateError(f"{key}: params must be exactly {sorted(template.params)}")
-    lang = language if language in LANGUAGES else DEFAULT_LANGUAGE
+    lang = output_language(language)
     subject = _HEADER_BREAK.sub(" ", format_message(template.subjects[lang], params)).strip()
     text = format_message(template.bodies[lang], params).strip() + "\n"
     return EmailContent(subject=subject, text=text, language=lang)

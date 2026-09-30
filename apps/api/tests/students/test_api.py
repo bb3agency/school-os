@@ -338,6 +338,7 @@ def test_guardians_and_enrollments_routes(world: Any, api: Any, admin_engine: En
     assert bad.status_code == 422
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_attribute_catalog_route(world: Any, api: Any) -> None:
     res = api.call(world.person("teacher"), "GET", "/api/v1/attributes")
     assert res.status_code == 200

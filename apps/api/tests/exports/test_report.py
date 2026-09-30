@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
+from app.core.languages import contains_telugu
 from app.core.redaction import verhoeff_check_digit
 from app.exports.config import load_config
 from app.exports.report import (
@@ -91,6 +94,7 @@ def test_US_501_AC4_ready_sheet_in_target_order_with_status() -> None:
     assert [t.name for t in report.tables] == ["Summary", "Findings", "Ready to enter"]
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_EXP_002_telugu_labels() -> None:
     report = build_precheck(_input("te"), load_config())
     assert report.findings.rows[0][0] == "సమర్పణను ఆపేది"
@@ -98,6 +102,7 @@ def test_FR_EXP_002_telugu_labels() -> None:
     assert report.summary.name == "సారాంశం"
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_901_AC2_watermark_in_summary_and_html() -> None:
     cfg = load_config()
     report = build_precheck(_input(), cfg)
@@ -108,6 +113,7 @@ def test_US_901_AC2_watermark_in_summary_and_html() -> None:
     assert "Restricted values are hidden" in page
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_html_escapes_values_and_has_no_scripts_or_external_resources() -> None:
     hostile = _finding(A, "blocker", "DQ-005", name='<script>alert(1)</script><img src="x">')
     report = build_precheck(_input(findings=(hostile,)), load_config())
@@ -117,6 +123,26 @@ def test_html_escapes_values_and_has_no_scripts_or_external_resources() -> None:
     assert "<img" not in page
     assert "http://" not in page
     assert page.count("https://") == 2  # the bundled font URL (CSS + CSP), served from memory
+
+
+@pytest.mark.parametrize("language", ["te", "en"])
+def test_ADR_0036_precheck_is_english_without_the_telugu_font_while_telugu_is_hidden(
+    language: str,
+) -> None:
+    cfg = load_config()
+    report = build_precheck(_input(language), cfg)
+    assert report.summary.name == "Summary"
+    assert report.watermark == cfg.watermark.en
+    tables = (report.summary, report.findings, report.ready)
+    for table in tables:
+        cells = [table.name, *map(str, table.header)]
+        cells += [str(v) for row in table.rows for v in row]
+        assert not contains_telugu(" ".join(cells)), table.name
+    page = render_precheck_html(report, cfg)
+    assert not contains_telugu(page)
+    assert "@font-face" not in page
+    assert "Noto Sans Telugu" not in page
+    assert page.count("https://") == 1  # only the CSP line; no font is asked for
 
 
 def test_invariant_4_aadhaar_masked_in_pdf_html() -> None:
