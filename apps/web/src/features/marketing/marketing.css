@@ -22,6 +22,7 @@
   --radius-lg: 0.875rem; /* 14px */
   --radius-xl: 1.25rem; /* 20px: cards */
   --radius-2xl: 1.5rem; /* 24px: plan cards, tiles */
+  --radius-3xl: 2rem; /* 32px: closing bands, large illustrations */
 }
 
 /* Anchored headings and focused controls clear the sticky header (WCAG 2.4.11). Scroll

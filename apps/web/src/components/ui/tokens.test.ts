@@ -170,5 +170,8 @@ describe("radius tokens: calm app corners, larger marketing corners (docs/17 §3
     expect(marketing.get("lg")).toBe(14);
     expect(marketing.get("xl")).toBe(20);
     expect(marketing.get("2xl")).toBe(24);
+    // rounded-3xl (closing bands) exists only because the theme defines it.
+    expect(app.has("3xl")).toBe(true);
+    expect(marketing.get("3xl")).toBe(32);
   });
 });
