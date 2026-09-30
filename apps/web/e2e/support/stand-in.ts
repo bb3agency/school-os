@@ -8,6 +8,7 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
+import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -360,10 +361,9 @@ const DOCUMENT = {
 };
 
 /**
- * Ask the school (docs/06 §5.1): a synthetic cited answer about the holiday circular, streamed
- * as the API does since M2 wave 5: `meta` (always mode "full"), preview `delta`s with their own
- * whitespace, the validated `final` (which the page shows instead of the preview), the legacy
- * `token` segments (ignored after `final`), `citation`s and `done` with the real status.
+ * Ask the school (docs/06 §5.1): a synthetic cited answer about the holiday circular. The events
+ * (meta with the conversation, status steps, preview deltas, the validated final, citation,
+ * done, follow-ups) and the stored conversations and memory live in ask-api.ts.
  */
 const ASK_QUERY_ID = "0192f3a4-0000-7000-8000-00000000e001";
 const ASK_SOURCE = `sos://doc/${DOC_ID}/v1#p1`;
@@ -373,37 +373,6 @@ const ASK_CITATION = {
   title: "Dasara holidays circular 2026",
   snippet: "Holidays from 02/10/2026 to 12/10/2026; school reopens on 13/10/2026.",
 };
-const ASK_EVENTS: Array<[string, unknown]> = [
-  ["meta", { query_id: ASK_QUERY_ID, language: "en", mode: "full" }],
-  ["delta", { text: "Dasara holidays run " }],
-  ["delta", { text: "from 02/10/2026 to 12/10/2026. [1] " }],
-  ["delta", { text: "School reopens on 13/10/2026. [1]" }],
-  [
-    "final",
-    {
-      text: "Dasara holidays run from 02/10/2026 to 12/10/2026. [1] School reopens on 13/10/2026. [1]",
-      replaced: false,
-      status: "answered",
-      mode: "full",
-    },
-  ],
-  ["token", { text: "Dasara holidays run from 02/10/2026 to 12/10/2026. [1]" }],
-  ["token", { text: "School reopens on 13/10/2026. [1]" }],
-  ["citation", ASK_CITATION],
-  ["done", { latency_ms: 420, cited_sources: 1, status: "answered", mode: "full" }],
-];
-/**
- * A question containing "budget": the AI budget ran out mid-answer, so the preview is replaced
- * by search-only passages. Only `final`/`done` say so (meta still says "full").
- */
-const ASK_SEARCH_ONLY_EVENTS: Array<[string, unknown]> = [
-  ["meta", { query_id: ASK_QUERY_ID, language: "en", mode: "full" }],
-  ["delta", { text: "Dasara holidays run " }],
-  ["error", { type: "ai_budget_exhausted", message_key: "kb.errors.budget" }],
-  ["final", { text: "", replaced: true, status: "search_only", mode: "search_only" }],
-  ["citation", ASK_CITATION],
-  ["done", { latency_ms: 310, cited_sources: 1, status: "search_only", mode: "search_only" }],
-];
 const VERIFIED_ANSWER = {
   id: "0192f3a4-0000-7000-8000-00000000e101",
   question: "When are the Dasara holidays?",
@@ -521,6 +490,7 @@ function streamAnswer(
   response: ServerResponse,
   events: Array<[string, unknown]>,
   slow: boolean,
+  onEnd: () => void = () => undefined,
 ): void {
   response.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
@@ -536,7 +506,10 @@ function streamAnswer(
   const next = () => {
     if (closed) return;
     const item = events[i];
-    if (!item) return void response.end();
+    if (!item) {
+      onEnd();
+      return void response.end();
+    }
     const [event, data] = item;
     response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     i += 1;
@@ -710,7 +683,7 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
     return [200, { ...DOCUMENT, versions: [DOC_VERSION] }];
   if (path === "/api/v1/knowledge/verified-answers" && method === "GET")
     return [200, page([VERIFIED_ANSWER])];
-  if (path === `/api/v1/knowledge/queries/${ASK_QUERY_ID}/feedback` && method === "POST")
+  if (/^\/api\/v1\/knowledge\/queries\/[^/]+\/feedback$/.test(path) && method === "POST")
     return [
       200,
       {
@@ -796,6 +769,7 @@ async function startApi(): Promise<Server> {
     // Test control and the files behind canned download links (not API paths).
     if (url.pathname === "/__e2e/reset" && method === "POST") {
       resetJourney();
+      resetAsk();
       return send(response, 204, "");
     }
     if (url.pathname.startsWith(FILES_PREFIX)) {
@@ -815,12 +789,18 @@ async function startApi(): Promise<Server> {
     }
     if (url.pathname === "/api/v1/knowledge/ask" && method === "POST") {
       const question = typeof body.question === "string" ? body.question : "";
-      const events = question.includes("budget") ? ASK_SEARCH_ONLY_EVENTS : ASK_EVENTS;
-      return streamAnswer(response, events, question.includes("slowly"));
+      const { events, commit } = askEvents(body, ASK_CITATION, question.includes("budget"));
+      return streamAnswer(response, events, question.includes("slowly"), commit);
     }
     const subject = subjectOf(request);
     const [status, answer] =
-      journeyAnswer(method, url, subject, body) ?? apiAnswer(method, url.pathname, subject);
+      askAnswer(method, url.pathname, body) ??
+      journeyAnswer(method, url, subject, body) ??
+      apiAnswer(method, url.pathname, subject);
+    if (status === 204) {
+      response.writeHead(204, { "cache-control": "no-store" });
+      return void response.end();
+    }
     send(response, status, answer, status >= 400 ? "application/problem+json" : "application/json");
   });
   await new Promise<void>((resolve) => server.listen(API_PORT, resolve));

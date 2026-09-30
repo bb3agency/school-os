@@ -2,8 +2,8 @@
 
 | Field            | Value                                                                                                                                                                                                                                                                                                                                              |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Version          | 0.3 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
-| Changes          | 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
+| Version          | 0.4 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
+| Changes          | 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
 | Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English and Telugu), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                   |
 | Related          | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10                                                                                                                                                                                                                                                                     |
 | Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                           |
@@ -45,9 +45,11 @@ know they are in the control plane.
    container queries, `appearance: base-select`.
 5. **Print.** Gradients, shadows and tints disappear; cards print as plain bordered boxes; chrome
    (`data-print="hide"`) is hidden; A4 margins; Telugu line height 1.8.
-6. **Motion.** Only colour transitions, the skeleton shimmer and the menu drawer's 160ms slide-in;
-   under `prefers-reduced-motion` the shimmer is a flat block and the drawer simply appears. The
-   sidebar's compact switch is instant (no width animation).
+6. **Motion.** Only colour transitions, the skeleton shimmer, the menu drawer's 160ms slide-in and
+   the Ask chat's motion tokens (§5.3: transform and opacity only, CSS only); under
+   `prefers-reduced-motion` the shimmer is a flat block, the drawer simply appears and the chat is
+   still (streamed text appears at once). The sidebar's compact switch is instant (no width
+   animation).
 7. **`cn()` joins classes, it does not merge them.** A `className` can add spacing, width or
    layout, but it cannot reliably override a colour, padding or radius the component already sets
    (CSS order decides, not class order). Use the variant, size, `tone` or `padding` props instead,
@@ -126,7 +128,7 @@ marked (client).
 | `Timeline`                                                                        | `items` `{id, title, time?, body?, chips?, status? done·current·pending, statusLabel?}[]`, `label`                                                                                                          | Ordered list, mono times                                                                                                                           |
 | `AiPanel`                                                                         | `greeting` (its heading), `eyebrow`, `description`, `suggestions` `{id,label,href?                                                                                                                          | onSelect?}[]`, `suggestionsLabel`, children (question form)                                                                                        | For the Ask screens. Answers go in normal cards **with source chips** (invariant 8) |
 | `QuoteBlock`                                                                      | `label`, children                                                                                                                                                                                           | Pale green quote                                                                                                                                   |
-| `SidebarNav` (client)                                                             | `label`, `items` **or** `sections` (`NavSection[]`: `{id, label, items}`; items `{href, label, icon?, exact?, nested?, activePattern?}`), `theme` `school`·`platform`, `id`                                 | One current page (`aria-current="page"` + accent bar); group headings name their lists; `collapsed:` compact styles. Used by the shell's `Sidebar` |
+| `SidebarNav` (client)                                                             | `label`, `items` **or** `sections` (`NavSection[]`: `{id, label, items}`; items `{href, label, icon?, exact?, nested?, activePattern?, sub?, subActivePattern?}`), `theme` `school`·`platform`, `id`                                 | One current page (`aria-current="page"` + accent bar); group headings name their lists; `collapsed:` compact styles. Used by the shell's `Sidebar`. `sub`: a client sub-list under an item (Ask: New chat, recents, All chats, Memory), hidden when compact; `subActivePattern`: paths whose current link is inside `sub` |
 | `UsageMeter`, `LanguageSwitcher`, `Value`, `Label`, `SecretOnce`, `ApiErrorAlert` | unchanged                                                                                                                                                                                                   |                                                                                                                                                    |
 
 Shells (`@/components/shell`): `SchoolShell` (`permissions`, `features`, `schoolName`,
@@ -265,6 +267,114 @@ fallback), `env(safe-area-inset-*)`, `:has()` and `:modal` (Baseline widely avai
 media query range syntax, `overscroll-behavior`, `overflow-wrap: anywhere`, native modal
 `<dialog>` (inert background, Escape close request).
 
+### 5.3 Ask chat patterns
+
+Ask the school is a chat (FR-KB-005, FR-KB-008, FR-KB-012; code in `features/ask/`). It lives
+inside the one shell: **no second sidebar**. Conversation history is the Ask item's sub-list in
+the sidebar (§5.2) and the All chats page.
+
+**Routes.** `/ask` (new chat), `/ask/c/{conversationId}` (a conversation, deep-linkable; `#m-{query
+id}` scrolls to one message and highlights it), `/ask/history` (All chats), `/ask/memory` (Manage
+memory), `/ask/search` and `/ask/verified` (unchanged). `/ask` and `/ask/c/{id}` share the
+`(chat)` layout, which mounts one streaming controller (`AskChatProvider`) and the chat screen,
+so a new chat keeps streaming (and keeps focus in the composer) while the URL moves to its
+conversation on the answer's `meta`. Leaving the chat stops the answer (the API records it
+`cancelled`).
+
+**Anatomy, top to bottom** (a full-height white card, `.chat-canvas`):
+
+| Part            | What it is                                                                                                                                                                                                                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header          | The chat's title as the page's `h1` (wraps, never cut off), "Chat options" (disclosure: pin, rename, delete, Manage memory, All chats) and the Ask tabs                                                                                                                                                                       |
+| Empty state     | Greeting with the first name ("Good morning, Lakshmi") and the school, the composer centred, four example cards (they only fill the box; nothing is sent until the member asks)                                                                                                                                                          |
+| Thread          | `role="log"` with `aria-live="off"`, max 48rem wide. Each turn: the question as a right-aligned bubble (`surface-sunken`), then the answer (`<article aria-label="Answer">`) full-width beside the AI mark                                                                                                                                 |
+| Answer          | Live status line → streamed preview ("Draft answer, not checked yet", caret) → the checked `final` text as restricted markdown with superscript citation chips → outcome alerts (search-only, not found, refused, error) → Sources (cards) → actions → memory notes → follow-up chips (latest answer only)                                  |
+| Composer        | Sticky at the bottom over a white fade (`.chat-dock`); auto-growing textarea (max 40vh, then scrolls), toolbar with the memory indicator, a counter from 800 of 1000 characters, and the send button that becomes Stop; hint and shortcuts below                                                                                            |
+| Jump to latest  | Floating pill above the composer when the reader scrolled up; a dot when new text arrived                                                                                                                                                                                                                                               |
+
+**Streaming semantics** (docs/06 §5.1, unchanged): `delta` is an unchecked preview; `final`
+replaces it (crossfade) and later `token`s are ignored; `status` events drive the live line
+(Understanding your question… · Searching school documents… 4 found · Searching your past chats… ·
+Reading student records… · Writing the answer…), which folds into "Worked for 4 seconds · 3
+sources" (a native `<details>` listing the steps). Events are folded as they arrive but painted at
+most once per animation frame, and only the streaming turn re-renders (`ChatTurn` is memoised).
+The preview holds back half-typed markdown (`**`, `[`, table rows, bare list markers) until it
+closes, and is revealed word by word with `requestAnimationFrame` at a pace that grows with the
+backlog (never splitting a Telugu word). The user's question appears at once and the status line
+within a frame; a failed request puts the question back into the box. After Stop the partial
+preview stays, marked "Stopped", with "Ask again".
+
+**Markdown** (`markdown.ts`, in-house, no dependency): paragraphs, bold lines for headings,
+lists (one nested level), GFM tables (in a focusable `table-scroll` region), quotes, code,
+bold/italic/strike, inline code. No HTML is ever rendered (tags are dropped as text); link targets
+other than `sos://` are dropped and their label stays text; `sos://` links open the source's
+screen. Only `[n]` markers of the answer's own citations become chips.
+
+**Citations.** A chip is a link to its source card (`Source 1: <title>`); hover or keyboard focus
+opens a popover (title, page, quote, "Open"), lazy-loaded, fixed-positioned by script through the
+CSSOM, flipped above when there is no room, closed by Escape (focus stays on the chip), by
+focus leaving or by scrolling (WCAG 1.4.13). Source cards: number, title link, page, the quote (at most 300 characters),
+"Download version n" for documents. A source the member can no longer open reads "Source you can
+no longer open", without text. Past-chat sources (`sos://conversation/{id}#q{query}`) open that
+message.
+
+**Actions** (32px icon buttons with names and tooltips; always shown on the latest answer and on
+touch screens, on hover and focus elsewhere; while streaming the row keeps its height but is
+hidden so nothing jumps): copy (plain text with `[n]` and a numbered source list), ask again
+(`regenerate_of`), helpful / not helpful (reason codes), "Save as verified answer"
+(`kb.verified_answer.manage`), and "‹ 1 / 2 ›" between versions. The latest question can be
+edited in place (`edit_of`; Enter sends, Escape cancels). "Answered from a recent identical
+question" (`meta.cached`) offers "Get a fresh answer". "Earlier messages were summarised…" is a
+quiet divider when the API says so.
+
+**Memory.** "Memory updated · Manage memory" under an answer; a suggestion card ("Remember
+this?") that saves only on Save (confirm) and deletes on Dismiss. The composer shows "Memory on"
+(link to Manage memory, with a tooltip) when the school and the member have it on. Manage memory:
+what memory is and is not, the switch (disabled with the reason when the school switched it
+off), items with edit/delete and save/dismiss for suggestions, add, "Forget everything" (confirm).
+Refused text (422 `memory_not_allowed`) says memory is for your own preferences and work context,
+not facts about students or staff.
+
+**Keyboard.** Enter sends, Shift+Enter adds a line, Ctrl+Enter always sends; never while an input
+method composes (`isComposing`, keyCode 229: Telugu keyboards); on touch-first screens Enter adds
+a line. `/` moves to the question box when not typing elsewhere (it only moves focus). Alt+N
+starts a new chat (matched by `code`, so it works with the Telugu layout, and never with AltGr).
+Chosen to avoid browser and AT shortcuts: Chrome/Edge use Ctrl+Shift+O (bookmarks/favourites) and
+NVDA uses Ctrl+Alt+N (start NVDA).
+
+**Scrolling.** The page scrolls (not an inner box). The thread follows new text while the reader
+is within 96px of the end; wheel, touch or keys away from the end unpin it (our own scrolling
+never does). Each conversation's position is remembered for the page view. Long threads render
+the newest 30 turns ("Show earlier messages" adds more) and older turns use `content-visibility:
+auto` where supported (progressive enhancement; the cap works everywhere).
+
+**Motion tokens** (`globals.css`): `--motion-enter` 180ms (message, note and chat fade + 6px rise),
+`--motion-quick` 120ms (popovers, dialogs, send/stop morph), `--motion-stagger` 50ms (follow-up
+chips, example cards), `--ease-out` cubic-bezier(0.2, 0.8, 0.2, 1); the status shimmer is a 2s
+gradient on one line of text; the caret blinks at 1s. Only transform and opacity animate (plus
+the shimmer's background position). Under `prefers-reduced-motion: reduce` nothing moves: no
+entrance, no shimmer (plain `ink-muted` text), no caret blink, streamed text appears at once and
+scrolling is instant; a highlighted message keeps a still tint. Forced colours: the shimmer is
+plain text and the caret `CanvasText`.
+
+**Accessibility.** One polite status region announces the step names (not counts, not words) and
+then "The answer is ready." with the checked answer as plain text once; the log itself is silent.
+Everything is reachable by keyboard with the visible focus ring; popovers and menus close with
+Escape and return focus. Colours reuse §7 pairs (`ink-muted` on white 7.56:1, `violet-ink` on
+`violet-soft` 7.96:1, `primary` on `primary-soft` 5.82:1, `on-action` on `action` 17.74:1).
+Telugu: the sans with `:lang(te)` line height; chat titles are the one place the sidebar
+truncates (single line, `leading-relaxed` so glyphs are not clipped; full title in `title` and
+the accessible name; the responsive check allows exactly this one-line ellipsis). Everything
+else wraps: the chat title, source titles and quotes.
+
+**Checks.** `features/ask/ask.test.tsx`, `chat.test.tsx`, `chat-units.test.tsx`,
+`history-memory.test.tsx` (vitest); `e2e/ask.spec.ts` (keyboard journey, Stop, search-only, All
+chats, memory, phone in Telugu, axe), the new pages in `e2e/responsive.spec.ts` and
+`e2e/a11y.spec.ts`. Web-platform features used: `ResizeObserver`, `IntersectionObserver`,
+`requestAnimationFrame`, `matchMedia`, `navigator.clipboard`, `background-clip: text`,
+`content-visibility` (progressive), regex lookbehind (all Baseline widely available except
+`content-visibility`, which has the DOM cap as its fallback).
+
 ## 6. Do and don't
 
 | Do                                                                                      | Don't                                                                                                         |
@@ -355,6 +465,11 @@ and the switch have no text inside when empty, so they use `border-control` (3:1
 
 - Screens still use `PageHeader`, `Card` and the other primitives in their old arrangement; each
   screen adopts breadcrumbs, KPI rows and filter bars in its own change.
-- The Ask screens have not adopted `AiPanel` yet.
+- Ask chat (§5.3), for the product owner: the recents show only while an Ask page is open (the
+  menu stays short elsewhere; one click more from other pages); example cards fill the box
+  instead of sending; `/` is a single-character shortcut (WCAG 2.1.4 asks for a way to turn it
+  off; it only moves focus); a stream keeps going when you open another conversation but stops
+  when you leave Ask; the conversation and memory endpoints are coded against a contract module
+  (`features/ask/contract.ts`) until the generated client has them.
 - `Sparkline` and `ProgressRing` cover small inline charts only; a chart library decision (if
   full charts are needed) needs an ADR (licence, bundle size, CSP).
