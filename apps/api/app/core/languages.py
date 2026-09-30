@@ -8,6 +8,7 @@ asks this module, never the setting directly.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 from app.core.config import Settings, get_settings
@@ -34,3 +35,27 @@ def output_language(requested: str | None, settings: Settings | None = None) -> 
     if requested in (TELUGU, "mixed") and telugu_enabled(settings):
         return TELUGU
     return ENGLISH
+
+
+def telugu_text(value: str | None, settings: Settings | None = None) -> str | None:
+    """A Telugu-only presentation value (a ``*_te`` label, a Telugu heading): ``value`` while
+    Telugu is switched on, ``None`` while it is hidden. Stored data is not passed through here,
+    only output that exists just to show Telugu."""
+    return value if telugu_enabled(settings) else None
+
+
+def shown_texts(
+    texts: Mapping[str, str], separator: str = " · ", settings: Settings | None = None
+) -> str:
+    """Per-language texts (``{"en": ..., "te": ...}``, e.g. a bilingual watermark) joined for
+    the languages shown, English first: only the English text while Telugu is hidden."""
+    return separator.join(texts[lang] for lang in enabled_languages(settings) if texts.get(lang))
+
+
+def contains_telugu(text: str) -> bool:
+    """True if ``text`` has any character of the Telugu Unicode block (U+0C00-U+0C7F)."""
+    return any(_TELUGU_FIRST <= ch <= _TELUGU_LAST for ch in text)
+
+
+_TELUGU_FIRST = chr(0x0C00)
+_TELUGU_LAST = chr(0x0C7F)

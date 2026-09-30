@@ -11,6 +11,7 @@ from sqlalchemy import Engine, text
 
 from app.certificates import service as certificates
 from app.core.errors import ValidationFailed
+from app.core.languages import contains_telugu
 
 pytestmark = pytest.mark.db
 C = sys.modules["sos_test_certificates_support"]
@@ -34,6 +35,21 @@ def _register_audit(admin: Engine, tenant_id: Any) -> dict[str, Any]:
     return value
 
 
+def test_ADR_0036_registers_are_english_while_telugu_is_hidden(school: Any) -> None:
+    C.issued_tc(school)
+    C.issue(school, C.student(school), "bonafide")
+    pages = [
+        _page(school, certificates.register_page, kind="transfer", academic_year_id=None),
+        _page(school, certificates.register_page, kind="certificates", academic_year_id=None),
+        _page(school, certificates.admission_register_page, academic_year_id=None),
+    ]
+    for page in pages:
+        assert "<thead>" in page or 'class="empty"' in page
+        assert not contains_telugu(page)
+        assert "Noto Sans Telugu" not in page
+
+
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_REG_001_tc_register_lists_every_serial_with_cancelled_and_duplicates(
     school: Any, admin_engine: Engine
 ) -> None:
@@ -92,6 +108,7 @@ def test_FR_REG_001_empty_year_prints_a_note(school: Any) -> None:
     assert "No certificates were issued in this academic year." in page
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_REG_003_admission_and_withdrawal_register(school: Any) -> None:
     staying = C.student(school, admission_no="AW/0009")
     leaving = C.student(school, admission_no="AW/0010")

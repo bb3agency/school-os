@@ -15,6 +15,8 @@ from typing import Final, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.languages import output_language, telugu_enabled
+
 CONFIG_PATH: Final = Path(__file__).with_name("config.yaml")
 Language = Literal["en", "te"]
 LayoutKind = Literal["board", "portal"]
@@ -79,7 +81,8 @@ class Bilingual(_Model):
     te: str = Field(min_length=1, max_length=300)
 
     def text(self, language: Language) -> str:
-        return self.te if language == "te" else self.en
+        """The label in ``language``; English while Telugu is hidden (ADR-0036)."""
+        return self.te if output_language(language) == "te" else self.en
 
 
 def _check_date_format(value: str) -> str:
@@ -168,7 +171,10 @@ class ExportsConfig(_Model):
         return label.text(language) if label is not None else source
 
     def watermark_text(self) -> str:
-        """Both languages, as printed on every file (US-901 AC2)."""
+        """As printed on every file (US-901 AC2): both languages, or English only while Telugu
+        is hidden (ADR-0036)."""
+        if not telugu_enabled():
+            return self.watermark.en
         return f"{self.watermark.en} · {self.watermark.te}"
 
 

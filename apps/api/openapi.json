@@ -479,6 +479,7 @@
       },
       "AnnouncementIn": {
         "additionalProperties": false,
+        "description": "``title_te`` and ``body_te`` are optional while Telugu is hidden (ADR-0036): left out or\nempty, the English text is stored in their place (a new announcement) or the stored text is\nkept (an update). While Telugu is shown they are required (422).",
         "properties": {
           "audience": {
             "default": "all",
@@ -521,8 +522,8 @@
             "type": "string"
           },
           "body_te": {
+            "default": "",
             "maxLength": 1000,
-            "minLength": 1,
             "title": "Body Te",
             "type": "string"
           },
@@ -563,17 +564,15 @@
             "type": "string"
           },
           "title_te": {
+            "default": "",
             "maxLength": 120,
-            "minLength": 1,
             "title": "Title Te",
             "type": "string"
           }
         },
         "required": [
           "title_en",
-          "title_te",
           "body_en",
-          "body_te",
           "starts_at",
           "ends_at"
         ],
@@ -3654,6 +3653,7 @@
       },
       "ClassCreate": {
         "additionalProperties": false,
+        "description": "``display_te`` is optional while Telugu is hidden (ADR-0036): left out, the English name\nis stored in its place. While Telugu is shown it is required (422).",
         "properties": {
           "code": {
             "title": "Code",
@@ -3666,10 +3666,17 @@
             "type": "string"
           },
           "display_te": {
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Display Te",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Te"
           },
           "sort_order": {
             "maximum": 10000.0,
@@ -3681,7 +3688,6 @@
         "required": [
           "code",
           "display_en",
-          "display_te",
           "sort_order"
         ],
         "title": "ClassCreate",
@@ -11365,7 +11371,7 @@
         "type": "object"
       },
       "NotificationOut": {
-        "description": "One notification, rendered in the reader's language (``Accept-Language``: en or te).",
+        "description": "One notification, rendered in the reader's language (``Accept-Language``: en or te;\nalways en while Telugu is hidden, ADR-0036).",
         "properties": {
           "body": {
             "title": "Body",
@@ -22730,7 +22736,7 @@
     },
     "/api/v1/attributes": {
       "get": {
-        "description": "Student attributes with classification (C2/C3), identity flag, allowed sources and\nEnglish/Telugu labels (permission ``student.read_basic``).",
+        "description": "Student attributes with classification (C2/C3), identity flag, allowed sources and\nEnglish labels (``label_te`` empty while Telugu is hidden, ADR-0036; permission\n``student.read_basic``).",
         "operationId": "list_attributes_api_v1_attributes_get",
         "responses": {
           "200": {
@@ -23884,7 +23890,7 @@
     },
     "/api/v1/certificates/{certificate_id}/print": {
       "get": {
-        "description": "The certificate as a print-ready A4 page in English and Telugu (a DRAFT while it waits\nfor approval; read, issue or approve permission). The view is audited.",
+        "description": "The certificate as a print-ready A4 page in English (and Telugu only while Telugu is\nshown, ADR-0036; a DRAFT while it waits for approval; read, issue or approve permission).\nThe view is audited.",
         "operationId": "print_certificate_api_v1_certificates__certificate_id__print_get",
         "parameters": [
           {
@@ -24366,7 +24372,7 @@
     },
     "/api/v1/change-requests/{change_request_id}/memo": {
       "get": {
-        "description": "Printable correction memo for the paper register, in English and Telugu (request or\napprove permission). Sensitive values appear only for ``student.read_sensitive`` holders.\nThe view is audited.",
+        "description": "Printable correction memo for the paper register, in English (Telugu too only while\nTelugu is shown, ADR-0036; request or approve permission). Sensitive values appear only\nfor ``student.read_sensitive`` holders. The view is audited.",
         "operationId": "change_request_memo_api_v1_change_requests__change_request_id__memo_get",
         "parameters": [
           {
@@ -24639,7 +24645,7 @@
     },
     "/api/v1/circulars/{document_id}": {
       "get": {
-        "description": "One circular with the reading of its current version: issuer, reference, date,\nsubject, English and Telugu summary with source chips, and suggested deadlines, each\nciting the sentence it comes from. Suggestions are not tasks until confirmed. The ETag is\nthe reading's version (for ``/review``). 404 when you cannot see the document.",
+        "description": "One circular with the reading of its current version: issuer, reference, date,\nsubject, English summary (``summary_te`` stays null while Telugu is hidden, ADR-0036)\nwith source chips, and suggested deadlines, each\nciting the sentence it comes from. Suggestions are not tasks until confirmed. The ETag is\nthe reading's version (for ``/review``). 404 when you cannot see the document.",
         "operationId": "get_circular_api_v1_circulars__document_id__get",
         "parameters": [
           {
@@ -24900,7 +24906,7 @@
     },
     "/api/v1/classes/defaults": {
       "post": {
-        "description": "Add any missing classes from Nursery to XII with English and Telugu names; existing\nclasses are kept (permission ``tenant.structure.manage``).",
+        "description": "Add any missing classes from Nursery to XII with English and Telugu names (the Telugu\nnames are stored but ``display_te`` is empty while Telugu is hidden, ADR-0036); existing\nclasses are kept (permission ``tenant.structure.manage``).",
         "operationId": "add_default_classes_api_v1_classes_defaults_post",
         "responses": {
           "200": {
@@ -25927,7 +25933,7 @@
     },
     "/api/v1/dq/findings": {
       "get": {
-        "description": "Findings, most severe first, with masked values, English/Telugu explanations and\ncorrection routes (permission ``dq.findings.read``). ``status`` defaults to unresolved\n(``open``, ``reopened``).",
+        "description": "Findings, most severe first, with masked values, English explanations (``te`` empty while\nTelugu is hidden, ADR-0036) and correction routes (permission ``dq.findings.read``).\n``status`` defaults to unresolved (``open``, ``reopened``).",
         "operationId": "list_findings_api_v1_dq_findings_get",
         "parameters": [
           {
@@ -26324,7 +26330,7 @@
     },
     "/api/v1/dq/rules": {
       "get": {
-        "description": "The rule catalog DQ-001..DQ-012 with English/Telugu texts (permission\n``dq.findings.read``).",
+        "description": "The rule catalog DQ-001..DQ-012 with English texts (``te`` empty while Telugu is\nhidden, ADR-0036; permission ``dq.findings.read``).",
         "operationId": "list_rules_api_v1_dq_rules_get",
         "responses": {
           "200": {
@@ -26880,7 +26886,7 @@
         ]
       },
       "post": {
-        "description": "Make a pre-check report for a board or portal profile (``export.board`` for board\nprofiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and\n``dq.findings.read``) with a recent sign-in with MFA (428 ``step_up_required``). Choose\nsections or classes (empty = every student you can see), the formats (``xlsx``, ``pdf``)\nand the language (``en``, ``te``). The students are checked again and the files are made\nin the background (202); you are notified when they are ready. Restricted (C3) values such\nas the UDISE+ ``category`` are hidden unless ``include_sensitive`` is true (needs\n``student.read_sensitive``, else 403 ``sensitive_not_allowed``); the audit log then lists\nthe restricted columns included. Errors: 422 ``unknown_profile``, ``no_students``,\n``too_many_students``. Accepts ``Idempotency-Key``.",
+        "description": "Make a pre-check report for a board or portal profile (``export.board`` for board\nprofiles, ``export.portal`` for portal profiles; also ``student.read_basic`` and\n``dq.findings.read``) with a recent sign-in with MFA (428 ``step_up_required``). Choose\nsections or classes (empty = every student you can see), the formats (``xlsx``, ``pdf``)\nand the language (``en``; ``te`` is accepted but gives English while Telugu is hidden,\nADR-0036). The students are checked again and the files are made\nin the background (202); you are notified when they are ready. Restricted (C3) values such\nas the UDISE+ ``category`` are hidden unless ``include_sensitive`` is true (needs\n``student.read_sensitive``, else 403 ``sensitive_not_allowed``); the audit log then lists\nthe restricted columns included. Errors: 422 ``unknown_profile``, ``no_students``,\n``too_many_students``. Accepts ``Idempotency-Key``.",
         "operationId": "create_precheck_export_api_v1_exports_post",
         "requestBody": {
           "content": {
@@ -29914,7 +29920,7 @@
         ]
       },
       "post": {
-        "description": "Start a parent notice in English and Telugu (``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the\nbackground; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``\n(``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it\nyourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the\nAI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer\nand queues nothing).",
+        "description": "Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;\n``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the\nbackground; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``\n(``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it\nyourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the\nAI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer\nand queues nothing).",
         "operationId": "create_notice_api_v1_notices_post",
         "requestBody": {
           "content": {
@@ -30052,7 +30058,7 @@
     },
     "/api/v1/notices/{notice_id}/approve": {
       "post": {
-        "description": "Approve a notice (``notice.approve``; ``If-Match``): English and Telugu titles and\nbodies filled (422 ``notice_incomplete``) and no personal numbers (422\n``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and\nthe image are made next.",
+        "description": "Approve a notice (``notice.approve``; ``If-Match``): the English title and body filled\n(and the Telugu ones only while Telugu is shown, ADR-0036; 422 ``notice_incomplete``) and\nno personal numbers (422\n``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and\nthe image are made next.",
         "operationId": "approve_notice_api_v1_notices__notice_id__approve_post",
         "parameters": [
           {
@@ -30274,7 +30280,7 @@
     },
     "/api/v1/notifications": {
       "get": {
-        "description": "Your notifications, newest first, in your language (English or Telugu).",
+        "description": "Your notifications, newest first, in your language (English; Telugu only while Telugu\nis shown, ADR-0036).",
         "operationId": "list_notifications_api_v1_notifications_get",
         "parameters": [
           {
@@ -33954,7 +33960,7 @@
     },
     "/api/v1/platform/tenants/{tenant_id}/deletion-certificate/download-url": {
       "get": {
-        "description": "A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English\nand Telugu). ``409 certificate_pending`` until it is issued. Audited as\n``tenant.deletion_certificate_downloaded``.",
+        "description": "A presigned GET (at most 5 minutes, attachment) for the certificate of deletion (English;\nTelugu too only while Telugu is shown, ADR-0036). ``409 certificate_pending`` until it is\nissued. Audited as ``tenant.deletion_certificate_downloaded``.",
         "operationId": "deletion_certificate_download_url_api_v1_platform_tenants__tenant_id__deletion_certificate_download_url_get",
         "parameters": [
           {

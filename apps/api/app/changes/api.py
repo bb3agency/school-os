@@ -135,9 +135,9 @@ def cancel_change_request(
     responses={200: {"content": {"text/html": {}}, "description": "Print-ready A4 memo"}},
 )
 def change_request_memo(ctx: Reader, db: TenantDB, change_request_id: uuid.UUID) -> HTMLResponse:
-    """Printable correction memo for the paper register, in English and Telugu (request or
-    approve permission). Sensitive values appear only for ``student.read_sensitive`` holders.
-    The view is audited."""
+    """Printable correction memo for the paper register, in English (Telugu too only while
+    Telugu is shown, ADR-0036; request or approve permission). Sensitive values appear only
+    for ``student.read_sensitive`` holders. The view is audited."""
     page = service.memo(db, ctx, change_request_id)
     return HTMLResponse(
         page,

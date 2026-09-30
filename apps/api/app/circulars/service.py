@@ -82,6 +82,7 @@ from app.core.errors import (
     ValidationFailed,
 )
 from app.core.ids import new_id
+from app.core.languages import telugu_enabled, telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
@@ -541,7 +542,7 @@ def _reading_out(session: Session, row: CircularReading) -> ReadingOut:
         issued_on=row.issued_on,
         subject=row.subject,
         summary_en=row.summary_en,
-        summary_te=row.summary_te,
+        summary_te=telugu_text(row.summary_te),  # null while Telugu is hidden (ADR-0036)
         summary_sources=[_citation(c) for c in row.summary_sources],
         suggestions=[_suggestion_out(s) for s in suggestions],
         suggestions_dropped=row.suggestions_dropped,
@@ -1139,8 +1140,9 @@ def _notice_out(session: Session, notice: ParentNotice) -> NoticeOut:
         draft_error=notice.draft_error,
         title_en=notice.title_en,
         body_en=notice.body_en,
-        title_te=notice.title_te,
-        body_te=notice.body_te,
+        # Kept in the database; empty while Telugu is hidden (ADR-0036).
+        title_te=telugu_text(notice.title_te) or "",
+        body_te=telugu_text(notice.body_te) or "",
         created_by=people.get(notice.created_by),
         approved_by=people.get(notice.approved_by) if notice.approved_by else None,
         approved_at=notice.approved_at,
@@ -1498,7 +1500,8 @@ def approve_notice(
     session: Session, ctx: UserContext, notice_id: uuid.UUID, version: int
 ) -> NoticeOut:
     """Approve a draft (``notice.approve``; ``If-Match``; FR-NOTICE-004/005): every title and
-    body filled (422 ``notice_incomplete``), no phone numbers, emails or Aadhaar-like numbers
+    body filled (422 ``notice_incomplete``; the Telugu ones only while Telugu is shown,
+    ADR-0036), no phone numbers, emails or Aadhaar-like numbers
     (422 ``notice_personal_data``). The PDF and image are rendered next (queue ``pdf``)."""
     if not ctx.has(NOTICE_APPROVE):
         raise Forbidden()
@@ -1513,21 +1516,29 @@ def approve_notice(
         "title_te": notice.title_te,
         "body_te": notice.body_te,
     }
-    empty = sorted(k for k, v in texts.items() if not v.strip())
+    # English first (ADR-0036): the Telugu title and body are needed only while Telugu is shown.
+    needed = texts if telugu_enabled() else {"title_en": notice.title_en, "body_en": notice.body_en}
+    empty = sorted(k for k, v in needed.items() if not v.strip())
     if empty:
         raise ValidationFailed([_error(f, "notice_incomplete") for f in empty])
     _refuse_personal(texts)
-    notice = repo.update_notice(
-        session,
-        notice.id,
-        {
-            "status": "approved",
-            "approved_by": ctx.user_id,
-            "approved_at": _now(),
-            "render_status": "queued",
-            "source_text": None,
-        },
-    )
+    values: dict[str, Any] = {
+        "status": "approved",
+        "approved_by": ctx.user_id,
+        "approved_at": _now(),
+        "render_status": "queued",
+        "source_text": None,
+    }
+    # The database still requires both languages on an approved notice
+    # (parent_notices_approved_complete). While Telugu is hidden an empty Telugu title or body
+    # takes the English text, so no migration is needed; it is never shown as Telugu (the page
+    # skips a Telugu section that repeats the English one, and the API hides it).
+    if not telugu_enabled():
+        if not notice.title_te.strip():
+            values["title_te"] = notice.title_en
+        if not notice.body_te.strip():
+            values["body_te"] = notice.body_en
+    notice = repo.update_notice(session, notice.id, values)
     _queue_render(session, notice.id)
     _audit(
         session, "notice.approved", "parent_notice", notice.id, {"ai_drafted": notice.ai_drafted}

@@ -18,6 +18,7 @@ from sqlalchemy import Engine, text
 from app.authz.kv import kv_store
 from app.core.config import EmailProviderKind, Settings
 from app.core.db import tenant_session
+from app.core.languages import contains_telugu
 from app.notifications import email, service, tasks
 
 pytestmark = pytest.mark.db
@@ -90,6 +91,7 @@ def test_US_102_no_email_is_queued_while_email_is_off(
     assert res.json()["code"] == "email_disabled"
 
 
+@pytest.mark.usefixtures("telugu_on")  # the invitee prefers Telugu (ADR-0036: switched on here)
 def test_US_102_invite_queues_an_ids_only_email_and_the_worker_sends_it(
     world: Any,
     api: Any,
@@ -127,6 +129,20 @@ def test_US_102_invite_queues_an_ids_only_email_and_the_worker_sends_it(
     assert "notifications.email.sent" in logs
     for secret in (address, "Synthetic Invitee", message.subject):
         assert secret not in logs
+
+
+def test_ADR_0036_invitation_email_is_english_while_telugu_is_hidden(
+    world: Any, api: Any, admin_engine: Engine, email_on: email.FakeEmailSender
+) -> None:
+    """A person whose profile says Telugu gets the English email and an /en sign-in link."""
+    invited = _invite(api, world.person("office_admin"), preferred_language="te")
+    (payload,) = _email_events(admin_engine, world.a.tenant_id, invited["id"])
+    assert _run(world.a.tenant_id, payload) == "sent"
+    (message,) = email_on.sent
+    assert message.language == "en"
+    assert "https://app.example.test/en" in message.text
+    assert "https://app.example.test/te" not in message.text
+    assert not contains_telugu(message.subject + message.text)
 
 
 def test_US_102_worker_skips_accepted_expired_and_unknown_invitations(

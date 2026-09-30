@@ -17,6 +17,8 @@ from app.certificates import service as certificates
 from app.certificates.schemas import ApproveIn, CertificateRequest, DuplicateRequest, ReasonIn
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, ValidationFailed
+from app.core.languages import contains_telugu
+from app.core.pdf import FONT_FAMILY, FONT_URL
 from app.core.redaction import verhoeff_check_digit
 from app.students import service as students
 
@@ -251,6 +253,7 @@ def test_US_1102_tc_waits_for_approval_and_notifies_approvers(
     assert school.people["office_admin"].membership_id not in notified
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_005_approval_issues_tc_ends_enrolment_and_student_leaves(
     school: Any, admin_engine: Engine
 ) -> None:
@@ -597,6 +600,7 @@ def _scoped_ctx(school: Any) -> Any:
     )
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_011_print_page_is_escaped_bilingual_and_marks_drafts(school: Any) -> None:
     tc = C.pending_tc(school)
     page = C.call(school, school.people["principal"], "principal", certificates.print_page, tc.id)
@@ -610,6 +614,7 @@ def test_FR_CERT_011_print_page_is_escaped_bilingual_and_marks_drafts(school: An
 # --- PDF as a document (FR-CERT-010) -------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_010_pdf_stored_as_private_certificate_document(
     school: Any, admin_engine: Engine
 ) -> None:
@@ -646,6 +651,52 @@ def test_FR_CERT_010_pdf_stored_as_private_certificate_document(
     # The document cannot be deleted while the register entry refers to it.
     with pytest.raises(DBAPIError), tenant_session(school.tenant_id) as s:
         s.execute(text("DELETE FROM kb.documents WHERE id = :d"), {"d": row["document_id"]})
+
+
+# --- English first (ADR-0036): Telugu hidden by default --------------------------------------
+
+
+def test_ADR_0036_tc_content_print_page_and_catalog_are_english_while_telugu_is_hidden(
+    school: Any,
+) -> None:
+    tc = C.pending_tc(school)
+    page = C.call(school, school.people["principal"], "principal", certificates.print_page, tc.id)
+    assert "DRAFT · NOT VALID" in page
+    assert "TRANSFER CERTIFICATE" in page
+    assert not contains_telugu(page)
+    assert FONT_FAMILY not in page
+    assert "Noto Sans Telugu" not in page
+    issued = C.approve(school, tc)
+    assert issued.content is not None
+    assert not contains_telugu(issued.content.model_dump_json())
+    assert issued.content.title_te == ""
+    assert not any(d.key.endswith("_te") for d in issued.content.details)
+    details = {d.key: d.value for d in issued.content.details}
+    assert details["class_at_leaving"] == "Class IX A (2026-27)"
+    catalog = certificates.types_catalog()
+    assert all(t.label_te == "" for t in catalog)
+    assert not contains_telugu("".join(t.model_dump_json() for t in catalog))
+
+
+def test_ADR_0036_certificate_pdf_page_has_no_telugu_or_telugu_font_by_default(
+    school: Any, admin_engine: Engine
+) -> None:
+    C.install()
+    cert = C.issue(school, C.student(school), "bonafide")
+    renderer = C.FakeRenderer()
+    assert C.render(school, cert, renderer) == "ready"
+    (page,) = renderer.pages
+    assert "This is to certify that" in page
+    assert not contains_telugu(page)
+    assert FONT_URL not in page
+    assert "@font-face" not in page
+    assert "Noto Sans Telugu" not in page
+    row = C.row(admin_engine, cert.id)
+    with admin_engine.connect() as c:
+        language: str = c.execute(
+            text("SELECT language FROM kb.documents WHERE id = :d"), {"d": row["document_id"]}
+        ).scalar_one()
+    assert language == "en"
 
 
 def test_FR_CERT_011_download_url_after_scan_and_audited(school: Any, admin_engine: Engine) -> None:

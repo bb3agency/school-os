@@ -5,6 +5,9 @@ A self-contained, bilingual (English + Telugu) A4 HTML page rendered with
 so a name such as ``<script>`` renders as text. The page has no scripts, links, images or
 external fonts; its only style block is allowed by hash (:data:`STYLE_CSP`). PDF rendering with
 headless Chromium arrives with exports (M1 exports module) and reuses this HTML.
+
+English first (ADR-0036): while Telugu is hidden (``app.core.languages``) the memo is English
+only; the Telugu lines stay in the template, dormant.
 """
 
 from __future__ import annotations
@@ -13,10 +16,13 @@ import base64
 import datetime as dt
 import hashlib
 import html
+import re
 from dataclasses import asdict, dataclass
 from string import Template
 from typing import Final
 from zoneinfo import ZoneInfo
+
+from app.core.languages import telugu_enabled
 
 IST: Final = ZoneInfo("Asia/Kolkata")
 
@@ -211,5 +217,19 @@ def render(data: MemoData) -> str:
         "notice_en": INSTRUCTIONS_EN if approved else NOT_APPROVED_EN,
         "notice_te": INSTRUCTIONS_TE if approved else NOT_APPROVED_TE,
     }
+    telugu = telugu_enabled()
+    if not telugu:
+        values["notice_te"] = ""
     escaped = {k: html.escape(v, quote=True) for k, v in values.items()}
-    return _PAGE.substitute(escaped, style=STYLE)
+    page = _PAGE.substitute(escaped, style=STYLE)
+    return page if telugu else _english_only(page)
+
+
+# Every Telugu line of the page sits in a ``<span class="te">`` whose content is escaped text
+# (never a tag), so dropping those spans leaves the English page.
+_TE_SPAN: Final = re.compile(r'\s*<span class="te">[^<]*</span>')
+
+
+def _english_only(page: str) -> str:
+    """The memo without its Telugu lines, while Telugu is hidden (ADR-0036)."""
+    return _TE_SPAN.sub("", page).replace(" / మెమో సూచిక", "").replace("<p></p>", "")

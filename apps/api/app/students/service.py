@@ -65,6 +65,7 @@ from app.core.errors import (
     ValidationFailed,
 )
 from app.core.ids import new_id
+from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.textnorm import comparison_key
@@ -428,7 +429,8 @@ def _source_rank(definition: AttributeDef, source: str) -> tuple[int, str]:
 
 
 def attribute_catalog(session: Session) -> list[AttributeOut]:
-    """Global + school attributes with classification, identity flag and labels (EN/TE)."""
+    """Global + school attributes with classification, identity flag and labels (EN/TE;
+    ``label_te`` is empty while Telugu is hidden, ADR-0036)."""
     return [
         AttributeOut(
             key=d.key,
@@ -436,7 +438,7 @@ def attribute_catalog(session: Session) -> list[AttributeOut]:
             classification=d.classification,
             is_identity=d.is_identity,
             label_en=d.label_en,
-            label_te=d.label_te,
+            label_te=telugu_text(d.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
             sort_order=d.sort_order,
             allowed_sources=list(d.allowed_sources) if d.allowed_sources else None,
             allowed_values=[str(v) for v in d.validation.get("values", ())] or None,

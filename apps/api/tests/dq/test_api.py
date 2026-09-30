@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from app.core.languages import contains_telugu
 from app.core.redaction import verhoeff_check_digit
 from app.dq.rules import load_rules
 from app.dq.schemas import RuleId
@@ -28,6 +29,7 @@ def test_FR_DQ_001_rule_filter_literal_matches_the_catalog() -> None:
     assert set(typing.get_args(RuleId)) == set(load_rules())
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_501_run_then_list_findings_with_explanations(world: Any, api: Any) -> None:
     sid = DS.student(world.a, extra=DS.aadhaar(name=SECRET, gender="female"))
     who = world.person("exam_coordinator")
@@ -61,6 +63,7 @@ def test_US_501_run_then_list_findings_with_explanations(world: Any, api: Any) -
     assert one.headers["ETag"] == f'W/"{items[0]["version"]}"'
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_US_501_summary_rules_and_profiles(world: Any, api: Any) -> None:
     who = world.person("principal")
     rules = api.call(who, "GET", "/api/v1/dq/rules").json()
@@ -84,6 +87,39 @@ def test_US_501_summary_rules_and_profiles(world: Any, api: Any) -> None:
     assert body["blockers"] + body["warnings"] == sum(body["by_severity"].values())
     bad = api.call(who, "GET", "/api/v1/dq/summary", params={"profile_key": "no-such-board"})
     assert bad.status_code == 422
+
+
+def test_ADR_0036_findings_rules_and_profiles_show_no_telugu_while_telugu_is_hidden(
+    world: Any, api: Any
+) -> None:
+    sid = DS.student(world.a, extra=DS.aadhaar(name=SECRET, gender="female"))
+    who = world.person("exam_coordinator")
+    body = {"scope": {"student_ids": [str(sid)]}, "profile_key": "cisce-registration-2026"}
+    res = api.call(
+        who, "POST", "/api/v1/dq/runs", json=body, headers={"Idempotency-Key": str(uuid.uuid4())}
+    )
+    assert res.status_code == 202, res.text
+    listed = api.call(
+        who,
+        "GET",
+        "/api/v1/dq/findings",
+        params={"student_id": str(sid), "profile_key": "cisce-registration-2026"},
+    )
+    items = listed.json()["data"]
+    assert items, "the synthetic student has findings"
+    assert all(i["explanation"]["en"] and i["explanation"]["te"] == "" for i in items)
+    assert all(r["te"] == "" for i in items for r in i["routes"])
+    assert not contains_telugu(listed.text)
+    rules = api.call(who, "GET", "/api/v1/dq/rules")
+    assert all(r["explanation"]["te"] == "" for r in rules.json())
+    assert not contains_telugu(rules.text)
+    profiles = api.call(who, "GET", "/api/v1/dq/profiles")
+    assert all(p["label_te"] == "" for p in profiles.json())
+    assert not contains_telugu(profiles.text)
+    attributes = api.call(who, "GET", "/api/v1/attributes")
+    assert attributes.status_code == 200, attributes.text
+    assert all(a["label_te"] == "" for a in attributes.json())
+    assert not contains_telugu(attributes.text)
 
 
 def test_US_501_run_validation(world: Any, api: Any) -> None:

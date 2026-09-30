@@ -117,10 +117,16 @@ def test_FR_ADM_001_manifest_lists_tables_counts_and_masking() -> None:
     assert doc["never_exported"] == ["aadhaar_name_as_printed"]
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_ADM_001_readme_is_bilingual() -> None:
     text = archive.readme("English part", "తెలుగు భాగం").decode("utf-8")
     assert "English part" in text
     assert "తెలుగు భాగం" in text
+
+
+def test_ADR_0036_readme_is_english_only_while_telugu_is_hidden() -> None:
+    text = archive.readme("English part", "తెలుగు భాగం").decode("utf-8")
+    assert text == "English part\n"
 
 
 def test_FR_ADM_001_record_tables_check_their_shape() -> None:

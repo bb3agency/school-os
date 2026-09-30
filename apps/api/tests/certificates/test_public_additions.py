@@ -195,6 +195,7 @@ def test_FR_CERT_010_download_and_archive_only_for_generated_documents(
     assert exc.value.code == "document_not_ready", "only after the malware scan"
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_013_letterhead_is_a_school_setting(school: Any, admin_engine: Engine) -> None:
     with tenant_session(school.tenant_id) as s:
         before = tenancy.get_tenant(s)

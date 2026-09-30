@@ -1,5 +1,56 @@
 @import "tailwindcss";
 
+/* PP Mori (Pangram Pangram Foundry), the UI text font. Commercial web licence held by the owner
+   (fonts/pp-mori/LICENSE-NOTE.md). Self-hosted WOFF2; no ₹ or Telugu glyphs, so the stack falls
+   back to Inter and Noto Sans Telugu for those. Weights: 200, 400, 600 (500 renders as 400). */
+@font-face {
+  font-family: "PP Mori";
+  src: url("./fonts/pp-mori/PPMori-Extralight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PP Mori";
+  src: url("./fonts/pp-mori/PPMori-ExtralightItalic.woff2") format("woff2");
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PP Mori";
+  src: url("./fonts/pp-mori/PPMori-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PP Mori";
+  src: url("./fonts/pp-mori/PPMori-RegularItalic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PP Mori";
+  src: url("./fonts/pp-mori/PPMori-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PP Mori";
+  src: url("./fonts/pp-mori/PPMori-SemiBoldItalic.woff2") format("woff2");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
 /*
  * SchoolOS design tokens (Tailwind v4, CSS-first). docs/17-ui-design-system.md describes them.
  * Only the semantic colours below exist, so every screen draws from the same palette.
@@ -120,7 +171,7 @@
   /* Latin UI font. While Telugu is switched on (ADR-0036), /fonts/telugu/noto-sans-telugu.css
      redefines the sans and mono stacks with the Telugu font as the fallback for Telugu
      glyphs; with it off, no Telugu font is named or loaded anywhere. */
-  --font-sans: "Inter Variable", system-ui, "Segoe UI", Arial, sans-serif;
+  --font-sans: "PP Mori", "Inter Variable", system-ui, "Segoe UI", Arial, sans-serif;
   /* Big KPI numbers and display headings, Latin only (:lang(te) switches back to sans). */
   --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
   --font-serif: var(--font-display);

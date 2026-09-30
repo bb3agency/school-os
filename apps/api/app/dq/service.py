@@ -49,6 +49,7 @@ from app.core.errors import (
     ValidationFailed,
 )
 from app.core.ids import new_id
+from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
@@ -202,6 +203,12 @@ def _param_text(
     return text
 
 
+def _shown(code: str, en: str, te: str) -> Bilingual:
+    """An explanation as shown: the Telugu text is empty while Telugu is hidden (ADR-0036).
+    Matching and the rules themselves never read it."""
+    return Bilingual(code=code, en=en, te=telugu_text(te) or "")
+
+
 def _explanation(
     code: str, params: Mapping[str, Any], labels: _Labels, related_visible: bool
 ) -> Bilingual:
@@ -214,12 +221,12 @@ def _explanation(
         )
         for lang in Language
     }
-    return Bilingual(code=code, en=texts[Language.EN], te=texts[Language.TE])
+    return _shown(code, texts[Language.EN], texts[Language.TE])
 
 
 def _bilingual(code: str) -> Bilingual:
     text = load_explanations().get(code)
-    return Bilingual(code=code, en=text.en, te=text.te)
+    return _shown(code, text.en, text.te)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1004,7 +1011,7 @@ def rules_catalog() -> list[RuleOut]:
                     floor=policy.floor.value if policy.floor else None,
                     cap=policy.cap.value if policy.cap else None,
                 ),
-                explanation=Bilingual(code=rule.explanation_key, en=text.en, te=text.te),
+                explanation=_shown(rule.explanation_key, text.en, text.te),
                 routes=[_bilingual(code) for code in rule.routes],
             )
         )
@@ -1017,7 +1024,7 @@ def profiles_catalog() -> list[ProfileOut]:
             key=p.key,
             version=p.version,
             label_en=p.label_en,
-            label_te=p.label_te,
+            label_te=telugu_text(p.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
             required_fields=list(p.required_fields),
             needs_apaar=p.needs_apaar,
         )

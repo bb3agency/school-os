@@ -69,6 +69,7 @@ def _aadhaar() -> str:
 # --- submit (FR-CR-001) --------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CR_001_submit_snapshots_old_value_and_announces_the_request(
     school: Any, admin_engine: Engine
 ) -> None:

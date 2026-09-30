@@ -19,7 +19,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from app.core.pdf import FONT_FAMILY, FONT_URL
+from app.core.languages import output_language, telugu_enabled
+from app.core.pdf import font_face_css, font_stack
 from app.exports.config import ExportsConfig, Language
 from app.exports.tables import Table, clean_text
 
@@ -119,7 +120,7 @@ def _counts(data: PrecheckInput) -> tuple[Counts, dict[uuid.UUID, str]]:
 
 
 def build_precheck(data: PrecheckInput, cfg: ExportsConfig) -> PrecheckReport:
-    lang = data.language
+    lang = output_language(data.language)  # English while Telugu is hidden (ADR-0036)
 
     def t(key: str) -> str:
         return cfg.label(key, lang)
@@ -198,13 +199,15 @@ def build_precheck(data: PrecheckInput, cfg: ExportsConfig) -> PrecheckReport:
 
 # --- print HTML -----------------------------------------------------------------------------------
 
-STYLE: Final = f"""
-@font-face {{ font-family: "{FONT_FAMILY}"; src: url("{FONT_URL}") format("truetype");
-  font-weight: 100 900; font-stretch: 62.5% 100%; }}
+
+def style() -> str:
+    """The print CSS. The bundled Telugu font is declared only while Telugu is shown
+    (ADR-0036)."""
+    return f"""{font_face_css()}
 @page {{ size: A4 landscape; margin: 14mm 12mm 16mm; }}
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; padding: 0; }}
-body {{ color: #111; background: #fff; font-family: "{FONT_FAMILY}", sans-serif;
+body {{ color: #111; background: #fff; font-family: {font_stack()};
   font-size: 9pt; line-height: 1.7; }}
 .watermark {{ position: fixed; top: 42%; left: 0; right: 0; text-align: center;
   transform: rotate(-18deg); font-size: 26pt; font-weight: 700; color: rgba(160, 0, 0, 0.10);
@@ -239,7 +242,7 @@ def _row(cells: Sequence[object], *, tag: str = "td", cls: str | None = None) ->
 def render_precheck_html(report: PrecheckReport, cfg: ExportsConfig) -> str:
     """A4 landscape print page: summary and findings (blockers first), watermarked."""
     data = report.data
-    lang = data.language
+    lang = output_language(data.language)  # English while Telugu is hidden (ADR-0036)
     summary = "".join(_row(r, tag="td") for r in report.summary.rows[:10])
     notes = []
     if data.sensitive_masked:
@@ -261,9 +264,10 @@ def render_precheck_html(report: PrecheckReport, cfg: ExportsConfig) -> str:
         f'<html lang="{lang}"><head><meta charset="utf-8">'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
         "style-src 'unsafe-inline'; font-src https://assets.sos.invalid\">"
-        f"<title>{_e(report.title)}</title><style>{STYLE}</style></head><body>"
-        f'<div class="watermark" aria-hidden="true">{_e(cfg.watermark.en)}<br>'
-        f"{_e(cfg.watermark.te)}</div>"
+        f"<title>{_e(report.title)}</title><style>{style()}</style></head><body>"
+        f'<div class="watermark" aria-hidden="true">{_e(cfg.watermark.en)}'
+        + (f"<br>{_e(cfg.watermark.te)}" if telugu_enabled() else "")
+        + "</div>"
         f'<header><p class="school">{_e(data.school)}</p><h1>{_e(report.title)}</h1>'
         f'<p class="mark">{_e(report.watermark)}</p></header>'
         f'<section><table class="summary"><tbody>{summary}</tbody></table>{"".join(notes)}'

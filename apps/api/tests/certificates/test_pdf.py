@@ -14,7 +14,8 @@ import pypdfium2 as pdfium
 import pytest
 
 from app.certificates import templates
-from app.core.pdf import ChromiumRenderer
+from app.core.languages import contains_telugu
+from app.core.pdf import ChromiumRenderer, font_face_css
 
 pytestmark = pytest.mark.chromium
 
@@ -65,6 +66,7 @@ def _text(pdf: bytes) -> tuple[int, str, tuple[float, float]]:
     return pages, text, size
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_CERT_010_transfer_certificate_prints_on_a4_with_telugu(
     renderer: ChromiumRenderer,
 ) -> None:
@@ -79,6 +81,7 @@ def test_FR_CERT_010_transfer_certificate_prints_on_a4_with_telugu(
     assert b"NotoSansTelugu" in pdf or b"Noto Sans Telugu" in pdf
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_FR_REG_004_register_prints_landscape(renderer: ChromiumRenderer) -> None:
     page = templates.render_register(
         templates.RegisterPage(
@@ -94,7 +97,7 @@ def test_FR_REG_004_register_prints_landscape(renderer: ChromiumRenderer) -> Non
             empty_en="None",
             empty_te="లేవు",
         )
-    ).replace("<style>", "<style>" + templates._FONT_FACE, 1)
+    ).replace("<style>", "<style>" + font_face_css(), 1)
     pdf = renderer.render(page)
     pages, text, (width, height) = _text(pdf)
     assert pages >= 2
@@ -102,3 +105,17 @@ def test_FR_REG_004_register_prints_landscape(renderer: ChromiumRenderer) -> Non
     assert "TC/2026-27/0079" in text
     # pdfium may split Telugu clusters with spaces in its text layer: compare without them.
     assert "క్రమసంఖ్య" in "".join(text.split())
+
+
+def test_ADR_0036_certificate_pdf_is_english_without_the_telugu_font(
+    renderer: ChromiumRenderer,
+) -> None:
+    """Telugu hidden (the default): an English page, and the Telugu font is not embedded."""
+    pdf = renderer.render(templates.render_certificate(_content(), reference="R1", for_pdf=True))
+    pages, text, _ = _text(pdf)
+    assert pages == 1
+    assert "TC/2026-27/0007" in text
+    assert "TRANSFER CERTIFICATE" in text
+    assert not contains_telugu(text)
+    assert b"NotoSansTelugu" not in pdf
+    assert b"Noto Sans Telugu" not in pdf

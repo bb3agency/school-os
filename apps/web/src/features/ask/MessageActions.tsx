@@ -9,7 +9,7 @@ import { useApiMutation } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import type { AskCitation } from "./answer";
 import { FEEDBACK_REASONS, useKnowledgeApi, type FeedbackBody, type FeedbackReason } from "./data";
-import { toPlainText } from "./markdown";
+import { toPlainText } from "./markdown-parse";
 
 /** Small round icon button of the message action rows (32px; label in a tooltip on hover). */
 export function ActionButton({

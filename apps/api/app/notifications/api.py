@@ -2,7 +2,8 @@
 
 Every route needs only an active membership (``session.authenticated``) and works on the
 caller's own notifications; another person's notification answers 404 (BOLA). Titles and bodies
-are rendered in the language of the ``Accept-Language`` header (``te`` or ``en``, default en).
+are rendered in the language of the ``Accept-Language`` header (``te`` or ``en``, default en;
+always English while Telugu is hidden, ADR-0036).
 """
 
 from __future__ import annotations
@@ -48,7 +49,8 @@ def list_notifications(
     cursor: Cursor = None,
     unread: Annotated[bool, Query(description="Only unread notifications.")] = False,
 ) -> Page[NotificationOut]:
-    """Your notifications, newest first, in your language (English or Telugu)."""
+    """Your notifications, newest first, in your language (English; Telugu only while Telugu
+    is shown, ADR-0036)."""
     return service.list_for_me(
         db,
         ctx,

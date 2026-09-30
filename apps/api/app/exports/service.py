@@ -68,6 +68,7 @@ from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, ValidationFailed
 from app.core.ids import new_id
+from app.core.languages import output_language, telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.pdf import PdfRenderer, get_renderer
 from app.documents import service as documents
@@ -275,7 +276,7 @@ def list_profiles(ctx: UserContext) -> list[ExportProfileOut]:
             version=p.version,
             layout_version=p.layout.layout_version,
             label_en=p.label_en,
-            label_te=p.label_te,
+            label_te=telugu_text(p.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
             fields=list(p.layout.fields),
             required_fields=list(p.required_fields),
             allowed=ctx.has(PERMISSION_OF_KIND[p.kind]),
@@ -339,6 +340,8 @@ def _create(
     sensitive_columns: Sequence[str] = (),
 ) -> ExportOut:
     export_id = new_id()
+    # ``te`` is accepted (backward compatible) but gives English while Telugu is hidden.
+    language = output_language(language)
     task = RENDER_TASK if "pdf" in formats else GENERATE_TASK
     job = ops.start_job(
         session, task_name=task, idempotency_key=f"{task}:{export_id}", created_by=ctx.user_id
@@ -754,7 +757,8 @@ class _Snapshot:
             kind=row.kind,
             profile_key=row.profile_key,
             formats=tuple(row.formats),
-            language="te" if row.language == "te" else "en",
+            # English while Telugu is hidden, also for a Telugu export queued before (ADR-0036).
+            language=output_language(row.language),
             scope=dict(row.scope or {}),
             columns=tuple(row.columns or ()),
             include_sensitive=row.include_sensitive,
