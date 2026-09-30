@@ -14,7 +14,7 @@ import {
   type BffStub,
 } from "@/test/bff-stub";
 import { fakeAadhaar, ID, me } from "@/test/records-fixtures";
-import { intlErrors, renderWithIntl } from "@/test/render";
+import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { renderChat } from "./chat-test-utils";
 import AskSearchPage from "@/app/[locale]/(school)/ask/search/page";
 import VerifiedAnswersPage from "@/app/[locale]/(school)/ask/verified/page";
@@ -681,6 +681,43 @@ describe("verified answers (US-802, FR-KB-030)", () => {
         "This text is not on that page. Copy the exact words from the document.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("with Telugu switched off, offers no answer language and saves English (ADR-0036)", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([]);
+    stub.routes["POST /bff/api/v1/knowledge/verified-answers"] = () =>
+      Response.json(verified(), { status: 201 });
+    renderWithIntl(<VerifiedAnswersPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Add a verified answer" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByLabelText(messages.en.ask.verified.language)).toBeNull();
+    expect(dialog.textContent ?? "").not.toMatch(/Telugu|[ఀ-౿]/);
+    await user.type(within(dialog).getByLabelText(/^Question/), "When do exams begin?");
+    await user.type(within(dialog).getByLabelText(/^Answer/), "On 22/09/2026.");
+    await user.type(within(dialog).getByLabelText(/^Source 1/), DOC_SOURCE);
+    await user.type(within(dialog).getByLabelText(/^Quoted text for source 1/), "Exams begin");
+    await user.click(within(dialog).getByRole("button", { name: "Save verified answer" }));
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/knowledge/verified-answers")).toHaveLength(1),
+    );
+    expect(body("POST /bff/api/v1/knowledge/verified-answers")).toMatchObject({ language: "en" });
+  });
+
+  it("offers Telugu and mixed answer languages when Telugu is switched on (ADR-0036)", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([]);
+    renderWithIntl(<VerifiedAnswersPage />, { telugu: true });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Add a verified answer" }));
+    const dialog = await screen.findByRole("dialog");
+    const select = within(dialog).getByLabelText(messages.en.ask.verified.language);
+    expect([...(select as HTMLSelectElement).options].map((option) => option.value)).toEqual([
+      "en",
+      "te",
+      "mixed",
+    ]);
   });
 
   it("checks sources before sending: only sos://doc pages", async () => {

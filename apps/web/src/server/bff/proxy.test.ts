@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { decodeProtectedHeader, jwtVerify } from "jose";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHarness, type Harness } from "@/test/bff-harness";
 import { TEST_SERVICE_TOKEN_KEY } from "@/test/server-env";
 import { isStrictPolicy, MAX_REQUEST_BODY_BYTES, proxyToApi } from "./proxy";
@@ -12,6 +12,10 @@ let h: Harness;
 
 beforeEach(async () => {
   h = await createHarness();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -37,6 +41,8 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
   });
 
   it("forwards with the access token and a service token that matches the API contract", async () => {
+    // Telugu switched on explicitly (ADR-0036): the browser's Telugu preference is forwarded.
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     await h.signIn("staff", clerk);
     h.apiCalls.length = 0;
     h.setApi(() => json({ data: [{ id: "u1" }], next_cursor: null }));
@@ -64,6 +70,18 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
     expect(payload.exp! - payload.iat!).toBeLessThanOrEqual(60);
     expect(payload.exp! - payload.iat!).toBeGreaterThan(0);
     expect(payload.jti).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
+  });
+
+  it("never asks the API for Telugu while Telugu is switched off (ADR-0036)", async () => {
+    await h.signIn("staff", clerk);
+    h.apiCalls.length = 0;
+    h.setApi(() => json({ data: [], next_cursor: null }));
+    await call("/bff/api/v1/users", { headers: { "accept-language": "te-IN,te;q=0.9,en;q=0.5" } });
+    await call("/bff/api/v1/users", { headers: { "accept-language": "te" } });
+    expect(h.apiCalls.map((upstream) => upstream.headers.get("accept-language"))).toEqual([
+      "en",
+      "en",
+    ]);
   });
 
   it("mints a fresh service token (new jti) for every call", async () => {

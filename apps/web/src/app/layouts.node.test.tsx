@@ -182,6 +182,8 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
   });
 
   it("goes back to the picker when the API says the school must be chosen again", async () => {
+    // Telugu switched on explicitly (ADR-0036): the picker keeps the Telugu UI language.
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     requestPath = "/te/audit";
     await signInDirect("staff", HARNESS_TENANT);
     h.setApi((request) =>
@@ -194,6 +196,21 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
         SchoolLayout({ children: "x", params: Promise.resolve({ locale: "te" }) }),
       ),
     ).toBe("/te/choose-school?next=%2Fte%2Faudit");
+  });
+
+  it("with Telugu switched off, a te locale param never yields Telugu pages (ADR-0036)", async () => {
+    requestPath = "/en/audit";
+    await signInDirect("staff", HARNESS_TENANT);
+    h.setApi((request) =>
+      new URL(request.url).pathname === "/api/v1/me"
+        ? json({ status: 409, code: "active_tenant_required" }, 409)
+        : defaultApi(request),
+    );
+    expect(
+      await redirectOf(() =>
+        SchoolLayout({ children: "x", params: Promise.resolve({ locale: "te" }) }),
+      ),
+    ).toBe("/en/choose-school?next=%2Fen%2Faudit");
   });
 });
 
@@ -253,6 +270,8 @@ describe("school picker page (ADR-0019)", () => {
   });
 
   it("keeps a same-origin next and sends people with no school to 'no access yet'", async () => {
+    // Telugu switched on explicitly (ADR-0036): 'no access yet' in the Telugu UI language.
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     await signInDirect("staff", null);
     const element = (await ChooseSchoolPage({
       params: en,
@@ -273,5 +292,22 @@ describe("school picker page (ADR-0019)", () => {
         }),
       ),
     ).toBe("/te/no-access");
+  });
+
+  it("with Telugu switched off, 'no access yet' is the English page (ADR-0036)", async () => {
+    await signInDirect("staff", null);
+    h.setApi((request) =>
+      new URL(request.url).pathname === "/api/v1/me/schools"
+        ? json({ data: [] })
+        : defaultApi(request),
+    );
+    expect(
+      await redirectOf(() =>
+        ChooseSchoolPage({
+          params: Promise.resolve({ locale: "te" }),
+          searchParams: Promise.resolve({}),
+        }),
+      ),
+    ).toBe("/en/no-access");
   });
 });

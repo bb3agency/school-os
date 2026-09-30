@@ -24,9 +24,17 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
-  it("negotiates Telugu from Accept-Language", () => {
+  it("negotiates Telugu from Accept-Language when Telugu is switched on (ADR-0036)", () => {
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     const response = proxy(request("/", { "accept-language": "te-IN,te;q=0.9,en;q=0.5" }));
     expect(response.headers.get("location")).toMatch(/\/te$/);
+  });
+
+  it("serves /te pages when Telugu is switched on (ADR-0036)", () => {
+    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
+    const response = proxy(request("/te/students"));
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("link") ?? "").toContain('hreflang="te"');
   });
 
   it("forwards a fresh nonce to rendering via the request CSP header", () => {
@@ -127,5 +135,53 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
         "default-src 'self'",
       );
     }
+  });
+});
+
+describe("proxy with Telugu switched off (ADR-0036, the default)", () => {
+  it("redirects every /te URL to the same /en page, keeping the query", () => {
+    for (const [path, target] of [
+      ["/te", "/en"],
+      ["/te/", "/en/"],
+      ["/te/students", "/en/students"],
+      ["/te/settings/users?page=2", "/en/settings/users?page=2"],
+      ["/te/platform/schools/abc", "/en/platform/schools/abc"],
+    ] as const) {
+      const response = proxy(request(path));
+      expect(response.status, path).toBe(307);
+      expect(response.headers.get("location"), path).toBe(`https://office.school.example${target}`);
+      expect(response.headers.get("content-security-policy"), path).toContain("default-src 'self'");
+      expect(response.headers.get("x-content-type-options"), path).toBe("nosniff");
+    }
+  });
+
+  it("treats an unrecognised or empty switch value as off", () => {
+    for (const value of ["", "false", "0", "no", "off", "maybe"]) {
+      vi.stubEnv("SOS_TELUGU_ENABLED", value);
+      expect(proxy(request("/te/students")).headers.get("location"), value).toMatch(
+        /\/en\/students$/,
+      );
+    }
+  });
+
+  it("never selects Telugu from Accept-Language or a stored locale cookie", () => {
+    const fromHeader = proxy(request("/", { "accept-language": "te-IN,te;q=0.9" }));
+    expect(fromHeader.headers.get("location")).toMatch(/\/en$/);
+    const fromCookie = proxy(request("/", { cookie: "NEXT_LOCALE=te" }));
+    expect(fromCookie.headers.get("location")).toMatch(/\/en$/);
+    const both = proxy(request("/students", { cookie: "NEXT_LOCALE=te", "accept-language": "te" }));
+    expect(both.headers.get("location")).toMatch(/\/en\/students$/);
+  });
+
+  it("serves /en pages and names no Telugu alternate", () => {
+    const response = proxy(request("/en/students", { "accept-language": "te" }));
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("link") ?? "").not.toMatch(/hreflang="te"|\/te(\/|>)/);
+  });
+
+  it("does not treat paths that merely start with te as Telugu", () => {
+    const response = proxy(request("/en/tests"));
+    expect(response.headers.get("location")).toBeNull();
+    expect(proxy(request("/teachers")).headers.get("location")).toMatch(/\/en\/teachers$/);
   });
 });

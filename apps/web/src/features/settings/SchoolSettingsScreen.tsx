@@ -21,6 +21,7 @@ import { refreshSessionInfo } from "@/lib/bff/session-client";
 import { STAFF_ME_KEY, useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatInr } from "@/lib/format";
 import { formList, useApiForm } from "@/lib/forms";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import type { Locale } from "@/i18n/routing";
 import {
   DATE_FORMATS,
@@ -164,11 +165,15 @@ function useSettingsText() {
 function SettingsList({ settings }: { settings: SchoolSettings }) {
   const t = useTranslations("schoolSettings.form");
   const text = useSettingsText();
+  const telugu = useTeluguEnabled();
   return (
     <dl className="divide-y divide-border">
-      <Row label={t("languagesField")}>
-        <Value>{text.languages(settings)}</Value>
-      </Row>
+      {/* ADR-0036: English is the only language while Telugu is switched off. */}
+      {telugu ? (
+        <Row label={t("languagesField")}>
+          <Value>{text.languages(settings)}</Value>
+        </Row>
+      ) : null}
       <Row label={t("dateFormatField")}>
         <Value>{settings.date_format}</Value>
       </Row>
@@ -247,6 +252,7 @@ function SettingsForm({
   const [reloading, setReloading] = useState(false);
   const settings = tenant.settings;
   const queryClient = useQueryClient();
+  const telugu = useTeluguEnabled();
 
   /**
    * A saved setting applies without a reload (FR-TEN-012): GET /me through the BFF sets the
@@ -265,7 +271,15 @@ function SettingsForm({
 
   const form = useApiForm({
     schema: settingsSchema,
-    extra: (element) => ({ languages: formList(element, "languages") }),
+    // ADR-0036: while Telugu is switched off the languages are not asked for; the stored
+    // choice is kept (English when none is stored).
+    extra: (element) => ({
+      languages: telugu
+        ? formList(element, "languages")
+        : settings.languages?.length
+          ? [...settings.languages]
+          : ["en"],
+    }),
     invalidate: [TENANT_KEY],
     submit: async (data): Promise<TenantProfile | null> => {
       setOutcome(null);
@@ -298,35 +312,37 @@ function SettingsForm({
     <form noValidate onSubmit={form.onSubmit} className="space-y-6">
       <Card title={t("groups.languages.title")} description={t("groups.languages.description")}>
         <div className="space-y-6">
-          <fieldset
-            className="space-y-2"
-            aria-describedby={languagesError ? `${languagesId}-error` : `${languagesId}-hint`}
-          >
-            <legend className="text-sm font-medium text-ink">{t("form.languagesField")}</legend>
-            <p id={`${languagesId}-hint`} className="text-sm text-ink-muted">
-              {t("form.languagesHint")}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {LANGUAGES.map((code) => (
-                <label key={code} className={chip}>
-                  <input
-                    type="checkbox"
-                    name="languages"
-                    value={code}
-                    defaultChecked={(settings.languages ?? []).includes(code)}
-                    aria-invalid={languagesError ? true : undefined}
-                    className="size-4 accent-primary"
-                  />
-                  <span lang={code}>{tl(code)}</span>
-                </label>
-              ))}
-            </div>
-            {languagesError ? (
-              <p id={`${languagesId}-error`} className="text-sm font-semibold text-danger">
-                {languagesError}
+          {telugu ? (
+            <fieldset
+              className="space-y-2"
+              aria-describedby={languagesError ? `${languagesId}-error` : `${languagesId}-hint`}
+            >
+              <legend className="text-sm font-medium text-ink">{t("form.languagesField")}</legend>
+              <p id={`${languagesId}-hint`} className="text-sm text-ink-muted">
+                {t("form.languagesHint")}
               </p>
-            ) : null}
-          </fieldset>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map((code) => (
+                  <label key={code} className={chip}>
+                    <input
+                      type="checkbox"
+                      name="languages"
+                      value={code}
+                      defaultChecked={(settings.languages ?? []).includes(code)}
+                      aria-invalid={languagesError ? true : undefined}
+                      className="size-4 accent-primary"
+                    />
+                    <span lang={code}>{tl(code)}</span>
+                  </label>
+                ))}
+              </div>
+              {languagesError ? (
+                <p id={`${languagesId}-error`} className="text-sm font-semibold text-danger">
+                  {languagesError}
+                </p>
+              ) : null}
+            </fieldset>
+          ) : null}
 
           <fieldset
             className="space-y-2"

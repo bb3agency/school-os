@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
 import { SourceChip } from "@/features/ask/parts";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
@@ -223,6 +224,7 @@ function SuggestionItem({
 
 function ReadingCard({ circular, reading }: { circular: CircularDetail; reading: Reading }) {
   const t = useTranslations("circulars");
+  const telugu = useTeluguEnabled();
   const nothing = t("notFound");
   return (
     <Card title={t("readingTitle")} actions={<ReadingPill status={circular.reading_status} />}>
@@ -236,19 +238,22 @@ function ReadingCard({ circular, reading }: { circular: CircularDetail; reading:
           </Fact>
           <Fact label={t("fields.subject")}>{reading.subject ?? nothing}</Fact>
         </dl>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className={telugu ? "grid gap-4 lg:grid-cols-2" : undefined}>
           <section aria-label={t("summaryEn")} className="space-y-1">
             <h3 className="text-sm font-semibold text-ink">{t("summaryEn")}</h3>
             <p lang="en" className="text-ink">
               {reading.summary_en ?? nothing}
             </p>
           </section>
-          <section aria-label={t("summaryTe")} className="space-y-1">
-            <h3 className="text-sm font-semibold text-ink">{t("summaryTe")}</h3>
-            <p lang="te" className="leading-loose text-ink">
-              {reading.summary_te ?? nothing}
-            </p>
-          </section>
+          {/* ADR-0036: the Telugu summary only while Telugu is switched on. */}
+          {telugu ? (
+            <section aria-label={t("summaryTe")} className="space-y-1">
+              <h3 className="text-sm font-semibold text-ink">{t("summaryTe")}</h3>
+              <p lang="te" className="leading-loose text-ink">
+                {reading.summary_te ?? nothing}
+              </p>
+            </section>
+          ) : null}
         </div>
         <Chips citations={reading.summary_sources} title={circular.title} />
         {reading.passages_total !== null &&

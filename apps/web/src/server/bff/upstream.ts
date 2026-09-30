@@ -1,4 +1,6 @@
 import "server-only";
+import { enabledLocales } from "@/i18n/languages";
+import type { Locale } from "@/i18n/routing";
 import type { AuthRuntime } from "@/server/runtime";
 import type { Session } from "@/server/session/store";
 import { mintServiceToken, SERVICE_TOKEN_HEADER } from "./service-token";
@@ -17,14 +19,16 @@ const FORWARDED_REQUEST_HEADERS = [
   "idempotency-key",
 ] as const;
 
-const SUPPORTED_LANGUAGES = ["en", "te"] as const;
-
-/** First supported language in an Accept-Language header; English otherwise. */
-export function negotiateLanguage(header: string | null): "en" | "te" {
+/**
+ * First language in an Accept-Language header that is switched on (English, and Telugu only
+ * while `SOS_TELUGU_ENABLED` is on: ADR-0036); English otherwise.
+ */
+export function negotiateLanguage(header: string | null): Locale {
+  const supported = enabledLocales();
   for (const part of (header ?? "").split(",")) {
     const tag = part.split(";")[0]?.trim().toLowerCase() ?? "";
     const primary = tag.split("-")[0];
-    const match = SUPPORTED_LANGUAGES.find((language) => language === primary);
+    const match = supported.find((language) => language === primary);
     if (match) return match;
   }
   return "en";

@@ -14,6 +14,7 @@ import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { STAFF_ME_KEY, useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -157,6 +158,7 @@ function EditProfile({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
   const t = useTranslations("school.users.detail.edit");
   const tl = useTranslations("language");
   const api = useBffClient("staff");
+  const telugu = useTeluguEnabled();
   return (
     <ActionDialog
       triggerLabel={t("trigger")}
@@ -165,6 +167,8 @@ function EditProfile({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
       confirmLabel={t("submit")}
       stepUp
       schema={profileSchema}
+      // ADR-0036: while Telugu is switched off the language is not asked for and stays as is.
+      {...(telugu ? {} : { extra: () => ({ preferred_language: user.preferred_language }) })}
       fieldMap={userFieldMap}
       invalidate={[USER_KEYS.all, ...(isSelf ? [STAFF_ME_KEY] : [])]}
       errorNamespace="school.users"
@@ -202,14 +206,16 @@ function EditProfile({ user, isSelf }: { user: StaffUser; isSelf: boolean }) {
             maxLength={EMAIL_MAX}
             autoComplete="off"
           />
-          <SelectField
-            name="preferred_language"
-            label={t("language")}
-            hint={t("languageHint")}
-            defaultValue={user.preferred_language}
-            error={errors.preferred_language}
-            options={USER_LANGUAGES.map((value) => ({ value, label: tl(value) }))}
-          />
+          {telugu ? (
+            <SelectField
+              name="preferred_language"
+              label={t("language")}
+              hint={t("languageHint")}
+              defaultValue={user.preferred_language}
+              error={errors.preferred_language}
+              options={USER_LANGUAGES.map((value) => ({ value, label: tl(value) }))}
+            />
+          ) : null}
         </>
       )}
     </ActionDialog>
@@ -330,6 +336,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
   const t = useTranslations("school.users");
   const td = useTranslations("school.users.detail");
   const tl = useTranslations("language");
+  const telugu = useTeluguEnabled();
   const tc = useTranslations("common");
   const tn = useTranslations("school.nav");
   const me = useStaffMe();
@@ -435,7 +442,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
               <Value>{user.email}</Value>
             </span>
           </Item>
-          <Item label={td("language")}>{tl(user.preferred_language)}</Item>
+          {telugu ? <Item label={td("language")}>{tl(user.preferred_language)}</Item> : null}
           <Item label={t("colStatus")}>
             <UserStatusBadge status={user.status} />
           </Item>

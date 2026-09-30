@@ -11,6 +11,7 @@ import { CircularsScreen } from "./CircularsScreen";
 import {
   dueState,
   looksPersonal,
+  noticeComplete,
   noticeText,
   setCircularsPollDelayForTesting,
   setNoticeDownloadOpenerForTesting,
@@ -37,6 +38,9 @@ vi.mock("next/navigation", async (importOriginal) => {
 });
 
 const en = messages.en;
+/** Telugu switched on explicitly (ADR-0036): the bilingual behaviour these tests pin. */
+const TELUGU_ON = { telugu: true } as const;
+const TELUGU_SCRIPT = /[\u0C00-\u0C7F]/;
 const DOC = "0192f3a4-0000-7000-8000-00000000d001";
 const SUGGESTION = "0192f3a4-0000-7000-8000-00000000e001";
 const TASK = "0192f3a4-0000-7000-8000-00000000f001";
@@ -217,7 +221,7 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
     stub.routes[`GET /bff/api/v1/circulars/${DOC}`] = () => Response.json(detail());
     stub.routes[`POST /bff/api/v1/circular-suggestions/${SUGGESTION}/confirm`] = () =>
       Response.json(task(), { status: 201 });
-    renderWithIntl(<CircularDetailScreen documentId={DOC} />);
+    renderWithIntl(<CircularDetailScreen documentId={DOC} />, TELUGU_ON);
     expect(await screen.findByText("Rc.No.101/A/2026")).toBeVisible();
     expect(screen.getAllByText(en.circulars.aiBadge).length).toBeGreaterThan(0);
     // Every AI statement comes with its source: the sentence of the circular (CLAUDE.md §10).
@@ -393,7 +397,7 @@ describe("parent notices (US-1605, US-1606)", () => {
       asked += 1;
       return Response.json(asked < 3 ? notice(drafting()) : notice({ version: 2 }));
     };
-    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />, TELUGU_ON);
     expect(await screen.findByText(en.notices.drafting.title)).toBeVisible();
     expect(screen.getByText(en.notices.drafting.body)).toBeVisible();
     expect(screen.getAllByText(en.notices.status.drafting).length).toBeGreaterThan(0);
@@ -426,7 +430,7 @@ describe("parent notices (US-1605, US-1606)", () => {
       current = notice(drafting({ version: 3 }));
       return Response.json(current, { status: 202 });
     };
-    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />, TELUGU_ON);
     expect(await screen.findByText(en.notices.draftFailed.title)).toBeVisible();
     expect(screen.getByText(en.notices.draftError.ai_budget_exhausted)).toBeVisible();
     // Writing it by hand stays possible.
@@ -497,14 +501,102 @@ describe("parent notices (US-1605, US-1606)", () => {
       });
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />, TELUGU_ON);
     await userEvent.click(await screen.findByRole("button", { name: en.notices.approved.copy }));
-    expect(writeText).toHaveBeenCalledWith(noticeText(approved));
-    expect(noticeText(approved)).toContain("క్రీడా దినోత్సవం");
+    expect(writeText).toHaveBeenCalledWith(noticeText(approved, { telugu: true }));
+    expect(noticeText(approved, { telugu: true })).toContain("క్రీడా దినోత్సవం");
     expect(await screen.findByText(en.notices.approved.copied)).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: en.notices.approved.downloadPdf }));
     await waitFor(() => expect(opened).toEqual([SIGNED]));
     expect(document.body.textContent).not.toContain("X-Amz-Signature");
+  });
+});
+
+describe("circulars and notices with Telugu switched off (ADR-0036, the default)", () => {
+  const off = messages.englishOnly;
+
+  it("the AI reading shows the English summary only", async () => {
+    signedIn(["document.read", "circular.review", "notice.draft"]);
+    stub.routes[`GET /bff/api/v1/circulars/${DOC}`] = () => Response.json(detail());
+    const { container } = renderWithIntl(<CircularDetailScreen documentId={DOC} />);
+    expect(await screen.findByText("Rc.No.101/A/2026")).toBeVisible();
+    expect(screen.getByRole("region", { name: off.circulars.summaryEn })).toBeVisible();
+    expect(screen.queryByRole("region", { name: en.circulars.summaryTe })).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(TELUGU_SCRIPT);
+    expect(container.textContent ?? "").not.toMatch(/Telugu/);
+    expect(container.querySelector("[lang='te']")).toBeNull();
+  });
+
+  it("the notices list shows no Telugu titles", async () => {
+    signedIn(["notice.draft"]);
+    stub.routes["GET /bff/api/v1/notices"] = () =>
+      Response.json({ data: [notice()], next_cursor: null });
+    const { container } = renderWithIntl(<NoticesScreen />);
+    expect(await screen.findByRole("link", { name: "Sports day" })).toBeVisible();
+    expect(container.textContent ?? "").not.toMatch(TELUGU_SCRIPT);
+    expect(container.textContent ?? "").not.toMatch(/Telugu/);
+  });
+
+  it("the editor asks for English only, saves English only and approves an English notice", async () => {
+    signedIn(["notice.draft", "notice.approve"]);
+    let current = notice({ title_te: "", body_te: "" });
+    stub.routes[`GET /bff/api/v1/notices/${NOTICE}`] = () => Response.json(current);
+    stub.routes[`PATCH /bff/api/v1/notices/${NOTICE}`] = () => {
+      current = notice({ title_en: "Sports day 2026", title_te: "", body_te: "", version: 2 });
+      return Response.json(current);
+    };
+    stub.routes[`POST /bff/api/v1/notices/${NOTICE}/approve`] = () => {
+      current = { ...current, status: "approved", render_status: "queued", version: 3 };
+      return Response.json(current);
+    };
+    const { container } = renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    expect(await screen.findByText(en.notices.aiDrafted)).toBeVisible();
+    expect(screen.getAllByLabelText(en.notices.editor.title)).toHaveLength(1);
+    expect(screen.getAllByLabelText(en.notices.editor.body)).toHaveLength(1);
+    expect(container.querySelector("[lang='te']")).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Telugu/);
+    // Telugu texts are empty, yet the notice is complete: approving is possible.
+    expect(screen.queryByText(off.notices.editor.incomplete)).toBeNull();
+    const title = screen.getByLabelText(en.notices.editor.title);
+    await userEvent.clear(title);
+    await userEvent.type(title, "Sports day 2026");
+    await userEvent.click(screen.getByRole("button", { name: en.notices.editor.approve }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/notices/${NOTICE}/approve`)).toHaveLength(1),
+    );
+    expect(
+      JSON.parse(stub.callsTo(`PATCH /bff/api/v1/notices/${NOTICE}`)[0]?.body ?? "{}"),
+    ).toEqual({ title_en: "Sports day 2026", body_en: "Sports day is on 14/11/2026." });
+  });
+
+  it("an approved notice previews and copies English only", async () => {
+    signedIn(["notice.draft"]);
+    const approved = notice({ status: "approved", files_available: true, render_status: "ready" });
+    stub.routes[`GET /bff/api/v1/notices/${NOTICE}`] = () => Response.json(approved);
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const { container } = renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    await userEvent.click(await screen.findByRole("button", { name: en.notices.approved.copy }));
+    expect(writeText).toHaveBeenCalledWith("Sports day\nSports day is on 14/11/2026.");
+    expect(container.textContent ?? "").not.toMatch(TELUGU_SCRIPT);
+    expect(container.querySelector("[lang='te']")).toBeNull();
+  });
+
+  it("drafting shows English wording and one English skeleton", async () => {
+    signedIn(["notice.draft"]);
+    stub.routes[`GET /bff/api/v1/notices/${NOTICE}`] = () => Response.json(notice(drafting()));
+    renderWithIntl(<NoticeDetailScreen noticeId={NOTICE} />);
+    expect(await screen.findByText(off.notices.drafting.title)).toBeVisible();
+    expect(document.body.textContent ?? "").not.toMatch(/Telugu/);
+  });
+
+  it("noticeText and noticeComplete leave Telugu out unless it is switched on", () => {
+    const text = notice();
+    expect(noticeText(text)).toBe("Sports day\nSports day is on 14/11/2026.");
+    expect(noticeText(text, { telugu: true })).toContain("క్రీడా దినోత్సవం");
+    const englishOnly = notice({ title_te: "", body_te: "" });
+    expect(noticeComplete(englishOnly)).toBe(true);
+    expect(noticeComplete(englishOnly, { telugu: true })).toBe(false);
   });
 });
 

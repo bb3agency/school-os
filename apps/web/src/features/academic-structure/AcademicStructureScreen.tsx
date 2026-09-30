@@ -19,6 +19,7 @@ import { DataTable, type Column } from "@/components/ui/Table";
 import { Label } from "@/components/ui/Label";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -28,8 +29,8 @@ import type { Loadable } from "@/lib/loadable";
 import {
   ALL_STRUCTURE_KEYS,
   STRUCTURE_MANAGE,
-  classCreateSchema,
-  classEditSchema,
+  classCreateSchemaFor,
+  classEditSchemaFor,
   classLabel,
   ifMatch,
   isArchived,
@@ -517,9 +518,10 @@ function ClassNameFields({
   nextOrder?: number;
 }) {
   const t = useTranslations("academicStructure.classes");
+  const telugu = useTeluguEnabled();
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className={telugu ? "grid gap-4 sm:grid-cols-2" : "grid gap-4"}>
         <TextField
           name="display_en"
           label={t("enField")}
@@ -529,15 +531,18 @@ function ClassNameFields({
           lang="en"
           required
         />
-        <TextField
-          name="display_te"
-          label={t("teField")}
-          error={errors.display_te}
-          defaultValue={schoolClass?.display_te}
-          maxLength={100}
-          lang="te"
-          required
-        />
+        {/* ADR-0036: the Telugu name only while Telugu is switched on. */}
+        {telugu ? (
+          <TextField
+            name="display_te"
+            label={t("teField")}
+            error={errors.display_te}
+            defaultValue={schoolClass?.display_te}
+            maxLength={100}
+            lang="te"
+            required
+          />
+        ) : null}
       </div>
       <TextField
         name="sort_order"
@@ -556,6 +561,7 @@ function ClassNameFields({
 function AddClassDialog({ nextOrder }: { nextOrder: number }) {
   const t = useTranslations("academicStructure.classes");
   const api = useBffClient("staff");
+  const telugu = useTeluguEnabled();
   return (
     <ActionDialog
       triggerLabel={t("add")}
@@ -563,7 +569,7 @@ function AddClassDialog({ nextOrder }: { nextOrder: number }) {
       title={t("add")}
       description={t("addDescription")}
       confirmLabel={t("add")}
-      schema={classCreateSchema}
+      schema={classCreateSchemaFor(telugu)}
       invalidate={ALL_STRUCTURE_KEYS}
       errorNamespace="academicStructure"
       submit={(data, key) =>
@@ -573,7 +579,9 @@ function AddClassDialog({ nextOrder }: { nextOrder: number }) {
             body: {
               code: data.code,
               display_en: data.display_en,
-              display_te: data.display_te,
+              // The API still requires a Telugu name; while Telugu is off (ADR-0036) nobody is
+              // asked for one, so the English name stands in until Telugu returns.
+              display_te: telugu ? (data.display_te ?? data.display_en) : data.display_en,
               sort_order: data.sort_order,
             },
           }),
@@ -606,6 +614,7 @@ function EditClassDialog({ schoolClass }: { schoolClass: SchoolClass }) {
   const locale = useLocale();
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
+  const telugu = useTeluguEnabled();
   const name = classLabel(schoolClass, locale);
   return (
     <ActionDialog
@@ -615,7 +624,7 @@ function EditClassDialog({ schoolClass }: { schoolClass: SchoolClass }) {
       title={t("classes.editTitle", { name })}
       description={t("classes.codeFixed", { code: schoolClass.code })}
       confirmLabel={t("save")}
-      schema={classEditSchema}
+      schema={classEditSchemaFor(telugu)}
       invalidate={ALL_STRUCTURE_KEYS}
       errorNamespace="academicStructure"
       submit={(data) =>
@@ -626,7 +635,8 @@ function EditClassDialog({ schoolClass }: { schoolClass: SchoolClass }) {
               headers: { "If-Match": ifMatch(schoolClass.version) },
               body: {
                 display_en: data.display_en,
-                display_te: data.display_te,
+                // ADR-0036: the stored Telugu name is left as it is while Telugu is off.
+                ...(telugu && data.display_te ? { display_te: data.display_te } : {}),
                 sort_order: data.sort_order,
               },
             }),

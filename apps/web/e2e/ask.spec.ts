@@ -7,6 +7,7 @@ import {
   pressOn,
   signIn,
 } from "./support/a11y-helpers";
+import { expectNoTelugu, openTelugu, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
 
 /**
  * Ask the school as a chat (US-801, US-802, FR-KB-005..012, FR-KB-030): the synthetic SSE
@@ -232,7 +233,43 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     await expect(page.getByText("Nothing remembered yet")).toBeVisible();
   });
 
-  test("phone (375×812): the chat, recents in the menu drawer, Telugu", async ({ page }) => {
+  test("phone (375×812): the chat, recents in the menu drawer, English", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await signIn(page, "/en/ask", "clerk");
+    const box = page.getByLabel(/^Your question/);
+    await expect(box).toBeVisible();
+    await expectNoHorizontalOverflow(page, "ask phone en");
+    await box.fill("When are the Dasara holidays?");
+    await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect(page).toHaveURL(/\/en\/ask\/c\//);
+    await expect(page.getByText("The answer is ready.")).toBeAttached();
+    await expectNoHorizontalOverflow(page, "ask answered phone en");
+    await expectNoAxeViolations(page, "ask answered phone en");
+    const boxBottom = await box.evaluate((node) => node.getBoundingClientRect().bottom);
+    expect(boxBottom).toBeLessThanOrEqual(812);
+
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer.getByRole("link", { name: "New chat" })).toBeVisible();
+    await expect(drawer.getByRole("list", { name: "Recent" }).getByRole("link")).not.toHaveCount(0);
+    await expectNoAxeViolations(page, "drawer recents en");
+  });
+
+  test("with Telugu off: Ask shows no Telugu and /te/ask lands on English (ADR-0036)", async ({
+    page,
+  }, testInfo) => {
+    test.skip(teluguOn(testInfo), "checks the Telugu-off default");
+    await signIn(page, "/en/ask", "clerk");
+    await expect(page.getByLabel(/^Your question/)).toBeVisible();
+    await expectNoTelugu(page, "/en/ask");
+    await openTelugu(page, "/te/ask", testInfo);
+    await openTelugu(page, "/te/ask/verified", testInfo);
+  });
+
+  test(`phone (375×812): the chat, recents in the menu drawer, Telugu ${TELUGU}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(!teluguOn(testInfo), TELUGU_OFF_REASON);
     await page.setViewportSize({ width: 375, height: 812 });
     await signIn(page, "/te/ask", "clerk");
     const box = page.getByLabel(/^మీ ప్రశ్న/);
@@ -255,7 +292,9 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     await expectNoAxeViolations(page, "drawer recents te");
   });
 
-  test("search, verified answers and Telugu pages pass axe", async ({ page }) => {
+  test(`search, verified answers and Telugu pages pass axe ${TELUGU}`, async ({
+    page,
+  }, testInfo) => {
     await signIn(page, "/en/ask/search", "clerk");
     await expect(page.getByRole("heading", { level: 1, name: "Ask the school" })).toBeVisible();
     await page.getByLabel(/^Search for/).focus();
@@ -270,7 +309,9 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
       ["/te/ask", "మీ ప్రశ్న"],
       ["/te/ask/verified", "When are the Dasara holidays?"],
     ] as const) {
-      await page.goto(path);
+      // ADR-0036: /te pages only while Telugu is on; otherwise they must land on English.
+      if (!path.startsWith("/te")) await page.goto(path);
+      else if (!(await openTelugu(page, path, testInfo))) continue;
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.getByText(proof).first()).toBeAttached();
       await expect(page.getByText("Loading…")).toHaveCount(0);

@@ -1,6 +1,7 @@
 import createIntlMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
-import { routing } from "@/i18n/routing";
+import { englishPathFor, teluguEnabled } from "@/i18n/languages";
+import { englishRouting, routing } from "@/i18n/routing";
 import {
   applySecurityHeaders,
   buildContentSecurityPolicy,
@@ -8,7 +9,9 @@ import {
   isHttpsDeployment,
 } from "@/lib/security-headers";
 
-const handleI18nRouting = createIntlMiddleware(routing);
+// ADR-0036: English and Telugu when SOS_TELUGU_ENABLED is on, English only otherwise.
+const handleBilingualRouting = createIntlMiddleware(routing);
+const handleEnglishRouting = createIntlMiddleware(englishRouting);
 
 /** Same name as PATH_HEADER in src/server/session/rsc.ts (kept here: no server-only import). */
 const PATH_HEADER = "x-sos-path";
@@ -37,6 +40,22 @@ function isNonLocalised(pathname: string): boolean {
 }
 
 /**
+ * Locale routing (NFR-I18N-001). With Telugu switched off (ADR-0036) a `/te/...` URL is
+ * redirected to the same `/en/...` page (307: temporary, Telugu may come back by
+ * configuration) and only English is negotiated.
+ */
+function localise(request: NextRequest): NextResponse {
+  if (teluguEnabled()) return handleBilingualRouting(request);
+  const english = englishPathFor(request.nextUrl.pathname);
+  if (english) {
+    const target = request.nextUrl.clone();
+    target.pathname = english;
+    return NextResponse.redirect(target, 307);
+  }
+  return handleEnglishRouting(request);
+}
+
+/**
  * Next.js 16 proxy (formerly middleware): per-request CSP nonce + security headers
  * (SEC-010) and locale negotiation/prefix routing (NFR-I18N-001).
  */
@@ -60,7 +79,7 @@ export function proxy(request: NextRequest): NextResponse {
 
   const response = isNonLocalised(request.nextUrl.pathname)
     ? NextResponse.next({ request: { headers: request.headers } })
-    : handleI18nRouting(request);
+    : localise(request);
 
   applySecurityHeaders(response.headers, { csp, hsts: https });
   if (OWN_CSP_PATHS.some((pattern) => pattern.test(request.nextUrl.pathname))) {

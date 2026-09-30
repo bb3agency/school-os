@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openTelugu, TELUGU } from "./support/telugu";
 import {
   expectFocusInsideOpenDialog,
   expectFocusRing,
@@ -19,7 +20,7 @@ import { API_PORT } from "./support/stand-in";
  *
  * Every screen: the data is shown (not only the shell), no WCAG 2.2 AA axe violations, no
  * horizontal scroll at 1366×768, a visible focus indicator on every Tab stop (English), and a
- * Telugu check. Key actions are driven by the keyboard only (focus, Enter/Space/Tab; Escape
+ * Telugu check (with Telugu switched on; ADR-0036). Key actions are driven by the keyboard only (focus, Enter/Space/Tab; Escape
  * closes dialogs and returns focus). Files are chosen through the file chooser that the
  * keyboard opens; the presigned storage POST is answered by page.route (same origin, so the
  * page's CSP `connect-src 'self'` holds).
@@ -61,7 +62,10 @@ async function openAndEscape(page: Page, trigger: Locator, name: string) {
   await expectFocusRing(trigger, `${name} trigger after Escape`);
 }
 
-test.describe.serial("M1 journeys: import, findings, change request, pre-check export", () => {
+// ADR-0036: tagged to run again with Telugu on; with it off each /te step checks the redirect
+// to the English page and that no Telugu is shown.
+test.describe
+  .serial(`M1 journeys: import, findings, change request, pre-check export ${TELUGU}`, () => {
   test.skip(process.env.E2E_STAND_IN !== "1", "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
 
   test.beforeAll(async ({ request }) => {
@@ -76,7 +80,7 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
 
   test("import: upload, map columns, check rows, add them (US-401, FR-IMP-001..005)", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await signIn(page, "/en/imports", MAKER);
     await expect(page).toHaveURL(/\/en\/imports$/);
     await checkScreen(page, "/en/imports", [
@@ -86,10 +90,10 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
     ]);
     await expect(page.getByRole("cell", { name: "42", exact: true })).toBeVisible();
 
-    await page.goto("/te/imports");
-    await checkScreen(page, "/te/imports", ["గత దిగుమతులు", "Class list (office format)"], {
-      focusStops: false,
-    });
+    if (await openTelugu(page, "/te/imports", testInfo))
+      await checkScreen(page, "/te/imports", ["గత దిగుమతులు", "Class list (office format)"], {
+        focusStops: false,
+      });
 
     // Upload by keyboard: Space on the file input opens the chooser; Tab; Enter submits.
     await page.goto("/en/imports");
@@ -160,18 +164,18 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
       "Synthetica Anjali Devi",
     ]);
 
-    await page.goto(`/te/imports/${IDS.importNew}`);
-    await checkScreen(
-      page,
-      "import committed te",
-      ["విద్యార్థి రికార్డుల్లో చేర్చబడింది", "చేర్చిన వరుసలు"],
-      { focusStops: false },
-    );
+    if (await openTelugu(page, `/te/imports/${IDS.importNew}`, testInfo))
+      await checkScreen(
+        page,
+        "import committed te",
+        ["విద్యార్థి రికార్డుల్లో చేర్చబడింది", "చేర్చిన వరుసలు"],
+        { focusStops: false },
+      );
   });
 
   test("findings: blockers first, resolve one with a note, accept one as it is (US-501, US-502, FR-DQ-020)", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await signIn(page, "/en/findings", MAKER);
     await expect(page).toHaveURL(/\/en\/findings$/);
     await expect(page.getByRole("heading", { level: 2, name: "1 blocker" })).toBeVisible();
@@ -182,13 +186,16 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
       "••/••/2014",
     ]);
 
-    await page.goto("/te/findings");
-    await checkScreen(
-      page,
-      "/te/findings",
-      ["పుట్టిన తేదీ వేరుగా ఉంది. బోర్డులు, APAAR కోసం ఇవి ఒకేలా ఉండాలి.", "Synthetica Ravi Kumar"],
-      { focusStops: false },
-    );
+    if (await openTelugu(page, "/te/findings", testInfo))
+      await checkScreen(
+        page,
+        "/te/findings",
+        [
+          "పుట్టిన తేదీ వేరుగా ఉంది. బోర్డులు, APAAR కోసం ఇవి ఒకేలా ఉండాలి.",
+          "Synthetica Ravi Kumar",
+        ],
+        { focusStops: false },
+      );
 
     // Open the parent-name finding by keyboard, then resolve it with a note.
     await page.goto("/en/findings");
@@ -225,10 +232,10 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
       { focusStops: false },
     );
 
-    await page.goto(`/te/findings/${IDS.findingFather}`);
-    await checkScreen(page, "finding resolved te", ["పరిష్కరించబడింది", "పరిష్కరించిన తేదీ"], {
-      focusStops: false,
-    });
+    if (await openTelugu(page, `/te/findings/${IDS.findingFather}`, testInfo))
+      await checkScreen(page, "finding resolved te", ["పరిష్కరించబడింది", "పరిష్కరించిన తేదీ"], {
+        focusStops: false,
+      });
 
     // Accept the gender finding as it is (reason; step-up is the server's call).
     await page.goto(`/en/findings/${IDS.findingGender}`);
@@ -249,13 +256,13 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
     await expect(waiveDialog).toBeHidden();
     await expect(page.getByText("Accepted on")).toBeVisible();
 
-    await page.goto(`/te/findings/${IDS.findingGender}`);
-    await checkScreen(page, "finding waived te", ["అంగీకరించబడింది"], { focusStops: false });
+    if (await openTelugu(page, `/te/findings/${IDS.findingGender}`, testInfo))
+      await checkScreen(page, "finding waived te", ["అంగీకరించబడింది"], { focusStops: false });
   });
 
   test("change request: the maker asks for a correction with evidence (US-601 AC1, FR-CR-001)", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await signIn(page, `/en/findings/${IDS.findingDob}`, MAKER);
     await checkScreen(page, "finding dob", ["Problem DQ-002", "••/••/2014"], {
       focusStops: false,
@@ -274,13 +281,13 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
     await expect(page.getByLabel("Field", { exact: true })).toHaveValue("dob");
     await expect(page.getByLabel("Record to correct")).toHaveValue("admission_register");
 
-    await page.goto(newUrl.replace("/en/", "/te/"));
-    await checkScreen(
-      page,
-      "new change request te",
-      ["సవరణ కోసం అభ్యర్థించండి", "Synthetica Ravi Kumar · SYN-2026-014 · Class 6 · A"],
-      { focusStops: false },
-    );
+    if (await openTelugu(page, newUrl.replace("/en/", "/te/"), testInfo))
+      await checkScreen(
+        page,
+        "new change request te",
+        ["సవరణ కోసం అభ్యర్థించండి", "Synthetica Ravi Kumar · SYN-2026-014 · Class 6 · A"],
+        { focusStops: false },
+      );
 
     // Keyboard only: value, Tab to the reason, the evidence file, Enter to send.
     await page.goto(newUrl);
@@ -319,15 +326,15 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
 
   test("change request: the checker approves it; the finding clears (US-601 AC2, FR-CR-002)", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await signIn(page, "/en/change-requests", CHECKER);
     await expect(page).toHaveURL(/\/en\/change-requests$/);
     await checkScreen(page, "/en/change-requests (checker)", ["Waiting for you", "Date of birth"]);
 
-    await page.goto("/te/change-requests");
-    await checkScreen(page, "/te/change-requests", ["మీ కోసం వేచి ఉంది", "పుట్టిన తేదీ"], {
-      focusStops: false,
-    });
+    if (await openTelugu(page, "/te/change-requests", testInfo))
+      await checkScreen(page, "/te/change-requests", ["మీ కోసం వేచి ఉంది", "పుట్టిన తేదీ"], {
+        focusStops: false,
+      });
 
     await page.goto("/en/change-requests");
     await pressOn(
@@ -351,10 +358,10 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
     await expect(page.getByText("The new value was recorded as verified")).toBeVisible();
     await checkScreen(page, "change request approved", ["Approved"], { focusStops: false });
 
-    await page.goto(`/te/change-requests/${IDS.changeRequest}`);
-    await checkScreen(page, "change request approved te", ["ఆమోదించబడింది"], {
-      focusStops: false,
-    });
+    if (await openTelugu(page, `/te/change-requests/${IDS.changeRequest}`, testInfo))
+      await checkScreen(page, "change request approved te", ["ఆమోదించబడింది"], {
+        focusStops: false,
+      });
 
     // Every finding is now resolved or accepted.
     await page.goto("/en/findings");
@@ -365,7 +372,7 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
 
   test("pre-check export: make it, wait until ready, download by keyboard (US-501 AC4, FR-EXP-001..004)", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await signIn(page, "/en/exports/new/precheck", MAKER);
     await expect(page).toHaveURL(/\/en\/exports\/new\/precheck$/);
     await checkScreen(page, "new pre-check", [
@@ -373,13 +380,13 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
     ]);
     await expect(page.getByLabel("Format")).toHaveValue("cisce-registration-2026");
 
-    await page.goto("/te/exports/new/precheck");
-    await checkScreen(
-      page,
-      "new pre-check te",
-      ["కొత్త ముందస్తు తనిఖీ", "పూర్తి పేరు, పుట్టిన తేదీ, లింగం"],
-      { focusStops: false },
-    );
+    if (await openTelugu(page, "/te/exports/new/precheck", testInfo))
+      await checkScreen(
+        page,
+        "new pre-check te",
+        ["కొత్త ముందస్తు తనిఖీ", "పూర్తి పేరు, పుట్టిన తేదీ, లింగం"],
+        { focusStops: false },
+      );
 
     await page.goto("/en/exports/new/precheck");
     await expect(page.getByLabel("Format")).toHaveValue("cisce-registration-2026");
@@ -398,15 +405,15 @@ test.describe.serial("M1 journeys: import, findings, change request, pre-check e
     await pressOn(download, "Enter", "download xlsx");
     expect((await file).suggestedFilename()).toBe("precheck-cisce-registration-2026.xlsx");
 
-    await page.goto(`/te/exports/${IDS.export}`);
-    await checkScreen(
-      page,
-      "export ready te",
-      ["బోర్డు ముందస్తు తనిఖీ · CISCE నమోదు 2026", "సిద్ధం"],
-      {
-        focusStops: false,
-      },
-    );
+    if (await openTelugu(page, `/te/exports/${IDS.export}`, testInfo))
+      await checkScreen(
+        page,
+        "export ready te",
+        ["బోర్డు ముందస్తు తనిఖీ · CISCE నమోదు 2026", "సిద్ధం"],
+        {
+          focusStops: false,
+        },
+      );
 
     await page.goto("/en/exports");
     await checkScreen(page, "/en/exports", ["Board pre-check · CISCE registration 2026"], {

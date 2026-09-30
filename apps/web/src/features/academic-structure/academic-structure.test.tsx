@@ -316,7 +316,8 @@ describe("academic structure screen (US-202, FR-TEN-010)", () => {
       Response.json({ ...CLASS_6, id: "0192f3a4-0000-7000-8000-0000000000c7" }, { status: 201 });
     stub.routes[`PATCH /bff/api/v1/classes/${CLASS_6.id}`] = () =>
       Response.json({ ...CLASS_6, version: 3 });
-    renderWithIntl(<AcademicStructureScreen />);
+    // Telugu switched on explicitly (ADR-0036): the Telugu name is asked for only then.
+    renderWithIntl(<AcademicStructureScreen />, { telugu: true });
 
     await userEvent.click(await screen.findByRole("button", { name: "Add class" }));
     const add = screen.getByRole("dialog", { name: "Add class" });
@@ -354,6 +355,49 @@ describe("academic structure screen (US-202, FR-TEN-010)", () => {
       display_te: "6వ తరగతి",
       sort_order: 6,
     });
+  });
+
+  it("with Telugu switched off, class forms ask for the English name only (ADR-0036)", async () => {
+    structure([READ, MANAGE]);
+    stub.routes["POST /bff/api/v1/classes"] = () =>
+      Response.json({ ...CLASS_6, id: "0192f3a4-0000-7000-8000-0000000000c7" }, { status: 201 });
+    stub.routes[`PATCH /bff/api/v1/classes/${CLASS_6.id}`] = () =>
+      Response.json({ ...CLASS_6, version: 3 });
+    const { container } = renderWithIntl(<AcademicStructureScreen />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add class" }));
+    const add = screen.getByRole("dialog", { name: "Add class" });
+    expect(within(add).queryByLabelText("Name in Telugu")).toBeNull();
+    expect(add.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    await userEvent.type(within(add).getByLabelText("Class code"), "7");
+    await userEvent.type(within(add).getByLabelText("Name in English"), "Class 7");
+    await userEvent.click(within(add).getByRole("button", { name: "Add class" }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/classes")).toHaveLength(1));
+    // The API still requires display_te: the English name stands in, never asked for.
+    expect(bodyOf("POST /bff/api/v1/classes")).toEqual({
+      code: "7",
+      display_en: "Class 7",
+      display_te: "Class 7",
+      sort_order: 7,
+    });
+
+    const classes = await region("Classes");
+    const row = within(classes).getByText("Class 6").closest("tr") as HTMLElement;
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const edit = screen.getByRole("dialog", { name: "Change Class 6" });
+    expect(within(edit).queryByLabelText("Name in Telugu")).toBeNull();
+    const english = within(edit).getByLabelText("Name in English");
+    await userEvent.clear(english);
+    await userEvent.type(english, "Class VI");
+    await userEvent.click(within(edit).getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(stub.callsTo(`PATCH /bff/api/v1/classes/${CLASS_6.id}`)).toHaveLength(1),
+    );
+    // The stored Telugu name is left as it is.
+    expect(
+      JSON.parse(stub.callsTo(`PATCH /bff/api/v1/classes/${CLASS_6.id}`)[0]?.body ?? "{}"),
+    ).toEqual({ display_en: "Class VI", sort_order: 6 });
+    expect(container.textContent ?? "").not.toMatch(/[\u0C00-\u0C7F]/);
   });
 
   it("adds the standard classes Nursery to XII (US-202 AC1)", async () => {

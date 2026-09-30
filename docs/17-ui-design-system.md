@@ -2,9 +2,9 @@
 
 | Field            | Value                                                                                                                                                                                                                                                                                                                                              |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Version          | 0.4 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
-| Changes          | 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
-| Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English and Telugu), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                   |
+| Version          | 0.5 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
+| Changes          | 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
+| Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English; Telugu hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                   |
 | Related          | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10                                                                                                                                                                                                                                                                     |
 | Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                           |
 | Living reference | `/[locale]/dev/ui`: every primitive and variant with synthetic content. Local development only (same guard as `/dev/sign-in`: `next dev` + local stub issuer; a 404 everywhere else)                                                                                                                                                               |
@@ -30,10 +30,11 @@ know they are in the control plane.
    a pair. Gradients are checked at their **lightest** stop. Focus is always visible (3px ring,
    `--color-focus`; yellow on platform chrome; white on the blue AI panel). Colour is never the only
    signal: pills carry text, rings carry a number, the switch knob moves.
-2. **Telugu.** Noto Sans Telugu is the fallback of every font stack, `:lang(te)` keeps the taller
-   line height, and the serif display and mono eyebrow switch back to the sans with normal spacing
-   in Telugu (`.font-display:lang(te)`, `.eyebrow:lang(te)`). Never set tight line heights or
-   letter-spacing on text that may be Telugu.
+2. **Telugu (only while it is switched on, §5.4).** Noto Sans Telugu is then the fallback of the
+   sans and mono stacks, `:lang(te)` keeps the taller line height, and the serif display and mono
+   eyebrow switch back to the sans with normal spacing in Telugu (`.font-display:lang(te)`,
+   `.eyebrow:lang(te)`). Never set tight line heights or letter-spacing on text that may be
+   Telugu: data (a name copied from a register) can still be in Telugu script.
 3. **CSP (SEC-010).** No `style` attributes, no external resources. Colours come from classes;
    SVG geometry uses presentation attributes (`strokeDashoffset`, `points`), which CSP allows.
    Fonts are self-hosted via `@fontsource` (`font-src 'self'`).
@@ -54,6 +55,9 @@ know they are in the control plane.
    layout, but it cannot reliably override a colour, padding or radius the component already sets
    (CSS order decides, not class order). Use the variant, size, `tone` or `padding` props instead,
    or ask for a new variant.
+8. **English first (ADR-0036).** With `SOS_TELUGU_ENABLED` off (the default) a screen shows no
+   Telugu at all: no language switch, no Telugu label, field, column, option, preview or font.
+   Hide Telugu through `useTeluguEnabled()` (§5.4), never by deleting it.
 
 ## 3. Tokens (`globals.css`, Tailwind v4 `@theme`)
 
@@ -75,7 +79,7 @@ Use them as Tailwind utilities (`bg-surface`, `text-ink-muted`, `border-border`,
 | Platform | `platform`, `platform-hover`, `platform-ink`, `platform-muted`, `platform-accent`, `platform-accent-ink`, `platform-soft`                 | Control-plane chrome only                                 |
 | Radii    | `xs` 4, `sm` 8, `md` 10 (buttons, inputs), `lg` 14, `xl` 20 (cards), `2xl` 24, `full`                                                     |                                                           |
 | Shadows  | `shadow-card`, `shadow-raised` (buttons, selected segment), `shadow-popover` (dialogs, menus)                                             |                                                           |
-| Fonts    | `font-sans` (Inter → Noto Sans Telugu), `font-display` / `font-serif` (Instrument Serif), `font-mono` (JetBrains Mono → Noto Sans Telugu) |                                                           |
+| Fonts    | `font-sans` (Inter; → Noto Sans Telugu while Telugu is on), `font-display` / `font-serif` (Instrument Serif), `font-mono` (JetBrains Mono; → Noto Sans Telugu while on) |                                                           |
 
 Component classes (in `@layer components`): `.eyebrow`, `.select-chevron`, `.skeleton`,
 `.pill-gradient-blue|violet|teal`, `.ai-gradient`, `.ai-chrome` (white focus ring),
@@ -83,8 +87,11 @@ Component classes (in `@layer components`): `.eyebrow`, `.select-chevron`, `.ske
 
 Fonts (all OFL-1.1, pinned exact in `apps/web/package.json`): `@fontsource-variable/inter`
 (variable weights), `@fontsource/instrument-serif` (400), `@fontsource/jetbrains-mono` (500),
-`@fontsource/noto-sans-telugu` (400/600/700). Every file declares `unicode-range`, so a page
-downloads only the scripts it shows.
+`@fontsource/noto-sans-telugu` (400/600/700, Telugu subset). Every file declares
+`unicode-range`, so a page downloads only the scripts it shows. Noto Sans Telugu is **not**
+bundled: `globals.css` names no Telugu font, and the locale layout links
+`/fonts/telugu/noto-sans-telugu.css` (faces plus the two stacks above) only while Telugu is on;
+that route answers 404 while it is off (§5.4).
 
 ## 4. Components (`@/components/ui`)
 
@@ -162,7 +169,7 @@ button and wordmark) and `<main id="main">`. See §5.2. `MinimalShell` (`wide` f
 ### 5.1 Responsive layout
 
 Every screen must work at **1366×768** (office PC, the design baseline) and **375×812** (phone),
-in English and Telugu: no horizontal page scroll, nothing past the screen or its card edge, no
+in English (and in Telugu while it is switched on, §5.4): no horizontal page scroll, nothing past the screen or its card edge, no
 clipped text, touch targets of at least 24×24 px (WCAG 2.5.8; inline links in a sentence and
 well-spaced small targets are the exceptions). `e2e/responsive.spec.ts` checks all of it for
 every screen (`make e2e` with `E2E_STAND_IN=1`, on every pull request); `e2e/audit/responsive.audit.ts`
@@ -251,7 +258,8 @@ storage the sidebar simply starts expanded.
 Platform: dark violet sidebar and top bar (`platform-chrome`: yellow focus ring), yellow mark,
 badge and active bar. Pairs in §7.
 
-**Telugu.** Every label is in `messages/*.json` (`shell` namespace plus the existing nav keys).
+**Telugu.** Every label is in `messages/*.json` (`shell` namespace plus the existing nav keys);
+the language switch in the top bar shows only while Telugu is switched on (§5.4).
 Labels wrap to a second line instead of being cut off (no `truncate` in the sidebar); names and
 school names use `break-anywhere`.
 
@@ -389,6 +397,67 @@ chats, memory, phone in Telugu, axe), the new pages in `e2e/responsive.spec.ts` 
 `content-visibility` (progressive), regex lookbehind (all Baseline widely available except
 `content-visibility`, which has the DOM cap as its fallback).
 
+### 5.4 Languages: English first, Telugu behind one switch (ADR-0036)
+
+The product owner decided on 2026-09-30 to launch in English and hide Telugu everywhere for now.
+Telugu is **hidden, not deleted**: catalogs, fields, previews, fonts and their tests stay in the
+code, dormant, so it returns by configuration.
+
+**The switch.** `SOS_TELUGU_ENABLED` (default `false`), the same variable as the API's. The web app
+reads it **only** in `src/i18n/languages.ts` (`teluguEnabled()`, `enabledLocales()`,
+`uiLocale()`), at run time on the server: the proxy, layouts, pages, route handlers and the BFF.
+It is never inlined into a browser bundle; one image serves both settings. Client components ask
+`useTeluguEnabled()` / `useEnabledLocales()` from `src/i18n/LanguagesProvider.tsx`, which the
+locale layout fills; without a provider only English is on. `app/client-boundary.test.ts` fails if
+a client module imports the server reader or code reads the variable anywhere else.
+
+**With the switch off:**
+
+- **Routing.** `/te/...` answers 307 to the same `/en/...` page (query kept; temporary, because
+  Telugu may return). Only English is negotiated: `Accept-Language: te` and a stored
+  `NEXT_LOCALE=te` cookie are ignored, the `Link` alternates name English only, and the locale
+  layout 404s a `te` param that slipped past the proxy. The BFF asks the API for English only.
+- **Messages.** The Telugu catalog is never loaded (`src/i18n/messages.ts`). English strings that
+  talk about Telugu ("in English and Telugu", "Write in English, Telugu or a mix") are replaced by
+  their English-only wording from `messages/en.telugu-off.json`: same keys, same ICU arguments
+  (tested). Keys that name Telugu for a Telugu-only control (`*.te`, `*_te`, `*.telugu`,
+  `teField`, `summaryTe`, …) stay in `en.json` and are rendered only while Telugu is on.
+- **Screens.** No language switch (school, platform, public pages); no `*_te` input (class names,
+  letterhead, notices, platform banners); no language choice where English is the only one
+  (school settings, invite and profile language, export file language, document language,
+  verified-answer language, owner language when provisioning); no Telugu column, list line,
+  summary or preview (notice list and preview, circular summary, finding explanation, UI
+  reference). Where the API still requires a Telugu value (`ClassCreate.display_te`,
+  `AnnouncementIn.title_te/body_te`), the English text stands in, never asked for; where a stored
+  Telugu value exists (letterhead, class name, a person's or a school's language), it is kept
+  and sent back unchanged. Data is not UI: a Telugu-script name copied from a register still
+  shows as data.
+- **Fonts.** No Telugu `@font-face`, preload or font-family stack reaches the browser (§3).
+
+**How to write a screen.** Show a Telugu field, column, option or preview only under
+`const telugu = useTeluguEnabled()`; build the form schema for the fields you show (see
+`classCreateSchemaFor`, `announcementSchemaFor`, `noticeEnglishSchema`) and fill a hidden
+required value through the form's `extra`. Pure helpers that combine languages take
+`{ telugu }` and default to English (`noticeText`, `noticeComplete`).
+
+**Strings.** Every UI string exists in `en`. While the switch is off, `te` entries are
+optional: keep the existing ones and add a `te` value when you add a key (the parity test in
+`i18n/messages.test.ts` still pins en/te keys so the catalog is ready when Telugu returns); if you
+add an English string that mentions Telugu, add its English-only wording to
+`en.telugu-off.json`.
+
+**Tests.** Default renders are English-only: `renderWithIntl(ui)` renders with Telugu off and
+the `en.telugu-off` wording; a Telugu render (`"te"`) or `{ telugu: true }` switches it on
+explicitly, and every Telugu test does so. `app/english-only.test.tsx` renders every page under
+`app/[locale]` with the switch off and fails on Telugu script, the word "Telugu", `lang`/`hreflang`
+te, `/te` links, `*_te` fields or a language switch; each feature's tests pin its forms and
+bodies. e2e: the default project runs with the switch off (`e2e/english-only.spec.ts`: redirects,
+a Telugu browser, the font 404, school and platform pages); `chromium-telugu` runs a second
+server from the same build with the switch on and re-runs the tests tagged `@telugu`.
+
+**Bringing Telugu back.** Set `SOS_TELUGU_ENABLED=true` (API and web), review the Telugu catalog,
+templates and prompts, run the `@telugu` e2e and the Telugu evals, and record it in a new ADR.
+
 ## 6. Do and don't
 
 | Do                                                                                      | Don't                                                                                                         |
@@ -471,6 +540,12 @@ icon itself identifies the control, so WCAG 1.4.11 does not require a 3:1 bounda
 and the switch have no text inside when empty, so they use `border-control` (3:1).
 
 ## 8. Open points
+
+- English first (§5.4, ADR-0036), for the product owner: while Telugu is off, a new class and a
+  platform banner store their English text in the Telugu fields because the API still requires
+  them (drop the requirement in the API, or accept that these need a Telugu pass when Telugu
+  returns); notifications the API created in Telugu before the switch still show their stored
+  text; the school's `languages` setting is kept but not shown.
 
 - Sidebar (§5.2), for the product owner: below lg "Lock now" sits inside the drawer (one tap
   more on phones and tablets); the school's name costs a GET `/me/schools` on each full page
