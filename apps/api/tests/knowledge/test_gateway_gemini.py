@@ -364,10 +364,8 @@ def test_FR_KB_005_markers_become_validated_citations() -> None:
     first, second, third = turn.segments
     (c1,) = first.citations
     assert c1.source == SOURCE_1
-    # The sentences that write the statement's numbers (IX = 9, 09:30, 12/10/2026), copied.
-    assert (
-        c1.cited_text == "Quarterly examinations for Class IX. Exams start at 09:30 on 12/10/2026."
-    )
+    # The fewest sentences that write the statement's numbers (09:30 covers the 9), copied.
+    assert c1.cited_text == "Exams start at 09:30 on 12/10/2026."
     assert c1.cited_text in BLOCK_1.text  # docs/06 §9 rule 2 holds by construction
     assert [c.source for c in second.citations] == [SOURCE_2]
     assert third.citations == ()  # [7] names no passage of this request: dropped

@@ -116,6 +116,14 @@ def test_FR_TALLY_008_every_figure_of_the_statement_is_inside_the_cited_text() -
     assert cited in dues
 
 
+def test_FR_KB_005_a_sentence_sharing_only_a_stray_month_or_year_is_not_cited() -> None:
+    fact = (
+        "Date of birth: 14/03/2012. Source: admission register (verified 02/03/2026). "
+        "UDISE+ differs: 15/03/2012."
+    )
+    assert supporting_sentence("Date of birth: 14/03/2012.", fact) == "Date of birth: 14/03/2012."
+
+
 def test_FR_KB_008_streamed_text_never_shows_a_marker() -> None:
     stripper = MarkerStripper()
     pieces = ["Fees are due [", "1", "]. Pay at", " the office [2][", "1].", " Done [x]."]

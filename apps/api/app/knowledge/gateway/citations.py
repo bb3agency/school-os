@@ -20,7 +20,7 @@ Stricter than a bare marker (FR-KB-005, FR-KB-007):
   statement counts as uncited (so an answer built on an invented date falls back to search-only
   or "not found");
 - ``cited_text`` is the part of the passage that supports the statement (the sentences that write
-  its numbers, else the sentence sharing most words with it), copied from
+  its numbers, fewest first, else the sentence sharing most words with it), copied from
   the passage (always a substring of it), so the source chip shows the supporting text.
 
 :class:`MarkerStripper` removes markers from streamed preview text (the final answer is
@@ -50,7 +50,9 @@ _PARTIAL: Final = re.compile(r"[ \t]?\[[\d\s,;]{0,40}$")
 _STRIP: Final = re.compile(r"[ \t]?" + MARKER.pattern)
 """A marker with the one space written before it (stream preview only)."""
 _TRAILING_PUNCT: Final = re.compile(r"^[.,;:!?।)\]]+")
-_SENTENCE: Final = re.compile(r"[^\n.!?।]*(?:[.!?।]+|\n|$)")
+_SENTENCE: Final = re.compile(r"(?:[^\n.!?।]|[.!?।](?![\s)]|$))*(?:[.!?।]+(?=[\s)]|$)|\n|$)")
+"""A sentence ends at ``.``, ``!``, ``?`` or ``।`` followed by a space or the end (so ``12,500.00``
+and ``Rc.No.12`` stay whole), or at a line break."""
 _WORD: Final = re.compile(r"[^\W_]+", re.UNICODE)
 _DIGITS: Final = re.compile(r"\d+(?:,\d{2,3})*")
 _ROMAN: Final = re.compile(r"\b(XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)\b")
@@ -111,14 +113,25 @@ def _words(text: str) -> set[str]:
 def supporting_sentence(claim: str, passage: str) -> str:
     """The part of the passage that supports the claim, always an exact substring of it.
 
-    When the claim writes numbers: the passage from the first to the last sentence that writes
-    one of them (so every figure the claim states is inside the cited text). Otherwise the
+    When the claim writes numbers: the passage from the first to the last of the fewest sentences
+    that write them (so every figure the claim states is inside the cited text). Otherwise the
     sentence sharing most words with the claim (the first one on a tie)."""
     claim_words, claim_numbers = _words(claim), numbers_in(claim)
     sentences = [m for m in _SENTENCE.finditer(passage) if m.group(0).strip()]
-    with_numbers = [m for m in sentences if claim_numbers & numbers_in(m.group(0), roman=True)]
-    if with_numbers:
-        return passage[with_numbers[0].start() : with_numbers[-1].end()].strip()
+    numbers = [numbers_in(m.group(0), roman=True) for m in sentences]
+    # Fewest sentences that write the claim's numbers (greedy cover, earliest on a tie), so a
+    # sentence that shares only a stray month or year with the claim is not pulled in.
+    chosen: list[int] = []
+    remaining = set(claim_numbers)
+    while remaining and sentences:
+        best = max(range(len(sentences)), key=lambda i: (len(numbers[i] & remaining), -i))
+        if not numbers[best] & remaining:
+            break
+        chosen.append(best)
+        remaining -= numbers[best]
+    if chosen:
+        first, last = sentences[min(chosen)], sentences[max(chosen)]
+        return passage[first.start() : last.end()].strip()
     best, best_score = "", -1
     for match in sentences:
         sentence = match.group(0).strip()
