@@ -9,7 +9,9 @@ breaker run exactly as in live mode, and the same inputs always give the same ou
 - After tool results: a grounded answer, one text block per ``search_result`` (at most three,
   in order), each citing its source with the block's full text as ``cited_text``
   (``search_result_location``, docs/06 §7, §9). No results: an honest "not found" in the
-  question's script (Telugu or English).
+  question's script (Telugu or English). With the English-first prompt (ADR-0036,
+  :mod:`.fake_language`) everything it writes is English: "not found" in English, and a cited
+  Telugu sentence is described in English instead of copied.
 - Structured output (``output_config.format``): circular readings and parent notices from the
   deterministic rules of :mod:`.fake_circulars`, chunk contexts from :mod:`.fake_contextual`
   (title, subject line and nearest heading of the document in the system prompt), the Ask
@@ -31,6 +33,7 @@ from app.knowledge.contextual.rules import SCHEMA_TAG as CONTEXT_SCHEMA_TAG
 from app.knowledge.gateway.fake_circulars import structured_reply
 from app.knowledge.gateway.fake_contextual import contextual_reply
 from app.knowledge.gateway.fake_conversations import conversation_reply
+from app.knowledge.gateway.fake_language import ENGLISH_STAND_IN, english_only, has_telugu
 from app.knowledge.gateway.schema_check import example
 from app.knowledge.gateway.transport import MessagesRequest
 
@@ -113,7 +116,7 @@ class FakeTransport:
             else:
                 reply = structured_reply(schema, request_text)
             if reply is None:
-                reply = conversation_reply(schema, request_text)
+                reply = conversation_reply(schema, request_text, _system(body))
             value = reply if reply is not None else example(schema)
             text = json.dumps(value, ensure_ascii=False)
             content: list[dict[str, Any]] = [{"type": "text", "text": text}]
@@ -157,8 +160,10 @@ class FakeTransport:
                 "input": {"query": question},
             }
             return [call], "tool_use"
+        english = english_only(_system(body))
         if not results:
-            text = NOT_FOUND_TE if _TELUGU.search(question) else NOT_FOUND_EN
+            telugu = _TELUGU.search(question) and not english
+            text = NOT_FOUND_TE if telugu else NOT_FOUND_EN
             return [{"type": "text", "text": text}], "end_turn"
         content: list[dict[str, Any]] = []
         for index, result in enumerate(results[:_MAX_CITED]):
@@ -176,10 +181,11 @@ class FakeTransport:
                 "start_block_index": 0,
                 "end_block_index": 1,
             }
+            said = f"{result.get('title')}: {_first_sentence(text)}"
             content.append(
                 {
                     "type": "text",
-                    "text": f"{result.get('title')}: {_first_sentence(text)}",
+                    "text": ENGLISH_STAND_IN if english and has_telugu(said) else said,
                     "citations": [citation],
                 }
             )

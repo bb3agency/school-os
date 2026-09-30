@@ -19,7 +19,9 @@ Product owner decision of 2026-09-30: an earlier checked answer is reused only w
 6. it is younger than ``answer_cache.ttl_hours``;
 7. AI answers are on for the school (the kill switch, ``ai_features_enabled`` and the flag): a
    school that switched AI off never gets a stored AI answer either. A used-up budget does not
-   stop a reuse (it costs nothing; product owner decision 2026-09-30 to confirm).
+   stop a reuse (it costs nothing; product owner decision 2026-09-30 to confirm);
+8. it was given in the language the answer is due in now (``kb.queries.language``): English
+   while Telugu is hidden (ADR-0036), so a Telugu answer is never reused once it is hidden.
 
 Invalidation: a cited or retrieved document's new searchable version, ACL change, archive or
 deletion sets ``cache_invalidated_at`` (the FR-KB-030 "sources changed" hook, ``lifecycle``).
@@ -102,14 +104,19 @@ def lookup(
     visibility: SourceVisibility,
     cfg: AnswerCache,
     now: dt.datetime | None = None,
+    language: str | None = None,
 ) -> Hit | None:
-    """The newest reusable answer, or None (see the module docstring for every rule)."""
+    """The newest reusable answer, or None (see the module docstring for every rule). With
+    ``language``, only an answer given in that language is reused (ADR-0036: an answer written
+    while Telugu was on is never shown once it is hidden)."""
     if not cfg.enabled:
         return None
     since = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(hours=cfg.ttl_hours)
     for row in repo.cache_candidates(
         session, question_hmac=question_hmac, fingerprint=access, since=since, limit=CANDIDATES
     ):
+        if language is not None and row.language != language:
+            continue
         retrieved = [str(r.get("source", "")) for r in row.retrieved or []]
         cited = stored_citations(session, row)
         used = retrieved + [c.source for c in cited]

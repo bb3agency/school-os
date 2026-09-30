@@ -11,6 +11,7 @@ suggestions in logs), 7 (audit), 8 (sources re-checked before history is shown o
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import uuid
 from collections.abc import Iterator, Mapping
@@ -78,6 +79,14 @@ def docs(world: Any, admin_engine: Engine) -> Iterator[dict[str, uuid.UUID]]:
 @pytest.fixture
 def fake(docs: dict[str, uuid.UUID]) -> Iterator[Any]:
     _rt, transport = K.install_runtime()
+    yield transport
+    composition.set_runtime(None)
+
+
+@pytest.fixture
+def fake_telugu(docs: dict[str, uuid.UUID]) -> Iterator[Any]:
+    """The runtime with SOS_TELUGU_ENABLED on (ADR-0036): the dormant Telugu path."""
+    _rt, transport = K.install_runtime(telugu=True)
     yield transport
     composition.set_runtime(None)
 
@@ -423,7 +432,7 @@ def test_FR_KB_012_only_the_latest_messages_can_be_changed(
 
 
 def test_FR_KB_008_follow_ups_come_in_the_questions_language_after_final(
-    world: Any, api: Any, admin_engine: Engine, fake: Any
+    world: Any, api: Any, admin_engine: Engine, fake_telugu: Any
 ) -> None:
     who = _person(admin_engine, world)
     events = _ask(api, who, "Zebra festival ఎప్పుడు?")
@@ -433,6 +442,28 @@ def test_FR_KB_008_follow_ups_come_in_the_questions_language_after_final(
     questions = _first(events, "followups")["questions"]
     assert questions
     assert all(any("ఀ" <= ch <= "౿" for ch in q) for q in questions)
+
+
+def test_english_first_a_code_mixed_question_gets_english_everything(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """ADR-0036 (switch off, the default): the Telugu-English question is accepted and
+    answered, and the answer, its language, the title and the follow-ups are English."""
+    who = _person(admin_engine, world)
+    events = _ask(api, who, "Zebra festival ఎప్పుడు?")
+    meta = _first(events, "meta")
+    assert meta["language"] == "en"
+    assert meta["title"] == "New conversation"
+    final = _first(events, "final")
+    assert final["status"] == "answered"
+    questions = _first(events, "followups")["questions"]
+    assert questions
+    shown = [final["text"], meta["title"], *questions]
+    shown += [d["text"] for e, d in events if e in ("delta", "token")]
+    assert not any("\u0c00" <= ch <= "\u0c7f" for text in shown for ch in text)
+    # The English-only prompt and header went to the model; the question as written too.
+    answers = _answer_requests(fake.sent)
+    assert "Write in English only" in json.dumps(answers[0], ensure_ascii=False)
 
 
 def test_FR_KB_008_search_only_answers_get_no_follow_ups(
@@ -452,9 +483,27 @@ def test_FR_KB_008_search_only_answers_get_no_follow_ups(
 # --- context: recent turns, rewrite, summary -----------------------------------------------------
 
 
-def test_FR_KB_012_a_follow_up_is_rewritten_and_carries_recent_turns_with_answers(
+def test_english_first_a_rewritten_follow_up_is_answered_in_english(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
+    who = _person(admin_engine, world)
+    first = _ask(api, who, "When is the Zebra festival?")[0][1]
+    fake.sent.clear()
+    _ask(api, who, "Can parents attend it?", conversation_id=first["conversation_id"])
+    body = _answer_requests(fake.sent)[0]
+    assert (
+        _block(body, CONFIG.rewritten_header_english)
+        == f"{CONFIG.rewritten_header_english}\nCan parents attend it?"
+    )
+    assert _block(body, CONFIG.rewritten_header) is None
+
+
+def test_FR_KB_012_a_follow_up_is_rewritten_and_carries_recent_turns_with_answers(
+    world: Any, api: Any, admin_engine: Engine, fake_telugu: Any
+) -> None:
+    # The header "answer in its language" belongs to the Telugu-on path (ADR-0036); the
+    # English-first header is pinned by the next test.
+    fake = fake_telugu
     who = _person(admin_engine, world)
     first = _ask(api, who, "When is the Zebra festival?")[0][1]
     fake.sent.clear()

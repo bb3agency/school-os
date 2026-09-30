@@ -6,7 +6,7 @@ Read this file completely before writing or changing code. If a request conflict
 
 A multi-tenant SaaS for Indian private schools (starting in Andhra Pradesh). The admin office enters student details once; SchoolOS checks them against other sources (admission register, Aadhaar-as-printed, UDISE+, board registration), flags mismatches before portal submissions, generates certificates/registers, and answers questions from the school's own records and documents with citations ("Ask the school").
 
-Users are office clerks, principals, management, accountants, exam coordinators and teachers. They are busy, often not technical, and work on shared office PCs with patchy internet. Parent-facing output is bilingual: English and Telugu.
+Users are office clerks, principals, management, accountants, exam coordinators and teachers. They are busy, often not technical, and work on shared office PCs with patchy internet. **English first** (ADR-0036, product owner 2026-09-30): every screen, document, notice, message and AI answer is in English. Telugu (the bilingual design: Telugu UI, parent-facing Telugu, Telugu AI answers) is **hidden, not deleted**, behind one switch `SOS_TELUGU_ENABLED` (default `false`), read only through `app.core.languages`; a question typed in Telugu is still accepted and answered in English.
 
 SchoolOS is a **managed SaaS** that we run, sold as a recurring subscription in two tiers from one codebase: the **shared tier** (pooled multi-tenant platform in AWS Mumbai) and the **dedicated tier** (one isolated host per school, optional custom domain). A **control plane** (platform admin panel, billing, fleet) runs only in the shared deployment and never reads student data (ADR-0015, ADR-0017, `docs/16-platform-admin-panel.md`).
 
@@ -35,8 +35,8 @@ Reference requirement IDs (e.g. `FR-STU-004`, `SEC-012`) in commit messages, PR 
 - **API/Workers:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2.x (typed, sync sessions with psycopg 3), Alembic, Celery + Valkey (Redis protocol; ADR-0014), httpx
 - **Database:** PostgreSQL 16+ with `pgvector`, `pg_trgm`, `citext`; RLS on every tenant table
 - **Files:** S3 (ap-south-1), private buckets, SSE-KMS, presigned URLs (SeaweedFS locally and in CI; ADR-0014)
-- **Web:** Next.js (App Router) + TypeScript strict + Tailwind; BFF pattern (tokens never reach browser JS); i18n `en` + `te`
-- **PDF:** HTML/CSS templates rendered by headless Chromium (Playwright) in workers; bundled Noto Sans Telugu
+- **Web:** Next.js (App Router) + TypeScript strict + Tailwind; BFF pattern (tokens never reach browser JS); i18n `en` (the `te` catalog is kept dormant behind `SOS_TELUGU_ENABLED`, ADR-0036)
+- **PDF:** HTML/CSS templates rendered by headless Chromium (Playwright) in workers; Noto Sans Telugu stays bundled but is not loaded while `SOS_TELUGU_ENABLED` is off
 - **LLM:** Google Gemini on Vertex AI (regional endpoint `asia-south1`, service identity, Zero Data Retention set-up), only through `app/knowledge/gateway/` (ADR-0005, ADR-0033); provider and model per role in `app/knowledge/config/models.yaml`; Anthropic Claude kept as a config-selectable fallback
 - **Embeddings:** provider interface in `app/knowledge/embeddings/`; model chosen by evaluation (ADR-0006)
 - **Identity:** OIDC provider behind `app/identity/` (reference: Amazon Cognito, ADR-0012; MFA and step-up per ADR-0018); operators use a separate OIDC client
@@ -129,7 +129,7 @@ Also: `make down`, `make logs`, `make db-shell`, `make format`. The dev OIDC stu
 3. Write/extend tests first: unit, API (incl. authz denial + cross-tenant denial), and migration test if schema changes.
 4. Implement in the owning module (routes → service → repository). Keep route handlers thin.
 5. Add audit events and redaction where data is sensitive.
-6. Update OpenAPI docstrings, i18n keys (`en` and `te`), and the docs if behaviour changed.
+6. Update OpenAPI docstrings, i18n keys (`en`; `te` optional while `SOS_TELUGU_ENABLED` is off, keep existing ones), and the docs if behaviour changed.
 7. Run `make check`. Paste the summary in the PR.
 
 ## 8. Definition of done
@@ -138,7 +138,7 @@ Also: `make down`, `make logs`, `make db-shell`, `make format`. The dev OIDC stu
 - Authz tests: allowed role succeeds; disallowed role gets 403; other tenant gets 404
 - No new PII in logs (log-redaction test covers new fields)
 - Migrations upgrade and downgrade cleanly on a populated synthetic DB
-- UI strings exist in `en` and `te`; screens usable at 1366×768 and keyboard-only
+- UI strings exist in `en` (`te` optional while `SOS_TELUGU_ENABLED` is off, ADR-0036; Telugu tests run with the switch on); screens usable at 1366×768 and keyboard-only
 - Docs updated; ADR added if a decision changed
 - CI green, including security scans and (for knowledge changes) `make eval` gates
 
@@ -154,7 +154,7 @@ Also: `make down`, `make logs`, `make db-shell`, `make format`. The dev OIDC stu
 
 - **Browser Support:** Baseline Widely Available features only unless a documented fallback exists. Targets: current Chrome/Edge on Windows 10+ office PCs, Android Chrome. Assume 1366×768 screens and slow connections.
 - Before implementing a UI pattern, check current web-platform guidance (e.g., the `modern-web-guidance` tool) rather than relying on memory.
-- Print is a first-class output: A4 print CSS, register formats, no clipped Telugu glyphs. Fonts are self-hosted (no external font CDNs).
+- Print is a first-class output: A4 print CSS, register formats; no clipped Telugu glyphs when `SOS_TELUGU_ENABLED` is on (while it is off nothing Telugu is printed). Fonts are self-hosted (no external font CDNs).
 - Plain language, sentence case, errors that say how to fix the problem. Every AI answer shows its source chips.
 
 ## 11. Never do this

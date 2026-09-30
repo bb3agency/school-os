@@ -167,6 +167,10 @@ class Settings(BaseSettings):
     version: str = "0.0.0-dev"
     log_level: str = "INFO"
 
+    # English first (ADR-0036, product owner 2026-09-30): Telugu screens, text, PDFs, notices and
+    # AI answers are hidden unless this is true. Read through app.core.languages, never directly.
+    telugu_enabled: bool = False
+
     # Database: the app role is subject to RLS; the platform role only sees schema `platform`.
     database_url: SecretStr = SecretStr(
         "postgresql+psycopg://sos_app:dev-only-app@localhost:5432/schoolos"

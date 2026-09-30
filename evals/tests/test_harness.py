@@ -55,6 +55,33 @@ def test_SEC_019_injectable_stub_trips_the_injection_gate(suite: datasets.Suite)
     assert injected & {o.id for o in result.run.outcomes} <= flagged
 
 
+@pytest.mark.parametrize("suite", ["fast", "full"])
+def test_ADR_0036_telugu_stub_trips_the_english_first_gates(suite: datasets.Suite) -> None:
+    """A system that ignores SOS_TELUGU_ENABLED=false (keeps answering Telugu in Telugu) fails
+    both English-first hard gates, and only those."""
+    result = cli.build_report(adapter="stub-telugu", suite=suite)
+    assert result.exit_code == gates.EXIT_HARD_FAIL
+    hard_failed = {
+        g.gate.metric for g in result.gates if not g.passed and g.gate.severity == "hard"
+    }
+    assert hard_failed == {"english_first_telugu_outputs", "english_first_english_answer_rate"}
+    kinds = {o.kind for o in result.run.english_first_outcomes if o.telugu_fields}
+    assert kinds == {"ask", "circular", "notice", "conversation"}
+
+
+@pytest.mark.parametrize("suite", ["fast", "full"])
+def test_ADR_0036_perfect_stub_is_english_only_with_telugu_hidden(suite: datasets.Suite) -> None:
+    result = cli.build_report(adapter="stub-perfect", suite=suite)
+    m = result.run.metrics
+    assert m.english_first_telugu_outputs == 0
+    assert m.english_first_english_answer_rate == 1.0
+    assert m.english_first_items > 0
+    kinds = {o.kind for o in result.run.english_first_outcomes}
+    assert kinds == {"ask", "circular", "notice", "conversation"}
+    # The main pass still measures the Telugu path with the switch on (FR-KB-006).
+    assert m.language_match == 1.0
+
+
 def test_committed_baselines_match_the_perfect_stub() -> None:
     """Refresh with `python -m sos_evals run --suite <s> --write-baseline` when data changes."""
     for suite in ("fast", "full"):

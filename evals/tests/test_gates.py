@@ -58,6 +58,10 @@ PERFECT = Metrics(
     conversation_context_accuracy=1.0,
     followup_language_match=1.0,
     memory_preference_applied=1.0,
+    english_first_items=10,
+    english_first_fields=40,
+    english_first_telugu_outputs=0,
+    english_first_english_answer_rate=1.0,
 )
 
 
@@ -86,6 +90,9 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         # Ask conversations and memory (ADR-0034; FR-KB-012): nothing leaks, no rule is broken.
         ("conversation_leakage_count", "==", 0),
         ("conversation_scope_violations", "==", 0),
+        # English first (ADR-0036): with Telugu hidden nothing shown is Telugu, answers are English.
+        ("english_first_telugu_outputs", "==", 0),
+        ("english_first_english_answer_rate", ">=", 1.0),
     }
 
 
@@ -138,6 +145,10 @@ def test_perfect_metrics_pass_every_gate() -> None:
         ({"circular_deadline_recall": None}, "circular_deadline_recall"),
         ({"ctx_leakage_count": 1}, "ctx_leakage_count"),
         ({"ctx_leakage_count": None}, "ctx_leakage_count"),
+        ({"english_first_telugu_outputs": 1}, "english_first_telugu_outputs"),
+        ({"english_first_telugu_outputs": None}, "english_first_telugu_outputs"),
+        ({"english_first_english_answer_rate": 0.99}, "english_first_english_answer_rate"),
+        ({"english_first_english_answer_rate": None}, "english_first_english_answer_rate"),
     ],
 )
 def test_a_failing_hard_gate_exits_1(change: dict[str, object], failed: str) -> None:

@@ -14,6 +14,10 @@ owns what the model sees and what comes back:
   ``parent_notice``) from a circular's passages or staff text, validated by
   :mod:`.circulars.notice`.
 
+English first (ADR-0036): the prompt and schema follow the Telugu switch of the runtime's
+settings (``app.core.languages``): while Telugu is hidden, an English reading (no Telugu
+summary) and an English-only notice; the bilingual prompts are used only with it on.
+
 Every provider refusal (AI switched off, budget used up, rate limit, outage, rejected request,
 invalid output) becomes :class:`AiUnavailable` with the gateway's stable code, so the caller can
 fall back to manual review. Nothing here logs or raises with passage, prompt or model text.
@@ -85,6 +89,11 @@ def _model(role: ModelRole) -> str:
     return composition.runtime().llm_config.roles[role].model
 
 
+def _telugu() -> bool:
+    """``SOS_TELUGU_ENABLED`` of the runtime's settings (ADR-0036)."""
+    return composition.runtime().telugu
+
+
 def read_circular(
     tenant_id: uuid.UUID,
     context: reading_rules.CircularContext,
@@ -96,7 +105,9 @@ def read_circular(
     if not passages:
         raise AiUnavailable(NO_TEXT)
     request = reading_rules.build_request(context, passages, cfg)
-    prompt = load_prompt(cfg.prompt.id, cfg.prompt.version)
+    telugu = _telugu()
+    ref = cfg.prompt_for(telugu)
+    prompt = load_prompt(ref.id, ref.version)
     gateway = composition.runtime().gateway
     try:
         raw = gateway.generate_json(
@@ -104,14 +115,14 @@ def read_circular(
             "circular",
             prompt.render(),
             request.text,
-            reading_rules.SCHEMA,
+            reading_rules.schema_for(telugu),
         )
     except GatewayMisuse:
         raise
     except GatewayError as exc:
         log.warning("knowledge.circular.read_failed", tenant_id=tenant_id, error_code=exc.code)
         raise AiUnavailable(exc.code) from None
-    result = reading_rules.validate_reading(raw, request, cfg)
+    result = reading_rules.validate_reading(raw, request, cfg, telugu=telugu)
     log.info(
         "knowledge.circular.read",
         tenant_id=tenant_id,
@@ -121,16 +132,19 @@ def read_circular(
     return ReadingOutcome(
         reading=result,
         model=_model("circular"),
-        prompt=f"{cfg.prompt.id}.v{cfg.prompt.version}",
+        prompt=f"{ref.id}.v{ref.version}",
     )
 
 
 def draft_notice(
     tenant_id: uuid.UUID, source: notice_rules.NoticeSource
 ) -> notice_rules.NoticeDraft:
-    """Draft a bilingual parent notice. Raises :class:`AiUnavailable`."""
+    """Draft a parent notice: English only while Telugu is hidden, bilingual with it on
+    (ADR-0036). Raises :class:`AiUnavailable`."""
     cfg = config().notice
-    prompt = load_prompt(cfg.prompt.id, cfg.prompt.version)
+    telugu = _telugu()
+    ref = cfg.prompt_for(telugu)
+    prompt = load_prompt(ref.id, ref.version)
     gateway = composition.runtime().gateway
     try:
         raw = gateway.generate_json(
@@ -138,14 +152,14 @@ def draft_notice(
             "notice",
             prompt.render(),
             notice_rules.build_request(source, cfg),
-            notice_rules.SCHEMA,
+            notice_rules.schema_for(telugu),
         )
     except GatewayMisuse:
         raise
     except GatewayError as exc:
         log.warning("knowledge.notice.draft_failed", tenant_id=tenant_id, error_code=exc.code)
         raise AiUnavailable(exc.code) from None
-    return notice_rules.validate_notice(raw, cfg)
+    return notice_rules.validate_notice(raw, cfg, telugu=telugu)
 
 
 __all__ = [

@@ -17,7 +17,7 @@
 3. **Flag, don't fix.** The system explains problems and the correction route; humans decide.
 4. **Answers with receipts.** Every AI answer shows where it came from.
 5. **Print is a feature.** Outputs look like the formats offices and authorities already accept.
-6. **Two languages, one product.** English and Telugu everywhere parents or staff read.
+6. **Two languages, one product.** English and Telugu everywhere parents or staff read. **English first for now** (ADR-0036, product owner 2026-09-30): every Telugu output below stays specified but is deferred, hidden while `SOS_TELUGU_ENABLED` is off; Telugu *input* (a question, a search or a register value in Telugu script) is still accepted and answered or shown in English.
 7. **Least privilege by default.** People see what their job needs.
 
 ## 2. Personas and jobs-to-be-done
@@ -44,17 +44,17 @@
 | C5 | Data-quality engine (mismatch rules, findings workflow) | M1 |
 | C6 | Change requests (maker-checker) for identity fields | M1 |
 | C7 | Documents & knowledge base (upload, OCR, versions, ACLs) | M2 |
-| C8 | Ask the school (RAG + read-only tools, citations, EN/TE) | M2 |
+| C8 | Ask the school (RAG + read-only tools, citations; English answers, TE deferred per ADR-0036) | M2 |
 | C9 | Exports framework (board/portal pre-check sheets, versioned profiles) | M1 |
 | C10 | Audit & activity (hash-chained log, viewer, export) | M0 |
-| C11 | Notifications (in-app, bilingual templates) | M1 |
+| C11 | Notifications (in-app, English templates; bilingual deferred per ADR-0036) | M1 |
 | C12 | School admin console (users, roles, retention, data export, plan & billing) | M0–M2 |
 | C13 | Platform operator console: folded into C14 (ID kept for traceability; tenant-side break-glass stays under FR-OPS-004) | — |
 | C14 | Platform admin panel / control plane: schools, provisioning (shared and dedicated tiers), plans, subscriptions, invoices, usage, flags, fleet, announcements, support, operators, platform audit (spec in 16) | M0 |
 | C15 | Certificates & registers (TC, bonafide, study, conduct; serial numbers; register entries; duplicates; register print views; certificate PDFs as documents) | M3 |
 
 Extension points for later modules: circulars→tasks & notices (M4), student timeline & early warning (M5), Tally connector (M6).
-| C16 | Circulars → tasks, reminders and bilingual parent notices (AI suggestions confirmed by staff) | M4 |
+| C16 | Circulars → tasks, reminders and parent notices, English (bilingual deferred per ADR-0036) (AI suggestions confirmed by staff) | M4 |
 | C17 | Student timeline and early warning: attendance and marks, behaviour notes, ABC indicators, flags with an owner and an intervention log (rules only, no AI) | M5 |
 
 Extension points for later modules: certificates & registers (M3), circulars→tasks & notices (M4, C16 below), student timeline & early warning (M5), Tally connector (M6).
@@ -127,7 +127,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 ### C5 · Data-quality engine
 
 **US-501** · As an exam coordinator, I want a pre-check report for my Class 9 batch so that I fix problems before board registration. [FR-DQ-001..012, FR-EXP-002]
-- AC1: Running "CISCE registration pre-check" on 9A–9D lists every finding by severity with student, field, the conflicting values (masked where sensitive), explanation in English/Telugu, and suggested correction route.
+- AC1: Running "CISCE registration pre-check" on 9A–9D lists every finding by severity with student, field, the conflicting values (masked where sensitive), explanation in English/Telugu, and suggested correction route. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC2: Blockers (e.g., missing mandatory field) are separated from warnings (e.g., initials vs expanded surname).
 - AC3: 2,000 students are checked in under 2 minutes.
 - AC4: The report exports to PDF and XLSX; the XLSX includes a "ready to enter" sheet in the target field order.
@@ -155,9 +155,9 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 ### C8 · Ask the school
 
-**US-801** · As staff, I want to ask a question in English, Telugu or a mix and get an answer with sources. [FR-KB-001..020]
+**US-801** · As staff, I want to ask a question in English, Telugu or a mix and get an answer with sources. [FR-KB-001..020] English first (ADR-0036): a Telugu or mixed question is accepted, searched as written and answered in English while `SOS_TELUGU_ENABLED` is off.
 - AC1: "When did roll number 1234 join and which class?" returns the answer citing the student record fields and register page.
-- AC2: "DEO circular lo exam timings enti?" (Telugu–English mix) answers in the same style, citing the circular (title, date, page).
+- AC2: "DEO circular lo exam timings enti?" (Telugu–English mix) answers in the same style, citing the circular (title, date, page). *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC3: If nothing relevant is found or I lack permission, the answer says so plainly and does not guess.
 - AC4: Citations open the exact record or document page; I can mark an answer helpful/not helpful with a reason.
 - AC5: First words appear within 3 seconds (p95); complete answer within 10 seconds (p95).
@@ -189,7 +189,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC1: Given I hold `tenant.billing.read`, when I open "Plan & billing", then I see the current plan, subscription status, billing period, trial end (if any), usage against plan limits, and a list of invoices with number, period, total, status and amount due.
 - AC2: Given I lack `tenant.billing.read`, the menu item is hidden and the API returns 403.
 - AC3: The page shows only my school's records (data comes from `core.current_subscription()`), never another school's.
-- AC4: Given an invoice is past due, a banner explains the amount, due date and how to pay, in English and Telugu.
+- AC4: Given an invoice is past due, a banner explains the amount, due date and how to pay, in English and Telugu. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 
 ### C14 · Platform admin panel (control plane)
 
@@ -233,7 +233,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 **US-1307** · As a platform engineer or support agent, I want to manage feature flags and announcements so that we can roll out changes safely and tell schools about them. [FR-PLT-022, FR-PLT-026]
 - AC1: Given I hold `platform.flags.manage` and completed step-up, when I set a global flag to 10% rollout, then about 10% of schools (stable per school) see the feature, and a per-school override always wins.
 - AC2: Given I post a maintenance announcement for the dedicated tier, when it starts, then staff at dedicated schools see the banner in their language and shared-tier schools do not.
-- AC3: Given either the English or the Telugu text is empty, then the announcement cannot be saved.
+- AC3: Given either the English or the Telugu text is empty, then the announcement cannot be saved. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 
 **US-1308** · As a platform engineer, I want to see fleet health so that dedicated hosts stay healthy, backed up and up to date. [FR-PLT-023..025]
 - AC1: Given a dedicated host sends a correctly signed heartbeat, then its last-heartbeat time, version and health update.
@@ -242,7 +242,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC4: Heartbeats never contain personal data.
 
 **US-1309** · As school staff and as a support agent, I want support tickets with clear statuses and response times so that problems are handled without sharing student data. [FR-PLT-027]
-- AC1: When a staff member opens a ticket, then the form warns (EN/TE) not to include student names, dates of birth, Aadhaar or phone numbers, and such numbers are masked before storage.
+- AC1: When a staff member opens a ticket, then the form warns (EN/TE) not to include student names, dates of birth, Aadhaar or phone numbers, and such numbers are masked before storage. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC2: Each ticket shows its SLA timers by priority; breaches appear on the dashboard.
 - AC3: Given a ticket was closed a year ago, then it has been deleted.
 
@@ -263,7 +263,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC5: No certificate ever shows an Aadhaar number, and restricted (C3) fields such as caste, religion or category are not printed.
 
 **US-1102** · As an office admin and a principal, I want transfer certificates to need the principal's approval so that no student leaves the rolls by one person's mistake. [FR-CERT-004, FR-CERT-005, FR-CERT-012, BR-04] *(Proposed from the roadmap scope; PO to confirm.)*
-- AC1: Given I hold `certificate.issue`, when I prepare a TC with the date of leaving, reason, conduct and promotion status, then it waits for approval (no serial number yet) and everyone holding `certificate.approve` is notified in English and Telugu.
+- AC1: Given I hold `certificate.issue`, when I prepare a TC with the date of leaving, reason, conduct and promotion status, then it waits for approval (no serial number yet) and everyone holding `certificate.approve` is notified in English and Telugu. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC2: Given I prepared the TC, I cannot approve it myself (checked by the service and by a database constraint); a different person holding `certificate.approve` approves or rejects it after a fresh MFA sign-in (step-up), rejection needs a reason, and I am notified either way. I can withdraw my own pending request.
 - AC3: When the TC is approved, then in one transaction it gets its serial number, the TC register entry is written, the student's active enrolment ends (transferred, on the date of leaving) and the student is marked as left; blockers are checked again at approval.
 - AC4: A student has at most one pending or issued original TC.
@@ -283,7 +283,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC3: To correct a certificate, the record is corrected through a change request and a new certificate is issued; the system never edits an issued certificate.
 
 **US-1106** · As an office admin, I want to print the TC register, the certificate issue register and the admission and withdrawal register in familiar A4 formats so that the paper registers stay complete. [FR-REG-001..005, BR-11] *(Proposed from the roadmap scope; PO to confirm.)*
-- AC1: Given I hold `register.read` and signed in with MFA within 5 minutes, I can open a print view of each register for an academic year: bilingual headings, dates as DD/MM/YYYY, A4 landscape, Telugu text never clipped.
+- AC1: Given I hold `register.read` and signed in with MFA within 5 minutes, I can open a print view of each register for an academic year: bilingual headings, dates as DD/MM/YYYY, A4 landscape, Telugu text never clipped. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC2: The TC register (counterfoil) and the certificate issue register list every serial number in order, including cancelled certificates and duplicates, with who issued and approved each.
 - AC3: The admission and withdrawal register lists students in admission-number order with their admission and leaving details and the TC serial number.
 - AC4: Every register view is audited (register, year, row count; never names).
@@ -292,14 +292,14 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC1: The certificate PDF is stored privately (encrypted) as a document of type "certificate", visible only to the office roles set in configuration, virus-scanned and indexed for "Ask the school" like other personal (C2) documents.
 - AC2: Certificate documents cannot be uploaded, replaced or deleted by hand while the register entry exists; opening or downloading one is audited.
 
-**US-1108** · As a principal, I want to set the school's letterhead once so that certificates show our name in English and Telugu, address and recognition details. [FR-CERT-013] *(Proposed from the roadmap scope; PO to confirm.)*
-- AC1: Given I hold `tenant.settings.manage` (step-up), I can set the Telugu school name, the address in English and Telugu, the recognition/affiliation line and the place printed on certificates; the English name is the school's name.
+**US-1108** · As a principal, I want to set the school's letterhead once so that certificates show our name in English and Telugu, address and recognition details. [FR-CERT-013] *(Proposed from the roadmap scope; PO to confirm.)* *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
+- AC1: Given I hold `tenant.settings.manage` (step-up), I can set the Telugu school name, the address in English and Telugu, the recognition/affiliation line and the place printed on certificates; the English name is the school's name. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC2: A school logo is not supported yet (PO question).
 ### C16 · Circulars, tasks and parent notices (M4)
 
 *Proposed from the roadmap scope (14 · M4); PO to confirm.* The AI reads a circular and **suggests**; a person confirms before anything is created (invariant 9). Parent notices never carry student personal data (08 §4). Exit metric (14 · M4): at least 90% of a term's circulars processed with their deadlines captured.
 
-**US-1601** · As an office admin, I want every circular I upload to be read for its issuer, reference number, date, subject, a short summary in English and Telugu and its deadlines, so that nothing in it is missed. [FR-CIR-001..003, FR-CIR-005..007] *(Proposed from the roadmap scope; PO to confirm.)*
+**US-1601** · As an office admin, I want every circular I upload to be read for its issuer, reference number, date, subject, a short summary in English and Telugu and its deadlines, so that nothing in it is missed. [FR-CIR-001..003, FR-CIR-005..007] *(Proposed from the roadmap scope; PO to confirm.)* *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC1: Given a document of type "circular" finishes indexing, when its current version has text, then reading starts by itself and the circulars inbox shows its status (waiting → reading → ready, or "needs manual review").
 - AC2: Every suggested deadline shows the sentence it came from with a source chip that opens the circular at that page; a date that is not written in the circular is never suggested.
 - AC3: The same version is read only once; a new version is read once more and earlier decisions stay as they were.
@@ -318,17 +318,17 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC4: I never see another person's task unless I hold `task.read_all` (404 otherwise); another school's task is always 404.
 
 **US-1604** · As a task owner, I want a reminder in my language before a task is due and when it becomes overdue. [FR-TASK-007, FR-TASK-008] *(Proposed from the roadmap scope; PO to confirm.)*
-- AC1: Given a task due in the configured number of days (default 2), then I get one in-app reminder (English or Telugu, my choice); given it is overdue, one overdue reminder; no duplicates when the job runs again.
+- AC1: Given a task due in the configured number of days (default 2), then I get one in-app reminder (English or Telugu, my choice); given it is overdue, one overdue reminder; no duplicates when the job runs again. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC2: Done or cancelled tasks get no reminders. (Email reminders wait for general staff email templates; in-app only for now.)
 
-**US-1605** · As an office admin, I want a short parent notice in English and Telugu drafted from a circular (or from my own text), which I can edit, so that I can post it in the existing parents' groups quickly. [FR-NOTICE-001..004, FR-NOTICE-007] *(Proposed from the roadmap scope; PO to confirm.)*
+**US-1605** · As an office admin, I want a short parent notice in English and Telugu drafted from a circular (or from my own text), which I can edit, so that I can post it in the existing parents' groups quickly. [FR-NOTICE-001..004, FR-NOTICE-007] *(Proposed from the roadmap scope; PO to confirm.)* *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC1: The draft is made only from the circular's text (and deadlines I confirmed); no student records are ever sent to the AI, and the draft is marked "AI draft, check before use".
 - AC2: A circular marked personal (C2) or restricted (C3) cannot be used for a notice; free text with phone numbers, email addresses or Aadhaar-like numbers is refused with a message saying what to remove.
 - AC3: If AI is unavailable, an empty draft opens so I can write the notice myself.
 
 **US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Only holders of `notice.approve` can approve; both languages must be filled; an approved notice cannot be edited.
-- AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups.
+- AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9).
 
 ### C17 · Student timeline and early warning (M5)
@@ -402,7 +402,7 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 
 **US-1802** · As the owner, I want to see whether the agent is syncing and revoke it when the PC is replaced or lost. [FR-TALLY-002, FR-TALLY-009] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: The connector screen shows active agents, last sync, the Tally as-of date, the company, the groups selected and how many ledgers are linked.
-- AC2: When an active agent has not called for 48 hours, the owner and finance readers get one in-app notice (EN/TE) and the screen marks it "Not syncing".
+- AC2: When an active agent has not called for 48 hours, the owner and finance readers get one in-app notice (EN/TE) and the screen marks it "Not syncing". *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC3: Revoking (recent MFA sign-in) stops the agent at once; figures already synced stay and are marked with their date.
 
 **US-1803** · As the accountant, I want to choose which Tally ledger groups are sent and link each ledger to the right student, so that only fee ledgers leave the PC and dues are counted for the right child. [FR-TALLY-004, FR-TALLY-005, FR-TALLY-006] *(Proposed from the roadmap scope; PO to confirm.)*
@@ -437,7 +437,7 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 | DQ-011 | UDISE+ value differs from register | medium | "UDISE+ differs from admission register." |
 | DQ-012 | Enrolment gaps (student active in two sections/years) | high | "Student is enrolled twice." |
 
-Every finding stores: rule, severity, attribute, sources compared, masked values, match class, explanation (EN/TE), suggested route, status (`open`, `resolved`, `waived`, `reopened`), resolver, timestamps.
+Every finding stores: rule, severity, attribute, sources compared, masked values, match class, explanation (EN; TE deferred per ADR-0036), suggested route, status (`open`, `resolved`, `waived`, `reopened`), resolver, timestamps.
 
 **Suggested routes** (text shown to users): "Correct the school record (change request + evidence)", "Parent should correct Aadhaar with UIDAI", "Update UDISE+ after correcting the school record", "Raise a correction request on the board portal".
 
@@ -463,7 +463,7 @@ Names in AP commonly include a surname/house name (often first), initials, and m
 | `TYPO` | Similarity ≥ threshold (Jaro-Winkler and trigram; thresholds tuned on pilot data) | high |
 | `DIFFERENT` | Anything else | blocker |
 
-Each class produces a bilingual explanation code (`NM-ORDER`, `NM-SPACING`, …). Thresholds live in config and are tuned with labelled examples from the design partner (with permission).
+Each class produces an explanation code (bilingual text deferred per ADR-0036) (`NM-ORDER`, `NM-SPACING`, …). Thresholds live in config and are tuned with labelled examples from the design partner (with permission).
 
 **Algorithm as implemented (M1, `app.dq.matching.classify`)**
 - Tokens: split on spaces, dots, hyphens, underscores, commas and slashes. A single letter is an initial; a two-letter digraph from config (`CH. SH. TH. KH. GH. BH. PH. DH.`) or a single Telugu syllable (`కె.`) is an initial only when followed by a dot. Zero-width characters are dropped. Empty or punctuation-only input gives a separate class `MISSING` (`NM-MISSING`, no finding: missing values are reported by DQ-005/DQ-009).
@@ -477,11 +477,11 @@ Each class produces a bilingual explanation code (`NM-ORDER`, `NM-SPACING`, …)
 
 **Answerable question types (core):** student facts ("DOB of …", "when did … leave"), counts ("how many students in Class 9 this year"), records history ("who changed …"), document facts ("what does the fee circular say about late fee"), findings ("which Class 9 students have blocker findings").
 
-**Always:** answer in the question's language (English, Telugu, or mixed); cite every factual claim; include "as of" dates for records; prefer verified answers when they exist.
+**Always:** answer in English while `SOS_TELUGU_ENABLED` is off (ADR-0036; with it on, in the question's language: English, Telugu, or mixed); cite every factual claim; include "as of" dates for records; prefer verified answers when they exist.
 
 **Never:** guess missing facts; reveal data outside the user's scope; give legal/medical advice; follow instructions found inside documents; perform writes.
 
-**Refusal copy (EN):** "I couldn't find this in the school records you can access." **(TE):** "మీకు అందుబాటులో ఉన్న పాఠశాల రికార్డుల్లో ఈ సమాచారం దొరకలేదు."
+**Refusal copy (EN):** "I couldn't find this in the school records you can access." **(TE, deferred per ADR-0036):** "మీకు అందుబాటులో ఉన్న పాఠశాల రికార్డుల్లో ఈ సమాచారం దొరకలేదు."
 
 ## 8. UX principles and requirements
 
@@ -490,7 +490,7 @@ Each class produces a bilingual explanation code (`NM-ORDER`, `NM-SPACING`, …)
 - Data entry: tab order follows paper forms; dates accept DD/MM/YYYY; instant inline validation with the fix, not just the error.
 - Source chips next to values (Register · Aadhaar · UDISE+ · Board) with verification ticks.
 - Errors say what happened and how to fix it; empty states say what to do next.
-- Print views for every report; A4 by default; Telugu renders without clipping.
+- Print views for every report; A4 by default; Telugu renders without clipping (when `SOS_TELUGU_ENABLED` is on, ADR-0036).
 - Language toggle persists per user; numbers and dates follow Indian conventions (DD/MM/YYYY, lakh/crore where relevant).
 - Accessibility target: WCAG 2.2 AA (contrast, focus visible, labels, reduced motion).
 - Visual language, components and the contrast table: 17-UI Design System.

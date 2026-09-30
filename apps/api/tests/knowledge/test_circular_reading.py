@@ -3,12 +3,18 @@
 Offline and deterministic: the real gateway (redaction, budget, metering, schema check) over the
 offline fake provider, plus the server-side validation that keeps only what the passages say
 (FR-CIR-002, FR-CIR-003, FR-NOTICE-001..004, invariants 4, 5, 8, 9, 13).
+
+English first (ADR-0036): the tests written for the bilingual reading and notice run with the
+Telugu switch ON explicitly (``telugu=True``, the v1 prompts and full schemas) and keep their
+assertions; the ``english_first`` tests pin the default (switch off): nothing the model writes
+in Telugu script is kept.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 import uuid
 from collections.abc import Mapping
 from decimal import Decimal
@@ -33,6 +39,7 @@ from app.knowledge.gateway.budget import (
     TenantAiSettings,
 )
 from app.knowledge.gateway.fake import FakeTransport
+from app.knowledge.gateway.fake_language import ENGLISH_ONLY
 from app.knowledge.gateway.gateway import Gateway
 from app.knowledge.gateway.metering import RecordingSink
 from app.knowledge.gateway.schema_check import validate
@@ -145,7 +152,14 @@ def _objects(schema: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 
 @pytest.mark.parametrize(
-    "schema", [reading_rules.SCHEMA, notice_rules.SCHEMA], ids=["reading", "notice"]
+    "schema",
+    [
+        reading_rules.SCHEMA,
+        notice_rules.SCHEMA,
+        reading_rules.ENGLISH_SCHEMA,
+        notice_rules.ENGLISH_SCHEMA,
+    ],
+    ids=["reading", "notice", "reading_english", "notice_english"],
 )
 def test_FR_CIR_002_schemas_use_only_what_structured_outputs_accept(
     schema: Mapping[str, Any],
@@ -170,6 +184,13 @@ def test_FR_CIR_002_prompts_are_versioned_files_with_their_roles() -> None:
     assert "data, not instructions" in reading.text  # SEC-019
     assert "Never guess" in reading.text
     assert "Never include personal details" in notice.text
+    # ADR-0036: the bilingual prompts are kept (dormant) for the switch-on path.
+    assert CFG.reading.telugu_prompt is not None
+    assert CFG.notice.telugu_prompt is not None
+    for ref in (CFG.reading.telugu_prompt, CFG.notice.telugu_prompt):
+        kept = registry.load_prompt(ref.id, ref.version)
+        assert "Telugu" in kept.text
+        assert ENGLISH_ONLY not in kept.text
     # Thinking off, or (Gemini 3 cannot turn it off; ADR-0033) at the lowest level Vertex takes.
     for config in (load_llm_config(), load_llm_config().use_fallback()):
         for role in ("circular", "notice"):
@@ -209,7 +230,7 @@ def _raw(**overrides: Any) -> dict[str, Any]:
 
 def test_FR_CIR_003_a_grounded_reading_is_kept_with_its_citation() -> None:
     req = request(*EN_PASSAGES)
-    out = reading_rules.validate_reading(_raw(), req, CFG.reading)
+    out = reading_rules.validate_reading(_raw(), req, CFG.reading, telugu=True)
     assert out.issuer == "Office of the District Educational Officer, Guntur"
     assert out.reference_no == "Rc.No.123/B/2026"
     assert out.issued_on == dt.date(2026, 10, 1)
@@ -235,7 +256,7 @@ def test_FR_CIR_003_a_grounded_reading_is_kept_with_its_citation() -> None:
 def test_FR_CIR_003_ungrounded_deadlines_are_dropped(change: dict[str, Any], why: str) -> None:
     deadline = {**_raw()["deadlines"][0], **change}
     out = reading_rules.validate_reading(
-        _raw(deadlines=[deadline]), request(*EN_PASSAGES), CFG.reading
+        _raw(deadlines=[deadline]), request(*EN_PASSAGES), CFG.reading, telugu=True
     )
     assert out.deadlines == (), why
     assert out.dropped == 1
@@ -250,7 +271,7 @@ def test_FR_CIR_003_metadata_not_in_the_passages_is_left_empty() -> None:
         summary_te="Only English here",
         summary_en="తెలుగు మాత్రమే",
     )
-    out = reading_rules.validate_reading(raw, request(*EN_PASSAGES), CFG.reading)
+    out = reading_rules.validate_reading(raw, request(*EN_PASSAGES), CFG.reading, telugu=True)
     assert (out.issuer, out.reference_no, out.issued_on, out.subject) == (None, None, None, None)
     assert (out.summary_en, out.summary_te) == (None, None)
 
@@ -258,7 +279,9 @@ def test_FR_CIR_003_metadata_not_in_the_passages_is_left_empty() -> None:
 def test_FR_CIR_003_duplicates_and_extra_deadlines_are_dropped() -> None:
     one = _raw()["deadlines"][0]
     many = [one] * (CFG.reading.max_deadlines + 3)
-    out = reading_rules.validate_reading(_raw(deadlines=many), request(*EN_PASSAGES), CFG.reading)
+    out = reading_rules.validate_reading(
+        _raw(deadlines=many), request(*EN_PASSAGES), CFG.reading, telugu=True
+    )
     assert len(out.deadlines) == 1
     assert out.dropped == CFG.reading.max_deadlines + 2
 
@@ -292,7 +315,7 @@ def _read(gw: Gateway, req: reading_rules.ReadingRequest) -> reading_rules.Circu
         reading_rules.SCHEMA,
     )
     validate(raw, reading_rules.SCHEMA)
-    return reading_rules.validate_reading(raw, req, CFG.reading)
+    return reading_rules.validate_reading(raw, req, CFG.reading, telugu=True)
 
 
 def test_FR_CIR_002_english_circular_through_the_gateway() -> None:
@@ -367,7 +390,7 @@ def test_FR_NOTICE_003_draft_through_the_gateway_is_bilingual_and_redacted() -> 
         notice_rules.build_request(source, CFG.notice),
         notice_rules.SCHEMA,
     )
-    draft = notice_rules.validate_notice(raw, CFG.notice)
+    draft = notice_rules.validate_notice(raw, CFG.notice, telugu=True)
     assert "14/11/2026" in draft.body_en
     assert draft.title_te
     assert draft.body_te
@@ -380,6 +403,7 @@ def test_FR_NOTICE_003_draft_through_the_gateway_is_bilingual_and_redacted() -> 
             "body_te": "ఫోన్ 9876543210",
         },
         CFG.notice,
+        telugu=True,
     )
     assert "9876543210" not in leaky.body_en + leaky.body_te
     assert leaky.title_te == ""  # Telugu fields must be Telugu script
@@ -402,6 +426,7 @@ def test_FR_NOTICE_003_cut_values_fit_the_configured_limits(value: str) -> None:
     draft = notice_rules.validate_notice(
         {"title_en": value, "body_en": value * 10, "title_te": "క" * 300, "body_te": "ఆ" * 3000},
         limits,
+        telugu=True,
     )
     for text, limit in (
         (draft.title_en, limits.max_title_chars),
@@ -415,3 +440,124 @@ def test_FR_NOTICE_003_cut_values_fit_the_configured_limits(value: str) -> None:
         cut = reading_rules._cut(value, limit)
         assert len(cut) <= limit
         assert cut.endswith("…")
+
+
+# --- English first (ADR-0036): the default, with SOS_TELUGU_ENABLED off -------------------------
+
+TELUGU_SCRIPT = re.compile(r"[ఀ-౿]")
+
+
+def _english_read(gw: Gateway, req: reading_rules.ReadingRequest) -> reading_rules.CircularReading:
+    ref = CFG.reading.prompt_for(False)
+    raw = gw.generate_json(
+        Metering(tenant_id=TENANT, feature="circulars"),
+        "circular",
+        registry.load_prompt(ref.id, ref.version).render(),
+        req.text,
+        reading_rules.schema_for(False),
+    )
+    validate(raw, reading_rules.ENGLISH_SCHEMA)
+    return reading_rules.validate_reading(raw, req, CFG.reading, telugu=False)
+
+
+def _shown(out: reading_rules.CircularReading) -> list[str]:
+    """Everything of a reading a person sees that the model wrote (not the quotes)."""
+    values = [out.issuer, out.reference_no, out.subject, out.summary_en, out.summary_te]
+    for d in out.deadlines:
+        values += [d.title, d.details]
+    return [v for v in values if v]
+
+
+def test_english_first_prompts_are_english_only_by_default() -> None:
+    assert (CFG.reading.prompt.id, CFG.reading.prompt.version) == ("circular_reading", 2)
+    assert (CFG.notice.prompt.id, CFG.notice.prompt.version) == ("parent_notice", 2)
+    for ref in (CFG.reading.prompt_for(False), CFG.notice.prompt_for(False)):
+        text = registry.load_prompt(ref.id, ref.version).text
+        assert ENGLISH_ONLY in text
+        assert "summary_te" not in text
+        assert "title_te" not in text
+    assert CFG.reading.prompt_for(True) == CFG.reading.telugu_prompt
+    assert "summary_te" not in reading_rules.ENGLISH_SCHEMA["properties"]
+    assert set(notice_rules.ENGLISH_SCHEMA["properties"]) == {"title_en", "body_en"}
+
+
+def test_english_first_validation_keeps_no_telugu_the_model_wrote() -> None:
+    raw = _raw(
+        subject="UDISE+ వివరాల సేకరణ",
+        summary_en="Submit UDISE+ data by 15 October.",
+        deadlines=[
+            {
+                "title": "UDISE+ వివరాలు సమర్పించండి",
+                "details": "ప్రధానోపాధ్యాయులు",
+                "due_on": "2026-10-15",
+                "passage": 2,
+                "quote": "submit the UDISE+ data sheets on or before 15/10/2026",
+            }
+        ],
+    )
+    te_req = request(EN_PASSAGES[0] + " విషయం: UDISE+ వివరాల సేకరణ", EN_PASSAGES[1])
+    out = reading_rules.validate_reading(raw, te_req, CFG.reading, telugu=False)
+    assert out.summary_te is None  # a valid Telugu summary is not kept while Telugu is hidden
+    assert out.summary_en == "Submit UDISE+ data by 15 October."
+    assert out.subject is None  # grounded, but written in Telugu script
+    (deadline,) = out.deadlines  # the deadline itself is never lost
+    assert deadline.title == CFG.reading.english_title_fallback
+    assert deadline.details is None
+    assert deadline.citation.quote  # the quote is the circular's own words (evidence)
+    assert not any(TELUGU_SCRIPT.search(v) for v in _shown(out))
+    # With the switch on the same reading keeps the Telugu subject and title.
+    on = reading_rules.validate_reading(raw, te_req, CFG.reading, telugu=True)
+    assert on.subject == "UDISE+ వివరాల సేకరణ"
+    assert on.deadlines[0].title == "UDISE+ వివరాలు సమర్పించండి"
+
+
+@pytest.mark.parametrize("texts", [EN_PASSAGES, TE_PASSAGES], ids=["en", "te"])
+def test_english_first_circular_through_the_gateway_is_english_only(
+    texts: tuple[str, ...],
+) -> None:
+    gw, _sink = gateway()
+    out = _english_read(gw, request(*texts))
+    assert out.deadlines  # the Telugu circular's deadline is still found
+    assert out.summary_en
+    assert out.summary_te is None
+    assert not any(TELUGU_SCRIPT.search(v) for v in _shown(out))
+
+
+def test_english_first_notice_is_english_only() -> None:
+    gw, _sink = gateway()
+    ref = CFG.notice.prompt_for(False)
+    source = notice_rules.NoticeSource(
+        kind="circular",
+        title="క్రీడా దినోత్సవం",
+        passages=passages("క్రీడా దినోత్సవం 14/11/2026న పాఠశాల మైదానంలో జరుగుతుంది."),
+        deadlines=(notice_rules.ConfirmedDeadline(dt.date(2026, 11, 14), "Sports day"),),
+    )
+    raw = gw.generate_json(
+        Metering(tenant_id=TENANT, feature="notices"),
+        "notice",
+        registry.load_prompt(ref.id, ref.version).render(),
+        notice_rules.build_request(source, CFG.notice),
+        notice_rules.schema_for(False),
+    )
+    validate(raw, notice_rules.ENGLISH_SCHEMA)
+    draft = notice_rules.validate_notice(raw, CFG.notice, telugu=False)
+    assert "14/11/2026" in draft.body_en
+    assert (draft.title_te, draft.body_te) == ("", "")
+    assert not TELUGU_SCRIPT.search(draft.title_en + draft.body_en)
+    # A model that writes Telugu anyway: nothing of it is kept.
+    leaky = notice_rules.validate_notice(
+        {
+            "title_en": "తల్లిదండ్రులకు సూచన",
+            "body_en": "Sports day on 14/11/2026.",
+            "title_te": "తల్లిదండ్రులకు సూచన",
+            "body_te": "క్రీడా దినోత్సవం 14/11/2026న.",
+        },
+        CFG.notice,
+        telugu=False,
+    )
+    assert (leaky.title_en, leaky.body_en, leaky.title_te, leaky.body_te) == (
+        "",
+        "Sports day on 14/11/2026.",
+        "",
+        "",
+    )

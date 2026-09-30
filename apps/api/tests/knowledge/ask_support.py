@@ -57,9 +57,13 @@ S = _load("sos_test_ingestion_support", TESTS / "knowledge" / "ingestion_support
 ASK_FLAG = "kb.ask.enabled"
 
 
-def install_runtime(**overrides: Any) -> tuple[composition.Runtime, FakeTransport]:
+def install_runtime(
+    *, telugu: bool = False, **overrides: Any
+) -> tuple[composition.Runtime, FakeTransport]:
+    """The knowledge runtime on the offline provider. ``telugu``: ``SOS_TELUGU_ENABLED`` for it
+    (ADR-0036; default off, English first): Telugu-output tests switch it on explicitly."""
     transport = overrides.pop("transport", None) or FakeTransport(record=True)
-    settings = get_settings().model_copy(update={"kb_enabled": True})
+    settings = get_settings().model_copy(update={"kb_enabled": True, "telugu_enabled": telugu})
     rt = composition.build_runtime(settings, transport=transport, **overrides)
     composition.set_runtime(rt)
     SW.configure_keyring()

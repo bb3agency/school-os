@@ -219,6 +219,20 @@ The three tables of `0038_ask_conversations` (`kb.conversations`, `kb.user_memor
 | Worker routing | `apps/worker/tests/test_knowledge_conversation_routing.py` | `knowledge.summarise_conversation` on `ingest`, `knowledge.tidy_conversations` on `maintenance` with its beat entry |
 | Conversation eval (FR-KB-012) | `evals/tests/test_conversations.py`, `evals/tests/test_gates.py`; `make eval` with `app-fake` | Scoring of each leak and violation, dataset keys, the two pinned hard gates (06 §13.5), the leaky stub trips the leakage gate; the app-fake run drives the real service |
 
+### 4.0.8 English first: Telugu hidden, switch-on runs of the Telugu tests (2026-09-30; ADR-0036)
+
+`SOS_TELUGU_ENABLED` is off by default. Rules: every test that asserts Telugu output keeps its assertions and runs with the switch **on explicitly** (knowledge: `install_runtime(telugu=True)` in `tests/knowledge/ask_support.py`, the `fake_telugu` fixture, `AnswerEngine(..., telugu=True)`, `validate_reading/validate_notice(..., telugu=True)`); new tests named `test_english_first_*` pin the default. No test was deleted, skipped or weakened.
+
+| Suite | File(s) | What it proves |
+|---|---|---|
+| The switch (ADR-0036) | `core/test_languages.py` | Off by default; `enabled_languages()` is `("en",)`; `output_language()` is English for `te`/`mixed` unless switched on |
+| Answer loop (FR-KB-006, FR-KB-007) | `knowledge/test_ask_engine.py` | Telugu and code-mixed questions are accepted, searched as written and answered in English (`language` = `en`, English not-found text, English-only prompt v3 and header flag); Telugu model prose falls back to search-only; the Telugu not-found and `te`/`mixed` language with the switch on |
+| Preview and stand-in | `knowledge/test_answer_streaming.py`, `knowledge/test_gateway_transport.py` | The streamed preview stops before Telugu script; the offline fake follows the English-only rule |
+| Prompts (invariant 13) | `knowledge/test_prompts.py`, `knowledge/test_circular_reading.py` | Every English-first prompt carries "Write in English only" and keeps the other rules; every bilingual prompt is kept as `telugu_prompt` |
+| Circular reading and notices (FR-CIR-002, FR-NOTICE-003) | `knowledge/test_circular_reading.py`; `circulars/test_reading_db.py`, `circulars/test_api.py` (bilingual cases switched on) | No Telugu summary, metadata, title or details kept; English-only notice; deadlines of a Telugu circular still found |
+| API (SSE) | `knowledge/test_conversations_api.py`, `knowledge/test_memory_api.py` | `meta.language` `en`, English title, answer and follow-ups for a code-mixed question; English memory reply to a Telugu "remember" instruction (Telugu with the switch on) |
+| Eval | `evals/tests/test_english_first.py`, `evals/tests/test_harness.py`, `evals/tests/test_gates.py` | The English-first scoring; `stub-telugu` trips exactly the two new hard gates; the gates are pinned |
+
 ### 4.0.7 Suites added for contextual retrieval and reranking (2026-09-30; behind switches, off; ADR-0035 Proposed)
 
 No new table or route: `0040_contextual_retrieval` adds columns to `kb.document_chunks` and `kb.llm_calls`, which the RLS catalog, isolation and offboarding-purge suites already cover.
@@ -305,7 +319,8 @@ Generated from the `is_platform` entries of `apps/api/app/authz/permissions.yaml
 
 - `make eval` runs on PRs touching `app/knowledge/**`, `prompts/**`, model config or retrieval SQL; full suite nightly and before releases.
 - Contextual retrieval and reranking (06 §13.6): the same run scores four variants on `contextual.jsonl`; `ctx_leakage_count == 0` is hard, the gain gates are soft and are the adoption rule for switching them on per environment (live run).
-- **Hard gates (block merge):** leakage = 0, injection resistance = 0 failures, citation precision ≥ 0.95, correct refusal ≥ 0.95.
+- **Hard gates (block merge):** leakage = 0, injection resistance = 0 failures, citation precision ≥ 0.95, correct refusal ≥ 0.95; English first (ADR-0036, 06 §13.8): with `SOS_TELUGU_ENABLED` off, Telugu outputs = 0 and English answer rate = 1.0.
+- **Telugu stays measured:** every pass except the English-first one runs with the switch **on**, so the Telugu datasets and gates (language match, follow-up language, TE and code-mixed circulars) cannot rot while Telugu is hidden.
 - **Soft gates (block release, may merge with ticket):** Recall@10 ≥ 0.90, MRR@10 ≥ 0.70, faithfulness ≥ 0.95, correctness ≥ 0.85, language match ≥ 0.98, latency/cost within budget.
 - Results stored as artifacts with per-category breakdowns (records, documents, mixed language, temporal, unanswerable, permissions, adversarial) and diffs against the last main-branch run.
 - Judge calibration: ≥ 100 human-labelled items; re-calibrate when changing judge model or rubric.
@@ -372,4 +387,4 @@ Plan to raise it: (1) whenever a merge raises the measured value by a whole poin
 
 ## 10. Definition of done (testing view)
 
-A story is done when its acceptance criteria are automated, security suites cover its new routes/resources, logs are proven PII-free, migrations are reversible, UI strings exist in both languages, and all merge gates pass.
+A story is done when its acceptance criteria are automated, security suites cover its new routes/resources, logs are proven PII-free, migrations are reversible, UI strings exist in `en` (`te` optional while `SOS_TELUGU_ENABLED` is off, ADR-0036), and all merge gates pass.

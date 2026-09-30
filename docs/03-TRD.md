@@ -10,6 +10,8 @@
 
 Normative keywords: **MUST / SHOULD / MAY** (RFC 2119). Every requirement has an ID and a verification method: **T** test · **I** inspection · **D** demonstration · **A** analysis.
 
+**English first (ADR-0036, 2026-09-30).** Every Telugu or bilingual *output* requirement below (FR-KB-006, EN/TE templates, notices, certificates, registers, summaries, NFR-I18N-001 `te`) stays specified but is marked **deferred: hidden while `SOS_TELUGU_ENABLED` is off**; its tests and eval gates run with the switch on. Telugu *input* stays in force: Telugu-script search and transliteration (FR-STU-010), Telugu column headers (FR-IMP-002), Telugu register values and OCR, Telugu questions in Ask (answered in English).
+
 ---
 
 ## 1. System summary
@@ -101,7 +103,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 
 | ID | Requirement | V |
 |---|---|---|
-| FR-DQ-001 | Rules MUST be declarative (registry with ID, version, severity, scope, explanation templates EN/TE). | I |
+| FR-DQ-001 | Rules MUST be declarative (registry with ID, version, severity, scope, explanation templates EN/TE). Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | I |
 | FR-DQ-002 | The engine MUST run on demand (per class/section/batch/export profile) and incrementally after writes. | T |
 | FR-DQ-003 | Name comparison MUST implement the match classes in PRD §6 with configurable thresholds and variant dictionary. | T |
 | FR-DQ-004 | Findings MUST be idempotent per (student, rule, attribute, sources) and reopen when conflicts reappear. | T |
@@ -144,7 +146,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-KB-003 | A router MUST choose between structured tools, document search, both, or refusal. | T |
 | FR-KB-004 | Structured questions MUST be answered via whitelisted read-only tools, not free-form SQL generation. | I/T |
 | FR-KB-005 | Answers MUST cite sources using search-result content blocks; server MUST validate every citation maps to retrieved content. | T |
-| FR-KB-006 | Answers MUST be in the language of the question (EN/TE/mixed). | T |
+| FR-KB-006 | Answers MUST be in the language of the question (EN/TE/mixed). **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036)**: questions in any of the three styles are accepted and answered in English, and nothing the system writes contains Telugu script (eval hard gates `english_first_*`); the Telugu behaviour keeps its tests and eval gates, run with the switch on. | T |
 | FR-KB-007 | When evidence is insufficient or forbidden, the answer MUST say so without speculation. | T |
 | FR-KB-008 | Responses MUST stream (SSE); first token ≤ 3 s p95; completion ≤ 10 s p95. | T |
 | FR-KB-009 | Every query MUST log: user, tenant, question hash + encrypted text, tools used, chunk IDs, model, tokens, latency, citations, feedback. | T |
@@ -158,7 +160,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | ID | Requirement | V |
 |---|---|---|
 | FR-EXP-001 | Export profiles MUST be versioned configs (required fields, order, formats, rules). | I |
-| FR-EXP-002 | Pre-check reports MUST be produced as PDF and XLSX, EN/TE. | D |
+| FR-EXP-002 | Pre-check reports MUST be produced as PDF and XLSX, EN/TE. Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | D |
 | FR-EXP-003 | Exports MUST be audited (who, when, which students, profile version) and watermarked. | T |
 | FR-EXP-004 | Bulk exports of personal data MUST require re-authentication. | T |
 
@@ -176,7 +178,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 
 | ID | Requirement | V |
 |---|---|---|
-| FR-NOT-001 | In-app notifications for approvals, findings, processing results; templates in EN/TE. | T |
+| FR-NOT-001 | In-app notifications for approvals, findings, processing results; templates in EN/TE. Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-ADM-001 | Full tenant data export (records CSV/JSON, files, audit CSV), async, MFA-gated, link valid 24 h. | T |
 | FR-ADM-002 | Retention settings per data category within legal bounds. | T |
 | FR-OPS-001 | *Superseded by FR-PLT-001..029 (platform admin panel, §3.12).* | — |
@@ -209,7 +211,7 @@ All FR-PLT routes are under `/api/v1/platform/*`, use `require_platform()` and t
 | FR-PLT-023 | The fleet registry MUST record per deployment: mode, region, host, host name, custom domain, running and target version, last heartbeat, status, backup and certificate state. | T |
 | FR-PLT-024 | `POST /api/v1/fleet/heartbeat` MUST authenticate with HMAC-SHA256 over timestamp and body using a per-deployment key, reject timestamps outside ±5 minutes, replayed nonces, unknown fields and oversized bodies, and accept no personal data. | T |
 | FR-PLT-025 | A deployment without a valid heartbeat for 20 minutes MUST become `unreachable` and alert; stale backups, low disk, expiring certificates and version skew MUST mark it `degraded`. | T |
-| FR-PLT-026 | Announcements MUST have English and Telugu text, a severity, an audience (all, tier, listed schools) and a schedule; they reach shared-tier schools within one minute and dedicated hosts at their next heartbeat. | T |
+| FR-PLT-026 | Announcements MUST have English and Telugu text, a severity, an audience (all, tier, listed schools) and a schedule; they reach shared-tier schools within one minute and dedicated hosts at their next heartbeat. Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-PLT-027 | Support tickets MUST have statuses, priorities and SLA timers; the form MUST warn against student data; messages MUST pass `redact()` before storage; tickets are deleted 1 year after closing. | T |
 | FR-PLT-028 | Operators MUST sign in through a separate OIDC client with MFA; roles come from the fixed platform role set; operators cannot change their own roles; at least one active `platform_owner` remains; platform permissions can never be granted to tenant roles. | T |
 | FR-PLT-029 | Every control-plane change MUST write one event to the hash-chained `platform.audit_events` in the same transaction; operators with `platform.audit.read` can filter, export and verify the chain. | T |
@@ -239,7 +241,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 
 | ID | Requirement | V |
 |---|---|---|
-| FR-CERT-001 | Certificate types (`transfer`, `bonafide`, `study`, `conduct`) MUST be defined in versioned configuration (`app/certificates/config.yaml`: printed attributes, required attributes, inputs with their allowed values, whether approval is needed, serial prefix and format) with versioned HTML/CSS templates in the package and bilingual (EN/TE) labels. Fields of the official AP transfer certificate that SchoolOS cannot fill yet are listed as `TODO(official format)` placeholders, never guessed. *(Proposed; PO to confirm.)* | I/T |
+| FR-CERT-001 | Certificate types (`transfer`, `bonafide`, `study`, `conduct`) MUST be defined in versioned configuration (`app/certificates/config.yaml`: printed attributes, required attributes, inputs with their allowed values, whether approval is needed, serial prefix and format) with versioned HTML/CSS templates in the package and bilingual (EN/TE) labels. Fields of the official AP transfer certificate that SchoolOS cannot fill yet are listed as `TODO(official format)` placeholders, never guessed. *(Proposed; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | I/T |
 | FR-CERT-002 | A certificate MUST be generated only from the canonical student record (BR-01). Issuing (and approving) MUST be refused with `409 certificate_blocked` while the student has an open or reopened **blocker** finding of a base rule on a printed attribute (or on the student as a whole), or a required printed attribute has no value; the response lists finding IDs, rule and attribute codes only. There is no override inside certificates: blockers are cleared by a change request (FR-CR-*) or waived under FR-DQ-020 (`dq.findings.waive`ᴿ). Provisional (unverified) values are printed and flagged in the preview. *(Proposed; PO to confirm.)* | T |
 | FR-CERT-003 | Issued certificates MUST never be edited: the printed values are frozen with the register entry (content + SHA-256) at issue. A wrong value is corrected through a change request, the certificate cancelled (FR-CERT-008) and a new one issued (invariant 6). *(Proposed; PO to confirm.)* | T |
 | FR-CERT-004 | Types marked for approval (default: `transfer`) MUST follow maker-checker (07 §6.3): prepared by `certificate.issue`, approved or rejected by `certificate.approve`ᴿ with `If-Match`, approver ≠ requester (service check **and** DB `CHECK`), rejection with a reason (10..1000 characters), withdrawal by the requester. At most one pending or issued original TC per student (partial unique index). Other types are issued directly by `certificate.issue`. *(Proposed; PO to confirm.)* | T |
@@ -250,13 +252,13 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-CERT-009 | Certificates MUST NOT carry Aadhaar data (PRV-013) or restricted (C3) attributes; free-text inputs and reasons refuse full Aadhaar numbers (`aadhaar_full_number_rejected`), and every printed value passes the Aadhaar mask as defence in depth. *(Proposed; PO to confirm.)* | T |
 | FR-CERT-010 | The PDF MUST be rendered on queue `pdf` by the shared renderer (`app.core.pdf`, bundled Noto Sans Telugu) and stored as a document (`purpose = certificate`, `doc_type = certificate`, C2, private bucket, SSE-KMS, ACL = the roles in configuration), malware-scanned and indexed like an upload; certificate documents cannot be uploaded, versioned or deleted while the register entry refers to them (composite FK). Rendering is idempotent and can be re-queued after a failure. *(Proposed; PO to confirm.)* | T |
 | FR-CERT-011 | Holders of `certificate.read` MUST be able to open a print view (HTML, no scripts, hash-pinned style) and a presigned PDF download (≤ 5 min, attachment); both audited. *(Proposed; PO to confirm.)* | T |
-| FR-CERT-012 | Every certificate transition MUST be audited in its transaction (IDs, codes, serial only; never names or values) and approval requests/decisions notified in EN/TE (FR-NOT-001). *(Proposed; PO to confirm.)* | T |
-| FR-CERT-013 | The letterhead (Telugu school name, address EN/TE, recognition line, place) MUST come from the school settings (`certificate_letterhead`, FR-TEN-012, `tenant.settings.manage`ᴿ); the English name is the school's name. *(Proposed; PO to confirm.)* | T |
+| FR-CERT-012 | Every certificate transition MUST be audited in its transaction (IDs, codes, serial only; never names or values) and approval requests/decisions notified in EN/TE (FR-NOT-001). *(Proposed; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
+| FR-CERT-013 | The letterhead (Telugu school name, address EN/TE, recognition line, place) MUST come from the school settings (`certificate_letterhead`, FR-TEN-012, `tenant.settings.manage`ᴿ); the English name is the school's name. *(Proposed; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-CERT-014 | Issuing MUST meet NFR-PERF-002 (write p95 ≤ 800 ms) and the PDF SHOULD be ready within 60 s p95 so the median request-to-print time stays under 5 minutes (BO-04). *(Proposed; PO to confirm.)* | T/D |
 | FR-REG-001 | A TC register (counterfoil) print view MUST list every TC serial of an academic year in order with issue date, student, admission number, class, date of leaving, reason, conduct, issued/approved by and status (issued, cancelled with reason, duplicates as their own lines). *(Proposed; PO to confirm.)* | T |
 | FR-REG-002 | A certificate issue register print view MUST list the other certificate types the same way. *(Proposed; PO to confirm.)* | T |
 | FR-REG-003 | An admission and withdrawal register print view MUST list students in admission-number order with admission number, name, parents' names, date of birth, date and class of admission, date and class of leaving and the TC serial number. *(Proposed; PO to confirm.)* | T |
-| FR-REG-004 | Register views MUST be A4 landscape print pages with bilingual headings, IST dates as DD/MM/YYYY and Telugu text that never clips; they need `register.read`ᴿ (bulk personal data, like an export, FR-EXP-004) and are audited with counts only (`register.viewed`). *(Proposed; PO to confirm.)* | T |
+| FR-REG-004 | Register views MUST be A4 landscape print pages with bilingual headings, IST dates as DD/MM/YYYY and Telugu text that never clips; they need `register.read`ᴿ (bulk personal data, like an export, FR-EXP-004) and are audited with counts only (`register.viewed`). *(Proposed; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-REG-005 | Register entries MUST be append-only: an issued certificate's number, content and dates are frozen by a trigger, the app role has no `DELETE`, and only workflow columns (status to `cancelled`, cancellation fields, PDF state, document link) change. *(Proposed; PO to confirm.)* | T |
 ### 3.14 Circulars, tasks and parent notices (FR-CIR, FR-TASK, FR-NOTICE) (M4; details in 06 §4.10, §10.4-10.5, §13)
 
@@ -265,27 +267,27 @@ Every row below is proposed from the roadmap scope (14 · M4; stories US-1601..U
 | ID | Requirement | V |
 |---|---|---|
 | FR-CIR-001 | When the current version of a document of type `circular` is indexed, a reading job MUST be queued in the same transaction (outbox); holders of `circular.review` MAY request it again while it is not `ready`. *(Proposed from the roadmap scope; PO to confirm.)* | T |
-| FR-CIR-002 | Reading MUST go through `knowledge.gateway` (role `circular`, prompt `circular_reading` in `app/knowledge/prompts/`, model and caps in `models.yaml`) with only that version's indexed, Aadhaar-masked passages as input; the strict-JSON output (issuer, reference number, date, subject, EN and TE summary, deadlines) MUST be validated server-side. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-002 | Reading MUST go through `knowledge.gateway` (role `circular`, prompt `circular_reading` in `app/knowledge/prompts/`, model and caps in `models.yaml`) with only that version's indexed, Aadhaar-masked passages as input; the strict-JSON output (issuer, reference number, date, subject, EN and TE summary, deadlines) MUST be validated server-side. The TE summary is **deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036)** (prompt `circular_reading` v2, no `summary_te`; nothing the model writes in Telugu script is kept). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-CIR-003 | Every suggested deadline MUST cite a passage of the same version with a quote that is a substring of it and contains the due date; issuer, reference number and date MUST appear in the passages. Anything else is dropped (counted, never stored) or left empty; nothing is guessed. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-CIR-004 | Suggestions MUST NOT create tasks: a person holding `circular.review` confirms (optionally editing title, details, due date; choosing the owner) or dismisses each one, once; decisions are audited in the same transaction (invariant 9). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-CIR-005 | Reading MUST be idempotent per document version (one row per version); a failure (AI off, budget used up, provider unavailable, invalid output, no text) MUST end in `needs_review` with an error code, never in silence. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-CIR-006 | Reading results MUST be visible only to users who can see the document (documents visibility, 404 otherwise). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-CIR-007 | Every reading MUST be metered (`kb.llm_calls`, feature `circulars`) and audited (`circular.read_completed` / `circular.read_failed`: ids, counts, codes only); logs MUST NOT carry prompt, passage or completion text. *(Proposed from the roadmap scope; PO to confirm.)* | T |
-| FR-CIR-008 | The eval harness MUST gate reading on synthetic EN, TE and code-mixed circulars: deadline recall ≥ 0.90, deadline precision ≥ 0.90, citation validity = 1.00, hallucinated deadlines = 0 (hard). *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-CIR-008 | The eval harness MUST gate reading on synthetic EN, TE and code-mixed circulars (run with `SOS_TELUGU_ENABLED` on; the English-first pass reads the TE and mixed ones again with it off, ADR-0036): deadline recall ≥ 0.90, deadline precision ≥ 0.90, citation validity = 1.00, hallucinated deadlines = 0 (hard). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TASK-001 | A task MUST have title, optional details, owner (an active membership of the school), due date, status (`open`, `in_progress`, `done`, `cancelled`) and source (`manual` or `circular` with document and citation). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TASK-002 | Owners MUST see their own tasks (`task.read`); only holders of `task.read_all` see every task; others get 404 for a task that is not theirs. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TASK-003 | Holders of `task.manage` MUST be able to create, reassign, edit and cancel tasks with optimistic locking (`If-Match`). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TASK-004 | Owners MUST be able to move their task between `open`, `in_progress` and `done`; `done` records who and when. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TASK-005 | Task lists MUST filter by status, owner, source circular and due window (`overdue`, `week`) and page with cursors. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TASK-006 | Creating, assigning, completing and cancelling a task MUST be audited in the same transaction (ids and codes only). *(Proposed from the roadmap scope; PO to confirm.)* | T |
-| FR-TASK-007 | A daily job MUST send each open task's owner one in-app reminder (EN/TE) N days before the due date (N in `app/circulars/config.yaml`) and one when it becomes overdue; reruns MUST NOT duplicate them. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TASK-007 | A daily job MUST send each open task's owner one in-app reminder (EN/TE) N days before the due date (N in `app/circulars/config.yaml`) and one when it becomes overdue; reruns MUST NOT duplicate them. *(Proposed from the roadmap scope; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-TASK-008 | Email reminders are out of scope until the notifications email interface supports staff templates beyond invitations. *(Proposed from the roadmap scope; PO to confirm.)* | I |
 | FR-NOTICE-001 | A parent notice MUST be drafted only from a confirmed circular's passages (and its confirmed deadlines) or from staff text; no student record is ever sent to the model. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-NOTICE-002 | Circulars classified C2 or C3 MUST NOT be used for notices; staff text and edited notices with phone numbers, email addresses or Aadhaar-like numbers MUST be refused with a fix-it message. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-NOTICE-003 | Drafting MUST go through `knowledge.gateway` (role `notice`, prompt `parent_notice`); the draft is marked AI-drafted and is editable; if AI is unavailable an empty draft opens. *(Proposed from the roadmap scope; PO to confirm.)* | T |
-| FR-NOTICE-004 | A notice MUST have English and Telugu title and body within configured lengths before approval. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-004 | A notice MUST have English and Telugu title and body within configured lengths before approval. *(Proposed from the roadmap scope; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-NOTICE-005 | Only holders of `notice.approve` may approve; approved notices are immutable. *(Proposed from the roadmap scope; PO to confirm.)* | T |
-| FR-NOTICE-006 | After approval the worker MUST render an A4 PDF and a PNG with headless Chromium and the bundled Noto Sans Telugu; downloads use presigned links ≤ 5 min and are audited. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-006 | After approval the worker MUST render an A4 PDF and a PNG with headless Chromium and the bundled Noto Sans Telugu; downloads use presigned links ≤ 5 min and are audited. *(Proposed from the roadmap scope; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-NOTICE-007 | Drafting, editing, approving and downloading MUST be audited (ids and codes only) and every model call metered (feature `notices`). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-NOTICE-008 | SchoolOS MUST NOT send notices to parents; staff copy or download them. *(Proposed from the roadmap scope; PO to confirm.)* | I |
 
@@ -310,7 +312,7 @@ Every row below is proposed from the roadmap scope (14 · M5; stories US-1701..U
 | FR-EW-003 | Raising MUST be idempotent: at most one open flag per student and rule (partial unique index) and never twice for the same basis (the run's first day, the exam, or the month for rate and behaviour rules); reruns change nothing. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-EW-004 | A new flag's owner MUST be the class teacher of the student's current section when that member is active and may act for the student (FR-EW-011); otherwise it is unassigned and every holder of `insights.manage` is notified. Due date = raised date (IST) + 7 days (`rules.yaml`). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-EW-005 | Rules MUST be evaluated daily for every student actively enrolled in the current academic year (beat, per school; one failing school does not stop the others) and after each attendance or marks write for the students written (outbox consumer); students who left are not evaluated. *(Proposed from the roadmap scope; PO to confirm.)* | T |
-| FR-EW-006 | In-app notifications (EN/TE, ids and codes only): `insights.flag_raised` to the owner, `insights.flag_assigned` to a new owner, `insights.flag_overdue` once when a flag passes its due date without an action (to the owner, or to `insights.manage` holders when unassigned); reruns never duplicate. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-EW-006 | In-app notifications (EN/TE, ids and codes only): `insights.flag_raised` to the owner, `insights.flag_assigned` to a new owner, `insights.flag_overdue` once when a flag passes its due date without an action (to the owner, or to `insights.manage` holders when unassigned); reruns never duplicate. *(Proposed from the roadmap scope; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-EW-007 | Flags MUST need a person (PRV-005): holders of `insights.act` add actions (kind code, date not in the future, optional note ≤ 1000 characters, encrypted); the first action sets `first_action_at` and moves `open` to `in_progress`; closing needs a reason code and `If-Match`; closed flags are read-only. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-EW-008 | Holders of `insights.act` MAY raise a `manual` flag for a student in their scope with an indicator and an optional note. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-EW-009 | Flag lists MUST offer `mine` (owner = me) and `all` (every flag in my `insights.read` scope) with status, indicator, section and overdue filters and cursor paging; details list the actions; changes use `If-Match`. *(Proposed from the roadmap scope; PO to confirm.)* | T |
@@ -340,7 +342,7 @@ Every row below is proposed from the roadmap scope (14 · M6; stories US-1801..U
 | FR-TALLY-006 | Only a person holding `tally.configure` MAY link or unlink a ledger to a student (many-to-many); SchoolOS MAY suggest candidates but MUST NOT link by itself, and the AI never links (invariant 9). Links and unlinks are audited with ids only; searches take names in POST bodies only (SEC-008). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TALLY-007 | `GET /tally/dues` (school-wide `finance.read`) MUST list students with dues from linked ledgers only, limited to students the caller can see, with totals, unlinked ledgers and the Tally as-of date. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-TALLY-008 | The read-only knowledge tool `get_fee_dues` MUST be offered only when the flag is on and the caller holds `finance.read` school-wide; it MUST check the student is in scope, select only ledgers linked to that student in SQL and cite `sos://fee/{id}` (no names in the URI). Eval hard gates: fee figure accuracy 1.00, leakage 0, guessed links 0, citation validity 1.00, refusal correctness ≥ 0.95. *(Proposed from the roadmap scope; PO to confirm.)* | T |
-| FR-TALLY-009 | A job every 30 minutes MUST notify holders of `tally.device.manage` and `finance.read` in the app (EN/TE) once per silence when an active agent has not called for 48 hours, and delete sync records older than 400 days. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-TALLY-009 | A job every 30 minutes MUST notify holders of `tally.device.manage` and `finance.read` in the app (EN/TE) once per silence when an active agent has not called for 48 hours, and delete sync records older than 400 days. *(Proposed from the roadmap scope; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-TALLY-010 | Everything MUST sit behind the per-school flag `tally.connector.enabled` (default off, unknown = off): every staff and agent route answers 404, the menu items are hidden and `get_fee_dues` is not offered. The BFF MUST refuse `/api/v1/edge/*`. The connector's tables MUST be in the school's full data export (without wrapped keys or code hashes) and deleted by the offboarding purge (ADR-0029). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 
 ---
@@ -408,7 +410,7 @@ Every row below is proposed from the roadmap scope (14 · M6; stories US-1801..U
 |---|---|
 | NFR-MNT-001 | Backend unit+integration coverage ≥ 80% on `authz`, `audit`, `students`, `dq`, `changes`, `knowledge`. |
 | NFR-MNT-002 | All modules follow the module structure and dependency rules (import-linter check in CI). |
-| NFR-I18N-001 | All UI strings externalized; `en` and `te` complete; CI fails on missing keys. |
+| NFR-I18N-001 | All UI strings externalized; `en` and `te` complete; CI fails on missing keys. `te` completeness **deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036)**; `en` must be complete. |
 | NFR-A11Y-001 | WCAG 2.2 AA for core screens (automated axe checks + manual review per release). |
 | NFR-CMP-001 | Current Chrome/Edge (Windows 10+), Android Chrome; 1366×768; usable at 1 Mbps. |
 
@@ -439,7 +441,7 @@ Every row below is proposed from the roadmap scope (14 · M6; stories US-1801..U
 | Anthropic Messages API (fallback only) | Out | HTTPS JSON, streaming | Commercial org API keys; ZDR requested; used only for a role switched back in config |
 | Fleet heartbeat (dedicated host → control plane) | In (to shared) | HTTPS JSON, HMAC-SHA256 signed | `POST /api/v1/fleet/heartbeat`; outbound from host only; no personal data (FR-PLT-024) |
 | Payment provider (Razorpay candidate) | Out | HTTPS | **Proposed only** (ADR-0016); not built; M0 uses manual payments |
-| Email (AWS SES) | Out | AWS SDK | Invites, billing reminders, usage alerts; templates EN/TE. Built: provider interface with a local fake and SES v2, staff invitation emails (queued at invite and on resend, sent by a worker); off by default (`SOS_EMAIL_PROVIDER`) |
+| Email (AWS SES) | Out | AWS SDK | Invites, billing reminders, usage alerts; templates EN/TE (TE deferred while `SOS_TELUGU_ENABLED` is off, ADR-0036). Built: provider interface with a local fake and SES v2, staff invitation emails (queued at invite and on resend, sent by a worker); off by default (`SOS_EMAIL_PROVIDER`) |
 | Embeddings provider (e.g., Voyage) | Out | HTTPS JSON | Behind interface; chosen by eval |
 | OCR/extraction provider(s) | Out | HTTPS | Behind interface; Telugu support required |
 | AWS S3, KMS, Secrets Manager, SSM Parameter Store | Out | AWS SDK | VPC endpoints where cost-justified |

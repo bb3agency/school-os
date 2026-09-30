@@ -2,7 +2,8 @@
 
 The model receives only one circular version's indexed passages (already Aadhaar-masked by
 ingestion), each numbered ``[n]`` with its page, plus the metadata the office typed. It returns
-metadata, a short English and Telugu summary and deadline suggestions, each citing a passage
+metadata, a short English summary (and a Telugu one only while Telugu is switched on, ADR-0036:
+:data:`ENGLISH_SCHEMA` has no ``summary_te``) and deadline suggestions, each citing a passage
 number and quoting it. Structured outputs cannot carry Messages API citations (they are mutually
 exclusive), so citations are passage numbers plus a quote, and this module checks them itself
 (docs/06 §9 rules 1-2 applied to JSON):
@@ -13,6 +14,10 @@ exclusive), so citations are passage numbers plus a quote, and this module check
 - issuer, reference number and subject are kept only when they appear in the passages, the
   issue date only when a passage writes it; otherwise they stay empty (never guessed, §4.4);
 - the Telugu summary must use Telugu script and the English one must not;
+- English first (``telugu`` false, ADR-0036): no Telugu summary; metadata written in Telugu
+  script is left empty; a deadline title in Telugu script is replaced by the configured English
+  title and Telugu details are dropped (the quote keeps the circular's own words: it is the
+  evidence, shown as a citation);
 - values are cut to the configured lengths, duplicates (same date and title) dropped.
 
 Nothing here logs or raises with text from the circular or the model (invariant 5).
@@ -88,6 +93,19 @@ SCHEMA: Final[dict[str, Any]] = {
         },
     },
 }
+
+
+ENGLISH_SCHEMA: Final[dict[str, Any]] = {
+    **SCHEMA,
+    "required": [k for k in SCHEMA["required"] if k != "summary_te"],
+    "properties": {k: v for k, v in SCHEMA["properties"].items() if k != "summary_te"},
+}
+"""The schema while Telugu is hidden (ADR-0036): the same, without ``summary_te``."""
+
+
+def schema_for(telugu: bool) -> dict[str, Any]:
+    """The reading schema for the Telugu switch (``app.core.languages``)."""
+    return SCHEMA if telugu else ENGLISH_SCHEMA
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,9 +239,12 @@ def _string(raw: Mapping[str, object], key: str) -> str | None:
     return value.strip() or None if isinstance(value, str) else None
 
 
-def _grounded(value: str | None, corpus: str, limit: int) -> str | None:
-    """``value`` only when the passages contain it (never guessed; docs/06 §4.4)."""
+def _grounded(value: str | None, corpus: str, limit: int, *, telugu: bool) -> str | None:
+    """``value`` only when the passages contain it (never guessed; docs/06 §4.4), and, while
+    Telugu is hidden, only when it is not written in Telugu script (ADR-0036)."""
     if value is None or len(value) > limit or normalise(value) not in corpus:
+        return None
+    if not telugu and _TELUGU.search(value):
         return None
     return _cut(value, limit)
 
@@ -253,7 +274,7 @@ def _issued_on(raw: Mapping[str, object], passages: Sequence[Passage]) -> dt.dat
 
 
 def _deadline(
-    item: object, by_number: Mapping[int, Passage], config: ReadingConfig
+    item: object, by_number: Mapping[int, Passage], config: ReadingConfig, *, telugu: bool
 ) -> DeadlineSuggestion | None:
     if not isinstance(item, Mapping):
         return None
@@ -268,6 +289,11 @@ def _deadline(
     if not mentions_date(quote, due_on):
         return None
     details = _string(item, "details")
+    if not telugu:  # ADR-0036: no Telugu text of the model's own is shown
+        if _TELUGU.search(title):
+            title = config.english_title_fallback
+        if details is not None and _TELUGU.search(details):
+            details = None
     return DeadlineSuggestion(
         title=_cut(mask_aadhaar(title), config.max_title_chars),
         details=_cut(mask_aadhaar(details), config.max_details_chars) if details else None,
@@ -277,9 +303,11 @@ def _deadline(
 
 
 def validate_reading(
-    raw: Mapping[str, object], request: ReadingRequest, config: ReadingConfig
+    raw: Mapping[str, object], request: ReadingRequest, config: ReadingConfig, *, telugu: bool
 ) -> CircularReading:
-    """Keep only what the passages support (see the module docstring)."""
+    """Keep only what the passages support (see the module docstring). ``telugu``:
+    ``app.core.languages.telugu_enabled()``; with it off nothing the model wrote in Telugu
+    script is kept (ADR-0036)."""
     passages = request.passages
     corpus = normalise(" ".join(p.text for p in passages))
     by_number = {p.number: p for p in passages}
@@ -289,7 +317,7 @@ def validate_reading(
     seen: set[tuple[dt.date, str]] = set()
     dropped = 0
     for item in items:
-        suggestion = _deadline(item, by_number, config)
+        suggestion = _deadline(item, by_number, config, telugu=telugu)
         key = (suggestion.due_on, normalise(suggestion.title)) if suggestion else None
         if suggestion is None or key is None or key in seen or len(kept) >= config.max_deadlines:
             dropped += 1
@@ -306,16 +334,18 @@ def validate_reading(
         if n in by_number
     )
     return CircularReading(
-        issuer=_grounded(_string(raw, "issuer"), corpus, config.max_field_chars),
-        reference_no=_grounded(_string(raw, "reference_no"), corpus, config.max_field_chars),
+        issuer=_grounded(_string(raw, "issuer"), corpus, config.max_field_chars, telugu=telugu),
+        reference_no=_grounded(
+            _string(raw, "reference_no"), corpus, config.max_field_chars, telugu=telugu
+        ),
         issued_on=_issued_on(raw, passages),
-        subject=_grounded(_string(raw, "subject"), corpus, config.max_field_chars),
+        subject=_grounded(_string(raw, "subject"), corpus, config.max_field_chars, telugu=telugu),
         summary_en=_summary(
             _string(raw, "summary_en"), telugu=False, limit=config.max_summary_chars
         ),
-        summary_te=_summary(
-            _string(raw, "summary_te"), telugu=True, limit=config.max_summary_chars
-        ),
+        summary_te=_summary(_string(raw, "summary_te"), telugu=True, limit=config.max_summary_chars)
+        if telugu
+        else None,
         summary_sources=sources,
         deadlines=tuple(sorted(kept, key=lambda d: (d.due_on, d.citation.passage))),
         dropped=dropped,
@@ -325,6 +355,7 @@ def validate_reading(
 
 
 __all__ = [
+    "ENGLISH_SCHEMA",
     "SCHEMA",
     "SCHEMA_TAG",
     "CircularContext",
@@ -335,5 +366,6 @@ __all__ = [
     "ReadingRequest",
     "build_request",
     "normalise",
+    "schema_for",
     "validate_reading",
 ]

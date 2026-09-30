@@ -66,6 +66,16 @@ and cites it whole. Without the tool (no ``finance.read``, connector off) it sea
 (there are none) and answers "not found". The figures therefore measure the application's tool,
 links, permission and flag checks, never Claude.
 
+English first (ADR-0036; ``sos_evals.english_first``): the adapter runs every pass with
+``SOS_TELUGU_ENABLED`` ON (the dormant Telugu path keeps its gates), then the harness calls
+:meth:`AppFakeAdapter.set_telugu` with ``False`` (the runtime is rebuilt with the product
+default) and replays the Telugu and code-mixed questions, circulars (reading and a notice draft
+through ``knowledge.service.draft_notice``) and conversations. The stand-in follows the prompt
+it is sent like a model would: under the English-only prompt it writes no Telugu (English
+"not found", a Telugu passage described in English and cited, no Telugu prefix even when the
+user's memory asks for Telugu), so the run measures that the English-only prompts and settings
+reach every call plus the application's server-side checks.
+
 Mapping: record sources carry the application's student ids; the bridge rewrites them to the
 corpus ids (``sos://student/<corpus id>/...``). Document ids are the corpus ids. Corpus doc
 types outside the documents module's list (``note``, ``checklist``, ``timetable``) are stored as
@@ -431,6 +441,19 @@ class EvalFakeTransport:
                 kept.append((result, text_))
         return self._cite(kept, prefix, first_only=False)
 
+    @staticmethod
+    def _english(body: Mapping[str, Any]) -> bool:
+        """The system prompt is the English-only one (Telugu hidden, ADR-0036)."""
+        from app.knowledge.gateway.fake_language import english_only
+
+        system = body.get("system") or ()
+        text_ = (
+            system
+            if isinstance(system, str)
+            else " ".join(str(b.get("text", "")) for b in system if isinstance(b, Mapping))
+        )
+        return english_only(text_)
+
     def send(self, request: Any) -> Mapping[str, Any]:
         body = request.body
         self.sent.append(body)
@@ -442,9 +465,11 @@ class EvalFakeTransport:
             return FakeTransport().send(request)
         messages = list(body.get("messages") or ())
         question = self._question(messages)
-        telugu = bool(re.search(r"[\u0c00-\u0c7f]", question))
+        english = self._english(body)
+        telugu = bool(re.search(r"[\u0c00-\u0c7f]", question)) and not english
         not_found = "ఇది కనబడలేదు." if telugu else "I could not find this in the records."
-        prefix = TELUGU_PREFIX if telugu or self._prefers_telugu(body) else ""
+        prefers = telugu or (self._prefers_telugu(body) and not english)
+        prefix = TELUGU_PREFIX if prefers else ""
         step: Step = []
         if not any(w in question.casefold() for w in AADHAAR_WORDS):
             tools: set[str] = set()
@@ -461,6 +486,13 @@ class EvalFakeTransport:
                 step = self._document_step(messages, question, tools, prefix)
         if isinstance(step, tuple):
             return self._use(step[0], step[1], body)
+        if english:
+            from app.knowledge.gateway.fake_language import ENGLISH_STAND_IN, has_telugu
+
+            step = [
+                {**block, "text": ENGLISH_STAND_IN} if has_telugu(str(block.get("text"))) else block
+                for block in step
+            ]
         return self._reply(step or [{"type": "text", "text": not_found}], "end_turn", body)
 
 
@@ -560,14 +592,12 @@ class AppFakeAdapter:
             }
         )
         self.transport = EvalFakeTransport()
-        if live:
-            self.K.install_runtime(gateway=live_gateway(relaxed), llm_config=relaxed)
-        else:
-            # ADR-0033: every role is on Gemini, so the stand-in speaks the Gemini wire through
-            # GeminiWireFake: the run measures the Gemini codec, its [n] passage markers and
-            # their mapping back to this request's passages (plus thought-signature replay),
-            # not the Messages API shape.
-            self.K.install_runtime(transport=GeminiWireFake(self.transport), llm_config=relaxed)
+        self._live = live
+        self._relaxed = relaxed
+        self._wire = GeminiWireFake
+        # ADR-0036: the main passes run with Telugu switched ON (the dormant Telugu gates);
+        # the English-first pass switches it off through set_telugu.
+        self.set_telugu(True)
         self._service = service.get_service()
         self.corpus = dict(corpus)
         self._schools: dict[str, Any] = {}
@@ -590,6 +620,20 @@ class AppFakeAdapter:
                     f"oracle/application visibility mismatch ({len(mismatches)}): "
                     + "; ".join(mismatches[:5])
                 )
+
+    def set_telugu(self, enabled: bool) -> None:
+        """Rebuild the knowledge runtime with ``SOS_TELUGU_ENABLED`` = ``enabled`` (ADR-0036)."""
+        if self._live:
+            gateway = live_gateway(self._relaxed)
+            self.K.install_runtime(gateway=gateway, llm_config=self._relaxed, telugu=enabled)
+        else:
+            # ADR-0033: every role is on Gemini, so the stand-in speaks the Gemini wire through
+            # GeminiWireFake: the run measures the Gemini codec, its [n] passage markers and
+            # their mapping back to this request's passages (plus thought-signature replay),
+            # not the Messages API shape.
+            self.K.install_runtime(
+                transport=self._wire(self.transport), llm_config=self._relaxed, telugu=enabled
+            )
 
     # --- set-up ---------------------------------------------------------------------------------
 
@@ -974,7 +1018,7 @@ class AppFakeAdapter:
 
     def ask(self, question: str, asker: Any) -> Any:
         from app.core.db import tenant_session
-        from app.knowledge.domain import AskRequest
+        from app.knowledge.domain import AskRequest, MetaEvent
         from sos_evals.adapters import AnswerSegment, AskResult, Citation
 
         school, ctx = self.context(asker)
@@ -984,6 +1028,7 @@ class AppFakeAdapter:
                 s, ctx, AskRequest(question=question, session_id=uuid.uuid4())
             )
         answer = outcome.answer
+        meta = next(e for e in outcome.events if isinstance(e, MetaEvent))
         segments = tuple(
             AnswerSegment(
                 text=seg.text,
@@ -1010,17 +1055,18 @@ class AppFakeAdapter:
             refused=answer.refused,
             provided_sources=tuple(self.corpus_source(p) for p in answer.provided),
             latency_ms=(time.perf_counter() - started) * 1000,
+            mode=answer.mode,
+            language=meta.language,
+            followups=outcome.followups,
+            title=meta.title,
         )
 
     # --- M4 circular reading (sos_evals.circulars; FR-CIR-008) ------------------------------
 
-    def read_circular(self, case: Any) -> Any:
-        """Store the synthetic circular in school A like the documents module does, index it
-        through the real pipeline (whose hook queues the reading), run the reading job and
-        return the suggestions the application kept."""
-        import app.circulars.service as circulars
+    def _store_circular(self, case: Any) -> tuple[Any, uuid.UUID, uuid.UUID] | None:
+        """The synthetic circular stored in school A like the documents module stores it and
+        indexed through the real pipeline (whose hook queues the reading); None if not indexed."""
         from app.knowledge.ingestion.extract import DOCX_MIME
-        from sos_evals.circulars import CircularResult, SuggestedDeadline
 
         support = self.K
         school = self._schools[sorted(self._schools)[0]]
@@ -1056,7 +1102,19 @@ class AppFakeAdapter:
             )
         support.D.memory_store().put(key, data, DOCX_MIME)
         if support.pipeline().ingest(school.tenant_id, doc_id, version_id) != "indexed":
+            return None
+        return school, doc_id, version_id
+
+    def read_circular(self, case: Any) -> Any:
+        """Store and index the circular, run the reading job and return what the application
+        kept (the suggestions, and the metadata and summaries shown with them)."""
+        import app.circulars.service as circulars
+        from sos_evals.circulars import CircularResult, SuggestedDeadline
+
+        stored = self._store_circular(case)
+        if stored is None:
             return CircularResult(failed=True)
+        school, _doc_id, version_id = stored
         with self._admin.connect() as c:
             reading_id: uuid.UUID = c.execute(
                 text("SELECT id FROM kb.circular_readings WHERE version_id = :v"),
@@ -1066,23 +1124,65 @@ class AppFakeAdapter:
             return CircularResult(failed=True)
         with self._admin.connect() as c:
             row = c.execute(
-                text("SELECT reference_no, issued_on FROM kb.circular_readings WHERE id = :r"),
+                text(
+                    "SELECT reference_no, issued_on, issuer, subject, summary_en, summary_te "
+                    "FROM kb.circular_readings WHERE id = :r"
+                ),
                 {"r": reading_id},
             ).one()
             found = c.execute(
                 text(
-                    "SELECT due_on, title, citation FROM kb.circular_suggestions "
+                    "SELECT due_on, title, details, citation FROM kb.circular_suggestions "
                     "WHERE reading_id = :r ORDER BY position"
                 ),
                 {"r": reading_id},
             ).all()
         return CircularResult(
             deadlines=tuple(
-                SuggestedDeadline(due_on=f.due_on, quote=f.citation["quote"], title=f.title)
+                SuggestedDeadline(
+                    due_on=f.due_on, quote=f.citation["quote"], title=f.title, details=f.details
+                )
                 for f in found
             ),
             reference_no=row.reference_no,
             issued_on=row.issued_on,
+            issuer=row.issuer,
+            subject=row.subject,
+            summary_en=row.summary_en,
+            summary_te=row.summary_te,
+        )
+
+    def draft_notice(self, case: Any) -> Any:
+        """A parent notice drafted from the stored circular by ``knowledge.service`` (the
+        circulars module's draft job calls the same function; FR-NOTICE-003)."""
+        from app.core.db import tenant_session
+        from app.knowledge import service
+        from sos_evals.english_first import NoticeResult
+
+        stored = self._store_circular(case)
+        if stored is None:
+            return NoticeResult(failed=True)
+        school, doc_id, version_id = stored
+        with tenant_session(school.tenant_id) as s:
+            passages = service.circular_passages(s, doc_id, version_id, 1)
+        source = service.NoticeSource(
+            kind="circular",
+            title=case.title,
+            passages=passages,
+            deadlines=tuple(
+                service.ConfirmedDeadline(due, "Deadline from the circular")
+                for due in case.expected_deadlines
+            ),
+        )
+        try:
+            draft = service.draft_notice(school.tenant_id, source)
+        except service.AiUnavailable:
+            return NoticeResult(failed=True)
+        return NoticeResult(
+            title_en=draft.title_en,
+            body_en=draft.body_en,
+            title_te=draft.title_te,
+            body_te=draft.body_te,
         )
 
     # --- M6 fee dues from Tally (sos_evals.fees; FR-TALLY-008) --------------------------------
@@ -1565,6 +1665,8 @@ class _ConversationRunner:
             stored = tuple(m.text for m in svc.list_memories(s, self.ctx[who]))
         answer = outcome.answer
         return TurnResult(
+            title=meta.title,
+            language=meta.language,
             step=index,
             text=answer.text,
             citations=tuple(self._source(c.source) for c in answer.cited),
