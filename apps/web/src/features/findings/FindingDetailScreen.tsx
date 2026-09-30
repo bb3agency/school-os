@@ -190,6 +190,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                   title={td("resolveTitle")}
                   description={td("resolveBody")}
                   confirmLabel={td("resolve")}
+                  consequence={td("resolveConsequence")}
                   schema={resolveSchema}
                   invalidate={invalidate}
                   errorNamespace="findings"
@@ -239,6 +240,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                   title={td("waiveTitle")}
                   description={td("waiveBody")}
                   confirmLabel={td("waive")}
+                  consequence={td("waiveConsequence")}
                   confirmVariant="danger"
                   stepUp
                   schema={waiveSchema}

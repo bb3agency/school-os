@@ -7,7 +7,11 @@ import {
 import {
   cspViolations,
   expectEverythingRevealedAfterScrolling,
+  expectPublicUrl,
   hiddenRevealContent,
+  MK,
+  PUBLIC_PAGES,
+  publicPathPattern,
   settleAnimations,
 } from "./support/marketing";
 import { expectNoTelugu, teluguOn } from "./support/telugu";
@@ -22,13 +26,9 @@ import { expectNoTelugu, teluguOn } from "./support/telugu";
  * The dedicated-host variant (SOS_DEPLOYMENT_MODE=dedicated) is covered in app/marketing.test.tsx.
  */
 
-const PAGES = [
-  { path: "/en/welcome", h1: "Enter student details once." },
-  { path: "/en/features", h1: "Everything the office needs to keep student records right" },
-  { path: "/en/security", h1: "Built for children's data from the first line of code" },
-  { path: "/en/pricing", h1: "Two ways to run SchoolOS" },
-  { path: "/en/about", h1: "Software for the school office, built with the office" },
-] as const;
+// Locale-free paths, headings from messages/en.json (support/marketing.ts): the same tests run
+// with today's /en prefix and after locale prefixes are removed.
+const PAGES = PUBLIC_PAGES;
 
 const VIEWPORTS = [
   { width: 1366, height: 768 },
@@ -88,9 +88,9 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
   test("keyboard focus inside a block that waits for its reveal shows it at once", async ({
     page,
   }) => {
-    await page.goto("/en/welcome");
+    await page.goto("/welcome");
     const tile = page
-      .getByRole("region", { name: "Built around the work the office already does" })
+      .getByRole("region", { name: MK.home.highlights.title })
       .getByRole("link")
       .first();
     const item = tile.locator("xpath=..");
@@ -105,7 +105,7 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
   test("Shift+Tab back up the page: the focused control is never under the sticky header (WCAG 2.4.11)", async ({
     page,
   }) => {
-    for (const path of ["/en/welcome", "/en/security"]) {
+    for (const path of ["/welcome", "/security"]) {
       await page.goto(path);
       await page.getByRole("contentinfo").getByRole("link").last().focus();
       const obscured: string[] = [];
@@ -135,15 +135,17 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
       await page.goto(path);
       const current = page.getByRole("banner").locator('[aria-current="page"]');
       await expect(current).toHaveCount(1);
-      expect(await current.getAttribute("href")).toBe(path);
+      expect(await current.getAttribute("href")).toMatch(publicPathPattern(path));
       const hrefs = await page
         .locator("header a[href], footer a[href]")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
       for (const href of hrefs) {
-        // Locale-free paths in the code become /en/... (no /te while Telugu is off).
-        expect(href, path).toMatch(/^(#|\/en\/|\/bff\/auth\/login$)/);
+        // Same-site paths (with today's /en prefix or none; never /te while Telugu is off),
+        // in-page anchors or sign-in.
+        expect(href, path).toMatch(/^(#|\/(?!te(\/|$))[a-z]|\/bff\/auth\/login$)/);
       }
-      for (const href of new Set(hrefs.filter((href) => href.startsWith("/en/")))) {
+      const pages = hrefs.filter((href) => href.startsWith("/") && !href.startsWith("/bff/"));
+      for (const href of new Set(pages)) {
         expect((await page.request.get(href)).status(), href).toBe(200);
       }
     }
@@ -152,7 +154,7 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
   test("features: the jump list moves to each section below the sticky header", async ({
     page,
   }) => {
-    await page.goto("/en/features");
+    await page.goto("/features");
     const jump = page.getByRole("navigation", { name: "Jump to a feature" });
     await jump.getByRole("link").nth(3).click();
     await expect(page).toHaveURL(/#ask$/);
@@ -164,13 +166,13 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
       .evaluate((el) => el.getBoundingClientRect().top);
     expect(top).toBeGreaterThanOrEqual(header);
     // A deep link lands with its illustration visible.
-    await page.goto("/en/features#certificates");
+    await page.goto("/features#certificates");
     await expect(page.locator("section#certificates h2")).toBeInViewport();
     await settleAnimations(page);
     const illustration = page.locator("section#certificates [data-reveal]");
     expect(Number(await illustration.evaluate((el) => getComputedStyle(el).opacity))).toBe(1);
     // Blocks above it reveal as the page scrolls back through them.
-    await expectEverythingRevealedAfterScrolling(page, "/en/features#certificates");
+    await expectEverythingRevealedAfterScrolling(page, "/features#certificates");
   });
 
   test("keyboard only on every page: visible focus on each stop", async ({ page }) => {
@@ -185,7 +187,7 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
   }) => {
     const violations = cspViolations(page);
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/en/pricing");
+    await page.goto("/pricing");
     const menu = page.getByRole("button", { name: "Menu" });
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await menu.click();
@@ -234,7 +236,7 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
     await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("button", { name: "Close menu" }).waitFor();
     await page.locator("header").getByRole("link", { name: "About" }).click();
-    await expect(page).toHaveURL(/\/en\/about$/);
+    await expectPublicUrl(page, "/about");
     await expect(page.getByRole("button", { name: "Menu" })).toHaveAttribute(
       "aria-expanded",
       "false",
@@ -243,7 +245,7 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
   });
 
   test("print: revealed content and dark bands print plainly", async ({ page }) => {
-    await page.goto("/en/security");
+    await page.goto("/security");
     await page.emulateMedia({ media: "print" });
     expect(await hiddenRevealContent(page)).toEqual([]);
     await expect(page.locator("header.mk-header")).toBeHidden();

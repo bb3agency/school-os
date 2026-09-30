@@ -41,6 +41,11 @@ export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
   stepUp?: boolean;
   /** Two-person actions: explain that a different operator must do the second step. */
   note?: ReactNode;
+  /**
+   * What confirming changes, in one plain sentence, shown just above the buttons and read
+   * as the confirm button's description (e.g. "Nothing on the student's record changes.").
+   */
+  consequence?: ReactNode;
   schema: TSchema;
   submit: (data: z.output<TSchema>, idempotencyKey: string) => Promise<TResult>;
   fieldMap?: (serverField: string) => string | undefined;
@@ -74,6 +79,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   confirmVariant = "primary",
   stepUp = false,
   note,
+  consequence,
   schema,
   submit,
   fieldMap,
@@ -91,6 +97,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   const titleId = useId();
   const descriptionId = useId();
   const triggerHintId = useId();
+  const consequenceId = useId();
   const [open, setOpen] = useState(false);
 
   // Fades out before it closes (Escape too); instant under reduced motion.
@@ -174,13 +181,27 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                   {stepUp ? <p className="text-sm text-ink-muted">{t("stepUpNote")}</p> : null}
                   <ApiErrorAlert error={form.error} namespace={errorNamespace} />
                 </div>
-                <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
+                {consequence ? (
+                  <p
+                    id={consequenceId}
+                    className="border-t border-border bg-surface-muted px-4 pt-3 text-sm text-ink sm:px-6 sm:pt-4 sm:text-end"
+                  >
+                    {consequence}
+                  </p>
+                ) : null}
+                <div
+                  className={cn(
+                    "flex flex-wrap justify-end gap-2 rounded-b-xl bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4",
+                    consequence ? "pt-2 sm:pt-3" : "border-t border-border",
+                  )}
+                >
                   <Button variant="secondary" onClick={close}>
                     {t("cancel")}
                   </Button>
                   <Button
                     type="submit"
                     variant={confirmVariant}
+                    aria-describedby={consequence ? consequenceId : undefined}
                     disabled={form.pending}
                     aria-disabled={form.pending || undefined}
                     loading={form.pending}

@@ -2897,7 +2897,9 @@
       "timelineLabel": "ఈ సమస్య చరిత్ర",
       "stillOpen": "ఇంకా తెరిచి ఉంది",
       "problem": "సమస్య",
-      "relatedLabel": "సంబంధిత పేజీలు"
+      "relatedLabel": "సంబంధిత పేజీలు",
+      "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
+      "waiveConsequence": "Nothing on the student's record changes."
     },
     "rules": {
       "title": "SchoolOS ఏమి తనిఖీ చేస్తుంది",
@@ -3186,7 +3188,10 @@
       "waitingDecision": "నిర్ణయం కోసం వేచి ఉంది",
       "decideHint": "సాక్ష్యాన్ని చూసి, ఈ అభ్యర్థనను ఆమోదించండి లేదా తిరస్కరించండి.",
       "timelineLabel": "ఈ అభ్యర్థన దశలు",
-      "relatedLabel": "సంబంధిత పేజీలు"
+      "relatedLabel": "సంబంధిత పేజీలు",
+      "approveConsequence": "The student's record changes as soon as you approve. The old value stays in the history.",
+      "rejectConsequence": "Nothing on the student's record changes.",
+      "cancelConsequence": "Nothing on the student's record changes."
     },
     "crumbHome": "హోమ్"
   },
@@ -4897,7 +4902,10 @@
       "talk": "Talk to us",
       "talkEmail": "Talk to us by email",
       "learnMore": "Learn more",
-      "existing": "Already using SchoolOS? Sign in with your school account."
+      "existing": "Already using SchoolOS? Sign in with your school account.",
+      "whatsapp": "Ask on WhatsApp",
+      "whatsappOpens": "(opens WhatsApp)",
+      "whatsappMessage": "Hello, I'd like to see SchoolOS for our school."
     },
     "sample": "Sample data",
     "planned": "Planned",
@@ -5103,7 +5111,7 @@
         "title": "How SchoolOS protects your records",
         "isolation": {
           "title": "Each school kept apart",
-          "body": "Every school's records are separated in the database itself, so a request for one school can never read another school's data. On the Dedicated plan your school also has its own server, storage and key."
+          "body": "Every school's records are separated in the database itself, so a request for one school can never read another school's data. On the Dedicated plan your school also runs in its own managed, isolated environment with a dedicated database, storage and key."
         },
         "encryption": {
           "title": "Encrypted in transit and at rest",
@@ -5168,15 +5176,15 @@
     "pricing": {
       "title": "Pricing",
       "eyebrow": "Pricing",
-      "headline": "Two ways to run SchoolOS",
-      "intro": "The same features, the same security and your data in India on both. We agree the price with each school before it starts.",
+      "headline": "How SchoolOS is priced",
+      "intro": "There is no price list. We agree the fee with each school in writing before it starts. This page explains what the fee is based on, what every school gets and what happens after you get in touch.",
       "forLabel": "Who it is for",
       "includedLabel": "What is included",
-      "priceNote": "Price agreed with your school",
+      "priceNote": "Quoted in writing for your school",
       "shared": {
         "name": "Shared",
-        "summary": "Your school runs as a separate, isolated school on the SchoolOS platform in AWS Mumbai.",
-        "for": "Most schools. No servers to think about and nothing to install.",
+        "summary": "Your school runs as a separate, isolated school on the managed SchoolOS platform in AWS Mumbai.",
+        "for": "Most schools. Nothing to install and nothing to look after.",
         "points": {
           "one": "Every SchoolOS feature",
           "two": "Managed, updated and backed up by SchoolOS",
@@ -5186,13 +5194,13 @@
       },
       "dedicated": {
         "name": "Dedicated",
-        "summary": "Your own isolated server in AWS Mumbai, running the same software, with its own storage and encryption key.",
-        "for": "Larger schools, school groups and schools that want their own server.",
+        "summary": "A managed, isolated SchoolOS environment with your own domain, a dedicated database and a documented data export. We run it for you in AWS Mumbai.",
+        "for": "Larger schools, school groups and schools that want their own environment and web address.",
         "points": {
           "one": "Every SchoolOS feature",
-          "two": "Your own server, storage and encryption key",
+          "two": "A dedicated database, storage and encryption key",
           "three": "Encrypted backups to AWS Hyderabad",
-          "four": "Optional web address on your school's own domain"
+          "four": "Web address on your school's own domain"
         }
       },
       "compare": {
@@ -5202,28 +5210,22 @@
         "features": "All features",
         "security": "Security controls and audit log",
         "location": "Data stored in India",
-        "server": "Server",
+        "server": "Environment",
         "serverShared": "Shared platform, your school isolated",
-        "serverDedicated": "Your own server",
+        "serverDedicated": "Managed, isolated environment with a dedicated database",
         "key": "Encryption key",
         "keyShared": "Your school's own key for sensitive fields",
-        "keyDedicated": "Your own key for the whole server",
+        "keyDedicated": "Your own key for the whole environment",
         "domain": "Web address",
         "domainShared": "SchoolOS domain",
         "domainDedicated": "SchoolOS domain or your own",
         "yes": "Included"
       },
-      "how": {
-        "title": "How pricing works",
-        "subscription": "SchoolOS is a recurring subscription. We agree the price with your school before it starts.",
-        "invoices": "You receive GST invoices from SchoolOS.",
-        "noSurprises": "No setup is needed on your side for the Shared plan."
-      },
       "faq": {
         "title": "Pricing questions",
         "price": {
           "q": "Why are there no prices on this page?",
-          "a": "Schools differ in size and needs, so we agree the price with each school before it starts. Talk to us and we will explain it plainly."
+          "a": "Schools differ in size, campuses and how they will use SchoolOS, so we quote each school in writing before it starts. Talk to us and we will explain every part of it plainly."
         },
         "switch": {
           "q": "What does a school need to get started?",
@@ -5231,11 +5233,114 @@
         },
         "features": {
           "q": "Does Dedicated have more features?",
-          "a": "No. Both plans have every feature and the same security. Dedicated adds your own server, storage and key, and an optional web address on your own domain."
+          "a": "No. Both plans have every feature and the same security. Dedicated adds a managed, isolated environment with a dedicated database, storage and key, and a web address on your own domain."
         },
         "data": {
           "q": "Where is our data on each plan?",
           "a": "In India on both: AWS Mumbai, with encrypted backups in Hyderabad."
+        },
+        "ai": {
+          "q": "What happens if we use up our questions?",
+          "a": "Everything else keeps working. You can add extra answers for the rest of the month or move to a bigger bundle from the next month."
+        }
+      },
+      "plansLabel": "The two ways to run SchoolOS",
+      "basis": {
+        "eyebrow": "Your fee",
+        "title": "What the fee is based on",
+        "intro": "Four things decide the recurring fee. We ask about them in the first conversation and show each one in your quote.",
+        "size": {
+          "title": "School size",
+          "body": "How many students the school has on its rolls."
+        },
+        "campuses": {
+          "title": "Campuses",
+          "body": "How many campuses or branches run on SchoolOS."
+        },
+        "tier": {
+          "title": "Shared or Dedicated",
+          "body": "A school on the shared platform, or its own managed, isolated environment."
+        },
+        "ai": {
+          "title": "AI question bundle",
+          "body": "How many questions your staff can ask the school's records each month."
+        }
+      },
+      "everyone": {
+        "title": "What every school gets",
+        "intro": "On both plans, whatever the size of the school.",
+        "items": {
+          "features": "Every SchoolOS feature, with new ones as they are released",
+          "security": "The same security controls and a tamper-evident audit log",
+          "india": "Data stored in India, with encrypted backups in AWS Hyderabad",
+          "managed": "Updates, monitoring and backups run by SchoolOS",
+          "export": "A full export of your school's data whenever the owner asks for it",
+          "support": "Support requests with agreed response times"
+        }
+      },
+      "implementation": {
+        "eyebrow": "One-time fee",
+        "title": "Implementation and data verification",
+        "intro": "A one-time fee, quoted with the subscription, for getting your records right before you rely on them.",
+        "coversLabel": "What it covers",
+        "items": {
+          "audit": "A data audit and cleaning of your student records",
+          "import": "Importing your historical records",
+          "mapping": "Mapping your records to your board and UDISE+ formats",
+          "templates": "Setting up your certificate templates",
+          "training": "Training for your admin office",
+          "reconciliation": "A reconciliation with your office before go-live",
+          "domain": "Connecting your own domain (Dedicated)"
+        }
+      },
+      "ai": {
+        "eyebrow": "Ask the school",
+        "title": "AI answers as monthly question bundles",
+        "intro": "Answers from your own records and documents, with sources, come in a monthly bundle of questions. You choose the bundle that fits how your staff work, and can change it later.",
+        "lite": {
+          "name": "Lite",
+          "body": "For an office that asks now and then, such as before a board submission."
+        },
+        "standard": {
+          "name": "Standard",
+          "body": "For everyday use by the office and the principal."
+        },
+        "high": {
+          "name": "High",
+          "body": "For schools where many staff ask questions every day."
+        },
+        "extra": {
+          "name": "Extra answers",
+          "body": "If a busy month uses up the bundle, you can add extra answers for the rest of that month."
+        },
+        "note": "Your quote says how questions are counted, so there are no surprises at the end of the month."
+      },
+      "billing": {
+        "title": "Billing and GST",
+        "cycle": "The subscription is billed monthly or annually, in advance, as agreed in your quote.",
+        "oneTime": "The implementation and data verification fee is invoiced once.",
+        "gst": "GST is shown separately on every tax invoice, never hidden inside the fee.",
+        "invoices": "Each tax invoice from SchoolOS lists the service period and every fee on its own line."
+      },
+      "next": {
+        "title": "What happens after you contact us",
+        "steps": {
+          "reply": {
+            "title": "We reply",
+            "body": "We ask a few questions: how many students and campuses you have, your board and how your office keeps records today."
+          },
+          "demo": {
+            "title": "We show you SchoolOS",
+            "body": "A walk-through on sample data. We never ask for real student records before you sign up."
+          },
+          "quote": {
+            "title": "You get a written quote",
+            "body": "The recurring fee, the one-time implementation fee and the AI bundle, each shown on its own, with GST shown separately."
+          },
+          "start": {
+            "title": "We set up and verify",
+            "body": "Once you agree, we set up your school, verify your records with your office and invite the school's owner to sign in."
+          }
         }
       }
     },

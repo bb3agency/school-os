@@ -145,6 +145,7 @@ function Decisions({ request, mode }: { request: ChangeRequest; mode: "decide" |
             title={t("approveTitle")}
             description={t("approveBody")}
             confirmLabel={t("approve")}
+            consequence={t("approveConsequence")}
             stepUp
             schema={approveSchema}
             invalidate={invalidate}
@@ -176,6 +177,7 @@ function Decisions({ request, mode }: { request: ChangeRequest; mode: "decide" |
             title={t("rejectTitle")}
             description={t("rejectBody")}
             confirmLabel={t("reject")}
+            consequence={t("rejectConsequence")}
             confirmVariant="danger"
             stepUp
             schema={rejectSchema}
@@ -211,6 +213,7 @@ function Decisions({ request, mode }: { request: ChangeRequest; mode: "decide" |
           title={t("cancelTitle")}
           description={t("cancelBody")}
           confirmLabel={t("cancel")}
+          consequence={t("cancelConsequence")}
           confirmVariant="danger"
           schema={z.object({})}
           invalidate={invalidate}
