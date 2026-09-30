@@ -11,6 +11,9 @@
   no job is needed. Verified answers citing the document must be flagged ``needs_review`` in
   that transaction too: :func:`flag_citing_answers` is a ``DELETED_HOOKS`` entry, called after
   the delete (and only for a delete that happened) in the same transaction.
+- The answer cache (docs/06 cost and performance design): archiving, deleting, a new searchable
+  version or an ACL change of a document marks every cached answer given its passages
+  ``cache_invalidated_at`` (never reused again).
 
 These run whether or not ``SOS_KB_ENABLED`` is on: hiding and flagging only ever narrow what
 can be retrieved (fail closed). Importing this module installs them (idempotent); the API and
@@ -39,6 +42,7 @@ def on_status_changed(session: Session, document_id: uuid.UUID, status: str) -> 
     _store.lock_document(session, document_id)
     tenant_id = repo.current_tenant_id(session)
     if status == "archived":
+        repo.invalidate_cache_citing(session, document_id)
         count = repo.demote_document(session, document_id)
     else:
         count = 0
@@ -57,7 +61,9 @@ def on_status_changed(session: Session, document_id: uuid.UUID, status: str) -> 
 
 
 def flag_citing_answers(session: Session, document_id: uuid.UUID) -> None:
-    """A ``DELETED_HOOKS`` entry: flags the verified answers citing the deleted document."""
+    """A ``DELETED_HOOKS`` entry: flags the verified answers citing the deleted document and
+    stops cached answers given its passages from being reused (docs/06 answer cache)."""
+    repo.invalidate_cache_citing(session, document_id)
     flagged = repo.flag_verified_answers_citing(session, document_id)
     if flagged:
         log.info(

@@ -32,7 +32,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import column, delete, func, insert, select, text, update
+from sqlalchemy import column, delete, func, insert, select, text, tuple_, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
@@ -41,10 +41,13 @@ from app.core.ids import new_id
 from app.knowledge.domain import Chunk, InputType
 from app.knowledge.models import (
     EMBEDDING_DIMENSIONS,
+    Conversation,
     DocumentChunk,
     EmbeddingCacheEntry,
     LlmCall,
     Query,
+    UserMemory,
+    UserMemorySettings,
     VerifiedAnswer,
 )
 
@@ -505,6 +508,469 @@ def insert_verified_answer(session: Session, values: Mapping[str, Any]) -> Verif
         .returning(VerifiedAnswer)
     ).scalar_one()
     return row
+
+
+# --- conversations (kb.conversations; 0038, ADR-0033) ------------------------------------------
+
+LIVE_STATUSES = (*EARLIER_STATUSES, "error", "cancelled", "streaming")
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationRow:
+    conversation: Conversation
+    message_count: int
+
+
+def _message_count() -> Any:
+    return (
+        select(func.count())
+        .select_from(Query)
+        .where(
+            Query.conversation_id == Conversation.id,
+            Query.user_id == Conversation.user_id,
+            Query.superseded_by.is_(None),
+        )
+        .correlate(Conversation)
+        .scalar_subquery()
+    )
+
+
+def insert_conversation(session: Session, values: Mapping[str, Any]) -> Conversation:
+    row = session.execute(
+        insert(Conversation)
+        .values(tenant_id=current_tenant_id(session), **values)
+        .returning(Conversation)
+    ).scalar_one()
+    return row
+
+
+def conversation_owner(session: Session, conversation_id: uuid.UUID) -> uuid.UUID | None:
+    """Who a conversation of this school belongs to (None: no such conversation). Used only to
+    tell a legacy ``session_id`` of another user apart; never returned to a caller."""
+    value: uuid.UUID | None = session.execute(
+        select(Conversation.user_id).where(Conversation.id == conversation_id)
+    ).scalar_one_or_none()
+    return value
+
+
+def get_conversation(
+    session: Session,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    for_update: bool = False,
+    include_deleted: bool = False,
+) -> Conversation | None:
+    """One of ``user_id``'s conversations (None for another user's, another school's or, unless
+    ``include_deleted``, a deleted one: the caller answers 404)."""
+    stmt = select(Conversation).where(
+        Conversation.id == conversation_id, Conversation.user_id == user_id
+    )
+    if not include_deleted:
+        stmt = stmt.where(Conversation.deleted_at.is_(None))
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def conversation_with_count(
+    session: Session, conversation_id: uuid.UUID, user_id: uuid.UUID
+) -> ConversationRow | None:
+    row = session.execute(
+        select(Conversation, _message_count()).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id,
+            Conversation.deleted_at.is_(None),
+        )
+    ).first()
+    return ConversationRow(row[0], int(row[1])) if row is not None else None
+
+
+def list_conversations(
+    session: Session,
+    user_id: uuid.UUID,
+    *,
+    limit: int,
+    after: tuple[bool, dt.datetime, uuid.UUID] | None,
+) -> list[ConversationRow]:
+    """``user_id``'s conversations, pinned first, then newest activity first (keyset on
+    ``(pinned, updated_at, id)``, all descending)."""
+    stmt = select(Conversation, _message_count()).where(
+        Conversation.user_id == user_id, Conversation.deleted_at.is_(None)
+    )
+    if after is not None:
+        stmt = stmt.where(
+            tuple_(Conversation.pinned, Conversation.updated_at, Conversation.id) < tuple_(*after)
+        )
+    stmt = stmt.order_by(
+        Conversation.pinned.desc(), Conversation.updated_at.desc(), Conversation.id.desc()
+    ).limit(limit)
+    return [ConversationRow(r[0], int(r[1])) for r in session.execute(stmt).all()]
+
+
+def recent_conversations(session: Session, user_id: uuid.UUID, limit: int) -> list[Conversation]:
+    """``user_id``'s newest (by activity) non-deleted conversations (chat search)."""
+    return list(
+        session.execute(
+            select(Conversation)
+            .where(Conversation.user_id == user_id, Conversation.deleted_at.is_(None))
+            .order_by(Conversation.updated_at.desc(), Conversation.id.desc())
+            .limit(limit)
+        ).scalars()
+    )
+
+
+def update_conversation(
+    session: Session, conversation_id: uuid.UUID, values: Mapping[str, Any]
+) -> Conversation | None:
+    return session.execute(
+        update(Conversation)
+        .where(Conversation.id == conversation_id)
+        .values(**values)
+        .returning(Conversation)
+    ).scalar_one_or_none()
+
+
+def conversation_messages(
+    session: Session, conversation_id: uuid.UUID, user_id: uuid.UUID
+) -> list[Query]:
+    """Every question of the conversation asked by ``user_id``, oldest first (superseded too)."""
+    return list(
+        session.execute(
+            select(Query)
+            .where(Query.conversation_id == conversation_id, Query.user_id == user_id)
+            .order_by(Query.created_at, Query.id)
+        ).scalars()
+    )
+
+
+def thread_messages(
+    session: Session, conversation_ids: Sequence[uuid.UUID], user_id: uuid.UUID
+) -> list[Query]:
+    """The current (not superseded) questions of these conversations, oldest first."""
+    if not conversation_ids:
+        return []
+    return list(
+        session.execute(
+            select(Query)
+            .where(
+                Query.conversation_id.in_(list(conversation_ids)),
+                Query.user_id == user_id,
+                Query.superseded_by.is_(None),
+            )
+            .order_by(Query.created_at, Query.id)
+        ).scalars()
+    )
+
+
+def completed_turns(
+    session: Session, conversation_id: uuid.UUID, user_id: uuid.UUID
+) -> list[Query]:
+    """The conversation's current, completed turns (context), oldest first."""
+    return list(
+        session.execute(
+            select(Query)
+            .where(
+                Query.conversation_id == conversation_id,
+                Query.user_id == user_id,
+                Query.superseded_by.is_(None),
+                Query.status.in_(EARLIER_STATUSES),
+            )
+            .order_by(Query.created_at, Query.id)
+        ).scalars()
+    )
+
+
+def supersede(session: Session, query_ids: Sequence[uuid.UUID], by: uuid.UUID) -> int:
+    if not query_ids:
+        return 0
+    result = session.execute(
+        update(Query)
+        .where(Query.id.in_(list(query_ids)), Query.superseded_by.is_(None))
+        .values(superseded_by=by)
+    )
+    return _rowcount(result)
+
+
+def orphan_sessions(session: Session, limit: int) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """``(session_id, user_id)`` groups of questions asked before conversations existed (no
+    ``conversation_id``) whose session id names no conversation yet, oldest first."""
+    rows = session.execute(
+        select(Query.session_id, Query.user_id)
+        .where(
+            Query.conversation_id.is_(None),
+            ~select(Conversation.id).where(Conversation.id == Query.session_id).exists(),
+        )
+        .group_by(Query.session_id, Query.user_id)
+        .order_by(func.min(Query.created_at))
+        .limit(limit)
+    ).all()
+    return [(r.session_id, r.user_id) for r in rows]
+
+
+def session_questions(session: Session, session_id: uuid.UUID, user_id: uuid.UUID) -> list[Query]:
+    """Questions of a legacy session (no conversation yet) of ``user_id``, oldest first."""
+    return list(
+        session.execute(
+            select(Query)
+            .where(
+                Query.session_id == session_id,
+                Query.user_id == user_id,
+                Query.conversation_id.is_(None),
+            )
+            .order_by(Query.created_at, Query.id)
+        ).scalars()
+    )
+
+
+def link_session(session: Session, session_id: uuid.UUID, user_id: uuid.UUID) -> int:
+    """Put a legacy session's questions into the conversation with the same id."""
+    result = session.execute(
+        update(Query)
+        .where(
+            Query.session_id == session_id,
+            Query.user_id == user_id,
+            Query.conversation_id.is_(None),
+        )
+        .values(conversation_id=session_id)
+    )
+    return _rowcount(result)
+
+
+def delete_empty_conversations(session: Session) -> int:
+    """Conversations with no question left (the query purge took them all), this school."""
+    result = session.execute(
+        delete(Conversation).where(
+            Conversation.tenant_id == current_tenant_id(session),
+            ~select(Query.id).where(Query.conversation_id == Conversation.id).exists(),
+        )
+    )
+    return _rowcount(result)
+
+
+def clear_summaries_before(session: Session, cutoff: dt.datetime) -> int:
+    """Forget rolling summaries that cover a question older than ``cutoff`` (the query-log
+    retention): they are rebuilt from the questions that are kept."""
+    result = session.execute(
+        update(Conversation)
+        .where(
+            Conversation.tenant_id == current_tenant_id(session),
+            Conversation.summary_oldest_at < cutoff,
+        )
+        .values(
+            summary_ciphertext=None,
+            summary_oldest_at=None,
+            summary_through=None,
+            summary_sources=[],
+        )
+    )
+    return _rowcount(result)
+
+
+def query_by_id(session: Session, query_id: uuid.UUID) -> Query | None:
+    return session.execute(select(Query).where(Query.id == query_id)).scalar_one_or_none()
+
+
+# --- answer cache (docs/06 cost and performance design) ------------------------------------------
+
+
+def cache_candidates(
+    session: Session, *, question_hmac: bytes, fingerprint: bytes, since: dt.datetime, limit: int
+) -> list[Query]:
+    """Earlier answered, documents-only questions with the same HMAC and access fingerprint,
+    not invalidated, asked since ``since``, newest first (the caller re-checks every source)."""
+    return list(
+        session.execute(
+            select(Query)
+            .where(
+                Query.question_hmac == question_hmac,
+                Query.access_fingerprint == fingerprint,
+                Query.cache_invalidated_at.is_(None),
+                Query.created_at >= since,
+                Query.status == "answered",
+                Query.route == "documents",
+                Query.cached_from.is_(None),
+                Query.answer_ciphertext.is_not(None),
+                Query.citations_ciphertext.is_not(None),
+            )
+            .order_by(Query.created_at.desc(), Query.id.desc())
+            .limit(limit)
+        ).scalars()
+    )
+
+
+def invalidate_cache_citing(session: Session, document_id: uuid.UUID) -> int:
+    """Cached answers given any page of the document stop being reused (FR-KB-030 mechanism:
+    a new version, an ACL change, archive or delete)."""
+    prefix = f"{_DOC_SOURCE_PREFIX}{document_id}/"
+    retrieved = (
+        func.jsonb_array_elements(Query.retrieved)
+        .table_valued(column("value", JSONB))
+        .alias("given")
+    )
+    used = (
+        select(1)
+        .select_from(retrieved)
+        .where(func.starts_with(retrieved.c.value["source"].astext, prefix))
+        .exists()
+    )
+    result = session.execute(
+        update(Query)
+        .where(
+            Query.access_fingerprint.is_not(None),
+            Query.cache_invalidated_at.is_(None),
+            used,
+        )
+        .values(cache_invalidated_at=func.now())
+    )
+    return _rowcount(result)
+
+
+# --- memory (kb.user_memories, kb.user_memory_settings; ADR-0033) ----------------------------
+
+
+def _live_memory(now: dt.datetime) -> Any:
+    return (UserMemory.expires_at.is_(None)) | (UserMemory.expires_at > now)
+
+
+def list_memories(session: Session, user_id: uuid.UUID, now: dt.datetime) -> list[UserMemory]:
+    """``user_id``'s memory items (active and unexpired pending), newest first."""
+    return list(
+        session.execute(
+            select(UserMemory)
+            .where(UserMemory.user_id == user_id, _live_memory(now))
+            .order_by(UserMemory.created_at.desc(), UserMemory.id.desc())
+        ).scalars()
+    )
+
+
+def active_memories(session: Session, user_id: uuid.UUID) -> list[UserMemory]:
+    """``user_id``'s confirmed items, oldest first (a stable prompt block)."""
+    return list(
+        session.execute(
+            select(UserMemory)
+            .where(UserMemory.user_id == user_id, UserMemory.status == "active")
+            .order_by(UserMemory.created_at, UserMemory.id)
+        ).scalars()
+    )
+
+
+def get_memory(
+    session: Session,
+    memory_id: uuid.UUID,
+    user_id: uuid.UUID,
+    now: dt.datetime,
+    *,
+    for_update: bool = False,
+) -> UserMemory | None:
+    stmt = select(UserMemory).where(
+        UserMemory.id == memory_id, UserMemory.user_id == user_id, _live_memory(now)
+    )
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def count_memories(session: Session, user_id: uuid.UUID, now: dt.datetime) -> int:
+    value: int = session.execute(
+        select(func.count())
+        .select_from(UserMemory)
+        .where(UserMemory.user_id == user_id, _live_memory(now))
+    ).scalar_one()
+    return value
+
+
+def insert_memory(session: Session, values: Mapping[str, Any]) -> UserMemory:
+    row = session.execute(
+        insert(UserMemory)
+        .values(tenant_id=current_tenant_id(session), **values)
+        .returning(UserMemory)
+    ).scalar_one()
+    return row
+
+
+def update_memory(
+    session: Session, memory_id: uuid.UUID, *, expected_version: int, values: Mapping[str, Any]
+) -> UserMemory | None:
+    return session.execute(
+        update(UserMemory)
+        .where(UserMemory.id == memory_id, UserMemory.version == expected_version)
+        .values(**values, version=UserMemory.version + 1, updated_at=func.now())
+        .returning(UserMemory)
+    ).scalar_one_or_none()
+
+
+def delete_memory(session: Session, memory_id: uuid.UUID) -> int:
+    return _rowcount(session.execute(delete(UserMemory).where(UserMemory.id == memory_id)))
+
+
+def delete_user_memories(session: Session, user_id: uuid.UUID) -> int:
+    return _rowcount(session.execute(delete(UserMemory).where(UserMemory.user_id == user_id)))
+
+
+def delete_expired_memories(session: Session, now: dt.datetime) -> int:
+    result = session.execute(
+        delete(UserMemory).where(
+            UserMemory.tenant_id == current_tenant_id(session),
+            UserMemory.expires_at.is_not(None),
+            UserMemory.expires_at <= now,
+        )
+    )
+    return _rowcount(result)
+
+
+def memory_user_ids(session: Session) -> set[uuid.UUID]:
+    """Users of this school with memory items or a memory setting."""
+    items = session.execute(select(UserMemory.user_id).distinct()).scalars()
+    switches = session.execute(select(UserMemorySettings.user_id)).scalars()
+    return set(items) | set(switches)
+
+
+def delete_memory_data_of(session: Session, user_ids: Sequence[uuid.UUID]) -> int:
+    """Every memory item and setting of these users in this school."""
+    if not user_ids:
+        return 0
+    wanted = list(user_ids)
+    items = _rowcount(session.execute(delete(UserMemory).where(UserMemory.user_id.in_(wanted))))
+    session.execute(delete(UserMemorySettings).where(UserMemorySettings.user_id.in_(wanted)))
+    return items
+
+
+def memory_enabled(session: Session, user_id: uuid.UUID) -> bool | None:
+    """The user's switch (None: never set, which means on)."""
+    value: bool | None = session.execute(
+        select(UserMemorySettings.enabled).where(UserMemorySettings.user_id == user_id)
+    ).scalar_one_or_none()
+    return value
+
+
+def set_memory_enabled(session: Session, user_id: uuid.UUID, enabled: bool) -> None:
+    stmt = pg_insert(UserMemorySettings).values(
+        tenant_id=current_tenant_id(session), user_id=user_id, enabled=enabled
+    )
+    session.execute(
+        stmt.on_conflict_do_update(
+            index_elements=[UserMemorySettings.tenant_id, UserMemorySettings.user_id],
+            set_={"enabled": enabled, "updated_at": func.now()},
+        )
+    )
+
+
+def export_memories(session: Session) -> list[UserMemory]:
+    """Every memory item of this school (full data export; the caller decrypts)."""
+    return list(
+        session.execute(select(UserMemory).order_by(UserMemory.user_id, UserMemory.created_at))
+        .scalars()
+        .all()
+    )
+
+
+def export_memory_settings(session: Session) -> list[UserMemorySettings]:
+    return list(
+        session.execute(select(UserMemorySettings).order_by(UserMemorySettings.user_id))
+        .scalars()
+        .all()
+    )
 
 
 def _rowcount(result: object) -> int:

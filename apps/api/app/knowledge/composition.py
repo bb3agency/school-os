@@ -28,7 +28,7 @@ and live-mode misconfiguration fails on first use, loudly (``EmbeddingsNotConfig
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Final
 
@@ -37,6 +37,7 @@ import app.knowledge.lifecycle  # noqa: F401  (installs the archive/unarchive/de
 from app.authz.kv import KVStore, kv_store
 from app.core.config import Settings, get_settings
 from app.knowledge.answer import AnswerEngine
+from app.knowledge.config.conversations import ConversationsConfig, load_conversations_config
 from app.knowledge.config.embeddings import EmbeddingsConfig, load_embeddings_config
 from app.knowledge.config.llm import LlmConfig, load_llm_config
 from app.knowledge.config.tools import ToolsConfig, load_tools_config
@@ -57,7 +58,7 @@ from app.knowledge.tools.documents import NAME as SEARCH_TOOL
 from app.knowledge.tools.documents import DocumentSearch
 from app.knowledge.tools.registry import OfferedTool, build_tools
 
-ANSWER_PROMPT: Final = ("answer_system", 1)
+ANSWER_PROMPT: Final = ("answer_system", 2)
 
 
 class _ProcessKV:
@@ -87,6 +88,8 @@ class Runtime:
     tools: dict[str, OfferedTool]
     engine: AnswerEngine
     policy: SchoolAiPolicy | None = None
+    conversations: ConversationsConfig = field(default_factory=load_conversations_config)
+    """Ask conversations, memory and the answer cache (``conversations.yaml``; ADR-0033)."""
 
 
 def build_runtime(
@@ -100,6 +103,7 @@ def build_runtime(
     embeddings_config: EmbeddingsConfig | None = None,
     llm_config: LlmConfig | None = None,
     tools_config: ToolsConfig | None = None,
+    conversations_config: ConversationsConfig | None = None,
 ) -> Runtime:
     settings = settings or get_settings()
     emb = embeddings_config or load_embeddings_config()
@@ -145,6 +149,7 @@ def build_runtime(
         tools=tools,
         engine=engine,
         policy=policy,
+        conversations=conversations_config or load_conversations_config(),
     )
 
 
