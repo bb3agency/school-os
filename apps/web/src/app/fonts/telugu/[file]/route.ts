@@ -1,5 +1,6 @@
 import { teluguEnabled } from "@/i18n/languages";
-import { readTeluguFont, TELUGU_STYLESHEET, teluguStylesheet } from "@/i18n/telugu-font";
+import { TELUGU_STYLESHEET, teluguStylesheet } from "@/i18n/telugu-font";
+import { readTeluguFont } from "@/i18n/telugu-font-files";
 
 /**
  * GET /fonts/telugu/{file}: the Telugu font stylesheet and files (ADR-0036). Public (fonts

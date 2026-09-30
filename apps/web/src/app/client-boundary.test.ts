@@ -66,7 +66,7 @@ describe("server/client boundary", () => {
 
   it("only server code reads the Telugu switch; client code asks LanguagesProvider (ADR-0036)", () => {
     const readers =
-      /from\s+"(@\/i18n\/languages|\.\/languages|@\/i18n\/messages|@\/i18n\/telugu-font)"/;
+      /from\s+"(@\/i18n\/languages|\.\/languages|@\/i18n\/messages|@\/i18n\/telugu-font(?:-files)?)"/;
     const offenders = files(src)
       .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
       .filter((file) => {

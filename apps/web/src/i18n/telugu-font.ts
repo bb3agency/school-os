@@ -1,6 +1,3 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 /**
  * Noto Sans Telugu, self-hosted (no font CDN), loaded only while Telugu is switched on
  * (ADR-0036). With it off, no Telugu `@font-face`, preload or font-family stack reaches the
@@ -47,24 +44,4 @@ ${faces.join("\n")}
     "JetBrains Mono", ui-monospace, Consolas, "Liberation Mono", "Noto Sans Telugu", monospace;
 }
 `;
-}
-
-const PACKAGE_FILES = path.join("node_modules", "@fontsource", "noto-sans-telugu", "files");
-
-/**
- * One font file's bytes. The package is hoisted to the repository root (npm workspaces);
- * `next dev` runs in apps/web and the standalone server chdirs to apps/web too, so both find
- * it two levels up. `outputFileTracingIncludes` (next.config.ts) copies the files into the
- * standalone bundle.
- */
-export async function readTeluguFont(file: string): Promise<Uint8Array<ArrayBuffer> | null> {
-  if (!TELUGU_FONT_FILES.includes(file)) return null;
-  for (const root of [path.resolve("..", ".."), path.resolve(".")]) {
-    try {
-      return new Uint8Array(await readFile(path.join(root, PACKAGE_FILES, file)));
-    } catch {
-      // try the next place
-    }
-  }
-  return null;
 }

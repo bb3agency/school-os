@@ -30,8 +30,9 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   // ADR-0036: the Telugu font files, read by the /fonts/telugu route only while Telugu is on.
   outputFileTracingIncludes: {
-    "/fonts/telugu/[file]": [
-      "../../node_modules/@fontsource/noto-sans-telugu/files/noto-sans-telugu-telugu-*-normal.woff2",
+    // The key is a glob over route paths ("[file]" would be a character class).
+    "/fonts/telugu/**": [
+      "../../node_modules/@fontsource/noto-sans-telugu/files/noto-sans-telugu-telugu-{400,600,700}-normal.woff2",
     ],
   },
   outputFileTracingExcludes: {
