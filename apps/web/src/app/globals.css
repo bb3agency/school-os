@@ -528,6 +528,12 @@
     overscroll-behavior-x: contain;
   }
 
+  /* Near-neutral canvas behind dense record screens (docs/17 §3.2): the console's root
+     covers the body gradient with a flat, calm colour. Set by AppShell (canvas.ts). */
+  .canvas-neutral {
+    background-color: var(--color-canvas-neutral);
+  }
+
   /* Pale green quote block (copilot suggestions). */
   .quote-gradient {
     background-color: var(--color-positive-soft);
@@ -924,6 +930,10 @@
 
   [data-print="hide"] {
     display: none !important;
+  }
+
+  .canvas-neutral {
+    background: #ffffff !important;
   }
 
   /* Registers (students × days) print on A4 landscape through a named page. Browsers without
