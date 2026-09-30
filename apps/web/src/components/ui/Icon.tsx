@@ -80,6 +80,14 @@ const paths = {
     <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-9-9h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9Z" />
   ),
   swap: <path d="M7 4 3 8l4 4M3 8h14m0 12 4-4-4-4m4 4H7" />,
+  // Sidebar collapse / expand (a panel with its left column and an arrow).
+  panelLeftClose: (
+    <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm4 0v18m7-12-3 3 3 3" />
+  ),
+  panelLeftOpen: (
+    <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm4 0v18m5-12 3 3-3 3" />
+  ),
+  cornerDownRight: <path d="M5 4v7a4 4 0 0 0 4 4h10m-4-4 4 4-4 4" />,
   more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
 } satisfies Record<string, ReactNode>;
 

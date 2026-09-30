@@ -1,7 +1,7 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { IdleWarning, SessionControls } from "@/components/session/SessionControls";
 import { Badge } from "@/components/ui/Badge";
-import type { IconName } from "@/components/ui/Icon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import type { NavItem, NavSection } from "@/components/ui/SidebarNav";
 import { AppShell } from "./AppShell";
@@ -9,33 +9,33 @@ import { AppShell } from "./AppShell";
 type PlatformNavItem = NavItem & { anyOf?: readonly string[] };
 
 /**
- * Platform admin panel chrome (C14). Same layout and card language as the school console,
- * but deliberately different: dark violet rail and top bar with a yellow "Platform admin"
- * badge and yellow focus ring, so an operator always knows they are in the control plane.
+ * Platform admin panel chrome (C14). Same single sidebar as the school console (AppShell,
+ * docs/17 §5.2), but deliberately different: a dark violet sidebar and top bar, a yellow
+ * "Platform admin" badge, yellow active markers and a yellow focus ring, so an operator
+ * always knows they are in the control plane.
  */
 export function PlatformShell({
   children,
-  headerActions,
+  account = null,
   permissions = null,
 }: {
   children: ReactNode;
-  /** Session controls (operator name, sign out). */
-  headerActions?: ReactNode;
+  /** The signed-in operator (name, role keys); "Sign out" and the idle warning come with it. */
+  account?: { displayName?: string | null; roles?: readonly string[] | null } | null;
   /** Effective permissions from GET /platform/me; null shows every item. UX only. */
   permissions?: readonly string[] | null;
 }) {
   const t = useTranslations();
-  const groups: Array<{ id: string; icon: IconName; items: PlatformNavItem[] }> = [
+  const tr = useTranslations("platform.operators.roles");
+  const groups: Array<{ id: string; items: PlatformNavItem[] }> = [
     {
       id: "overview",
-      icon: "chart",
       items: [
         { href: "/platform", label: t("platform.nav.dashboard"), exact: true, icon: "chart" },
       ],
     },
     {
       id: "schools",
-      icon: "building",
       items: [
         {
           href: "/platform/schools",
@@ -77,7 +77,6 @@ export function PlatformShell({
     },
     {
       id: "operations",
-      icon: "server",
       items: [
         {
           href: "/platform/flags",
@@ -106,7 +105,6 @@ export function PlatformShell({
     },
     {
       id: "access",
-      icon: "key",
       items: [
         { href: "/platform/break-glass", label: t("platform.nav.breakGlass"), icon: "key" },
         {
@@ -126,7 +124,6 @@ export function PlatformShell({
   ];
   const sections: NavSection[] = groups.map((group) => ({
     id: group.id,
-    icon: group.icon,
     label: t(`platform.nav.sections.${group.id}` as "platform.nav.sections.overview"),
     items: group.items
       .filter(
@@ -142,24 +139,33 @@ export function PlatformShell({
         ...(icon ? { icon } : {}),
       })),
   }));
+  const role =
+    (account?.roles ?? [])
+      .filter((key) => tr.has(key as "platform_owner"))
+      .map((key) => tr(key as "platform_owner"))
+      .join(", ") || null;
+  const badge = <Badge tone="platform">{t("platform.badge")}</Badge>;
   return (
     <AppShell
       theme="platform"
       homeHref="/platform"
       navLabel={t("platform.nav.label")}
       sections={sections}
-      brand={
-        <div className="flex min-w-0 items-center gap-3">
-          <p className="truncate text-lg font-semibold">{t("common.appName")}</p>
-          <Badge tone="platform">{t("platform.badge")}</Badge>
-        </div>
+      context={<div className="px-1.5 collapsed:sr-only">{badge}</div>}
+      brandBadge={badge}
+      account={
+        account ? (
+          <SessionControls
+            variant="sidebar"
+            kind="operator"
+            tone="dark"
+            displayName={account.displayName ?? null}
+            role={role}
+          />
+        ) : null
       }
-      headerActions={
-        <>
-          {headerActions}
-          <LanguageSwitcher tone="dark" />
-        </>
-      }
+      session={account ? <IdleWarning kind="operator" /> : null}
+      topbarActions={<LanguageSwitcher tone="dark" />}
     >
       {children}
     </AppShell>

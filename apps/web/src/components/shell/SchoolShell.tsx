@@ -1,9 +1,11 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { IdleWarning, SessionControls } from "@/components/session/SessionControls";
+import { Icon } from "@/components/ui/Icon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import type { NavItem, NavSection } from "@/components/ui/SidebarNav";
 import { Link } from "@/i18n/navigation";
+import type { SessionKind } from "@/lib/bff/session-client";
 import { AppShell } from "./AppShell";
 
 interface SchoolNavItem extends NavItem {
@@ -21,20 +23,28 @@ export interface SchoolFeatures {
 
 interface SchoolNavSection {
   id: string;
-  icon: IconName;
   items: SchoolNavItem[];
 }
 
+/** Who is signed in, for the account area at the foot of the sidebar. */
+export interface ShellAccount {
+  kind: SessionKind;
+  displayName?: string | null;
+  /** Role keys from GET /me; system roles are shown by name, others are left out. */
+  roles?: readonly string[] | null;
+}
+
 /**
- * School office console chrome: icon rail, grouped menu panel, top bar and main landmark
- * on the gradient canvas (AppShell).
- * `headerActions` holds the session controls (who is signed in, "Lock now") and the bell.
+ * School office console chrome (AppShell, docs/17 §5.2): one sidebar with the school, the
+ * grouped menu and the signed-in account; a top bar with the bell and the language switch.
  * `permissions` (from GET /me) hides menu items the user cannot use; null shows all.
  * Hiding is never a security control: every API route checks its permission.
  */
 export function SchoolShell({
   children,
-  headerActions,
+  topbarActions,
+  account = null,
+  schoolName = null,
   permissions = null,
   canSwitchSchool = false,
   languages = null,
@@ -42,7 +52,12 @@ export function SchoolShell({
   banner,
 }: {
   children: ReactNode;
-  headerActions?: ReactNode;
+  /** Top bar tools before the language switch (the notification bell). */
+  topbarActions?: ReactNode;
+  /** Who is signed in ("Lock now" and the idle warning come with it); null: none shown. */
+  account?: ShellAccount | null;
+  /** The active school's name (GET /me/schools), shown at the top of the sidebar. */
+  schoolName?: string | null;
   permissions?: readonly string[] | null;
   canSwitchSchool?: boolean;
   /** The school's languages from GET /me `settings` (first is the default; FR-TEN-012). */
@@ -53,15 +68,14 @@ export function SchoolShell({
   banner?: ReactNode;
 }) {
   const t = useTranslations();
+  const tr = useTranslations("school.users.roles");
   const groups: SchoolNavSection[] = [
     {
       id: "overview",
-      icon: "home",
       items: [{ href: "/", label: t("school.nav.home"), exact: true, icon: "home" }],
     },
     {
       id: "records",
-      icon: "users",
       items: [
         {
           href: "/students",
@@ -101,7 +115,6 @@ export function SchoolShell({
     {
       // M5 (US-1701..US-1709): attendance, marks and early-warning flags.
       id: "classroom",
-      icon: "activity",
       items: [
         {
           href: "/attendance",
@@ -120,7 +133,6 @@ export function SchoolShell({
     },
     {
       id: "checks",
-      icon: "shieldCheck",
       items: [
         {
           href: "/findings",
@@ -144,13 +156,11 @@ export function SchoolShell({
     },
     {
       id: "ask",
-      icon: "sparkles",
       items: [{ href: "/ask", label: t("ask.nav"), permission: "kb.ask", icon: "sparkles" }],
     },
     {
       // M4 (US-1601..US-1606): circulars read with AI, the tasks they become, parent notices.
       id: "work",
-      icon: "calendar",
       items: [
         { href: "/tasks", label: t("tasks.nav"), permission: "task.read", icon: "calendar" },
         {
@@ -177,7 +187,6 @@ export function SchoolShell({
     },
     {
       id: "admin",
-      icon: "settings",
       items: [
         { href: "/settings/school", label: t("schoolSettings.nav"), icon: "building" },
         { href: "/settings/structure", label: t("school.nav.structure"), icon: "layers" },
@@ -253,7 +262,6 @@ export function SchoolShell({
       ));
   const sections: NavSection[] = groups.map((group) => ({
     id: group.id,
-    icon: group.icon,
     label: t(`school.nav.sections.${group.id}` as "school.nav.sections.overview"),
     items: group.items
       .filter(allowed)
@@ -266,25 +274,56 @@ export function SchoolShell({
         ...(icon ? { icon } : {}),
       })),
   }));
+  // System roles by name ("Principal, Class teacher"); custom roles have no fixed label here.
+  const role =
+    (account?.roles ?? [])
+      .filter((key) => tr.has(key as "owner"))
+      .map((key) => tr(key as "owner"))
+      .join(", ") || null;
+  const context =
+    schoolName || canSwitchSchool ? (
+      <div className="rounded-lg bg-surface-muted px-3 py-2.5 collapsed:bg-transparent collapsed:p-0">
+        {schoolName ? (
+          <p className="collapsed:sr-only">
+            <span className="block text-xs text-ink-subtle">{t("shell.currentSchool")}</span>
+            <span className="block text-sm font-semibold text-ink break-anywhere">
+              {schoolName}
+            </span>
+          </p>
+        ) : null}
+        {canSwitchSchool ? (
+          <Link
+            href="/choose-school"
+            data-tooltip={t("school.switchSchool")}
+            className="-mx-1 mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md px-1 text-sm font-medium text-primary hover:underline collapsed:mx-0 collapsed:mt-0 collapsed:flex collapsed:size-10 collapsed:justify-center collapsed:px-0 collapsed:hover:bg-surface-muted"
+          >
+            <Icon name="swap" className="size-4" />
+            <span className="collapsed:sr-only">{t("school.switchSchool")}</span>
+          </Link>
+        ) : null}
+      </div>
+    ) : null;
   return (
     <AppShell
       theme="school"
       homeHref="/"
       navLabel={t("school.nav.label")}
       sections={sections}
-      brand={<p className="truncate text-lg font-semibold text-ink">{t("common.appName")}</p>}
-      headerActions={
+      context={context}
+      account={
+        account ? (
+          <SessionControls
+            variant="sidebar"
+            kind={account.kind}
+            displayName={account.displayName ?? null}
+            role={role}
+          />
+        ) : null
+      }
+      session={account ? <IdleWarning kind={account.kind} /> : null}
+      topbarActions={
         <>
-          {canSwitchSchool ? (
-            <Link
-              href="/choose-school"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-border-soft px-3 text-sm font-medium text-primary hover:bg-primary-soft"
-            >
-              <Icon name="swap" className="size-4" />
-              {t("school.switchSchool")}
-            </Link>
-          ) : null}
-          {headerActions}
+          {topbarActions}
           <LanguageSwitcher languages={languages} />
         </>
       }

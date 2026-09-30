@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { SessionControls } from "@/components/session/SessionControls";
 import { PlatformShell } from "@/components/shell/PlatformShell";
 import { apiGetAsSession, platformEnabled, requireOperator } from "@/server/session/rsc";
 
@@ -28,9 +27,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const me = await apiGetAsSession<OperatorMe>("operator", "/api/v1/platform/me");
   return (
     <PlatformShell
-      headerActions={
-        <SessionControls kind="operator" displayName={session.displayName} tone="dark" />
-      }
+      account={{ displayName: session.displayName, roles: me?.data?.roles ?? null }}
       permissions={me?.data?.permissions ?? null}
     >
       {children}

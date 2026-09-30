@@ -2,7 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import {
   ACTIVITY_EVENT,
@@ -35,19 +37,30 @@ export interface SessionControlsProps {
   tone?: "light" | "dark";
   /** Tests inject navigation; the app leaves the page. */
   navigate?: Navigate;
+  /**
+   * "header" (default): one row for the top bars outside the consoles, with the idle
+   * warning. "sidebar": the account area at the foot of the console sidebar (docs/17 §5.2);
+   * the console mounts the idle warning once itself (AppShell `session`).
+   */
+  variant?: "header" | "sidebar";
+  /** Sidebar variant: the person's role(s), already translated (optional second line). */
+  role?: string | null;
 }
 
 /**
- * Header controls for a signed-in session (docs/07 §5.2): who is signed in, a visible
- * "Lock now" button for shared office PCs, and the idle-timeout warning.
+ * Controls for a signed-in session (docs/07 §5.2): who is signed in, a visible "Lock now"
+ * button for shared office PCs, and (header variant) the idle-timeout warning.
  */
 export function SessionControls({
   kind,
   displayName,
   tone = "light",
   navigate = defaultNavigate,
+  variant = "header",
+  role = null,
 }: SessionControlsProps) {
   const t = useTranslations("auth");
+  const ts = useTranslations("shell");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const hintId = useId();
@@ -63,6 +76,66 @@ export function SessionControls({
     }
   }, [kind, navigate]);
 
+  const lockLabel = busy ? t("signingOut") : kind === "staff" ? t("lockNow") : t("signOut");
+  const dark = tone === "dark";
+
+  if (variant === "sidebar") {
+    return (
+      <section aria-label={ts("account")} className="space-y-2.5" data-print="hide">
+        {displayName ? (
+          <div className="flex min-w-0 items-center gap-2.5 px-1 collapsed:justify-center collapsed:px-0">
+            <Avatar name={displayName} decorative />
+            <div className="min-w-0 flex-1 collapsed:sr-only">
+              <p
+                className={cn(
+                  "text-sm font-semibold break-anywhere",
+                  dark ? "text-platform-ink" : "text-ink",
+                )}
+              >
+                {/* Heard as "Signed in as …"; seen as the name under "Your account". */}
+                <span className="sr-only">{t("signedInAs", { name: displayName })}</span>
+                <span aria-hidden="true">{displayName}</span>
+              </p>
+              {role ? (
+                <p className={cn("text-xs", dark ? "text-platform-muted" : "text-ink-subtle")}>
+                  {role}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void lock()}
+          disabled={busy}
+          aria-describedby={hintId}
+          data-tooltip={lockLabel}
+          className={cn(
+            "flex min-h-10 w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60",
+            "collapsed:px-0",
+            dark
+              ? "border-platform-hover text-platform-ink hover:bg-platform-hover"
+              : "border-border-soft bg-surface text-ink hover:bg-surface-muted",
+          )}
+        >
+          <Icon name="lock" className="size-4.5" />
+          <span className="collapsed:sr-only">{lockLabel}</span>
+        </button>
+        <span id={hintId} className="sr-only">
+          {t("lockNowHint")}
+        </span>
+        {failed ? (
+          <p
+            role="alert"
+            className={cn("text-sm break-anywhere", dark ? "text-platform-ink" : "text-danger")}
+          >
+            {t("signOutFailed")}
+          </p>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-3" data-print="hide">
       {displayName ? (
@@ -77,7 +150,7 @@ export function SessionControls({
         disabled={busy}
         aria-describedby={hintId}
       >
-        {busy ? t("signingOut") : kind === "staff" ? t("lockNow") : t("signOut")}
+        {lockLabel}
       </Button>
       <span id={hintId} className="sr-only">
         {t("lockNowHint")}
@@ -99,8 +172,16 @@ export function SessionControls({
  * Native <dialog> shown 1 minute before the idle timeout. "Stay signed in" slides the
  * server-side timeout; doing nothing signs the user out (and ends the IdP session).
  * Every successful BFF call counts as activity (the server slides the timeout too).
+ * Mount exactly one per page: the header SessionControls includes it; the consoles mount it
+ * through AppShell's `session` slot.
  */
-export function IdleWarning({ kind, navigate }: { kind: SessionKind; navigate: Navigate }) {
+export function IdleWarning({
+  kind,
+  navigate = defaultNavigate,
+}: {
+  kind: SessionKind;
+  navigate?: Navigate;
+}) {
   const t = useTranslations("auth.idle");
   const dialogRef = useRef<HTMLDialogElement>(null);
   // The session's own idle timeout (the school's setting) arrives with the session info; the

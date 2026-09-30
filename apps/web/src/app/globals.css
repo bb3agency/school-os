@@ -138,11 +138,26 @@
 }
 
 /*
+ * Compact sidebar (docs/17 §5.2): `collapsed:` styles apply inside the wide-screen sidebar
+ * (`data-sidebar-mode="inline"`) while <html> carries data-sidebar="collapsed" (set before
+ * the first paint by the root layout, then by the collapse button). The menu drawer is
+ * never compact. :where() keeps the specificity of the plain utility.
+ */
+@custom-variant collapsed {
+  &:where(
+    :root[data-sidebar="collapsed"] [data-sidebar-mode="inline"],
+    :root[data-sidebar="collapsed"] [data-sidebar-mode="inline"] *
+  ) {
+    @slot;
+  }
+}
+
+/*
  * Responsive layout (docs/17 §5.1). One spacing scale for every page:
  *   --page-gutter   space between the viewport edge and the content: 16px phones,
  *                   24px from md (768px), 32px from lg (1024px) outside the consoles;
- *   --shell-gutter  the same inside the consoles (16px, 24px from md), where the rail and
- *                   the list panel already use width;
+ *   --shell-gutter  the same inside the consoles (16px, 24px from md), where the sidebar
+ *                   already uses width;
  *   --content-max   the widest the console content gets (1920px screens keep centred lines);
  *   --sticky-offset room kept above focused or scrolled-to elements (WCAG 2.4.11).
  * Safe-area insets (notches, rounded corners) are added on top via env(); they are 0 on
@@ -169,7 +184,7 @@
 }
 
 /* Full-height layouts: 100vh first as the fallback, then the dynamic viewport height, so the
-   mobile address bar never hides the bottom of the rail or the page. */
+   mobile address bar never hides the bottom of the sidebar or the page. */
 @utility min-h-viewport {
   min-height: 100vh;
   min-height: 100dvh;
@@ -376,10 +391,10 @@
       linear-gradient(135deg, var(--color-ai-from) 0%, var(--color-ai-to) 100%);
   }
 
-  /* Menu drawer (AppShell, below lg): a native modal <dialog> pinned to the left edge, full
-     height, leaving a strip of the dimmed page visible to tap. Safe-area insets pad the
-     sheet. The dialog box is only the sheet, so a click on the dialog itself is the
-     backdrop. */
+  /* Menu drawer (AppShell, below lg): the same Sidebar as on wide screens, in a native modal
+     <dialog> pinned to the left edge, full height, leaving a strip of the dimmed page visible
+     to tap. The dialog box is only the sheet, so a click on the dialog itself is the
+     backdrop. The sheet is a column: header and account stay put, the menu scrolls. */
   .drawer {
     position: fixed;
     inset: 0 auto 0 0;
@@ -394,16 +409,44 @@
     background-color: var(--color-surface);
     color: var(--color-ink);
     box-shadow: var(--shadow-popover);
-    overflow-y: auto;
+    overflow: hidden;
     overscroll-behavior: contain;
   }
 
   .drawer-sheet {
-    min-height: 100%;
-    padding-top: max(0.75rem, env(safe-area-inset-top));
-    padding-right: 0.75rem;
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-    padding-left: max(0.75rem, env(safe-area-inset-left));
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+
+  /* Label of a compact sidebar item on hover and focus (AppShell). Fixed, so the scrolling
+     menu does not clip it; the script places it beside the item. Visual only (aria-hidden):
+     the item's own text is its accessible name. The transparent start padding bridges the
+     gap to the item, so the pointer can move onto the label (WCAG 1.4.13). */
+  .sidebar-tip {
+    position: fixed;
+    z-index: 40;
+    transform: translateY(-50%);
+    padding-inline-start: 0.5rem;
+    max-width: 16rem;
+  }
+
+  .sidebar-tip-bubble {
+    display: block;
+    border-radius: var(--radius-sm);
+    background-color: var(--color-action);
+    color: var(--color-on-action);
+    padding: 0.25rem 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    box-shadow: var(--shadow-popover);
+  }
+
+  .sidebar-tip-bubble:lang(te) {
+    line-height: 1.75;
   }
 
   /* Wide tables scroll inside their card (DataTable, TableScroll). `relative` keeps the
@@ -420,6 +463,23 @@
   .quote-gradient {
     background-color: var(--color-positive-soft);
     background-image: linear-gradient(135deg, #ecfdf5, #f0fdf4 60%, #f7fee7);
+  }
+}
+
+/* The drawer slides in from the left (160ms), only when the viewer has not asked for less
+   motion; under reduced motion it simply appears. */
+@media (prefers-reduced-motion: no-preference) {
+  .drawer[open] {
+    animation: drawer-in 160ms ease-out;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 
@@ -446,6 +506,10 @@
   .pill-gradient-teal,
   .ai-gradient {
     border-color: CanvasText;
+  }
+
+  .sidebar-tip-bubble {
+    border: 1px solid CanvasText;
   }
 }
 

@@ -15,10 +15,12 @@ import "../globals.css";
 import type { Metadata, Viewport } from "next";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { SIDEBAR_STATE_SCRIPT } from "@/components/shell/sidebar-script";
 import { routing } from "@/i18n/routing";
 
 type LayoutProps = {
@@ -54,9 +56,20 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
   setRequestLocale(locale);
   // Nonce-based CSP needs every page rendered per request (SEC-010).
   await connection();
+  // The per-request CSP nonce (src/proxy.ts) for the one inline script below.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html lang={locale}>
+    // The inline script may add data-sidebar before React hydrates (a per-viewer preference
+    // the server cannot know), so <html> alone may differ from the server markup.
+    <html lang={locale} suppressHydrationWarning>
+      <head>
+        {/* Compact sidebar on the first paint, no layout shift (docs/17 §5.2). Constant
+            text; browsers hide the nonce attribute after parsing, hence the suppression. */}
+        <script nonce={nonce} suppressHydrationWarning>
+          {SIDEBAR_STATE_SCRIPT}
+        </script>
+      </head>
       <body>
         <NextIntlClientProvider>
           <QueryProvider>{children}</QueryProvider>

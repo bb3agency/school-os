@@ -49,10 +49,15 @@
       "stored": "ఈ కీని సురక్షితంగా భద్రపరిచాను"
     },
     "dateHintFormat": "{format} రూపంలో ఇవ్వండి, ఉదాహరణకు {example}.",
-    "breadcrumb": "మీరు ఉన్న స్థానం",
-    "sectionsNav": "విభాగాలు",
+    "breadcrumb": "మీరు ఉన్న స్థానం"
+  },
+  "shell": {
     "menu": "మెనూ",
-    "closeMenu": "మెనూ మూసివేయండి"
+    "closeMenu": "మెనూ మూసివేయండి",
+    "collapse": "మెనూను కుదించండి",
+    "expand": "మెనూను విస్తరించండి",
+    "currentSchool": "ప్రస్తుత పాఠశాల",
+    "account": "మీ ఖాతా"
   },
   "language": {
     "label": "భాష",

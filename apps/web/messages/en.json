@@ -49,10 +49,15 @@
       "stored": "I have stored this key safely"
     },
     "dateHintFormat": "Use {format}, for example {example}.",
-    "breadcrumb": "You are here",
-    "sectionsNav": "Sections",
+    "breadcrumb": "You are here"
+  },
+  "shell": {
     "menu": "Menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "collapse": "Collapse menu",
+    "expand": "Expand menu",
+    "currentSchool": "Current school",
+    "account": "Your account"
   },
   "language": {
     "label": "Language",

@@ -1,8 +1,7 @@
-import type { Me } from "@schoolos/api-client";
+import type { Me, SchoolChoices } from "@schoolos/api-client";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { SessionControls } from "@/components/session/SessionControls";
 import { StepUpHost } from "@/components/session/StepUpHost";
 import { SchoolShell } from "@/components/shell/SchoolShell";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
@@ -40,7 +39,12 @@ export default async function SchoolLayout({
   const supportEnded = `/${locale}/signed-out?kind=support&error=support_ended`;
   if (!session.activeTenantId) redirect(support ? supportEnded : picker);
 
-  const me = await apiGetAsSession<Me>("staff", "/api/v1/me");
+  // The school's name for the sidebar comes from the picker's list (no personal data); both
+  // calls run at once. Without it the sidebar simply shows no name.
+  const [me, schools] = await Promise.all([
+    apiGetAsSession<Me>("staff", "/api/v1/me"),
+    apiGetAsSession<SchoolChoices>("staff", "/api/v1/me/schools"),
+  ]);
   // The grant ended or was revoked: the API refuses the support session everywhere.
   if (support && me && (me.status === 401 || me.status === 403)) redirect(supportEnded);
   if (me && me.code && CHOOSE_AGAIN.has(me.code)) redirect(picker);
@@ -58,17 +62,19 @@ export default async function SchoolLayout({
     ? (await apiGetAsSession<unknown>("staff", "/api/v1/tally/status"))?.status === 200
     : false;
 
+  const activeTenantId = profile?.tenant_id ?? session.activeTenantId;
+  const schoolName =
+    schools?.data?.data?.find((school) => school.tenant_id === activeTenantId)?.name ?? null;
+
   return (
     <SchoolShell
-      headerActions={
-        <>
-          {suspended ? null : <NotificationBell />}
-          <SessionControls
-            kind={support ? "support" : "staff"}
-            displayName={profile?.display_name ?? session.displayName}
-          />
-        </>
-      }
+      topbarActions={suspended ? null : <NotificationBell />}
+      account={{
+        kind: support ? "support" : "staff",
+        displayName: profile?.display_name ?? session.displayName,
+        roles: profile?.roles ?? null,
+      }}
+      schoolName={schoolName}
       permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
       languages={settings?.languages ?? null}
