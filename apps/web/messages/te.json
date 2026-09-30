@@ -3552,7 +3552,7 @@
     },
     "operators": {
       "title": "ప్లాట్‌ఫారమ్ ఆపరేటర్లు",
-      "body": "ఆపరేటర్లు సీడ్ చేయబడరు. మొదటి ఆపరేటర్‌ను app.platform.bootstrap_owner తో సృష్టించి, ఆ సబ్జెక్ట్‌తో /en/platform వద్ద సైన్ ఇన్ చేయండి."
+      "body": "ఆపరేటర్లు సీడ్ చేయబడరు. మొదటి ఆపరేటర్‌ను app.platform.bootstrap_owner తో సృష్టించి, ఆ సబ్జెక్ట్‌తో /platform వద్ద సైన్ ఇన్ చేయండి."
     }
   },
   "academicStructure": {
