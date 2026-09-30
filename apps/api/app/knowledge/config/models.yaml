@@ -52,6 +52,17 @@ roles:
     model: claude-sonnet-5
     max_output_tokens: 1200
     thinking: disabled
+  # Contextual retrieval (docs/06 §4.11; PO approval 2026-09-30, behind retrieval.yaml
+  # `contextual_chunks`): a 50-100 token context situating each chunk in its document, written at
+  # ingestion from the document's already-masked text (document first and stable, chunks last,
+  # so the provider's prompt cache serves every call of one document). Provider-neutral: the
+  # model is the small tier of whichever provider the gateway runs (ADR-0033), chosen by the
+  # docs/06 §13.6 live evaluation (cost per million document tokens is the driver); the entry
+  # below is today's small-tier default. Output cap: `contextual.yaml` chunks_per_call contexts.
+  contextualize:
+    model: claude-haiku-4-5-20251001
+    max_output_tokens: 2000
+    thinking: disabled
   # Ask conversations (docs/06 §5, cost and performance design; ADR-0034): cheap roles, each a
   # metered, budget-checked structured-output call through the gateway.
   # Follow-up suggestions (0-3, the answer's language) plus at most one memory suggestion.

@@ -9,7 +9,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import circulars, conversations, fees, metrics
+from sos_evals import circulars, contextual, conversations, fees, metrics
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
@@ -75,6 +75,20 @@ class Metrics(_Model):
     fee_guessed_link_count: int | None = None
     fee_citation_validity: float | None = None
     fee_refusal_correctness: float | None = None
+    # Contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.6). None when not
+    # measured (their gates fail).
+    ctx_items: int = 0
+    ctx_recall_at_5_plain: float | None = None
+    ctx_recall_at_5_contextual: float | None = None
+    ctx_recall_at_5_rerank: float | None = None
+    ctx_recall_at_5_contextual_rerank: float | None = None
+    ctx_mrr_at_10_plain: float | None = None
+    ctx_mrr_at_10_contextual: float | None = None
+    ctx_mrr_at_10_rerank: float | None = None
+    ctx_mrr_at_10_contextual_rerank: float | None = None
+    ctx_recall_gain_contextual: float | None = None
+    ctx_mrr_gain_rerank: float | None = None
+    ctx_leakage_count: int | None = None
     # Ask conversations (sos_evals.conversations; ADR-0034, FR-KB-012). None when not measured.
     conversation_items: int = 0
     conversation_leakage_count: int | None = None
@@ -208,6 +222,7 @@ class RunResult(_Model):
     outcomes: tuple[ItemOutcome, ...]
     circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
     fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
+    contextual_outcomes: tuple[contextual.CtxOutcome, ...] = ()
     conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
 
 
@@ -221,6 +236,9 @@ def run(
     circular_cases: Sequence[circulars.CircularCase] = (),
     fee: fees.FeeAdapter | None = None,
     fee_cases: Sequence[fees.FeeCase] = (),
+    ctx: contextual.ContextualAdapter | None = None,
+    ctx_set: contextual.ContextualSet | None = None,
+    ctx_fast: bool = False,
     conversation: conversations.ConversationAdapter | None = None,
     conversation_cases: Sequence[conversations.ConversationCase] = (),
 ) -> RunResult:
@@ -245,6 +263,10 @@ def run(
     if fee is not None and fee_cases:
         dues, fee_outcomes = fees.run(fee_cases, fee)
         overall = overall.model_copy(update=dues.model_dump())
+    ctx_outcomes: tuple[contextual.CtxOutcome, ...] = ()
+    if ctx is not None and ctx_set is not None:
+        ctx_metrics, ctx_outcomes = contextual.run(ctx_set, ctx_set.select(ctx_fast), ctx)
+        overall = overall.model_copy(update=ctx_metrics.model_dump())
     conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
     if conversation is not None and conversation_cases:
         talk, conversation_outcomes = conversations.run(conversation_cases, conversation)
@@ -255,5 +277,6 @@ def run(
         outcomes=tuple(outcomes),
         circular_outcomes=circular_outcomes,
         fee_outcomes=fee_outcomes,
+        contextual_outcomes=ctx_outcomes,
         conversation_outcomes=conversation_outcomes,
     )

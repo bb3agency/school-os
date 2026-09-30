@@ -102,6 +102,25 @@ def apply_boosts(items: Sequence[Scored], boosts: Boosts, *, prefer_latest: bool
     return sorted(out, key=_order)
 
 
+def apply_rerank(
+    items: Sequence[Scored], head_scores: Sequence[float], fusion_k: int
+) -> list[Scored]:
+    """Reorder the first ``len(head_scores)`` items by the reranker's scores (ties keep their
+    fused order); the rest follow in fused order. Scores become ``1 / (fusion_k + rank)`` of the
+    new order, so they stay on the RRF scale for merging and display. Never adds or drops."""
+    head = list(items[: len(head_scores)])
+    if len(head) != len(head_scores):
+        raise ValueError("one rerank score per head item")
+    ordered = [
+        item
+        for _, _, item in sorted(
+            zip(head_scores, range(len(head)), head, strict=True), key=lambda t: (-t[0], t[1])
+        )
+    ]
+    ordered += items[len(head_scores) :]
+    return [replace(item, score=1.0 / (fusion_k + rank)) for rank, item in enumerate(ordered, 1)]
+
+
 def diversify(items: Sequence[Scored], diversity: Diversity, k: int) -> list[Scored]:
     """At most ``max_chunks_per_document`` per document, at most ``k`` in total, best first."""
     per_doc: dict[uuid.UUID, int] = {}
@@ -155,6 +174,7 @@ __all__ = [
     "Scored",
     "adjacent_groups",
     "apply_boosts",
+    "apply_rerank",
     "diversify",
     "reciprocal_rank_fusion",
 ]

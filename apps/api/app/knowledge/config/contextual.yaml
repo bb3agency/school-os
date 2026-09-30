@@ -1,0 +1,69 @@
+# Contextual chunk headers at ingestion (docs/06 §4.11; FR-KB-001; PO approval 2026-09-30).
+# Whether they are made and used is retrieval.yaml `contextual_chunks` (off by default; the
+# environment variable SOS_KB_CONTEXTUAL_CHUNKS overrides it per environment). The model and its
+# output cap are the `contextualize` role in models.yaml; the prompt is a versioned file.
+# Invariant 13: every limit and rule below is read from here. Changes need a passing `make eval`.
+version: 1
+
+prompt:
+  id: contextualize
+  version: 1
+
+# Passages per model call. The document is the stable, cached part of every call (system
+# prompt, document first); the passages are the only part that changes, so one document's calls
+# share one prompt-cache entry. More passages per call = fewer calls and fewer cache reads.
+chunks_per_call: 6
+
+# The document text sent with every call (already Aadhaar-masked by ingestion). A longer
+# document is sent from its start, cut at a paragraph boundary (its subject and headings come
+# first in office documents); the passages themselves are always sent whole.
+max_document_chars: 60000
+
+# Output checks (docs/06 §4.11). A context outside these limits, in the wrong script, with a
+# number or capitalised name the document does not contain, or with an e-mail address, link or
+# phone-like number is rejected and the chunk is indexed without one (status `rejected`).
+min_chars: 15
+max_chars: 500          # longer contexts are cut at a word boundary, not rejected
+# Capitalised words a context may use although the document does not contain them (connective
+# and generic words at the start of a sentence). Compared case-insensitively.
+generic_words:
+  - "this"
+  - "the"
+  - "these"
+  - "it"
+  - "its"
+  - "a"
+  - "an"
+  - "in"
+  - "on"
+  - "of"
+  - "for"
+  - "from"
+  - "part"
+  - "section"
+  - "passage"
+  - "document"
+  - "circular"
+  - "notice"
+  - "letter"
+  - "policy"
+  - "minutes"
+  - "report"
+  - "form"
+  - "school"
+  - "office"
+  - "here"
+  - "describes"
+  - "covers"
+  - "about"
+  - "related"
+  - "terms"
+
+# Backfill of chunks indexed without a context (flag turned on later, or deferred because the
+# school's AI budget was used up, the school switched AI off or the provider was down). Task
+# `knowledge.contextualize_backfill` (queue `ingest`), every `every_minutes` while the flag is
+# on; each document is re-indexed through the normal ingestion path (idempotent).
+backfill:
+  every_minutes: 60
+  documents_per_school_per_run: 20
+  documents_per_run: 200

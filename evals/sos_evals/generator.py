@@ -19,6 +19,8 @@ from pathlib import Path
 
 from sos_evals.circular_cases import CASES as CIRCULAR_CASES
 from sos_evals.circulars import CircularCase
+from sos_evals.contextual import CtxDocument, CtxQuestion
+from sos_evals.contextual_cases import CASES as CONTEXTUAL_CASES
 from sos_evals.conversation_cases import CASES as CONVERSATION_CASES
 from sos_evals.conversations import ConversationCase
 from sos_evals.fee_cases import CASES as FEE_CASES
@@ -792,6 +794,7 @@ def _jsonl(
     | Sequence[EvalItem]
     | Sequence[CircularCase]
     | Sequence[FeeCase]
+    | Sequence[CtxDocument | CtxQuestion]
     | Sequence[ConversationCase],
 ) -> str:
     return "".join(
@@ -808,6 +811,9 @@ def render() -> dict[str, str]:
         files[f"{category}.jsonl"] = _jsonl([i for i in items if i.category == category])
     files["circulars.jsonl"] = _jsonl(CIRCULAR_CASES)
     files["fees.jsonl"] = _jsonl(FEE_CASES)
+    rows: list[CtxDocument | CtxQuestion] = [*CONTEXTUAL_CASES.documents]
+    rows += CONTEXTUAL_CASES.questions
+    files["contextual.jsonl"] = _jsonl(rows)
     files["conversations.jsonl"] = _jsonl(CONVERSATION_CASES)
     return files
 

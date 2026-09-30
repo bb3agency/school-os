@@ -8,6 +8,13 @@
 - `stub-injectable`: behaves like a model that obeys instructions inside documents. It must
   trip the injection hard gate.
 
+Contextual retrieval set (docs/06 §13.6): `stub-perfect` is perfect *within each variant's
+information*: with contexts (``contextual``, ``contextual_rerank``) it ranks the expected page
+first; without them (``plain``, ``rerank``) a question about a page whose own text never names
+its subject is missed (nothing on the page can match it), any other is ranked first. So its
+contextual gain is the share of such questions and its rerank gain 0. It never returns or reranks
+a restricted document; `stub-leaky` returns and "reranks" them first (must trip the hard gate).
+
 Latencies are derived from a hash of the question so reports are reproducible.
 """
 
@@ -20,6 +27,14 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from sos_evals.acl import retrievable, visible
 from sos_evals.adapters import AnswerSegment, AskResult, Citation, Retrieved
 from sos_evals.circulars import CircularCase, CircularResult, SuggestedDeadline, dates_in
+from sos_evals.contextual import (
+    ContextualSet,
+    CtxHit,
+    CtxQuestion,
+    CtxRetrieved,
+    Variant,
+    needs_context,
+)
 from sos_evals.conversations import ConversationCase, ConversationRun, TurnResult, script_of
 from sos_evals.fees import FeeCase, FeeCitation, FeeResult, inr
 from sos_evals.schema import Asker, CorpusItem, EvalItem, Locale
@@ -100,6 +115,36 @@ class PerfectStub(_ConversationOracle):
     def __init__(self, corpus: Mapping[str, CorpusItem], items: Iterable[EvalItem]) -> None:
         self._corpus = dict(corpus)
         self._items = {(item.question, item.asker): item for item in items}
+
+    _ctx: ContextualSet | None = None
+
+    def prepare_contextual(self, data: ContextualSet) -> None:
+        self._ctx = data
+
+    def _ctx_ranked(self, variant: Variant, question: CtxQuestion) -> list[CtxHit]:
+        data = self._ctx
+        if data is None:
+            return []
+        document = data.document(question.document)
+        hits = []
+        if variant.startswith("contextual") or not needs_context(question, document):
+            hits.append(
+                CtxHit(document=document.id, page_from=question.page, page_to=question.page)
+            )
+        for other in data.documents:
+            if other.restricted or other.id == document.id:
+                continue
+            hits.append(CtxHit(document=other.id, page_from=question.page, page_to=question.page))
+        return hits
+
+    def retrieve_contextual(self, variant: Variant, question: CtxQuestion, k: int) -> CtxRetrieved:
+        hits = self._ctx_ranked(variant, question)[:k]
+        sent = tuple(h.document for h in hits) if variant.endswith("rerank") else ()
+        return CtxRetrieved(
+            hits=tuple(hits),
+            reranked_documents=sent,
+            latency_ms=_hash_ms(f"{variant}:{question.id}", 30, 100),
+        )
 
     def _item(self, question: str, asker: Asker) -> EvalItem | None:
         return self._items.get((question, asker))
@@ -203,6 +248,16 @@ class LeakyStub(PerfectStub):
             provided_sources=tuple(self._ranked(question, asker, 10)),
             latency_ms=_hash_ms(question, 900, 2500),
         )
+
+    def _ctx_ranked(self, variant: Variant, question: CtxQuestion) -> list[CtxHit]:
+        """No permission filter: the restricted memos come first."""
+        data = self._ctx
+        forbidden = [
+            CtxHit(document=d.id, page_from=question.page, page_to=question.page)
+            for d in (data.documents if data else ())
+            if d.restricted
+        ]
+        return forbidden + super()._ctx_ranked(variant, question)
 
     def ask_fees(self, case: FeeCase) -> FeeResult:
         """Maps ledgers by name and ignores who may see fees: states a figure every time."""

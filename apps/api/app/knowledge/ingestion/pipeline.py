@@ -28,27 +28,35 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
+
+from opentelemetry import trace
 
 from app.core.db import tenant_session
 from app.core.logging import get_logger
 from app.core.redaction import mask_aadhaar
 from app.knowledge.chunking import StructureChunker, count_tokens
 from app.knowledge.config.chunking import ChunkingConfig, load_chunking_config
+from app.knowledge.contextual import rules as contextual_rules
 from app.knowledge.domain import Chunk, DocumentContext
 from app.knowledge.ingestion.clean import clean_document
+from app.knowledge.ingestion.contextual import ChunkContextualizer, DocumentInput
 from app.knowledge.ingestion.extract import ExtractionFailed, extract_pages
 from app.knowledge.ingestion.ports import (
+    NO_CONTEXT,
     ChunkAcl,
+    ChunkContext,
     ChunkFilters,
     ChunkStore,
+    ContextStore,
     DocumentFacts,
     DocumentNotReady,
     DocumentSource,
     IndexedChunk,
+    StoredContext,
     VersionFacts,
     VersionIndex,
 )
@@ -58,6 +66,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 log = get_logger(__name__)
+tracer = trace.get_tracer("app.knowledge.ingestion")
 
 SessionFactory = Callable[[uuid.UUID], AbstractContextManager["Session"]]
 IndexedHook = Callable[["Session", uuid.UUID, uuid.UUID, str], None]
@@ -87,11 +96,14 @@ class _Read:
     """None: a type ingestion cannot read yet (nothing is indexed for the version)."""
 
 
-def embedding_text(chunk: Chunk) -> str:
-    """What is embedded (and what full-text search indexes): header, blank line, content."""
-    if not chunk.context_header:
+def embedding_text(chunk: Chunk, context: str = "") -> str:
+    """What is embedded: header, the chunk's model-written context (contextual retrieval, docs/06
+    §4.11; empty when off or not made), blank line, content. Full text indexes the same parts
+    (``content_tsv`` = header + content, ``context_tsv`` = context)."""
+    head = "\n".join(p for p in (chunk.context_header, context) if p)
+    if not head:
         return chunk.content
-    return f"{chunk.context_header}\n\n{chunk.content}"
+    return f"{head}\n\n{chunk.content}"
 
 
 def _session(tenant_id: uuid.UUID) -> AbstractContextManager[Session]:
@@ -109,8 +121,12 @@ class DocumentIngestionPipeline:
         config: ChunkingConfig | None = None,
         session_factory: SessionFactory = _session,
         indexed_hooks: Sequence[IndexedHook] = (),
+        contextualizer: ChunkContextualizer | None = None,
     ) -> None:
         self._config = config or load_chunking_config()
+        # Contextual chunk headers (docs/06 §4.11): given by the composition root only while
+        # retrieval.yaml `contextual_chunks` is on; None = every chunk indexed without one.
+        self._contextualizer = contextualizer
         # Kept by reference: the composition root passes INDEXED_HOOKS itself, so modules that
         # register after the pipeline is built are still called.
         self._indexed_hooks = indexed_hooks
@@ -166,15 +182,19 @@ class DocumentIngestionPipeline:
         read = self._read(tenant_id, document_id, version_id)
         if not isinstance(read, _Read):
             return self._done(tenant_id, document_id, *read)
-        outcome, chunks = UNSUPPORTED, []
+        outcome, text = UNSUPPORTED, ""
+        chunks: list[Chunk] = []
         if read.data is not None:
             try:
-                chunks = self._chunks(read, read.data, tenant_id)
+                chunks, text = self._chunks(read, read.data, tenant_id)
                 outcome = INDEXED
             except ExtractionFailed as exc:
                 outcome = exc.code
-        vectors = self._embed(tenant_id, chunks)
-        written = self._write(tenant_id, document_id, version_id, chunks, vectors)
+        contexts = self._contextualize(tenant_id, read, version_id, chunks, text)
+        vectors = self._embed(tenant_id, chunks, contexts)
+        written = self._write(
+            tenant_id, document_id, version_id, chunks, vectors=vectors, contexts=contexts
+        )
         if not isinstance(written, int):
             return self._done(tenant_id, document_id, *written)
         return self._done(tenant_id, document_id, outcome, written)
@@ -207,7 +227,9 @@ class DocumentIngestionPipeline:
         document_id: uuid.UUID,
         version_id: uuid.UUID,
         chunks: Sequence[Chunk],
+        *,
         vectors: Sequence[Sequence[float]],
+        contexts: Sequence[ChunkContext],
     ) -> int | tuple[str, int]:
         """Transaction 3, under the document's index lock, with facts read again."""
         with self._session(tenant_id) as s:
@@ -231,8 +253,8 @@ class DocumentIngestionPipeline:
                     acl=ChunkAcl.from_entries(fresh.acl),
                     is_latest=is_latest,
                     chunks=tuple(
-                        IndexedChunk(chunk=c, embedding=tuple(v))
-                        for c, v in zip(chunks, vectors, strict=True)
+                        IndexedChunk(chunk=c, embedding=tuple(v), context=x)
+                        for c, v, x in zip(chunks, vectors, contexts, strict=True)
                     ),
                 ),
             )
@@ -247,7 +269,8 @@ class DocumentIngestionPipeline:
                 self._store.delete_versions(s, document_id, retired)
             return written
 
-    def _chunks(self, read: _Read, data: bytes, tenant_id: uuid.UUID) -> list[Chunk]:
+    def _chunks(self, read: _Read, data: bytes, tenant_id: uuid.UUID) -> tuple[list[Chunk], str]:
+        """The chunks and the whole cleaned, Aadhaar-masked text (what a contextualizer reads)."""
         facts, version = read.facts, read.version
         pages = extract_pages(data, version.mime_type, self._config.extraction)
         cleaned = clean_document(
@@ -267,7 +290,66 @@ class DocumentIngestionPipeline:
                 count=cleaned.redactions,
             )
         chunks = self._chunker.chunk(cleaned.document, _context(facts))
-        return [self._recheck(c) for c in chunks]
+        text = ""
+        if self._contextualizer is not None:
+            text = mask_aadhaar(contextual_rules.document_text(cleaned.document))
+        return [self._recheck(c) for c in chunks], text
+
+    def _contextualize(
+        self,
+        tenant_id: uuid.UUID,
+        read: _Read,
+        version_id: uuid.UUID,
+        chunks: Sequence[Chunk],
+        text: str,
+    ) -> list[ChunkContext]:
+        """Contextual chunk headers (docs/06 §4.11), outside any transaction; never fails the
+        ingestion: a refusal indexes the chunks without a context (``deferred``)."""
+        contextualizer = self._contextualizer
+        if contextualizer is None or not chunks:
+            return [NO_CONTEXT] * len(chunks)
+        stored: Mapping[int, StoredContext] = {}
+        if isinstance(self._store, ContextStore):
+            with self._session(tenant_id) as s:
+                stored = self._store.version_contexts(s, version_id)
+        facts = read.facts
+        with tracer.start_as_current_span("kb.ingest.contextualize") as span:
+            outcome = contextualizer.contextualize(
+                DocumentInput(
+                    tenant_id=tenant_id,
+                    document_id=facts.id,
+                    title=mask_aadhaar(facts.title),
+                    doc_type=facts.doc_type,
+                    issuer=mask_aadhaar(facts.issuer) if facts.issuer else None,
+                    text=text,
+                ),
+                chunks,
+                stored,
+            )
+            counts = {s: outcome.count(s) for s in ("ok", "rejected", "deferred")}
+            span.set_attributes(
+                {
+                    "kb.context.calls": outcome.calls,
+                    "kb.context.reused": outcome.reused,
+                    **{f"kb.context.{k}": v for k, v in counts.items()},
+                }
+            )
+        fields: dict[str, object] = {
+            "tenant_id": tenant_id,
+            "resource_type": "document",
+            "resource_id": facts.id,
+            "count": counts["ok"],
+            "attempt": outcome.calls,
+        }
+        if counts["deferred"]:
+            code = next(iter(outcome.reasons), "deferred")
+            log.info(
+                "knowledge.ingest.context_deferred", outcome="deferred", error_code=code, **fields
+            )
+        else:
+            outcome_code = "partial" if counts["rejected"] else "ok"
+            log.info("knowledge.ingest.contextualized", outcome=outcome_code, **fields)
+        return outcome.contexts
 
     def _recheck(self, chunk: Chunk) -> Chunk:
         """Defence in depth: nothing unmasked reaches the embedder or the index (invariant 4)."""
@@ -284,10 +366,12 @@ class DocumentIngestionPipeline:
             token_count=count_tokens(content, self._config.token_estimate),
         )
 
-    def _embed(self, tenant_id: uuid.UUID, chunks: Sequence[Chunk]) -> list[list[float]]:
+    def _embed(
+        self, tenant_id: uuid.UUID, chunks: Sequence[Chunk], contexts: Sequence[ChunkContext]
+    ) -> list[list[float]]:
         if not chunks:
             return []
-        texts = [embedding_text(c) for c in chunks]
+        texts = [embedding_text(c, x.text) for c, x in zip(chunks, contexts, strict=True)]
         with self._session(tenant_id) as s:
             vectors = self._embedder.embed(s, tenant_id, texts, "document")
         if len(vectors) != len(texts):

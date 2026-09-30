@@ -153,6 +153,7 @@ def pipeline() -> DocumentIngestionPipeline:
         store=SqlChunkStore(),
         embedder=composition.runtime().embedder,
         indexed_hooks=INDEXED_HOOKS,
+        contextualizer=composition.runtime().contextualizer,
     )
 
 

@@ -108,3 +108,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0030](ADR-0030-in-house-identity-and-sessions.md) | In-house sign-in, MFA and sessions (replacing the managed OIDC provider) | Proposed |
 | [ADR-0032](ADR-0032-tally-edge-agent.md) | Tally edge agent, device credentials and the `get_fee_dues` tool (M6) | Proposed |
 | [ADR-0034](ADR-0034-ask-conversations-and-memory.md) | Ask conversations, context and per-user memory (amends FR-KB-012 and ADR-0008) | Accepted |
+| [ADR-0035](ADR-0035-contextual-retrieval-and-reranking.md) | Contextual chunk headers and a reranker for "Ask the school" (behind switches, off) | Proposed |

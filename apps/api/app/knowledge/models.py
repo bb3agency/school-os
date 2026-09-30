@@ -121,6 +121,20 @@ class DocumentChunk(Base):
         Computed("to_tsvector('simple'::regconfig, context_header || ' ' || content)"),
         nullable=False,
     )
+    # Contextual retrieval (0040_contextual_retrieval; docs/06 §4.11): a model-written context
+    # situating the chunk in its document. Embedding, full-text and keyword input only; never
+    # shown to users or sent to the answer model.
+    chunk_context: Mapped[str] = mapped_column(Text, server_default=text("''"))
+    context_tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('simple'::regconfig, chunk_context)"), nullable=False
+    )
+    context_status: Mapped[str] = mapped_column(Text, server_default=text("'none'"))
+    """``none`` (not asked: off, or indexed before), ``ok``, ``rejected`` (failed the checks:
+    indexed without context), ``deferred`` (budget, switch or outage: indexed plainly; the
+    backfill asks again)."""
+    context_model: Mapped[str | None] = mapped_column(Text)
+    context_prompt: Mapped[str | None] = mapped_column(Text)
+    """``<prompt id>.v<version>`` that wrote ``chunk_context``."""
     language: Mapped[str | None] = mapped_column(Text)
     token_count: Mapped[int] = mapped_column(Integer)
     is_table: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
@@ -284,6 +298,8 @@ class LlmCall(Base):
     feature: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text)
     query_id: Mapped[uuid.UUID | None]
+    document_id: Mapped[uuid.UUID | None]
+    """0040_contextual_retrieval: the document a contextualize call served (no FK: a ledger)."""
     provider: Mapped[str] = mapped_column(Text)
     model: Mapped[str] = mapped_column(Text)
     outcome: Mapped[str] = mapped_column(Text)
