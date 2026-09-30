@@ -733,10 +733,12 @@ forbidden_modules =
     app.knowledge.models
     app.knowledge.circulars
     app.knowledge.circular_ai
+    app.knowledge.contextual
+    app.knowledge.rerank
 allow_indirect_imports = True
 
 # Top to bottom: a package may import only packages below it. Consequences that matter:
-# retrieval, tools, embeddings and chunking cannot reach the gateway (no model calls from
+# retrieval, tools, rerank, embeddings and chunking cannot reach the gateway (no model calls from
 # ranking, record tools or chunking); nothing below ingestion can write the index; the
 # pure foundations (prompts, config, interfaces, sources, domain) import no knowledge package.
 # Implementations are wired together in service (composition root).
@@ -751,6 +753,7 @@ layers =
     gateway
     tools
     retrieval
+    rerank
     embeddings
     chunking
     prompts
@@ -772,6 +775,7 @@ forbidden_modules =
     app.knowledge.ingestion
     app.knowledge.tools
     app.knowledge.retrieval
+    app.knowledge.rerank
     app.knowledge.embeddings
     app.knowledge.chunking
     app.identity
@@ -824,6 +828,7 @@ source_modules =
     app.knowledge.domain
     app.knowledge.sources
     app.knowledge.circulars
+    app.knowledge.contextual
 forbidden_modules =
     sqlalchemy
     fastapi
