@@ -111,6 +111,7 @@ class LedgerMeteringSink:
                         "feature": event.feature,
                         "role": event.role,
                         "query_id": event.query_id,
+                        "document_id": event.document_id,
                         "provider": event.provider,
                         "model": event.model,
                         "outcome": event.outcome,

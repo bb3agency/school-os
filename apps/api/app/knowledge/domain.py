@@ -23,12 +23,30 @@ InputType = Literal["document", "query"]
 """What an embedding is for (ADR-0006: ``embed(texts, input_type)``)."""
 
 ModelRole = Literal[
-    "answer", "router", "metadata", "translation", "extraction", "circular", "notice", "eval_judge"
+    "answer",
+    "router",
+    "metadata",
+    "translation",
+    "extraction",
+    "circular",
+    "notice",
+    "contextualize",
+    "eval_judge",
 ]
-"""Keys of ``knowledge/config/models.yaml`` ``roles`` (docs/06 §4.4, §4.10, §5, §6, §10, §12)."""
+"""Keys of ``knowledge/config/models.yaml`` ``roles`` (docs/06 §4.4, §4.10, §4.11, §5, §6, §10,
+§12). ``contextualize``: the short context situating each chunk in its document (contextual
+retrieval, docs/06 §4.11)."""
 
 Feature = Literal[
-    "ask", "metadata", "translation", "extraction", "circulars", "notices", "embeddings", "eval"
+    "ask",
+    "metadata",
+    "translation",
+    "extraction",
+    "circulars",
+    "notices",
+    "contextualize",
+    "embeddings",
+    "eval",
 ]
 """What a metered model call was for (FR-KB-009, NFR-CST-001: spend per tenant and feature)."""
 
@@ -274,6 +292,9 @@ class Metering:
     tenant_id: uuid.UUID
     feature: Feature
     query_id: uuid.UUID | None = None
+    document_id: uuid.UUID | None = None
+    """The document a call served (contextual chunk headers: spend per document, docs/06
+    §4.11); stored in ``kb.llm_calls.document_id``."""
 
 
 # --- ask request and SSE events (docs/06 §5, §5.1) ----------------------------------------------

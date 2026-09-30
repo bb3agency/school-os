@@ -52,6 +52,15 @@ roles:
     model: claude-sonnet-5
     max_output_tokens: 1200
     thinking: disabled
+  # Contextual retrieval (docs/06 §4.11; PO approval 2026-09-30, behind retrieval.yaml
+  # `contextual_chunks`): a 50-100 token context situating each chunk in its document, written at
+  # ingestion from the document's already-masked text (document first and stable, chunks last,
+  # so the provider's prompt cache serves every call of one document). Small tier: cost per
+  # million document tokens is the driver. Output cap: `contextual.yaml` chunks_per_call contexts.
+  contextualize:
+    model: claude-haiku-4-5-20251001
+    max_output_tokens: 2000
+    thinking: disabled
   # Offline evaluation judge (top tier, §12, §13). Never used for product traffic. Opus 5.5 cannot
   # turn thinking off and rejects forced tool_choice: thinking left to the model, effort kept low
   # (its default is medium), JSON through structured outputs, never a forced tool.
