@@ -174,7 +174,8 @@ def test_FR_KB_009_query_is_logged_encrypted_and_audited_without_text(
     assert row["status"] == "answered"
     assert row["mode"] == "full"
     assert row["route"] == "documents"
-    assert row["model_ids"] == ["claude-sonnet-5"]
+    # The model that served the question, as configured for the answer role (ADR-0033: Gemini).
+    assert row["model_ids"] == [load_llm_config().roles["answer"].model]
     assert row["input_tokens"] > 0
     assert row["output_tokens"] > 0
     assert {c["source"] for c in row["citations"]} == set(_sources(events))
