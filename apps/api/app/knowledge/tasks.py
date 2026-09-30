@@ -12,6 +12,11 @@
   (``kb.queries``) older than its retention (180 days; docs/05 §13), each school in its own
   ``tenant_session``; a failing school does not stop the others (logged with ids only, counted
   in ``failed``, retried on the next run). Counts only in the result and the log.
+- ``knowledge.contextualize_backfill`` (every ``contextual.yaml`` ``backfill.every_minutes``,
+  queue ``ingest``, explicit route in ``sos_worker.celery_app``): while contextual chunks are on
+  (docs/06 §4.11), re-index documents whose searchable chunks have no context yet (indexed
+  before the switch, or deferred by the school's budget/AI switch/provider), rate-limited per
+  school and per run (:mod:`app.knowledge.contextual_backfill`). A no-op while off.
 
 Every task is idempotent and retries with exponential backoff (max 5, docs/04 §6); after the
 last attempt it logs ``error_code`` and gives up (the next event for the document repairs it).
@@ -31,7 +36,8 @@ from celery.schedules import crontab
 
 from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
-from app.knowledge import composition, service
+from app.knowledge import composition, contextual_backfill, service
+from app.knowledge.config.contextual import load_contextual_config
 from app.knowledge.ingestion import hooks, runtime
 from app.tenancy import service as tenancy
 
@@ -39,6 +45,7 @@ log = get_logger(__name__)
 
 MAX_RETRIES: Final = 5
 PURGE_QUERIES_TASK: Final = "knowledge.purge_queries"
+CONTEXT_BACKFILL_TASK: Final = "knowledge.contextualize_backfill"
 # Schools whose query log is still kept (an offboarded school's rows go with the whole purge).
 PURGE_TENANT_STATUSES: Final = ("active", "suspended", "offboarding")
 
@@ -157,11 +164,30 @@ def purge_queries() -> dict[str, int]:
     return purge_queries_all()
 
 
+def contextualize_backfill_all() -> dict[str, int]:
+    """One contextual-header backfill run (no-op while contextual chunks are off)."""
+    if composition.runtime().contextualizer is None:
+        return {"tenants": 0, "documents": 0, "stopped": 0, "failed": 0}
+    limits = load_contextual_config().backfill
+    return contextual_backfill.run(runtime.pipeline(), limits).as_dict()
+
+
+@shared_task(name=CONTEXT_BACKFILL_TASK, queue="ingest", acks_late=True, ignore_result=True)
+def contextualize_backfill() -> dict[str, int]:
+    return contextualize_backfill_all()
+
+
 def beat_schedule() -> dict[str, dict[str, Any]]:
     """Beat entries for knowledge (both deployment modes)."""
+    every = load_contextual_config().backfill.every_minutes
     return {
         "knowledge-purge-queries": {
             "task": PURGE_QUERIES_TASK,
             "schedule": crontab(minute=25, hour=21),  # 02:55 IST
+        },
+        # docs/06 §4.11: a no-op unless contextual chunks are on.
+        "knowledge-contextualize-backfill": {
+            "task": CONTEXT_BACKFILL_TASK,
+            "schedule": float(every * 60),
         },
     }

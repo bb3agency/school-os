@@ -7,7 +7,10 @@ need:
   local/CI, the ADR-0006 selection built by ``gateway.build_voyage_provider`` in live mode)
   wrapped in :class:`CachingTenantEmbedder` with the ``kb.embedding_cache`` adapter
   (:class:`SqlEmbeddingCache`).
-- **Retrieval:** :class:`HybridRetriever` and :class:`DocumentSearch` (query embedding + ACL keys).
+- **Retrieval:** :class:`HybridRetriever` and :class:`DocumentSearch` (query embedding + ACL keys),
+  with ``retrieval.yaml`` as overridden by ``SOS_KB_CONTEXTUAL_CHUNKS`` / ``SOS_KB_RERANK``
+  (:func:`retrieval_config`) and, when reranking is on, the reranker ``select_reranker`` picks
+  (the offline fake in fake mode, ``gateway.build_voyage_reranker`` in live mode).
 - **Gateway:** ``build_gateway`` with :class:`SchoolAiPolicy` (school setting AND the
   ``kb.ask.enabled`` flag; budget from tenancy) and :class:`LedgerMeteringSink`
   (``kb.llm_calls``). Its rate-limit counters follow the process KV store (``authz.kv``).
@@ -15,10 +18,11 @@ need:
   with the ``answer_system`` prompt (v1).
 - **Ingestion:** :func:`configure_ingestion` hands ``ingestion.runtime`` a factory for
   :class:`DocumentIngestionPipeline` over ``documents.service`` (:class:`DocumentsServiceSource`),
-  the SQL chunk store and the tenant embedder. Importing this module installs the documents
-  hooks (``ingestion.hooks``: version ready / ACL changed -> outbox; ``lifecycle``: archive,
-  unarchive, delete) in whichever process imports it (API through ``knowledge.service``,
-  worker through ``knowledge.tasks``).
+  the SQL chunk store, the tenant embedder and, while ``contextual_chunks`` is on, the
+  :class:`ChunkContextualizer` over the gateway (docs/06 §4.11). Importing this module installs
+  the documents hooks (``ingestion.hooks``: version ready / ACL changed -> outbox;
+  ``lifecycle``: archive, unarchive, delete) in whichever process imports it (API through
+  ``knowledge.service``, worker through ``knowledge.tasks``).
 
 Nothing is built at import time (no provider construction, no database), so importing is cheap
 and live-mode misconfiguration fails on first use, loudly (``EmbeddingsNotConfiguredError``,
@@ -37,20 +41,25 @@ import app.knowledge.lifecycle  # noqa: F401  (installs the archive/unarchive/de
 from app.authz.kv import KVStore, kv_store
 from app.core.config import Settings, get_settings
 from app.knowledge.answer import AnswerEngine
+from app.knowledge.config.contextual import load_contextual_config
 from app.knowledge.config.embeddings import EmbeddingsConfig, load_embeddings_config
 from app.knowledge.config.llm import LlmConfig, load_llm_config
+from app.knowledge.config.retrieval import RetrievalConfig, load_retrieval_config
 from app.knowledge.config.tools import ToolsConfig, load_tools_config
 from app.knowledge.embeddings import CachingTenantEmbedder, select_embeddings_provider
 from app.knowledge.gateway.embeddings_voyage import build_voyage_provider
 from app.knowledge.gateway.factory import build_gateway
 from app.knowledge.gateway.metering import MeteringSink
+from app.knowledge.gateway.rerank_voyage import build_voyage_reranker
 from app.knowledge.gateway.transport import Transport
 from app.knowledge.ingestion import runtime as ingestion_runtime
+from app.knowledge.ingestion.contextual import ChunkContextualizer
 from app.knowledge.ingestion.documents_source import DocumentsServiceSource
 from app.knowledge.ingestion.pipeline import INDEXED_HOOKS, DocumentIngestionPipeline
 from app.knowledge.interfaces import EmbeddingsProvider, LlmGateway, TenantEmbedder
 from app.knowledge.policy import LedgerMeteringSink, SchoolAiPolicy
 from app.knowledge.prompts.registry import load_prompt
+from app.knowledge.rerank import select_reranker
 from app.knowledge.retrieval import HybridRetriever
 from app.knowledge.store import SqlChunkStore, SqlEmbeddingCache
 from app.knowledge.tools.documents import NAME as SEARCH_TOOL
@@ -87,6 +96,8 @@ class Runtime:
     tools: dict[str, OfferedTool]
     engine: AnswerEngine
     policy: SchoolAiPolicy | None = None
+    contextualizer: ChunkContextualizer | None = None
+    """Contextual chunk headers at ingestion (docs/06 §4.11); None while they are off."""
 
 
 def build_runtime(
@@ -100,6 +111,7 @@ def build_runtime(
     embeddings_config: EmbeddingsConfig | None = None,
     llm_config: LlmConfig | None = None,
     tools_config: ToolsConfig | None = None,
+    retrieval: RetrievalConfig | None = None,
 ) -> Runtime:
     settings = settings or get_settings()
     emb = embeddings_config or load_embeddings_config()
@@ -111,8 +123,16 @@ def build_runtime(
         network={"voyage": partial(build_voyage_provider, settings=settings, http=emb.voyage)},
     )
     embedder = CachingTenantEmbedder(provider, emb, SqlEmbeddingCache())
+    rcfg = retrieval or retrieval_config(settings)
+    reranker = select_reranker(
+        settings.resolved_kb_provider_mode,
+        rcfg.rerank,
+        network={"voyage": partial(build_voyage_reranker, settings=settings)},
+    )
     search = DocumentSearch(
-        retriever=HybridRetriever(), embedder=embedder, config=tools_cfg.tools[SEARCH_TOOL]
+        retriever=HybridRetriever(rcfg, reranker=reranker),
+        embedder=embedder,
+        config=tools_cfg.tools[SEARCH_TOOL],
     )
     policy: SchoolAiPolicy | None = None
     if gateway is None:
@@ -135,6 +155,15 @@ def build_runtime(
         config=llm,
         prompt=load_prompt(prompt_id, version),
     )
+    contextualizer = None
+    if rcfg.contextual:
+        ctx_cfg = load_contextual_config()
+        contextualizer = ChunkContextualizer(
+            gateway=gateway,
+            model=llm.roles["contextualize"].model,
+            prompt=load_prompt(ctx_cfg.prompt.id, ctx_cfg.prompt.version),
+            config=ctx_cfg,
+        )
     return Runtime(
         settings=settings,
         llm_config=llm,
@@ -145,6 +174,14 @@ def build_runtime(
         tools=tools,
         engine=engine,
         policy=policy,
+        contextualizer=contextualizer,
+    )
+
+
+def retrieval_config(settings: Settings) -> RetrievalConfig:
+    """``retrieval.yaml`` with the per-environment switches applied (docs/06 §4.11, §6)."""
+    return load_retrieval_config().with_overrides(
+        contextual_chunks=settings.kb_contextual_chunks, rerank=settings.kb_rerank
     )
 
 
@@ -173,6 +210,7 @@ def _pipeline() -> DocumentIngestionPipeline:
         store=SqlChunkStore(),
         embedder=runtime().embedder,
         indexed_hooks=INDEXED_HOOKS,
+        contextualizer=runtime().contextualizer,
     )
 
 
@@ -186,6 +224,7 @@ __all__ = [
     "Runtime",
     "build_runtime",
     "configure_ingestion",
+    "retrieval_config",
     "runtime",
     "set_runtime",
 ]
