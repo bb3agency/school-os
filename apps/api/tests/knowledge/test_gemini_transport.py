@@ -541,6 +541,30 @@ def test_ADR_0033_the_fake_rejects_a_replayed_call_without_its_signature() -> No
     assert fake.send(request(body))["candidates"]
 
 
+class _TwoSentenceStandIn:
+    """A Messages-API stand-in whose answer is one cited block of two sentences."""
+
+    name = "two-sentences"
+
+    def send(self, request: MessagesRequest) -> dict[str, Any]:
+        citation = {"type": "search_result_location", "source": "passage:1", "cited_text": "x"}
+        text = "Fees are due on 15/10/2026. Pay at Rs. 500 per term."
+        return {
+            "content": [{"type": "text", "text": text, "citations": [citation]}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        }
+
+
+def test_FR_KB_005_the_fake_marks_every_sentence_of_a_cited_block() -> None:
+    """Like the marker instructions ask of the model: ``[n]`` after every sentence it supports
+    (the gateway gives a marker only to the sentence it ends, docs/06 §9 rule 3)."""
+    fake = GeminiWireFake(_TwoSentenceStandIn())  # type: ignore[arg-type]
+    body: dict[str, Any] = {"contents": [{"role": "user", "parts": [{"text": "q"}]}]}
+    (part,) = fake.send(request(body))["candidates"][0]["content"]["parts"]
+    assert part["text"] == "Fees are due on 15/10/2026. [1] Pay at Rs. 500 per term. [1]"
+
+
 def test_ADR_0033_fake_mode_answers_through_the_gemini_codec_with_valid_citations() -> None:
     from app.authz.kv import InMemoryKV
     from app.knowledge.domain import (

@@ -466,6 +466,151 @@ def test_english_first_composition_picks_the_english_prompt() -> None:
     assert ENGLISH_ONLY not in load_prompt(*composition.ANSWER_PROMPT).text
 
 
+# --- per-sentence citations (docs/06 §9 rule 3 as built; FR-KB-005, FR-KB-007, invariant 8) ---
+
+
+def answered(*segments: AnswerSegment, telugu: bool = False, tool: FakeTool | None = None) -> Any:
+    gw = ScriptedGateway([turn(calls=[search_call()]), turn(*segments)])
+    return run(engine(gw, [tool or search_tool()], telugu=telugu))
+
+
+def test_FR_KB_005_an_uncited_factual_sentence_is_dropped_and_the_rest_is_kept() -> None:
+    answer = answered(
+        cited("Exams begin on 22/09/2026."),
+        cited(" They start at 09:30."),
+        cited(" Students carry hall tickets."),
+        AnswerSegment(" Results come on 30/10/2026."),
+    )
+    assert answer.status == "answered"
+    assert "30/10/2026" not in answer.text
+    assert answer.text == (
+        "Exams begin on 22/09/2026. [1] They start at 09:30. [1] Students carry hall tickets. [1]"
+    )
+    assert answer.uncited_factual == 1
+    assert answer.sentences_dropped == 1
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        " The office can tell you more about it.",  # a claim without digits
+        " Fees are not due during the exams.",  # negation is a claim too
+        " Yes.",
+    ],
+)
+def test_FR_KB_007_an_uncited_claim_without_figures_is_dropped(claim: str) -> None:
+    answer = answered(cited("Exams begin on 22/09/2026."), AnswerSegment(claim))
+    assert answer.status == "answered"
+    assert answer.text == "Exams begin on 22/09/2026. [1]"
+    assert answer.sentences_dropped == 1
+
+
+def test_non_factual_sentences_need_no_citation() -> None:
+    answer = answered(
+        AnswerSegment("Here is what the timetable says:"),
+        cited(" Exams begin on 22/09/2026."),
+        AnswerSegment(" I could not find the results date in the school records."),
+    )
+    assert answer.status == "answered"
+    assert answer.text == (
+        "Here is what the timetable says: Exams begin on 22/09/2026. [1] "
+        "I could not find the results date in the school records."
+    )
+    assert answer.sentences_dropped == 0
+    assert answer.uncited_factual == 0
+
+
+def test_FR_KB_005_a_native_citation_supports_every_sentence_of_its_block() -> None:
+    answer = answered(cited("Exams begin on 22/09/2026. Students carry hall tickets."))
+    assert answer.text == "Exams begin on 22/09/2026. Students carry hall tickets. [1]"
+
+
+def test_FR_KB_005_an_uncited_sentence_in_the_middle_is_cut_cleanly() -> None:
+    answer = answered(
+        cited("Exams begin on 22/09/2026."),
+        AnswerSegment(" Results come on 30/10/2026. The office is open."),
+        cited(" They start at 09:30."),
+        cited(" Students carry hall tickets."),
+        cited(" Hall tickets are checked at 09:30."),
+    )
+    assert answer.status == "answered"
+    assert answer.text == (
+        "Exams begin on 22/09/2026. [1] They start at 09:30. [1] "
+        "Students carry hall tickets. [1] Hall tickets are checked at 09:30. [1]"
+    )
+    assert answer.sentences_dropped == 2
+    assert all(s.text.strip() for s in answer.segments)
+
+
+def test_docs_06_s9_rule3_the_answer_losing_its_core_falls_back_to_search_only() -> None:
+    answer = answered(
+        cited("Exams begin on 22/09/2026."),
+        cited(" They start at 09:30."),
+        AnswerSegment(" Results come on 30/10/2026."),  # 1 of 3 figures uncited: > 0.30
+    )
+    assert answer.status == "search_only"
+    assert answer.segments == ()
+    assert [c.source for c in answer.cited] == [SOURCE]
+    assert answer.uncited_factual == 1
+
+
+def test_FR_KB_005_multiple_markers_on_one_sentence() -> None:
+    second = SearchResultBlock(OTHER, "Circular · Hall tickets (p.1)", "Carry hall tickets daily.")
+    tool = search_tool(SearchResultBlock(SOURCE, "Circular · Timetable (p.1)", TEXT), second)
+    both = AnswerSegment(
+        "Exams begin on 22/09/2026 and hall tickets are needed.",
+        (Citation(SOURCE, TEXT), Citation(OTHER, "Carry hall tickets daily.")),
+    )
+    answer = answered(both, tool=tool)
+    assert answer.text == "Exams begin on 22/09/2026 and hall tickets are needed. [1][2]"
+    assert [c.source for c in answer.cited] == [SOURCE, OTHER]
+
+
+def test_FR_KB_005_an_uncited_list_item_is_removed_with_its_line() -> None:
+    answer = answered(
+        AnswerSegment("Key dates:"),
+        cited("\n- Exams begin on 22/09/2026."),
+        AnswerSegment("\n- Results come on 30/10/2026."),
+        cited("\n- Papers start at 09:30."),
+        cited("\n- Hall tickets are needed from 22/09/2026."),
+    )
+    assert answer.status == "answered"
+    assert "Results" not in answer.text
+    assert [s.text.strip() for s in answer.segments] == [
+        "Key dates:",
+        "- Exams begin on 22/09/2026. [1]",
+        "- Papers start at 09:30. [1]",
+        "- Hall tickets are needed from 22/09/2026. [1]",
+    ]
+
+
+def test_FR_KB_005_an_uncited_table_row_is_removed_and_the_header_kept() -> None:
+    answer = answered(
+        AnswerSegment("| Event | Date |\n|---|---|\n"),
+        cited("| Exams | 22/09/2026 |"),
+        AnswerSegment("\n| Results | 30/10/2026 |"),
+        cited("\n| First paper | 09:30 |"),
+        cited("\n| Hall tickets | 22/09/2026 |"),
+    )
+    assert answer.status == "answered"
+    assert "Results" not in answer.text
+    assert answer.segments[0].text.strip() == "| Event | Date |\n|---|---|"
+    assert answer.sentences_dropped == 1
+
+
+def test_FR_KB_006_telugu_sentences_are_checked_the_same_way() -> None:
+    answer = answered(
+        cited("పరీక్షలు 22/09/2026న ప్రారంభమవుతాయి."),
+        cited(" మొదటి పేపర్ 09:30కి."),
+        cited(" హాల్ టికెట్లు తీసుకురండి."),
+        AnswerSegment(" ఫలితాలు 30/10/2026న వస్తాయి."),
+        telugu=True,
+    )
+    assert answer.status == "answered"
+    assert "30/10/2026" not in answer.text
+    assert answer.sentences_dropped == 1
+
+
 def test_english_first_answer_language() -> None:
     assert answer_language("te", telugu=False) == "en"
     assert answer_language("mixed", telugu=False) == "en"
