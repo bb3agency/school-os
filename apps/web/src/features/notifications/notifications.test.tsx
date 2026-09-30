@@ -132,6 +132,31 @@ describe("notification bell (FR-NOT-001)", () => {
     expect(bell).toHaveFocus();
   });
 
+  it("a click elsewhere closes the panel after its short exit; focus stays where it went (docs/17 §5.5)", async () => {
+    stub.routes["GET /bff/api/v1/notifications/unread-count"] = () => Response.json({ count: 0 });
+    stub.routes["GET /bff/api/v1/notifications"] = () => page([]);
+    renderWithIntl(
+      <>
+        <NotificationBell />
+        <button type="button">Elsewhere</button>
+      </>,
+    );
+    const bell = await screen.findByRole("button", { name: /^Notifications/ });
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/notifications/unread-count")).toHaveLength(1),
+    );
+    await userEvent.click(bell);
+    expect(screen.getByRole("region", { name: "Latest notifications" })).toHaveClass(
+      "origin-top-right",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Elsewhere" }));
+    expect(bell).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "Latest notifications" })).toBeNull(),
+    );
+    expect(screen.getByRole("button", { name: "Elsewhere" })).toHaveFocus();
+  });
+
   it("marks everything read", async () => {
     stub.routes["GET /bff/api/v1/notifications/unread-count"] = () => Response.json({ count: 2 });
     stub.routes["GET /bff/api/v1/notifications"] = () => page([notification()]);
