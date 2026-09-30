@@ -4818,6 +4818,7 @@
       "cards": "Cards and KPIs",
       "forms": "Form controls",
       "navigation": "Tabs and segmented controls",
+      "sidebar": "Sidebar",
       "table": "Table",
       "feedback": "Alerts, empty and loading states",
       "people": "Avatars, progress and timeline",
@@ -4825,7 +4826,8 @@
       "dialog": "Dialog",
       "icons": "Icons",
       "telugu": "Telugu"
-    }
+    },
+    "sidebarNote": "The one sidebar of the school app (white) and the platform console (dark violet): brand, school or badge, grouped menu with the current page marked, signed-in account. From lg it sits beside the page and can be made compact; below lg it opens as the menu drawer. docs/17 §5.2 has the rules."
   },
   "admin": {
     "nav": {

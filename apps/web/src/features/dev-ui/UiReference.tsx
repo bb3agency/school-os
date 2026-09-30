@@ -1,6 +1,8 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { MinimalShell } from "@/components/shell/MinimalShell";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { sidebarThemes } from "@/components/shell/sidebar-theme";
 import { AiPanel, QuoteBlock } from "@/components/ui/AiPanel";
 import { Alert } from "@/components/ui/Alert";
 import { Avatar, AvatarStack } from "@/components/ui/Avatar";
@@ -17,6 +19,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
+import type { NavSection } from "@/components/ui/SidebarNav";
 import { Sparkline } from "@/components/ui/Sparkline";
 import { KpiCard, StatCard } from "@/components/ui/StatCard";
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
@@ -55,6 +58,27 @@ const SWATCHES = [
   ["platform", "bg-platform"],
   ["platform-accent", "bg-platform-accent"],
 ] as const;
+
+/** Sample menu for the sidebar previews (synthetic labels; nothing is current on this page). */
+const SAMPLE_NAV: NavSection[] = [
+  {
+    id: "records",
+    label: "Records",
+    items: [
+      { href: "/", label: "Home", exact: true, icon: "home" },
+      { href: "/students", label: "Students", icon: "users" },
+      { href: "/imports", label: "Import a spreadsheet", icon: "upload" },
+    ],
+  },
+  {
+    id: "checks",
+    label: "Checks and submissions",
+    items: [
+      { href: "/findings", label: "Check before submitting", icon: "shieldCheck" },
+      { href: "/exports", label: "Board and portal files", icon: "file" },
+    ],
+  },
+];
 
 const ROWS = [
   {
@@ -303,6 +327,52 @@ export function UiReference() {
             <Toggle label="Answer from documents" description="Staff can ask questions." />
             <Toggle label="Weekly summary email" defaultChecked />
             <Toggle label="Locked by the plan" disabled />
+          </div>
+        </Section>
+
+        <Section id="sidebar" title={t("sections.sidebar")}>
+          <p className="text-sm text-ink-muted">{t("sidebarNote")}</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {(["school", "platform"] as const).map((theme) => (
+              <div
+                key={theme}
+                className={`h-[34rem] w-68 max-w-full overflow-hidden rounded-xl border border-border ${sidebarThemes[theme].surface}`}
+              >
+                <Sidebar
+                  mode="drawer"
+                  theme={theme}
+                  homeHref="/"
+                  navLabel={theme === "school" ? "Sample school menu" : "Sample platform menu"}
+                  sections={SAMPLE_NAV}
+                  context={
+                    theme === "school" ? (
+                      <div className="rounded-lg bg-surface-muted px-3 py-2.5">
+                        <p className="text-xs text-ink-subtle">Current school</p>
+                        <p className="text-sm font-semibold text-ink">Sample Model School</p>
+                      </div>
+                    ) : (
+                      <div className="px-1.5">
+                        <Badge tone="platform">Platform admin</Badge>
+                      </div>
+                    )
+                  }
+                  account={
+                    <div className="flex items-center gap-2.5 px-1">
+                      <Avatar name="Sample Staff A" decorative />
+                      <p className="text-sm font-semibold">
+                        Sample Staff A
+                        <span
+                          className={`block text-xs font-normal ${theme === "school" ? "text-ink-subtle" : "text-platform-muted"}`}
+                        >
+                          Office staff
+                        </span>
+                      </p>
+                    </div>
+                  }
+                  control={null}
+                />
+              </div>
+            ))}
           </div>
         </Section>
 

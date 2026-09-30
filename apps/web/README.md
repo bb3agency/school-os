@@ -9,7 +9,7 @@ same-origin BFF under `/bff/*`, which keeps the OIDC tokens server-side in Valke
 Tokens live in `src/app/globals.css` (Tailwind v4 `@theme`: gradient canvas, white cards,
 ink scale, near-black primary, brand blue, status and chart colours, radii, shadows, fonts),
 primitives in `src/components/ui/` (exported from `index.ts`) and the console layout in
-`src/components/shell/` (`AppShell`: icon rail, grouped menu panel, top bar). Fonts are
+`src/components/shell/` (`AppShell`: one collapsible sidebar, top bar; docs/17 §5.2). Fonts are
 self-hosted `@fontsource` packages (Inter, Instrument Serif for big numbers, JetBrains Mono
 for eyebrow labels, Noto Sans Telugu for Telugu). `docs/17-ui-design-system.md` has the
 component API, do/don't and the contrast table; `src/components/ui/tokens.test.ts` recomputes
