@@ -59,7 +59,7 @@ Operators are SchoolOS staff, not school users. One person may hold several role
 | Module | `apps/api/app/platform/` (ADR-0017); billing is part of it |
 | API routes | `/api/v1/platform/*` with `require_platform("platform.<…>")`; heartbeat `POST /api/v1/fleet/heartbeat` with `require_fleet_signature()` |
 | DB access | `core.db.platform_session()` as `sos_platform` (`SOS_PLATFORM_DATABASE_URL`). Exceptions (ADR-0013 Amendment A10): `tenant_session()` for school-chain audit events (§16), the school-side routes (§8.3) and the daily active-user count (§11); `app.tenancy.service` wrappers for the definer functions |
-| Web | Next.js route group `/[locale]/platform/*`; production host `admin.<domain>`; own `__Host-sos_platform_session` cookie; BFF handlers mirror API paths |
+| Web | Next.js route group `app/[locale]/platform/*`, served at `/platform/*` (no URL carries a locale, ADR-0036 note); production host `admin.<domain>`; own `__Host-sos_platform_session` cookie; BFF handlers mirror API paths |
 | Identity | Separate OIDC client (`SOS_PLATFORM_OIDC_ISSUER`, `SOS_PLATFORM_OIDC_AUDIENCE`; web `PLATFORM_OIDC_CLIENT_ID/SECRET`); reference setup: a separate Cognito user pool with MFA ON and the `sos:mfa` claim (ADR-0018); MFA mandatory for every operator |
 | Jobs | Shared `worker`/`beat`; progress in `platform.job_runs` |
 | Dedicated hosts | Routers and web route group not mounted; platform beat schedules not registered |
