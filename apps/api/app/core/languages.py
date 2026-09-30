@@ -8,6 +8,7 @@ asks this module, never the setting directly.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 from app.core.config import Settings, get_settings
@@ -41,6 +42,14 @@ def telugu_text(value: str | None, settings: Settings | None = None) -> str | No
     Telugu is switched on, ``None`` while it is hidden. Stored data is not passed through here,
     only output that exists just to show Telugu."""
     return value if telugu_enabled(settings) else None
+
+
+def shown_texts(
+    texts: Mapping[str, str], separator: str = " · ", settings: Settings | None = None
+) -> str:
+    """Per-language texts (``{"en": ..., "te": ...}``, e.g. a bilingual watermark) joined for
+    the languages shown, English first: only the English text while Telugu is hidden."""
+    return separator.join(texts[lang] for lang in enabled_languages(settings) if texts.get(lang))
 
 
 def contains_telugu(text: str) -> bool:

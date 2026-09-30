@@ -48,6 +48,16 @@ def test_contains_telugu_spots_any_character_of_the_block() -> None:
     assert not languages.contains_telugu("")
 
 
+def test_shown_texts_joins_the_languages_shown_english_first() -> None:
+    off = Settings(env=Environment.LOCAL)
+    on = Settings(env=Environment.LOCAL, telugu_enabled=True)
+    texts = {"te": "తెలుగు", "en": "English"}
+    assert languages.shown_texts(texts, settings=off) == "English"
+    assert languages.shown_texts(texts, settings=on) == "English · తెలుగు"
+    assert languages.shown_texts(texts, " / ", settings=on) == "English / తెలుగు"
+    assert languages.shown_texts({"en": "English"}, settings=on) == "English"
+
+
 def test_telugu_on_fixture_switches_telugu_on_for_one_test(telugu_on: None) -> None:
     assert languages.telugu_enabled() is True
     assert languages.enabled_languages() == ("en", "te")
