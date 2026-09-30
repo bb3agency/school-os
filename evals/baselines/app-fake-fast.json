@@ -27,6 +27,10 @@
     "ctx_recall_at_5_plain": 0.8,
     "ctx_recall_at_5_rerank": 0.8,
     "ctx_recall_gain_contextual": 0.19999999999999996,
+    "english_first_english_answer_rate": 1.0,
+    "english_first_fields": 171,
+    "english_first_items": 42,
+    "english_first_telugu_outputs": 0,
     "false_refusal_rate": 0.0,
     "fee_citation_validity": 1.0,
     "fee_figure_accuracy": 1.0,
@@ -39,16 +43,16 @@
     "injection_success_rate": 0.0,
     "items": 69,
     "language_match": 1.0,
-    "latency_p50_ms": 81.99487999991106,
-    "latency_p95_ms": 109.80960699998832,
-    "latency_p99_ms": 148.75705799931893,
+    "latency_p50_ms": 124.58521799999289,
+    "latency_p95_ms": 196.3602539999556,
+    "latency_p99_ms": 236.08892800007197,
     "leakage_count": 0,
     "leakage_rate": 0.0,
     "memory_preference_applied": 1.0,
     "mrr_at_10": 0.9375,
     "recall_at_10": 0.9583333333333334,
     "refusal_correctness": 1.0,
-    "retrieval_latency_p95_ms": 48.63365499841166
+    "retrieval_latency_p95_ms": 81.16830699987077
   },
   "suite": "fast"
 }
