@@ -639,7 +639,12 @@ def get_class(session: Session, class_id: uuid.UUID) -> ClassOut:
 
 
 def create_class(session: Session, data: ClassCreate) -> ClassOut:
-    """Audit: ``class.created``."""
+    """Audit: ``class.created``. ``display_te`` is required only while Telugu is shown
+    (ADR-0036; 422 ``missing``)."""
+    if data.display_te is None and telugu_enabled():
+        raise ValidationFailed(
+            [{"field": "display_te", "code": "missing", "message_key": "errors.missing"}]
+        )
     tenant_id = repo.current_tenant_id(session)
     with _db_errors():
         klass = repo.insert_class(

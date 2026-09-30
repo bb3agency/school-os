@@ -685,6 +685,21 @@ def test_ADR_0036_english_notice_is_approved_and_rendered_without_telugu(
 
 
 @pytest.mark.usefixtures("telugu_on")
+def test_ADR_0036_notice_needs_its_telugu_texts_while_telugu_is_shown(ai_on: Any, api: Any) -> None:
+    school = ai_on.a
+    office = school.people["office_staff"]
+    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    path = f"/api/v1/notices/{blank['id']}"
+    english = {"title_en": "Sports day", "body_en": "Sports day is on 14/11/2026 at 9:00."}
+    assert api.call(office, "PATCH", path, json=english, headers=_if(1)).status_code == 200
+    refused = api.call(
+        school.people["principal"], "POST", f"{path}/approve", json={}, headers=_if(2)
+    )
+    assert refused.status_code == 422
+    assert {e["field"] for e in refused.json()["errors"]} == {"title_te", "body_te"}
+
+
+@pytest.mark.usefixtures("telugu_on")
 def test_ADR_0036_english_text_in_the_telugu_columns_is_not_printed_twice() -> None:
     """A notice approved while Telugu was hidden holds its English text in the Telugu columns
     (the database needs both filled); switched on again, the page does not repeat it."""
