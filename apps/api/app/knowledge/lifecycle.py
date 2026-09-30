@@ -6,11 +6,19 @@
   document from retrieval (``demote_document``; the chunks are kept for version history), and
   unarchiving makes the current version searchable again (``promote_version``) when it has been
   indexed. Ingestion never promotes a version of an archived document (``DocumentFacts.status``).
-- Deletion (FR-DOC-007, docs/06 §4.8): deleting ``kb.documents`` / ``kb.document_versions``
-  rows cascades to their chunks in the same statement (0021_kb_tables ``ON DELETE CASCADE``), so
-  no job is needed. Verified answers citing the document must be flagged ``needs_review`` in
-  that transaction too: :func:`flag_citing_answers` is a ``DELETED_HOOKS`` entry, called after
-  the delete (and only for a delete that happened) in the same transaction.
+- Deletion (FR-DOC-007, docs/06 §4.8, docs/08 §7 erasure chain): deleting ``kb.documents`` /
+  ``kb.document_versions`` rows cascades to their chunks (embeddings and contextual summaries
+  are columns of them) in the same statement (0021_kb_tables ``ON DELETE CASCADE``), so no job
+  is needed. The per-school embedding cache is keyed by text digest, which no foreign key
+  reaches: :func:`forget_document_embeddings`, a ``DELETING_HOOKS`` entry, deletes the cached
+  vectors of the document's chunks just before the rows go. Verified answers citing the
+  document must be flagged ``needs_review`` in that transaction too: :func:`flag_citing_answers`
+  is a ``DELETED_HOOKS`` entry, called after the delete (and only for a delete that happened) in
+  the same transaction.
+- Discarded versions (PRV-016, ``VERSION_DISCARDED_HOOKS``): :func:`on_version_discarded`
+  deletes the version's chunks and cached vectors at once (not only at the next ingestion),
+  stops cached answers given the document's passages from being reused and, when it was the
+  searchable version, flags the verified answers citing the document.
 - The answer cache (docs/06 cost and performance design): archiving, deleting, a new searchable
   version or an ACL change of a document marks every cached answer given its passages
   ``cache_invalidated_at`` (never reused again).
@@ -74,13 +82,55 @@ def flag_citing_answers(session: Session, document_id: uuid.UUID) -> None:
         )
 
 
+def forget_document_embeddings(session: Session, document_id: uuid.UUID) -> None:
+    """A ``DELETING_HOOKS`` entry: the cached vectors of the document's chunks, before the
+    delete cascades to the chunks (docs/08 §7 erasure chain)."""
+    _store.lock_document(session, document_id)
+    forgotten = repo.forget_chunk_embeddings(session, document_id=document_id)
+    log.info(
+        "knowledge.document.embeddings_forgotten",
+        resource_type="document",
+        resource_id=document_id,
+        count=forgotten,
+    )
+
+
+def on_version_discarded(session: Session, document_id: uuid.UUID, version_id: uuid.UUID) -> None:
+    """A ``VERSION_DISCARDED_HOOKS`` entry (PRV-016): the version is erased from the index in
+    the discard's transaction (chunks, their embeddings, contextual summaries and cached
+    vectors); cached answers given the document's passages are never reused; verified answers
+    citing it wait for a person's review when it was the searchable version (FR-KB-030)."""
+    _store.lock_document(session, document_id)
+    searchable = repo.latest_version_of(session, document_id) == version_id
+    repo.invalidate_cache_citing(session, document_id)
+    removed = _store.delete_versions(session, document_id, [version_id])
+    flagged = repo.flag_verified_answers_citing(session, document_id) if searchable else 0
+    log.info(
+        "knowledge.document.version_erased",
+        resource_type="document",
+        resource_id=document_id,
+        count=removed,
+        outcome=f"flagged:{flagged}",
+    )
+
+
 def install() -> None:
     if on_status_changed not in documents.STATUS_CHANGED_HOOKS:
         documents.STATUS_CHANGED_HOOKS.append(on_status_changed)
     if flag_citing_answers not in documents.DELETED_HOOKS:
         documents.DELETED_HOOKS.append(flag_citing_answers)
+    if forget_document_embeddings not in documents.DELETING_HOOKS:
+        documents.DELETING_HOOKS.append(forget_document_embeddings)
+    if on_version_discarded not in documents.VERSION_DISCARDED_HOOKS:
+        documents.VERSION_DISCARDED_HOOKS.append(on_version_discarded)
 
 
 install()
 
-__all__ = ["flag_citing_answers", "install", "on_status_changed"]
+__all__ = [
+    "flag_citing_answers",
+    "forget_document_embeddings",
+    "install",
+    "on_status_changed",
+    "on_version_discarded",
+]

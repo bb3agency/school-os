@@ -18,3 +18,13 @@ def test_FR_DOC_007_flagging_runs_as_a_deleted_hook_not_a_delete_guard() -> None
     assert documents.DELETED_HOOKS.count(lifecycle.flag_citing_answers) == 1
     assert lifecycle.flag_citing_answers not in documents.DELETE_GUARDS
     assert documents.STATUS_CHANGED_HOOKS.count(lifecycle.on_status_changed) == 1
+
+
+def test_PRV_009_erasure_hooks_are_installed_once() -> None:
+    """The embedding cache has no foreign key to chunks: its vectors are forgotten before the
+    delete cascades (``DELETING_HOOKS``); a discarded version leaves the index at once
+    (``VERSION_DISCARDED_HOOKS``; PRV-016). docs/08 §7 erasure chain."""
+    lifecycle.install()
+    lifecycle.install()
+    assert documents.DELETING_HOOKS.count(lifecycle.forget_document_embeddings) == 1
+    assert documents.VERSION_DISCARDED_HOOKS.count(lifecycle.on_version_discarded) == 1

@@ -27,6 +27,7 @@ from app.knowledge.embeddings.embedder import (
     EmbeddingDimensionError,
     batches,
     content_sha256,
+    embedding_input,
     is_transient,
 )
 from app.knowledge.embeddings.fake import FakeEmbeddingsProvider
@@ -47,6 +48,7 @@ __all__ = [
     "QueryEmbeddingCache",
     "batches",
     "content_sha256",
+    "embedding_input",
     "is_transient",
     "select_embeddings_provider",
 ]

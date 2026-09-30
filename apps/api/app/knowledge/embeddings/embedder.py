@@ -54,6 +54,17 @@ def content_sha256(text: str) -> bytes:
     return hashlib.sha256(text.encode("utf-8")).digest()
 
 
+def embedding_input(header: str, context: str, content: str) -> str:
+    """The text a document chunk is embedded as (and cached under): header, the chunk's
+    model-written context (contextual retrieval, docs/06 §4.11; empty when off or not made),
+    blank line, content. One definition for ingestion and for erasure, which finds a deleted
+    chunk's ``kb.embedding_cache`` entry by its digest (docs/08 §7 erasure chain)."""
+    head = "\n".join(p for p in (header, context) if p)
+    if not head:
+        return content
+    return f"{head}\n\n{content}"
+
+
 def is_transient(exc: BaseException) -> bool:
     """The retry contract shared with network providers (see the module docstring)."""
     if isinstance(exc, TimeoutError | ConnectionError):

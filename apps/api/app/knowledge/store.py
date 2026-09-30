@@ -4,8 +4,10 @@
   ``kb.document_chunks`` (docs/06 §4.7): ``replace_version`` -> ``replace_version_chunks``
   (hidden until promoted), ``set_latest`` -> ``promote_version``, ``hide_document`` ->
   ``demote_document``, ``update_acl`` -> ``refresh_acl``, ``delete_versions`` /
-  ``delete_document`` -> ``delete_version_chunks`` / ``delete_document_chunks``, and the
-  optional ``ContextStore.version_contexts`` -> ``version_chunk_contexts``. When a new
+  ``delete_document`` -> ``delete_version_chunks`` / ``delete_document_chunks`` (each after
+  ``forget_chunk_embeddings``: the chunks' cached vectors go with them), the optional
+  ``ContextStore.version_contexts`` -> ``version_chunk_contexts`` and
+  ``EmbeddingEraser.forget_embeddings`` -> ``forget_cached_embeddings``. When a new
   version replaces the searchable one, active verified answers citing the document are flagged
   ``needs_review`` in the same transaction (FR-KB-030, docs/06 §4.8).
 - :class:`SqlEmbeddingCache` implements :class:`app.knowledge.embeddings.EmbeddingCache` on
@@ -109,11 +111,18 @@ class SqlChunkStore:
     def delete_versions(
         self, session: Session, document_id: uuid.UUID, version_ids: Sequence[uuid.UUID]
     ) -> int:
-        del document_id  # version ids are unique; RLS keeps them to this school
+        # Their cached vectors go first (found through the chunk rows; docs/08 §7 erasure).
+        repo.forget_chunk_embeddings(session, document_id=document_id, version_ids=version_ids)
         return sum(repo.delete_version_chunks(session, v) for v in version_ids)
 
     def delete_document(self, session: Session, document_id: uuid.UUID) -> int:
+        repo.forget_chunk_embeddings(session, document_id=document_id)
         return repo.delete_document_chunks(session, document_id)
+
+    def forget_embeddings(self, session: Session, model: str, digests: Sequence[bytes]) -> int:
+        """:class:`~app.knowledge.ingestion.ports.EmbeddingEraser`: vectors an ingestion cached
+        for a document that went while it ran (docs/08 §7 erasure chain)."""
+        return repo.forget_cached_embeddings(session, model=model, digests=digests)
 
     def version_contexts(
         self, session: Session, version_id: uuid.UUID

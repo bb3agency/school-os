@@ -6,13 +6,15 @@ the earlier answer cited, under the caller's CURRENT permissions and scopes, thr
 modules' services (the same rules as the UI and the record tools):
 
 - ``doc``: the documents service's visibility (ACL and scope) and, for a restricted (C3)
-  document, ``student.read_sensitive`` (the retrieval rule, docs/06 §6). :meth:`current`
-  additionally needs the cited version to be the document's current, active version.
+  document, ``student.read_sensitive`` (the retrieval rule, docs/06 §6); the cited version must
+  still exist and be ``ready`` (a version discarded since, PRV-016, is withheld: docs/08 §7).
+  :meth:`current` additionally needs the cited version to be the document's current, active
+  version.
 - ``student``: ``students.get_profile`` under the caller's scope, and the field not masked for
   the caller now (a restricted value they may no longer read is withheld).
 - ``finding`` / ``change``: the dq / changes services' scoped reads.
 - ``verified``: an answer of this school that is not retired and whose every citation is a
-  document the caller can read.
+  document the caller can read, at a version that still exists and is ``ready``.
 - ``count`` / ``fee``: aggregates of a tool; visible while the caller may still use that tool
   (fail closed when the caller's tools are not known).
 - ``conversation``: one of the caller's own conversations that is not deleted.
@@ -103,7 +105,9 @@ class SourceVisibility:
         try:
             match ref.kind:
                 case "doc":
-                    return self._doc_visible(ref.object_id)
+                    return self._doc_visible(ref.object_id) and self._version_kept(
+                        ref.object_id, ref.version_no
+                    )
                 case "student":
                     return self._field_visible(ref.object_id, ref.attribute)
                 case "finding":
@@ -143,6 +147,16 @@ class SourceVisibility:
             return False
         return getattr(doc, "sensitivity", "C3") != "C3" or self._ctx.has(READ_SENSITIVE)
 
+    def _version_kept(self, document_id: uuid.UUID, version_no: int | None) -> bool:
+        """The cited version still exists and is usable: a version discarded since (PRV-016,
+        ``quarantined``) or gone is withheld like a deleted document (docs/08 §7 erasure)."""
+        doc = self._document(document_id)
+        versions = getattr(doc, "versions", None) or []
+        return any(
+            getattr(v, "version_no", None) == version_no and getattr(v, "status", None) == "ready"
+            for v in versions
+        )
+
     def _field_visible(self, student_id: uuid.UUID, attribute: str | None) -> bool:
         profile = students.get_profile(self._session, self._ctx, student_id)
         if attribute is None:
@@ -162,6 +176,8 @@ class SourceVisibility:
             except ValueError:
                 return False
             if ref.kind != "doc" or not self._doc_visible(ref.object_id):
+                return False
+            if not self._version_kept(ref.object_id, ref.version_no):
                 return False
         return True
 

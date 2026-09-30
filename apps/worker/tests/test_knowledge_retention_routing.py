@@ -16,3 +16,13 @@ def test_FR_ADM_002_query_log_purge_registered_routed_and_scheduled() -> None:
     assert celery_app.amqp.router.route({}, "knowledge.ingest_version")["queue"].name == "ingest"
     entry = celery_app.conf.beat_schedule["knowledge-purge-queries"]
     assert entry["task"] == "knowledge.purge_queries"
+
+
+def test_PRV_009_orphan_vector_sweep_registered_routed_and_scheduled() -> None:
+    """docs/08 §7 erasure chain: cached document vectors no chunk uses are swept daily."""
+    celery_app.loader.import_default_modules()
+    assert "knowledge.purge_orphan_vectors" in celery_app.tasks
+    route = celery_app.amqp.router.route({}, "knowledge.purge_orphan_vectors")
+    assert route["queue"].name == "maintenance"
+    entry = celery_app.conf.beat_schedule["knowledge-purge-orphan-vectors"]
+    assert entry["task"] == "knowledge.purge_orphan_vectors"

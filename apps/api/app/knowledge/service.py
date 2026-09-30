@@ -105,6 +105,7 @@ from app.knowledge.circulars.reading import (
     PassageCitation,
 )
 from app.knowledge.config.circulars import CircularsConfig
+from app.knowledge.config.embeddings import load_embeddings_config
 from app.knowledge.config.llm import load_llm_config
 from app.knowledge.domain import (
     AclKeys,
@@ -1934,6 +1935,7 @@ __all__ = [
     "has_personal_numbers",
     "purge_memories",
     "purge_old_queries",
+    "purge_orphan_vectors",
     "purge_tenant_data",
     "read_circular",
     "reencrypt_queries",
@@ -1978,6 +1980,17 @@ def purge_old_queries(session: Session, *, now: dt.datetime | None = None) -> in
     repo.clear_summaries_before(session, cutoff)
     repo.delete_empty_conversations(session)
     return deleted
+
+
+def purge_orphan_vectors(session: Session, *, now: dt.datetime | None = None) -> int:
+    """Delete the current school's cached document vectors that no chunk uses any more and that
+    are older than ``orphan_vector_grace_hours`` (embeddings.yaml; docs/08 §7 erasure chain).
+    Deleting a document or version already removes its vectors in the same transaction; this
+    daily sweep catches vectors cached before that existed and ones left by a job that stopped
+    between embedding and writing. Call inside the school's ``tenant_session``."""
+    grace = load_embeddings_config().orphan_vector_grace_hours
+    cutoff = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(hours=grace)
+    return repo.purge_orphan_embeddings(session, older_than=cutoff)
 
 
 def purge_memories(session: Session, *, now: dt.datetime | None = None) -> int:
