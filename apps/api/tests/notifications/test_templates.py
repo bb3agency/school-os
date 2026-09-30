@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from app.core.languages import contains_telugu
 from app.notifications import templates as t
 
 REQUIRED = {
@@ -69,7 +70,9 @@ def test_FR_NOT_001_required_templates_exist_in_english_and_telugu() -> None:
 
 @pytest.mark.parametrize("key", sorted(t.catalog()))
 @pytest.mark.parametrize("number", [0, 1, 7])
-def test_FR_NOT_001_every_template_renders_in_both_languages(key: str, number: int) -> None:
+def test_FR_NOT_001_every_template_renders_in_both_languages(
+    key: str, number: int, telugu_on: None
+) -> None:
     template = t.get(key)
     for lang in ("en", "te"):
         msg = t.render(key, _sample(template, number), lang)
@@ -83,7 +86,7 @@ def test_FR_NOT_001_every_template_renders_in_both_languages(key: str, number: i
     assert any("ఀ" <= ch <= "౿" for ch in te.title + te.body), "Telugu script"
 
 
-def test_FR_NOT_001_plural_and_select_forms() -> None:
+def test_FR_NOT_001_plural_and_select_forms(telugu_on: None) -> None:
     zero = t.render("dq.run.completed", {"run_id": "r", "blockers": 0, "warnings": 1}, "en")
     assert zero.body == ("The data check found no problems that block submission and 1 warning.")
     many = t.render("import.committed", {"import_id": "i", "rows": 12}, "en")
@@ -136,8 +139,28 @@ def test_FR_NOT_001_template_parser_rejects_malformed_messages() -> None:
         ("te;q=abc", "en"),
     ],
 )
-def test_FR_NOT_001_accept_language_negotiation(header: str | None, expected: str) -> None:
+def test_FR_NOT_001_accept_language_negotiation(
+    header: str | None, expected: str, telugu_on: None
+) -> None:
     assert t.negotiate_language(header) == expected
+
+
+@pytest.mark.parametrize("key", sorted(t.catalog()))
+def test_ADR_0036_every_template_renders_in_english_while_telugu_is_hidden(key: str) -> None:
+    template = t.get(key)
+    for number in (0, 1, 7):
+        params = _sample(template, number)
+        for lang in ("te", "mixed", "en", "fr"):
+            msg = t.render(key, params, lang)
+            assert msg == t.render(key, params, "en")
+            assert not contains_telugu(msg.title + msg.body)
+
+
+@pytest.mark.parametrize("header", ["te", "te-IN,te;q=0.9,en;q=0.8", "hi-IN, te;q=0.5", None])
+def test_ADR_0036_accept_language_te_gives_english_while_telugu_is_hidden(
+    header: str | None,
+) -> None:
+    assert t.negotiate_language(header) == "en"
 
 
 def test_FR_ADM_002_read_retention_is_ninety_days() -> None:

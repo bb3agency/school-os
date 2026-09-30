@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from app.audit.schemas import SummaryError
 from app.core.db import tenant_session
+from app.core.languages import contains_telugu
 from app.notifications import service
 from app.notifications.tasks import purge_all
 from app.notifications.templates import TemplateError
@@ -207,7 +208,10 @@ def test_FR_NOT_001_list_count_read_and_read_all(
 
 
 def test_FR_NOT_001_rendered_in_telugu_for_accept_language_te(
-    school: Staff, api: Any, admin_engine: Engine
+    school: Staff,
+    api: Any,
+    admin_engine: Engine,
+    telugu_on: None,
 ) -> None:
     me = W.add_member(admin_engine, school.tenant_id, ["teacher"])
     _notify(school.tenant_id, [me.membership_id], import_id="i", rows=4)
@@ -219,6 +223,20 @@ def test_FR_NOT_001_rendered_in_telugu_for_accept_language_te(
     assert item["language"] == "te"
     assert item["title"] == "రికార్డులు జోడించబడ్డాయి"
     assert item["body"] == "4 వరుసలు విద్యార్థి రికార్డులకు జోడించబడ్డాయి."
+
+
+def test_ADR_0036_accept_language_te_gives_english_while_telugu_is_hidden(
+    school: Staff, api: Any, admin_engine: Engine
+) -> None:
+    me = W.add_member(admin_engine, school.tenant_id, ["teacher"])
+    _notify(school.tenant_id, [me.membership_id], import_id="i", rows=4)
+    for path in ("/api/v1/notifications", "/api/v1/notifications?unread=true"):
+        res = api.call(me, "GET", path, headers={"Accept-Language": "te-IN,te;q=0.9"})
+        assert res.headers["content-language"] == "en"
+        item = res.json()["data"][0]
+        assert item["language"] == "en"
+        assert item["title"] == "Records added"
+        assert not contains_telugu(res.text)
 
 
 def test_SEC_015_cannot_read_or_mark_someone_elses_notification(
