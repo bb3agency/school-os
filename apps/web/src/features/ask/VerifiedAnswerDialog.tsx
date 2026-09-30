@@ -150,11 +150,13 @@ export function VerifiedAnswerDialog({
   draft,
   triggerLabel,
   triggerVariant = "secondary",
+  triggerSize = "md",
   onSaved,
 }: {
   draft: VerifiedDraft | null;
   triggerLabel: string;
-  triggerVariant?: "primary" | "secondary";
+  triggerVariant?: "primary" | "secondary" | "ghost";
+  triggerSize?: "sm" | "md";
   onSaved?: (answer: VerifiedAnswer) => void;
 }) {
   const t = useTranslations("ask.verified");
@@ -163,6 +165,7 @@ export function VerifiedAnswerDialog({
     <ActionDialog
       triggerLabel={triggerLabel}
       triggerVariant={triggerVariant}
+      triggerSize={triggerSize}
       title={t("dialogTitle")}
       description={t("dialogDescription")}
       confirmLabel={t("confirm")}

@@ -467,6 +467,224 @@
   }
 }
 
+/*
+ * Ask chat (docs/17 §5.3). Calm, CSS-only motion on transform and opacity (the status shimmer
+ * moves a gradient on one short line of text). Motion tokens:
+ *   --motion-enter 180ms  messages, notes, the chat itself (fade + 6px rise)
+ *   --motion-quick 120ms  popovers, the send/stop morph, dialogs
+ *   --motion-stagger 50ms between follow-up chips and suggestion cards
+ *   --ease-out            decelerating curve for everything that enters
+ * Under prefers-reduced-motion everything below is instant and still (see the media query).
+ */
+:root {
+  --motion-enter: 180ms;
+  --motion-quick: 120ms;
+  --motion-stagger: 50ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer components {
+  /* The chat card fills the screen below the top bar (100vh first, dvh second). */
+  .chat-canvas {
+    min-height: calc(100vh - 6rem);
+    min-height: calc(100dvh - 6rem);
+  }
+
+  /* The composer's backdrop: the card's white fading in above it, so messages scroll under
+     it softly. Decorative; the composer itself is an opaque field. */
+  .chat-dock {
+    background-image: linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0) 0,
+      var(--color-surface) 1.5rem,
+      var(--color-surface) 100%
+    );
+  }
+
+  /* Blinking caret at the end of the streaming text. */
+  .chat-caret {
+    display: inline-block;
+    width: 0.5em;
+    height: 1em;
+    margin-inline-start: 0.125em;
+    vertical-align: -0.125em;
+    border-radius: 0.125rem;
+    background-color: var(--color-ink);
+  }
+
+  /* The live status line ("Searching school documents…"): a soft light moving along the
+     text. Its colour stays ink-muted (7.6:1) for contrast checks and forced colours. */
+  .chat-shimmer-text {
+    color: var(--color-ink-muted);
+  }
+
+  /* An older message renders only when near the screen, where the browser supports it
+     (progressive enhancement; the DOM is capped by "Show earlier messages" everywhere). */
+  .chat-past {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 16rem;
+  }
+
+  /* Citation popover (fixed, placed by script through the CSSOM). */
+  .chat-popover {
+    position: fixed;
+    z-index: 45;
+    width: min(22rem, calc(100vw - 2rem));
+  }
+
+  /* The action row keeps its height while the answer streams, so nothing jumps when it
+     appears; it fades in on hover and focus except on the latest answer and on touch. */
+  .chat-actions-idle {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chat-enter {
+    animation: chat-rise var(--motion-enter) var(--ease-out) both;
+  }
+
+  .chat-fade {
+    animation: chat-fade var(--motion-enter) var(--ease-out) both;
+  }
+
+  .chat-pop {
+    animation: chat-pop var(--motion-quick) var(--ease-out) both;
+  }
+
+  .chat-stagger > * {
+    animation: chat-rise var(--motion-enter) var(--ease-out) both;
+  }
+
+  .chat-stagger > :nth-child(2) {
+    animation-delay: var(--motion-stagger);
+  }
+
+  .chat-stagger > :nth-child(3) {
+    animation-delay: calc(var(--motion-stagger) * 2);
+  }
+
+  .chat-stagger > :nth-child(n + 4) {
+    animation-delay: calc(var(--motion-stagger) * 3);
+  }
+
+  .chat-caret {
+    animation: chat-blink 1s steps(2, jump-none) infinite;
+  }
+
+  .chat-shimmer-text {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-ink-muted) 0%,
+      var(--color-ink-muted) 35%,
+      var(--color-ink) 50%,
+      var(--color-ink-muted) 65%,
+      var(--color-ink-muted) 100%
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: chat-shimmer 2s linear infinite;
+  }
+
+  .chat-morph-icon {
+    transition:
+      opacity var(--motion-quick) var(--ease-out),
+      transform var(--motion-quick) var(--ease-out);
+  }
+
+  .chat-highlight {
+    animation: chat-highlight 2.4s var(--ease-out) both;
+  }
+
+  .chat-actions {
+    transition: opacity var(--motion-quick) var(--ease-out);
+  }
+
+  dialog.chat-dialog[open] {
+    animation: chat-pop var(--motion-quick) var(--ease-out) both;
+  }
+}
+
+/* Under reduced motion the highlighted message keeps a still tint instead of a flash. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-highlight {
+    background-color: var(--color-primary-soft);
+  }
+}
+
+@keyframes chat-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes chat-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes chat-blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes chat-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+@keyframes chat-highlight {
+  0%,
+  40% {
+    background-color: var(--color-primary-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Windows high contrast: the shimmer's clipped gradient would vanish, so plain text. */
+@media (forced-colors: active) {
+  .chat-shimmer-text {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .chat-caret {
+    background-color: CanvasText;
+  }
+}
+
 /* The drawer slides in from the left (160ms), only when the viewer has not asked for less
    motion; under reduced motion it simply appears. */
 @media (prefers-reduced-motion: no-preference) {

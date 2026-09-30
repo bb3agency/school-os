@@ -1,9 +1,11 @@
-import { AskScreen } from "@/features/ask/AskScreen";
 import { pageMetadata } from "@/lib/metadata";
 
 export const generateMetadata = pageMetadata((t) => t("ask.title"));
 
-/** US-801..803, FR-KB-001..012: ask the school's records and documents, with sources. */
+/**
+ * US-801..803, FR-KB-001..012: a new chat. The chat itself is rendered by the (chat) layout,
+ * so an answer keeps streaming while the URL moves on to its conversation.
+ */
 export default function AskPage() {
-  return <AskScreen />;
+  return null;
 }
