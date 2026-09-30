@@ -17,7 +17,7 @@ import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { cn } from "@/lib/cn";
 import { text as textSchema } from "@/lib/validation";
-import { outcomeOf, stateFromMessage, type AskState } from "./answer";
+import { outcomeOf, stateFromMessage, type AnswerExtras, type AskState } from "./answer";
 import { NEW_CHAT_EVENT, useChat, type LiveTurn } from "./chat";
 import { Composer, MAX_QUESTION, type ComposerHandle } from "./Composer";
 import type { ConversationMessage } from "./contract";
@@ -61,6 +61,25 @@ interface Group {
  * The thread's turns: stored messages grouped into versions (a regenerated or edited question
  * supersedes the one before it, which stays as an earlier version), plus the live turn.
  */
+const stored = new WeakMap<ConversationMessage, { extras: AnswerExtras | null; state: AskState }>();
+
+/**
+ * A stored message's state, cached per message object (the query cache keeps them stable), so
+ * a turn that did not change keeps the same state and its memoised component does not
+ * re-render while another answer streams.
+ */
+function storedState(
+  message: ConversationMessage,
+  extras: (queryId: string) => AnswerExtras | null,
+): AskState {
+  const extra = extras(message.query_id);
+  const hit = stored.get(message);
+  if (hit && hit.extras === extra) return hit.state;
+  const state = stateFromMessage(message, extra);
+  stored.set(message, { extras: extra, state });
+  return state;
+}
+
 export function buildGroups(
   messages: readonly ConversationMessage[],
   live: LiveTurn | null,
@@ -123,7 +142,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
   const [shown, setShown] = useState(INITIAL_TURNS);
   const allowed = can(ASK_PERM.ask);
 
-  const { live, finished } = chat;
+  const { live, finished, busy, ask, dismissLive, extras } = chat;
   // A new chat follows its conversation once the answer's `meta` names it.
   const id = conversationId ?? chat.newChatId;
   // The thread's identity: a new chat becoming its conversation (and the URL following it)
@@ -193,7 +212,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
       return {
         key: message.query_id,
         question: message.question,
-        state: stateFromMessage(message, chat.extras(message.query_id)),
+        state: storedState(message, extras),
         live: false,
         latest,
         feedback: message.feedback,
@@ -202,7 +221,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
       };
     });
     return all;
-  }, [groups, selected, chat]);
+  }, [groups, selected, extras]);
 
   const visible = turns.slice(Math.max(0, turns.length - shown));
   const hidden = turns.length - visible.length;
@@ -210,6 +229,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
   const ready = !detail.isPending || id === null;
 
   const stick = useStickToBottom(logNode, viewKey, ready && turns.length > 0);
+  const { onSent } = stick;
 
   // A link to one message (`#m-{query id}`, a past-chat source) scrolls to it once it is on
   // the page, focuses it and highlights it briefly (a still tint under reduced motion).
@@ -241,16 +261,16 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
       }
       // Invariant 4: a full Aadhaar number never leaves the browser (the API masks it too).
       if (containsAadhaarNumber(parsed.data)) return tv("noAadhaar");
-      chat.ask(parsed.data, { conversationId: id, ...options });
-      stick.onSent();
+      ask(parsed.data, { conversationId: id, ...options });
+      onSent();
       return null;
     },
-    [chat, id, stick, tv],
+    [ask, id, onSent, tv],
   );
 
   const handlers = useMemo<TurnHandlers>(
     () => ({
-      busy: chat.busy,
+      busy,
       canVerify: can(ASK_PERM.manageVerified),
       onVersion: (group, index) => setSelected((current) => ({ ...current, [group]: index })),
       onRegenerate: (queryId, question) => {
@@ -262,7 +282,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
         return send(question, { editOf: queryId });
       },
       onRetry: (turn) => {
-        chat.dismissLive();
+        dismissLive();
         const queryId = turn.state.queryId;
         send(
           turn.question,
@@ -273,7 +293,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
         send(question);
       },
     }),
-    [chat, can, send],
+    [busy, dismissLive, can, send],
   );
 
   // Keyboard: "/" moves to the question box (when not typing elsewhere); Alt+N starts a new chat.

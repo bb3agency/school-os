@@ -19,6 +19,7 @@ import { parseMarkdown, stableStreamingText, toPlainText } from "./markdown";
 import { copyText } from "./MessageActions";
 import { nextRevealLength, prefersReducedMotion, useReducedMotion, useSmoothText } from "./motion";
 import { isNearBottom, stickReducer } from "./scroll";
+import { sameTurn } from "./Turn";
 import { createSseParser } from "./sse";
 import { CHAT, message, sse, summary } from "./chat-test-utils";
 
@@ -303,6 +304,36 @@ describe("smooth reveal and reduced motion", () => {
     act(() => frames.shift()?.(performance.now() + 50));
     expect(result.current.length).toBeGreaterThan(0);
     expect(result.current.length).toBeLessThan(49);
+  });
+});
+
+describe("render isolation while streaming", () => {
+  it("a turn re-renders only when its own fields or state change", () => {
+    const handlers = {
+      busy: false,
+      canVerify: false,
+      onVersion: () => undefined,
+      onRegenerate: () => undefined,
+      onEdit: () => null,
+      onRetry: () => undefined,
+      onFollowUp: () => undefined,
+    };
+    const state = { ...INITIAL_ASK };
+    const turn = {
+      key: "k",
+      question: "Q?",
+      state,
+      live: false,
+      latest: false,
+      feedback: null,
+      versions: null,
+      past: false,
+    };
+    expect(sameTurn({ turn, handlers }, { turn: { ...turn }, handlers })).toBe(true);
+    expect(sameTurn({ turn, handlers }, { turn: { ...turn, state: { ...state } }, handlers })).toBe(
+      false,
+    );
+    expect(sameTurn({ turn, handlers }, { turn: { ...turn, latest: true }, handlers })).toBe(false);
   });
 });
 

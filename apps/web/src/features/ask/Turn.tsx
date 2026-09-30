@@ -531,4 +531,26 @@ export const ChatTurn = memo(function ChatTurn({
       <AssistantMessage turn={turn} handlers={handlers} />
     </div>
   );
-});
+}, sameTurn);
+
+/** Props equality for ChatTurn: the turn's fields (its state by identity) and the handlers. */
+export function sameTurn(
+  a: { turn: TurnModel; handlers: TurnHandlers },
+  b: { turn: TurnModel; handlers: TurnHandlers },
+): boolean {
+  const x = a.turn;
+  const y = b.turn;
+  return (
+    a.handlers === b.handlers &&
+    x.key === y.key &&
+    x.question === y.question &&
+    x.state === y.state &&
+    x.live === y.live &&
+    x.latest === y.latest &&
+    x.feedback === y.feedback &&
+    x.past === y.past &&
+    x.versions?.index === y.versions?.index &&
+    x.versions?.total === y.versions?.total &&
+    x.versions?.group === y.versions?.group
+  );
+}
