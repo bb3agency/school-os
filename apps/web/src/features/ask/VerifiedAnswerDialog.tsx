@@ -7,6 +7,7 @@ import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Button } from "@/components/ui/Button";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
+import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import type { FieldErrors } from "@/lib/forms";
 import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { text } from "@/lib/validation";
@@ -161,6 +162,7 @@ export function VerifiedAnswerDialog({
 }) {
   const t = useTranslations("ask.verified");
   const api = useKnowledgeApi();
+  const telugu = useTeluguEnabled();
   return (
     <ActionDialog
       triggerLabel={triggerLabel}
@@ -170,7 +172,11 @@ export function VerifiedAnswerDialog({
       description={t("dialogDescription")}
       confirmLabel={t("confirm")}
       schema={verifiedAnswerSchema}
-      extra={(form) => ({ citations: citationsFrom(form) })}
+      extra={(form) => ({
+        citations: citationsFrom(form),
+        // ADR-0036: while Telugu is switched off every verified answer is in English.
+        ...(telugu ? {} : { language: "en" }),
+      })}
       fieldMap={verifiedFieldMap}
       invalidate={[ASK_KEYS.verifiedAll]}
       submit={(data, key) => api.createVerified(data, key)}
@@ -187,16 +193,18 @@ export function VerifiedAnswerDialog({
             rows={2}
             error={errors.question}
           />
-          <SelectField
-            name="language"
-            label={t("language")}
-            defaultValue={draft?.language ?? "en"}
-            options={(["en", "te", "mixed"] as const).map((value) => ({
-              value,
-              label: t(`languages.${value}`),
-            }))}
-            error={errors.language}
-          />
+          {telugu ? (
+            <SelectField
+              name="language"
+              label={t("language")}
+              defaultValue={draft?.language ?? "en"}
+              options={(["en", "te", "mixed"] as const).map((value) => ({
+                value,
+                label: t(`languages.${value}`),
+              }))}
+              error={errors.language}
+            />
+          ) : null}
           <TextAreaField
             name="answer_text"
             label={t("answer")}
