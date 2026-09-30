@@ -1133,6 +1133,187 @@ class AppFakeAdapter:
             provided_sources=tuple(answer.provided),
         )
 
+    # --- contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.5) ------------
+
+    def prepare_contextual(self, data: Any) -> None:
+        """Two schools with the same synthetic circulars: one indexed plainly, one with
+        contextual chunk headers (the real pipeline and ``ChunkContextualizer`` over the real
+        gateway with the offline fake); a teacher in each (every visible circular names the
+        teacher role in its ACL; the restricted memos name only the principal)."""
+        from app.knowledge import composition
+        from app.knowledge.config.contextual import load_contextual_config
+        from app.knowledge.ingestion.contextual import ChunkContextualizer
+        from app.knowledge.prompts.registry import load_prompt
+
+        rt = composition.runtime()
+        cfg = load_contextual_config()
+        contextualizer = ChunkContextualizer(
+            gateway=rt.gateway,
+            model=rt.llm_config.roles["contextualize"].model,
+            prompt=load_prompt(cfg.prompt.id, cfg.prompt.version),
+            config=cfg,
+        )
+        self._ctx_data = data
+        self._ctx_docs: dict[uuid.UUID, str] = {}
+        self._ctx_schools: dict[bool, tuple[Any, Any]] = {}
+        for contextual in (False, True):
+            school = self._school(f"ctx:{'contextual' if contextual else 'plain'}")
+            ctx = self._ctx_teacher(school)
+            for document in data.documents:
+                doc_id = self._ctx_store(school, document, contextualizer if contextual else None)
+                self._ctx_docs[doc_id] = document.id
+            self._ctx_schools[contextual] = (school, ctx)
+        self.ctx_reranked: list[str] = []
+
+    def _ctx_teacher(self, school: Any) -> Any:
+        from app.authz.catalog import implicit_permissions, system_roles
+        from app.authz.context import Scopes, UserContext
+
+        member = self.K.W.add_member(self._admin, school.tenant_id, ["teacher"])
+        template = system_roles()["teacher"]
+        scoped = {p for p in template.permission_keys if (g := template.grant(p)) and g.scoped}
+        return UserContext(
+            user_id=member.user_id,
+            tenant_id=school.tenant_id,
+            membership_id=member.membership_id,
+            roles=frozenset({"teacher"}),
+            permissions=frozenset(set(template.permission_keys) | set(implicit_permissions())),
+            scopes=Scopes(school=False, section_ids=frozenset({school.ids["section:9A"]})),
+            mfa=True,
+            auth_time=None,
+            scoped_permissions=frozenset(scoped),
+        )
+
+    def _ctx_store(self, school: Any, document: Any, contextualizer: Any) -> uuid.UUID:
+        from app.knowledge import composition
+        from app.knowledge.ingestion.documents_source import DocumentsServiceSource
+        from app.knowledge.ingestion.extract import DOCX_MIME
+        from app.knowledge.ingestion.pipeline import DocumentIngestionPipeline
+        from app.knowledge.store import SqlChunkStore
+
+        support = self.K
+        body = ""
+        for kind, line in document.lines():
+            if kind == "page":
+                body += support.S.page_break()
+            elif kind == "heading":
+                body += support.S.p(line, "Heading2")
+            elif kind == "subject":
+                body += support.S.p(f"Sub: {line}")
+            else:
+                body += support.S.p(line)
+        data = support.S.docx(body, support.S.HEADING_STYLES)
+        doc_id, version_id = uuid.uuid4(), uuid.uuid4()
+        key = f"t/{school.tenant_id}/docs/{doc_id}/v1/original.docx"
+        owner = school.people["owner"].user_id
+        acl = [("role", "principal")] if document.restricted else [("role", "teacher")]
+        acl.append(("role", "owner"))
+        with self._admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, "
+                    "sensitivity, current_version_id, created_by) VALUES (:d, :t, 'circular', "
+                    "'circular', :ti, 'C1', :v, :u)"
+                ),
+                {
+                    "d": doc_id,
+                    "t": school.tenant_id,
+                    "ti": document.title,
+                    "v": version_id,
+                    "u": owner,
+                },
+            )
+            c.execute(
+                text(
+                    "INSERT INTO kb.document_versions (id, tenant_id, document_id, version_no, "
+                    "object_key, sha256, mime_type, size_bytes, status, created_by) VALUES "
+                    "(:v, :t, :d, 1, :k, :h, :m, :s, 'ready', :u)"
+                ),
+                {
+                    "v": version_id,
+                    "t": school.tenant_id,
+                    "d": doc_id,
+                    "k": key,
+                    "h": hashlib.sha256(data).digest(),
+                    "m": DOCX_MIME,
+                    "s": len(data),
+                    "u": owner,
+                },
+            )
+            for ptype, ref in acl:
+                c.execute(
+                    text(
+                        "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, "
+                        "principal_ref) VALUES (:t, :d, :pt, :r)"
+                    ),
+                    {"t": school.tenant_id, "d": doc_id, "pt": ptype, "r": ref},
+                )
+        support.D.memory_store().put(key, data, DOCX_MIME)
+        pipeline = DocumentIngestionPipeline(
+            source=DocumentsServiceSource(),
+            store=SqlChunkStore(),
+            embedder=composition.runtime().embedder,
+            contextualizer=contextualizer,
+        )
+        if pipeline.ingest(school.tenant_id, doc_id, version_id) != "indexed":
+            raise RuntimeError(f"contextual eval document {document.id} was not indexed")
+        return doc_id
+
+    def _ctx_owner(self, passage: str) -> str | None:
+        """The dataset document a passage sent to the reranker belongs to (by its text)."""
+        for document in self._ctx_data.documents:
+            if any(page.text[:60] in passage for page in document.pages):
+                return str(document.id)
+        return None
+
+    def retrieve_contextual(self, variant: str, question: Any, k: int) -> Any:
+        from app.core.db import tenant_session
+        from app.knowledge import composition
+        from app.knowledge.rerank import FakeReranker
+        from app.knowledge.retrieval import HybridRetriever
+        from app.knowledge.tools.documents import NAME as SEARCH_TOOL
+        from app.knowledge.tools.documents import DocumentSearch
+        from sos_evals.contextual import CtxHit, CtxRetrieved
+
+        rt = composition.runtime()
+        contextual = variant.startswith("contextual")
+        rerank = variant.endswith("rerank")
+        config = composition.retrieval_config(rt.settings).with_overrides(
+            contextual_chunks="on" if contextual else "off", rerank="voyage" if rerank else "off"
+        )
+        sent: list[str] = []
+        fake = FakeReranker()
+
+        class Recording:
+            name, model = fake.name, fake.model
+
+            def rerank(self, query: str, passages: Sequence[str], *, timeout_s: float) -> Any:
+                sent.extend(passages)
+                return fake.rerank(query, passages, timeout_s=timeout_s)
+
+        search = DocumentSearch(
+            retriever=HybridRetriever(config, reranker=Recording() if rerank else None),
+            embedder=rt.embedder,
+            config=rt.tools_config.tools[SEARCH_TOOL],
+        )
+        school, ctx = self._ctx_schools[contextual]
+        started = time.perf_counter()
+        with tenant_session(school.tenant_id, ctx.user_id) as s:
+            found = search.search(s, ctx, question.question, k=k)
+        latency = (time.perf_counter() - started) * 1000
+        return CtxRetrieved(
+            hits=tuple(
+                CtxHit(
+                    document=self._ctx_docs.get(c.document_id),
+                    page_from=c.page_from,
+                    page_to=c.page_to,
+                )
+                for c in found
+            ),
+            reranked_documents=tuple(self._ctx_owner(p) for p in sent),
+            latency_ms=latency,
+        )
+
 
 def build(corpus: Mapping[str, Any], items: Iterable[Any]) -> AppFakeAdapter:
     return AppFakeAdapter(corpus, items)

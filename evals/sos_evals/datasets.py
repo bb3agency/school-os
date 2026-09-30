@@ -11,6 +11,7 @@ from typing import Literal
 
 from sos_evals.acl import CLASSES, SECTIONS, can_ask, retrievable, visible
 from sos_evals.circulars import CircularCase, validate_cases
+from sos_evals.contextual import ContextualSet, CtxDocument, CtxQuestion
 from sos_evals.fees import FeeCase
 from sos_evals.fees import validate_cases as validate_fee_cases
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
@@ -20,6 +21,7 @@ DATASETS_DIR = EVALS_DIR / "datasets"
 CORPUS_FILE = "corpus.jsonl"
 CIRCULARS_FILE = "circulars.jsonl"
 FEES_FILE = "fees.jsonl"
+CONTEXTUAL_FILE = "contextual.jsonl"
 
 Suite = Literal["fast", "full"]
 
@@ -38,6 +40,8 @@ class Dataset:
     """Synthetic circulars for the M4 reading eval (every suite runs all of them)."""
     fees: tuple[FeeCase, ...] = ()
     """Synthetic fee cases for the M6 Tally eval (every suite runs all of them)."""
+    contextual: ContextualSet | None = None
+    """Contextual retrieval and reranking set (docs/06 §13.5; the fast suite runs its subset)."""
 
     def select(self, suite: Suite) -> tuple[EvalItem, ...]:
         if suite == "full":
@@ -66,6 +70,7 @@ def dataset_files(directory: Path) -> list[Path]:
         *(directory / f"{c}.jsonl" for c in CATEGORIES),
         directory / CIRCULARS_FILE,
         directory / FEES_FILE,
+        directory / CONTEXTUAL_FILE,
     ]
 
 
@@ -94,11 +99,12 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
                 raise DatasetError(f"{question.id} is in {path.name} but has {question.category}")
             items.append(question)
     validate(corpus, items)
-    circulars = tuple(CircularCase.model_validate(row) for row in _read_jsonl(files[-2]))
-    fees = tuple(FeeCase.model_validate(row) for row in _read_jsonl(files[-1]))
+    circulars = tuple(CircularCase.model_validate(row) for row in _read_jsonl(files[-3]))
+    fees = tuple(FeeCase.model_validate(row) for row in _read_jsonl(files[-2]))
     try:
         validate_cases(circulars)
         validate_fee_cases(fees)
+        contextual = load_contextual(files[-1])
     except ValueError as exc:
         raise DatasetError(str(exc)) from exc
     return Dataset(
@@ -107,7 +113,22 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
         sha256=digest.hexdigest(),
         circulars=circulars,
         fees=fees,
+        contextual=contextual,
     )
+
+
+def load_contextual(path: Path) -> ContextualSet:
+    """``contextual.jsonl``: document rows (``kind: document``) then question rows."""
+    documents: list[CtxDocument] = []
+    questions: list[CtxQuestion] = []
+    for row in _read_jsonl(path):
+        if row.get("kind") == "document":
+            documents.append(CtxDocument.model_validate(row))
+        elif row.get("kind") == "question":
+            questions.append(CtxQuestion.model_validate(row))
+        else:
+            raise DatasetError(f"{path.name}: each row needs kind document or question")
+    return ContextualSet(documents=tuple(documents), questions=tuple(questions))
 
 
 def _check_structure(where: str, sections: Sequence[str], classes: Sequence[str]) -> None:

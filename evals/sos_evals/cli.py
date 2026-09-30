@@ -44,6 +44,9 @@ def build_report(
         circular_cases=data.circulars,
         fee=stub,
         fee_cases=data.fees,
+        ctx=stub,
+        ctx_set=data.contextual,
+        ctx_fast=suite == "fast",
     )
     gate_results = gates.evaluate(gates.load_gates(gates_file), result.metrics)
     code = gates.exit_code(gate_results, fail_on_soft=fail_on_soft)

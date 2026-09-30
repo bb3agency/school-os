@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from typing import Final
 
 FAKE_MODEL: Final = "sos-fake-lexical-rerank-v1"
-_WORD: Final = re.compile(r"\w+", re.UNICODE)
+_WORD: Final = re.compile(r"[\w\u0c00-\u0c7f]+")  # Telugu signs are not \w in re
 _STOP: Final = frozenset(
     {
         "a", "an", "the", "is", "are", "was", "be", "of", "to", "in", "on", "at", "for", "by",
