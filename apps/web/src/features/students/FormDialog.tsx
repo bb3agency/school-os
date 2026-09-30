@@ -2,9 +2,11 @@
 
 import type { QueryKey } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useCallback, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
 import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
+import { DialogCloseButton } from "@/components/ui/DialogCloseButton";
+import { useDialogClose } from "@/lib/dialog-motion";
 import { useApiForm, type FieldErrors } from "@/lib/forms";
 import { ProblemAlert, type ProblemNamespace } from "./ProblemAlert";
 
@@ -66,7 +68,8 @@ export function FormDialog<TSchema extends z.ZodType, TResult>({
   const descriptionId = useId();
   const hintId = useId();
   const [open, setOpen] = useState(false);
-  const close = useCallback(() => dialogRef.current?.close(), []);
+  // Fades out before it closes (Escape too); instant under reduced motion (docs/17 §5.5).
+  const close = useDialogClose(dialogRef, "modal");
 
   const form = useApiForm({
     schema,
@@ -112,12 +115,12 @@ export function FormDialog<TSchema extends z.ZodType, TResult>({
           setOpen(false);
           triggerRef.current?.focus();
         }}
-        className="m-auto w-[min(36rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-ink shadow-xl"
+        className="dialog-motion m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
       >
         {open ? (
           <>
-            <div className="flex items-start justify-between gap-4 border-b border-border p-5">
-              <div className="space-y-1">
+            <div className="flex items-start justify-between gap-4 p-4 pb-2 sm:p-6 sm:pb-2">
+              <div className="min-w-0 space-y-1">
                 <h2 id={titleId} className="text-lg font-semibold">
                   {title}
                 </h2>
@@ -127,26 +130,10 @@ export function FormDialog<TSchema extends z.ZodType, TResult>({
                   </p>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={close}
-                aria-label={tc("close")}
-                className="rounded-md p-1 text-ink-muted hover:bg-surface-muted hover:text-ink"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="size-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              </button>
+              <DialogCloseButton label={tc("close")} onClick={close} />
             </div>
             <form noValidate onSubmit={form.onSubmit}>
-              <div className="max-h-[60vh] space-y-4 overflow-y-auto p-5">
+              <div className="max-h-[60vh] space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
                 {children?.(form.errors)}
                 <ProblemAlert
                   error={form.error}
@@ -154,7 +141,7 @@ export function FormDialog<TSchema extends z.ZodType, TResult>({
                   action={form.error !== undefined ? problemAction?.(form.error) : undefined}
                 />
               </div>
-              <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
+              <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
                 <Button variant="secondary" onClick={close}>
                   {tc("cancel")}
                 </Button>
@@ -163,6 +150,7 @@ export function FormDialog<TSchema extends z.ZodType, TResult>({
                   variant={confirmVariant}
                   disabled={form.pending}
                   aria-disabled={form.pending || undefined}
+                  loading={form.pending}
                 >
                   {form.pending ? tc("working") : confirmLabel}
                 </Button>
