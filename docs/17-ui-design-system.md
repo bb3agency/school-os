@@ -2,8 +2,8 @@
 
 | Field            | Value                                                                                                                                                                                                                                                                                                                                              |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Version          | 0.5 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
-| Changes          | 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
+| Version          | 0.6 · 2026-09-30                                                                                                                                                                                                                                                                                                                                   |
+| Changes          | 0.6: §5.5 public marketing pages (layout, settings, CSP-safe motion with Motion, dedicated hosts); §2 rule 6 points to it. 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
 | Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English; Telugu hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                   |
 | Related          | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10                                                                                                                                                                                                                                                                     |
 | Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                           |
@@ -50,7 +50,7 @@ know they are in the control plane.
    the Ask chat's motion tokens (§5.3: transform and opacity only, CSS only); under
    `prefers-reduced-motion` the shimmer is a flat block, the drawer simply appears and the chat is
    still (streamed text appears at once). The sidebar's compact switch is instant (no width
-   animation).
+   animation). The public marketing pages have their own restrained motion rules (§5.5).
 7. **`cn()` joins classes, it does not merge them.** A `className` can add spacing, width or
    layout, but it cannot reliably override a colour, padding or radius the component already sets
    (CSS order decides, not class order). Use the variant, size, `tone` or `padding` props instead,
@@ -457,6 +457,87 @@ server from the same build with the switch on and re-runs the tests tagged `@tel
 
 **Bringing Telugu back.** Set `SOS_TELUGU_ENABLED=true` (API and web), review the Telugu catalog,
 templates and prompts, run the `@telugu` e2e and the Telugu evals, and record it in a new ADR.
+
+### 5.5 Public marketing pages
+
+The public site for prospects (FR-IAM-001 public entry): `/welcome` (home; signed-out visitors to
+the bare school home land here), `/features`, `/security`, `/pricing` and `/about`. Code in
+`features/marketing/`, routes in `app/[locale]/{welcome,features,security,pricing,about}` outside
+the `(school)` group; no session needed. Links are locale-free paths through `Link` from
+`@/i18n/navigation`. Strings are in the `marketing` namespace of `messages/en.json`.
+
+**Layout.** `MarketingShell` (Server Component): skip link, `SiteHeader`, `<main id="main">`,
+footer with every page link. `SiteHeader` (client) is sticky and transparent over the hero; once
+the page scrolls it becomes a white bar with a hairline (`data-scrolled`, colour only). From lg
+it shows the wordmark, the four pages (`aria-current="page"` plus a dot on the current one),
+"Sign in" and "Talk to us"; below lg a 44px "Menu" button opens the same links as a disclosure
+panel: focus moves to the first link, Escape or the button closes it and focus returns to the
+button, following a link or widening to lg closes it. Content column `max-w-7xl` inside
+`px-page`; sections `py-20 md:py-28`; section intros `mb-12 md:mb-16`; grids `gap-4 md:gap-5`.
+Every grid and flex child in `.mk` may shrink (`min-width: 0`), so a wide illustration never
+pushes the page past a 360px screen.
+
+**Type.** PP Mori extralight (200) for the page `h1` at 40px and up only (thin strokes need a
+large size; ink on the canvas stays 14:1), regular (400) for section `h2`, semibold for `h3`;
+tight tracking on display sizes (`.mk-display`, `.mk-title`; normal spacing under `:lang(te)`).
+Instrument Serif for the one accent phrase in the home headline and step numbers; JetBrains Mono
+for eyebrows. Dark bands (`.mk-night`, #0b1220) use white (18.9:1) and `--mk-night-muted`
+#c3cbd8 (10.9:1 on #111827) with a white focus ring.
+
+**Calls to action (owner decisions).** "Talk to us" is a plain `mailto:` link, shown only when
+`SOS_PUBLIC_CONTACT_EMAIL` is set; there is no form and no lead data. "Sign in" goes to
+`/bff/auth/login`. Without an address "Sign in" becomes the primary button and the home hero
+offers "See how it works".
+
+**Settings** (read on the server at request time by `features/marketing/settings.ts`, never in a
+browser bundle; unset or invalid means that part is not shown, no placeholder anywhere):
+
+| Variable | Default | Use |
+| --- | --- | --- |
+| `SOS_PUBLIC_CONTACT_EMAIL` | unset | "Talk to us" mailto in the header, hero, plans, closing band, footer and About. Must be a plain address (no `?`, `,` or spaces), else ignored |
+| `SOS_PUBLIC_COMPANY_NAME` | unset | Footer "© {company}" line and the About contact block (≤ 200 characters) |
+| `SOS_PUBLIC_COMPANY_ADDRESS` | unset | About contact block; lines split on `\|` or `\n` |
+
+**Dedicated hosts.** With `SOS_DEPLOYMENT_MODE=dedicated` (`platformEnabled()`) `/features`,
+`/security`, `/pricing` and `/about` answer 404 and `/welcome` is a branded sign-in card only: a
+dedicated host is one school's own address, not a sales site.
+
+**Illustrations.** HTML, CSS and inline SVG only (`mockups.tsx`): crisp at any DPI, no image
+requests, no style attributes. Each carries a "Sample data" tag, uses made-up values ("Sample
+student A"), sits in a `<figure>` whose picture is `aria-hidden` and whose `figcaption` (sr-only)
+describes it, and keeps AA contrast like real UI.
+
+**Motion** (design-engineering skills in `.claude/skills/`; purpose first, transform and opacity
+only, strong ease-out `cubic-bezier(0.23, 1, 0.32, 1)`):
+
+| Where | What | Why | How |
+| --- | --- | --- | --- |
+| Hero illustration | Three layers settle in once (700ms, 120ms apart); the mismatch row glows once | Explanation, first visit | CSS keyframes (`.mk-settle`, `.mk-flag`); runs without JS and always ends visible; the headline and CTAs never animate |
+| Sections below the fold | Fade + 16px rise once when scrolled into view (600ms, 60ms stagger) | Orientation on a long page | `Reveal` (client): Motion `useAnimate` + `inView` |
+| Phone menu | Scales in from the button's corner (200ms), out in 150ms | Spatial consistency | Motion `LazyMotion` + `domAnimation` + `m` + `AnimatePresence`, `MotionConfig reducedMotion="user"` |
+| Buttons, tiles | Press `scale(0.97)` (160ms); tiles lift 2px and arrows nudge on hover | Feedback | CSS; hover only under `(hover: hover) and (pointer: fine)` |
+| Header | White bar after scrolling (200ms colour) | State | CSS transition on `data-scrolled` |
+
+**CSP-safe animation pattern (SEC-010).** The nonce CSP has no `'unsafe-inline'` for styles, and
+Motion's `initial`/`animate` props server-render a `style` attribute (a violation, and invisible
+content if the style never lands). So: never give a server-rendered Motion component
+`initial`/`animate`; render content **visible** on the server; after hydration set start states
+through Motion's imperative `animate` (the CSSOM, which CSP allows), and only for content that is
+still below the fold, so nothing on screen blinks. Components that exist only after a user action
+(the phone menu) may use `m` with `initial`/`exit`, because they are never server-rendered. Do
+not use `whileHover`/`whileTap` on non-interactive elements (Motion adds `tabindex="0"`). Under
+reduced motion, without JavaScript or without IntersectionObserver nothing is hidden; print
+resets revealed content (`marketing.css`). `app/marketing.test.tsx` renders every page to a
+string and fails on any `style=` attribute.
+
+**Honest claims.** Only what docs/01, 07, 08, 14 and 16 say: no prices, logos, testimonials,
+ratings, customer counts or certifications (a test scans the catalog); certificates and
+registers show "Planned" until the owner confirms them for schools.
+
+**Checks.** `app/marketing.test.tsx` (vitest: headings, landmarks, CTA hrefs, contact shown only
+when set, dedicated 404s and sign-in page, no style attributes in DOM or server HTML, no external
+resources, honest-claims scan). The existing public e2e specs (`e2e/welcome.spec.ts`) were
+written for the old welcome page and need updating together with the locale-free URLs.
 
 ## 6. Do and don't
 
