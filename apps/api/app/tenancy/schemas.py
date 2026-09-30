@@ -197,9 +197,12 @@ class AcademicYearOut(_Out):
 
 
 class ClassCreate(_In):
+    """``display_te`` is optional (ADR-0036: Telugu is hidden); left out, the English name is
+    stored in its place."""
+
     code: ClassCode
     display_en: NfcLabel
-    display_te: NfcLabel
+    display_te: NfcLabel | None = None
     sort_order: SortOrder
 
 

@@ -229,7 +229,8 @@ def list_classes(
 
 @router.post("/classes/defaults", response_model=Page[ClassOut])
 def add_default_classes(ctx: Manager, db: TenantDB) -> Page[ClassOut]:
-    """Add any missing classes from Nursery to XII with English and Telugu names; existing
+    """Add any missing classes from Nursery to XII with English and Telugu names (the Telugu
+    names are stored but ``display_te`` is empty while Telugu is hidden, ADR-0036); existing
     classes are kept (permission ``tenant.structure.manage``)."""
     classes = tenancy.ensure_default_classes(db)
     return Page[ClassOut](data=classes, next_cursor=None)
