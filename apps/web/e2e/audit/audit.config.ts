@@ -19,7 +19,17 @@ import { chromiumLaunchOptions } from "../support/browser";
  * headless shell, e2e/support/browser.ts) stands in for a browser download that is blocked.
  */
 const external = process.env.E2E_BASE_URL;
-const server = base.webServer && !Array.isArray(base.webServer) ? base.webServer : undefined;
+/**
+ * ADR-0036: playwright.config.ts starts two servers, Telugu off (the default) and on. The
+ * audit uses the Telugu-off one unless SOS_TELUGU_ENABLED=true is set for the audit run.
+ */
+const servers = Array.isArray(base.webServer)
+  ? base.webServer
+  : base.webServer
+    ? [base.webServer]
+    : [];
+const server = servers[process.env.SOS_TELUGU_ENABLED === "true" ? 1 : 0] ?? servers[0];
+const serverBase = server?.url?.replace(/\/healthz$/, "");
 
 export default defineConfig({
   testDir: ".",
@@ -30,7 +40,7 @@ export default defineConfig({
   reporter: [["list"]],
   globalSetup: "../support/global-setup.ts",
   use: {
-    baseURL: external ?? base.use?.baseURL,
+    baseURL: external ?? serverBase ?? base.use?.baseURL,
     locale: "en-IN",
     timezoneId: "Asia/Kolkata",
     launchOptions: chromiumLaunchOptions(),

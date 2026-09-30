@@ -5,6 +5,7 @@ import {
   expectVisibleFocusOnEveryStop,
   signIn,
 } from "./support/a11y-helpers";
+import { openTelugu, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
 
 /**
  * Accessibility (WCAG 2.2 AA via axe-core) and keyboard-only paths at 1366×768 (PRD §8,
@@ -17,7 +18,10 @@ const PROMOTIONS = "/en/settings/structure/years/0192f3a4-0000-7000-8000-0000000
 
 test.describe("accessibility: public pages", () => {
   for (const locale of ["en", "te"] as const) {
-    test(`signed-out page has no WCAG 2.2 AA violations [${locale}]`, async ({ page }) => {
+    test(`signed-out page has no WCAG 2.2 AA violations [${locale}]${locale === "te" ? ` ${TELUGU}` : ""}`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
       await page.goto(`/${locale}/signed-out?error=signin_failed`);
       await expectNoAxeViolations(page, `signed-out ${locale}`);
     });
@@ -27,7 +31,9 @@ test.describe("accessibility: public pages", () => {
 test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
   test.skip(process.env.E2E_STAND_IN !== "1", "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
 
-  test("school pages: banner, permission-filtered menu, no axe violations", async ({ page }) => {
+  test(`school pages: banner, permission-filtered menu, no axe violations ${TELUGU}`, async ({
+    page,
+  }, testInfo) => {
     await signIn(page, "/en/settings/billing", "clerk");
     await expect(page).toHaveURL(/\/en\/settings\/billing$/);
     await expect(page.getByRole("heading", { level: 1, name: "Plan and billing" })).toBeVisible();
@@ -62,7 +68,9 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     await expect(page.locator("main#main")).toBeFocused();
 
     for (const path of ["/en", "/en/support", "/te/settings/billing", "/te/support"]) {
-      await page.goto(path);
+      // ADR-0036: /te pages only while Telugu is on; otherwise they must land on English.
+      if (!path.startsWith("/te")) await page.goto(path);
+      else if (!(await openTelugu(page, path, testInfo))) continue;
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expectNoAxeViolations(page, path);
     }
@@ -80,9 +88,9 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     await expect(page.getByRole("link", { name: "Switch school" })).toBeVisible();
   });
 
-  test("school settings, structure, users, documents, audit check: axe and keyboard (NFR-A11Y-001)", async ({
+  test(`school settings, structure, users, documents, audit check: axe and keyboard (NFR-A11Y-001) ${TELUGU}`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     // Eighteen pages, each with axe and a Tab-through: about 45s against a production build.
     test.setTimeout(120_000);
     await signIn(page, "/en/settings/structure", "clerk");
@@ -110,7 +118,9 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
       ["/te/ask/memory", "I work in the school office"],
     ];
     for (const [path, proof] of pages) {
-      await page.goto(path);
+      // ADR-0036: /te pages only while Telugu is on; otherwise they must land on English.
+      if (!path.startsWith("/te")) await page.goto(path);
+      else if (!(await openTelugu(page, path, testInfo))) continue;
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       // Wait for the data, not only the shell, before checking.
       await expect(page.getByText(proof).first()).toBeVisible();
@@ -177,9 +187,9 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     await expectNoAxeViolations(page, "audit verify result");
   });
 
-  test("platform school detail: provisioning state and 'Resume provisioning' by keyboard (FR-PLT-002)", async ({
+  test(`platform school detail: provisioning state and 'Resume provisioning' by keyboard (FR-PLT-002) ${TELUGU}`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     const detail = "/en/platform/schools/0192f3a4-0000-7000-8000-000000000003";
     await signIn(page, detail, "operator-1");
     await expect(
@@ -202,12 +212,15 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     await expect(dialog).toBeHidden();
     await expect(resume).toBeFocused();
 
-    await page.goto(detail.replace("/en/", "/te/"));
-    await expect(page.getByRole("button", { name: "సెటప్‌ను కొనసాగించండి" })).toBeVisible();
-    await expectNoAxeViolations(page, "school detail provisioning te");
+    if (await openTelugu(page, detail.replace("/en/", "/te/"), testInfo)) {
+      await expect(page.getByRole("button", { name: "సెటప్‌ను కొనసాగించండి" })).toBeVisible();
+      await expectNoAxeViolations(page, "school detail provisioning te");
+    }
   });
 
-  test("platform pages: no axe violations; wizard and dialogs by keyboard", async ({ page }) => {
+  test(`platform pages: no axe violations; wizard and dialogs by keyboard ${TELUGU}`, async ({
+    page,
+  }, testInfo) => {
     await signIn(page, "/en/platform", "operator-1");
     await expect(page.getByRole("heading", { level: 1, name: "Platform dashboard" })).toBeVisible();
     await expect(page.getByText("4 of 5 healthy")).toBeVisible();
@@ -216,9 +229,12 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
       "/en/platform/schools",
       "/en/platform/invoices",
       "/en/platform/plans",
+      "/en/platform/provision",
       "/te/platform/provision",
     ]) {
-      await page.goto(path);
+      // ADR-0036: /te pages only while Telugu is on; otherwise they must land on English.
+      if (!path.startsWith("/te")) await page.goto(path);
+      else if (!(await openTelugu(page, path, testInfo))) continue;
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       // The dark violet sidebar: one Platform navigation, yellow focus ring (platform-chrome).
       await expect(page.getByRole("navigation", { name: /^(Platform|ప్లాట్‌ఫామ్)$/ })).toHaveCount(

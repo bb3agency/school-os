@@ -9,10 +9,15 @@ import {
   settle,
   signInAs,
 } from "./support/responsive";
+import { englishPath, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
+
+/** ADR-0036: a [te] variant is tagged to run with Telugu on, and skipped while it is off. */
+const tag = (locale: string) => (locale === "te" ? ` ${TELUGU}` : "");
 
 /**
  * Responsive layout (NFR-A11Y-001, NFR-I18N-001; CLAUDE.md §8, §10; docs/17 §5.1): every
- * screen at 1366×768 (office PC) and 375×812 (phone), in English and Telugu, has no
+ * screen at 1366×768 (office PC) and 375×812 (phone), in English and (while it is switched on,
+ * ADR-0036) Telugu, has no
  * horizontal page scroll, nothing sticking out of the screen or its card, no clipped text
  * and no touch target under 24px (WCAG 2.5.8). The shell's menu drawer works keyboard-only,
  * dialogs fit a phone and print stays inside an A4 page.
@@ -47,9 +52,10 @@ for (const [width, height] of REQUIRED_VIEWPORTS) {
 
     for (const [name, group] of Object.entries(SCREEN_GROUPS)) {
       for (const locale of LOCALES) {
-        test(`${name} screens [${locale}]: no sideways scroll, clipping or small targets (NFR-A11Y-001)`, async ({
+        test(`${name} screens [${locale}]: no sideways scroll, clipping or small targets (NFR-A11Y-001)${tag(locale)}`, async ({
           page,
-        }) => {
+        }, testInfo) => {
+          test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
           test.skip(group.subject !== null && !standIn, "set E2E_STAND_IN=1 (needs Valkey)");
           test.setTimeout(10 * 60_000);
           if (group.subject) {
@@ -71,9 +77,10 @@ test.describe("app shell on a phone: the one sidebar as a keyboard-only drawer (
   test.use({ viewport: { width: 375, height: 812 } });
 
   for (const locale of LOCALES) {
-    test(`school console [${locale}]: open with Enter, focus trapped, Escape closes and returns focus`, async ({
+    test(`school console [${locale}]: open with Enter, focus trapped, Escape closes and returns focus${tag(locale)}`, async ({
       page,
-    }) => {
+    }, testInfo) => {
+      test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
       await installFixtures(page);
       await signInAs(page, "/en/support", "clerk");
       await page.goto(`/${locale}/students`);
@@ -171,9 +178,10 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
   test.use({ viewport: { width: 1366, height: 768 } });
 
   for (const locale of LOCALES) {
-    test(`school console [${locale}]: sticky sidebar, own scroll, collapse remembered without a shift`, async ({
+    test(`school console [${locale}]: sticky sidebar, own scroll, collapse remembered without a shift${tag(locale)}`, async ({
       page,
-    }) => {
+    }, testInfo) => {
+      test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
       await installFixtures(page);
       await signInAs(page, "/en/support", "clerk");
       await page.goto(`/${locale}/students`);
@@ -237,7 +245,10 @@ test.describe("dialogs on a phone (NFR-A11Y-001)", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   for (const locale of LOCALES) {
-    test(`a form dialog fits the screen and scrolls inside [${locale}]`, async ({ page }) => {
+    test(`a form dialog fits the screen and scrolls inside [${locale}]${tag(locale)}`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
       await installFixtures(page);
       await signInAs(page, "/en/platform", "operator-1");
       await page.goto(`/${locale}/platform/plans`);
@@ -265,18 +276,22 @@ test.describe("print: A4 pages (CLAUDE.md §10)", () => {
   // The A4 content box with the 12mm side margins of globals.css: 186mm ≈ 703 CSS px.
   test.use({ viewport: { width: 703, height: 1000 } });
 
-  test("student profile and lists print inside the page, Telugu unclipped", async ({ page }) => {
+  test(`student profile and lists print inside the page, Telugu unclipped ${TELUGU}`, async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(3 * 60_000);
     await installFixtures(page);
     await signInAs(page, "/en/support", "clerk");
     await page.emulateMedia({ media: "print", reducedMotion: "reduce" });
     const failures: string[] = [];
-    for (const path of [
+    // ADR-0036: the Telugu pages while Telugu is on, their English pages while it is off.
+    const paths = [
       "/te/students/0192f3a4-0000-7000-8000-00000000e501",
       "/en/students",
       "/te/findings",
       "/te/settings/structure",
-    ]) {
+    ].map((path) => (teluguOn(testInfo) ? path : englishPath(path)));
+    for (const path of paths) {
       await page.goto(path);
       await settle(page);
       // Navigation chrome is not printed.

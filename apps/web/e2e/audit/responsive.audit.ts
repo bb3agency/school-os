@@ -6,7 +6,8 @@
  * problem; the other viewports are reported only. Run it against a running app with the
  * stand-in IdP and API (see audit.config.ts).
  *
- * Knobs: AUDIT_VP ("375x812,1366x768"), AUDIT_LOCALES ("en,te"), AUDIT_ONLY (regex on the
+ * Knobs: AUDIT_VP ("375x812,1366x768"), AUDIT_LOCALES ("en", or "en,te" when the run sets
+ * SOS_TELUGU_ENABLED=true: ADR-0036), AUDIT_ONLY (regex on the
  * URL), AUDIT_SHOTS (widths to screenshot, "" for none), AUDIT_OUT (default audit-out).
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -28,7 +29,9 @@ const SHOTS = new Set(
   (process.env.AUDIT_SHOTS ?? "375,1366").split(",").filter(Boolean).map(Number),
 );
 const ONLY = process.env.AUDIT_ONLY ? new RegExp(process.env.AUDIT_ONLY) : null;
-const LOCALES = (process.env.AUDIT_LOCALES ?? "en,te").split(",");
+const LOCALES = (
+  process.env.AUDIT_LOCALES ?? (process.env.SOS_TELUGU_ENABLED === "true" ? "en,te" : "en")
+).split(",");
 const VIEWPORTS = (
   process.env.AUDIT_VP ??
   "360x740,375x812,390x844,414x896,768x1024,1024x768,1280x800,1366x768,1440x900,1920x1080"
