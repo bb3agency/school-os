@@ -26,9 +26,7 @@ export function DedicatedWelcome() {
             <BrandMark />
             <span className="text-lg font-semibold tracking-tight text-ink">{tc("appName")}</span>
           </p>
-          <h1 className="mk-title mt-8 text-3xl font-semibold text-ink">
-            {t("dedicated.headline")}
-          </h1>
+          <h1 className="mk-title mt-8 text-3xl font-normal text-ink">{t("dedicated.headline")}</h1>
           <p className="mt-3 text-ink-muted">{t("dedicated.body")}</p>
           <a
             href={SIGN_IN_HREF}

@@ -63,20 +63,26 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
             role="region"
             aria-labelledby="compare-title"
           >
-            <table className="w-full min-w-[36rem] border-collapse text-start">
+            <table className="w-full border-collapse text-sm sm:text-base text-start">
               <caption className="sr-only">{t("pricing.compare.caption")}</caption>
               <thead>
                 <tr className="bg-surface-muted">
                   <th
                     scope="col"
-                    className="w-1/3 px-5 py-4 text-start text-sm font-semibold text-ink-muted"
+                    className="w-1/3 px-3 py-4 sm:px-5 text-start text-sm font-semibold text-ink-muted"
                   >
                     {t("pricing.compare.feature")}
                   </th>
-                  <th scope="col" className="px-5 py-4 text-start text-sm font-semibold text-ink">
+                  <th
+                    scope="col"
+                    className="px-3 py-4 sm:px-5 text-start text-sm font-semibold text-ink"
+                  >
                     {t("pricing.shared.name")}
                   </th>
-                  <th scope="col" className="px-5 py-4 text-start text-sm font-semibold text-ink">
+                  <th
+                    scope="col"
+                    className="px-3 py-4 sm:px-5 text-start text-sm font-semibold text-ink"
+                  >
                     {t("pricing.dedicated.name")}
                   </th>
                 </tr>
@@ -84,11 +90,11 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
               <tbody className="divide-y divide-border">
                 {ROWS.map((row) => (
                   <tr key={row.key}>
-                    <th scope="row" className="px-5 py-4 text-start font-medium text-ink">
+                    <th scope="row" className="px-3 py-4 sm:px-5 text-start font-medium text-ink">
                       {t(`pricing.compare.${row.key}`)}
                     </th>
-                    <td className="px-5 py-4">{cell(row.shared)}</td>
-                    <td className="px-5 py-4">{cell(row.dedicated)}</td>
+                    <td className="px-3 py-4 sm:px-5">{cell(row.shared)}</td>
+                    <td className="px-3 py-4 sm:px-5">{cell(row.dedicated)}</td>
                   </tr>
                 ))}
               </tbody>

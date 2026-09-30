@@ -35,7 +35,7 @@ export function AboutView({ settings }: { settings: MarketingSettings }) {
 
       <Section id="who" labelledBy="who-title" tone="white" className="md:py-24">
         <Container className="grid gap-10 lg:grid-cols-2 lg:gap-20">
-          <h2 id="who-title" className="mk-title text-3xl font-semibold text-ink md:text-4xl">
+          <h2 id="who-title" className="mk-title text-3xl font-normal text-ink md:text-4xl">
             {t("about.who.title")}
           </h2>
           <p className="mk-lede text-lg text-ink-muted md:text-xl">{t("about.who.body")}</p>

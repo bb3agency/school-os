@@ -80,7 +80,13 @@ function Chip({
   );
 }
 
-export function FindingCard({ className, flag = false }: { className?: string | undefined; flag?: boolean }) {
+export function FindingCard({
+  className,
+  flag = false,
+}: {
+  className?: string | undefined;
+  flag?: boolean;
+}) {
   const t = useTranslations("marketing.mock.finding");
   const ts = useTranslations("marketing");
   const rows = [
@@ -110,7 +116,7 @@ export function FindingCard({ className, flag = false }: { className?: string | 
             )}
           >
             <dt className="min-w-0 text-ink-muted">{row.label}</dt>
-            <dd className="flex items-center gap-2 font-mono text-xs text-ink sm:text-sm">
+            <dd className="flex shrink-0 items-center gap-2 font-mono text-xs whitespace-nowrap text-ink">
               <span className="max-[380px]:hidden">{row.value}</span>
               {row.ok ? (
                 <Chip tone="ok" icon="check">
@@ -135,6 +141,7 @@ export function FindingCard({ className, flag = false }: { className?: string | 
 
 export function ImportCard({ className }: { className?: string | undefined }) {
   const t = useTranslations("marketing.mock.import");
+  const ts = useTranslations("marketing");
   const steps = ["upload", "preview", "confirm"] as const;
   return (
     <Card className={cn("p-4", className)}>
@@ -142,7 +149,8 @@ export function ImportCard({ className }: { className?: string | undefined }) {
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success-ink">
           <Icon name="file" className="size-4" />
         </span>
-        <p className="min-w-0 truncate text-sm font-semibold text-ink">{t("title")}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{t("title")}</p>
+        <SampleTag label={ts("sample")} />
       </div>
       <ol className="mt-3 flex items-center gap-1.5">
         {steps.map((step, index) => (
@@ -429,7 +437,7 @@ export function HeroComposition() {
   const nav: IconName[] = ["home", "users", "shieldCheck", "clipboard", "sparkles", "activity"];
   return (
     <Mock caption={t("hero")} className="mx-auto w-full max-w-xl lg:max-w-none">
-      <div className="relative pt-6 pb-4 sm:pt-10 sm:pb-12 lg:ps-6">
+      <div className="relative pt-2 sm:pt-16 lg:ps-4">
         <div className="mk-window mk-settle overflow-hidden rounded-2xl">
           <div className="flex items-center gap-2 border-b border-border bg-surface-muted px-4 py-2.5">
             <span className="flex gap-1.5">
@@ -458,11 +466,20 @@ export function HeroComposition() {
             </div>
             <div className="min-w-0 flex-1 bg-canvas p-3 sm:p-5">
               <FindingCard flag className="shadow-card" />
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 sm:mb-16">
+                <Chip tone="neutral" icon="info">
+                  {t("finding.missing")}
+                </Chip>
+                <p className="min-w-0 truncate text-sm text-ink">
+                  <span className="font-semibold">{t("finding.missingTitle")}</span>
+                  <span className="text-ink-muted"> · {t("finding.missingStudent")}</span>
+                </p>
+              </div>
             </div>
           </div>
         </div>
-        <ImportCard className="mk-float mk-settle mk-settle-2 absolute -top-2 right-2 hidden w-60 sm:block lg:-right-6" />
-        <AskCard className="mk-float mk-settle mk-settle-3 relative mt-4 sm:absolute sm:-bottom-6 sm:-left-2 sm:mt-0 sm:w-80 lg:-left-6" />
+        <ImportCard className="mk-float mk-settle mk-settle-2 absolute top-0 right-2 hidden w-72 sm:block lg:-right-6" />
+        <AskCard className="mk-float mk-settle mk-settle-3 relative mt-4 sm:-mt-14 sm:ms-6 sm:w-80 lg:-ms-4" />
       </div>
     </Mock>
   );

@@ -20,6 +20,13 @@
   scroll-padding-top: calc(var(--mk-header-h) + 1rem);
 }
 
+/* Grid and flex children may shrink below their content (illustrations are wide), so a
+   track never pushes past the screen; overflow is clipped inside the mock instead. */
+.mk .grid > *,
+.mk .flex > * {
+  min-width: 0;
+}
+
 /* Display type: tight tracking as it grows (Latin only; Telugu keeps normal spacing). */
 .mk-display {
   letter-spacing: -0.035em;

@@ -5295,7 +5295,10 @@
         "board": "Board registration",
         "matches": "Matches",
         "differs": "Differs",
-        "route": "Register is the legal record. Fix it with a change request and evidence."
+        "route": "Register is the legal record. Fix it with a change request and evidence.",
+        "missing": "Missing field",
+        "missingTitle": "Board registration number",
+        "missingStudent": "Sample student C · Class 7-B"
       },
       "import": {
         "title": "Class 7 list.xlsx",

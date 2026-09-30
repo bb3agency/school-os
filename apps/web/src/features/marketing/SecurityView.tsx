@@ -39,7 +39,7 @@ export function SecurityView({ settings }: { settings: MarketingSettings }) {
       <Section id="where" labelledBy="where-title" tone="white" className="md:py-24">
         <Container className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
           <div>
-            <h2 id="where-title" className="mk-title text-3xl font-semibold text-ink md:text-4xl">
+            <h2 id="where-title" className="mk-title text-3xl font-normal text-ink md:text-4xl">
               {t("security.where.title")}
             </h2>
             <p className="mk-lede mt-5 text-lg text-ink-muted">{t("security.where.body")}</p>
@@ -156,7 +156,7 @@ export function SecurityView({ settings }: { settings: MarketingSettings }) {
 
       <section aria-labelledby="security-cta" className="py-20 md:py-24" data-print="hide">
         <Container className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
-          <h2 id="security-cta" className="mk-title max-w-xl text-3xl font-semibold text-ink">
+          <h2 id="security-cta" className="mk-title max-w-xl text-3xl font-normal text-ink">
             {t("home.closing.title")}
           </h2>
           <CtaGroup

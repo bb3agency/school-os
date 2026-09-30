@@ -48,7 +48,7 @@ export function PlanCards({
             <Heading
               id={`plan-${plan}`}
               className={cn(
-                "mk-title mt-5 text-2xl font-semibold md:text-3xl",
+                "mk-title mt-5 text-2xl font-normal md:text-3xl",
                 dark ? "text-white" : "text-ink",
               )}
             >

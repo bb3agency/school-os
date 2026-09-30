@@ -73,15 +73,15 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
         className="mk-hero-bg relative -mt-16 overflow-hidden pt-16"
       >
         <div aria-hidden="true" className="mk-grid pointer-events-none absolute inset-0" />
-        <Container className="relative grid items-center gap-12 pt-10 pb-16 md:pt-16 lg:grid-cols-[1fr_1.05fr] lg:gap-10 lg:pt-20 lg:pb-24">
-          <div>
+        <Container className="relative grid items-start gap-12 pt-10 pb-16 md:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:pt-14 lg:pb-24">
+          <div className="lg:pt-10">
             <p className="eyebrow inline-flex items-center gap-2 rounded-full border border-border bg-surface/80 px-3 py-1.5 text-ink">
               <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
               {t("home.eyebrow")}
             </p>
             <h1
               id="home-title"
-              className="mk-display mt-6 text-[2.5rem] font-semibold text-ink sm:text-5xl lg:text-[3.5rem] xl:text-[4rem]"
+              className="mk-display mt-6 text-[2.5rem] font-extralight text-ink sm:text-5xl lg:text-[3.25rem] xl:text-[3.5rem] 2xl:text-[4rem]"
             >
               {t("home.headlineLead")}{" "}
               <span className="font-display font-normal tracking-normal text-primary">
@@ -277,7 +277,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
             <div className="relative">
               <h2
                 id="closing-title"
-                className="mk-title text-3xl font-semibold text-white md:text-5xl"
+                className="mk-title text-3xl font-normal text-white md:text-5xl"
               >
                 {t("home.closing.title")}
               </h2>

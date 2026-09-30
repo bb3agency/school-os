@@ -70,7 +70,7 @@ export function SectionIntro({
       <Heading
         id={id}
         className={cn(
-          "mk-title font-semibold",
+          "mk-title font-normal",
           level === 1
             ? "text-4xl md:text-5xl lg:text-6xl"
             : "text-3xl md:text-4xl lg:text-[2.75rem]",
@@ -115,7 +115,7 @@ export function PageHero({
         <p className="eyebrow text-primary">{eyebrow}</p>
         <h1
           id={id}
-          className="mk-display mt-5 max-w-4xl text-[2.5rem] font-semibold text-ink sm:text-5xl lg:text-6xl"
+          className="mk-display mt-5 max-w-4xl text-[2.5rem] font-extralight text-ink sm:text-5xl lg:text-6xl"
         >
           {title}
         </h1>

@@ -25,7 +25,7 @@ function Illustration({ feature }: { feature: FeatureSection }): ReactNode {
       return (
         <div className="grid gap-4">
           <ImportCard className="mk-float" />
-          <FindingCard className="mk-float ms-6 sm:ms-12" />
+          <FindingCard className="mk-float sm:ms-8" />
         </div>
       );
     case "checks":
@@ -91,7 +91,7 @@ export function FeaturesView({ settings }: { settings: MarketingSettings }) {
               </div>
               <h2
                 id={`${feature}-title`}
-                className="mk-title mt-4 text-3xl font-semibold text-ink md:text-4xl"
+                className="mk-title mt-4 text-3xl font-normal text-ink md:text-4xl"
               >
                 {t(`features.${feature}.title`)}
               </h2>
@@ -124,7 +124,7 @@ export function FeaturesView({ settings }: { settings: MarketingSettings }) {
         data-print="hide"
       >
         <Container className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
-          <h2 id="features-cta" className="mk-title max-w-xl text-3xl font-semibold text-ink">
+          <h2 id="features-cta" className="mk-title max-w-xl text-3xl font-normal text-ink">
             {t("home.closing.title")}
           </h2>
           <CtaGroup
