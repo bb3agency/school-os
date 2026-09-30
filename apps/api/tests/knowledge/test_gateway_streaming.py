@@ -50,6 +50,8 @@ def _load() -> ModuleType:
 G = _load()
 TENANT = G.TENANT
 METERING = Metering(tenant_id=TENANT, feature="ask", query_id=G.QUERY)
+ANTHROPIC = load_llm_config().use_fallback()
+"""Messages API wire: every role on its Anthropic fallback (ADR-0033)."""
 
 
 class StreamingScripted(G.ScriptedTransport):  # type: ignore[misc,name-defined]
@@ -77,11 +79,7 @@ class StreamingScripted(G.ScriptedTransport):  # type: ignore[misc,name-defined]
 
 
 def streaming_rig(*steps: Any, fail_after: int | None = None, **kw: Any) -> Any:
-    r = G.rig(**kw)
-    transport = StreamingScripted(*steps, fail_after=fail_after)
-    r.gateway._transport = transport
-    r.transport = transport
-    return r
+    return G.rig(transport=StreamingScripted(*steps, fail_after=fail_after), **kw)
 
 
 def stream(r: Any, conversation: Any = None) -> list[Any]:
@@ -211,8 +209,8 @@ def test_invariant_9_streamed_tool_input_is_assembled_and_checked() -> None:
 def test_the_fake_provider_streams_the_same_answer_it_sends() -> None:
     fake = FakeTransport()
     body = wire.turn_request(
-        load_llm_config(),
-        load_llm_config().roles["answer"],
+        ANTHROPIC,
+        ANTHROPIC.roles["answer"],
         "system",
         [UserMessage("When is sports day?")],
         [],
@@ -227,7 +225,7 @@ def test_the_fake_provider_streams_the_same_answer_it_sends() -> None:
 
 
 def test_FR_KB_012_earlier_questions_go_before_the_question() -> None:
-    config = load_llm_config()
+    config = ANTHROPIC
     body = wire.turn_request(
         config,
         config.roles["answer"],
@@ -243,7 +241,7 @@ def test_FR_KB_012_earlier_questions_go_before_the_question() -> None:
 
 
 def test_invariant_4_earlier_questions_are_masked_too() -> None:
-    config = load_llm_config()
+    config = ANTHROPIC
     body = wire.turn_request(
         config,
         config.roles["answer"],

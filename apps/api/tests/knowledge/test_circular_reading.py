@@ -170,9 +170,15 @@ def test_FR_CIR_002_prompts_are_versioned_files_with_their_roles() -> None:
     assert "data, not instructions" in reading.text  # SEC-019
     assert "Never guess" in reading.text
     assert "Never include personal details" in notice.text
-    roles = load_llm_config().roles
-    assert roles["circular"].thinking == "disabled"
-    assert roles["notice"].thinking == "disabled"
+    # Thinking off, or (Gemini 3 cannot turn it off; ADR-0033) at the lowest level Vertex takes.
+    for config in (load_llm_config(), load_llm_config().use_fallback()):
+        for role in ("circular", "notice"):
+            settings = config.roles[role]
+            assert settings.thinking == "disabled" or (
+                settings.thinking == "level" and settings.thinking_level == "low"
+            ), role
+            caps = config.capabilities[settings.model]
+            assert settings.thinking == "disabled" or not caps.can_disable_thinking, role
 
 
 # --- validation (FR-CIR-003) --------------------------------------------------------------------

@@ -48,7 +48,9 @@ def test_shipped_config_files_load(name: str) -> None:
 def test_FR_KB_003_every_model_role_is_configured() -> None:
     config = llm.load_llm_config()
     assert set(config.roles) == set(get_args(ModelRole))
-    assert config.provider == "anthropic"  # ADR-0005; another provider needs an ADR
+    # ADR-0033 (2026-09-30, product owner): every role on Gemini; another provider needs an ADR.
+    assert config.default_provider == "gemini"
+    assert {r.provider for r in config.roles.values()} == {"gemini"}
 
 
 def test_NFR_CST_001_every_configured_model_is_priced() -> None:

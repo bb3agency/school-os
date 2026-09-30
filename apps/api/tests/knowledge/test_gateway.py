@@ -1,4 +1,8 @@
-"""LLM gateway controls (ADR-0005; docs/06 §5, §7, §12, §15; K4).
+"""LLM gateway controls (ADR-0005, ADR-0033; docs/06 §5, §7, §12, §15; K4).
+
+These run the Messages API wire with every role switched to its evaluated Anthropic fallback
+(``LlmConfig.use_fallback``); ``test_gateway_gemini.py`` runs the same controls on the Gemini wire
+(the default provider).
 
 Offline and deterministic: a scripted transport stands in for the provider, and clock, sleep
 and the budget month are injected. Covers redaction before send (invariant 4), no text in logs
@@ -155,8 +159,12 @@ def rig(
     budget_inr: int = 5000,
     ai_enabled: bool = True,
     kill_switch_on: bool = True,
+    transport: ScriptedTransport | None = None,
 ) -> Rig:
-    config = load_llm_config()
+    # The Messages-API doubles below run every role on its evaluated Anthropic fallback
+    # (ADR-0033: config-selectable); the same controls on the Gemini wire are in
+    # test_gateway_gemini.py.
+    config = load_llm_config().use_fallback()
     clock = Clock()
     now = [NOW]
     ledger = InMemorySpendLedger()
@@ -168,7 +176,7 @@ def rig(
         counters,
         now=lambda: now[0],
     )
-    transport = ScriptedTransport(*steps)
+    transport = transport if transport is not None else ScriptedTransport(*steps)
     sink = RecordingSink()
     gateway = Gateway(
         config=config,
