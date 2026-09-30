@@ -1,0 +1,4 @@
+data: {"candidates": [{"content": {"role": "model", "parts": [{"text": "Exams start"}]}}], "modelVersion": "gemini-3.5-flash"}
+
+data: {"error": {"code": 503, "message": "synthetic: the model is overloaded", "status": "UNAVAILABLE"}}
+

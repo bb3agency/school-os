@@ -1,0 +1,33 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "id": "call-7f3a",
+              "name": "search_documents",
+              "args": {"query": "exam timings class 9"}
+            },
+            "thoughtSignature": "CiQBjz1rX3N5bnRoZXRpYy1zaWduYXR1cmUtb25lEgZ0aGlua3M="
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.12
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 812,
+    "candidatesTokenCount": 18,
+    "thoughtsTokenCount": 41,
+    "totalTokenCount": 871,
+    "trafficType": "ON_DEMAND",
+    "promptTokensDetails": [{"modality": "TEXT", "tokenCount": 812}],
+    "candidatesTokensDetails": [{"modality": "TEXT", "tokenCount": 18}]
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-30T05:10:11.123456Z",
+  "responseId": "synthetic-response-1"
+}

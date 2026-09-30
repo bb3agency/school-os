@@ -1,0 +1,8 @@
+{
+  "name": "projects/123456789012/locations/asia-south1/cachedContents/5812345678901234567",
+  "model": "projects/sos-ai-test/locations/asia-south1/publishers/google/models/gemini-3.5-flash",
+  "createTime": "2026-09-30T05:00:00.000000Z",
+  "updateTime": "2026-09-30T05:00:00.000000Z",
+  "expireTime": "2026-09-30T06:00:00.000000Z",
+  "usageMetadata": {"totalTokenCount": 5100}
+}

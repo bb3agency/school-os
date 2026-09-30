@@ -46,6 +46,16 @@ dependencies = [
   # Starlette's TestClient from httpx to httpx2 across every test module; that migration is a
   # separate, repo-wide change (CLAUDE.md §3 lists httpx), so it is deferred, not smuggled in here.
   "anthropic==0.125.0",
+  # Google OAuth credentials for Gemini on Vertex AI (ADR-0033), imported ONLY under
+  # app/knowledge/gateway (semgrep sos-llm-sdk-outside-gateway). Only token minting is used: the
+  # service-account JWT flow and AWS -> Google workload identity federation; the Vertex REST calls
+  # themselves go through httpx (already pinned) with an httpx transport adapter, so neither
+  # `requests` nor the google-genai SDK is needed. Licence Apache-2.0; runtime deps pyasn1-modules
+  # (BSD-2-Clause) and cryptography (already pinned); maintained by Google (2.59.0 released
+  # 2026-09); no known vulnerabilities (pip-audit / OSV, 2026-09-30). google-genai (Apache-2.0) was
+  # not chosen: it pulls requests, websockets, aiohttp-style extras and tenacity, and its own retry
+  # and logging would bypass the gateway's retry, breaker and no-text-in-logs controls.
+  "google-auth==2.59.0",
   # PDF text layer for knowledge ingestion (ADR-0027, FR-KB-001), imported ONLY by
   # app/knowledge/ingestion/pdf.py inside the ingest worker. Licence Apache-2.0 / BSD-3-Clause;
   # bundles a PDFium binary (BSD-3-Clause) per platform wheel (manylinux/musllinux, win_amd64);

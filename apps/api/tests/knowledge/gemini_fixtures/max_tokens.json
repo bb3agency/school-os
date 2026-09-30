@@ -1,0 +1,15 @@
+{
+  "candidates": [
+    {
+      "content": {"role": "model", "parts": [{"text": "Exams start at 09:30 [1]. The venue"}]},
+      "finishReason": "MAX_TOKENS"
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 900,
+    "candidatesTokenCount": 1200,
+    "thoughtsTokenCount": 300,
+    "totalTokenCount": 2400
+  },
+  "modelVersion": "gemini-3.5-flash"
+}

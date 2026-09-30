@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": 429,
+    "message": "synthetic: Resource exhausted. Please try again later. Question text echoed here must never be logged.",
+    "status": "RESOURCE_EXHAUSTED"
+  }
+}

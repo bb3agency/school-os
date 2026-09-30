@@ -1,0 +1,8 @@
+{
+  "promptFeedback": {
+    "blockReason": "PROHIBITED_CONTENT",
+    "blockReasonMessage": "synthetic: the prompt was blocked"
+  },
+  "usageMetadata": {"promptTokenCount": 250, "totalTokenCount": 250},
+  "modelVersion": "gemini-3.5-flash"
+}

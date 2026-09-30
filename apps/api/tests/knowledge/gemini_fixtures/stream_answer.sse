@@ -1,0 +1,8 @@
+data: {"candidates": [{"content": {"role": "model", "parts": [{"text": "Exams start at 09:30 on "}]}}], "modelVersion": "gemini-3.5-flash"}
+
+data: {"candidates": [{"content": {"role": "model", "parts": [{"text": "12/10/2026 ["}]}}], "modelVersion": "gemini-3.5-flash"}
+
+data: {"candidates": [{"content": {"role": "model", "parts": [{"text": "1]. The venue is"}]}}], "modelVersion": "gemini-3.5-flash"}
+
+data: {"candidates": [{"content": {"role": "model", "parts": [{"text": " the main hall [2]."}]}, "finishReason": "STOP"}], "usageMetadata": {"promptTokenCount": 900, "candidatesTokenCount": 30, "thoughtsTokenCount": 20, "totalTokenCount": 950}, "modelVersion": "gemini-3.5-flash"}
+

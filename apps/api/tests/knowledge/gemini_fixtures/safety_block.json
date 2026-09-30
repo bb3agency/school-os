@@ -1,0 +1,13 @@
+{
+  "candidates": [
+    {
+      "content": {"role": "model", "parts": [{"text": "Partial text that must not be shown"}]},
+      "finishReason": "SAFETY",
+      "safetyRatings": [
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "probability": "HIGH", "blocked": true}
+      ]
+    }
+  ],
+  "usageMetadata": {"promptTokenCount": 300, "candidatesTokenCount": 5, "totalTokenCount": 305},
+  "modelVersion": "gemini-3.5-flash"
+}

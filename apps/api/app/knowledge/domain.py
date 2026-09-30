@@ -3,7 +3,8 @@
 No I/O, no database, no web: every subpackage (including the pure ``chunking``) may import this
 module. Types are frozen so a value handed to the gateway or a tool cannot be widened on the way
 (the LLM never receives data the user cannot see, invariant 8). Names and shapes follow docs/06:
-``SearchResultBlock`` mirrors the Messages API ``search_result`` block (§7), ``Citation`` /
+``SearchResultBlock`` is a citable passage (a Messages API ``search_result`` block, or a numbered
+passage on Gemini; §7), ``Citation`` /
 ``AnswerSegment`` the citations shape the eval harness also uses (``evals/sos_evals/adapters.py``),
 and the ``*Event`` classes the SSE protocol (§5.1).
 """
@@ -170,7 +171,9 @@ class RankedChunk:
 
 @dataclass(frozen=True, slots=True)
 class SearchResultBlock:
-    """A Messages API ``search_result`` block: the only way content reaches the answer model."""
+    """A passage the answer model may see and cite: the only way content reaches it. The gateway
+    sends it as a Messages API ``search_result`` block (Anthropic) or as a numbered passage that
+    the model cites with ``[n]`` markers (Gemini; ADR-0033, docs/06 §7)."""
 
     source: str
     title: str
@@ -205,6 +208,9 @@ class ToolCall:
     call_id: str
     name: str
     arguments: Mapping[str, object]
+    signature: str | None = field(default=None, compare=False, repr=False)
+    """Opaque provider state the gateway must send back with this call on the next request
+    (a Gemini thought signature; ADR-0033). Not model text: never shown, logged or stored."""
 
 
 @dataclass(frozen=True, slots=True)

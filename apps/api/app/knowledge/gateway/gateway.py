@@ -1,15 +1,18 @@
-"""The :class:`~app.knowledge.interfaces.LlmGateway` implementation (ADR-0005; docs/06 §5, §12).
+"""The :class:`~app.knowledge.interfaces.LlmGateway` implementation (ADR-0005, ADR-0033; docs/06
+§5, §12).
 
-Every call runs the same controls, in this order:
+Every call runs the same controls, in this order, whichever provider serves the role:
 
 1. ``SOS_KB_ENABLED`` kill switch, then the role's rules (the offline eval judge only for
    ``feature="eval"``; tools only from the ADR-0008 whitelist in ``tools.yaml``; tool results
-   within the docs/06 §12 context budget).
+   within the docs/06 §12 context budget; images only for a role that accepts them).
 2. :class:`BudgetGuard`: the school's AI switch and flag, its monthly budget (100 % -> refuse,
    the caller answers search-only) and the per-tenant rate limit.
-3. The circuit breaker; then the redacted request (:mod:`.wire`) goes to the transport with the
-   role's model, output cap, thinking setting and timeout from ``models.yaml``; retries with
-   backoff and jitter on 429/5xx/529 only.
+3. The role's provider (``models.yaml`` ``roles.<role>.provider``) picks the transport and, by
+   the transport's wire format, the codec (:mod:`.codec`: Anthropic Messages API or Gemini
+   ``generateContent``). Then that transport's circuit breaker; then the redacted request goes
+   out with the role's model, output cap, thinking setting and timeout from ``models.yaml``;
+   retries with backoff and jitter on 429/5xx/529 only.
 4. Metering: tokens and list-price cost per tenant and feature into the spend ledger, the
    :class:`MeteringSink` and the ``llm.call`` span; a log line with ids, role, outcome, attempts
    and latency. Never prompt or completion text (invariant 5).
@@ -30,7 +33,7 @@ from opentelemetry.trace import Span
 
 from app.authz.kv import KVUnavailable
 from app.core.logging import get_logger
-from app.knowledge.config.llm import LlmConfig, RoleConfig
+from app.knowledge.config.llm import PROVIDERS, LlmConfig, Provider, RoleConfig
 from app.knowledge.config.tools import ToolsConfig
 from app.knowledge.domain import (
     ConversationItem,
@@ -43,6 +46,7 @@ from app.knowledge.domain import (
 )
 from app.knowledge.gateway import wire
 from app.knowledge.gateway.budget import BudgetGuard, TenantAiSettings
+from app.knowledge.gateway.codec import AnthropicCodec, Codec, ImageInput, Prepared
 from app.knowledge.gateway.errors import (
     AiDisabled,
     GatewayMisuse,
@@ -50,6 +54,7 @@ from app.knowledge.gateway.errors import (
     ProviderRejected,
     ProviderUnavailable,
 )
+from app.knowledge.gateway.gemini_wire import GeminiCodec
 from app.knowledge.gateway.metering import MeteringEvent, MeteringSink, Outcome, cost_usd
 from app.knowledge.gateway.resilience import CircuitBreaker, backoff_delay
 from app.knowledge.gateway.schema_check import SchemaViolation, validate
@@ -59,10 +64,25 @@ from app.knowledge.gateway.transport import (
     StreamingTransport,
     Transport,
     TransportError,
+    Wire,
+    wire_of,
 )
 
 log = get_logger(__name__)
 tracer = trace.get_tracer("app.knowledge.gateway")
+
+
+def _codec_for(wire_format: Wire) -> Codec:
+    return GeminiCodec() if wire_format == "gemini" else AnthropicCodec()
+
+
+@dataclass(frozen=True, slots=True)
+class _Route:
+    """Where one role's calls go: the transport, its codec and its circuit breaker."""
+
+    transport: Transport
+    codec: Codec
+    breaker: CircuitBreaker
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +94,7 @@ class _Call:
     role_config: RoleConfig
     settings: TenantAiSettings
     started: float
+    route: _Route
     span: Span | None = None
 
 
@@ -85,34 +106,61 @@ class _Sent:
 
 
 class Gateway:
-    """One per process (the breaker is shared by every tenant's calls)."""
+    """One per process (each transport's breaker is shared by every tenant's calls).
+
+    ``transports`` maps each provider to its transport; ``transport`` (tests, the eval bridge)
+    serves every provider. A provider without a transport is a deployment error that surfaces
+    as :class:`ProviderRejected` for that role only."""
 
     def __init__(
         self,
         *,
         config: LlmConfig,
         tools_config: ToolsConfig,
-        transport: Transport,
         guard: BudgetGuard,
         sink: MeteringSink,
         enabled: Callable[[], bool],
+        transport: Transport | None = None,
+        transports: Mapping[Provider, Transport] | None = None,
         breaker: CircuitBreaker | None = None,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
+        chosen: dict[Provider, Transport] = dict(transports or {})
+        if transport is not None:
+            for provider in PROVIDERS:
+                chosen.setdefault(provider, transport)
+        if not chosen:
+            raise ValueError("the gateway needs at least one transport")
         self._config = config
         self._whitelist = frozenset(tools_config.tools)
-        self._transport = transport
         self._guard = guard
         self._sink = sink
         self._enabled = enabled
-        self._breaker = breaker or CircuitBreaker(config.client, clock=clock)
         self._sleep = sleep
         self._clock = clock
+        breakers: dict[int, CircuitBreaker] = {}
+        self._routes: dict[Provider, _Route] = {}
+        for provider, t in chosen.items():
+            shared = breaker or breakers.setdefault(
+                id(t), CircuitBreaker(config.client, clock=clock)
+            )
+            self._routes[provider] = _Route(t, _codec_for(wire_of(t)), shared)
+        self._default = self._routes.get(config.default_provider) or next(
+            iter(self._routes.values())
+        )
 
     @property
     def breaker(self) -> CircuitBreaker:
-        return self._breaker
+        """The circuit breaker of the default provider's transport."""
+        return self._default.breaker
+
+    def breaker_for(self, provider: Provider) -> CircuitBreaker:
+        return self._routes[provider].breaker
+
+    @property
+    def _transport(self) -> Transport:
+        return self._default.transport
 
     # --- LlmGateway ---------------------------------------------------------------------------
 
@@ -134,9 +182,13 @@ class Gateway:
         system: str,
         text: str,
         schema: Mapping[str, object],
+        *,
+        images: Sequence[ImageInput] = (),
     ) -> Mapping[str, object]:
+        """Strict JSON validated against ``schema``. ``images`` (register pages) only for a
+        role with ``accepts_images``; the caller must have blacked out Aadhaar numbers."""
         with tracer.start_as_current_span("llm.call"):
-            return self._generate_json(metering, role, system, text, schema)
+            return self._generate_json(metering, role, system, text, schema, images=images)
 
     def stream_turn(
         self,
@@ -151,16 +203,16 @@ class Gateway:
         # The span is not made current: a generator resumes in whichever thread iterates it.
         span = tracer.start_span("llm.call")
         try:
-            role_config, offered, body = self._prepare_turn(
+            role_config, route, offered, prepared = self._prepare_turn(
                 metering, role, system, conversation, tools
             )
             settings = self._guard.check(metering.tenant_id, metering.feature)
-            call = _Call(metering, role, role_config, settings, self._clock(), span)
-            transport = self._transport
+            call = _Call(metering, role, role_config, settings, self._clock(), route, span)
+            transport = route.transport
             if isinstance(transport, StreamingTransport):
-                yield from self._streamed(transport, call, body, offered)
+                yield from self._streamed(transport, call, prepared, offered)
             else:
-                yield from self._unstreamed(call, body, offered)
+                yield from self._unstreamed(call, prepared, offered)
         finally:
             span.end()
 
@@ -171,8 +223,9 @@ class Gateway:
         system: str,
         conversation: Sequence[ConversationItem],
         tools: Sequence[ToolSpec],
-    ) -> tuple[RoleConfig, frozenset[str], dict[str, Any]]:
+    ) -> tuple[RoleConfig, _Route, frozenset[str], Prepared]:
         role_config = self._role(metering, role)
+        route = self._route(role_config)
         offered = frozenset(t.name for t in tools)
         outside = sorted(offered - self._whitelist)
         if outside:
@@ -181,8 +234,8 @@ class Gateway:
         used = wire.tool_result_tokens(conversation, limits.chars_per_token_estimate)
         if used > limits.tool_result_context_tokens:
             raise GatewayMisuse("tool results exceed the context budget; send fewer blocks")
-        body = wire.turn_request(self._config, role_config, system, conversation, tools)
-        return role_config, offered, body
+        prepared = route.codec.turn_request(self._config, role_config, system, conversation, tools)
+        return role_config, route, offered, prepared
 
     def _run_turn(
         self,
@@ -192,55 +245,83 @@ class Gateway:
         conversation: Sequence[ConversationItem],
         tools: Sequence[ToolSpec],
     ) -> ModelTurn:
-        role_config, offered, body = self._prepare_turn(metering, role, system, conversation, tools)
+        role_config, route, offered, prepared = self._prepare_turn(
+            metering, role, system, conversation, tools
+        )
         settings = self._guard.check(metering.tenant_id, metering.feature)
-        sent = self._send(metering, role, role_config, settings, body)
-        call = _Call(metering, role, role_config, settings, self._clock())
-        return self._finish_turn(call, sent, offered)
+        call = _Call(metering, role, role_config, settings, self._clock(), route)
+        sent = self._send(call, prepared)
+        return self._finish_turn(call, sent, offered, prepared)
 
-    def _finish_turn(self, call: _Call, sent: _Sent, offered: frozenset[str]) -> ModelTurn:
+    def _finish_turn(
+        self, call: _Call, sent: _Sent, offered: frozenset[str], prepared: Prepared
+    ) -> ModelTurn:
+        codec = call.route.codec
         try:
-            turn, usage = wire.parse_turn(sent.response, offered, call.role_config.model)
+            parsed = codec.parse_turn(
+                self._config, sent.response, offered, call.role_config.model, prepared
+            )
         except InvalidModelOutput:
-            self._meter_call(call, sent, "invalid_output", wire.usage(sent.response))
+            self._meter_call(call, sent, "invalid_output", codec.usage(sent.response))
             raise
+        turn = parsed.turn
         outcome: Outcome = "ok"
         if turn.stop_reason == "refusal":
             outcome = "refused"
         elif turn.stop_reason == "max_tokens":
             outcome = "max_tokens"
-        self._meter_call(call, sent, outcome, usage)
+        if parsed.dropped_markers:
+            ids: dict[str, Any] = {"tenant_id": call.metering.tenant_id}
+            if call.metering.query_id is not None:
+                ids |= {"resource_type": "kb_query", "resource_id": call.metering.query_id}
+            log.info(
+                "kb.llm.citation_markers_dropped",
+                **ids,
+                action=call.role,
+                count=parsed.dropped_markers,
+            )
+        self._meter_call(call, sent, outcome, parsed.usage)
         return turn
 
     def _unstreamed(
-        self, call: _Call, body: Mapping[str, Any], offered: frozenset[str]
+        self, call: _Call, prepared: Prepared, offered: frozenset[str]
     ) -> Iterator[TurnEvent]:
         """A transport without streaming: the whole text as one delta, then the turn."""
-        sent = self._send(call.metering, call.role, call.role_config, call.settings, body)
-        turn = self._finish_turn(call, sent, offered)
+        sent = self._send(call, prepared)
+        turn = self._finish_turn(call, sent, offered, prepared)
         text = "".join(s.text for s in turn.segments)
         if text:
             yield TextDelta(text)
         yield turn
 
+    def _request(self, call: _Call, prepared: Prepared) -> MessagesRequest:
+        return MessagesRequest(
+            body=prepared.body,
+            timeout_s=self._config.client.request_timeout_s,
+            model=call.role_config.model,
+            location=call.role_config.location,
+            static_prefix=prepared.static_prefix,
+        )
+
     def _streamed(
         self,
         transport: StreamingTransport,
         call: _Call,
-        body: Mapping[str, Any],
+        prepared: Prepared,
         offered: frozenset[str],
     ) -> Iterator[TurnEvent]:
-        request = MessagesRequest(body=body, timeout_s=self._config.client.request_timeout_s)
+        request = self._request(call, prepared)
         events, first, attempts = self._open_stream(transport, request, call)
-        assembler = wire.StreamAssembler()
+        assembler = call.route.codec.assembler(self._config, prepared)
         masker = AadhaarStreamMasker()
+        breaker = call.route.breaker
 
         def sent() -> _Sent:
             return _Sent(assembler.response(), attempts, self._elapsed_ms(call.started))
 
         def partial(outcome: Outcome) -> None:
             so_far = sent()
-            self._meter_call(call, so_far, outcome, wire.usage(so_far.response))
+            self._meter_call(call, so_far, outcome, call.route.codec.usage(so_far.response))
 
         try:
             for event in itertools.chain((first,), events):
@@ -249,9 +330,9 @@ class Gateway:
                 if shown:
                     yield TextDelta(shown)
             if not assembler.complete:
-                raise TransportError("connection")  # the stream ended without message_stop
+                raise TransportError("connection")  # the stream ended without its last event
         except TransportError as exc:
-            if exc.kind != "rejected" and self._breaker.record_failure():
+            if exc.kind != "rejected" and breaker.record_failure():
                 log.warning("kb.llm.circuit_opened", action=call.role, error_code=exc.kind)
             partial("unavailable")
             raise ProviderUnavailable("AI answers are temporarily unavailable") from None
@@ -266,11 +347,11 @@ class Gateway:
             close = getattr(events, "close", None)
             if callable(close):
                 close()
-        self._breaker.record_success()
-        tail = masker.flush()
+        breaker.record_success()
+        tail = masker.feed(assembler.flush()) + masker.flush()
         if tail:
             yield TextDelta(tail)
-        yield self._finish_turn(call, sent(), offered)
+        yield self._finish_turn(call, sent(), offered, prepared)
 
     def _open_stream(
         self, transport: StreamingTransport, request: MessagesRequest, call: _Call
@@ -279,7 +360,7 @@ class Gateway:
         before any event arrived is retried; once events flow it is not)."""
         attempt = 0
         while True:
-            if not self._breaker.allow():
+            if not call.route.breaker.allow():
                 self._meter_call(call, _Sent({}, attempt, self._elapsed_ms(call.started)))
                 raise ProviderUnavailable("AI answers are temporarily unavailable")
             attempt += 1
@@ -297,12 +378,13 @@ class Gateway:
     def _failed(self, call: _Call, exc: TransportError, attempt: int) -> None:
         """One failed attempt: sleep before a retry, or meter and raise the gateway error."""
         client = self._config.client
+        breaker = call.route.breaker
         sent = _Sent({}, attempt, self._elapsed_ms(call.started))
         if exc.kind == "rejected":
-            self._breaker.record_success()  # reachable: our request was wrong
+            breaker.record_success()  # reachable: our request (or its setup) was wrong
             self._meter_call(call, sent, "rejected")
             raise ProviderRejected("The AI provider rejected the request") from None
-        if self._breaker.record_failure():
+        if breaker.record_failure():
             log.warning("kb.llm.circuit_opened", action=call.role, error_code=exc.kind)
         if exc.retryable and attempt <= client.max_retries:
             delay = backoff_delay(client, attempt - 1, retry_after_s=exc.retry_after_s)
@@ -326,16 +408,7 @@ class Gateway:
         outcome: Outcome = "unavailable",
         usage: wire.RawUsage | None = None,
     ) -> None:
-        self._meter(
-            call.metering,
-            call.role,
-            call.role_config,
-            call.settings,
-            sent=sent,
-            outcome=outcome,
-            usage=usage,
-            span=call.span,
-        )
+        self._meter(call, sent=sent, outcome=outcome, usage=usage)
 
     def _generate_json(
         self,
@@ -344,34 +417,32 @@ class Gateway:
         system: str,
         text: str,
         schema: Mapping[str, object],
+        *,
+        images: Sequence[ImageInput],
     ) -> Mapping[str, object]:
         role_config = self._role(metering, role)
-        body = wire.json_request(role_config, system, text, schema)
+        if images and not role_config.accepts_images:
+            raise GatewayMisuse(f"role {role} does not take images")
+        route = self._route(role_config)
+        prepared = route.codec.json_request(
+            self._config, role_config, system, text, schema, images=images
+        )
         settings = self._guard.check(metering.tenant_id, metering.feature)
-        sent = self._send(metering, role, role_config, settings, body)
-        usage = wire.usage(sent.response)
+        call = _Call(metering, role, role_config, settings, self._clock(), route)
+        sent = self._send(call, prepared)
+        usage = route.codec.usage(sent.response)
         try:
-            if sent.response.get("stop_reason") == "refusal":
-                raise InvalidModelOutput("the model declined")
-            value = json.loads(wire.response_text(sent.response))
+            value = json.loads(route.codec.json_text(sent.response))
             validate(value, schema)
             if not isinstance(value, Mapping):
                 raise InvalidModelOutput("structured output is not an object")
         except (ValueError, InvalidModelOutput) as exc:
-            self._meter(
-                metering,
-                role,
-                role_config,
-                settings,
-                sent=sent,
-                outcome="invalid_output",
-                usage=usage,
-            )
+            self._meter(call, sent=sent, outcome="invalid_output", usage=usage)
             if isinstance(exc, InvalidModelOutput):
                 raise
             where = str(exc) if isinstance(exc, SchemaViolation) else "not JSON"
             raise InvalidModelOutput(f"structured output rejected: {where}") from None
-        self._meter(metering, role, role_config, settings, sent=sent, outcome="ok", usage=usage)
+        self._meter(call, sent=sent, outcome="ok", usage=usage)
         result: Mapping[str, object] = wire.redact_payload(value)
         return result
 
@@ -385,51 +456,54 @@ class Gateway:
             raise GatewayMisuse(f"role {role} is for offline evaluation only")
         return role_config
 
-    def _send(
-        self,
-        metering: Metering,
-        role: ModelRole,
-        role_config: RoleConfig,
-        settings: TenantAiSettings,
-        body: Mapping[str, Any],
-    ) -> _Sent:
-        client = self._config.client
-        request = MessagesRequest(body=body, timeout_s=client.request_timeout_s)
-        started = self._clock()
+    def _route(self, role_config: RoleConfig) -> _Route:
+        route = self._routes.get(role_config.provider)
+        if route is None:
+            log.error("kb.llm.provider_not_configured", action=role_config.provider)
+            raise ProviderRejected("The AI provider for this feature is not configured")
+        return route
+
+    def _send(self, call: _Call, prepared: Prepared) -> _Sent:
+        request = self._request(call, prepared)
+        breaker = call.route.breaker
         attempt = 0
         while True:
-            if not self._breaker.allow():
-                sent = _Sent({}, attempt, self._elapsed_ms(started))
-                self._meter(metering, role, role_config, settings, sent=sent, outcome="unavailable")
+            if not breaker.allow():
+                sent = _Sent({}, attempt, self._elapsed_ms(call.started))
+                self._meter(call, sent=sent, outcome="unavailable")
                 raise ProviderUnavailable("AI answers are temporarily unavailable")
             attempt += 1
             try:
                 with tracer.start_as_current_span("llm.attempt"):
-                    response = self._transport.send(request)
+                    response = call.route.transport.send(request)
             except TransportError as exc:
-                self._failed(_Call(metering, role, role_config, settings, started), exc, attempt)
+                self._failed(call, exc, attempt)
                 continue
-            self._breaker.record_success()
-            return _Sent(response, attempt, self._elapsed_ms(started))
+            breaker.record_success()
+            return _Sent(response, attempt, self._elapsed_ms(call.started))
 
     def _elapsed_ms(self, started: float) -> int:
         return max(0, int((self._clock() - started) * 1000))
 
     def _meter(
         self,
-        metering: Metering,
-        role: ModelRole,
-        role_config: RoleConfig,
-        settings: TenantAiSettings,
+        call: _Call,
         *,
         sent: _Sent,
         outcome: Outcome,
         usage: wire.RawUsage | None = None,
-        span: Span | None = None,
     ) -> None:
+        metering, role, role_config, settings = (
+            call.metering,
+            call.role,
+            call.role_config,
+            call.settings,
+        )
         usage = usage or wire.RawUsage(0, 0)
         model = role_config.model
-        cost = cost_usd(self._config.prices[model], self._config.cache_price_multipliers, usage)
+        cost = cost_usd(
+            self._config.prices[model], self._config.cache_multipliers(role_config.provider), usage
+        )
         month_spend: Decimal | None = None
         if cost > 0:
             try:
@@ -448,7 +522,7 @@ class Gateway:
             feature=metering.feature,
             role=role,
             query_id=metering.query_id,
-            provider=self._transport.name,
+            provider=call.route.transport.name,
             model=model,
             outcome=outcome,
             attempts=sent.attempts,
@@ -460,7 +534,7 @@ class Gateway:
             cost_usd=cost,
             month_spend_usd=month_spend,
         )
-        (span or trace.get_current_span()).set_attributes(
+        (call.span or trace.get_current_span()).set_attributes(
             {
                 "llm.provider": event.provider,
                 "llm.model": model,
