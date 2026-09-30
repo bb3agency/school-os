@@ -8,6 +8,7 @@ the configured provider (the in-memory fake here), resent on request with a cool
 from __future__ import annotations
 
 import datetime as dt
+import re
 import sys
 import uuid
 from typing import Any
@@ -91,6 +92,12 @@ def test_US_102_no_email_is_queued_while_email_is_off(
     assert res.json()["code"] == "email_disabled"
 
 
+def _assert_prefix_less_sign_in_link(text: str) -> None:
+    """ADR-0036 note (2026-09-30): no URL carries a locale; the link is the web app's home."""
+    links = re.findall(r"https://app\.example\.test\S*", text)
+    assert links == ["https://app.example.test/"], links
+
+
 @pytest.mark.usefixtures("telugu_on")  # the invitee prefers Telugu (ADR-0036: switched on here)
 def test_US_102_invite_queues_an_ids_only_email_and_the_worker_sends_it(
     world: Any,
@@ -119,7 +126,7 @@ def test_US_102_invite_queues_an_ids_only_email_and_the_worker_sends_it(
     (message,) = email_on.sent
     assert message.to == address
     assert message.language == "te"
-    assert "https://app.example.test/te" in message.text
+    _assert_prefix_less_sign_in_link(message.text)
     expires = (dt.datetime.fromisoformat(invited["created_at"]) + dt.timedelta(days=30)).astimezone(
         service.IST
     )
@@ -134,14 +141,13 @@ def test_US_102_invite_queues_an_ids_only_email_and_the_worker_sends_it(
 def test_ADR_0036_invitation_email_is_english_while_telugu_is_hidden(
     world: Any, api: Any, admin_engine: Engine, email_on: email.FakeEmailSender
 ) -> None:
-    """A person whose profile says Telugu gets the English email and an /en sign-in link."""
+    """A person whose profile says Telugu gets the English email and a prefix-less sign-in link."""
     invited = _invite(api, world.person("office_admin"), preferred_language="te")
     (payload,) = _email_events(admin_engine, world.a.tenant_id, invited["id"])
     assert _run(world.a.tenant_id, payload) == "sent"
     (message,) = email_on.sent
     assert message.language == "en"
-    assert "https://app.example.test/en" in message.text
-    assert "https://app.example.test/te" not in message.text
+    _assert_prefix_less_sign_in_link(message.text)
     assert not contains_telugu(message.subject + message.text)
 
 

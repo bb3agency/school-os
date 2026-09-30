@@ -94,7 +94,7 @@ def test_SEC_009_staging_and_prod_refuse_the_fake_and_non_https_links() -> None:
 def test_invitation_template_renders_in_english_and_telugu(telugu_on: None) -> None:
     params = {
         "school": "Synthetic High School",
-        "sign_in_url": "https://app.example.test/te",
+        "sign_in_url": "https://app.example.test/",
         "expires_on": "28/10/2026",
     }
     en = email.render_email("invitation.staff", params, "en")
@@ -104,7 +104,7 @@ def test_invitation_template_renders_in_english_and_telugu(telugu_on: None) -> N
     assert "Synthetic High School" in en.subject
     assert "Synthetic High School" in te.subject
     for content in (en, te):
-        assert "https://app.example.test/te" in content.text
+        assert "https://app.example.test/" in content.text
         assert "28/10/2026" in content.text
         assert "{" not in content.subject + content.text
         assert content.text.endswith("\n")
@@ -115,7 +115,7 @@ def test_invitation_template_renders_in_english_and_telugu(telugu_on: None) -> N
 def test_ADR_0036_email_is_english_while_telugu_is_hidden() -> None:
     params = {
         "school": "Synthetic High School",
-        "sign_in_url": "https://app.example.test/en",
+        "sign_in_url": "https://app.example.test/",
         "expires_on": "28/10/2026",
     }
     for template_key in email.email_catalog():
