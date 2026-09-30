@@ -192,6 +192,56 @@ describe("DataTable states", () => {
     );
     expect(within(table).getByRole("cell", { name: "Sample school" })).toBeInTheDocument();
   });
+
+  it("numeric columns are right-aligned with tabular figures, header and cells alike", () => {
+    renderWithIntl(
+      <DataTable
+        {...props}
+        columns={[
+          ...columns,
+          {
+            key: "students",
+            header: "Students",
+            numeric: true,
+            cell: (row: { id: string; name: string }) => (row.id === "1" ? "1,240" : "87"),
+          },
+        ]}
+        state={ready([
+          { id: "1", name: "Sample school" },
+          { id: "2", name: "Sample school B" },
+        ])}
+      />,
+    );
+    const table = screen.getByRole("table", { name: "Schools" });
+    const header = within(table).getByRole("columnheader", { name: "Students" });
+    expect(header).toHaveClass("text-end", "tabular-nums");
+    for (const value of ["1,240", "87"]) {
+      expect(within(table).getByRole("cell", { name: value })).toHaveClass(
+        "text-end",
+        "tabular-nums",
+      );
+    }
+    expect(within(table).getByRole("columnheader", { name: "Name" })).not.toHaveClass("text-end");
+  });
+
+  it("Th and Td take the same numeric prop for hand-built tables", () => {
+    renderWithIntl(
+      <Table>
+        <THead>
+          <Tr>
+            <Th numeric>Rows</Th>
+          </Tr>
+        </THead>
+        <TBody>
+          <Tr>
+            <Td numeric>42</Td>
+          </Tr>
+        </TBody>
+      </Table>,
+    );
+    expect(screen.getByRole("columnheader", { name: "Rows" })).toHaveClass("text-end");
+    expect(screen.getByRole("cell", { name: "42" })).toHaveClass("text-end", "tabular-nums");
+  });
 });
 
 describe("TableScroll: wide tables scroll inside a named region (NFR-A11Y-001)", () => {

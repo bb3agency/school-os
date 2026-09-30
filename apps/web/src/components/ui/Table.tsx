@@ -106,13 +106,27 @@ export function Tr(props: ComponentProps<"tr">) {
   return <tr {...props} />;
 }
 
-export function Th({ className, scope = "col", ...props }: ComponentProps<"th">) {
+/** Numbers line up: right-aligned (end), tabular figures, never wrapped mid-number. */
+const NUMERIC = "text-end tabular-nums whitespace-nowrap";
+
+export interface CellProps {
+  /** A numeric column (counts, amounts): right-aligned with tabular figures. */
+  numeric?: boolean;
+}
+
+export function Th({
+  className,
+  scope = "col",
+  numeric = false,
+  ...props
+}: ComponentProps<"th"> & CellProps) {
   return (
     <th
       scope={scope}
       className={cn(
         "px-4 py-3 text-xs font-medium whitespace-nowrap text-ink-muted",
         "group-data-[density=compact]/table:px-3 group-data-[density=compact]/table:py-2",
+        numeric && NUMERIC,
         className,
       )}
       {...props}
@@ -120,12 +134,13 @@ export function Th({ className, scope = "col", ...props }: ComponentProps<"th">)
   );
 }
 
-export function Td({ className, ...props }: ComponentProps<"td">) {
+export function Td({ className, numeric = false, ...props }: ComponentProps<"td"> & CellProps) {
   return (
     <td
       className={cn(
         "px-4 py-4 align-middle text-ink",
         "group-data-[density=compact]/table:px-3 group-data-[density=compact]/table:py-2 group-data-[density=compact]/table:align-top",
+        numeric && NUMERIC,
         className,
       )}
       {...props}
@@ -138,6 +153,8 @@ export interface Column<T> {
   header: ReactNode;
   cell: (row: T) => ReactNode;
   className?: string;
+  /** Counts and amounts: right-aligned, tabular figures (header and cells). */
+  numeric?: boolean;
 }
 
 export interface DataTableProps<T> {
@@ -200,7 +217,7 @@ export function DataTable<T>({
           <THead>
             <Tr>
               {columns.map((column) => (
-                <Th key={column.key} className={column.className}>
+                <Th key={column.key} className={column.className} numeric={column.numeric === true}>
                   {column.header}
                 </Th>
               ))}
@@ -210,7 +227,7 @@ export function DataTable<T>({
             {state.data.map((row) => (
               <Tr key={rowKey(row)}>
                 {columns.map((column) => (
-                  <Td key={column.key} className={column.className}>
+                  <Td key={column.key} className={column.className} numeric={column.numeric === true}>
                     {column.cell(row)}
                   </Td>
                 ))}
