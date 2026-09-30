@@ -355,7 +355,10 @@ def _decimal(cell: Cell) -> Decimal | None:
             return None
     if not number.is_finite():
         return None
-    return number.quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
+    try:
+        return number.quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
+    except InvalidOperation:  # more digits than the context holds: not a mark
+        return None
 
 
 def _subjects(layout: _Layout, cfg: AcademicsConfig, issues: _Issues) -> dict[int, str]:

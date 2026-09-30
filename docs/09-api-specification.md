@@ -400,7 +400,7 @@ All **built** (modules `app/academics` and `app/insights`, docs/05 §5.8, purpos
 | POST | `/edge/tally/enrol` (`code`, `device` facts) | 201: `device_id`, `key_id`, `secret` (once) (FR-TALLY-001) |
 | GET | `/edge/tally/config` | Selected company and groups, sync interval, `min_agent_version`, rotate-after days (FR-TALLY-004) |
 | PUT | `/edge/tally/catalog` | Company, Tally product/version, groups (names, parents); ≤ 500 groups (FR-TALLY-004) |
-| POST | `/edge/tally/syncs` | One snapshot (`batch_id`, company, `as_of`, parties under selected groups, ≤ 5,000); a repeated `batch_id` gets the first result; 409 `no_groups_selected`, `agent_outdated`; 422 `group_not_selected`, `company_not_selected`, `duplicate_party`, `too_many` (FR-TALLY-005) |
+| POST | `/edge/tally/syncs` | One snapshot (`batch_id`, company, `as_of`, parties under selected groups, ≤ 5,000); a repeated `batch_id` gets the first result; 409 `no_groups_selected`, `agent_outdated`; 422 `group_not_selected`, `company_not_selected`, `duplicate_party`, `too_many`, `total_too_large` (FR-TALLY-005) |
 | POST | `/edge/tally/key-rotation` | New `key_id` and `secret` once; the old key works until the new one is used or 7 days (FR-TALLY-002) |
 
 ### Exports, audit, admin, jobs

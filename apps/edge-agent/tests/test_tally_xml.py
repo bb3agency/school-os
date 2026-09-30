@@ -96,7 +96,9 @@ def test_FR_TALLY_003_amounts_are_decimals_owed_to_the_school(text: str | None, 
     assert tx.parse_amount(text) == Decimal(owed)
 
 
-@pytest.mark.parametrize("text", ["abc", "1.2.3", "12 Dr Cr"])
+# An amount with more digits than a Decimal context holds (28) cannot be quantised: refused
+# like any other bad amount, not an ArithmeticError the sync loop does not catch.
+@pytest.mark.parametrize("text", ["abc", "1.2.3", "12 Dr Cr", "-" + "9" * 40, "9" * 30 + ".50 Dr"])
 def test_FR_TALLY_003_bad_amounts_are_refused(text: str) -> None:
     with pytest.raises(tx.TallyXmlError):
         tx.parse_amount(text)

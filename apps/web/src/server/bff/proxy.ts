@@ -170,6 +170,15 @@ function sessionEnded(requestId: string, kind: SessionKind): Response {
   });
 }
 
+/** The path as the API will route it (percent-decoded); null when an escape is malformed. */
+function decodedPath(path: string): string | null {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+}
+
 async function resolveSession(
   request: Request,
   runtime: AuthRuntime,
@@ -206,10 +215,14 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
     return problem(requestId, 400, "bad_request", "Bad request");
   }
   const apiPath = rawPath.slice(BFF_PREFIX.length);
-  if (apiPath === "/api/v1/edge" || apiPath.startsWith("/api/v1/edge/")) {
+  // The API routes on the percent-decoded path (/api/v1/%65dge/... is /api/v1/edge/...), so
+  // the machine-only and control-plane checks look at the decoded path too.
+  const routed = decodedPath(apiPath);
+  if (routed === null) return problem(requestId, 400, "bad_request", "Bad request");
+  if (routed === "/api/v1/edge" || routed.startsWith("/api/v1/edge/")) {
     return problem(requestId, 404, "not_found", "Not found");
   }
-  const isPlatform = apiPath === "/api/v1/platform" || apiPath.startsWith("/api/v1/platform/");
+  const isPlatform = routed === "/api/v1/platform" || routed.startsWith("/api/v1/platform/");
   const kind: SessionKind = isPlatform ? "operator" : "staff";
   if (isPlatform && !runtime.config.platformEnabled) {
     return problem(requestId, 404, "not_found", "Not found");

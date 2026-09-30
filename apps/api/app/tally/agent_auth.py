@@ -232,7 +232,9 @@ def verify_signed(
     except CryptoError:
         raise _reject("key_unwrap_failed", device_id) from None
     expected = sign(secret, method=method, path=path, timestamp=timestamp, nonce=nonce, body=body)
-    if not hmac.compare_digest(expected, headers.get(HEADER_SIGNATURE, "")):
+    # Bytes, not str: compare_digest refuses str with non-ASCII characters (headers are latin-1).
+    given = headers.get(HEADER_SIGNATURE, "").encode("utf-8", "surrogateescape")
+    if not hmac.compare_digest(expected.encode("ascii"), given):
         raise _reject("bad_signature", device_id)
     if not flag_on:
         raise NotFound()

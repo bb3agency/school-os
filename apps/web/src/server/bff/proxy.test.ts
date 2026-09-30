@@ -205,6 +205,23 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       expect(h.apiCalls).toHaveLength(0);
     });
 
+    it("edge-agent routes stay unproxied when the path is percent-encoded (ADR-0032)", async () => {
+      // The API decodes the path before routing, so /api/v1/%65dge/... IS /api/v1/edge/...
+      await h.signIn("staff", clerk);
+      h.apiCalls.length = 0;
+      for (const path of [
+        "/bff/api/v1/%65dge/tally/config",
+        "/bff/api/v1/%65%64%67%65/tally/syncs",
+        "/bff/api/v1/edg%65",
+      ]) {
+        const response = await call(path, { method: "GET" });
+        expect(response.status).toBe(404);
+      }
+      const malformed = await call("/bff/api/v1/%e0%a4/tally", { method: "GET" });
+      expect(malformed.status).toBe(400);
+      expect(h.apiCalls).toHaveLength(0);
+    });
+
     it("platform routes are 404 on dedicated hosts", async () => {
       const dedicated = await createHarness({ SOS_DEPLOYMENT_MODE: "dedicated" });
       const response = await proxyToApi(

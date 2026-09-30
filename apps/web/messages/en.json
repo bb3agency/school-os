@@ -5818,6 +5818,7 @@
       "thresholdFor": "Threshold for {rule} ({min} to {max})",
       "bounds": "Allowed: {min} to {max}",
       "on": "On",
+      "enabledFor": "Use the rule {rule}",
       "off": "Off",
       "alwaysOn": "always on",
       "stepUp": "Saving may ask you to confirm your sign-in again.",

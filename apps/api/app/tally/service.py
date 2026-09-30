@@ -64,6 +64,7 @@ from app.tally.agent_auth import AgentCaller, EnrolmentCaller
 from app.tally.config import rules, version_tuple
 from app.tally.models import Device, Group, Party
 from app.tally.schemas import (
+    MAX_AMOUNT,
     AgentConfigOut,
     CatalogIn,
     CatalogOut,
@@ -773,7 +774,14 @@ def _check_snapshot(data: SyncIn, selected: Sequence[Group]) -> str:
     plain = [p.name for p in data.parties if not p.guid]
     if len(set(guids)) != len(guids) or len(set(plain)) != len(plain):
         raise _field_error("parties", "duplicate_party")
+    # The sync record keeps the snapshot's total due in the same numeric(14,2) as one balance.
+    if _snapshot_due(data) > MAX_AMOUNT:
+        raise _field_error("parties", "total_too_large")
     return company
+
+
+def _snapshot_due(data: SyncIn) -> Decimal:
+    return sum((p.closing_balance for p in data.parties if p.closing_balance > 0), ZERO)
 
 
 def accept_sync(caller: AgentCaller, data: SyncIn) -> SyncOut:
@@ -852,9 +860,7 @@ def accept_sync(caller: AgentCaller, data: SyncIn) -> SyncOut:
                 "created": len(creates),
                 "updated": changed,
                 "missing": len(missing),
-                "total_due": sum(
-                    (p.closing_balance for p in data.parties if p.closing_balance > 0), ZERO
-                ),
+                "total_due": _snapshot_due(data),
                 "received_at": now,
             },
         )

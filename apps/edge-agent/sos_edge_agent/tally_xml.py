@@ -214,7 +214,10 @@ def parse_amount(value: str | None) -> Decimal:
             owed = -owed
     else:
         owed = amount if sign else -amount  # XML: a debit (owed to us) is negative
-    return owed.quantize(Decimal("0.01"))
+    try:
+        return owed.quantize(Decimal("0.01"))
+    except InvalidOperation as exc:  # more digits than a Decimal context holds
+        raise TallyXmlError("not a Tally amount") from exc
 
 
 def parse_companies(raw: bytes) -> list[str]:

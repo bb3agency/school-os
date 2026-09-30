@@ -169,6 +169,22 @@ def test_FR_MRK_004_bad_marks_text() -> None:
     assert [(i.row, i.column, i.code) for i in out.issues] == [(3, 2, "bad_marks")]
 
 
+def test_FR_MRK_004_enormous_numbers_are_problems_not_errors() -> None:
+    # Decimal.quantize raises InvalidOperation beyond 28 digits: a cell must be listed as a
+    # problem, never fail the whole preview (500).
+    out = _marks(
+        ["Adm No", "Telugu", "Maths"],
+        ["Max marks", "1e30", 100],
+        ["SYN-001", 30, "1e40"],
+        ["SYN-002", 30, 1e300],
+    )
+    codes = {(i.row, i.column, i.code) for i in out.issues}
+    assert (2, 2, "bad_max_marks") in codes
+    assert (3, 3, "bad_marks") in codes
+    assert (4, 3, "bad_marks") in codes
+    assert [(e.student_id, e.subject) for e in out.entries] == []
+
+
 def test_normalised_headers_ignore_case_spaces_and_punctuation() -> None:
     assert sheets.normalise_header(" Adm. No ") == sheets.normalise_header("admno")
     assert sheets.normalise_header("ప్రవేశ సంఖ్య") == sheets.normalise_header("ప్రవేశసంఖ్య")

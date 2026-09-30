@@ -1747,7 +1747,8 @@ export interface paths {
          * Post Sync
          * @description One complete snapshot of the party ledgers under the selected groups. Idempotent by
          *     ``batch_id`` (a repeat returns the first result with ``repeat: true``). 409
-         *     ``no_groups_selected`` / ``agent_outdated``; 422 ``group_not_selected``.
+         *     ``no_groups_selected`` / ``agent_outdated``; 422 ``group_not_selected`` or
+         *     ``total_too_large`` (the positive balances add up to more than ₹999,999,999,999.99).
          */
         post: operations["post_sync_api_v1_edge_tally_syncs_post"];
         delete?: never;

@@ -211,6 +211,21 @@ def test_FR_ATT_003_month_register_lists_school_days(school: Any) -> None:
         assert day.isoformat() in row.days
 
 
+def test_FR_ATT_003_a_month_outside_the_calendar_is_refused_not_an_error(school: Any) -> None:
+    # "YYYY-MM" passes the route's pattern; dt.date() refused year 0 and, for December 9999,
+    # the first day of the next month (500).
+    actor = S.principal_ctx(school)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, actor.user_id) as db,
+    ):
+        academics.attendance_month(db, actor, school.ids["section_9a"], "0000-01")
+    assert _codes(err) == {"invalid_month"}
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        last = academics.attendance_month(db, actor, school.ids["section_9a"], "9999-12")
+    assert last.school_days == []
+
+
 # --- sheets ---------------------------------------------------------------------------------------
 
 
@@ -364,6 +379,28 @@ def test_FR_MRK_002_bad_marks_are_refused(school: Any, entry: dict[str, Any], co
             MarksWrite(entries=[MarkIn.model_validate({**base, **entry})]),
         )
     assert code in _codes(err)
+
+
+def test_FR_MRK_002_a_subject_spelt_in_another_case_corrects_the_same_paper(school: Any) -> None:
+    # One mark per exam, student and subject: "MATHS" from a sheet corrects "Maths" typed on
+    # screen instead of adding a second paper that the percentage would count twice.
+    exam_id = S.exam(school, f"Synthetic FA4 {uuid.uuid4().hex[:5]}", S.school_days(1)[0])
+    a1 = school.ids["a1"]
+    S.marks(school, "section_9a", exam_id, {a1: [("Maths", 10, 50), ("Telugu", 40, 50)]})
+    again = S.marks(school, "section_9a", exam_id, {a1: [("MATHS", 30, 50)]})
+    assert (again.written, again.unchanged) == (1, 0)
+    # Another student's first maths paper joins the exam's column.
+    S.marks(school, "section_9a", exam_id, {school.ids["a2"]: [("maths", 25, 50)]})
+    ct = S.ct_ctx(school)
+    with tenant_session(school.tenant_id, ct.user_id) as db:
+        grid = academics.section_marks(db, ct, school.ids["section_9a"], exam_id)
+    row = {s.student.student_id: s for s in grid.students}[a1]
+    assert sorted((m.subject, m.marks) for m in row.marks) == [
+        ("Maths", Decimal("30.00")),
+        ("Telugu", Decimal("40.00")),
+    ]
+    assert row.percent == 70.0
+    assert grid.subjects == ["Maths", "Telugu"]
 
 
 def test_FR_MRK_004_marks_sheet_preview(school: Any, admin_engine: Engine) -> None:

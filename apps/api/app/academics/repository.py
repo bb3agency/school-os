@@ -170,6 +170,17 @@ def exam_marks(
     )
 
 
+def exam_subjects(session: Session, exam_id: uuid.UUID) -> list[str]:
+    """The subjects stored for an exam (every section), first written first."""
+    rows = session.execute(
+        select(ExamMark.subject, func.min(ExamMark.created_at).label("first"))
+        .where(ExamMark.exam_id == exam_id)
+        .group_by(ExamMark.subject)
+        .order_by("first", ExamMark.subject)
+    )
+    return [r.subject for r in rows]
+
+
 def results_of(
     session: Session, student_ids: Collection[uuid.UUID], academic_year_id: uuid.UUID | None
 ) -> list[tuple[ExamMark, Exam]]:
@@ -212,6 +223,7 @@ __all__ = [
     "current_tenant_id",
     "exam_marks",
     "exam_name_taken",
+    "exam_subjects",
     "export_tables",
     "get_exam",
     "insert_exam",
