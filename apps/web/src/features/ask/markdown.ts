@@ -61,7 +61,11 @@ interface InlineRule {
 // Order breaks ties (same start): code, then links and citations, then emphasis.
 const INLINE_RULES: InlineRule[] = [
   { kind: "code", pattern: /`([^`\n]+)`/g },
-  { kind: "link", pattern: /\[([^\]\n]+)\]\(\s*([^)\s]*)(?:\s+"[^"\n]*")?\s*\)/g },
+  // The target may hold one level of balanced parentheses (`javascript:alert(1)`).
+  {
+    kind: "link",
+    pattern: /\[([^\]\n]+)\]\(\s*((?:[^()\s]|\([^()\s]*\))*)(?:\s+"[^"\n]*")?\s*\)/g,
+  },
   { kind: "cite", pattern: /\[(\d{1,3})\]/g },
   { kind: "strong", pattern: /\*\*(?=\S)([\s\S]*?\S)\*\*|__(?=\S)([\s\S]*?\S)__/g },
   { kind: "del", pattern: /~~(?=\S)([\s\S]*?\S)~~/g },
