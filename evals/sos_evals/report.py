@@ -207,6 +207,11 @@ def _failures(outcomes: Sequence[ItemOutcome]) -> list[str]:
             problems.append("refused an answerable question")
         if o.covered_segments < o.factual_segments:
             problems.append("uncited factual sentence")
+        if o.unsupported_sentences:
+            problems.append(
+                f"{o.unsupported_sentences} unsupported sentence(s), "
+                f"{o.high_severity_sentences} with a figure"
+            )
         if not o.language_match:
             problems.append("language mismatch")
         if problems:
