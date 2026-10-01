@@ -14,7 +14,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en",
+    usePathname: () => "/",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   };
 });
@@ -113,10 +113,7 @@ describe("notification bell (FR-NOT-001)", () => {
     const link = await within(panel).findByRole("link", {
       name: /A correction request is waiting for you/,
     });
-    expect(link).toHaveAttribute(
-      "href",
-      "/en/change-requests/0192f3a4-0000-7000-8000-00000000c001",
-    );
+    expect(link).toHaveAttribute("href", "/change-requests/0192f3a4-0000-7000-8000-00000000c001");
     // jsdom cannot navigate: stop the link's default action after React has handled the click.
     document.addEventListener("click", (event) => event.preventDefault(), { once: true });
     await userEvent.click(link);
@@ -154,8 +151,11 @@ describe("notification bell (FR-NOT-001)", () => {
     expect(bell).toHaveAttribute("aria-expanded", "false");
     // While it fades out it takes no focus and no clicks (inert), then it is gone.
     expect(document.getElementById(panelId)).toHaveAttribute("inert");
-    await waitFor(() =>
-      expect(screen.queryByRole("region", { name: "Latest notifications" })).toBeNull(),
+    // The 150 ms exit runs on Motion's frame loop; under a loaded full-suite run jsdom frames
+    // can stall past waitFor's 1 s default, so allow more time (the assertion is unchanged).
+    await waitFor(
+      () => expect(screen.queryByRole("region", { name: "Latest notifications" })).toBeNull(),
+      { timeout: 4000 },
     );
     expect(screen.getByRole("button", { name: "Elsewhere" })).toHaveFocus();
   });

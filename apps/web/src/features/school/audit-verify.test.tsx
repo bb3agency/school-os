@@ -16,7 +16,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/audit/verify",
+    usePathname: () => "/audit/verify",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   };
 });
@@ -101,7 +101,7 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
     renderWithIntl(<AuditView events={{ status: "ready", data: [] }} />);
     expect(screen.getByRole("link", { name: "Check integrity" })).toHaveAttribute(
       "href",
-      "/en/audit/verify",
+      "/audit/verify",
     );
   });
 
@@ -116,10 +116,7 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
     expect(form).toHaveAttribute("method", "get");
     expect(screen.getByRole("searchbox", { name: "Action" })).toHaveValue("student.update");
     expect(screen.getByLabelText("From date")).toHaveValue("01/06/2026");
-    expect(screen.getByRole("link", { name: "Clear filters" })).toHaveAttribute(
-      "href",
-      "/en/audit",
-    );
+    expect(screen.getByRole("link", { name: "Clear filters" })).toHaveAttribute("href", "/audit");
     // FR-AUD-005: the CSV download is available next to the filters.
     expect(screen.getByRole("button", { name: "Download CSV" })).toBeEnabled();
   });

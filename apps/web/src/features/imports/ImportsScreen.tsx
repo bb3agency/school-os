@@ -293,11 +293,13 @@ export function ImportsView({
     {
       key: "rows",
       header: t("colRows"),
+      numeric: true,
       cell: (row) => <span className="tabular-nums">{count(row.row_count)}</span>,
     },
     {
       key: "errors",
       header: t("colErrors"),
+      numeric: true,
       cell: (row) =>
         row.error_count > 0 ? (
           <Pill variant="negative">{count(row.error_count)}</Pill>

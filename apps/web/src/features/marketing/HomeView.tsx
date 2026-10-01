@@ -94,6 +94,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
             <CtaGroup
               className="mt-9"
               contactEmail={email}
+              whatsappNumber={settings.whatsappNumber}
               talkLabel={t("cta.talk")}
               signInLabel={t("cta.signIn")}
               secondary={{ href: "#how", label: t("home.secondary") }}
@@ -287,6 +288,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
               <CtaGroup
                 className="mt-9 justify-center"
                 contactEmail={email}
+                whatsappNumber={settings.whatsappNumber}
                 talkLabel={t("cta.talk")}
                 signInLabel={t("cta.signIn")}
                 inverse

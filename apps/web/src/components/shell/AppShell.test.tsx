@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NavSection } from "@/components/ui/SidebarNav";
 import { messages, renderWithIntl } from "@/test/render";
 import { AppShell, type AppShellProps } from "./AppShell";
+import { NEUTRAL_CANVAS_PATHS, canvasFor } from "./canvas";
 import { SIDEBAR_ATTRIBUTE, SIDEBAR_STATE_SCRIPT, SIDEBAR_STORAGE_KEY } from "./sidebar-script";
 
 /**
@@ -18,7 +19,7 @@ import { SIDEBAR_ATTRIBUTE, SIDEBAR_STATE_SCRIPT, SIDEBAR_STORAGE_KEY } from "./
  * e2e/responsive.spec.ts and e2e/a11y.spec.ts in a real browser.
  */
 
-const path = vi.hoisted(() => ({ current: "/en/students" }));
+const path = vi.hoisted(() => ({ current: "/students" }));
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return { ...actual, usePathname: () => path.current };
@@ -66,7 +67,7 @@ function inlineSidebar(): HTMLElement {
 }
 
 beforeEach(() => {
-  path.current = "/en/students";
+  path.current = "/students";
   document.documentElement.removeAttribute(SIDEBAR_ATTRIBUTE);
   window.localStorage.clear();
 });
@@ -101,7 +102,7 @@ describe("AppShell: one sidebar, no rail and no second list panel", () => {
     renderWithIntl(shell());
     const sidebar = inlineSidebar();
     const brand = within(sidebar).getByRole("link", { name: "SchoolOS" });
-    expect(brand).toHaveAttribute("href", "/en");
+    expect(brand).toHaveAttribute("href", "/");
     const context = within(sidebar).getByText("Sample School");
     const nav = within(sidebar).getByRole("navigation", { name: "Main" });
     const account = within(sidebar).getByRole("button", { name: "Lock now" });
@@ -133,7 +134,7 @@ describe("AppShell: one sidebar, no rail and no second list panel", () => {
   });
 
   it("the current page is marked once with aria-current='page'", () => {
-    path.current = "/en/imports";
+    path.current = "/imports";
     renderWithIntl(shell());
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "Imports" })).toHaveAttribute(
@@ -333,10 +334,88 @@ describe("AppShell: the same sidebar as a drawer below lg (NFR-A11Y-001)", () =>
     const dialog = screen.getByRole("dialog", { name: "Menu" });
     expect(dialog).toHaveAttribute("open");
     // The router changes the path (same tree, new pathname).
-    path.current = "/en/imports";
+    path.current = "/imports";
     rerender(shell());
     expect(dialog).not.toHaveAttribute("open");
     expect(menu).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("AppShell: canvas behind the page (docs/17 §3.2, NFR-A11Y-001)", () => {
+  function canvas(): HTMLElement {
+    const node = document.querySelector<HTMLElement>("[data-canvas]");
+    if (!node) throw new Error("no canvas");
+    return node;
+  }
+
+  it("dense record screens get the near-neutral canvas", () => {
+    for (const route of ["/students", "/students/0193", "/settings/users"]) {
+      path.current = route;
+      const { unmount } = renderWithIntl(shell());
+      expect(canvas(), route).toHaveAttribute("data-canvas", "neutral");
+      expect(canvas(), route).toHaveClass("canvas-neutral");
+      unmount();
+    }
+  });
+
+  it("the school home dashboard keeps the gradient (the body's, so nothing is painted over it)", () => {
+    path.current = "/";
+    renderWithIntl(shell());
+    expect(canvas()).toHaveAttribute("data-canvas", "gradient");
+    expect(canvas()).not.toHaveClass("canvas-neutral");
+  });
+
+  it("platform: the dashboard keeps the gradient, the platform tables are neutral", () => {
+    path.current = "/platform";
+    const { unmount } = renderWithIntl(shell({ theme: "platform", homeHref: "/platform" }));
+    expect(canvas()).toHaveAttribute("data-canvas", "gradient");
+    unmount();
+    path.current = "/platform/schools";
+    renderWithIntl(shell({ theme: "platform", homeHref: "/platform" }));
+    expect(canvas()).toHaveAttribute("data-canvas", "neutral");
+  });
+
+  it("a page can choose its canvas explicitly", () => {
+    path.current = "/";
+    renderWithIntl(shell({ canvas: "neutral" }));
+    expect(canvas()).toHaveAttribute("data-canvas", "neutral");
+  });
+});
+
+describe("canvasFor (docs/17 §3.2)", () => {
+  it.each(NEUTRAL_CANVAS_PATHS.school)("school %s and its sub-pages are neutral", (prefix) => {
+    expect(canvasFor("school", prefix)).toBe("neutral");
+    expect(canvasFor("school", `${prefix}/sample-id`)).toBe("neutral");
+  });
+
+  it("the school home, Ask and look-alike paths keep the gradient", () => {
+    for (const route of ["/", "", "/ask", "/notices", "/studentsx", "/settingsx/a"]) {
+      expect(canvasFor("school", route), route).toBe("gradient");
+    }
+  });
+
+  it("every platform page but the dashboard is neutral", () => {
+    expect(canvasFor("platform", "/platform")).toBe("gradient");
+    expect(canvasFor("platform", "/platform/")).toBe("gradient");
+    for (const route of ["/platform/schools", "/platform/schools/1", "/platform/audit"]) {
+      expect(canvasFor("platform", route), route).toBe("neutral");
+    }
+  });
+
+  it("covers the screens the owner named", () => {
+    expect([...NEUTRAL_CANVAS_PATHS.school].sort()).toEqual(
+      [
+        "/audit",
+        "/change-requests",
+        "/documents",
+        "/exports",
+        "/findings",
+        "/imports",
+        "/register-photos",
+        "/settings",
+        "/students",
+      ].sort(),
+    );
   });
 });
 

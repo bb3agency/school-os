@@ -12,7 +12,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/dev/sign-in",
+    usePathname: () => "/dev/sign-in",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -122,7 +122,7 @@ describe("signed-out page link to dev sign-in", () => {
     await render();
     expect(screen.getByRole("link", { name: "Dev sign-in (local only)" })).toHaveAttribute(
       "href",
-      "/en/dev/sign-in",
+      "/dev/sign-in",
     );
   });
 

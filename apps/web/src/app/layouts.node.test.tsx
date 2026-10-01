@@ -21,7 +21,7 @@ import {
  */
 
 const cookieJar = new Map<string, string>();
-let requestPath = "/en/settings/users";
+let requestPath = "/settings/users";
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -54,7 +54,6 @@ import PlatformLayout from "./[locale]/platform/layout";
 import SchoolLayout from "./[locale]/(school)/layout";
 
 const OTHER = "0192f3a4-0000-7000-8000-000000000002";
-const en = Promise.resolve({ locale: "en" });
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -102,7 +101,7 @@ type ShellProps = { permissions: readonly string[] | null; canSwitchSchool: bool
 describe("school layout reads /me from the server (FR-IAM-013)", () => {
   it("passes effective permissions to the shell and sends the active school", async () => {
     await signInDirect("staff", HARNESS_TENANT);
-    const element = (await SchoolLayout({ children: "x", params: en })) as ReactElement<ShellProps>;
+    const element = (await SchoolLayout({ children: "x" })) as ReactElement<ShellProps>;
     expect(element.props.permissions).toEqual(HARNESS_ME.permissions);
     expect(element.props.canSwitchSchool).toBe(false);
     const call = h.apiCalls.find((r) => new URL(r.url).pathname === "/api/v1/me");
@@ -118,7 +117,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       schoolName: string | null;
       account: { kind: string; displayName: string | null; roles: readonly string[] | null };
     };
-    const element = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Props>;
+    const element = (await SchoolLayout({ children: "x" })) as ReactElement<Props>;
     expect(element.props.schoolName).toBe("Sample School");
     expect(element.props.account).toEqual({
       kind: "staff",
@@ -134,7 +133,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
         ? json({ status: 503, code: "unavailable" }, 503)
         : defaultApi(request),
     );
-    const without = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Props>;
+    const without = (await SchoolLayout({ children: "x" })) as ReactElement<Props>;
     expect(without.props.schoolName).toBeNull();
     expect(without.props.permissions).toEqual(HARNESS_ME.permissions);
   });
@@ -146,7 +145,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
         ? json({ ...HARNESS_ME, tenant_ids: [HARNESS_TENANT, OTHER] })
         : defaultApi(request),
     );
-    const element = (await SchoolLayout({ children: "x", params: en })) as ReactElement<ShellProps>;
+    const element = (await SchoolLayout({ children: "x" })) as ReactElement<ShellProps>;
     expect(element.props.canSwitchSchool).toBe(true);
   });
 
@@ -165,16 +164,16 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       return defaultApi(request);
     });
     type Features = ShellProps & { features: { tally?: boolean } };
-    const off = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Features>;
+    const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(off.props.features).toEqual({ tally: false });
     connector = 200;
-    const on = (await SchoolLayout({ children: "x", params: en })) as ReactElement<Features>;
+    const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(on.props.features).toEqual({ tally: true });
   });
 
   it("does not ask for the Tally status for people without a Tally permission", async () => {
     await signInDirect("staff", HARNESS_TENANT);
-    const element = (await SchoolLayout({ children: "x", params: en })) as ReactElement<
+    const element = (await SchoolLayout({ children: "x" })) as ReactElement<
       ShellProps & { features: { tally?: boolean } }
     >;
     expect(element.props.features).toEqual({ tally: false });
@@ -182,35 +181,32 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
   });
 
   it("goes back to the picker when the API says the school must be chosen again", async () => {
-    // Telugu switched on explicitly (ADR-0036): the picker keeps the Telugu UI language.
-    vi.stubEnv("SOS_TELUGU_ENABLED", "true");
-    requestPath = "/te/audit";
+    requestPath = "/audit?page=2";
     await signInDirect("staff", HARNESS_TENANT);
     h.setApi((request) =>
       new URL(request.url).pathname === "/api/v1/me"
         ? json({ status: 409, code: "active_tenant_required" }, 409)
         : defaultApi(request),
     );
-    expect(
-      await redirectOf(() =>
-        SchoolLayout({ children: "x", params: Promise.resolve({ locale: "te" }) }),
-      ),
-    ).toBe("/te/choose-school?next=%2Fte%2Faudit");
+    expect(await redirectOf(() => SchoolLayout({ children: "x" }))).toBe(
+      "/choose-school?next=%2Faudit%3Fpage%3D2",
+    );
   });
 
-  it("with Telugu switched off, a te locale param never yields Telugu pages (ADR-0036)", async () => {
-    requestPath = "/en/audit";
-    await signInDirect("staff", HARNESS_TENANT);
-    h.setApi((request) =>
-      new URL(request.url).pathname === "/api/v1/me"
-        ? json({ status: 409, code: "active_tenant_required" }, 409)
-        : defaultApi(request),
-    );
-    expect(
-      await redirectOf(() =>
-        SchoolLayout({ children: "x", params: Promise.resolve({ locale: "te" }) }),
-      ),
-    ).toBe("/en/choose-school?next=%2Fen%2Faudit");
+  it("the picker address carries no locale with Telugu on or off (ADR-0036 note)", async () => {
+    for (const telugu of ["true", "false"]) {
+      vi.stubEnv("SOS_TELUGU_ENABLED", telugu);
+      requestPath = "/audit";
+      await signInDirect("staff", HARNESS_TENANT);
+      h.setApi((request) =>
+        new URL(request.url).pathname === "/api/v1/me"
+          ? json({ status: 409, code: "active_tenant_required" }, 409)
+          : defaultApi(request),
+      );
+      expect(await redirectOf(() => SchoolLayout({ children: "x" })), telugu).toBe(
+        "/choose-school?next=%2Faudit",
+      );
+    }
   });
 });
 
@@ -257,57 +253,54 @@ describe("school picker page (ADR-0019)", () => {
         : defaultApi(request),
     );
     const element = (await ChooseSchoolPage({
-      params: en,
       searchParams: Promise.resolve({ next: "https://evil.example/phish" }),
     })) as Shell;
     expect(element.props.children.props.schools.map((s) => s.status)).toEqual([
       "active",
       "suspended",
     ]);
-    expect(element.props.children.props.next).toBe("/en");
+    expect(element.props.children.props.next).toBe("/");
     const call = h.apiCalls.find((r) => new URL(r.url).pathname === "/api/v1/me/schools");
     expect(call?.headers.has("x-active-tenant")).toBe(false);
   });
 
   it("keeps a same-origin next and sends people with no school to 'no access yet'", async () => {
-    // Telugu switched on explicitly (ADR-0036): 'no access yet' in the Telugu UI language.
+    // Telugu switched on explicitly (ADR-0036): the language is in the cookie, not the URL.
     vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     await signInDirect("staff", null);
     const element = (await ChooseSchoolPage({
-      params: en,
-      searchParams: Promise.resolve({ next: "/en/settings/users" }),
+      searchParams: Promise.resolve({ next: "/settings/users" }),
     })) as Shell;
-    expect(element.props.children.props.next).toBe("/en/settings/users");
+    expect(element.props.children.props.next).toBe("/settings/users");
+    // An old prefixed return address loses its prefix; the picker itself is never "next".
+    const legacy = (await ChooseSchoolPage({
+      searchParams: Promise.resolve({ next: "/te/settings/users" }),
+    })) as Shell;
+    expect(legacy.props.children.props.next).toBe("/settings/users");
+    const loop = (await ChooseSchoolPage({
+      searchParams: Promise.resolve({ next: "/choose-school?next=%2F" }),
+    })) as Shell;
+    expect(loop.props.children.props.next).toBe("/");
 
     h.setApi((request) =>
       new URL(request.url).pathname === "/api/v1/me/schools"
         ? json({ data: [] })
         : defaultApi(request),
     );
-    expect(
-      await redirectOf(() =>
-        ChooseSchoolPage({
-          params: Promise.resolve({ locale: "te" }),
-          searchParams: Promise.resolve({}),
-        }),
-      ),
-    ).toBe("/te/no-access");
+    expect(await redirectOf(() => ChooseSchoolPage({ searchParams: Promise.resolve({}) }))).toBe(
+      "/no-access",
+    );
   });
 
-  it("with Telugu switched off, 'no access yet' is the English page (ADR-0036)", async () => {
+  it("with Telugu switched off, 'no access yet' is the same prefix-less page (ADR-0036)", async () => {
     await signInDirect("staff", null);
     h.setApi((request) =>
       new URL(request.url).pathname === "/api/v1/me/schools"
         ? json({ data: [] })
         : defaultApi(request),
     );
-    expect(
-      await redirectOf(() =>
-        ChooseSchoolPage({
-          params: Promise.resolve({ locale: "te" }),
-          searchParams: Promise.resolve({}),
-        }),
-      ),
-    ).toBe("/en/no-access");
+    expect(await redirectOf(() => ChooseSchoolPage({ searchParams: Promise.resolve({}) }))).toBe(
+      "/no-access",
+    );
   });
 });

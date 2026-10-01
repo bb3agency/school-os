@@ -12,7 +12,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/break-glass",
+    usePathname: () => "/break-glass",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   };
 });
@@ -49,11 +49,11 @@ describe("support access list (US-103, FR-OPS-004, SEC-021)", () => {
     expect(within(screen.getByRole("table")).getByText("Open now")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^Decide/ })).toHaveAttribute(
       "href",
-      `/en/break-glass/${ID}`,
+      `/break-glass/${ID}`,
     );
     expect(
       screen.getByRole("link", { name: "See what support looked at (audit log)" }),
-    ).toHaveAttribute("href", "/en/audit?action=breakglass.access");
+    ).toHaveAttribute("href", "/audit?action=breakglass.access");
   });
 
   it("is only for the owner and principal", async () => {

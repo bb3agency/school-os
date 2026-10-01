@@ -75,11 +75,11 @@ describe("school home (dashboard)", () => {
     expect(await screen.findByText("3 changes are waiting for approval.")).toBeVisible();
     expect(screen.getByRole("link", { name: sm.home.work.checksAction })).toHaveAttribute(
       "href",
-      "/en/findings",
+      "/findings",
     );
     expect(await screen.findByRole("link", { name: "Admission register" })).toHaveAttribute(
       "href",
-      `/en/imports/${IMPORT.id}`,
+      `/imports/${IMPORT.id}`,
     );
     // Only pending requests are counted, from one page.
     const call = stub.callsTo("GET /bff/api/v1/change-requests")[0];
@@ -330,7 +330,7 @@ describe("school picker (FR-IAM-013)", () => {
     const navigate = vi.fn();
     const user = userEvent.setup();
     renderWithIntl(
-      <ChooseSchoolView schools={schools} next="/en/settings/users" navigate={navigate} />,
+      <ChooseSchoolView schools={schools} next="/settings/users" navigate={navigate} />,
     );
     const list = screen.getByRole("list", { name: messages.en.chooseSchool.listLabel });
     const [open, suspended] = within(list).getAllByRole("button");
@@ -339,7 +339,7 @@ describe("school picker (FR-IAM-013)", () => {
     await user.tab();
     expect(open).toHaveFocus();
     await user.keyboard("{Enter}");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/en/settings/users"));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/settings/users"));
     const [call] = stub.callsTo("POST /bff/auth/active-tenant");
     expect(call?.headers.get("x-csrf-token")).toBe(CSRF);
     expect(JSON.parse(call?.body ?? "{}")).toEqual({ tenant_id: T });
@@ -349,7 +349,7 @@ describe("school picker (FR-IAM-013)", () => {
     stub.routes["POST /bff/auth/active-tenant"] = () => problem(403, "tenant_not_available");
     const navigate = vi.fn();
     const user = userEvent.setup();
-    renderWithIntl(<ChooseSchoolView schools={schools} next="/te" navigate={navigate} />, "te");
+    renderWithIntl(<ChooseSchoolView schools={schools} next="/" navigate={navigate} />, "te");
     await user.click(within(screen.getByRole("list")).getAllByRole("button")[0] as HTMLElement);
     expect(await screen.findByText(messages.te.chooseSchool.errorNotAvailable)).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
@@ -362,7 +362,7 @@ describe("school picker (FR-IAM-013)", () => {
     const user = userEvent.setup();
     renderWithIntl(<CheckInvitationsButton navigate={navigate} />);
     await user.click(screen.getByRole("button", { name: messages.en.noAccess.checkAgain }));
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/en/choose-school"));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/choose-school"));
     expect(
       stub.callsTo("POST /bff/api/v1/me/accept-invitations")[0]?.headers.get("x-csrf-token"),
     ).toBe(CSRF);

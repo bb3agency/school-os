@@ -36,7 +36,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/students",
+    usePathname: () => "/students",
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -111,7 +111,7 @@ describe("US-302 / FR-STU-010: find students", () => {
 
     expect(await screen.findByRole("link", { name: "Venkata Sai K." })).toHaveAttribute(
       "href",
-      `/en/students/${ID.student}`,
+      `/students/${ID.student}`,
     );
     expect(window.location.href).toBe(before);
     // SEC-008: the name travels in the POST body, never in the request URL (access logs).
@@ -446,7 +446,7 @@ describe("US-301: a student's values with their sources", () => {
     ).toBeInTheDocument();
     expect(
       within(dialog).getByRole("link", { name: sm.record.goToChangeRequests }),
-    ).toHaveAttribute("href", `/en/change-requests?student_id=${ID.student}`);
+    ).toHaveAttribute("href", `/change-requests?student_id=${ID.student}`);
     const call = stub.callsTo(`POST /bff/api/v1/students/${ID.student}/values`)[0];
     expect(call?.headers.get("if-match")).toBe('"4"');
   });

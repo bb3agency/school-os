@@ -8,7 +8,6 @@ import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { AnnouncementBanner } from "@/features/school/AnnouncementBanner";
 import { SuspendedBanner, type SchoolStatus } from "@/features/school-status/SuspendedBanner";
 import { SupportAccessBanner } from "@/features/support-access/SupportAccessBanner";
-import { uiLocale } from "@/i18n/languages";
 import { apiGetAsSession, PATH_HEADER, requireStaff } from "@/server/session/rsc";
 
 /** Permissions that use the Tally connector screens (M6); nobody else needs its status. */
@@ -25,19 +24,13 @@ const CHOOSE_AGAIN = new Set(["active_tenant_required", "no_membership", "invali
  * hides menu items using the effective permissions from GET /me (UX only; the BFF and API
  * check every call).
  */
-export default async function SchoolLayout({
-  children,
-  params,
-}: {
-  children: ReactNode;
-  params: Promise<{ locale: string }>;
-}) {
+export default async function SchoolLayout({ children }: { children: ReactNode }) {
   const session = await requireStaff();
   const support = session.kind === "support";
-  const locale = uiLocale((await params).locale);
-  const path = (await headers()).get(PATH_HEADER) ?? `/${locale}`;
-  const picker = `/${locale}/choose-school?next=${encodeURIComponent(path)}`;
-  const supportEnded = `/${locale}/signed-out?kind=support&error=support_ended`;
+  // No locale in any URL (ADR-0036 note): the language stays in the NEXT_LOCALE cookie.
+  const path = (await headers()).get(PATH_HEADER) ?? "/";
+  const picker = `/choose-school?next=${encodeURIComponent(path)}`;
+  const supportEnded = "/signed-out?kind=support&error=support_ended";
   if (!session.activeTenantId) redirect(support ? supportEnded : picker);
 
   // The school's name for the sidebar comes from the picker's list (no personal data); both

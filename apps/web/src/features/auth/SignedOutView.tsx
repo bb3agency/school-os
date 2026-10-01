@@ -1,4 +1,4 @@
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
 import { buttonClasses } from "@/components/ui/Button";
@@ -36,7 +36,6 @@ export function SignedOutView({
 }) {
   const t = useTranslations("auth");
   const td = useTranslations("devSignIn");
-  const locale = useLocale();
   const signIn = operator ? "/bff/auth/platform/login" : "/bff/auth/login";
   return (
     <MinimalShell
@@ -64,9 +63,9 @@ export function SignedOutView({
           {support ? t("signedOut.supportBody") : t("signedOut.body")}
         </p>
         {support ? (
-          <a href={`/${locale}/platform/break-glass`} className={buttonClasses("primary")}>
+          <Link href="/platform/break-glass" className={buttonClasses("primary")}>
             {t("signedOut.supportBack")}
-          </a>
+          </Link>
         ) : (
           /* Plain link: the BFF route starts the OIDC redirect (not a client navigation). */
           <a href={signIn} className={buttonClasses("primary")}>
@@ -75,9 +74,9 @@ export function SignedOutView({
         )}
         {devSignIn && !support ? (
           <p className="text-sm">
-            <a href={`/${locale}/dev/sign-in`} className="text-primary underline">
+            <Link href="/dev/sign-in" className="text-primary underline">
               {td("link")}
-            </a>
+            </Link>
           </p>
         ) : null}
       </div>

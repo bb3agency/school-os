@@ -1,7 +1,5 @@
 import "server-only";
 import * as oauth from "openid-client";
-import { ENGLISH, TELUGU, uiLocale } from "@/i18n/languages";
-import type { Locale } from "@/i18n/routing";
 import { requestIdFrom } from "@/lib/problem";
 import {
   csrfFailed,
@@ -368,14 +366,6 @@ export async function handleSupportLogin(request: Request, runtime: AuthRuntime)
   });
 }
 
-/**
- * The UI language of a `next` path (`/te/...` while Telugu is switched on), English otherwise
- * (ADR-0036: with Telugu off the proxy sends `/te` pages to `/en` anyway).
- */
-function localeOf(path: string): Locale {
-  return /^\/te(\/|$|\?)/.test(path) ? uiLocale(TELUGU) : ENGLISH;
-}
-
 async function revokeAtIdp(runtime: AuthRuntime, session: Session): Promise<void> {
   try {
     const stored = await runtime.store.tokens(session.id);
@@ -509,16 +499,16 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
   }
   if (kind === "staff" && !transaction.stepUpSessionId) {
     const outcome = await afterStaffSignIn(runtime, session, tokens.accessToken, requestId);
-    const locale = localeOf(next);
     if (outcome.kind === "mfa_required") {
       // A privileged role without MFA gets no session at all (FR-IAM-002).
       await store.revoke(session.id);
       return fail("mfa_required");
     }
     if (outcome.kind === "choose") {
-      next = `/${locale}/choose-school?next=${encodeURIComponent(next)}`;
+      // No locale in any URL (ADR-0036 note): the page's language comes from the cookie.
+      next = `/choose-school?next=${encodeURIComponent(next)}`;
     } else if (outcome.kind === "none") {
-      next = `/${locale}/no-access`;
+      next = "/no-access";
     }
   }
   logEvent(

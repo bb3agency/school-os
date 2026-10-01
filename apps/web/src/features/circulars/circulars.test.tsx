@@ -30,7 +30,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/circulars",
+    usePathname: () => "/circulars",
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -288,7 +288,7 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
       });
     renderWithIntl(<CircularDetailScreen documentId={DOC} />);
     await userEvent.click(await screen.findByRole("button", { name: en.circulars.draftNotice }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/notices/${NOTICE}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/notices/${NOTICE}`));
     const call = stub.callsTo("POST /bff/api/v1/notices")[0];
     expect(JSON.parse(call?.body ?? "{}")).toEqual({ source: "circular", document_id: DOC });
     expect(call?.headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/);
@@ -381,7 +381,7 @@ describe("parent notices (US-1605, US-1606)", () => {
       "Sports day on 14/11/2026 at 9:00",
     );
     await userEvent.click(screen.getByRole("button", { name: en.notices.new.draftWithAi }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/notices/${NOTICE}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/notices/${NOTICE}`));
     const call = stub.callsTo("POST /bff/api/v1/notices")[0];
     expect(JSON.parse(call?.body ?? "{}")).toEqual({
       source: "staff_text",

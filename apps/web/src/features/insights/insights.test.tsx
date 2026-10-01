@@ -30,7 +30,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/flags",
+    usePathname: () => "/flags",
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -276,7 +276,7 @@ describe("flags list (US-1705, US-1706, US-1708; FR-EW-009, FR-EW-015)", () => {
     stub.routes["GET /bff/api/v1/insights/flags"] = () => page([flag()]);
     renderWithIntl(<FlagsScreen />);
     const link = await screen.findByRole("link", { name: "Synthetica Ravi" });
-    expect(link).toHaveAttribute("href", `/en/flags/${FLAG}`);
+    expect(link).toHaveAttribute("href", `/flags/${FLAG}`);
     const row = link.closest("tr") as HTMLElement;
     expect(
       within(row).getByText(/Absent 3 school days in a row \(22\/09\/2026 to 24\/09\/2026\)/),

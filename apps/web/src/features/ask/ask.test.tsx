@@ -24,7 +24,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/ask",
+    usePathname: () => "/ask",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -135,10 +135,10 @@ describe("Ask the school (US-801, FR-KB-005, FR-KB-008)", () => {
     ).toHaveAttribute("href", `#ask-${QUERY}-source-1`);
     expect(
       within(answer).getByRole("link", { name: /Circular · Exam timings \(open the document\)/ }),
-    ).toHaveAttribute("href", `/en/documents/${DOC}`);
+    ).toHaveAttribute("href", `/documents/${DOC}`);
     expect(
       within(answer).getByRole("link", { name: /Admission register \(open the student record\)/ }),
-    ).toHaveAttribute("href", `/en/students/${ID.student}`);
+    ).toHaveAttribute("href", `/students/${ID.student}`);
     expect(within(answer).getByText("page 1")).toBeInTheDocument();
   });
 
@@ -766,7 +766,7 @@ describe("verified answers (US-802, FR-KB-030)", () => {
     expect(screen.getByText(/A source document changed or was deleted/)).toBeVisible();
     expect(
       screen.getAllByRole("link", { name: /Source 1 \(open the document\)/ })[0],
-    ).toHaveAttribute("href", `/en/documents/${DOC}`);
+    ).toHaveAttribute("href", `/documents/${DOC}`);
     expect(screen.queryByRole("button", { name: "Add a verified answer" })).toBeNull();
   });
 
@@ -920,7 +920,7 @@ describe("search documents (FR-KB-001, FR-KB-002, SEC-008)", () => {
     });
     expect(
       screen.getByRole("link", { name: /Circular · Exam timings \(open the document\)/ }),
-    ).toHaveAttribute("href", `/en/documents/${DOC}`);
+    ).toHaveAttribute("href", `/documents/${DOC}`);
     expect(screen.getByText("Circular · issued 15/09/2026")).toBeInTheDocument();
   });
 
@@ -951,7 +951,7 @@ describe("navigation (UX only; the API checks every call)", () => {
       within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", {
         name: "Ask the school",
       }),
-    ).toHaveAttribute("href", "/en/ask");
+    ).toHaveAttribute("href", "/ask");
     unmount();
     renderWithIntl(
       <SchoolShell permissions={["document.read"]}>
@@ -971,11 +971,11 @@ describe("navigation (UX only; the API checks every call)", () => {
     expect(within(tabs).getByRole("link", { name: "Ask" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).getByRole("link", { name: "Search documents" })).toHaveAttribute(
       "href",
-      "/en/ask/search",
+      "/ask/search",
     );
     expect(within(tabs).getByRole("link", { name: "Verified answers" })).toHaveAttribute(
       "href",
-      "/en/ask/verified",
+      "/ask/verified",
     );
   });
 });
