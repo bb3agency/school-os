@@ -2,6 +2,10 @@
   "adapter": "stub-perfect",
   "dataset_sha256": "d047b52e4519790fc1e2a9458eea305a04dcdc50a54320cac10acd87ac6acffc",
   "metrics": {
+    "authorised_recall_at_10": 1.0,
+    "authorised_recall_at_10_critical": 1.0,
+    "authorised_recall_items": 48,
+    "authorised_recall_leakage_count": 0,
     "circular_citation_validity": 1.0,
     "circular_complete_rate": 1.0,
     "circular_deadline_precision": 1.0,

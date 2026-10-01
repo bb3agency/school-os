@@ -62,6 +62,10 @@ PERFECT = Metrics(
     english_first_fields=40,
     english_first_telugu_outputs=0,
     english_first_english_answer_rate=1.0,
+    authorised_recall_items=16,
+    authorised_recall_at_10=1.0,
+    authorised_recall_at_10_critical=1.0,
+    authorised_recall_leakage_count=0,
 )
 
 

@@ -9,7 +9,15 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import circulars, contextual, conversations, english_first, fees, metrics
+from sos_evals import (
+    authorised_recall,
+    circulars,
+    contextual,
+    conversations,
+    english_first,
+    fees,
+    metrics,
+)
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
@@ -102,6 +110,12 @@ class Metrics(_Model):
     english_first_fields: int = 0
     english_first_telugu_outputs: int | None = None
     english_first_english_answer_rate: float | None = None
+    # Authorised retrieval recall (sos_evals.authorised_recall; docs/06 §6): the production
+    # vector path against an exact oracle under narrowing permissions. None when not measured.
+    authorised_recall_items: int = 0
+    authorised_recall_at_10: float | None = None
+    authorised_recall_at_10_critical: float | None = None
+    authorised_recall_leakage_count: int | None = None
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -231,6 +245,7 @@ class RunResult(_Model):
     contextual_outcomes: tuple[contextual.CtxOutcome, ...] = ()
     conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
     english_first_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
+    authorised_recall_outcomes: tuple[authorised_recall.RecallOutcome, ...] = ()
 
 
 def run(
@@ -249,6 +264,8 @@ def run(
     conversation: conversations.ConversationAdapter | None = None,
     conversation_cases: Sequence[conversations.ConversationCase] = (),
     english: english_first.EnglishFirstAdapter | None = None,
+    recall: authorised_recall.AuthorisedRecallAdapter | None = None,
+    recall_fast: bool = False,
 ) -> RunResult:
     """Every pass with the Telugu switch ON (the dormant Telugu gates keep running), then, with
     ``english``, the English-first pass with it OFF (the product default, ADR-0036)."""
@@ -281,6 +298,10 @@ def run(
     if conversation is not None and conversation_cases:
         talk, conversation_outcomes = conversations.run(conversation_cases, conversation)
         overall = overall.model_copy(update=talk.model_dump())
+    recall_outcomes: tuple[authorised_recall.RecallOutcome, ...] = ()
+    if recall is not None:
+        found, recall_outcomes = authorised_recall.run(recall, fast=recall_fast)
+        overall = overall.model_copy(update=found.model_dump())
     english_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
     if english is not None:
         first, english_outcomes = english_first.run(
@@ -299,4 +320,5 @@ def run(
         contextual_outcomes=ctx_outcomes,
         conversation_outcomes=conversation_outcomes,
         english_first_outcomes=english_outcomes,
+        authorised_recall_outcomes=recall_outcomes,
     )

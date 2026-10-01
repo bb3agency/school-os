@@ -21,6 +21,9 @@ its subject is missed (nothing on the page can match it), any other is ranked fi
 contextual gain is the share of such questions and its rerank gain 0. It never returns or reranks
 a restricted document; `stub-leaky` returns and "reranks" them first (must trip the hard gate).
 
+Authorised retrieval recall (docs/06 §6): `stub-perfect` returns the oracle's own nearest
+authorised chunks (recall 1.0); `stub-leaky` puts a chunk the caller may not see first.
+
 Latencies are derived from a hash of the question so reports are reproducible.
 """
 
@@ -32,6 +35,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from sos_evals.acl import retrievable, visible
 from sos_evals.adapters import AnswerSegment, AskResult, Citation, Retrieved
+from sos_evals.authorised_recall import RecallHit, RecallLevel, RecallRetrieved
 from sos_evals.circulars import CircularCase, CircularResult, SuggestedDeadline, dates_in
 from sos_evals.contextual import (
     ContextualSet,
@@ -52,6 +56,8 @@ REFUSALS: Mapping[Locale, str] = {
     "te": "మీరు చూడగల పాఠశాల రికార్డులలో ఇది కనబడలేదు.",
 }
 _TE_PREFIX = "సమాధానం: "
+RECALL_SCHOOL_CHUNKS = 4000
+"""The stubs' notional school size for the authorised-recall probes (no vectors, no DB)."""
 EN_STAND_IN = "The cited passage from the school's records answers this."
 """What an English-first answer says instead of copying a Telugu passage (it cites it)."""
 
@@ -170,6 +176,23 @@ class PerfectStub(_ConversationOracle):
             hits=tuple(hits),
             reranked_documents=sent,
             latency_ms=_hash_ms(f"{variant}:{question.id}", 30, 100),
+        )
+
+    def _recall_exact(self, level: RecallLevel, query: int, k: int) -> list[RecallHit]:
+        authorised = round(level.selectivity * RECALL_SCHOOL_CHUNKS)
+        return [
+            RecallHit(chunk=f"{level.id}-q{query}-c{i}", distance=0.01 * (i + 1))
+            for i in range(min(k, authorised))
+        ]
+
+    def retrieve_authorised(self, level: RecallLevel, query: int, k: int) -> RecallRetrieved:
+        """The oracle itself: returns exactly the nearest authorised chunks."""
+        exact = self._recall_exact(level, query, k)
+        return RecallRetrieved(
+            exact=tuple(exact),
+            returned=tuple(exact),
+            authorised=round(level.selectivity * RECALL_SCHOOL_CHUNKS),
+            route="oracle",
         )
 
     def _item(self, question: str, asker: Asker) -> EvalItem | None:
@@ -302,6 +325,17 @@ class LeakyStub(PerfectStub):
             refused=False,
             provided_sources=tuple(self._ranked(question, asker, 10)),
             latency_ms=_hash_ms(question, 900, 2500),
+        )
+
+    def retrieve_authorised(self, level: RecallLevel, query: int, k: int) -> RecallRetrieved:
+        """No permission filter: a chunk the caller may not see comes first."""
+        exact = self._recall_exact(level, query, k)
+        forbidden = RecallHit(chunk=f"{level.id}-q{query}-forbidden", distance=None)
+        return RecallRetrieved(
+            exact=tuple(exact),
+            returned=(forbidden, *exact[: k - 1]),
+            authorised=round(level.selectivity * RECALL_SCHOOL_CHUNKS),
+            route="unfiltered",
         )
 
     def _ctx_ranked(self, variant: Variant, question: CtxQuestion) -> list[CtxHit]:

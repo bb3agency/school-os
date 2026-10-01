@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import contextual
+from sos_evals import authorised_recall, contextual
 from sos_evals.gates import GateResult
 from sos_evals.runner import ItemOutcome, Metrics, RunResult
 
@@ -31,6 +31,7 @@ LOWER_IS_BETTER = frozenset(
         "conversation_leakage_count",
         "english_first_telugu_outputs",
         "conversation_scope_violations",
+        "authorised_recall_leakage_count",
     }
 )
 _MAX_LISTED = 20
@@ -138,7 +139,17 @@ def to_markdown(report: Report) -> str:
         n
         for n in Metrics.model_fields
         if n != "items"
-        and not n.startswith(("circular_", "fee_", "ctx_", "conversation_", "followup_", "memory_"))
+        and not n.startswith(
+            (
+                "circular_",
+                "fee_",
+                "ctx_",
+                "conversation_",
+                "followup_",
+                "memory_",
+                "authorised_recall_",
+            )
+        )
     ]
     lines += [
         "",
@@ -175,6 +186,8 @@ def to_markdown(report: Report) -> str:
     lines += _conversation_lines(report.run) or ["Not measured."]
     lines += ["", "## English first, Telugu hidden (ADR-0036)", ""]
     lines += _english_first_lines(report.run) or ["Not measured."]
+    lines += ["", "## Authorised retrieval recall (docs/06 §6)", ""]
+    lines += _authorised_recall_lines(report.run) or ["Not measured."]
     return "\n".join(lines) + "\n"
 
 
@@ -330,6 +343,29 @@ def _english_first_lines(run: RunResult) -> list[str]:
             if o.english_answer is False:
                 problems.append("answer not in English")
             lines.append(f"- `{o.id}` ({o.kind}): " + ", ".join(problems))
+    return lines
+
+
+def _authorised_recall_lines(run: RunResult) -> list[str]:
+    if not run.authorised_recall_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- Probes: {m.authorised_recall_items} · recall@10 {fmt(m.authorised_recall_at_10)} · "
+        f"critical (<= 5 % visible) {fmt(m.authorised_recall_at_10_critical)} · leakage "
+        f"{fmt(m.authorised_recall_leakage_count)}",
+        "",
+        "| Level | Visible share | Authorised chunks | Recall@10 | Route |",
+        "|---|---|---|---|---|",
+    ]
+    table = authorised_recall.by_level(run.authorised_recall_outcomes)
+    for level in authorised_recall.LEVELS:
+        if level.id in table:
+            recall, authorised, routes = table[level.id]
+            lines.append(
+                f"| {level.id} | {level.selectivity:.0%} | {authorised} | {fmt(recall)} | "
+                f"{routes} |"
+            )
     return lines
 
 
