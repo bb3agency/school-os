@@ -654,8 +654,9 @@ for eyebrows. Dark bands (`.mk-night`, #0b1220) use white (18.9:1) and `--mk-nig
 `/bff/auth/login`. Without an address "Sign in" becomes the primary button and the home hero
 offers "See how it works". **"Ask on WhatsApp"** (`WhatsAppLink`) is a secondary button beside
 "Talk to us" (after "Sign in" when there is no address), shown only when
-`SOS_PUBLIC_WHATSAPP_NUMBER` is set: in the header bar from xl (1280px; below that in the
-phone menu), the hero, both plan cards on /pricing and the closing bands. It is a plain link
+`SOS_PUBLIC_WHATSAPP_NUMBER` is set: in the header bar from xl (1280px), in the phone menu
+below lg (1024px; between 1024 and 1279px the header has no WhatsApp link, only the page body
+does), the hero, both plan cards on /pricing and the closing bands. It is a plain link
 to `https://wa.me/<digits>?text=<encoded>` with the fixed greeting "Hello, I'd like to see
 SchoolOS for our school." (`marketing.cta.whatsappMessage`; never student or other personal
 data), `rel="noopener noreferrer"`, same tab, and an accessible name that starts with the
