@@ -337,12 +337,42 @@ DROP_ORDER = (
 )
 
 
+# The keys this revision seeds. Later revisions seed the keys they add to attributes.yaml
+# (0042_apaar_id: udise_pen, apaar_id), so a fresh upgrade never meets a data type that this
+# revision's CHECK does not know yet.
+SEEDED_KEYS = frozenset(
+    {
+        "full_name",
+        "dob",
+        "gender",
+        "father_name",
+        "mother_name",
+        "admission_no",
+        "admission_date",
+        "mother_tongue",
+        "nationality",
+        "aadhaar_last4",
+        "aadhaar_name_as_printed",
+        "aadhaar_dob_as_printed",
+        "aadhaar_gender_as_printed",
+        "category",
+        "caste",
+        "religion",
+        "health_notes",
+        "disability",
+        "address",
+    }
+)
+
+
 def _attribute_rows() -> list[dict[str, Any]]:
     raw: dict[str, Any] = yaml.safe_load(
         resources.files("app.students").joinpath("attributes.yaml").read_text("utf-8")
     )
     rows: list[dict[str, Any]] = []
     for key, spec in raw["attributes"].items():
+        if key not in SEEDED_KEYS:
+            continue
         rows.append(
             {
                 "id": uuid.uuid5(ATTRDEF_NAMESPACE, f"sis.attribute_definitions:{key}"),

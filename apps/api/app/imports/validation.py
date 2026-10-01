@@ -47,6 +47,7 @@ MIN_DATE: Final = dt.date(1900, 1, 1)
 _EXPLICIT_PHONE_RE: Final = re.compile(r"\+91[ \u00a0-]?[6-9][0-9]{4}[ \u00a0-]?[0-9]{5}")
 _MASKED_LAST4_RE: Final = re.compile(r"^(?:[Xx*•]{4}[\s-]?){2}(\d{4})$")
 _TWELVE_DIGITS_RE: Final = re.compile(r"^\d{4}[\s-]?\d{4}[\s-]?\d{4}$")
+_DIGITS12_RE: Final = re.compile(r"[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}")
 
 RowStatus = Literal["valid", "error"]
 Action = Literal["create", "update"]
@@ -318,6 +319,13 @@ class _RowValidator:
             if re.fullmatch(r"[0-9]{4}", text) is None:
                 result.errors.append(issue(key, "digits4_required", AADHAAR_MESSAGE_KEY))
                 return None
+        if spec.data_type == "digits12":
+            # APAAR ID (ADR-0037, FR-STU-015): 12 ASCII digits, groups of 4 allowed. A number
+            # passing Verhoeff never gets here: the row scan refused the cell (invariant 4).
+            if _DIGITS12_RE.fullmatch(text) is None:
+                result.errors.append(issue(key, "digits12_required"))
+                return None
+            return re.sub(r"[ -]", "", text)
         pattern = self.patterns.get(key)
         if pattern is not None and pattern.fullmatch(text) is None:
             result.errors.append(issue(key, "invalid_format"))

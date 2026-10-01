@@ -4,8 +4,8 @@
 sentence for office staff:
 
 - ``match_classes``: ``NM-EXACT`` ... ``NM-MISSING`` (one per name-match class),
-- ``routes``: the four suggested correction routes (``ROUTE-SCHOOL-CR``, ``ROUTE-UIDAI``,
-  ``ROUTE-UDISE``, ``ROUTE-BOARD``),
+- ``routes``: the suggested correction routes (``ROUTE-SCHOOL-CR``, ``ROUTE-UIDAI``,
+  ``ROUTE-UDISE``, ``ROUTE-BOARD``, ``ROUTE-APAAR``),
 - ``rules``: the explanation template of each DQ rule (``DQ-001`` ...) and of rule variants
   for a second situation of the same rule (``DQ-005-UNVERIFIED``).
 
@@ -40,6 +40,7 @@ ROUTE_CODES: Final[tuple[str, ...]] = (
     "ROUTE-UIDAI",
     "ROUTE-UDISE",
     "ROUTE-BOARD",
+    "ROUTE-APAAR",
 )
 
 _IDENTIFIER: Final = re.compile(r"^[a-z][a-z0-9_]*$")

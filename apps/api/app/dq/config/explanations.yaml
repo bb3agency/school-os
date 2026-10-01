@@ -48,6 +48,11 @@ routes:
   ROUTE-BOARD:
     en: "Raise a correction request on the board portal."
     te: "బోర్డు పోర్టల్‌లో సవరణ అభ్యర్థన సమర్పించండి."
+  # ADR-0037: the APAAR ID is not an identity field; the office records the right one and
+  # verifies it (no change request).
+  ROUTE-APAAR:
+    en: "Check the APAAR ID on the UDISE+ portal or the APAAR card, then record and verify the right one."
+    te: "UDISE+ పోర్టల్‌లో లేదా APAAR కార్డులో APAAR ఐడిని సరిచూసి, సరైనదాన్ని నమోదు చేసి ధృవీకరించండి."
 
 # Rule explanation templates (rules.yaml `explanation_key`), English from docs/02 §5.
 rules:
@@ -92,3 +97,14 @@ rules:
   DQ-012:
     en: "Student is enrolled twice."
     te: "విద్యార్థి రెండుసార్లు నమోదై ఉన్నారు."
+  # ADR-0037 (FR-DQ-021, FR-DQ-022). The APAAR ID itself is never part of a text.
+  DQ-021:
+    en: "The APAAR ID is not 12 digits."
+    te: "APAAR ఐడి 12 అంకెలుగా లేదు."
+  # DQ-021 when two students of the school have the same APAAR ID.
+  DQ-021-DUPLICATE:
+    en: "Same APAAR ID as {student}. One of them is wrong."
+    te: "{student} కి ఉన్న APAAR ఐడి నే ఇక్కడా ఉంది. వాటిలో ఒకటి తప్పు."
+  DQ-022:
+    en: "UDISE+ details differ from Aadhaar. APAAR generation will fail until these match."
+    te: "UDISE+ వివరాలు ఆధార్‌తో సరిపోలడం లేదు. ఇవి సరిపోలే వరకు APAAR రూపొందించడం విఫలమవుతుంది."

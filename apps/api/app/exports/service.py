@@ -94,7 +94,15 @@ from app.exports.schemas import (
     RequestedBy,
     StudentListCreate,
 )
-from app.exports.tables import CSV_MIME, PDF_MIME, XLSX_MIME, Table, write_csv, write_xlsx
+from app.exports.tables import (
+    CSV_MIME,
+    PDF_MIME,
+    XLSX_MIME,
+    Table,
+    typed_digits12,
+    write_csv,
+    write_xlsx,
+)
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
@@ -851,6 +859,9 @@ def _format_value(
         return None
     if key == "aadhaar_last4":
         return cfg.aadhaar_last4_display.format(last4=value[-4:])
+    if data_type == "digits12":
+        # ADR-0037 option (a): the typed APAAR ID is written unmasked; free text never is.
+        return typed_digits12(value)
     if data_type == "date":
         try:
             return dt.date.fromisoformat(value).strftime(date_format)

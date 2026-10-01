@@ -1987,6 +1987,7 @@
       "identityField": "Identity field: changes need a correction request",
       "restrictedField": "Restricted: hidden until you choose Show",
       "provisional": "Provisional",
+      "apaarNotVerified": "Not verified yet. An APAAR ID counts once someone checks it against the UDISE+ portal or the APAAR card and marks it verified.",
       "conflicts": "Differs from: {sources}",
       "recordedOn": "Recorded {date}",
       "hasEvidence": "evidence attached",
@@ -2026,6 +2027,8 @@
       "value": "Value",
       "digits4Hint": "Only the last 4 digits of the Aadhaar number, for example 1234.",
       "digits4Invalid": "Enter exactly 4 digits: the last 4 digits of the Aadhaar number.",
+      "digits12Hint": "The 12-digit APAAR ID as shown in the UDISE+ portal or on the APAAR card. Spaces between groups of 4 are fine.",
+      "digits12Invalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
       "identityNote": "This is an identity field. Once the admission register value is recorded, changing it needs a correction request with evidence, approved by the principal.",
       "submit": "Record value",
       "goToChangeRequests": "Open correction requests for this student"

@@ -135,10 +135,116 @@ def test_CLAUDE_6_12_sis_migration_reversible_with_data(populated: tuple[Config,
     assert _scalar(admin, "SELECT to_regclass('sis.students') IS NULL") is True
     assert _scalar(admin, "SELECT count(*) FROM core.memberships") > 0, "earlier data untouched"
     command.upgrade(cfg, "0008_sis_students")
-    assert _scalar(admin, "SELECT array_agg(id ORDER BY key) FROM sis.attribute_definitions") == ids
+    # 0008 seeds its own keys; later revisions seed the keys they add (0042_apaar_id).
+    assert _scalar(
+        admin,
+        "SELECT array_agg(id ORDER BY key) FROM sis.attribute_definitions "
+        "WHERE key <> ALL (ARRAY['apaar_id', 'udise_pen'])",
+    ) == _scalar(
+        admin,
+        "SELECT array_agg(id ORDER BY key) FROM sis.attribute_definitions",
+    )
+    assert len(ids) - 2 == _scalar(admin, "SELECT count(*) FROM sis.attribute_definitions")
     command.downgrade(cfg, "0007_accept_invitations")
     command.upgrade(cfg, "head")
     assert _scalar(
         admin, "SELECT count(*) FROM sis.attribute_definitions WHERE tenant_id IS NULL"
     ) == len(ids)
     assert all(isinstance(i, uuid.UUID) for i in ids)
+
+
+APAAR = "0042_apaar_id"
+BEFORE_APAAR = "0041_billing_catalogue"
+
+
+def _apaar_student(admin: Engine) -> uuid.UUID:
+    """A synthetic student with an APAAR ID and a PEN recorded through the service."""
+    with admin.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT m.tenant_id, m.user_id, m.id AS membership_id FROM core.memberships m "
+                "WHERE m.status = 'active' ORDER BY m.created_at LIMIT 1"
+            )
+        ).one()
+        sid: uuid.UUID = c.execute(
+            text("SELECT id FROM sis.students WHERE tenant_id = :t ORDER BY id LIMIT 1"),
+            {"t": row.tenant_id},
+        ).scalar_one()
+    person = SW.W.Person("office_admin", row.user_id, row.membership_id, "sub", "Synthetic")
+    ctx = SW.ctx_for(row.tenant_id, person, "office_admin")
+    with tenant_session(row.tenant_id, row.user_id) as db:
+        students.record_value(db, ctx, sid, "apaar_id", "udise_plus", "1234 5678 9011")
+        students.record_value(db, ctx, sid, "udise_pen", "udise_plus", "21345678901")
+    return uuid.UUID(str(sid))
+
+
+def test_FR_STU_013_apaar_migration_reversible_with_values(
+    populated: tuple[Config, Engine],
+) -> None:
+    """0042_apaar_id: down keeps recorded values and drops the two global definitions and the
+    ``digits12`` type; up re-seeds the same ids and the values show again (invariant 12)."""
+    cfg, admin = populated
+    sid = _apaar_student(admin)
+    keys = (
+        "SELECT array_agg(key ORDER BY key) FROM sis.attribute_definitions WHERE key IN "
+        "('apaar_id', 'udise_pen')"
+    )
+    ids = _scalar(admin, keys.replace("array_agg(key", "array_agg(id"))
+    assert _scalar(admin, keys) == ["apaar_id", "udise_pen"]
+    assert (
+        _scalar(admin, "SELECT data_type FROM sis.attribute_definitions WHERE key = 'apaar_id'")
+        == "digits12"
+    )
+    values = (
+        f"SELECT count(*) FROM sis.attribute_values WHERE student_id = '{sid}' "
+        "AND attribute_key IN ('apaar_id', 'udise_pen')"
+    )
+    assert _scalar(admin, values) == 2
+    assert (
+        _scalar(
+            admin,
+            f"SELECT value_text FROM sis.attribute_values WHERE student_id = '{sid}' "
+            "AND attribute_key = 'apaar_id'",
+        )
+        == "123456789011"
+    )
+
+    command.downgrade(cfg, BEFORE_APAAR)
+    assert _scalar(admin, keys) is None
+    assert _scalar(admin, values) == 2, "recorded values are kept"
+    with (
+        pytest.raises(Exception, match="attribute_definitions_data_type_check"),
+        admin.begin() as c,
+    ):
+        c.execute(
+            text(
+                "INSERT INTO sis.attribute_definitions (id, key, data_type, classification, "
+                "canonical_policy, label_en, label_te) VALUES (gen_random_uuid(), 'x_digits', "
+                "'digits12', 'C2', '{}'::jsonb, 'X', 'X')"
+            )
+        )
+
+    command.upgrade(cfg, "head")
+    assert _scalar(admin, keys.replace("array_agg(key", "array_agg(id")) == ids
+    assert _scalar(admin, values) == 2
+
+
+def test_FR_STU_015_digits12_is_only_for_global_definitions(
+    populated: tuple[Config, Engine],
+) -> None:
+    """A school's own attribute can never be ``digits12`` (the typed-field exemption)."""
+    _, admin = populated
+    tenant = _scalar(admin, "SELECT id FROM core.tenants ORDER BY created_at LIMIT 1")
+    with (
+        pytest.raises(Exception, match="attribute_definitions_digits12_global"),
+        admin.begin() as c,
+    ):
+        c.execute(
+            text(
+                "INSERT INTO sis.attribute_definitions (id, tenant_id, key, data_type, "
+                "classification, canonical_policy, label_en, label_te) VALUES "
+                "(gen_random_uuid(), :t, 'school_id12', 'digits12', 'C2', '{}'::jsonb, "
+                "'X', 'X')"
+            ),
+            {"t": tenant},
+        )

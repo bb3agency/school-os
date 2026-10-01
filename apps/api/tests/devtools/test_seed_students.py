@@ -260,7 +260,7 @@ def test_FR_DQ_003_school_scale_db_run_meets_the_precision_gate(
     seeded: Seeded, db_findings: list[dq_eval.Observed]
 ) -> None:
     scores = dq_eval.score(db_findings, seeded.school.expected())
-    assert set(scores) == {f"DQ-{n:03d}" for n in range(1, 13)}
+    assert set(scores) == {*(f"DQ-{n:03d}" for n in range(1, 13)), "DQ-022"}
     for rule, s in scores.items():
         assert s.precision >= dq_eval.MIN_PRECISION, (rule, s)
         assert s.unexpected == [], (rule, s.unexpected[:5])

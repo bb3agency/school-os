@@ -39,7 +39,8 @@ def _rule_data(registry: RuleRegistry, rule_id: str) -> dict[str, Any]:
 
 
 def test_FR_DQ_001_catalog_has_dq_001_to_012(registry: RuleRegistry) -> None:
-    assert list(registry) == [f"DQ-{n:03d}" for n in range(1, 13)]
+    # DQ-021 and DQ-022: APAAR ID rules (ADR-0037, FR-DQ-021, FR-DQ-022).
+    assert list(registry) == [f"DQ-{n:03d}" for n in (*range(1, 13), 21, 22)]
     for rule in registry.values():
         assert rule.version >= 1
         assert rule.routes
@@ -61,7 +62,7 @@ def test_fixed_severities_match_the_prd(registry: RuleRegistry) -> None:
     text = PRD.read_text("utf-8")
     rows = re.findall(r"^\| (DQ-\d{3}) \| [^|]+ \| ([^|]+) \|", text, flags=re.MULTILINE)
     documented = {rule_id: severity.strip() for rule_id, severity in rows}
-    assert len(documented) == 12
+    assert len(documented) == 14
     for rule_id, severity in documented.items():
         rule = registry[rule_id]
         if rule.severity.mode == "fixed":

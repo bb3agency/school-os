@@ -47,6 +47,8 @@ NAMESPACE: Final = uuid.uuid5(uuid.NAMESPACE_URL, "https://schoolos.invalid/devt
 _PRECEDENCE: Final[dict[str, tuple[str, ...]]] = {
     "father_name": ("admission_register", "parent_form"),
     "mother_name": ("admission_register", "parent_form"),
+    "udise_pen": ("udise_plus",),
+    "apaar_id": ("udise_plus",),  # unverified: DQ-009 and DQ-022 still apply (ADR-0037)
 }
 _DEFAULT_PRECEDENCE: Final = ("admission_register",)
 IDENTITY_KEYS: Final = frozenset(

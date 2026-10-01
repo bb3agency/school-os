@@ -277,6 +277,50 @@ def test_SEC_013_aadhaar_column_keeps_last_four_digits_only() -> None:
     }
 
 
+def test_FR_STU_015_apaar_column_takes_twelve_digits_and_never_an_aadhaar_number() -> None:
+    """ADR-0037: an APAAR ID column imports 12 digits (groups allowed). The import's row scan is
+    unchanged: a 12-digit value passing Verhoeff is still refused there, as in every column
+    (invariant 4); such an APAAR ID is typed in on the student page instead."""
+    from app.core.redaction import verhoeff_check_digit
+
+    body = "78912345678"
+    verhoeff = body + verhoeff_check_digit(body)
+    spec = AttributeSpec(
+        "apaar_id", "digits12", "C2", False, ("udise_plus", "parent_form", "manual_entry"), None
+    )
+    sheet = read_sheet(
+        S.csv_bytes(
+            [
+                ["Adm No", "APAAR", "Name"],
+                ["A-1", "123456789011", "x"],
+                ["A-2", "1234 5678 9011", "x"],
+                ["A-3", "12345678901", "x"],
+                ["A-4", verhoeff, "x"],
+            ]
+        ),
+        "csv",
+        CFG.limits,
+    )
+    existing = {f"a-{i}": ExistingStudent(f"sid-{i}", None, {}) for i in range(1, 5)}
+    result = validate_sheet(
+        sheet,
+        {"0": "admission_no", "1": "apaar_id"},
+        _ctx(source="udise_plus", existing=existing, specs={**SPECS, "apaar_id": spec}),
+    )
+    assert [r.values.get("apaar_id") for r in result.rows] == [
+        "123456789011",
+        "123456789011",
+        None,
+        None,
+    ]
+    assert [sorted(e["code"] for e in r.errors) for r in result.rows] == [
+        [],
+        [],
+        ["digits12_required"],
+        ["aadhaar_full_number_rejected"],
+    ]
+
+
 def test_SEC_017_mapped_formula_cells_are_errors_unmapped_ones_warnings() -> None:
     header = [*S.HEADER, "Notes"]
     sheet = read_sheet(

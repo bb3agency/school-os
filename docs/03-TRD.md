@@ -79,6 +79,9 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-STU-010 | Search MUST support partial names, transliteration (Telugu↔Latin), admission number, class/section, and parent name, filtered by scope. | T |
 | FR-STU-011 | Search results for 2,000-student tenants MUST return in ≤ 300 ms p95. | T |
 | FR-STU-012 | The system MUST reject input of full Aadhaar numbers in any field and store only `aadhaar_last4` plus as-printed fields. | T |
+| FR-STU-013 | The student record MUST hold the APAAR ID as attribute `apaar_id` (C2, not an identity field, ADR-0037) with provenance: sources `udise_plus`, `parent_form` and `manual_entry` (precedence in that order); a value counts (canonical, verified) only after a person verifies it against the portal or the card. Corrections are recorded as new values from a source and verified again (history kept, FR-STU-005). | T |
+| FR-STU-014 | The student record MUST hold the UDISE+ PEN as attribute `udise_pen` (C2, not an identity field) from `udise_plus` or `manual_entry`, with the same verification rule. *(PEN format to confirm from the portal; until then 1-20 letters or digits.)* | T |
+| FR-STU-015 | Data type `digits12` MUST accept exactly 12 ASCII digits (spaces or hyphens between digit groups are removed). Only the value of a `digits12` attribute is exempt from the full-Aadhaar refusal (FR-STU-012): a 12-digit value passing the Verhoeff check is stored only as `apaar_id`, never treated as or matched against an Aadhaar number, and a 12-digit value is still refused in every other field, including `aadhaar_last4` and free-text search. | T |
 
 ### 3.4 Import & onboarding (FR-IMP)
 
@@ -110,6 +113,8 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-DQ-005 | 2,000 students MUST be checked in ≤ 2 min. | T |
 | FR-DQ-006 | Findings MUST include suggested correction route and masked values for C3 attributes. | T |
 | FR-DQ-020 | Resolve requires a linked change request or note; waive requires `dq.findings.waive` and a reason. | T |
+| FR-DQ-021 | DQ-021 MUST flag an `apaar_id` value that is not 12 digits (any source) and a student whose APAAR ID another student of the school also has (blocker; raised for each student when that student is checked, naming the first other record by admission number, masked outside the reader's scope as for DQ-008, and never showing the ID). | T |
+| FR-DQ-022 | DQ-022 MUST flag, for a student without a verified APAAR ID, a UDISE+ name, date of birth or gender that differs from the Aadhaar-as-printed value (names by match class, "APAAR generation will fail until these match"). DQ-009 MUST be raised only for students without a verified APAAR ID. | T |
 
 ### 3.6 Change requests (FR-CR)
 
@@ -163,6 +168,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-EXP-002 | Pre-check reports MUST be produced as PDF and XLSX, EN/TE. Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | D |
 | FR-EXP-003 | Exports MUST be audited (who, when, which students, profile version) and watermarked. | T |
 | FR-EXP-004 | Bulk exports of personal data MUST require re-authentication. | T |
+| FR-EXP-005 | The UDISE+ pre-check "ready to enter" sheet MUST carry `udise_pen` and `apaar_id` columns (layout version 2), empty when unknown; the typed `apaar_id` column is written unmasked (ADR-0037 option (a)), every other cell still passes the Aadhaar mask. | T |
 
 ### 3.10 Audit (FR-AUD)
 
