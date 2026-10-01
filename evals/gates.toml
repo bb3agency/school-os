@@ -58,6 +58,33 @@ threshold = 0.95
 severity = "soft"
 requirements = ["FR-KB-005"]
 
+# Per-sentence citations (sos_evals.sentences; docs/06 §9 rule 3, §13.2). Every factual sentence
+# of an answer shown needs a valid citation of a source it was given; the harness splits
+# sentences on its own rules. Recall and the unsupported rate block release; an unsupported
+# figure (a date, time, amount or number no cited source writes, or one without a citation)
+# breaks invariant 8 and blocks merge.
+
+[[gate]]
+metric = "citation_recall"
+op = ">="
+threshold = 0.95
+severity = "soft"
+requirements = ["FR-KB-005", "FR-KB-007"]
+
+[[gate]]
+metric = "unsupported_sentence_rate"
+op = "<="
+threshold = 0.02
+severity = "soft"
+requirements = ["FR-KB-005", "FR-KB-007"]
+
+[[gate]]
+metric = "unsupported_high_severity_count"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["FR-KB-005", "FR-KB-007"]
+
 [[gate]]
 # Telugu questions answered in Telugu: measured with SOS_TELUGU_ENABLED on (the dormant Telugu
 # path, ADR-0036); the English-first default has its own hard gates at the end of this file.

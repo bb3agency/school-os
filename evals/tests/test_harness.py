@@ -153,6 +153,53 @@ def test_FR_KB_005_invented_quote_and_superseded_version_are_invalid_citations()
     assert outcome.factual_segments == 1
 
 
+def test_FR_KB_005_per_sentence_recall_and_unsupported_sentences() -> None:
+    """docs/06 §13.2: an uncited sentence lowers citation recall; one with a figure is a
+    high-severity unsupported sentence (hard gate); a lead-in needs no citation."""
+    item = _item("documents")
+    source = item.expected_sources[0]
+    lead = DATA.corpus[source].content.split("\n")[0]
+    answer = AskResult(
+        segments=(
+            AnswerSegment(text="Here is what the records say:"),
+            AnswerSegment(
+                text=f" {lead} [1]", citations=(Citation(source=source, cited_text=lead),)
+            ),
+            AnswerSegment(text=" The office opens at 07:45 on 01/01/2031."),
+            AnswerSegment(text=" Parents are welcome."),
+        ),
+        refused=False,
+        provided_sources=(source,),
+    )
+    adapter = _Scripted({item.question: answer})
+    result = runner.run([item], DATA.corpus, adapter, adapter)
+    outcome = result.outcomes[0]
+    assert outcome.factual_sentences >= 3
+    assert outcome.unsupported_sentences == 2
+    assert outcome.high_severity_sentences == 1
+    assert outcome.cited_sentences == outcome.factual_sentences - 2
+    values = result.metrics
+    assert values.citation_recall is not None
+    assert values.citation_recall < 1.0
+    assert values.unsupported_high_severity_count == 1
+    failed = {g.gate.metric for g in gates.evaluate(gates.load_gates(), values) if not g.passed}
+    assert {"unsupported_high_severity_count", "citation_recall"} <= failed
+
+
+def test_per_sentence_metrics_skip_refusals_and_fail_without_data() -> None:
+    item = _item("unanswerable")
+    answer = AskResult(
+        segments=(AnswerSegment(text="Not found in school records you can access."),),
+        refused=True,
+        provided_sources=(),
+    )
+    adapter = _Scripted({item.question: answer})
+    result = runner.run([item], DATA.corpus, adapter, adapter)
+    assert result.outcomes[0].factual_sentences == 0
+    assert result.metrics.citation_recall is None
+    assert result.metrics.unsupported_high_severity_count is None
+
+
 def test_FR_KB_007_refusal_with_citations_is_not_a_correct_refusal() -> None:
     item = _item("unanswerable")
     visible_source = next(

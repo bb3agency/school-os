@@ -349,7 +349,23 @@ budget:
     ttl_s: 600                        # abandoned reservations lapse; > timeout x 3 attempts + backoff
 
 answer_checks:
-  max_uncited_factual_fraction: 0.30  # §9 rule 3
+  # §9 rule 3, per sentence: every factual sentence of the final answer needs a valid citation of
+  # a passage given in THIS request. Uncited factual sentences are dropped; above this share of
+  # the factual sentences the answer lost its core and is replaced by the search-only view.
+  max_uncited_factual_fraction: 0.30
+  sentences:
+    terminators: ".?!।॥…"
+    # A "." after these words does not end a sentence ("Rc. No. 12", "Rs. 500", "Smt. Devi").
+    abbreviations: ["no", "nos", "rc", "rs", "dr", "mr", "mrs", "ms", "smt", "sri", "shri", "st",
+      "std", "govt", "dept", "dt", "vol", "pg", "pp", "ref", "sl", "approx", "vs", "e.g", "i.e",
+      "ch", "sec", "cl"]
+    # "Class X." may end a sentence; any other single capital with a dot is an initial ("K. Rao").
+    class_words: [class, std, standard, grade, section]
+    lead_in_max_words: 12
+    connectives: [in summary, in short, to summarise, to summarize, however, also, note, please note,
+      for example, here are the details, here is what i found, here is what the records say]
+    not_found_phrases: [not found in school records, could not find, couldn't find, cannot find,
+      can't find, no record of this in the school records]
   # Shown instead of an answer that no valid citation supports (FR-KB-007, invariant 8). English
   # first (ADR-0036): always `en` while SOS_TELUGU_ENABLED is off; with it on, `te` when the
   # question uses Telugu script (alone or code-mixed), otherwise `en` (FR-KB-006).
