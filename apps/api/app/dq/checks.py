@@ -701,9 +701,7 @@ class ApaarIdCheck(_Check):
                 )
         yield from self._duplicates(context, key, severity)
 
-    def _duplicates(
-        self, context: CheckContext, key: str, severity: Severity
-    ) -> Iterator[Finding]:
+    def _duplicates(self, context: CheckContext, key: str, severity: Severity) -> Iterator[Finding]:
         rule = self.rule
         index: dict[str, list[StudentFacts]] = defaultdict(list)
         for facts in {**context.population, **context.students}.values():

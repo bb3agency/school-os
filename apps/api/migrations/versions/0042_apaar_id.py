@@ -60,9 +60,7 @@ ALTER TABLE sis.attribute_definitions ADD CONSTRAINT attribute_definitions_data_
 """
 
 # The owner lifts FORCE for these statements only; the block's own rollback restores it.
-UNFORCE = (
-    "ALTER TABLE sis.attribute_definitions NO FORCE ROW LEVEL SECURITY"  # nosemgrep: sos-migration-rls-bypass -- owner writes global catalogue rows; FORCE is restored in the same transaction
-)
+UNFORCE = "ALTER TABLE sis.attribute_definitions NO FORCE ROW LEVEL SECURITY"  # nosemgrep: sos-migration-rls-bypass -- owner writes global catalogue rows; FORCE is restored in the same transaction
 REFORCE = "ALTER TABLE sis.attribute_definitions FORCE ROW LEVEL SECURITY"
 
 SEED = sa.text(

@@ -124,7 +124,7 @@ def test_FR_DQ_021_wrong_format_from_any_source_is_a_blocker() -> None:
     assert finding.attribute_key == "apaar_id"
     assert finding.sources == ("parent_form",)
     assert finding.explanation_code == "DQ-021"
-    details = dict(finding.details)
+    details: dict[str, Any] = dict(finding.details)
     assert details["reason"] == "format"
     assert details["values"][0]["masked"] == "••••"
     assert "12345678901" not in repr(finding)
@@ -189,8 +189,9 @@ def test_FR_DQ_022_udise_differs_from_aadhaar_without_an_apaar_id() -> None:
     assert name.severity.value == "high"
     assert name.match_class == "DIFFERENT"
     assert name.route_codes[0] == "ROUTE-UIDAI"
-    assert dict(dob.details)["differs_in"] == ["month"]
-    assert {v["masked"] for v in dict(dob.details)["values"]} == {DATE_MASK}
+    dob_details: dict[str, Any] = dict(dob.details)
+    assert dob_details["differs_in"] == ["month"]
+    assert {v["masked"] for v in dob_details["values"]} == {DATE_MASK}
 
 
 def test_FR_DQ_022_still_raised_with_an_unverified_apaar_id() -> None:

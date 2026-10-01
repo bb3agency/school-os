@@ -39,7 +39,7 @@ def new_student(api: Any, who: Any, name: str, section: str | None = None) -> st
     return str(res.json()["id"])
 
 
-def record(api: Any, who: Any, sid: str, key: str, source: str, value: str) -> Any:
+def record(api: Any, who: Any, sid: str, key: str, source: str, value: str) -> Any:  # noqa: PLR0917
     return api.call(
         who,
         "POST",
@@ -54,7 +54,9 @@ def test_FR_STU_013_apaar_id_round_trips_unmasked_and_counts_once_verified(
     admin = world.person("office_admin")
     sid = new_student(api, admin, "Synthetica Apaar Roundtrip")
     number = verhoeff_apaar()
-    res = record(api, admin, sid, "apaar_id", "udise_plus", f"{number[:4]} {number[4:8]} {number[8:]}")
+    res = record(
+        api, admin, sid, "apaar_id", "udise_plus", f"{number[:4]} {number[4:8]} {number[8:]}"
+    )
     assert res.status_code == 201, res.text
     value_id = res.json()["id"]
     with admin_engine.connect() as c:
@@ -216,7 +218,7 @@ def test_FR_STU_013_other_school_and_out_of_scope_get_404(
     for path in ("", "/values"):
         assert api.call(b_owner, "GET", f"{BASE}/{sid}{path}").status_code == 404
     with admin_engine.connect() as c:
-        status = c.execute(
+        status: str = c.execute(
             text("SELECT verification_status FROM sis.attribute_values WHERE id = :i"),
             {"i": uuid.UUID(value_id)},
         ).scalar_one()

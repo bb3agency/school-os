@@ -82,7 +82,9 @@ def test_FR_DQ_021_one_apaar_id_on_two_students_across_sections(
         DS.call(world.a, dq.get_finding, theirs["id"], as_ctx=teacher)
 
     # The office records the right ID for one of them: both findings clear when checked.
-    DS.call(world.a, students.record_value, in_9c, "apaar_id", "parent_form", synthetic_apaar_id(RNG))
+    DS.call(
+        world.a, students.record_value, in_9c, "apaar_id", "parent_form", synthetic_apaar_id(RNG)
+    )
     DS.run(world.a, in_9a, in_9c)
     assert DS.one(admin_engine, in_9a, "DQ-021")["status"] == "resolved"
     assert DS.one(admin_engine, in_9c, "DQ-021")["status"] == "resolved"
@@ -101,7 +103,11 @@ def test_DQ_009_and_FR_DQ_022_clear_once_the_apaar_id_is_verified(
     DS.run(world.a, sid, profile_key="udise-plus")
     assert DS.one(admin_engine, sid, "DQ-009")["status"] == "open"
     dq22 = DS.one(admin_engine, sid, "DQ-022")
-    assert (dq22["status"], dq22["severity"], dq22["attribute_key"]) == ("open", "high", "full_name")
+    assert (dq22["status"], dq22["severity"], dq22["attribute_key"]) == (
+        "open",
+        "high",
+        "full_name",
+    )
     assert dq22["sources"] == ["aadhaar_as_printed", "udise_plus"]
 
     # An unverified APAAR ID does not count yet.

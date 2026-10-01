@@ -1,9 +1,9 @@
 """Data-quality rule registry types (docs/02 §5, FR-DQ-001, FR-DQ-004, FR-DQ-006).
 
-Rules are declarative: ``config/rules.yaml`` lists DQ-001..DQ-012, DQ-021 and DQ-022, DQ-021 and DQ-022 with their version, check
-kind, scope, attributes, sources compared, severity policy, explanation template key and
-suggested correction routes. The checks themselves belong to the DQ engine (M1 wave 2), which
-implements :class:`RuleCheck` per ``check`` kind and emits :class:`Finding` values.
+Rules are declarative: ``config/rules.yaml`` lists DQ-001..DQ-012, DQ-021 and DQ-022 with their
+version, check kind, scope, attributes, sources compared, severity policy, explanation template
+key and suggested correction routes. The checks themselves belong to the DQ engine (M1 wave 2),
+which implements :class:`RuleCheck` per ``check`` kind and emits :class:`Finding` values.
 
 A finding is identified by its :func:`finding_fingerprint` (student, rule, attribute, sorted
 sources), which makes findings idempotent across runs and lets a re-run reopen a resolved
