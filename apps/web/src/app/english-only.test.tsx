@@ -11,7 +11,7 @@ import { renderWithIntl } from "@/test/render";
  * shows Telugu. Every page under app/[locale] is rendered inside its shell, with the school's
  * languages set to Telugu and English, the API answering 404 (empty and error states), and
  * the DOM is scanned for Telugu script (U+0C00–U+0C7F), the word "Telugu", `lang="te"`,
- * `hreflang="te"` and links to /te. Pages that need a live session (server layouts are
+ * `hreflang="te"`, links to /te and any address with a locale prefix. Pages that need a live session (server layouts are
  * covered in layouts.node.test.tsx) are skipped here, and the count of pages scanned is pinned.
  */
 
@@ -92,12 +92,30 @@ function offenders(root: HTMLElement): string[] {
   return found;
 }
 
+/**
+ * Links, forms and resources whose address names a locale (`/en`, `/te`, `/en/...`): no URL
+ * carries a locale in any language (product owner 2026-09-30, ADR-0036 note).
+ */
+function localePrefixed(root: HTMLElement): string[] {
+  const found: string[] = [];
+  for (const node of root.querySelectorAll("[href], [action], [src]")) {
+    for (const attr of ["href", "action", "src"]) {
+      const value = node.getAttribute(attr);
+      if (value && /^\/(en|te)(\/|$|\?|#)/i.test(value)) {
+        found.push(`locale in URL: ${node.tagName.toLowerCase()} ${attr}=${value}`);
+      }
+    }
+  }
+  return found;
+}
+
 describe("English only while Telugu is switched off (ADR-0036)", () => {
   it("no page under app/[locale] shows Telugu, a Telugu field or a language switch", async () => {
     const paths = Object.keys(modules).sort();
     expect(paths.length).toBeGreaterThan(60);
     const scanned: string[] = [];
     const failures: Record<string, string[]> = {};
+    let links = 0;
     for (const path of paths) {
       const page = await element(path);
       if (!page) continue;
@@ -113,13 +131,16 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
-      const found = offenders(container);
+      const found = [...offenders(container), ...localePrefixed(container)];
       if (found.length > 0) failures[path] = found;
+      links += container.querySelectorAll("a[href^='/']").length;
       expect(container.querySelector("nav[aria-label='Language']"), path).toBeNull();
       scanned.push(path);
       cleanup();
     }
     expect(failures).toEqual({});
+    // The scan really looked at in-app links (none may name a locale).
+    expect(links).toBeGreaterThan(50);
     // Most pages render without a session; pinned so a broken import cannot empty the scan.
     expect(scanned.length).toBeGreaterThan(75);
     // The public marketing pages (docs/17 §5.6) are always part of the scan.
