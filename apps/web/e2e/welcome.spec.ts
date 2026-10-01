@@ -20,7 +20,14 @@ import {
   settleAnimations,
 } from "./support/marketing";
 import { E2E_PUBLIC_SETTINGS, E2E_WHATSAPP_DIGITS } from "./support/public-settings";
-import { expectNoTelugu, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
+import {
+  expectNoLocaleLinks,
+  expectNoTelugu,
+  selectLanguage,
+  TELUGU,
+  TELUGU_OFF_REASON,
+  teluguOn,
+} from "./support/telugu";
 import en from "../messages/en.json" with { type: "json" };
 
 /**
@@ -29,10 +36,10 @@ import en from "../messages/en.json" with { type: "json" };
  * and 1920 px, keyboard only, reduced motion), SEC-010 (no CSP violations), NFR-I18N-001 /
  * ADR-0036 (English; the Telugu checks are tagged @telugu).
  *
- * URLs: tests open locale-free paths (`/features`) and follow the site's own links. Today the
- * proxy adds `/en`; once locale prefixes are removed the same paths answer directly, and every
- * URL check accepts both (support/marketing.ts `publicPathPattern`). Only the @telugu tests at
- * the end still name `/te` URLs: they belong to the locale-prefix change.
+ * URLs: no URL carries a locale (ADR-0036 note, 2026-09-30). Tests open the plain paths
+ * (`/features`), follow the site's own links and accept exactly those paths
+ * (support/marketing.ts `publicPathPattern`); Telugu is chosen by the NEXT_LOCALE cookie, and
+ * old `/en` and `/te` URLs are checked to answer 308 to the plain path.
  *
  * Server variants (playwright.config.ts): the default server has no SOS_PUBLIC_* settings (every
  * contact element hidden); @contact runs against synthetic values for all four
@@ -77,7 +84,7 @@ test.describe("public site, shared tier (FR-IAM-001, NFR-A11Y-001, SEC-010)", ()
     request,
   }) => {
     const home = await redirectChain(request, "/");
-    expect(home.at(-1) ?? "", "/ lands on").toMatch(publicPathPattern("/welcome"));
+    expect(home, "/ goes straight to /welcome").toEqual(["/welcome"]);
     // Deep links keep going straight to sign-in, with the return path.
     const deep = await redirectChain(request, "/students");
     const login = new URL(deep.at(-1) ?? "", "http://x");
@@ -423,11 +430,9 @@ test.describe("dedicated host: no marketing, a sign-in card @dedicated", () => {
     request,
   }) => {
     for (const { path } of PUBLIC_PAGES.slice(1)) {
-      // Follow today's /x -> /en/x hop, then expect the 404.
-      const chain = await redirectChain(request, path);
-      const final = chain.at(-1) ?? path;
-      expect(final, path).toMatch(publicPathPattern(path));
-      expect((await request.get(final, { maxRedirects: 0 })).status(), path).toBe(404);
+      // Served at its own path (no locale hop), as a 404.
+      expect(await redirectChain(request, path), path).toEqual([]);
+      expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(404);
     }
     const violations = cspViolations(page);
     for (const viewport of WIDTHS) {
@@ -463,21 +468,20 @@ test.describe("dedicated host: no marketing, a sign-in card @dedicated", () => {
 });
 
 /**
- * Telugu (ADR-0036). These tests name locale-prefixed URLs on purpose: they check the /te
- * routing that the locale-prefix change will replace, and move with that change.
+ * Telugu (ADR-0036). No URL carries a locale: Telugu is chosen by the NEXT_LOCALE cookie (as the
+ * switcher does) and old `/en` and `/te` URLs answer 308 to the same path without the prefix.
  */
 test.describe("public site and Telugu (ADR-0036)", () => {
   test(`the school home sends signed-out visitors to the welcome page ${TELUGU}`, async ({
     request,
-  }, testInfo) => {
-    // With Telugu off, /te goes to /en first.
-    for (const [path, target] of [
-      ["/en", "/en/welcome"],
-      ["/te", teluguOn(testInfo) ? "/te/welcome" : "/en"],
-    ] as const) {
+  }) => {
+    expect(await redirectChain(request, "/")).toEqual(["/welcome"]);
+    // Old /en and /te homes lose their prefix first (308), then land on /welcome.
+    for (const path of ["/en", "/te"]) {
       const response = await request.get(path, { maxRedirects: 0 });
-      expect(response.status(), path).toBe(307);
-      expect(new URL(response.headers()["location"] ?? "", "http://x").pathname, path).toBe(target);
+      expect(response.status(), path).toBe(308);
+      expect(new URL(response.headers()["location"] ?? "", "http://x").pathname, path).toBe("/");
+      expect(await redirectChain(request, path), path).toEqual(["/", "/welcome"]);
     }
   });
 
@@ -487,9 +491,11 @@ test.describe("public site and Telugu (ADR-0036)", () => {
     test.skip(!teluguOn(testInfo), TELUGU_OFF_REASON);
     for (const viewport of WIDTHS.slice(0, 2)) {
       await page.setViewportSize(viewport);
-      await page.goto("/te/welcome");
-      await expect(page).toHaveURL(/\/te\/welcome$/);
+      await selectLanguage(page, "te");
+      await page.goto("/welcome");
+      await expectPublicUrl(page, "/welcome");
       await expect(page.locator("html")).toHaveAttribute("lang", "te");
+      await expectNoLocaleLinks(page, `welcome te ${viewport.width}`);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await settleAnimations(page);
       await expectNoAxeViolations(page, `welcome te ${viewport.width}`);
@@ -497,10 +503,14 @@ test.describe("public site and Telugu (ADR-0036)", () => {
     }
   });
 
-  test("with Telugu off: /te/welcome is the English page, no Telugu font", async ({
+  test("with Telugu off: a Telugu cookie or an old /te/welcome gives the English page, no Telugu font", async ({
     page,
   }, testInfo) => {
     test.skip(teluguOn(testInfo), "checks the Telugu-off default");
+    await selectLanguage(page, "te");
+    await page.goto("/welcome");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expectNoTelugu(page, "welcome with a te cookie");
     await page.goto("/te/welcome");
     await expectPublicUrl(page, "/welcome");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -513,8 +523,10 @@ test.describe("public site and Telugu (ADR-0036)", () => {
     page,
   }, testInfo) => {
     test.skip(!teluguOn(testInfo), TELUGU_OFF_REASON);
-    await page.goto("/te/signed-out");
+    await selectLanguage(page, "te");
+    await page.goto("/signed-out");
     await page.getByRole("link", { name: "SchoolOS హోమ్ పేజీ" }).click();
-    await expect(page).toHaveURL(/\/te\/welcome$/);
+    await expectPublicUrl(page, "/welcome");
+    await expect(page.locator("html")).toHaveAttribute("lang", "te");
   });
 });

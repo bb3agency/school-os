@@ -170,6 +170,23 @@ class RateLimit(ConfigModel):
     """Questions one user may ask per minute (docs/06 §5 step 1; checked before any model call)."""
 
 
+class BudgetReservation(ConfigModel):
+    """What the gateway reserves before each provider call (FR-KB-011).
+
+    The estimate is the list price of ``input_tokens`` input tokens plus the role's
+    ``max_output_tokens`` output tokens (no cache discount), reserved atomically against the
+    school's month before the call and settled to the real cost after it, so concurrent calls
+    can never all pass the budget check together."""
+
+    input_tokens: int = Field(ge=1, le=1_000_000)
+    """Input tokens assumed per call: the docs/06 §12 tool-result context budget plus the system
+    prompt, tool definitions, question and earlier turns. A call that uses more is still
+    recorded at its real cost (and logged ``kb.budget.over_estimate``)."""
+    ttl_s: int = Field(ge=60, le=3600)
+    """An abandoned reservation (the process died mid-call) lapses after this long. Must exceed
+    the longest call (timeout x attempts plus backoff; checked at load)."""
+
+
 class Budget(ConfigModel):
     """Per-tenant monthly budget thresholds (FR-KB-011, NFR-CST-001)."""
 
@@ -178,6 +195,7 @@ class Budget(ConfigModel):
     """At this share of the budget, Ask degrades to search-only until reset or top-up."""
     usd_inr_rate: Decimal = Field(gt=0)
     """Converts metered USD spend to the school's INR budget (same rate as platform billing)."""
+    reservation: BudgetReservation
 
     @model_validator(mode="after")
     def _alert_first(self) -> Budget:
@@ -420,6 +438,14 @@ class LlmConfig(ConfigModel):
                 self._check_answer(role, config.with_fallback())
             if config.accepts_images and not self.capabilities[config.model].vision:
                 raise ValueError(f"roles.{role}: {config.model} does not take images")
+        client = self.client
+        longest_call_s = client.request_timeout_s * (client.max_retries + 1)
+        longest_call_s += client.backoff_max_s * client.max_retries
+        if self.budget.reservation.ttl_s <= longest_call_s:
+            raise ValueError(
+                "budget.reservation.ttl_s must exceed the longest call "
+                f"({longest_call_s:.0f} s: timeout x attempts plus backoff)"
+            )
         return self
 
     def _check_settings(self, where: str, config: RoleSettings) -> None:

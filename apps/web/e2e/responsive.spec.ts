@@ -9,7 +9,13 @@ import {
   settle,
   signInAs,
 } from "./support/responsive";
-import { englishPath, TELUGU, TELUGU_OFF_REASON, teluguOn } from "./support/telugu";
+import {
+  selectLanguage,
+  TELUGU,
+  TELUGU_OFF_REASON,
+  teluguOn,
+  type UiLocale,
+} from "./support/telugu";
 
 /** ADR-0036: a [te] variant is tagged to run with Telugu on, and skipped while it is off. */
 const tag = (locale: string) => (locale === "te" ? ` ${TELUGU}` : "");
@@ -34,10 +40,12 @@ const standIn = process.env.E2E_STAND_IN === "1";
 // stand-in state), so the tests may run in parallel and CI can split them across shards.
 test.describe.configure({ mode: "parallel" });
 
-async function checkScreens(page: Page, locale: string, pages: string[]): Promise<string[]> {
+async function checkScreens(page: Page, locale: UiLocale, pages: string[]): Promise<string[]> {
   const failures: string[] = [];
+  // The language comes from the NEXT_LOCALE cookie; no URL carries a locale (ADR-0036 note).
+  await selectLanguage(page, locale);
   for (const path of pages) {
-    const url = `/${locale}${path}`;
+    const url = path || "/";
     await page.goto(url);
     await settle(page);
     await expect(page.locator("main#main, main").first(), url).toBeVisible();
@@ -82,8 +90,9 @@ test.describe("app shell on a phone: the one sidebar as a keyboard-only drawer (
     }, testInfo) => {
       test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
       await installFixtures(page);
-      await signInAs(page, "/en/support", "clerk");
-      await page.goto(`/${locale}/students`);
+      await signInAs(page, "/support", "clerk");
+      await selectLanguage(page, locale);
+      await page.goto("/students");
       await settle(page);
       const menuName = locale === "en" ? "Menu" : "మెనూ";
       const closeName = locale === "en" ? "Close menu" : "మెనూ మూసివేయండి";
@@ -146,7 +155,7 @@ test.describe("app shell on a phone: the one sidebar as a keyboard-only drawer (
       await menu.press("Enter");
       await drawer.locator("a[href$='/support']").click();
       await expect(drawer).toBeHidden();
-      await expect(page).toHaveURL(new RegExp(`/${locale}/support$`));
+      await expect(page).toHaveURL((url) => url.pathname === "/support");
     });
   }
 
@@ -154,8 +163,8 @@ test.describe("app shell on a phone: the one sidebar as a keyboard-only drawer (
     page,
   }) => {
     await installFixtures(page);
-    await signInAs(page, "/en/platform", "operator-1");
-    await page.goto("/en/platform/schools");
+    await signInAs(page, "/platform", "operator-1");
+    await page.goto("/platform/schools");
     await settle(page);
     await page.getByRole("button", { name: "Menu", exact: true }).click();
     const drawer = page.getByRole("dialog", { name: "Menu" });
@@ -183,8 +192,9 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
     }, testInfo) => {
       test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
       await installFixtures(page);
-      await signInAs(page, "/en/support", "clerk");
-      await page.goto(`/${locale}/students`);
+      await signInAs(page, "/support", "clerk");
+      await selectLanguage(page, locale);
+      await page.goto("/students");
       await settle(page);
       const mainName = locale === "en" ? "Main" : "ప్రధాన మెనూ";
       const collapseName = locale === "en" ? "Collapse menu" : "మెనూను కుదించండి";
@@ -228,7 +238,7 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
 
       // Remembered on this computer and applied before the first paint: compact already
       // when the HTML has been parsed, before the app's scripts run.
-      await page.goto(`/${locale}/findings`, { waitUntil: "domcontentloaded" });
+      await page.goto("/findings", { waitUntil: "domcontentloaded" });
       expect(await page.evaluate(() => document.documentElement.getAttribute("data-sidebar"))).toBe(
         "collapsed",
       );
@@ -250,8 +260,9 @@ test.describe("dialogs on a phone (NFR-A11Y-001)", () => {
     }, testInfo) => {
       test.skip(locale === "te" && !teluguOn(testInfo), TELUGU_OFF_REASON);
       await installFixtures(page);
-      await signInAs(page, "/en/platform", "operator-1");
-      await page.goto(`/${locale}/platform/plans`);
+      await signInAs(page, "/platform", "operator-1");
+      await selectLanguage(page, locale);
+      await page.goto("/platform/plans");
       await settle(page);
       await page
         .getByRole("button", { name: locale === "en" ? "New plan" : "కొత్త ప్లాన్", exact: true })
@@ -281,17 +292,19 @@ test.describe("print: A4 pages (CLAUDE.md §10)", () => {
   }, testInfo) => {
     test.setTimeout(3 * 60_000);
     await installFixtures(page);
-    await signInAs(page, "/en/support", "clerk");
+    await signInAs(page, "/support", "clerk");
     await page.emulateMedia({ media: "print", reducedMotion: "reduce" });
     const failures: string[] = [];
     // ADR-0036: the Telugu pages while Telugu is on, their English pages while it is off.
-    const paths = [
-      "/te/students/0192f3a4-0000-7000-8000-00000000e501",
-      "/en/students",
-      "/te/findings",
-      "/te/settings/structure",
-    ].map((path) => (teluguOn(testInfo) ? path : englishPath(path)));
-    for (const path of paths) {
+    const telugu: UiLocale = teluguOn(testInfo) ? "te" : "en";
+    const pages: [UiLocale, string][] = [
+      [telugu, "/students/0192f3a4-0000-7000-8000-00000000e501"],
+      ["en", "/students"],
+      [telugu, "/findings"],
+      [telugu, "/settings/structure"],
+    ];
+    for (const [locale, path] of pages) {
+      await selectLanguage(page, locale);
       await page.goto(path);
       await settle(page);
       // Navigation chrome is not printed.

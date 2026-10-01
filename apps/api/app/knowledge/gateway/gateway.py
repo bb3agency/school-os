@@ -6,14 +6,16 @@ Every call runs the same controls, in this order, whichever provider serves the 
 1. ``SOS_KB_ENABLED`` kill switch, then the role's rules (the offline eval judge only for
    ``feature="eval"``; tools only from the ADR-0008 whitelist in ``tools.yaml``; tool results
    within the docs/06 §12 context budget; images only for a role that accepts them).
-2. :class:`BudgetGuard`: the school's AI switch and flag, its monthly budget (100 % -> refuse,
-   the caller answers search-only) and the per-tenant rate limit.
+2. :class:`BudgetGuard`: the school's AI switch and flag, an atomic reservation of the call's
+   worst-case cost against its monthly budget (no room -> refuse, the caller answers
+   search-only) and the per-tenant rate limit. The reservation is settled to the real cost when
+   the call is metered, and released in a ``finally`` whatever else happens (FR-KB-011).
 3. The role's provider (``models.yaml`` ``roles.<role>.provider``) picks the transport and, by
    the transport's wire format, the codec (:mod:`.codec`: Anthropic Messages API or Gemini
    ``generateContent``). Then that transport's circuit breaker; then the redacted request goes
    out with the role's model, output cap, thinking setting and timeout from ``models.yaml``;
    retries with backoff and jitter on 429/5xx/529 only.
-4. Metering: tokens and list-price cost per tenant and feature into the spend ledger, the
+4. Metering: tokens and list-price cost per tenant and feature settled into the spend ledger, the
    :class:`MeteringSink` and the ``llm.call`` span; a log line with ids, role, outcome, attempts
    and latency. Never prompt or completion text (invariant 5).
 """
@@ -45,7 +47,7 @@ from app.knowledge.domain import (
     TurnEvent,
 )
 from app.knowledge.gateway import wire
-from app.knowledge.gateway.budget import BudgetGuard, TenantAiSettings
+from app.knowledge.gateway.budget import Admission, BudgetGuard
 from app.knowledge.gateway.codec import AnthropicCodec, Codec, ImageInput, Prepared
 from app.knowledge.gateway.errors import (
     AiDisabled,
@@ -92,7 +94,7 @@ class _Call:
     metering: Metering
     role: ModelRole
     role_config: RoleConfig
-    settings: TenantAiSettings
+    admission: Admission
     started: float
     route: _Route
     span: Span | None = None
@@ -198,18 +200,21 @@ class Gateway:
         :meth:`run_turn`, text deltas (Aadhaar-masked) as they arrive, then the whole turn."""
         # The span is not made current: a generator resumes in whichever thread iterates it.
         span = tracer.start_span("llm.call")
+        admission: Admission | None = None
         try:
             role_config, route, offered, prepared = self._prepare_turn(
                 metering, role, system, conversation, tools
             )
-            settings = self._guard.check(metering.tenant_id, metering.feature)
-            call = _Call(metering, role, role_config, settings, self._clock(), route, span)
+            admission = self._guard.admit(metering.tenant_id, metering.feature, role_config)
+            call = _Call(metering, role, role_config, admission, self._clock(), route, span)
             transport = route.transport
             if isinstance(transport, StreamingTransport):
                 yield from self._streamed(transport, call, prepared, offered)
             else:
                 yield from self._unstreamed(call, prepared, offered)
         finally:
+            if admission is not None:
+                self._guard.release(admission)  # a no-op once metering settled it
             span.end()
 
     def _prepare_turn(
@@ -244,10 +249,13 @@ class Gateway:
         role_config, route, offered, prepared = self._prepare_turn(
             metering, role, system, conversation, tools
         )
-        settings = self._guard.check(metering.tenant_id, metering.feature)
-        call = _Call(metering, role, role_config, settings, self._clock(), route)
-        sent = self._send(call, prepared)
-        return self._finish_turn(call, sent, offered, prepared)
+        admission = self._guard.admit(metering.tenant_id, metering.feature, role_config)
+        try:
+            call = _Call(metering, role, role_config, admission, self._clock(), route)
+            sent = self._send(call, prepared)
+            return self._finish_turn(call, sent, offered, prepared)
+        finally:
+            self._guard.release(admission)  # a no-op once metering settled it
 
     def _finish_turn(
         self, call: _Call, sent: _Sent, offered: frozenset[str], prepared: Prepared
@@ -423,12 +431,21 @@ class Gateway:
         prepared = route.codec.json_request(
             self._config, role_config, system, text, schema, images=images
         )
-        settings = self._guard.check(metering.tenant_id, metering.feature)
-        call = _Call(metering, role, role_config, settings, self._clock(), route)
-        sent = self._send(call, prepared)
-        usage = route.codec.usage(sent.response)
+        admission = self._guard.admit(metering.tenant_id, metering.feature, role_config)
         try:
-            value = json.loads(route.codec.json_text(sent.response))
+            call = _Call(metering, role, role_config, admission, self._clock(), route)
+            return self._json_call(call, prepared, schema)
+        finally:
+            self._guard.release(admission)  # a no-op once metering settled it
+
+    def _json_call(
+        self, call: _Call, prepared: Prepared, schema: Mapping[str, object]
+    ) -> Mapping[str, object]:
+        codec = call.route.codec
+        sent = self._send(call, prepared)
+        usage = codec.usage(sent.response)
+        try:
+            value = json.loads(codec.json_text(sent.response))
             validate(value, schema)
             if not isinstance(value, Mapping):
                 raise InvalidModelOutput("structured output is not an object")
@@ -489,22 +506,20 @@ class Gateway:
         outcome: Outcome,
         usage: wire.RawUsage | None = None,
     ) -> None:
-        metering, role, role_config, settings = (
-            call.metering,
-            call.role,
-            call.role_config,
-            call.settings,
-        )
+        metering, role, role_config = call.metering, call.role, call.role_config
         usage = usage or wire.RawUsage(0, 0)
         model = role_config.model
         cost = cost_usd(
             self._config.prices[model], self._config.cache_multipliers(role_config.provider), usage
         )
         month_spend: Decimal | None = None
-        if cost > 0:
+        if cost <= 0:
+            self._guard.release(call.admission)  # nothing billed: free the reservation
+        else:
             try:
-                after = self._guard.record(metering.tenant_id, settings, cost)
+                after = self._guard.settle(call.admission, cost)
             except KVUnavailable:
+                # The reservation lapses on its TTL; this call's cost is missing from the month.
                 log.error("kb.budget.spend_unrecorded", tenant_id=metering.tenant_id)
             else:
                 month_spend = after.total_usd

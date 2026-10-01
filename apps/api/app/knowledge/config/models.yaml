@@ -341,6 +341,12 @@ budget:
   # converted at this rate; keep it equal to app/platform/billing.yaml usd_inr_rate (a test pins it).
   usd_inr_rate: "84.00"
   # Budget months are calendar months in IST (Asia/Kolkata).
+  # Before each call the gateway reserves its worst case (input_tokens at the model's input price
+  # plus the role's max_output_tokens at its output price) atomically against the month, and
+  # settles it to the real cost afterwards, so concurrent calls cannot overshoot (FR-KB-011).
+  reservation:
+    input_tokens: 16000               # 12k tool results + system prompt, tools, question, history
+    ttl_s: 600                        # abandoned reservations lapse; > timeout x 3 attempts + backoff
 
 answer_checks:
   # §9 rule 3, per sentence: every factual sentence of the final answer needs a valid citation of

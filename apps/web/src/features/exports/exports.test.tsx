@@ -33,7 +33,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/exports",
+    usePathname: () => "/exports",
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -218,7 +218,7 @@ describe("new pre-check (US-501 AC4, FR-EXP-001..004, SEC-005)", () => {
     expect(await screen.findByText(/Admission number, Full name, gender/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include restricted details/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Make the pre-check" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/exports/${CREATED}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/exports/${CREATED}`));
     const call = stub.callsTo("POST /bff/api/v1/exports")[0];
     expect(call?.headers.get("idempotency-key")).toMatch(UUID);
     expect(body("POST /bff/api/v1/exports")).toEqual({
@@ -342,12 +342,12 @@ describe("new pre-check (US-501 AC4, FR-EXP-001..004, SEC-005)", () => {
     stub.routes["POST /bff/api/v1/exports"] = () => {
       attempts += 1;
       return attempts === 1
-        ? problem(428, "step_up_required", { step_up_url: "/bff/auth/step-up?next=%2Fen" })
+        ? problem(428, "step_up_required", { step_up_url: "/bff/auth/step-up?next=%2F" })
         : created();
     };
     renderWithIntl(<NewPrecheckScreen params={parseNewPrecheckParams({})} />);
     await userEvent.click(await screen.findByRole("button", { name: "Make the pre-check" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/exports/${CREATED}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/exports/${CREATED}`));
     expect(prompt).toHaveBeenCalledTimes(1);
     const calls = stub.callsTo("POST /bff/api/v1/exports");
     expect(calls).toHaveLength(2);
@@ -392,7 +392,7 @@ describe("new student list (US-901, FR-EXP-004)", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "Date of birth" }));
     await userEvent.click(screen.getByRole("radio", { name: "CSV" }));
     await userEvent.click(screen.getByRole("button", { name: "Make the student list" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/exports/${CREATED}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/exports/${CREATED}`));
     const call = stub.callsTo("POST /bff/api/v1/exports/student-list")[0];
     expect(call?.headers.get("idempotency-key")).toMatch(UUID);
     expect(body("POST /bff/api/v1/exports/student-list")).toEqual({
@@ -511,7 +511,7 @@ describe("export detail and download (FR-EXP-003..004, SEC-005, ADR-0021)", () =
     expect(await screen.findByText("The files have been deleted")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Make a new export" })).toHaveAttribute(
       "href",
-      "/en/exports/new/precheck?profile=cisce-registration-2026",
+      "/exports/new/precheck?profile=cisce-registration-2026",
     );
     expect(screen.queryByRole("button", { name: /Download/ })).not.toBeInTheDocument();
   });

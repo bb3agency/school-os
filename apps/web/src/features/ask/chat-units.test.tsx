@@ -87,7 +87,7 @@ describe("restricted markdown (docs/06 §9 rule 5)", () => {
     );
     expect(container.querySelector("script, img, iframe")).toBeNull();
     const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/en/documents/0192f3a4-0000-7000-8000-00000000c701"]);
+    expect(hrefs).toEqual(["/documents/0192f3a4-0000-7000-8000-00000000c701"]);
     expect(container).toHaveTextContent("Hi alert(1) click site x doc");
     expect(container.innerHTML).not.toContain("javascript:");
   });

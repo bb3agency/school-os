@@ -16,7 +16,7 @@ import { MotionProvider } from "./MotionProvider";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
-  return { ...actual, usePathname: () => "/en/students" };
+  return { ...actual, usePathname: () => "/students" };
 });
 
 function ReducedMotionProbe() {

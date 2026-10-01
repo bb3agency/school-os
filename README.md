@@ -93,7 +93,7 @@ make check                    # lint + typecheck + tests + security scans (what 
 ```
 
 - API: <http://localhost:8000/healthz>, <http://localhost:8000/readyz>, OpenAPI at `/api/v1/docs` (off in staging/prod); the committed contract is `apps/api/openapi.json` (`make openapi`)
-- Web: <http://localhost:3000> (school app at `/en`; `/te` redirects to `/en` while Telugu is hidden, `SOS_TELUGU_ENABLED=false` by default, ADR-0036; platform admin panel at `/en/platform`). Signing in locally needs the dev OIDC stub (`docker compose --profile dev up -d oidc`) and the web app run on the host; see `apps/web/README.md`
+- Web: <http://localhost:3000> (school app at `/`, platform admin panel at `/platform`; no URL carries a locale: the language comes from the `NEXT_LOCALE` cookie, old `/en/...` and `/te/...` links redirect to the same path without the prefix; Telugu is hidden while `SOS_TELUGU_ENABLED=false`, the default, ADR-0036). Signing in locally needs the dev OIDC stub (`docker compose --profile dev up -d oidc`) and the web app run on the host; see `apps/web/README.md`
 - Tests need Docker: they start PostgreSQL 16 + pgvector with testcontainers and run `infra/db/bootstrap.sql` + migrations, then connect as the real `sos_app` role (RLS enforced). `make test-security` runs only the security suites; `make migration-check` the migration round trips.
 - Run `uv run pre-commit install` once to get ruff, mypy, eslint, prettier and gitleaks on every commit.
 
