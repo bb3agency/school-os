@@ -317,10 +317,29 @@ Settings per query: `SET LOCAL hnsw.ef_search = 64` (tune), and iterative scans 
 - **Eval oracle.** `evals/sos_evals/acl.py` is narrower: it knows only roles, sections and classes, with no school-wide readers, memberships or sensitivity. A test checks that the SQL filter and the oracle agree on everything the oracle can express.
 - **Verified answers** (M2 wave 5, `retrieval/verified.py`): active ones whose every cited document passes this same predicate are searched separately and put before the passages (§5 as built). Their "boost" is that position; the `verified_answer` doc-type factor in `retrieval.yaml` stays neutral because no chunk has that type.
 - **Branches.** Differences from the sketch above:
-  - *vector:* `ORDER BY embedding <=> :qvec LIMIT 40` with `hnsw.iterative_scan = relaxed_order` and `hnsw.max_scan_tuples`. Without iterative scan, HNSW returns only `ef_search` neighbours from all schools and RLS drops most of them. A small school may be planned as exact kNN over its rows through the tenant btree, which is cheaper.
+  - *vector:* `ORDER BY embedding <=> :qvec LIMIT 40` with `hnsw.iterative_scan = relaxed_order` and `hnsw.max_scan_tuples`. Without iterative scan, HNSW returns only `ef_search` neighbours from all schools and RLS drops most of them. A small school may be planned as exact kNN over its rows through the tenant btree, which is cheaper. Routed per search between exact and HNSW ranking ("Authorised recall" below).
   - *full text:* `content_tsv @@ q`, ranked by `ts_rank_cd`, where `q` ORs the question's lexemes (`any_term`). `websearch_to_tsquery` ANDs every word, so natural questions rarely match. The tsquery is built by PostgreSQL once per text.
   - *keyword:* `:q <% context_header`, ranked by `word_similarity`. `content % :q` with `similarity()` cannot match a short question against a 350–600-token chunk. Under RLS it also costs about 3 s per 20k chunks, because every row needs a trigram scan. The header holds the title, issuer, reference number, date, subject and section, which are what trigram matching is for.
 - **Index use.** GIN cannot serve `@@`, `<%` or `&&` under FORCE RLS: they are not leakproof (05 §6.2). The text branches filter one school's rows through the tenant btree instead, measured at about 50 ms of full-text filtering per 20k chunks. Watch this at Stage 2; tenant partitioning is in 05 §12.
+- **Authorised recall (routing; FR-KB-001, FR-KB-007).** The shared tier keeps every school's chunks in one HNSW graph. A caller whose ACL narrows the candidates heavily (a class teacher who sees 1-2 % of a school) is the hard case for an approximate index: most graph neighbours fail RLS or `acl_predicate`, and a graph walk that runs out of budget returns too few or the wrong passages, which the answer reports as a false "not found in school records". So `HybridRetriever` routes the vector branch once per search (`retrieval/hybrid.py` `vector_route`):
+  - It counts the authorised chunks with the SAME RLS session and `acl_predicate` (and filters), stopping at `branches.vector.exact_search_max_rows` + 1 (`SELECT count(*) FROM (SELECT 1 ... WHERE <ALLOWED> LIMIT n+1)`; no embedding or text is read).
+  - At most `exact_search_max_rows` (**5 000**, `retrieval.yaml`; 0 turns routing off): **exact**. The filtered rows and their distances go into a `MATERIALIZED` CTE (an optimisation fence no index can order) and are ranked by `(distance, id)`. Recall 1.0 by construction.
+  - Above it: **ann**, HNSW with the iterative scan as before. Span attribute `retrieval.vector.route`.
+  - Invariant 8 is unchanged: both routes and the count carry `acl_predicate` in their WHERE clause; nothing the caller may not see is ranked.
+  - *Measured* (`tests/knowledge/test_retrieval_recall.py`; synthetic clustered 1024-dim halfvec corpus: 128 topic/sub-topic clusters, one school of 20 000 chunks with its section ACLs spread over 100 buckets independently of topic, 8 more schools of 2 500 chunks in the same index; 20 query vectors; recall@10 against an exact oracle computed under the same RLS session and predicate, tie-tolerant; `ann/hnsw` = the planner's alternatives disabled so the graph walk is really measured; ms = the production path per query on a laptop, about 45 ms of it fixed overhead):
+
+    | Route and settings | 100 % (20 000) | 20 % (4 000) | 5 % (1 000) | 1 % (200) |
+    |---|---|---|---|---|
+    | ann/hnsw, iterative scan off, ef 64 | 1.000 | 0.975 | 0.330 | **0.070** |
+    | ann/hnsw, relaxed_order, ef 64, 20 000 tuples (production) | 1.000 | 1.000 | 1.000 | 1.000 (171 ms) |
+    | ann/hnsw, relaxed_order, ef 64, 1 000 tuples | 1.000 | 1.000 | 0.995 | **0.880** |
+    | ann/hnsw, strict_order, ef 64, 1 000 tuples | 1.000 | 0.995 | 0.975 | **0.880** |
+    | ann/hnsw, relaxed_order, ef 128, 20 000 tuples | 1.000 | 1.000 | 1.000 | 1.000 (180 ms) |
+    | ann/planner (what PostgreSQL chose), any setting | 1.000 | 0.975-1.000 | 1.000 | 1.000 |
+    | exact | 1.000 (202 ms) | 1.000 (91 ms) | 1.000 (69 ms) | 1.000 (64 ms) |
+
+  - *Reading.* An iterative scan fills a narrow list only after roughly `limit / (authorised share of the whole shared table)` tuples; the 1 000-tuple rows stand in for the production budget (20 000) on a shared table 20 times larger (about 0.8 M chunks), where the 1 % caller falls to 0.88, below the 0.95 gate. On this table the planner itself usually ranks narrow filters exactly through the tenant btree, but that rests on its selectivity estimate for `&&` over the ACL arrays, which production cannot rely on. Exact ranking costs about +20 ms at 1 000 authorised rows and +45 ms at 4 000, and the walk is slower than that for narrow callers (171 ms at 1 %). **Rule:** exact up to 5 000 authorised chunks; HNSW above. HNSW then stays at or above 0.95 while `authorised / shared-table rows >= vector.limit / max_scan_tuples` (40 / 20 000 = 0.2 %), i.e. for any caller routed to it while the shared table holds up to about 2.5 M chunks. Revisit (raise `max_scan_tuples` or the threshold, or partition per tenant, 05 §12) before then; the sweep reruns with `SOS_RECALL_SWEEP=1 uv run pytest apps/api/tests/knowledge/test_retrieval_recall.py -m recall_sweep -s` (sizes via `SOS_RECALL_SWEEP_*`).
+  - *CI* (seconds): a 4 000-chunk school plus 4 x 500, asserting recall@10 >= 0.95 at 100/20/5/1 % with the production config, and with the threshold lowered to 100 so the wider callers take the HNSW route; the route choice at each level; the exact route never uses the HNSW index (EXPLAIN) and equals the oracle; a full hybrid search on the exact route returns only authorised chunks. The HNSW graph is not deterministic (pgvector draws node levels at random), so HNSW assertions keep a margin and the "forced walk fails" half is only measured by the sweep. `make eval` gates the same measure (§13.9).
 - **Fusion.** RRF (k = 60) is computed in Python so that it is deterministic, with ties broken by chunk ID. Then come the boosts, `max_chunks_per_document`, `k`, and merging of adjacent chunks on the same page, which keeps the best chunk's ID and the union of pages. The recency and verified-answer factors ship **neutral** (1.0) until `make eval` tunes them. Recency is measured against the newest candidate, not the wall clock.
 - **Ingestion writes the index only through `knowledge.repository`:**
   - `replace_version_chunks` (hidden until promoted)
@@ -758,6 +777,18 @@ Every pass above runs with `SOS_TELUGU_ENABLED` **on**, so the Telugu datasets a
 | `english_first_english_answer_rate` | Answers to Telugu and code-mixed questions that are English (Latin letters, no Telugu script), "not found" included | **≥ 1.0 (hard)** |
 
 `stub-perfect` passes; `stub-telugu` (ignores the switch) must fail exactly these two gates. The offline stand-ins follow the English-only rule sentence ("Write in English only", `gateway/fake_language.py`) as a model would, so app-fake measures that the English-only prompts, schemas and settings reach every call plus the server-side checks. Baselines (2026-09-30, app-fake): fast 42 probes / 171 shown texts, full 88 / 395; zero Telugu outputs, English answer rate 1.0; every Telugu-on metric unchanged.
+
+### 13.9 Authorised retrieval recall (`sos_evals.authorised_recall`; §6 "Authorised recall")
+
+Does the production vector path still find the nearest passages a caller MAY see when permissions narrow the candidates? The harness fixes four ACL selectivity levels (100, 20, 5 and 1 % of a school; critical = 5 % and 1 %, the narrow callers) and 4 (fast) or 12 (full) query vectors per level. The adapter builds the corpus and answers each probe with the oracle's k = 10 nearest authorised chunks (exact, same RLS session and `acl_predicate`) and what the production path returned, each with its exact distance (none for a chunk the caller may not see: a miss, counted as leakage). Recall@10 is tie-tolerant (distance within 1e-4 of the 10th).
+
+| Metric | Definition | Gate |
+|---|---|---|
+| `authorised_recall_at_10` | Mean recall@10 over every probe | ≥ 0.90 (soft) |
+| `authorised_recall_at_10_critical` | Mean recall@10 over the 5 % and 1 % probes | ≥ 0.95 (soft) |
+| `authorised_recall_leakage_count` | Probes that returned a chunk outside the ACL | reported (the leakage hard gates of §13.2 cover the same predicate) |
+
+`stub-perfect` returns the oracle (1.0); `stub-leaky` puts a forbidden chunk first (fails the critical gate). `app-fake` builds the CI corpus of §6 (`tests/knowledge/recall_support.py`) in its database and runs `vector_route` + `vector_statement` exactly as `HybridRetriever.search` does.
 
 ## 14. Observability for RAG
 
