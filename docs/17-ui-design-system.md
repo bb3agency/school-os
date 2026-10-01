@@ -533,9 +533,9 @@ add an English string that mentions Telugu, add its English-only wording to
 the `en.telugu-off` wording; a Telugu render (`"te"`) or `{ telugu: true }` switches it on
 explicitly, and every Telugu test does so. `app/english-only.test.tsx` renders every page under
 `app/[locale]` with the switch off and fails on Telugu script, the word "Telugu", `lang`/`hreflang`
-te, `/te` links, `*_te` fields or a language switch (`app/no-locale-urls.test.tsx` scans every
-page the same way for a link, form or resource whose address names a locale, and the shells
-with Telugu on); each feature's tests pin its forms and
+te, `/te` links, a link, form or resource whose address names a locale (`/en/…`, `/te/…`),
+`*_te` fields or a language switch (`app/no-locale-urls.test.tsx` checks the shells' links and
+the switch with Telugu on); each feature's tests pin its forms and
 bodies. e2e: the default project runs with the switch off (`e2e/english-only.spec.ts`: the
 308 from old `/te` and `/en` URLs, no open redirect, a Telugu browser with a `te` cookie, the font
 404, school and platform pages); `chromium-telugu` runs a second server from the same build with
