@@ -448,6 +448,13 @@ class LlmConfig(ConfigModel):
             return self.gemini.cache_price_multipliers
         return self.cache_price_multipliers
 
+    def anthropic_roles(self) -> tuple[str, ...]:
+        """Roles (sorted) whose calls go to Anthropic: written so, or on an applied fallback.
+        Every role counts, the offline eval judge too (Claude safety lock, fail closed)."""
+        return tuple(
+            sorted(name for name, role in self.roles.items() if role.provider == "anthropic")
+        )
+
     def use_fallback(self, roles: Iterable[ModelRole] | None = None) -> LlmConfig:
         """A copy with the named roles (default: every role that has one) on their evaluated
         fallback: what a reviewed switch-back would load, and what the fallback tests run."""

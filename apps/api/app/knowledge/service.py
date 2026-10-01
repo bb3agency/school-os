@@ -131,6 +131,7 @@ from app.knowledge.domain import (
     TokenEvent,
 )
 from app.knowledge.gateway.errors import AiRateLimited
+from app.knowledge.gateway.factory import require_provider_agreements
 from app.knowledge.ingestion.pipeline import INDEXED_HOOKS, IndexedHook
 from app.knowledge.interfaces import IngestionPipeline, KnowledgeService
 from app.knowledge.keys import (
@@ -173,6 +174,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from app.authz.context import UserContext
+    from app.core.config import Settings
 
 log = get_logger(__name__)
 
@@ -1883,6 +1885,13 @@ def circulars_config() -> CircularsConfig:
     return circular_ai.config()
 
 
+def check_provider_agreements(settings: Settings) -> None:
+    """Start-up check of the API and the worker (Claude safety lock, owner decision 2026-10-01):
+    in staging/prod, refuse to start while a models.yaml role uses provider anthropic without
+    ``SOS_ANTHROPIC_ZDR_CONFIRMED`` (raises ``ProviderModeError``; docs/10 §11)."""
+    require_provider_agreements(settings, load_llm_config())
+
+
 __all__ = [
     "ASK",
     "CIRCULAR_NO_TEXT",
@@ -1926,6 +1935,7 @@ __all__ = [
     "StatusEvent",
     "TokenEvent",
     "adopt_conversations",
+    "check_provider_agreements",
     "circular_passages",
     "circulars_config",
     "draft_notice",
