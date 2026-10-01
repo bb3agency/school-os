@@ -34,7 +34,19 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Text, case, column, delete, func, insert, select, text, tuple_, update
+from sqlalchemy import (
+    Text,
+    case,
+    column,
+    delete,
+    func,
+    insert,
+    or_,
+    select,
+    text,
+    tuple_,
+    update,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
@@ -901,6 +913,86 @@ def clear_summaries_before(session: Session, cutoff: dt.datetime) -> int:
         )
     )
     return _rowcount(result)
+
+
+def _jsonb_sources_start_with(column_: Any, prefixes: Sequence[str]) -> Any:
+    """EXISTS an element of the jsonb array ``column_`` whose ``source`` (objects) or value
+    (strings) starts with one of ``prefixes``."""
+    elements = func.jsonb_array_elements(column_).table_valued(column("value", JSONB)).alias("e")
+    as_text = func.jsonb_build_array(elements.c.value).op("->>", return_type=Text)(0)
+    source = func.coalesce(elements.c.value["source"].astext, as_text)
+    return (
+        select(1)
+        .select_from(elements)
+        .where(or_(*(func.starts_with(source, p) for p in prefixes)))
+        .exists()
+    )
+
+
+def erase_answers_quoting(session: Session, prefixes: Sequence[str]) -> list[uuid.UUID]:
+    """Owner decision 2026-10-01 (docs/08 §7 erasure chain): HARD-delete the stored answer text,
+    citation details (titles and snippets) and follow-ups of every question whose answer was
+    given or cited a source starting with one of ``prefixes``; the row keeps ids, codes and
+    counts only and is never reused by the answer cache. Returns the questions changed."""
+    if not prefixes:
+        return []
+    result = session.execute(
+        update(Query)
+        .where(
+            or_(
+                Query.answer_ciphertext.is_not(None),
+                Query.citations_ciphertext.is_not(None),
+                Query.followups_ciphertext.is_not(None),
+            ),
+            or_(
+                _jsonb_sources_start_with(Query.retrieved, prefixes),
+                _jsonb_sources_start_with(Query.citations, prefixes),
+            ),
+        )
+        .values(
+            answer_ciphertext=None,
+            citations_ciphertext=None,
+            followups_ciphertext=None,
+            cache_invalidated_at=func.coalesce(Query.cache_invalidated_at, func.now()),
+        )
+        .returning(Query.id)
+    )
+    return sorted(result.scalars())
+
+
+def erase_summaries_quoting(session: Session, prefixes: Sequence[str]) -> list[uuid.UUID]:
+    """Owner decision 2026-10-01: delete every rolling conversation summary that rests on a
+    source starting with one of ``prefixes`` (rebuilt from the questions kept). Returns the
+    conversations changed."""
+    if not prefixes:
+        return []
+    result = session.execute(
+        update(Conversation)
+        .where(
+            Conversation.summary_ciphertext.is_not(None),
+            _jsonb_sources_start_with(Conversation.summary_sources, prefixes),
+        )
+        .values(
+            summary_ciphertext=None,
+            summary_oldest_at=None,
+            summary_through=None,
+            summary_sources=[],
+        )
+        .returning(Conversation.id)
+    )
+    return sorted(result.scalars())
+
+
+def verified_answers_citing(session: Session, document_id: uuid.UUID) -> list[uuid.UUID]:
+    """Verified answers (any status) citing a page of the document."""
+    prefix = f"{_DOC_SOURCE_PREFIX}{document_id}/"
+    return sorted(
+        session.execute(
+            select(VerifiedAnswer.id).where(
+                _jsonb_sources_start_with(VerifiedAnswer.citations, [prefix])
+            )
+        ).scalars()
+    )
 
 
 def query_by_id(session: Session, query_id: uuid.UUID) -> Query | None:

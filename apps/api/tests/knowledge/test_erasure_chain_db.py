@@ -24,6 +24,7 @@ prefix). Synthetic data only.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import uuid
 from collections.abc import Iterator, Sequence
@@ -193,6 +194,24 @@ class Before:
         assert any(s.startswith(f"sos://doc/{doc}/") for s in _cited(events))
         self.query_id = events[0][1]["query_id"]
         self.conversation_id = events[0][1]["conversation_id"]
+        stored = _scalar(
+            admin, "SELECT answer_ciphertext FROM kb.queries WHERE id = :i", i=self.query_id
+        )
+        assert stored is not None
+        # A rolling summary of the conversation that rests on (quotes) the document.
+        with admin.begin() as c:
+            c.execute(
+                text(
+                    "UPDATE kb.conversations SET summary_ciphertext = :b, "
+                    "summary_oldest_at = now(), summary_through = now(), "
+                    "summary_sources = CAST(:s AS jsonb) WHERE id = :i"
+                ),
+                {
+                    "b": b"synthetic-summary-ciphertext",
+                    "s": json.dumps([f"sos://doc/{doc}/v1#p1"]),
+                    "i": self.conversation_id,
+                },
+            )
 
 
 def _assert_erased(admin: Engine, api: Any, school: Any, doc: uuid.UUID, before: Before) -> None:
@@ -208,6 +227,41 @@ def _assert_erased(admin: Engine, api: Any, school: Any, doc: uuid.UUID, before:
         admin, "SELECT cache_invalidated_at FROM kb.queries WHERE id = :i", i=before.query_id
     )
     assert invalidated is not None
+    # Owner decision 2026-10-01: the answers and summaries that quoted it are HARD-DELETED.
+    with admin.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT answer_ciphertext, citations_ciphertext, followups_ciphertext "
+                "FROM kb.queries WHERE id = :i"
+            ),
+            {"i": before.query_id},
+        ).one()
+        quoting = c.execute(
+            text(
+                "SELECT count(*) FROM kb.queries WHERE tenant_id = :t AND (answer_ciphertext "
+                "IS NOT NULL OR citations_ciphertext IS NOT NULL OR followups_ciphertext IS NOT "
+                "NULL) AND (retrieved::text LIKE :p OR citations::text LIKE :p)"
+            ),
+            {"t": school.tenant_id, "p": f"%sos://doc/{doc}/%"},
+        ).scalar_one()
+        summary = c.execute(
+            text(
+                "SELECT summary_ciphertext, summary_through, summary_sources "
+                "FROM kb.conversations WHERE id = :i"
+            ),
+            {"i": before.conversation_id},
+        ).one()
+    assert tuple(row) == (None, None, None)
+    assert quoting == 0
+    assert tuple(summary) == (None, None, [])
+    # Audited with ids and counts only, in the deleting transaction.
+    (erased,) = W.audit_events(admin, school.tenant_id, "kb.document_answers.erased")
+    assert str(erased["resource_id"]) == str(doc)
+    assert erased["actor_id"] is None
+    assert before.query_id in erased["summary"]["query_ids"]
+    assert erased["summary"]["conversation_ids"] == [before.conversation_id]
+    assert erased["summary"]["answers"] >= 1
+    assert erased["summary"]["summaries"] == 1
     # Search and Ask find nothing; the repeat is answered afresh, "not found".
     assert _search(api, owner) == []
     events = _ask(api, owner, QUESTION)
