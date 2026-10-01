@@ -236,7 +236,7 @@ def _assert_erased(admin: Engine, api: Any, school: Any, doc: uuid.UUID, before:
             ),
             {"i": before.query_id},
         ).one()
-        quoting = c.execute(
+        quoting: int = c.execute(
             text(
                 "SELECT count(*) FROM kb.queries WHERE tenant_id = :t AND (answer_ciphertext "
                 "IS NOT NULL OR citations_ciphertext IS NOT NULL OR followups_ciphertext IS NOT "
