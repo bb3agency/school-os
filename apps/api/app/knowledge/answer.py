@@ -14,10 +14,13 @@
    ``is_latest`` retrieval and scoped record reads) and its ``cited_text`` is a
    whitespace-normalised substring of that block's text. Invalid citations are dropped.
 3. **Grounding** (invariant 8, FR-KB-007): an answer with no valid citation is replaced by the
-   configured "not found in school records" text; when more than
-   ``max_uncited_factual_fraction`` of the factual segments (those with digits, or with
-   citations) have no valid citation, the answer is replaced by the search-only view of the
-   passages the model was given (§9 rule 3).
+   configured "not found in school records" text. Then per sentence (§9 rule 3,
+   :func:`enforce_sentences`, rules in ``answer_checks.sentences``): every factual sentence
+   needs a valid citation (a ``[n]`` marker at its end, or a native citation on its text
+   block); an uncited factual sentence is cut from the answer. When more than
+   ``max_uncited_factual_fraction`` of the sentences that are cited or write a figure are
+   uncited figures, the answer lost its core and is replaced by the search-only view of the
+   passages the model was given.
 4. **Output sanitising** (§9 rule 5, SEC-019): HTML tags and any link other than ``sos://``
    are removed from the model's text; Aadhaar numbers are masked (the gateway also masks).
    **English first** (ADR-0036): while Telugu is hidden (``SOS_TELUGU_ENABLED`` off, the
@@ -52,7 +55,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.logging import get_logger
 from app.core.redaction import mask_aadhaar
 from app.knowledge import sources
-from app.knowledge.config.llm import LlmConfig
+from app.knowledge.config.llm import LlmConfig, SentenceRules
 from app.knowledge.domain import (
     AnswerSegment,
     AskMode,
@@ -76,6 +79,9 @@ from app.knowledge.domain import (
 from app.knowledge.gateway.errors import GatewayError, InvalidModelOutput
 from app.knowledge.interfaces import LlmGateway, StreamingLlmGateway
 from app.knowledge.prompts.registry import PromptTemplate
+from app.knowledge.sentences import body as sentence_body
+from app.knowledge.sentences import is_factual as sentence_is_factual
+from app.knowledge.sentences import split_sentences
 from app.knowledge.tools.documents import NAME as SEARCH_TOOL
 from app.knowledge.tools.documents import DocumentSearch, to_block
 from app.knowledge.tools.registry import OfferedTool, offered
@@ -134,11 +140,6 @@ def sanitise(text: str) -> str:
     text = _MD_LINK.sub(r"\1", text)
     text = _BARE_LINK.sub("", text)
     return mask_aadhaar(text)
-
-
-def is_factual(segment: AnswerSegment) -> bool:
-    """§9 rule 3 heuristic: numbers and dates are facts; a cited segment states one too."""
-    return bool(segment.citations) or bool(_DIGIT.search(segment.text))
 
 
 CHAT_SEARCH_TOOL: Final = "search_my_conversations"
@@ -207,6 +208,10 @@ class Answer:
     output_tokens: int = 0
     citations_dropped: int = 0
     uncited_factual: int = 0
+    """Factual sentences of the model's answer without a valid citation (dropped, or the
+    reason for a search-only fallback)."""
+    sentences_dropped: int = 0
+    """Uncited factual sentences cut from the answer shown (docs/06 §9 rule 3 as built)."""
 
     @property
     def refused(self) -> bool:
@@ -347,6 +352,106 @@ def validate(
         if text.strip() or good:
             out.append(AnswerSegment(text=text, citations=good))
     return out, dropped
+
+
+@dataclass(frozen=True, slots=True)
+class SentenceCheck:
+    """One sentence of the final answer as the per-sentence check saw it."""
+
+    text: str
+    factual: bool
+    cited: bool
+    figures: bool
+    """It writes a digit (a date, amount, count, class or admission number)."""
+
+    @property
+    def supported(self) -> bool:
+        return self.cited or not self.factual
+
+
+@dataclass(frozen=True, slots=True)
+class Enforced:
+    """The answer after the per-sentence check (docs/06 §9 rule 3 as built)."""
+
+    segments: tuple[AnswerSegment, ...]
+    """The segments without the unsupported sentences (empty uncited segments removed)."""
+    checks: tuple[SentenceCheck, ...]
+
+    @property
+    def unsupported(self) -> tuple[SentenceCheck, ...]:
+        return tuple(c for c in self.checks if not c.supported)
+
+    def core_lost(self, max_fraction: float) -> bool:
+        """More than ``max_fraction`` of the answer's figure-bearing and cited sentences are
+        uncited figures: what is left would not be the answer (search-only instead)."""
+        weighed = [c for c in self.checks if c.factual and (c.cited or c.figures)]
+        uncited = [c for c in weighed if not c.cited]
+        return bool(weighed) and len(uncited) / len(weighed) > max_fraction
+
+
+def _joined(segments: Sequence[AnswerSegment]) -> tuple[str, list[tuple[int, int]]]:
+    """The segments' text as one string (a space where two meet without whitespace) and each
+    segment's span in it."""
+    text = ""
+    spans: list[tuple[int, int]] = []
+    for seg in segments:
+        if text and seg.text and not text[-1].isspace() and not seg.text[0].isspace():
+            text += " "
+        spans.append((len(text), len(text) + len(seg.text)))
+        text += seg.text
+    return text, spans
+
+
+def _cut(text: str, start: int, end: int) -> tuple[int, int]:
+    """The span of a dropped sentence widened over the spaces after it and, when it starts a
+    line, over the line break before it (the first line: after it), so no blank line or double
+    space is left and the next line keeps its own line break."""
+    while end < len(text) and text[end] in " \t":
+        end += 1
+    if start > 0 and text[start - 1] == "\n":
+        start -= 1
+    elif start == 0 and end < len(text) and text[end] == "\n":
+        end += 1
+    return start, end
+
+
+def enforce_sentences(segments: Sequence[AnswerSegment], rules: SentenceRules) -> Enforced:
+    """Every factual sentence needs a valid citation (invariant 8; FR-KB-005, FR-KB-007).
+
+    ``segments`` carry only valid citations (:func:`validate`). A sentence is cited when it
+    overlaps a segment with a citation: a ``[n]`` marker cites the sentence it ends (the gateway
+    splits marker text per sentence), a native citation its whole text block. Factual sentences
+    (:func:`app.knowledge.sentences.is_factual`) that are not cited are cut out of the segments.
+    """
+    text, spans = _joined(segments)
+    checks: list[SentenceCheck] = []
+    cuts: list[tuple[int, int]] = []
+    for sentence in split_sentences(text, rules):
+        cited = any(
+            seg.citations and max(a, sentence.start) < min(b, sentence.end)
+            for seg, (a, b) in zip(segments, spans, strict=True)
+        )
+        factual = sentence_is_factual(sentence, rules)
+        figures = bool(_DIGIT.search(sentence_body(sentence)))
+        checks.append(SentenceCheck(sentence.text, factual, cited, figures))
+        if factual and not cited:
+            cuts.append(_cut(text, sentence.start, sentence.end))
+    if not cuts:
+        return Enforced(tuple(segments), tuple(checks))
+    kept: list[AnswerSegment] = []
+    for seg, (a, b) in zip(segments, spans, strict=True):
+        pieces: list[str] = []
+        pos = a
+        for start, end in cuts:
+            if end <= pos or start >= b:
+                continue
+            pieces.append(text[pos : max(pos, start)])
+            pos = max(pos, min(end, b))
+        pieces.append(text[pos:b])
+        left = "".join(pieces)
+        if left.strip() or seg.citations:
+            kept.append(dataclasses.replace(seg, text=left) if left != seg.text else seg)
+    return Enforced(tuple(kept), tuple(checks))
 
 
 def cited_sources(
@@ -658,8 +763,9 @@ class AnswerEngine:
         final = turns[-1] if turns and not turns[-1].tool_calls else None
         segments, dropped = validate(final.segments if final else (), provided)
         base = self._base(language, turns, runs, provided, dropped)
-        factual = [s for s in segments if is_factual(s)]
-        uncited = [s for s in factual if not s.citations]
+        checks = self._config.answer_checks
+        enforced = enforce_sentences(segments, checks.sentences)
+        uncited = enforced.unsupported
         if not any(s.citations for s in segments):
             return dataclasses.replace(
                 base,
@@ -678,8 +784,7 @@ class AnswerEngine:
                 count=sum(1 for s in segments if has_telugu(s.text)),
             )
             return self._search_only_from(base, provided, uncited=len(uncited))
-        threshold = self._config.answer_checks.max_uncited_factual_fraction
-        if factual and len(uncited) / len(factual) > threshold:
+        if enforced.core_lost(checks.max_uncited_factual_fraction):
             log.warning(
                 "kb.answer.uncited_fallback",
                 tenant_id=ctx.tenant_id,
@@ -688,13 +793,23 @@ class AnswerEngine:
                 count=len(uncited),
             )
             return self._search_only_from(base, provided, uncited=len(uncited))
-        marked, cited = cited_sources(segments, provided)
+        if uncited:
+            # Invariant 8: an unsupported sentence is never shown (counts only in the log).
+            log.info(
+                "kb.answer.sentences_dropped",
+                tenant_id=ctx.tenant_id,
+                resource_type="kb_query",
+                resource_id=query_id,
+                count=len(uncited),
+            )
+        marked, cited = cited_sources(enforced.segments, provided)
         return dataclasses.replace(
             base,
             status="answered",
             segments=tuple(marked),
             cited=tuple(cited),
             uncited_factual=len(uncited),
+            sentences_dropped=len(uncited),
         )
 
     def _run_tool(
@@ -821,15 +936,17 @@ __all__ = [
     "AnswerEngine",
     "AskContext",
     "CitedSource",
+    "Enforced",
     "PreviewSanitiser",
     "Progress",
+    "SentenceCheck",
     "ToolRun",
     "answer_language",
     "cited_sources",
     "detect_language",
     "elapsed_ms",
+    "enforce_sentences",
     "has_telugu",
-    "is_factual",
     "normalise",
     "sanitise",
     "step_for",

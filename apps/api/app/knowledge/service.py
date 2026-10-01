@@ -654,6 +654,7 @@ class SchoolKnowledgeService:
             "citations": len(result.cited),
             "citations_dropped": result.citations_dropped,
             "uncited_factual": result.uncited_factual,
+            "sentences_dropped": result.sentences_dropped,
         }
 
     @staticmethod

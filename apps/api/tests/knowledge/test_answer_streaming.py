@@ -195,6 +195,43 @@ def test_FR_KB_005_invalid_citation_after_streaming_replaces_the_preview() -> No
     assert answer.text == E.CONFIG.answer_checks.not_found.en
 
 
+def test_FR_KB_005_an_uncited_sentence_streamed_in_the_preview_never_reaches_the_final() -> None:
+    """Drafts are provisional (docs/06 §5.1): the preview may show a sentence the check later
+    drops; the final answer (the ``final``/``token`` events) carries only validated text and is
+    flagged ``replaced``."""
+    gw = StreamingGateway(
+        [
+            E.turn(calls=[E.search_call()]),
+            E.turn(
+                E.cited("Exams begin on 22/09/2026."),
+                AnswerSegment(" The canteen stays open late that week."),
+            ),
+        ]
+    )
+    answer, deltas, _ = streamed(engine(gw, [E.search_tool()]))
+    assert "canteen" in "".join(deltas)
+    assert answer.status == "answered"
+    assert answer.text == "Exams begin on 22/09/2026. [1]"
+    assert "canteen" not in " ".join(s.text for s in answer.segments)
+    assert answer.sentences_dropped == 1
+    assert was_replaced("".join(deltas), answer)
+    unstreamed = E.run(
+        engine(
+            E.ScriptedGateway(
+                [
+                    E.turn(calls=[E.search_call()]),
+                    E.turn(
+                        E.cited("Exams begin on 22/09/2026."),
+                        AnswerSegment(" The canteen stays open late that week."),
+                    ),
+                ]
+            ),
+            [E.search_tool()],
+        )
+    )
+    assert unstreamed.text == answer.text
+
+
 def test_NFR_AVL_004_failure_mid_stream_degrades_to_search_only() -> None:
     final = E.turn(E.cited(LONG))
     words = len(LONG.split())
