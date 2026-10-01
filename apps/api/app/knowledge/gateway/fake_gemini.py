@@ -29,8 +29,10 @@ import re
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any, Final
 
+from app.knowledge.config.llm import load_llm_config
 from app.knowledge.gateway.fake import text_pieces
 from app.knowledge.gateway.transport import MessagesRequest, Transport, TransportError, Wire
+from app.knowledge.sentences import split_sentences
 
 PASSAGE_SOURCE: Final = "passage:"
 _SOURCE: Final = re.compile(r"^passage:(\d+)$")
@@ -41,6 +43,21 @@ _FINISH: Final = {
     "max_tokens": "MAX_TOKENS",
     "refusal": "SAFETY",
 }
+
+
+def _marked(text: str, markers: str) -> str:
+    """``text`` with ``markers`` after every sentence, as ``citations.marker_instructions``
+    asks of the model (a marker cites only the sentence it ends; docs/06 §9 rule 3)."""
+    found = split_sentences(text, load_llm_config().answer_checks.sentences)
+    if not found:
+        return f"{text} {markers}"
+    out: list[str] = []
+    pos = 0
+    for sentence in found:
+        out += [text[pos : sentence.end], f" {markers}"]
+        pos = sentence.end
+    out.append(text[pos:])
+    return "".join(out)
 
 
 def signature_for(call_id: str) -> str:
@@ -182,7 +199,7 @@ class GeminiWireFake:
                 text = str(block.get("text", ""))
                 markers = self._markers(block)
                 if markers:
-                    text = f"{text.rstrip()} {markers}"
+                    text = _marked(text.rstrip(), markers)
                 if texts and text and not text[0].isspace() and text[0] not in ".,;:!?)":
                     text = " " + text
                 texts.append(text)
