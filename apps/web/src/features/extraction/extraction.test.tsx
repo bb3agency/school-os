@@ -34,7 +34,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/register-photos",
+    usePathname: () => "/register-photos",
     useRouter: () => ({ push: vi.fn(), replace, refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -225,11 +225,11 @@ describe("US-402 AC4 / PRV-016: a batch", () => {
     expect(screen.getByText(xm.pages.withheld)).toBeInTheDocument();
     expect(screen.getByText("1 photo was withheld")).toBeInTheDocument();
     const link = await screen.findByRole("link", { name: /Check this row\s*Page 2, row 1/ });
-    expect(link).toHaveAttribute("href", `/en/register-photos/items/${ID.item}`);
+    expect(link).toHaveAttribute("href", `/register-photos/items/${ID.item}`);
     expect(screen.getByText("1 unclear value")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: xm.batch.start })).toHaveAttribute(
       "href",
-      `/en/register-photos/${ID.batch}/next`,
+      `/register-photos/${ID.batch}/next`,
     );
     const query = stub.callsTo("GET /bff/api/v1/extraction-items")[0]?.url.searchParams;
     expect(query?.get("batch_id")).toBe(ID.batch);
@@ -341,7 +341,7 @@ describe("US-402 AC1/AC2: check one row beside its page photo", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: xm.review.goToChangeRequests })).toHaveAttribute(
       "href",
-      `/en/change-requests?student_id=${ID.student2}`,
+      `/change-requests?student_id=${ID.student2}`,
     );
     const body = JSON.parse(
       stub.callsTo(`POST /bff/api/v1/extraction-items/${ID.item}/confirm`)[0]?.body ?? "{}",
@@ -408,12 +408,12 @@ describe("US-402 AC1/AC2: check one row beside its page photo", () => {
       page([{ ...extractionItem(), id: ID.item2 }]);
     const { unmount } = renderWithIntl(<NextItemScreen batchId={ID.batch} after="confirmed" />);
     await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith(`/en/register-photos/items/${ID.item2}?after=confirmed`),
+      expect(replace).toHaveBeenCalledWith(`/register-photos/items/${ID.item2}?after=confirmed`),
     );
     unmount();
     replace.mockReset();
     stub.routes["GET /bff/api/v1/extraction-items"] = () => page([]);
     renderWithIntl(<NextItemScreen batchId={ID.batch} />);
-    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/en/register-photos/${ID.batch}`));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/register-photos/${ID.batch}`));
   });
 });

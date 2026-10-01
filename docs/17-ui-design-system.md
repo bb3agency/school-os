@@ -7,7 +7,7 @@
 | Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English; Telugu hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Related          | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Living reference | `/[locale]/dev/ui`: every primitive and variant with synthetic content. Local development only (same guard as `/dev/sign-in`: `next dev` + local stub issuer; a 404 everywhere else)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Living reference | `/dev/ui`: every primitive and variant with synthetic content. Local development only (same guard as `/dev/sign-in`: `next dev` + local stub issuer; a 404 everywhere else)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ---
 
@@ -474,12 +474,32 @@ It is never inlined into a browser bundle; one image serves both settings. Clien
 locale layout fills; without a provider only English is on. `app/client-boundary.test.ts` fails if
 a client module imports the server reader or code reads the variable anywhere else.
 
+**No locale in any URL** (product owner, 2026-09-30: "just remove the prefix system across
+the site"). Every page has one address in every language: `/`, `/students`, `/ask/c/<id>`,
+`/platform/schools`, `/dev/sign-in`, `/welcome`, `/features`, … next-intl runs with
+`localePrefix: "never"` (`src/i18n/routing.ts`); the proxy (`src/proxy.ts`) rewrites each
+request internally to `app/[locale]/…` (the folder stays, so layouts and pages keep their
+`locale` param and nothing else moved). The language comes from the `NEXT_LOCALE` cookie, then
+`Accept-Language`, among the switched-on locales only. There are no `hreflang` alternates by
+path (no `Link` header). Old `/en/…` and `/te/…` links answer **308** to the same path without
+the prefix (query kept, every security header set, leading slashes collapsed so
+`/en//evil.example` stays on this site); while Telugu is on, an old `/te/…` link (and `/en/…`)
+first stores its language in the cookie. Links go through `Link`/`useRouter`/`redirect` from
+`@/i18n/navigation` or are plain prefix-less paths; never build `` `/${locale}/…` ``. Return
+addresses (`next`) are prefix-less paths (`safeNext` drops an old prefix and still refuses
+anything that is not a same-origin path). The language switcher (Telugu on only) is a pair of
+buttons (`aria-pressed`, each name in its own `lang`) that write the cookie
+(`src/i18n/locale-cookie.ts`: `path=/`, one year, `SameSite=Lax`, `Secure` over https) and
+reload the same page: a full reload, because `<html lang>` and every cached API answer change
+with it.
+
 **With the switch off:**
 
-- **Routing.** `/te/...` answers 307 to the same `/en/...` page (query kept; temporary, because
-  Telugu may return). Only English is negotiated: `Accept-Language: te` and a stored
-  `NEXT_LOCALE=te` cookie are ignored, the `Link` alternates name English only, and the locale
-  layout 404s a `te` param that slipped past the proxy. The BFF asks the API for English only.
+- **Routing.** Only English is negotiated: `Accept-Language: te` and a stored
+  `NEXT_LOCALE=te` cookie are ignored (and left alone for when Telugu returns: the proxy writes
+  no language cookie while Telugu is off), an old `/te/…` link lands on the same prefix-less
+  English page, and the locale layout 404s a `te` param that slipped past the proxy. The BFF asks
+  the API for English only.
 - **Messages.** The Telugu catalog is never loaded (`src/i18n/messages.ts`). English strings that
   talk about Telugu ("in English and Telugu", "Write in English, Telugu or a mix") are replaced by
   their English-only wording from `messages/en.telugu-off.json`: same keys, same ICU arguments
@@ -513,10 +533,15 @@ add an English string that mentions Telugu, add its English-only wording to
 the `en.telugu-off` wording; a Telugu render (`"te"`) or `{ telugu: true }` switches it on
 explicitly, and every Telugu test does so. `app/english-only.test.tsx` renders every page under
 `app/[locale]` with the switch off and fails on Telugu script, the word "Telugu", `lang`/`hreflang`
-te, `/te` links, `*_te` fields or a language switch; each feature's tests pin its forms and
-bodies. e2e: the default project runs with the switch off (`e2e/english-only.spec.ts`: redirects,
-a Telugu browser, the font 404, school and platform pages); `chromium-telugu` runs a second
-server from the same build with the switch on and re-runs the tests tagged `@telugu`.
+te, `/te` links, a link, form or resource whose address names a locale (`/en/…`, `/te/…`),
+`*_te` fields or a language switch (`app/no-locale-urls.test.tsx` checks the shells' links and
+the switch with Telugu on); each feature's tests pin its forms and
+bodies. e2e: the default project runs with the switch off (`e2e/english-only.spec.ts`: the
+308 from old `/te` and `/en` URLs, no open redirect, a Telugu browser with a `te` cookie, the font
+404, school and platform pages); `chromium-telugu` runs a second server from the same build with
+the switch on and re-runs the tests tagged `@telugu`, choosing Telugu the way the switcher does,
+through the `NEXT_LOCALE` cookie (`e2e/support/telugu.ts`: `selectLanguage`, `inTelugu`,
+`openIn`), plus the switcher, cookie and Accept-Language checks in `e2e/smoke.spec.ts`.
 
 **Bringing Telugu back.** Set `SOS_TELUGU_ENABLED=true` (API and web), review the Telugu catalog,
 templates and prompts, run the `@telugu` e2e and the Telugu evals, and record it in a new ADR.

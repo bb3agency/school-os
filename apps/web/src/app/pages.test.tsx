@@ -11,7 +11,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/platform/schools",
+    usePathname: () => "/platform/schools",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -214,7 +214,12 @@ describe("app shells", () => {
       screen.getByRole("navigation", { name: messages.te.school.nav.label }),
     ).toBeInTheDocument();
     const languages = screen.getByRole("navigation", { name: messages.te.language.label });
-    expect(within(languages).getByRole("link", { name: "English" })).toHaveAttribute("lang", "en");
+    // Buttons that set the language cookie: no URL carries a locale (ADR-0036 note).
+    expect(within(languages).getByRole("button", { name: "English" })).toHaveAttribute(
+      "lang",
+      "en",
+    );
+    expect(within(languages).queryAllByRole("link")).toEqual([]);
     expect(screen.queryByText(messages.te.platform.badge)).not.toBeInTheDocument();
   });
 

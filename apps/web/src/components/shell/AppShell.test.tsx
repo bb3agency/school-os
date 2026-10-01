@@ -19,7 +19,7 @@ import { SIDEBAR_ATTRIBUTE, SIDEBAR_STATE_SCRIPT, SIDEBAR_STORAGE_KEY } from "./
  * e2e/responsive.spec.ts and e2e/a11y.spec.ts in a real browser.
  */
 
-const path = vi.hoisted(() => ({ current: "/en/students" }));
+const path = vi.hoisted(() => ({ current: "/students" }));
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return { ...actual, usePathname: () => path.current };
@@ -67,7 +67,7 @@ function inlineSidebar(): HTMLElement {
 }
 
 beforeEach(() => {
-  path.current = "/en/students";
+  path.current = "/students";
   document.documentElement.removeAttribute(SIDEBAR_ATTRIBUTE);
   window.localStorage.clear();
 });
@@ -102,7 +102,7 @@ describe("AppShell: one sidebar, no rail and no second list panel", () => {
     renderWithIntl(shell());
     const sidebar = inlineSidebar();
     const brand = within(sidebar).getByRole("link", { name: "SchoolOS" });
-    expect(brand).toHaveAttribute("href", "/en");
+    expect(brand).toHaveAttribute("href", "/");
     const context = within(sidebar).getByText("Sample School");
     const nav = within(sidebar).getByRole("navigation", { name: "Main" });
     const account = within(sidebar).getByRole("button", { name: "Lock now" });
@@ -134,7 +134,7 @@ describe("AppShell: one sidebar, no rail and no second list panel", () => {
   });
 
   it("the current page is marked once with aria-current='page'", () => {
-    path.current = "/en/imports";
+    path.current = "/imports";
     renderWithIntl(shell());
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "Imports" })).toHaveAttribute(
@@ -334,7 +334,7 @@ describe("AppShell: the same sidebar as a drawer below lg (NFR-A11Y-001)", () =>
     const dialog = screen.getByRole("dialog", { name: "Menu" });
     expect(dialog).toHaveAttribute("open");
     // The router changes the path (same tree, new pathname).
-    path.current = "/en/imports";
+    path.current = "/imports";
     rerender(shell());
     expect(dialog).not.toHaveAttribute("open");
     expect(menu).toHaveAttribute("aria-expanded", "false");
@@ -349,7 +349,7 @@ describe("AppShell: canvas behind the page (docs/17 §3.2, NFR-A11Y-001)", () =>
   }
 
   it("dense record screens get the near-neutral canvas", () => {
-    for (const route of ["/en/students", "/en/students/0193", "/en/settings/users"]) {
+    for (const route of ["/students", "/students/0193", "/settings/users"]) {
       path.current = route;
       const { unmount } = renderWithIntl(shell());
       expect(canvas(), route).toHaveAttribute("data-canvas", "neutral");
@@ -359,24 +359,24 @@ describe("AppShell: canvas behind the page (docs/17 §3.2, NFR-A11Y-001)", () =>
   });
 
   it("the school home dashboard keeps the gradient (the body's, so nothing is painted over it)", () => {
-    path.current = "/en";
+    path.current = "/";
     renderWithIntl(shell());
     expect(canvas()).toHaveAttribute("data-canvas", "gradient");
     expect(canvas()).not.toHaveClass("canvas-neutral");
   });
 
   it("platform: the dashboard keeps the gradient, the platform tables are neutral", () => {
-    path.current = "/en/platform";
+    path.current = "/platform";
     const { unmount } = renderWithIntl(shell({ theme: "platform", homeHref: "/platform" }));
     expect(canvas()).toHaveAttribute("data-canvas", "gradient");
     unmount();
-    path.current = "/en/platform/schools";
+    path.current = "/platform/schools";
     renderWithIntl(shell({ theme: "platform", homeHref: "/platform" }));
     expect(canvas()).toHaveAttribute("data-canvas", "neutral");
   });
 
   it("a page can choose its canvas explicitly", () => {
-    path.current = "/en";
+    path.current = "/";
     renderWithIntl(shell({ canvas: "neutral" }));
     expect(canvas()).toHaveAttribute("data-canvas", "neutral");
   });

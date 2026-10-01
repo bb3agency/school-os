@@ -26,8 +26,8 @@ import { expectNoTelugu, teluguOn } from "./support/telugu";
  * The dedicated-host variant (SOS_DEPLOYMENT_MODE=dedicated) is covered in app/marketing.test.tsx.
  */
 
-// Locale-free paths, headings from messages/en.json (support/marketing.ts): the same tests run
-// with today's /en prefix and after locale prefixes are removed.
+// Plain paths (no URL carries a locale, ADR-0036 note), headings from messages/en.json
+// (support/marketing.ts).
 const PAGES = PUBLIC_PAGES;
 
 const VIEWPORTS = [
@@ -140,9 +140,8 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
         .locator("header a[href], footer a[href]")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
       for (const href of hrefs) {
-        // Same-site paths (with today's /en prefix or none; never /te while Telugu is off),
-        // in-page anchors or sign-in.
-        expect(href, path).toMatch(/^(#|\/(?!te(\/|$))[a-z]|\/bff\/auth\/login$)/);
+        // Same-site paths without a locale prefix (never /en or /te), in-page anchors or sign-in.
+        expect(href, path).toMatch(/^(#|\/(?!(en|te)(\/|$|#))[a-z]|\/bff\/auth\/login$)/);
       }
       const pages = hrefs.filter((href) => href.startsWith("/") && !href.startsWith("/bff/"));
       for (const href of new Set(pages)) {

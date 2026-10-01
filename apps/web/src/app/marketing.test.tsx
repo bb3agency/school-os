@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readMarketingSettings } from "@/features/marketing/settings";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 
-let pathname = "/en/welcome";
+let pathname = "/welcome";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
@@ -46,11 +46,14 @@ const PAGES = {
 type PageName = keyof typeof PAGES;
 const NAMES = Object.keys(PAGES) as PageName[];
 
-/** The href without the locale prefix (links are locale-free paths; the prefix may go). */
-const bare = (href: string | null) => (href ?? "").replace(/^\/(en|te)(?=\/|$)/, "") || "/";
+/**
+ * The href exactly as rendered. No URL carries a locale (ADR-0036 note, 2026-09-30), so the
+ * links are compared as they are: a `/en` or `/te` prefix fails the comparison.
+ */
+const bare = (href: string | null) => href ?? "";
 
 function render(name: PageName) {
-  pathname = `/en/${name}`;
+  pathname = `/${name}`;
   const { Page } = PAGES[name];
   return renderWithIntl(Page() as ReactElement);
 }
@@ -553,7 +556,7 @@ describe("honest claims (docs/01, 07, 08, 14, 16)", () => {
 
 describe("the signed-out page links to the public home page", () => {
   it("keeps its SchoolOS home link", async () => {
-    pathname = "/en/signed-out";
+    pathname = "/signed-out";
     renderWithIntl(await SignedOutPage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByRole("link", { name: messages.en.auth.signedOut.signIn })).toHaveAttribute(
       "href",

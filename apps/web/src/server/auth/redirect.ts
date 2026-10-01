@@ -1,23 +1,25 @@
 import "server-only";
+import { withoutLocalePrefix } from "@/i18n/languages";
 import type { SessionKind } from "@/server/config";
 
 /**
  * `next` validation for sign-in, step-up and error redirects (open-redirect prevention).
  *
  * Only same-origin relative paths are accepted. Anything else falls back to the kind's
- * home: "/" for school staff, "/en/platform" for operators. Staff cannot be sent into the
- * control plane and operators cannot be sent into the school console.
+ * home: "/" for school staff, "/platform" for operators. Staff cannot be sent into the
+ * control plane and operators cannot be sent into the school console. No URL carries a locale
+ * (ADR-0036 note, 2026-09-30): an old `/en/...` or `/te/...` return address loses its prefix.
  */
 
 const MAX_NEXT_LENGTH = 2048;
 const PROBE_ORIGIN = "https://next.invalid";
 // ASCII control characters, space and backslash are never valid in our paths.
 const FORBIDDEN = /[\u0000- \u007f\\]/;
-const PLATFORM_PATH = /^\/(en|te)\/platform(\/|$|\?|#)/;
+const PLATFORM_PATH = /^\/platform(\/|$|\?|#)/;
 
 export const DEFAULT_NEXT: Record<SessionKind, string> = {
   staff: "/",
-  operator: "/en/platform",
+  operator: "/platform",
   support: "/",
 };
 
@@ -34,7 +36,8 @@ export function safeNext(value: string | null | undefined, kind: SessionKind): s
     return fallback;
   }
   if (url.origin !== PROBE_ORIGIN) return fallback;
-  const path = `${url.pathname}${url.search}${url.hash}`;
+  // An old locale prefix is dropped ("/en/x" → "/x"; "/en//evil.example" → "/evil.example").
+  const path = withoutLocalePrefix(`${url.pathname}${url.search}${url.hash}`);
   // Dot-segment normalisation can turn "/.//evil.example" into "//evil.example".
   if (!path.startsWith("/") || path.startsWith("//")) return fallback;
   // Never bounce into the BFF itself (auth routes, API proxy).

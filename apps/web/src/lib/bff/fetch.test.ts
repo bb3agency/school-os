@@ -53,7 +53,7 @@ function setup(api: (request: Request) => Response | Promise<Response>) {
 beforeEach(() => {
   forgetSessionInfo();
   vi.unstubAllGlobals();
-  window.history.replaceState(null, "", "/te/settings/users?page=2");
+  window.history.replaceState(null, "", "/settings/users?page=2");
 });
 
 describe("browser BFF client (SEC-004)", () => {
@@ -76,9 +76,7 @@ describe("browser BFF client (SEC-004)", () => {
     await expect(
       bffFetch(new Request("http://localhost:3000/bff/api/v1/users")),
     ).rejects.toBeInstanceOf(AuthRedirectError);
-    expect(navigate).toHaveBeenCalledWith(
-      "/bff/auth/login?next=%2Fte%2Fsettings%2Fusers%3Fpage%3D2",
-    );
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/login?next=%2Fsettings%2Fusers%3Fpage%3D2");
   });
 
   it("goes to the step-up URL on 428", async () => {
@@ -86,13 +84,13 @@ describe("browser BFF client (SEC-004)", () => {
       Response.json(
         {
           code: "step_up_required",
-          step_up_url: "/bff/auth/step-up?next=%2Fte%2Fsettings%2Fusers",
+          step_up_url: "/bff/auth/step-up?next=%2Fsettings%2Fusers",
         },
         { status: 428 },
       ),
     );
     await expect(bffFetch(new Request("http://localhost:3000/bff/api/v1/users"))).rejects.toThrow();
-    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fte%2Fsettings%2Fusers");
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fsettings%2Fusers");
   });
 
   it("ignores a step_up_url that points anywhere else", async () => {
@@ -103,9 +101,7 @@ describe("browser BFF client (SEC-004)", () => {
       ),
     );
     await expect(bffFetch(new Request("http://localhost:3000/bff/api/v1/users"))).rejects.toThrow();
-    expect(navigate).toHaveBeenCalledWith(
-      "/bff/auth/step-up?next=%2Fte%2Fsettings%2Fusers%3Fpage%3D2",
-    );
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fsettings%2Fusers%3Fpage%3D2");
   });
 
   it("re-reads the CSRF token once after csrf_failed and retries with the same body", async () => {
@@ -213,7 +209,7 @@ describe("background polls and suspended schools (FR-NOT-001, BR-08)", () => {
 describe("step-up and retry (ADR-0018, SEC-005)", () => {
   const stepUp = () =>
     Response.json(
-      { code: "step_up_required", step_up_url: "/bff/auth/step-up?next=%2Fte%2Ffindings" },
+      { code: "step_up_required", step_up_url: "/bff/auth/step-up?next=%2Ffindings" },
       { status: 428 },
     );
 
@@ -239,7 +235,7 @@ describe("step-up and retry (ADR-0018, SEC-005)", () => {
     } finally {
       unregister();
     }
-    expect(handler).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fte%2Ffindings");
+    expect(handler).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Ffindings");
     expect(navigate).not.toHaveBeenCalled();
     expect(calls).toHaveLength(2);
     await expect(calls[1]?.text()).resolves.toBe('{"reason":"Checked with the register"}');
@@ -271,7 +267,7 @@ describe("step-up and retry (ADR-0018, SEC-005)", () => {
       unregister();
     }
     expect(calls).toHaveLength(2);
-    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Fte%2Ffindings");
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/step-up?next=%2Ffindings");
   });
 
   it("a handler registered for operators is not used for staff calls", async () => {
@@ -290,6 +286,6 @@ describe("step-up and retry (ADR-0018, SEC-005)", () => {
   });
 
   it("the step-up window returns to the completion page, never elsewhere", () => {
-    expect(stepUpWindowUrl("te")).toBe("/bff/auth/step-up?next=%2Fte%2Fstep-up-complete");
+    expect(stepUpWindowUrl()).toBe("/bff/auth/step-up?next=%2Fstep-up-complete");
   });
 });

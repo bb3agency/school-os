@@ -3557,7 +3557,7 @@
     },
     "operators": {
       "title": "Platform operators",
-      "body": "Operators are not seeded. Create the first one with app.platform.bootstrap_owner, then sign in at /en/platform with that subject."
+      "body": "Operators are not seeded. Create the first one with app.platform.bootstrap_owner, then sign in at /platform with that subject."
     }
   },
   "academicStructure": {

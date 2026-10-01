@@ -10,7 +10,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en",
+    usePathname: () => "/",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   };
 });
@@ -61,7 +61,7 @@ describe("suspended-school banner (FR-PLT-004, BR-08)", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Plan and billing" })).toHaveAttribute(
       "href",
-      "/en/settings/billing",
+      "/settings/billing",
     );
   });
 

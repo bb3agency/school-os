@@ -10,7 +10,7 @@ import AskHistoryPage from "@/app/[locale]/(school)/ask/history/page";
 import AskMemoryPage from "@/app/[locale]/(school)/ask/memory/page";
 import { CHAT, LIST_ROUTE, summary } from "./chat-test-utils";
 
-const nav = vi.hoisted(() => ({ path: "/en/ask/history" }));
+const nav = vi.hoisted(() => ({ path: "/ask/history" }));
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
@@ -33,7 +33,7 @@ const SETTINGS = "/bff/api/v1/knowledge/memory-settings";
 let stub: BffStub;
 
 beforeEach(() => {
-  nav.path = "/en/ask/history";
+  nav.path = "/ask/history";
   stub = installBffStub("staff");
   stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["kb.ask"]));
 });
@@ -68,7 +68,7 @@ describe("All chats (FR-KB-012)", () => {
     const pinned = await screen.findByRole("region", { name: "Pinned" });
     expect(
       within(pinned).getByRole("link", { name: /Transfer certificate steps/ }),
-    ).toHaveAttribute("href", `/en/ask/c/${B}`);
+    ).toHaveAttribute("href", `/ask/c/${B}`);
     const others = screen.getByRole("region", { name: "Chats" });
     expect(
       within(others)
@@ -231,12 +231,12 @@ describe("recent chats in the one sidebar (FR-KB-012, docs/17 §5.2)", () => {
   });
 
   it("shows New chat, the recents (pinned first), All chats and Memory; the open chat is the one current page", async () => {
-    nav.path = `/en/ask/c/${A}`;
+    nav.path = `/ask/c/${A}`;
     shell();
     const menu = screen.getByRole("navigation", { name: "Main" });
     const recents = await within(menu).findByRole("list", { name: "Recent" });
     const links = within(recents).getAllByRole("link");
-    expect(links.map((l) => l.getAttribute("href"))).toEqual([`/en/ask/c/${B}`, `/en/ask/c/${A}`]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual([`/ask/c/${B}`, `/ask/c/${A}`]);
     // Truncated visually; the full title stays the name and the tooltip.
     expect(links[0]).toHaveAttribute(
       "title",
@@ -248,19 +248,19 @@ describe("recent chats in the one sidebar (FR-KB-012, docs/17 §5.2)", () => {
     expect(within(menu).getByRole("link", { name: "Ask the school" })).not.toHaveAttribute(
       "aria-current",
     );
-    expect(within(menu).getByRole("link", { name: "New chat" })).toHaveAttribute("href", "/en/ask");
+    expect(within(menu).getByRole("link", { name: "New chat" })).toHaveAttribute("href", "/ask");
     expect(within(menu).getByRole("link", { name: "All chats" })).toHaveAttribute(
       "href",
-      "/en/ask/history",
+      "/ask/history",
     );
     expect(within(menu).getByRole("link", { name: "Memory" })).toHaveAttribute(
       "href",
-      "/en/ask/memory",
+      "/ask/memory",
     );
   });
 
   it("stays out of the way on other pages (no request, no sub-list)", async () => {
-    nav.path = "/en/students";
+    nav.path = "/students";
     shell();
     await Promise.resolve();
     expect(screen.queryByRole("link", { name: "New chat" })).toBeNull();
@@ -268,7 +268,8 @@ describe("recent chats in the one sidebar (FR-KB-012, docs/17 §5.2)", () => {
   });
 
   it("marks All chats current on the history page and works in Telugu", async () => {
-    nav.path = "/te/ask/history";
+    // No locale in the URL (ADR-0036 note): the Telugu page has the same path.
+    nav.path = "/ask/history";
     renderWithIntl(
       <SchoolShell permissions={["kb.ask"]}>
         <p>x</p>
@@ -313,7 +314,7 @@ describe("Manage memory", () => {
     });
 
   beforeEach(() => {
-    nav.path = "/en/ask/memory";
+    nav.path = "/ask/memory";
     stub.routes[`GET ${SETTINGS}`] = () => Response.json({ enabled: true, school_enabled: true });
     stub.routes[`GET ${MEM}`] = () =>
       pageOf(

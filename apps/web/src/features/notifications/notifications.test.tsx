@@ -14,7 +14,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en",
+    usePathname: () => "/",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   };
 });
@@ -113,10 +113,7 @@ describe("notification bell (FR-NOT-001)", () => {
     const link = await within(panel).findByRole("link", {
       name: /A correction request is waiting for you/,
     });
-    expect(link).toHaveAttribute(
-      "href",
-      "/en/change-requests/0192f3a4-0000-7000-8000-00000000c001",
-    );
+    expect(link).toHaveAttribute("href", "/change-requests/0192f3a4-0000-7000-8000-00000000c001");
     // jsdom cannot navigate: stop the link's default action after React has handled the click.
     document.addEventListener("click", (event) => event.preventDefault(), { once: true });
     await userEvent.click(link);

@@ -1,7 +1,6 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { routing, type Locale } from "@/i18n/routing";
 import { isHttpsDeployment } from "@/lib/security-headers";
 import { callApi } from "@/server/bff/upstream";
 import type { SessionKind } from "@/server/config";
@@ -51,17 +50,13 @@ export async function getSession(kind: SessionKind): Promise<SessionView | null>
   return session && session.kind === kind ? toSessionView(session) : null;
 }
 
-/** The bare school home: "/", "/en", "/te" (optional trailing slash; the query is ignored). */
-const SCHOOL_HOME = /^\/(?:(en|te)\/?)?$/;
-
 /**
- * The locale when `path` (pathname plus optional query, as in PATH_HEADER) is exactly the
- * school home, otherwise null. "/" has no locale yet: the default one.
+ * True when `path` (pathname plus optional query, as in PATH_HEADER) is exactly the bare
+ * school home "/" (the query is ignored). No URL carries a locale (ADR-0036 note): the proxy
+ * sends an old "/en" or "/te" to "/" before any page renders.
  */
-export function isSchoolHomePath(path: string): Locale | null {
-  const match = SCHOOL_HOME.exec(path.split("?", 1)[0] ?? "");
-  if (!match) return null;
-  return (match[1] as Locale | undefined) ?? routing.defaultLocale;
+export function isSchoolHomePath(path: string): boolean {
+  return (path.split("?", 1)[0] ?? "") === "/";
 }
 
 async function requireSession(kind: SessionKind): Promise<SessionView> {
@@ -72,8 +67,7 @@ async function requireSession(kind: SessionKind): Promise<SessionView> {
   const path = (await headers()).get(PATH_HEADER) ?? "/";
   // A signed-out visitor to the school home sees the public product page first; deep
   // links still go straight to sign-in and come back (FR-IAM-001).
-  const home = kind === "staff" ? isSchoolHomePath(path) : null;
-  if (home) redirect(`/${home}/welcome`);
+  if (kind === "staff" && isSchoolHomePath(path)) redirect("/welcome");
   const login = kind === "operator" ? "/bff/auth/platform/login" : "/bff/auth/login";
   // The login route validates `next` again (same-origin paths of the right kind only).
   redirect(`${login}?next=${encodeURIComponent(path)}`);

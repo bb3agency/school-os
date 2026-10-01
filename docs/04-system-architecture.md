@@ -129,7 +129,7 @@ Browser → WAF → ALB → web (BFF)
   8. response (problem+json on errors; no internal details)
 ```
 
-Signed-out browsers: every school console page needs a staff session and sends a visitor to staff sign-in (`/bff/auth/login?next=<path>`), except the bare school home (`/`, `/en`, `/te`), which shows the public welcome page `/<locale>/welcome` (no session; product overview and a "Sign in" link). Operator pages always go to operator sign-in (`apps/web/README.md`).
+Signed-out browsers: every school console page needs a staff session and sends a visitor to staff sign-in (`/bff/auth/login?next=<path>`), except the bare school home `/`, which shows the public welcome page `/welcome` (no session; product overview and a "Sign in" link). Operator pages always go to operator sign-in (`apps/web/README.md`).
 
 ## 6. Asynchronous processing
 
