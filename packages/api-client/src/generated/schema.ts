@@ -16043,7 +16043,7 @@ export interface operations {
                 /** @description Page size (max 200). */
                 limit?: number;
                 profile_key?: string | null;
-                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012")[] | null;
+                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022")[] | null;
                 section_id?: string | null;
                 severity?: ("blocker" | "high" | "medium" | "low" | "info")[] | null;
                 status?: ("open" | "resolved" | "waived" | "reopened")[] | null;

@@ -1961,6 +1961,7 @@
       "identityField": "గుర్తింపు ఫీల్డ్: మార్పులకు సవరణ అభ్యర్థన అవసరం",
       "restrictedField": "పరిమితం: చూపించండి నొక్కే వరకు దాచబడి ఉంటుంది",
       "provisional": "తాత్కాలికం",
+      "apaarNotVerified": "Not verified yet. An APAAR ID counts once someone checks it against the UDISE+ portal or the APAAR card and marks it verified.",
       "conflicts": "వీటితో తేడా ఉంది: {sources}",
       "recordedOn": "{date} న నమోదైంది",
       "hasEvidence": "ఆధారం జత చేయబడింది",
@@ -2000,6 +2001,8 @@
       "value": "విలువ",
       "digits4Hint": "ఆధార్ నంబర్ చివరి 4 అంకెలు మాత్రమే, ఉదాహరణకు 1234.",
       "digits4Invalid": "సరిగ్గా 4 అంకెలు ఇవ్వండి: ఆధార్ నంబర్ చివరి 4 అంకెలు.",
+      "digits12Hint": "The 12-digit APAAR ID as shown in the UDISE+ portal or on the APAAR card. Spaces between groups of 4 are fine.",
+      "digits12Invalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
       "identityNote": "ఇది గుర్తింపు ఫీల్డ్. ప్రవేశ రిజిస్టర్ విలువ నమోదైన తర్వాత దాన్ని మార్చడానికి ఆధారంతో సవరణ అభ్యర్థన, ప్రిన్సిపాల్ ఆమోదం అవసరం.",
       "submit": "విలువను నమోదు చేయండి",
       "goToChangeRequests": "ఈ విద్యార్థి సవరణ అభ్యర్థనలు తెరవండి"
