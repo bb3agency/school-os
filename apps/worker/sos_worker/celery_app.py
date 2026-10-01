@@ -140,6 +140,8 @@ def create_celery() -> Celery:
             # ADR-0034: the rolling summary of an Ask conversation, after the answer.
             "knowledge.summarise_conversation": {"queue": "ingest"},
             "knowledge.tidy_conversations": {"queue": "maintenance"},
+            # docs/08 §7 erasure chain: the daily sweep of cached vectors no chunk uses.
+            "knowledge.purge_orphan_vectors": {"queue": "maintenance"},
             "knowledge.*": {"queue": "ingest"},
             # M4 (FR-CIR-002): circular reading through the knowledge gateway, next to the
             # ingestion that triggers it; notice PDFs/PNGs on the Chromium workers

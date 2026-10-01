@@ -171,12 +171,26 @@ QUARANTINE_HOOKS: list[VersionHook] = []
 READY_HOOKS: list[VersionHook] = []
 """Called when a version becomes ``ready`` (M2: text extraction, chunking, embeddings)."""
 
+VERSION_DISCARDED_HOOKS: list[VersionHook] = []
+"""``hook(session, document_id, version_id)`` after a version was discarded (PRV-016:
+``discard_version`` / ``replace_with_redacted``), in the same transaction as the status change
+and its ``document.version_discarded`` audit event (knowledge: remove the version's chunks and
+cached vectors at once, docs/08 §7 erasure chain). Not called for a version already
+discarded; a hook that raises rolls the discard back."""
+
 DeleteGuard = Callable[[Session, uuid.UUID], str | None]
 """``guard(session, document_id)`` returns an error code to refuse deletion (retention)."""
 
 DELETE_GUARDS: list[DeleteGuard] = []
 
 DeletedHook = Callable[[Session, uuid.UUID], None]
+DELETING_HOOKS: list[DeletedHook] = []
+"""``hook(session, document_id)`` right before a document's rows are deleted (by a user or a
+retention job), after every ``DELETE_GUARDS`` entry let it go, in the same transaction: for
+derived data that no foreign key reaches and that can only be found through the rows about to
+go (knowledge: the embedding-cache vectors of the document's chunks, keyed by text digest;
+docs/08 §7 erasure chain). A hook that raises rolls the delete back."""
+
 DELETED_HOOKS: list[DeletedHook] = []
 """``hook(session, document_id)`` after a document was deleted (by a user or a retention job):
 its rows are gone, ``document.deleted`` is audited and the object purge is queued, all in the
@@ -1201,6 +1215,8 @@ def _delete(session: Session, doc: Document, *, reason: str | None) -> None:
     if reason is not None:
         summary["reason"] = reason
     with _db_errors():
+        for deleting in DELETING_HOOKS:
+            deleting(session, doc.id)
         repo.delete_document(session, doc.id)
         _audit(session, "document.deleted", doc.id, summary, system=reason is not None)
         ops.enqueue_event(session, DELETED_EVENT, {"document_id": doc.id, "batch_ids": batch_ids})
@@ -1444,6 +1460,8 @@ def _discard_version(session: Session, version: DocumentVersion, reason_code: st
     ops.enqueue_event(
         session, DISCARDED_EVENT, {"document_id": version.document_id, "version_id": version.id}
     )
+    for hook in VERSION_DISCARDED_HOOKS:
+        hook(session, version.document_id, version.id)
     return True
 
 
@@ -2316,6 +2334,7 @@ __all__ = [
     "ACL_CHANGED_HOOKS",
     "DELETED_HOOKS",
     "DELETE_GUARDS",
+    "DELETING_HOOKS",
     "DISCARDED_EVENT",
     "DISCARD_REASONS",
     "DISCARD_TASK",
@@ -2325,6 +2344,7 @@ __all__ = [
     "RETENTION_REASONS",
     "STATUS_CHANGED_HOOKS",
     "TENANT_EXPORT_MIME",
+    "VERSION_DISCARDED_HOOKS",
     "FileTooLarge",
     "ObjectStore",
     "ObjectWriter",
