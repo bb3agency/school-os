@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · implementation amendment 2026-09-29 (ADR-0029) |
+| Status | Accepted · implementation amendments 2026-09-29 (ADR-0029), 2026-10-01 (ADR-0037) |
 | Date | 2026-09-27 |
 | Deciders | Founder (product owner decisions of 2026-09-27 on the M0 "decisions needed" list, [14 · M0 status](../14-roadmap.md#m0-status-2026-09-26)) |
 | Amends / supersedes | Amends [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (settles Amendments A6 and A10) and [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) (what `platform` may call on the tenant side) |
@@ -49,10 +49,10 @@ It MUST NOT read tenant data. Pinned tenant-side imports, with the names they ma
 
 `tenant_session()` MAY be opened only in:
 - `platform/tenant_audit.py`: delivery and its dedupe lookup of one event ID;
-- `platform/usage.py`: one aggregate count per school per day.
+- `platform/usage.py`: aggregate counts per school per day (active users; questions and billable AI answers, amendment B2).
 
 The school-side routes in `platform/tenant_api.py` use the request's `TenantDB` like every tenant route. Raw SQL in `platform` may name only these tenant-side relations:
-- `audit.events`, in those two files;
+- `audit.events`, in those two files, and `kb.queries` in `usage.py` (counts only, amendment B2);
 - the definer functions `core.current_subscription()` and `core.create_owner_invite()`.
 
 `apps/api/tests/platform/test_boundaries.py` enforces all of this with an AST scan of `app/platform/**/*.py`. Changing any of its lists is a boundary change: update this ADR in the same PR, or write a new ADR if the decision changes.
@@ -91,3 +91,17 @@ Implementation facts only; the decision stands (policy in docs/adr/README.md).
 `TENANCY_ALLOWED` in `apps/api/tests/platform/test_boundaries.py` lists the five names. The
 `tenant.deleted` school-chain copy goes through `tenant_audit.enqueue` in the certificate
 transaction (the follow-up above).
+
+## Amendments (2026-10-01)
+
+**B2 · Billable AI answer count (ADR-0037).** `platform/usage.py` already opens the school's own
+`tenant_session` for one aggregate count per school per day (distinct active users from
+`audit.events`). In the same pattern it now also counts, per IST day, the school's `kb.queries`
+rows and those with a billable status (`billing.yaml` → `ai_answers.billable_statuses`) and
+stores only the two numbers (`platform.usage_daily.ai_queries`, `ai_answers`). RLS applies (the
+query runs as `sos_app` with the school's tenant context); no column other than `status`,
+`tenant_id` and `created_at` is read; no question, answer, person or ID leaves the session. No
+definer function, `definer_access` policy or grant was added, and `platform` imports no new
+tenant-side module. `SQL_ALLOWED` in `apps/api/tests/platform/test_boundaries.py` gains
+(`usage.py`, `kb.queries`); `TENANT_SESSION_FILES` is unchanged. A dedicated host runs the same
+function locally and sends the count in its heartbeat.
