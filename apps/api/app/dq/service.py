@@ -263,6 +263,13 @@ def _display(session: Session, rows: Sequence[RowMapping], labels: _Labels) -> _
     return _Display(values=current, names=names)
 
 
+def _uuid_or_none(value: object) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(str(value)) if value else None
+    except ValueError:
+        return None
+
+
 def _finding_out(
     row: RowMapping, labels: _Labels, display: _Display, reach: frozenset[uuid.UUID] | None
 ) -> FindingOut:
@@ -270,7 +277,9 @@ def _finding_out(
     raw_values = details.pop("values", [])
     match = details.get("match")
     related = row["related_student_id"]
-    related_visible = related is None or _visible(reach, related)
+    # DQ-021 names another student without pairing (ADR-0037): same masking as DQ-008.
+    named = related or _uuid_or_none(details.get("other_student_id"))
+    related_visible = named is None or _visible(reach, named)
     values = []
     for v in raw_values:
         value_id = uuid.UUID(str(v["value_id"]))

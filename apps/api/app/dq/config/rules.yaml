@@ -99,8 +99,9 @@ rules:
     explanation_key: DQ-008
     routes: [ROUTE-SCHOOL-CR]
 
+  # v2 (ADR-0037): only for students without a verified APAAR ID.
   - id: DQ-009
-    version: 1
+    version: 2
     check: aadhaar_details
     scope: student
     attribute_keys: [aadhaar_last4, full_name, dob, gender]
@@ -139,3 +140,27 @@ rules:
     severity: {mode: fixed, level: high}
     explanation_key: DQ-012
     routes: [ROUTE-SCHOOL-CR]
+
+  # ADR-0037 (FR-DQ-021): an APAAR ID that is not 12 digits (any source), or one APAAR ID on two
+  # students of the school (canonical values; both students, naming the other record).
+  - id: DQ-021
+    version: 1
+    check: apaar_id
+    scope: student
+    attribute_keys: [apaar_id]
+    sources: [udise_plus, parent_form, manual_entry]
+    severity: {mode: fixed, level: blocker}
+    explanation_key: DQ-021
+    routes: [ROUTE-APAAR]
+
+  # ADR-0037 (FR-DQ-022): UDISE+ vs Aadhaar-as-printed for students without a verified APAAR ID;
+  # generation authenticates against Aadhaar, so these must match. Names by match class.
+  - id: DQ-022
+    version: 1
+    check: apaar_demographics
+    scope: student
+    attribute_keys: [full_name, dob, gender]
+    sources: [udise_plus, aadhaar_as_printed]
+    severity: {mode: fixed, level: high}
+    explanation_key: DQ-022
+    routes: [ROUTE-UIDAI, ROUTE-UDISE]

@@ -16,8 +16,11 @@ source_attributes:
     gender: aadhaar_gender_as_printed
 
 # DQ-009: the Aadhaar details APAAR generation needs (all from source aadhaar_as_printed).
+# Checked only for students without a verified APAAR ID (`apaar_attribute`, ADR-0037).
 apaar_attributes: [aadhaar_last4, aadhaar_name_as_printed, aadhaar_dob_as_printed,
                    aadhaar_gender_as_printed]
+# The APAAR ID attribute (DQ-009 gate, DQ-021, DQ-022; app/students/attributes.yaml).
+apaar_attribute: apaar_id
 
 # DQ-008 possible duplicate: same canonical date of birth, a name in one of `name_classes` and a
 # father's or mother's name in one of `parent_classes` (match classes of app.dq.matching).

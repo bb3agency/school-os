@@ -1,4 +1,5 @@
-"""Rule checks DQ-001..DQ-012 (docs/02 §5, FR-DQ-001, FR-DQ-003, FR-DQ-004, FR-DQ-006).
+"""Rule checks DQ-001..DQ-012, DQ-021, DQ-022 (docs/02 §5, FR-DQ-001, FR-DQ-003, FR-DQ-004,
+FR-DQ-006, FR-DQ-021, FR-DQ-022).
 
 Pure module: every check implements :class:`app.dq.rules.RuleCheck` over a
 :class:`CheckContext` of in-memory facts that the engine (:mod:`app.dq.engine`) loads in bulk
@@ -26,14 +27,25 @@ Check kinds and their rules:
 ``name_format`` (DQ-006)      canonical names against the profile's length/character rules
 ``age_band`` (DQ-007)         age on the first day of the academic year vs the class band
 ``duplicate`` (DQ-008)        same date of birth + matching name + a matching parent name
-``aadhaar_details`` (DQ-009)  Aadhaar last 4 / as-printed fields missing when APAAR is needed
+``aadhaar_details`` (DQ-009)  Aadhaar last 4 / as-printed fields missing when APAAR is needed,
+                              for students without a verified APAAR ID (ADR-0037)
 ``enrolment_overlap`` (DQ-012) more than one active enrolment
+``apaar_id`` (DQ-021)         an APAAR ID that is not 12 digits (any source), or the student's
+                              APAAR ID on another student of the school (one finding per student,
+                              naming the first other record; each side is raised when its own
+                              student is checked, since only DQ-008 findings may pair students)
+``apaar_demographics``        UDISE+ vs Aadhaar-as-printed (as ``cross_source``) for students
+(DQ-022)                      without a verified APAAR ID
 ============================  =====================================================================
+
+The APAAR ID itself never appears in a finding: values are masked (``••••``) and a duplicate
+names the other record by admission number only (PRV-020).
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import re
 import unicodedata
 import uuid
 from collections import defaultdict
@@ -64,6 +76,8 @@ DATE_KEYS: Final = frozenset({"dob", "admission_date", "aadhaar_dob_as_printed"}
 PARENT_KEYS: Final = ("father_name", "mother_name")
 # Keys the engine lifts out of ``Finding.details`` into their own columns.
 RESERVED_DETAILS: Final = ("params", "profile_key", "related_student_id")
+APAAR_DUPLICATE_CODE: Final = "DQ-021-DUPLICATE"
+_APAAR_RE: Final = re.compile(r"[0-9]{12}")
 
 
 def value_kind(attribute_key: str) -> str:
@@ -90,6 +104,7 @@ class CanonicalFact:
     value: str | None
     source: str | None = None
     provisional: bool = False
+    verified: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +139,13 @@ class StudentFacts:
         if fact is None or fact.value is None or not fact.value.strip():
             return None
         return fact.value
+
+    def has_verified(self, attribute_key: str) -> bool:
+        """A canonical value a person verified (ADR-0037: an APAAR ID counts only then)."""
+        fact = self.canonical.get(attribute_key)
+        return (
+            fact is not None and fact.verified and self.canonical_value(attribute_key) is not None
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,11 +354,14 @@ class ValueEqualCheck(_Check):
 class CrossSourceCheck(_Check):
     """DQ-010, DQ-011: register vs board registration / UDISE+ for each identity attribute."""
 
+    def _students(self, context: CheckContext) -> Iterable[StudentFacts]:
+        return context.students.values()
+
     def evaluate(self, context: CheckContext, /) -> Iterator[Finding]:
         rule, cfg = self.rule, context.config
         anchor, other = rule.sources[0], rule.sources[1]
         severity = _fixed(rule)
-        for facts in context.students.values():
+        for facts in self._students(context):
             for key in rule.attribute_keys:
                 a_key, b_key = cfg.physical_key(key, anchor), cfg.physical_key(key, other)
                 a, b = facts.value(a_key, anchor), facts.value(b_key, other)
@@ -605,7 +630,8 @@ class DuplicateCheck(_Check):
 
 
 class AadhaarDetailsCheck(_Check):
-    """DQ-009 per profile that needs APAAR: missing Aadhaar last 4 / as-printed fields."""
+    """DQ-009 per profile that needs APAAR: missing Aadhaar last 4 / as-printed fields, for
+    students without a verified APAAR ID (v2, ADR-0037)."""
 
     def evaluate(self, context: CheckContext, /) -> Iterator[Finding]:
         rule, keys = self.rule, context.config.apaar_attributes
@@ -615,6 +641,8 @@ class AadhaarDetailsCheck(_Check):
             if not profile.needs_apaar:
                 continue
             for facts in context.students.values():
+                if facts.has_verified(context.config.apaar_attribute):
+                    continue  # ADR-0037: the APAAR ID exists; readiness no longer matters
                 missing = [k for k in keys if facts.value(k, source) is None]
                 if not missing:
                     continue
@@ -649,6 +677,76 @@ class EnrolmentOverlapCheck(_Check):
             )
 
 
+class ApaarIdCheck(_Check):
+    """DQ-021 (ADR-0037): an APAAR ID that is not 12 digits from any listed source, and a
+    canonical APAAR ID that another student of the school also has (one finding per checked
+    student, naming the first other record by admission number; never the ID)."""
+
+    def evaluate(self, context: CheckContext, /) -> Iterator[Finding]:
+        rule = self.rule
+        severity = _fixed(rule)
+        key = rule.attribute_keys[0]
+        for facts in context.students.values():
+            for source in rule.sources:
+                fact = facts.value(key, source)
+                if fact is None or fact.value is None or _APAAR_RE.fullmatch(fact.value.strip()):
+                    continue
+                yield make_finding(
+                    rule,
+                    facts.student_id,
+                    severity,
+                    attribute_key=key,
+                    sources=(source,),
+                    details={"reason": "format", "values": [value_entry(key, source, fact)]},
+                )
+        yield from self._duplicates(context, key, severity)
+
+    def _duplicates(
+        self, context: CheckContext, key: str, severity: Severity
+    ) -> Iterator[Finding]:
+        rule = self.rule
+        index: dict[str, list[StudentFacts]] = defaultdict(list)
+        for facts in {**context.population, **context.students}.values():
+            value = facts.canonical_value(key)
+            if value is not None and _APAAR_RE.fullmatch(value.strip()):
+                index[value.strip()].append(facts)
+        for facts in context.students.values():
+            value = facts.canonical_value(key)
+            if value is None:
+                continue
+            others = sorted(
+                (o for o in index.get(value.strip(), ()) if o.student_id != facts.student_id),
+                key=lambda o: (student_label(o), str(o.student_id)),
+            )
+            if not others:
+                continue
+            yield make_finding(
+                rule,
+                facts.student_id,
+                severity,
+                attribute_key=key,
+                sources=(CANONICAL,),
+                details={
+                    "reason": "duplicate",
+                    "others": len(others),
+                    # The record named in the text: the service masks it outside the reader's
+                    # scope, as for DQ-008 (only DQ-008 may use related_student_id).
+                    "other_student_id": str(others[0].student_id),
+                },
+                params={"student": student_label(others[0])},
+                explanation_code=APAAR_DUPLICATE_CODE,
+            )
+
+
+class ApaarDemographicsCheck(CrossSourceCheck):
+    """DQ-022 (ADR-0037): UDISE+ vs Aadhaar-as-printed, compared as DQ-010/011 do, for students
+    without a verified APAAR ID (generation authenticates against Aadhaar)."""
+
+    def _students(self, context: CheckContext) -> Iterable[StudentFacts]:
+        key = context.config.apaar_attribute
+        return [f for f in context.students.values() if not f.has_verified(key)]
+
+
 CHECKS: Final[dict[CheckKind, Callable[[Rule], RuleCheck[CheckContext]]]] = {
     CheckKind.NAME_MATCH: NameMatchCheck,
     CheckKind.VALUE_EQUAL: ValueEqualCheck,
@@ -659,6 +757,8 @@ CHECKS: Final[dict[CheckKind, Callable[[Rule], RuleCheck[CheckContext]]]] = {
     CheckKind.DUPLICATE: DuplicateCheck,
     CheckKind.AADHAAR_DETAILS: AadhaarDetailsCheck,
     CheckKind.ENROLMENT_OVERLAP: EnrolmentOverlapCheck,
+    CheckKind.APAAR_ID: ApaarIdCheck,
+    CheckKind.APAAR_DEMOGRAPHICS: ApaarDemographicsCheck,
 }
 
 
@@ -680,7 +780,13 @@ def attribute_keys_needed(config: EngineConfig, rules: RuleRegistry) -> dict[str
     """Physical attribute keys per source the source-value checks read (for bulk loading)."""
     needed: dict[str, set[str]] = defaultdict(set)
     for rule in rules.values():
-        if rule.check in (CheckKind.NAME_MATCH, CheckKind.VALUE_EQUAL, CheckKind.CROSS_SOURCE):
+        if rule.check in (
+            CheckKind.NAME_MATCH,
+            CheckKind.VALUE_EQUAL,
+            CheckKind.CROSS_SOURCE,
+            CheckKind.APAAR_ID,
+            CheckKind.APAAR_DEMOGRAPHICS,
+        ):
             for source in rule.sources:
                 for key in rule.attribute_keys:
                     needed[source].add(config.physical_key(key, source))

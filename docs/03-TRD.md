@@ -113,7 +113,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-DQ-005 | 2,000 students MUST be checked in ≤ 2 min. | T |
 | FR-DQ-006 | Findings MUST include suggested correction route and masked values for C3 attributes. | T |
 | FR-DQ-020 | Resolve requires a linked change request or note; waive requires `dq.findings.waive` and a reason. | T |
-| FR-DQ-021 | DQ-021 MUST flag an `apaar_id` value that is not 12 digits (any source) and two students of the school sharing one APAAR ID (both students, blocker; the finding names the other record by admission number and never shows the ID). | T |
+| FR-DQ-021 | DQ-021 MUST flag an `apaar_id` value that is not 12 digits (any source) and a student whose APAAR ID another student of the school also has (blocker; raised for each student when that student is checked, naming the first other record by admission number, masked outside the reader's scope as for DQ-008, and never showing the ID). | T |
 | FR-DQ-022 | DQ-022 MUST flag, for a student without a verified APAAR ID, a UDISE+ name, date of birth or gender that differs from the Aadhaar-as-printed value (names by match class, "APAAR generation will fail until these match"). DQ-009 MUST be raised only for students without a verified APAAR ID. | T |
 
 ### 3.6 Change requests (FR-CR)

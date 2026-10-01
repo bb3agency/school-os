@@ -175,7 +175,9 @@ def _canonical_facts(
     canon: Mapping[str, students.CanonicalValue],
 ) -> dict[str, CanonicalFact]:
     return {
-        key: CanonicalFact(value=v.value, source=v.source, provisional=v.provisional)
+        key: CanonicalFact(
+            value=v.value, source=v.source, provisional=v.provisional, verified=v.verified
+        )
         for key, v in canon.items()
     }
 
@@ -189,7 +191,8 @@ def load_context(
     identity_keys = frozenset(a.key for a in catalog if a.is_identity)
     needed = attribute_keys_needed(cfg, rules)
     source_keys = set().union(*needed.values()) if needed else set()
-    canonical_keys = set(BASE_CANONICAL_KEYS)
+    # The APAAR ID gates DQ-009/DQ-022 and is compared for DQ-021 (ADR-0037).
+    canonical_keys = {*BASE_CANONICAL_KEYS, cfg.apaar_attribute}
     for profile in profiles:
         canonical_keys.update(profile.required_fields)
         if profile.name_format is not None:
@@ -235,24 +238,26 @@ def load_context(
         config=cfg,
         policy=load_match_policy(),
         variants=load_variant_dictionary(),
-        population=_population(session, facts),
+        population=_population(session, facts, cfg.apaar_attribute),
         profiles=tuple(profiles),
         identity_keys=identity_keys,
     )
 
 
 def _population(
-    session: Session, in_scope: Mapping[uuid.UUID, StudentFacts]
+    session: Session, in_scope: Mapping[uuid.UUID, StudentFacts], apaar_key: str
 ) -> dict[uuid.UUID, StudentFacts]:
-    """Canonical name, date of birth and parents of every student of the school (DQ-008)."""
+    """Canonical name, date of birth and parents (DQ-008) and APAAR ID (DQ-021) of every
+    student of the school."""
     tenant_id = repo.current_tenant(session)
     everyone = students.list_students_in_scope(session, system_context(tenant_id))
     others = [s for s in everyone if s not in in_scope]
-    canonical = students.canonical_values(session, others, DUPLICATE_KEYS)
+    canonical = students.canonical_values(session, others, (*DUPLICATE_KEYS, apaar_key))
     out: dict[uuid.UUID, StudentFacts] = {}
     for sid in others:
         canon = _canonical_facts(canonical.get(sid, {}))
-        if canon.get("dob") is None or canon["dob"].value is None:
+        compared = [canon.get(k) for k in ("dob", apaar_key)]
+        if all(fact is None or fact.value is None for fact in compared):
             continue
         out[sid] = StudentFacts(
             student_id=sid,

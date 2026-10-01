@@ -1,6 +1,6 @@
 """Data-quality rule registry types (docs/02 §5, FR-DQ-001, FR-DQ-004, FR-DQ-006).
 
-Rules are declarative: ``config/rules.yaml`` lists DQ-001..DQ-012 with their version, check
+Rules are declarative: ``config/rules.yaml`` lists DQ-001..DQ-012, DQ-021 and DQ-022, DQ-021 and DQ-022 with their version, check
 kind, scope, attributes, sources compared, severity policy, explanation template key and
 suggested correction routes. The checks themselves belong to the DQ engine (M1 wave 2), which
 implements :class:`RuleCheck` per ``check`` kind and emits :class:`Finding` values.
@@ -75,6 +75,8 @@ class CheckKind(StrEnum):
     DUPLICATE = "duplicate"
     AADHAAR_DETAILS = "aadhaar_details"
     ENROLMENT_OVERLAP = "enrolment_overlap"
+    APAAR_ID = "apaar_id"  # DQ-021 (ADR-0037)
+    APAAR_DEMOGRAPHICS = "apaar_demographics"  # DQ-022 (ADR-0037)
 
 
 # sis.attribute_values.source (docs/05 §5) plus the resolved canonical value (docs/05 §10).
@@ -174,6 +176,7 @@ class Rule(BaseModel):
         if self.severity.mode == "match_class" and self.check not in (
             CheckKind.NAME_MATCH,
             CheckKind.CROSS_SOURCE,
+            CheckKind.APAAR_DEMOGRAPHICS,
         ):
             raise ValueError(f"{self.id}: only name comparisons take match_class severity")
         return self

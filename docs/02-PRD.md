@@ -439,12 +439,12 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 | DQ-010 | Board registration value differs from register | high | "Board record differs from admission register." |
 | DQ-011 | UDISE+ value differs from register | medium | "UDISE+ differs from admission register." |
 | DQ-012 | Enrolment gaps (student active in two sections/years) | high | "Student is enrolled twice." |
-| DQ-021 | APAAR ID not 12 digits, or one APAAR ID on two students of the school (FR-DQ-021) | blocker | "The APAAR ID is not 12 digits." / "Same APAAR ID as {student}. One of them is wrong." |
+| DQ-021 | APAAR ID not 12 digits, or one APAAR ID on two students of the school (FR-DQ-021; the second case reads "Same APAAR ID as {student}. One of them is wrong.") | blocker | "The APAAR ID is not 12 digits." |
 | DQ-022 | UDISE+ name, date of birth or gender differs from Aadhaar-as-printed, for a student without a verified APAAR ID (FR-DQ-022) | high | "UDISE+ details differ from Aadhaar. APAAR generation will fail until these match." |
 
 Every finding stores: rule, severity, attribute, sources compared, masked values, match class, explanation (EN; TE deferred per ADR-0036), suggested route, status (`open`, `resolved`, `waived`, `reopened`), resolver, timestamps.
 
-**Suggested routes** (text shown to users): "Correct the school record (change request + evidence)", "Parent should correct Aadhaar with UIDAI", "Update UDISE+ after correcting the school record", "Raise a correction request on the board portal".
+**Suggested routes** (text shown to users): "Correct the school record (change request + evidence)", "Parent should correct Aadhaar with UIDAI", "Update UDISE+ after correcting the school record", "Raise a correction request on the board portal", "Check the APAAR ID on the UDISE+ portal or the APAAR card, then record and verify the right one".
 
 ## 6. Name-matching specification (AP naming conventions)
 
