@@ -790,7 +790,7 @@ Does the production vector path still find the nearest passages a caller MAY see
 | `authorised_recall_at_10_critical` | Mean recall@10 over the 5 % and 1 % probes | ≥ 0.95 (soft) |
 | `authorised_recall_leakage_count` | Probes that returned a chunk outside the ACL | reported (the leakage hard gates of §13.2 cover the same predicate) |
 
-`stub-perfect` returns the oracle (1.0); `stub-leaky` puts a forbidden chunk first (fails the critical gate). `app-fake` builds the CI corpus of §6 (`tests/knowledge/recall_support.py`) in its database and runs `vector_route` + `vector_statement` exactly as `HybridRetriever.search` does.
+`stub-perfect` returns the oracle (1.0); `stub-leaky` puts a forbidden chunk first (fails the critical gate). `app-fake` builds the CI corpus of §6 (`tests/knowledge/recall_support.py`) in its database and runs `vector_route` + `vector_statement` exactly as `HybridRetriever.search` does. Run of 2026-10-01 (app-fake, full): 48 probes, recall@10 1.00 overall and critical, leakage 0; at this corpus size (4 000 chunks, under the 5 000 threshold) every probe takes the exact route, so the HNSW route is measured by the pytest suite (threshold lowered to 100) and the sweep of §6, not by this pass.
 
 ## 14. Observability for RAG
 
