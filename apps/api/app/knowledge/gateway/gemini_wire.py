@@ -309,6 +309,7 @@ class GeminiCodec:
                 text,
                 prepared.passages,
                 require_numbers=config.citations.require_numbers_in_passage,
+                sentences=config.answer_checks.sentences,
             )
             dropped = marked.dropped
             segments = tuple(
