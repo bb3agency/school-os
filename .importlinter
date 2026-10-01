@@ -819,7 +819,7 @@ allow_indirect_imports = True
 # Chunking, prompts, config and the value types stay pure (no database, web, network or
 # feature module), so they run anywhere and test without a database. Indirect imports count.
 [importlinter:contract:knowledge-pure-foundations]
-name = knowledge chunking/prompts/config/domain/sources stay pure (only app.core helpers)
+name = knowledge chunking/prompts/config/domain/sources/sentences stay pure (only app.core helpers)
 type = forbidden
 source_modules =
     app.knowledge.chunking
@@ -827,6 +827,7 @@ source_modules =
     app.knowledge.config
     app.knowledge.domain
     app.knowledge.sources
+    app.knowledge.sentences
     app.knowledge.circulars
     app.knowledge.contextual
 forbidden_modules =
