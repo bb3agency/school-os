@@ -173,7 +173,7 @@ def _apaar_student(admin: Engine) -> uuid.UUID:
     person = SW.W.Person("office_admin", row.user_id, row.membership_id, "sub", "Synthetic")
     ctx = SW.ctx_for(row.tenant_id, person, "office_admin")
     with tenant_session(row.tenant_id, row.user_id) as db:
-        students.record_value(db, ctx, sid, "apaar_id", "udise_plus", "1234 5678 9010")
+        students.record_value(db, ctx, sid, "apaar_id", "udise_plus", "1234 5678 9011")
         students.record_value(db, ctx, sid, "udise_pen", "udise_plus", "21345678901")
     return uuid.UUID(str(sid))
 
@@ -200,7 +200,7 @@ def test_FR_STU_013_apaar_migration_reversible_with_values(
         admin,
         f"SELECT value_text FROM sis.attribute_values WHERE student_id = '{sid}' "
         "AND attribute_key = 'apaar_id'",
-    ) == "123456789010"
+    ) == "123456789011"
 
     command.downgrade(cfg, BEFORE_APAAR)
     assert _scalar(admin, keys) is None

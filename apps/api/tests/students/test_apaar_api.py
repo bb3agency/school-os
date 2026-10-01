@@ -119,7 +119,7 @@ def test_FR_STU_013_apaar_id_correction_is_a_new_verified_value_not_a_change_req
     [
         ("apaar_id", "udise_plus", "12345678901"),
         ("apaar_id", "udise_plus", "1234-5678-901X"),
-        ("apaar_id", "admission_register", "123456789010"),
+        ("apaar_id", "admission_register", "123456789011"),
     ],
 )
 def test_FR_STU_015_apaar_id_refuses_bad_values(

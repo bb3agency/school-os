@@ -6,7 +6,10 @@ Pure module (no database or web). Every value that goes into an exported file pa
 1. ``None`` becomes an empty cell; text is NFC-normalised and control characters other than
    tab, line feed and carriage return are removed (they are invalid in XLSX and useless in CSV).
 2. :func:`app.core.redaction.mask_aadhaar` masks any 12-digit sequence that passes the Verhoeff
-   check (invariant 4: no Aadhaar numbers, ever, in any exported cell).
+   check (invariant 4: no Aadhaar numbers, ever, in any exported cell). The one exception is a
+   :class:`TypedDigits12` cell: the value of the typed ``apaar_id`` attribute (exactly 12 ASCII
+   digits from a field whose type and source are known; ADR-0037 option (a), PRV-020). Only the
+   exports service creates one, for that column; free text never does.
 3. Formula injection (SEC-017, docs/07 §10): a cell that starts with ``=``, ``+``, ``-``, ``@``,
    tab or carriage return is prefixed with an apostrophe, so spreadsheet programs show it as
    text and never evaluate it.
@@ -43,6 +46,26 @@ CSV_MIME: Final = "text/csv"
 PDF_MIME: Final = "application/pdf"
 
 
+_DIGITS12_RE: Final = re.compile(r"[0-9]{12}")
+
+
+class TypedDigits12(str):
+    """The typed APAAR ID of one student (ADR-0037): exactly 12 ASCII digits, exported as is."""
+
+    __slots__ = ()
+
+    def __new__(cls, value: str) -> TypedDigits12:
+        if _DIGITS12_RE.fullmatch(value) is None:
+            raise ValueError("a typed digits12 cell holds exactly 12 ASCII digits")
+        return super().__new__(cls, value)
+
+
+def typed_digits12(value: str) -> str:
+    """``value`` as a :class:`TypedDigits12` cell when it is exactly 12 ASCII digits; otherwise
+    unchanged (and masked like any other text)."""
+    return TypedDigits12(value) if _DIGITS12_RE.fullmatch(value) else value
+
+
 def neutralise_formula(text: str) -> str:
     """Prefix ``'`` when ``text`` would start a formula (SEC-017)."""
     return NEUTRALISER + text if text.startswith(FORMULA_TRIGGERS) else text
@@ -53,6 +76,8 @@ def clean_text(value: object) -> str:
     Used as is for PDF text (nothing evaluates formulas there)."""
     if value is None:
         return ""
+    if isinstance(value, TypedDigits12) and _DIGITS12_RE.fullmatch(value):
+        return str(value)  # ADR-0037: the typed APAAR ID column, never free text
     text = unicodedata.normalize("NFC", str(value))
     text = _CONTROL_RE.sub("", text)
     text = mask_aadhaar(text)
@@ -167,11 +192,13 @@ __all__ = [
     "PDF_MIME",
     "XLSX_MIME",
     "Table",
+    "TypedDigits12",
     "clean_text",
     "neutralise_formula",
     "rows_of",
     "safe_cell",
     "sheet_title",
+    "typed_digits12",
     "write_csv",
     "write_xlsx",
 ]

@@ -23,7 +23,15 @@ What every student gets (dataset ``v1``):
 - UDISE+ name, date of birth, gender and parents; board registration (classes IX-XII only)
   in upper case; a parent form (father and mother names) for about 30 %;
 - guardians father (primary, with a synthetic address) and mother. No phone numbers: a random
-  10-digit mobile number could belong to a real person.
+  10-digit mobile number could belong to a real person;
+- UDISE+ PEN (11 digits) for every student and an APAAR ID for about 60 % (ADR-0037), both from
+  ``udise_plus`` and unverified. The APAAR-like ID starts with ``1`` and FAILS the Verhoeff check
+  (:func:`app.devtools.fake_ids.synthetic_apaar_id`), so it never looks like an Aadhaar number.
+  Drawn from their own random stream, so adding them changed no other synthetic value.
+
+DQ-022 (UDISE+ vs Aadhaar-as-printed for students without a verified APAAR ID) is expected with
+every injection that makes the UDISE+ and Aadhaar-as-printed name, date of birth or gender
+differ (``also``), since the seeded APAAR IDs are unverified.
 
 Injected mismatches (:data:`INJECTIONS`): each kind has a documented rate (share of the
 school's students, at least one per kind), an eligibility rule and the findings it must
@@ -47,7 +55,12 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final, Literal
 
-from app.devtools.fake_ids import invalid_aadhaar_like, last4
+from app.devtools.fake_ids import (
+    invalid_aadhaar_like,
+    last4,
+    synthetic_apaar_id,
+    synthetic_udise_pen,
+)
 from app.devtools.names import (
     GIVEN_FIRST,
     GIVEN_SECOND,
@@ -78,6 +91,7 @@ CLASS_ORDER: Final = ("NUR", "LKG", "UKG", "I", "II", "III", "IV", "V", "VI", "V
 CLASS_AGE: Final[dict[str, int]] = {code: 3 + i for i, code in enumerate(CLASS_ORDER)}
 BOARD_CLASSES: Final = frozenset({"IX", "X", "XI", "XII"})
 PARENT_FORM_RATE: Final = 0.30
+APAAR_RATE: Final = 0.60  # share of students with an APAAR ID (ADR-0037)
 UPPER_REGISTER_RATE: Final = 0.5
 
 MOTHER_TONGUES: Final = (("Telugu", 80), ("Urdu", 8), ("Hindi", 6), ("Tamil", 3), ("Kannada", 2),
@@ -107,9 +121,20 @@ class InjectionKind:
     description: str
 
 
-def _k(key: str, rule: str, rate: float, serious: bool | None, description: str) -> InjectionKind:
-    expects = () if serious is None else (Expect(rule, serious),)
+def _k(
+    key: str,
+    rule: str,
+    rate: float,
+    serious: bool | None,
+    description: str,
+    also: tuple[Expect, ...] = (),
+) -> InjectionKind:
+    expects = (() if serious is None else (Expect(rule, serious),)) + also
     return InjectionKind(key, rule, rate, expects, description)
+
+
+# UDISE+ and Aadhaar-as-printed differ: APAAR generation would fail (ADR-0037, FR-DQ-022).
+APAAR_BLOCKED: Final = (Expect("DQ-022", True),)
 
 
 # Order matters: kinds with small eligible pools pick first. Rates are shares of all students.
@@ -119,17 +144,73 @@ INJECTIONS: Final[tuple[InjectionKind, ...]] = (
     _k("board_dob_mismatch", "DQ-010", 0.005, True, "board date of birth off by one day"),
     _k("board_gender_mismatch", "DQ-010", 0.002, True, "board gender differs"),
     _k("board_father_initials", "DQ-010", 0.005, True, "board father's name with initial"),
-    _k("aadhaar_dob_day_month_swap", "DQ-002", 0.010, True, "Aadhaar DOB day and month swapped"),
+    _k(
+        "aadhaar_dob_day_month_swap",
+        "DQ-002",
+        0.010,
+        True,
+        "Aadhaar DOB day and month swapped",
+        APAAR_BLOCKED,
+    ),
     _k("aadhaar_name_script", "DQ-001", 0.005, None, "Aadhaar name in Telugu script (no finding)"),
-    _k("aadhaar_name_spacing", "DQ-001", 0.015, False, "Aadhaar name: given names joined"),
-    _k("aadhaar_name_initials", "DQ-001", 0.020, False, "Aadhaar name: house name as initial"),
-    _k("aadhaar_name_spelling", "DQ-001", 0.020, False, "Aadhaar name: spelling variant"),
-    _k("aadhaar_name_order", "DQ-001", 0.010, False, "Aadhaar name: given names first"),
-    _k("aadhaar_name_typo", "DQ-001", 0.020, True, "Aadhaar name: one letter wrong"),
-    _k("aadhaar_name_different", "DQ-001", 0.010, True, "Aadhaar of a different person"),
-    _k("aadhaar_dob_off_by_one_day", "DQ-002", 0.010, True, "Aadhaar DOB one day later"),
-    _k("aadhaar_dob_off_by_one_year", "DQ-002", 0.005, True, "Aadhaar DOB one year later"),
-    _k("aadhaar_gender_mismatch", "DQ-003", 0.005, True, "Aadhaar gender differs"),
+    _k(
+        "aadhaar_name_spacing",
+        "DQ-001",
+        0.015,
+        False,
+        "Aadhaar name: given names joined",
+        APAAR_BLOCKED,
+    ),
+    _k(
+        "aadhaar_name_initials",
+        "DQ-001",
+        0.020,
+        False,
+        "Aadhaar name: house name as initial",
+        APAAR_BLOCKED,
+    ),
+    _k(
+        "aadhaar_name_spelling",
+        "DQ-001",
+        0.020,
+        False,
+        "Aadhaar name: spelling variant",
+        APAAR_BLOCKED,
+    ),
+    _k(
+        "aadhaar_name_order",
+        "DQ-001",
+        0.010,
+        False,
+        "Aadhaar name: given names first",
+        APAAR_BLOCKED,
+    ),
+    _k("aadhaar_name_typo", "DQ-001", 0.020, True, "Aadhaar name: one letter wrong", APAAR_BLOCKED),
+    _k(
+        "aadhaar_name_different",
+        "DQ-001",
+        0.010,
+        True,
+        "Aadhaar of a different person",
+        APAAR_BLOCKED,
+    ),
+    _k(
+        "aadhaar_dob_off_by_one_day",
+        "DQ-002",
+        0.010,
+        True,
+        "Aadhaar DOB one day later",
+        APAAR_BLOCKED,
+    ),
+    _k(
+        "aadhaar_dob_off_by_one_year",
+        "DQ-002",
+        0.005,
+        True,
+        "Aadhaar DOB one year later",
+        APAAR_BLOCKED,
+    ),
+    _k("aadhaar_gender_mismatch", "DQ-003", 0.005, True, "Aadhaar gender differs", APAAR_BLOCKED),
     _k("parent_form_father_initials", "DQ-004", 0.010, False, "parent form: father as initial"),
     _k("parent_form_mother_typo", "DQ-004", 0.010, True, "parent form: mother's name typo"),
     _k("missing_mother_name", "DQ-005", 0.005, True, "no mother's name in any source"),
@@ -139,8 +220,22 @@ INJECTIONS: Final[tuple[InjectionKind, ...]] = (
     _k("age_out_of_band", "DQ-007", 0.005, False, "born two years earlier: outside the band"),
     _k("duplicate_record", "DQ-008", 0.005, True, "second record of the same child"),
     _k("no_aadhaar", "DQ-009", 0.010, False, "no Aadhaar details (APAAR, UDISE+ profile)"),
-    _k("udise_name_spacing", "DQ-011", 0.010, False, "UDISE+ name: given names joined"),
-    _k("udise_dob_off_by_one_day", "DQ-011", 0.005, False, "UDISE+ DOB one day later"),
+    _k(
+        "udise_name_spacing",
+        "DQ-011",
+        0.010,
+        False,
+        "UDISE+ name: given names joined",
+        APAAR_BLOCKED,
+    ),
+    _k(
+        "udise_dob_off_by_one_day",
+        "DQ-011",
+        0.005,
+        False,
+        "UDISE+ DOB one day later",
+        APAAR_BLOCKED,
+    ),
     _k("udise_mother_name_spelling", "DQ-011", 0.005, False, "UDISE+ mother's name spelling"),
     _k("enrolled_twice", "DQ-012", 0.003, True, "still active in last year's section"),
 )
@@ -327,6 +422,8 @@ class _Draft:
     aadhaar_last4: str
     parent_form: bool
     address: str
+    udise_pen: str = ""
+    apaar_id: str | None = None
     injection: str | None = None
     related: str | None = None
 
@@ -401,6 +498,10 @@ def _draft(
     admission_date = dt.date(admitted_year, 6, rng.randint(1, 20))
     number = invalid_aadhaar_like(rng)  # Verhoeff-INVALID look-alike; only last 4 are kept
     town = rng.choice(TOWNS)
+    # ADR-0037: own stream, so the PEN and APAAR ID leave every other value unchanged.
+    ids = random.Random(f"{stream}:national-ids:{ordinal}")  # noqa: S311 - synthetic test data
+    udise_pen = synthetic_udise_pen(ids)
+    apaar_id = synthetic_apaar_id(ids) if ids.random() < APAAR_RATE else None
     return _Draft(
         ordinal=ordinal,
         section=section,
@@ -416,6 +517,8 @@ def _draft(
         aadhaar_last4=last4(number),
         parent_form=rng.random() < PARENT_FORM_RATE,
         address=f"H.No {rng.randint(1, 40)}-{rng.randint(1, 300)}, Synthetic Colony, {town}",
+        udise_pen=udise_pen,
+        apaar_id=apaar_id,
     )
 
 
@@ -496,7 +599,10 @@ def _base_values(d: _Draft) -> Values:
         ("gender", UDISE): gender,
         ("father_name", UDISE): d.father.canonical,
         ("mother_name", UDISE): d.mother.canonical,
+        ("udise_pen", UDISE): d.udise_pen,
     }
+    if d.apaar_id is not None:
+        v[("apaar_id", UDISE)] = d.apaar_id
     if d.class_code in BOARD_CLASSES:
         v |= {
             ("full_name", BOARD): d.name.canonical.upper(),
@@ -666,6 +772,8 @@ _ORDER: Final = (
     "aadhaar_name_as_printed",
     "aadhaar_dob_as_printed",
     "aadhaar_gender_as_printed",
+    "udise_pen",
+    "apaar_id",
 )
 _SOURCES: Final = (REG, AAD, UDISE, BOARD, PFORM)
 
