@@ -782,6 +782,75 @@ def test_NFR_AVL_004_provider_failure_mid_answer_falls_back_to_search_only(
     assert _llm_outcomes(admin_engine, uuid.UUID(query_id)) == ["ok", "unavailable"]
 
 
+class UncitedSentenceTransport(FakeTransport):
+    """The fake model's cited answer followed by ``extra``: text no passage supports."""
+
+    def __init__(self, extra: str) -> None:
+        super().__init__(record=True)
+        self.extra = extra
+
+    def send(self, request: MessagesRequest) -> Mapping[str, Any]:
+        response = dict(super().send(request))
+        content = list(response["content"])
+        if any(b.get("citations") for b in content):
+            content.append({"type": "text", "text": self.extra})
+        response["content"] = content
+        return response
+
+
+def _ask_with(transport: FakeTransport, api: Any, who: Any) -> list[tuple[str, dict[str, Any]]]:
+    _install(transport=transport)
+    try:
+        res, events = K.ask(api, who, "When is sports day?")
+    finally:
+        composition.set_runtime(None)
+    assert res.status_code == 200, res.text
+    events_list: list[tuple[str, dict[str, Any]]] = events
+    return events_list
+
+
+def test_FR_KB_005_an_uncited_factual_sentence_is_trimmed_from_the_final_answer(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    """Invariant 8: the preview may show it, the validated ``final`` and ``token`` events never
+    do; the rest of the answer stays, with its citations, flagged ``replaced``."""
+    extra = " The canteen serves free lunch to every visitor that day."
+    events = _ask_with(UncitedSentenceTransport(extra), api, world.person("office_staff"))
+    preview = "".join(d["text"] for e, d in events if e == "delta")
+    assert "canteen" in preview
+    final = next(d for e, d in events if e == "final")
+    assert (final["status"], final["mode"], final["replaced"]) == ("answered", "full", True)
+    assert "canteen" not in final["text"]
+    assert "28/11/2026" in final["text"]
+    assert final["text"] == _text(events)
+    assert any(str(docs["sports"]) in s for s in _sources(events))
+    query_id = events[0][1]["query_id"]
+    assert _query_row(admin_engine, query_id)["status"] == "answered"
+    (completed,) = _audits(admin_engine, world, "kb.query.completed", uuid.UUID(query_id))
+    assert completed["summary"]["sentences_dropped"] == 1
+    assert completed["summary"]["uncited_factual"] == 1
+
+
+def test_FR_KB_007_uncited_figures_that_outweigh_the_cited_ones_fall_back_to_search_only(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    extra = " Gates open at 07:15. Buses leave at 16:45. Parents collect children by 17:30."
+    extra += " The prize ceremony starts at 15:00."
+    events = _ask_with(UncitedSentenceTransport(extra), api, world.person("office_staff"))
+    final = next(d for e, d in events if e == "final")
+    assert (final["status"], final["mode"], final["text"], final["replaced"]) == (
+        "search_only",
+        "search_only",
+        "",
+        True,
+    )
+    assert _text(events) == ""
+    shown = str([d for e, d in events if e in ("final", "token", "citation")])
+    assert not any(t in shown for t in ("07:15", "16:45", "17:30", "15:00"))
+    assert any(str(docs["sports"]) in s for s in _sources(events))
+    assert _query_row(admin_engine, events[0][1]["query_id"])["status"] == "search_only"
+
+
 # --- conversation (docs/06 §5 conversation rules; FR-KB-012) -----------------------------------
 
 
