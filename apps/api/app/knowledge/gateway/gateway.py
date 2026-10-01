@@ -353,9 +353,12 @@ class Gateway:
                 close()
         breaker.record_success()
         tail = masker.feed(assembler.flush()) + masker.flush()
+        # The call is complete: meter it before the last delta, so a client that leaves while
+        # that delta is pending cannot make a billed call vanish from the month's spend.
+        turn = self._finish_turn(call, sent(), offered, prepared)
         if tail:
             yield TextDelta(tail)
-        yield self._finish_turn(call, sent(), offered, prepared)
+        yield turn
 
     def _open_stream(
         self, transport: StreamingTransport, request: MessagesRequest, call: _Call

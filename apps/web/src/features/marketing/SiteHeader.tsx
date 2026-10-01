@@ -41,7 +41,7 @@ export function SiteHeader({
 }: {
   current: MarketingPage;
   contactEmail: string | null;
-  /** "Ask on WhatsApp": in the bar from xl (room beside the page links), always in the menu. */
+  /** "Ask on WhatsApp": in the bar from xl (room beside the page links), in the menu below lg. */
   whatsappNumber?: string | null;
 }) {
   const t = useTranslations("marketing");
