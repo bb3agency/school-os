@@ -7,8 +7,8 @@
  * stand-in IdP and API (see audit.config.ts).
  *
  * Knobs: AUDIT_VP ("375x812,1366x768"), AUDIT_LOCALES ("en", or "en,te" when the run sets
- * SOS_TELUGU_ENABLED=true: ADR-0036), AUDIT_ONLY (regex on the
- * URL), AUDIT_SHOTS (widths to screenshot, "" for none), AUDIT_OUT (default audit-out).
+ * SOS_TELUGU_ENABLED=true: ADR-0036; chosen by the NEXT_LOCALE cookie), AUDIT_ONLY (regex on
+ * "[locale] /path"), AUDIT_SHOTS (widths to screenshot, "" for none), AUDIT_OUT (default audit-out).
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,6 +23,7 @@ import {
   signInAs,
   type LayoutReport,
 } from "../support/responsive";
+import { selectLanguage, type UiLocale } from "../support/telugu";
 
 const OUT = process.env.AUDIT_OUT ?? "audit-out";
 const SHOTS = new Set(
@@ -31,7 +32,9 @@ const SHOTS = new Set(
 const ONLY = process.env.AUDIT_ONLY ? new RegExp(process.env.AUDIT_ONLY) : null;
 const LOCALES = (
   process.env.AUDIT_LOCALES ?? (process.env.SOS_TELUGU_ENABLED === "true" ? "en,te" : "en")
-).split(",");
+)
+  .split(",")
+  .filter((locale): locale is UiLocale => locale === "en" || locale === "te");
 const VIEWPORTS = (
   process.env.AUDIT_VP ??
   "360x740,375x812,390x844,414x896,768x1024,1024x768,1280x800,1366x768,1440x900,1920x1080"
@@ -53,21 +56,25 @@ for (const [groupName, group] of Object.entries(SCREEN_GROUPS)) {
     const results: Record<string, LayoutReport> = {};
     const failures: string[] = [];
     for (const locale of LOCALES) {
+      // The language is the NEXT_LOCALE cookie; no URL carries a locale (ADR-0036 note).
+      await selectLanguage(page, locale);
       for (const path of group.pages) {
-        const url = `/${locale}${path}`;
-        if (ONLY && !ONLY.test(url)) continue;
+        const url = path || "/";
+        const label = `[${locale}] ${url}`;
+        if (ONLY && !ONLY.test(label)) continue;
         for (const [w, h] of VIEWPORTS) {
           // A fresh load at each size: some layout is chosen when the page starts.
           await page.setViewportSize({ width: w, height: h });
           await page.goto(url);
           await settle(page);
           const report = await measure(page);
-          results[`${url} @${w}x${h}`] = report;
+          results[`${label} @${w}x${h}`] = report;
           if (required(w, h)) {
-            for (const problem of problems(report)) failures.push(`${url} @${w}x${h}: ${problem}`);
+            for (const problem of problems(report))
+              failures.push(`${label} @${w}x${h}: ${problem}`);
           }
           if (SHOTS.has(w)) {
-            const name = `${url.replace(/[/?=&]/g, "_")}_${w}.png`;
+            const name = `${locale}${url.replace(/[/?=&]/g, "_")}_${w}.png`;
             await page.screenshot({ path: join(OUT, "shots", name), fullPage: true });
           }
         }

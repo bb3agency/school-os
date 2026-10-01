@@ -28,7 +28,7 @@ export function CheckInvitationsButton({ navigate = defaultNavigate }: { navigat
       }
       const schools = await api.GET("/api/v1/me/schools");
       if ((schools.data?.data.length ?? 0) > 0 || (data?.accepted.length ?? 0) > 0) {
-        navigate(`/${locale}/choose-school`);
+        navigate("/choose-school");
         return;
       }
       setState("none");

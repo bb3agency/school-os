@@ -11,7 +11,7 @@ Rules (docs/16 §5.6-5.9, §9, §10):
   next gapless number of the Indian financial year under a row lock; issued invoices are frozen.
 - GST 18% by default: CGST + SGST when the place of supply equals the supplier's state (AP = 37),
   IGST otherwise; half-up rounding to paise.
-- Commercial catalogue (ADR-0037): a plan's one-time "Implementation and data verification" fee
+- Commercial catalogue (ADR-0038): a plan's one-time "Implementation and data verification" fee
   is charged once, on the subscription's first invoice (the next new invoice if that one is
   voided). An AI answer bundle is a monthly add-on billed in advance with the plan; answers above
   its quota in a calendar month are billed on the next invoice (``usage_month`` stops a second

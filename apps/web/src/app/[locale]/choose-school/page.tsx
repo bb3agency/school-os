@@ -5,7 +5,6 @@ import { SessionControls } from "@/components/session/SessionControls";
 import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
 import { ChooseSchoolView } from "@/features/auth/ChooseSchoolView";
-import { uiLocale } from "@/i18n/languages";
 import { pageMetadata } from "@/lib/metadata";
 import { safeNext } from "@/server/auth/redirect";
 import { apiGetAsSession, requireStaff } from "@/server/session/rsc";
@@ -23,7 +22,6 @@ function PickerLoadError({ mfa }: { mfa: boolean }) {
 }
 
 type Props = {
-  params: Promise<{ locale: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
@@ -31,18 +29,16 @@ type Props = {
  * FR-IAM-013 / ADR-0019: pick the school to work in (GET /api/v1/me/schools, which works
  * without an active school). Also reached from "Switch school" in the school header.
  */
-export default async function ChooseSchoolPage({ params, searchParams }: Props) {
+export default async function ChooseSchoolPage({ searchParams }: Props) {
   const session = await requireStaff();
-  const locale = uiLocale((await params).locale);
   const raw = (await searchParams).next;
   let next = safeNext(typeof raw === "string" ? raw : null, "staff");
-  if (next === "/" || /^\/(en|te)\/(choose-school|no-access)(\/|\?|$)/.test(next)) {
-    next = `/${locale}`;
-  }
+  // No locale in any URL (ADR-0036 note); safeNext has already dropped an old prefix.
+  if (/^\/(choose-school|no-access)(\/|\?|$)/.test(next)) next = "/";
 
   const result = await apiGetAsSession<SchoolChoices>("staff", "/api/v1/me/schools");
   const schools = result?.data?.data ?? null;
-  if (schools && schools.length === 0) redirect(`/${locale}/no-access`);
+  if (schools && schools.length === 0) redirect("/no-access");
 
   return (
     <MinimalShell

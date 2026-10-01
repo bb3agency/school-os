@@ -790,7 +790,7 @@ function PreviewCard({
       header: t("colToSection"),
       cell: (row) => (row.to_label ? <TargetChip label={row.to_label} /> : <Value>{null}</Value>),
     },
-    { key: "count", header: t("colStudents"), cell: (row) => row.count },
+    { key: "count", header: t("colStudents"), numeric: true, cell: (row) => row.count },
   ];
   const problemCount = preview.problems.reduce((sum, row) => sum + row.count, 0);
 

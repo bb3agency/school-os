@@ -1,6 +1,6 @@
 """Billing catalogue: one-time fee, AI answer bundles, overage (FR-PLT-010..017, FR-PLT-020).
 
-Owner-approved commercial model of 2026-10-01 (ADR-0037; docs/16 §5.6, §5.7, §10.2, §11).
+Owner-approved commercial model of 2026-10-01 (ADR-0038; docs/16 §5.6, §5.7, §10.2, §11).
 Prices are ex-GST starting prices in INR; GST goes on the invoice as before.
 
 Schema ``platform`` only (control plane, no RLS, no student data):

@@ -270,12 +270,12 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       json({ type: "about:blank", title: "Step-up", status: 428, code: "step_up_required" }, 428),
     );
     const response = await call("/bff/api/v1/users", {
-      headers: { referer: "https://office.school.example/te/settings/users" },
+      headers: { referer: "https://office.school.example/settings/users" },
     });
     expect(response.status).toBe(428);
     await expect(response.json()).resolves.toMatchObject({
       code: "step_up_required",
-      step_up_url: "/bff/auth/step-up?next=%2Fte%2Fsettings%2Fusers",
+      step_up_url: "/bff/auth/step-up?next=%2Fsettings%2Fusers",
     });
   });
 
@@ -287,11 +287,11 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       body: "{}",
       headers: {
         "x-csrf-token": await h.csrf("operator"),
-        referer: "https://evil.example/en/platform",
+        referer: "https://evil.example/platform/schools",
       },
     });
     await expect(response.json()).resolves.toMatchObject({
-      step_up_url: "/bff/auth/platform/step-up?next=%2Fen%2Fplatform",
+      step_up_url: "/bff/auth/platform/step-up?next=%2Fplatform",
     });
   });
 

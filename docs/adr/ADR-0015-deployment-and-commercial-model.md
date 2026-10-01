@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · Amended by ADR-0037 (commercial catalogue) |
+| Status | Accepted · Amended by ADR-0038 (commercial catalogue) |
 | Date | 2026-09-26 |
 | Deciders | Founder (product owner approval of build proposals B1–B25) |
 | Amends / supersedes | Supersedes the "pool only, silo as escape hatch" part of [ADR-0003](ADR-0003-pool-tenancy-rls.md) and the "ECS-only hosting" part of [ADR-0009](ADR-0009-aws-india-hosting.md); the rest of both stays in force |

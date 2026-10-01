@@ -6,7 +6,7 @@ import type { SessionKind } from "./session-client";
  *
  * When the API answers 428 step_up_required, the BFF client asks the registered handler
  * (StepUpHost, mounted by the school layout) to confirm the user's identity. The host opens
- * the BFF step-up route in a small window whose return address is `/<locale>/step-up-complete`;
+ * the BFF step-up route in a small window whose return address is `/step-up-complete`;
  * that page announces completion on a BroadcastChannel (same origin only). The client then
  * retries the original request once, with a fresh CSRF token. Nothing is written to browser
  * storage: the pending request lives only in memory in this tab. Without a handler (or when the
@@ -51,6 +51,7 @@ export class StepUpCancelledError extends Error {
  * Staff step-up route that returns to the completion page (opened in its own window). The
  * platform admin panel registers no handler and keeps the full-page step-up.
  */
-export function stepUpWindowUrl(locale: string): string {
-  return `/bff/auth/step-up?next=${encodeURIComponent(`/${locale}/step-up-complete`)}`;
+export function stepUpWindowUrl(): string {
+  // No locale in any URL (ADR-0036 note): the window's language comes from the cookie.
+  return `/bff/auth/step-up?next=${encodeURIComponent("/step-up-complete")}`;
 }

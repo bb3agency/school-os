@@ -32,7 +32,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/documents",
+    usePathname: () => "/documents",
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -227,7 +227,7 @@ describe("documents list (US-701, FR-DOC-005..008)", () => {
     renderWithIntl(<DocumentsScreen filters={parseDocumentListFilters({ purpose: "circular" })} />);
     expect(
       await screen.findByRole("link", { name: "Dasara holidays circular 2026" }),
-    ).toHaveAttribute("href", `/en/documents/${DOC}`);
+    ).toHaveAttribute("href", `/documents/${DOC}`);
     const blocked = screen.getAllByRole("row")[2];
     expect(blocked && within(blocked).getByText("Blocked")).toBeInTheDocument();
     expect(blocked && within(blocked).getByText("Only some staff")).toBeInTheDocument();
@@ -276,7 +276,7 @@ describe("documents list (US-701, FR-DOC-005..008)", () => {
     renderWithIntl(<DocumentsScreen filters={parseDocumentListFilters({})} deleted />);
     expect(await screen.findByRole("link", { name: "Upload a document" })).toHaveAttribute(
       "href",
-      "/en/documents/new",
+      "/documents/new",
     );
     expect(screen.getByText("Document deleted")).toBeInTheDocument();
     expect(await screen.findByText("No documents yet")).toBeInTheDocument();
@@ -370,7 +370,7 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
       Response.json(detail({ versions: [version({ mime_type: xlsx })] }));
     const { unmount } = renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
     const link = await screen.findByRole("link", { name: messages.en.sheets.document.open });
-    expect(link).toHaveAttribute("href", `/en/documents/${DOC}/sheet`);
+    expect(link).toHaveAttribute("href", `/documents/${DOC}/sheet`);
     unmount();
     stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () =>
       Response.json(
@@ -466,7 +466,7 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
     expect(stub.callsTo(`DELETE /bff/api/v1/documents/${DOC}`)).toHaveLength(0);
     await userEvent.click(screen.getByRole("button", { name: "Delete document" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/en/documents?deleted=1"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/documents?deleted=1"));
     expect(stub.callsTo(`DELETE /bff/api/v1/documents/${DOC}`)).toHaveLength(1);
   });
 
@@ -765,7 +765,7 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     await userEvent.click(screen.getByRole("radio", { name: "Only some staff" }));
     await userEvent.click(await screen.findByRole("checkbox", { name: "Class 9" }));
     await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/documents/${DOC}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/documents/${DOC}`));
     expect(body("POST /bff/api/v1/documents/uploads")).toEqual({
       filename: "minutes.docx",
       content_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -802,7 +802,7 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     await userEvent.click(screen.getByRole("radio", { name: "Only some staff" }));
     await userEvent.click(await screen.findByRole("checkbox", { name: "Class 9" }));
     await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/documents/${DOC}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/documents/${DOC}`));
     expect(body("POST /bff/api/v1/documents")).toMatchObject({ language: null });
   });
 
@@ -826,7 +826,7 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     expect(await screen.findByText(/The file could not be uploaded/)).toBeInTheDocument();
     expect(stub.callsTo("POST /bff/api/v1/documents")).toHaveLength(0);
     await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/documents/${DOC}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/documents/${DOC}`));
     const presigns = stub.callsTo("POST /bff/api/v1/documents/uploads");
     expect(presigns).toHaveLength(2);
     expect(presigns[0]?.headers.get("idempotency-key")).not.toBe(
@@ -908,7 +908,7 @@ describe("documents pages and menu (NFR-I18N-001)", () => {
     const nav = screen.getByRole("navigation", { name: messages.en.school.nav.label });
     expect(within(nav).getByRole("link", { name: "Documents" })).toHaveAttribute(
       "href",
-      "/en/documents",
+      "/documents",
     );
   });
 

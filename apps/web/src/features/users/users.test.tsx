@@ -24,7 +24,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/settings/users",
+    usePathname: () => "/settings/users",
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -157,7 +157,7 @@ describe("users list (US-102, FR-IAM-010..014)", () => {
       ]);
     renderWithIntl(<UsersScreen />);
     const link = await screen.findByRole("link", { name: "Lakshmi Sample" });
-    expect(link).toHaveAttribute("href", `/en/settings/users/${USER}`);
+    expect(link).toHaveAttribute("href", `/settings/users/${USER}`);
     const ravi = screen.getAllByRole("row").find((row) => within(row).queryByText("Ravi Sample"));
     // Roles are tags, one list item each, with names from /roles or the messages.
     expect(ravi && (await within(ravi).findByText("Librarian"))).toBeTruthy();
@@ -171,7 +171,7 @@ describe("users list (US-102, FR-IAM-010..014)", () => {
     expect(ravi && within(ravi).getByText("Invited")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Invite user" })).toHaveAttribute(
       "href",
-      "/en/settings/users/new",
+      "/settings/users/new",
     );
     expect(await screen.findByText("Made for this school")).toBeInTheDocument();
     // No personal data in any URL the screen asked for.
@@ -232,7 +232,7 @@ describe("users list (US-102, FR-IAM-010..014)", () => {
     );
     expect(screen.getByRole("link", { name: "Users and roles" })).toHaveAttribute(
       "href",
-      "/en/settings/users",
+      "/settings/users",
     );
   });
 });
@@ -261,7 +261,7 @@ describe("invite user (US-102 AC1, FR-IAM-010..012)", () => {
     await userEvent.click(screen.getByLabelText("Only some classes or sections"));
     await userEvent.click(await screen.findByLabelText("Class 9 · A"));
     await userEvent.click(screen.getByRole("button", { name: "Send invitation" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/settings/users/${CREATED}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/settings/users/${CREATED}`));
     const call = stub.callsTo("POST /bff/api/v1/users")[0];
     expect(call?.headers.get("idempotency-key")).toMatch(/^[0-9a-f-]{36}$/);
     expect(body("POST /bff/api/v1/users")).toEqual({
@@ -316,7 +316,7 @@ describe("invite user (US-102 AC1, FR-IAM-010..012)", () => {
     stub.routes["POST /bff/api/v1/users"] = () => {
       attempts += 1;
       return attempts === 1
-        ? problem(428, "step_up_required", { step_up_url: "/bff/auth/step-up?next=%2Fen" })
+        ? problem(428, "step_up_required", { step_up_url: "/bff/auth/step-up?next=%2F" })
         : Response.json(user({ id: CREATED, status: "invited" }), { status: 201 });
     };
     renderWithIntl(<InviteUserScreen />);
@@ -325,7 +325,7 @@ describe("invite user (US-102 AC1, FR-IAM-010..012)", () => {
     await userEvent.click(screen.getByLabelText("Office staff"));
     await userEvent.click(screen.getByLabelText("Whole school"));
     await userEvent.click(screen.getByRole("button", { name: "Send invitation" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/settings/users/${CREATED}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/settings/users/${CREATED}`));
     expect(prompt).toHaveBeenCalledTimes(1);
     const calls = stub.callsTo("POST /bff/api/v1/users");
     expect(calls).toHaveLength(2);
@@ -484,7 +484,7 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
     expect(await screen.findByText("Temporary SchoolOS support access")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to Support access" })).toHaveAttribute(
       "href",
-      "/en/break-glass",
+      "/break-glass",
     );
     expect(screen.queryByRole("button", { name: "Suspend" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save roles" })).not.toBeInTheDocument();
@@ -606,7 +606,7 @@ describe("edit a staff member's details (US-102, FR-IAM-010)", () => {
     stub.routes[PATCH] = () => {
       attempts += 1;
       return attempts === 1
-        ? problem(428, "step_up_required", { step_up_url: "/bff/auth/step-up?next=%2Fen" })
+        ? problem(428, "step_up_required", { step_up_url: "/bff/auth/step-up?next=%2F" })
         : Response.json(user({ display_name: "Lakshmi K", email: null, version: 4 }));
     };
     renderWithIntl(<UserDetailScreen userId={USER} />);

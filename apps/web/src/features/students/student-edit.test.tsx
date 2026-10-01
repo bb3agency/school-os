@@ -25,7 +25,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => `/en/students/${ID.student}`,
+    usePathname: () => `/students/${ID.student}`,
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -165,7 +165,7 @@ describe("invariant 6 / FR-CR-001: identity fields change only through a correct
     });
     expect(request).toHaveAttribute(
       "href",
-      `/en/change-requests/new?student_id=${ID.student}&attribute_key=full_name`,
+      `/change-requests/new?student_id=${ID.student}&attribute_key=full_name`,
     );
     // Identity rows are never edited in place: no direct "Change" for them.
     expect(

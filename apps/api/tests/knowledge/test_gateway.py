@@ -392,12 +392,18 @@ def test_FR_KB_011_at_100_percent_calls_stop_and_the_caller_degrades_to_search_o
     assert len(r.transport.sent) == 1
 
 
-def test_FR_KB_011_the_call_that_reaches_100_percent_completes_then_the_next_is_refused() -> None:
+def test_FR_KB_011_the_last_call_that_fits_completes_then_the_next_is_refused() -> None:
+    # Since reservations (FR-KB-011) a call is admitted only while its worst-case estimate still
+    # fits: list price of budget.reservation.input_tokens + the role's max_output_tokens
+    # (claude-sonnet-5, answer: 16000 * $2 + 1500 * $10 per MTok = $0.047).
     r = rig(budget_inr=84)
-    r.ledger.add_usd(TENANT, "2026-09", Decimal("0.998"))
-    ask(r)
+    r.ledger.add_usd(TENANT, "2026-09", Decimal("0.953"))
+    ask(r)  # 0.953 + 0.047 = 1.000: fits exactly; it really costs 0.004
+    assert r.ledger.spent_usd(TENANT, "2026-09") == Decimal("0.957")
     with pytest.raises(BudgetExhausted):
-        ask(r)
+        ask(r)  # 0.957 + 0.047 > 1.000
+    assert len(r.transport.sent) == 1
+    assert r.ledger.spent_usd(TENANT, "2026-09") <= Decimal(1)
 
 
 def test_FR_KB_011_zero_budget_means_no_ai() -> None:

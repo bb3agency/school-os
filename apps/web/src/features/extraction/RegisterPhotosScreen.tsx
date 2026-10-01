@@ -236,6 +236,7 @@ export function RegisterPhotosView({
     {
       key: "pages",
       header: t("colPages"),
+      numeric: true,
       cell: (row) => (
         <span className="tabular-nums">
           {t("pagesDone", { done: count(row.pages_done), total: count(row.page_count) })}

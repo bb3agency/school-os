@@ -23,7 +23,7 @@ describe("SchoolOS support access in the school app (ADR-0023, SEC-021)", () => 
     );
     expect(screen.getByRole("alert")).toHaveTextContent("This support access has ended");
     const back = screen.getByRole("link", { name: "Back to break-glass requests" });
-    expect(back).toHaveAttribute("href", "/en/platform/break-glass");
+    expect(back).toHaveAttribute("href", "/platform/break-glass");
     expect(screen.queryByRole("link", { name: /Sign in to the school office/ })).toBeNull();
     const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href") ?? "");
     expect(hrefs.some((href) => href.startsWith("/bff/auth/") || href.includes("/dev/"))).toBe(

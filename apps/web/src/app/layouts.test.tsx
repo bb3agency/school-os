@@ -15,7 +15,7 @@ import { messages, renderWithIntl } from "@/test/render";
  */
 
 const cookieJar = new Map<string, string>();
-let requestPath = "/en/settings/users";
+let requestPath = "/settings/users";
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -53,7 +53,6 @@ import SchoolLayout from "./[locale]/(school)/layout";
 import { isSchoolHomePath, requireOperator, requireStaff } from "@/server/session/rsc";
 
 let h: Harness;
-const en = Promise.resolve({ locale: "en" });
 
 /** A JWT-shaped token (the layout must never render any of these). */
 function fakeJwt(): string {
@@ -117,17 +116,15 @@ async function redirectOf(render: () => Promise<unknown>): Promise<string | null
 
 describe("school layout", () => {
   it("sends visitors without a staff session to staff sign-in, returning here", async () => {
-    requestPath = "/en/settings/users?page=2";
-    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toBe(
-      "/bff/auth/login?next=%2Fen%2Fsettings%2Fusers%3Fpage%3D2",
+    requestPath = "/settings/users?page=2";
+    expect(await redirectOf(() => SchoolLayout({ children: "x" }))).toBe(
+      "/bff/auth/login?next=%2Fsettings%2Fusers%3Fpage%3D2",
     );
   });
 
   it("does not accept an operator session", async () => {
     await signInDirect("operator", { sub: "op-1" });
-    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toMatch(
-      /^\/bff\/auth\/login/,
-    );
+    expect(await redirectOf(() => SchoolLayout({ children: "x" }))).toMatch(/^\/bff\/auth\/login/);
   });
 
   it("renders the shell with Lock now, and nothing secret reaches the page", async () => {
@@ -137,7 +134,7 @@ describe("school layout", () => {
     });
     const tokens = (await h.runtime.store.tokens(session.id))!.tokens;
 
-    const { container } = renderWithIntl(await SchoolLayout({ children: <p>page</p>, params: en }));
+    const { container } = renderWithIntl(await SchoolLayout({ children: <p>page</p> }));
     // Account area at the foot of the one sidebar (docs/17 §5.2); the school's name from
     // GET /me/schools is covered by layouts.node.test.tsx.
     const account = screen.getByRole("region", { name: messages.en.shell.account });
@@ -160,69 +157,59 @@ describe("school layout", () => {
 
 describe("school home without a session: public welcome page (FR-IAM-001)", () => {
   it.each([
-    ["/en", "/en/welcome"],
-    ["/en/", "/en/welcome"],
-    ["/te", "/te/welcome"],
-    ["/te/", "/te/welcome"],
-    ["/", "/en/welcome"],
-    ["/te?from=bookmark", "/te/welcome"],
+    ["/", "/welcome"],
+    ["/?from=bookmark", "/welcome"],
   ])("a signed-out visitor to %s sees %s instead of the sign-in page", async (path, welcome) => {
     requestPath = path;
-    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toBe(welcome);
+    expect(await redirectOf(() => SchoolLayout({ children: "x" }))).toBe(welcome);
     expect(await redirectOf(() => requireStaff())).toBe(welcome);
   });
 
   it.each([
-    ["/en/students", "/bff/auth/login?next=%2Fen%2Fstudents"],
-    ["/te/ask?q=1", "/bff/auth/login?next=%2Fte%2Fask%3Fq%3D1"],
-    ["/en/welcome-back", "/bff/auth/login?next=%2Fen%2Fwelcome-back"],
+    ["/students", "/bff/auth/login?next=%2Fstudents"],
+    ["/ask?q=1", "/bff/auth/login?next=%2Fask%3Fq%3D1"],
+    ["/welcome-back", "/bff/auth/login?next=%2Fwelcome-back"],
     ["/english", "/bff/auth/login?next=%2Fenglish"],
-    ["/en//", "/bff/auth/login?next=%2Fen%2F%2F"],
+    ["//", "/bff/auth/login?next=%2F%2F"],
   ])("a deep link %s still goes straight to sign-in, returning there", async (path, login) => {
     requestPath = path;
     expect(await redirectOf(() => requireStaff())).toBe(login);
   });
 
   it("a signed-in staff member on the school home gets the console, not the welcome page", async () => {
-    requestPath = "/en";
+    requestPath = "/";
     await signInDirect("staff", { sub: "staff-1", name: "Office Clerk" });
     const session = await requireStaff();
     expect(session.kind).toBe("staff");
   });
 
   it("a SchoolOS support session on the school home still opens the console (ADR-0023)", async () => {
-    requestPath = "/te";
+    requestPath = "/";
     await signInDirect("support", { sub: "op-1" });
     const session = await requireStaff();
     expect(session.kind).toBe("support");
   });
 
   it("the operator panel never sends visitors to the school welcome page", async () => {
-    requestPath = "/en";
-    expect(await redirectOf(() => requireOperator())).toBe("/bff/auth/platform/login?next=%2Fen");
+    requestPath = "/";
+    expect(await redirectOf(() => requireOperator())).toBe("/bff/auth/platform/login?next=%2F");
   });
 
-  it("recognises only the bare locale home as the school home", () => {
-    expect(["/", "/en", "/te", "/en/", "/te/", "/en?x=1"].map(isSchoolHomePath)).toEqual([
-      "en",
-      "en",
-      "te",
-      "en",
-      "te",
-      "en",
-    ]);
-    for (const path of ["/fr", "/en/students", "/en//", "//en", "/te/welcome", "", "en"]) {
-      expect(isSchoolHomePath(path), path).toBeNull();
+  it("recognises only the bare home / as the school home (no locale in any URL)", () => {
+    expect(["/", "/?x=1"].map(isSchoolHomePath)).toEqual([true, true]);
+    // The proxy answers an old /en or /te with 308 to / before any page renders.
+    for (const path of ["/fr", "/en", "/te/", "/students", "//", "//en", "/welcome", "", "en"]) {
+      expect(isSchoolHomePath(path), path).toBe(false);
     }
   });
 });
 
 describe("school layout: active school and permissions (FR-IAM-013)", () => {
   it("without an active school, sends the user to the school picker, returning here", async () => {
-    requestPath = "/en/settings/users";
+    requestPath = "/settings/users";
     await signInDirect("staff", { sub: "staff-1" }, null);
-    expect(await redirectOf(() => SchoolLayout({ children: "x", params: en }))).toBe(
-      "/en/choose-school?next=%2Fen%2Fsettings%2Fusers",
+    expect(await redirectOf(() => SchoolLayout({ children: "x" }))).toBe(
+      "/choose-school?next=%2Fsettings%2Fusers",
     );
   });
 
@@ -231,7 +218,7 @@ describe("school layout: active school and permissions (FR-IAM-013)", () => {
     h.setApi(() => {
       throw new TypeError("fetch failed");
     });
-    renderWithIntl(await SchoolLayout({ children: <p>page</p>, params: en }));
+    renderWithIntl(await SchoolLayout({ children: <p>page</p> }));
     const nav = screen.getByRole("navigation", { name: messages.en.school.nav.label });
     expect(
       within(nav).getByRole("link", { name: messages.en.school.nav.audit }),
@@ -241,26 +228,26 @@ describe("school layout: active school and permissions (FR-IAM-013)", () => {
 
 describe("school picker page (FR-IAM-013, ADR-0019)", () => {
   it("needs a staff session", async () => {
-    requestPath = "/en/choose-school";
-    expect(
-      await redirectOf(() => ChooseSchoolPage({ params: en, searchParams: Promise.resolve({}) })),
-    ).toBe("/bff/auth/login?next=%2Fen%2Fchoose-school");
+    requestPath = "/choose-school";
+    expect(await redirectOf(() => ChooseSchoolPage({ searchParams: Promise.resolve({}) }))).toBe(
+      "/bff/auth/login?next=%2Fchoose-school",
+    );
   });
 });
 
 describe("platform layout", () => {
   it("sends visitors to the operator sign-in", async () => {
-    requestPath = "/te/platform/schools";
+    requestPath = "/platform/schools";
     expect(await redirectOf(() => PlatformLayout({ children: "x" }))).toBe(
-      "/bff/auth/platform/login?next=%2Fte%2Fplatform%2Fschools",
+      "/bff/auth/platform/login?next=%2Fplatform%2Fschools",
     );
   });
 
   it("does not accept a staff session", async () => {
-    requestPath = "/en/platform";
+    requestPath = "/platform";
     await signInDirect("staff", { sub: "staff-1" });
     expect(await redirectOf(() => PlatformLayout({ children: "x" }))).toBe(
-      "/bff/auth/platform/login?next=%2Fen%2Fplatform",
+      "/bff/auth/platform/login?next=%2Fplatform",
     );
   });
 

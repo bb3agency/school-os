@@ -28,7 +28,7 @@ WHAT IT DOES FIRST, all idempotent and additive (it never drops, resets or delet
    refuses outside SOS_ENV=local|ci and re-running it is idempotent. ``--no-seed`` skips it.
 
 Then it prints a "Sign in as" cheat sheet (synthetic subjects from ``app.devtools.plan``, no
-database) and the dev sign-in page, http://localhost:3000/en/dev/sign-in. The local OIDC stub
+database) and the dev sign-in page, http://localhost:3000/dev/sign-in. The local OIDC stub
 marks every staff sign-in as MFA, so typing a subject is enough; the app's MFA and step-up
 checks are unchanged (apps/web/README.md, "Manual verification with the dev OIDC stub").
 
@@ -290,7 +290,7 @@ CHEAT_SHEET_ROLES = (
     "class_teacher",
     "teacher",
 )
-DEV_SIGN_IN_URL = "http://localhost:3000/en/dev/sign-in"
+DEV_SIGN_IN_URL = "http://localhost:3000/dev/sign-in"
 
 
 def sign_in_lines(plan_json: str) -> list[str]:

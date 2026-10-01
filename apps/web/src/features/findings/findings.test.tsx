@@ -22,7 +22,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/findings",
+    usePathname: () => "/findings",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -269,7 +269,7 @@ describe("finding detail (US-502, FR-DQ-020)", () => {
     renderWithIntl(<FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />);
     const link = await screen.findByRole("link", { name: "Request a correction" });
     expect(link.getAttribute("href")).toBe(
-      `/en/change-requests/new?student_id=${STUDENT}&finding_id=0192f3a4-0000-7000-8000-00000000f001&attribute_key=date_of_birth`,
+      `/change-requests/new?student_id=${STUDENT}&finding_id=0192f3a4-0000-7000-8000-00000000f001&attribute_key=date_of_birth`,
     );
   });
 

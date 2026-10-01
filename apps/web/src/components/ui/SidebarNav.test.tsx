@@ -5,7 +5,7 @@ import { SchoolShell } from "@/components/shell/SchoolShell";
 import { messages, renderWithIntl } from "@/test/render";
 import { activeHref, type NavItem } from "./SidebarNav";
 
-const path = vi.hoisted(() => ({ current: "/en" }));
+const path = vi.hoisted(() => ({ current: "/" }));
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return { ...actual, usePathname: () => path.current };
@@ -37,7 +37,7 @@ describe("sidebar: one current page, the most specific (FR-TEN-011 menu entry)",
   });
 
   it("school menu: Promotions sits under School structure for structure managers only", () => {
-    path.current = "/en/settings/structure/years/0192f3a4-0000-7000-8000-0000000000a1/promotions";
+    path.current = "/settings/structure/years/0192f3a4-0000-7000-8000-0000000000a1/promotions";
     const { unmount } = renderWithIntl(
       <SchoolShell permissions={["tenant.structure.manage"]}>
         <p>x</p>
@@ -45,7 +45,7 @@ describe("sidebar: one current page, the most specific (FR-TEN-011 menu entry)",
     );
     const nav = screen.getByRole("navigation", { name: "Main" });
     const promotions = within(nav).getByRole("link", { name: messages.en.school.nav.promotions });
-    expect(promotions).toHaveAttribute("href", "/en/settings/structure/promotions");
+    expect(promotions).toHaveAttribute("href", "/settings/structure/promotions");
     expect(promotions).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "School structure" })).not.toHaveAttribute(
       "aria-current",
@@ -53,7 +53,7 @@ describe("sidebar: one current page, the most specific (FR-TEN-011 menu entry)",
     expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
     unmount();
 
-    path.current = "/en/settings/structure";
+    path.current = "/settings/structure";
     renderWithIntl(
       <SchoolShell permissions={["student.read_basic"]}>
         <p>x</p>

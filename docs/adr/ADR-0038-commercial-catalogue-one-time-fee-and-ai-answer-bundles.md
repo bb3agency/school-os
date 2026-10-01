@@ -1,4 +1,4 @@
-# ADR-0037: Commercial catalogue: one-time fee and AI answer bundles with overage
+# ADR-0038: Commercial catalogue: one-time fee and AI answer bundles with overage
 
 | Field | Value |
 |---|---|

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readMarketingSettings } from "@/features/marketing/settings";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 
-let pathname = "/en/welcome";
+let pathname = "/welcome";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
@@ -46,11 +46,14 @@ const PAGES = {
 type PageName = keyof typeof PAGES;
 const NAMES = Object.keys(PAGES) as PageName[];
 
-/** The href without the locale prefix (links are locale-free paths; the prefix may go). */
-const bare = (href: string | null) => (href ?? "").replace(/^\/(en|te)(?=\/|$)/, "") || "/";
+/**
+ * The href exactly as rendered. No URL carries a locale (ADR-0036 note, 2026-09-30), so the
+ * links are compared as they are: a `/en` or `/te` prefix fails the comparison.
+ */
+const bare = (href: string | null) => href ?? "";
 
 function render(name: PageName) {
-  pathname = `/en/${name}`;
+  pathname = `/${name}`;
   const { Page } = PAGES[name];
   return renderWithIntl(Page() as ReactElement);
 }
@@ -241,6 +244,73 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
     expect(within(table).getByText(m.pricing.compare.domainDedicated)).toBeInTheDocument();
   });
 
+  it("pricing explains the packaging: fee basis, what everyone gets, the one-time fee, AI, GST, next steps", () => {
+    render("pricing");
+    const region = (name: string) => screen.getByRole("region", { name });
+
+    // What the fee is based on: size, campuses, Shared vs Dedicated, AI bundle.
+    const basis = region(m.pricing.basis.title);
+    for (const factor of ["size", "campuses", "tier", "ai"] as const) {
+      expect(
+        within(basis).getByRole("heading", { level: 3, name: m.pricing.basis[factor].title }),
+      ).toBeInTheDocument();
+    }
+
+    // What every school gets.
+    const everyone = region(m.pricing.everyone.title);
+    for (const item of Object.values(m.pricing.everyone.items)) {
+      expect(within(everyone).getByText(item)).toBeInTheDocument();
+    }
+
+    // The one-time implementation and data verification fee and what it covers.
+    const implementation = region(m.pricing.implementation.title);
+    const covers = within(implementation).getByRole("list", {
+      name: m.pricing.implementation.coversLabel,
+    });
+    expect(within(covers).getAllByRole("listitem")).toHaveLength(7);
+    for (const item of Object.values(m.pricing.implementation.items)) {
+      expect(within(covers).getByText(item)).toBeInTheDocument();
+    }
+
+    // AI as monthly question bundles, in words.
+    const ai = region(m.pricing.ai.title);
+    for (const bundle of ["lite", "standard", "high", "extra"] as const) {
+      expect(
+        within(ai).getByRole("heading", { level: 3, name: m.pricing.ai[bundle].name }),
+      ).toBeInTheDocument();
+    }
+
+    // Billing cycle and GST shown separately.
+    const billing = region(m.pricing.billing.title);
+    expect(within(billing).getByText(m.pricing.billing.cycle)).toBeInTheDocument();
+    expect(within(billing).getByText(m.pricing.billing.gst)).toBeInTheDocument();
+
+    // What happens after you contact us: numbered steps in order.
+    const next = region(m.pricing.next.title);
+    const steps = within(next).getByRole("list");
+    expect(steps.tagName).toBe("OL");
+    expect(
+      within(steps)
+        .getAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent),
+    ).toEqual([
+      m.pricing.next.steps.reply.title,
+      m.pricing.next.steps.demo.title,
+      m.pricing.next.steps.quote.title,
+      m.pricing.next.steps.start.title,
+    ]);
+  });
+
+  it("pricing describes Dedicated as a managed, isolated environment, never 'your own server'", () => {
+    render("pricing");
+    const dedicated = screen.getByRole("article", { name: m.pricing.dedicated.name });
+    expect(dedicated).toHaveTextContent(
+      "A managed, isolated SchoolOS environment with your own domain, a dedicated database and a documented data export",
+    );
+    const text = JSON.stringify(m);
+    expect(text).not.toMatch(/own server|your server|source code|own the (code|software)/i);
+  });
+
   it("about: the contact block appears only with settings, and shows each set line", () => {
     render("about");
     expect(screen.queryByRole("heading", { name: m.about.contact.title })).toBeNull();
@@ -297,14 +367,21 @@ describe("marketing settings (SOS_PUBLIC_*)", () => {
       contactEmail: null,
       companyName: null,
       companyAddress: null,
+      whatsappNumber: null,
     });
     expect(
       readMarketingSettings({
         SOS_PUBLIC_CONTACT_EMAIL: "  ",
         SOS_PUBLIC_COMPANY_NAME: " ",
         SOS_PUBLIC_COMPANY_ADDRESS: "|",
+        SOS_PUBLIC_WHATSAPP_NUMBER: " ",
       }),
-    ).toEqual({ contactEmail: null, companyName: null, companyAddress: null });
+    ).toEqual({
+      contactEmail: null,
+      companyName: null,
+      companyAddress: null,
+      whatsappNumber: null,
+    });
   });
 
   it("an address that could break out of the mailto link is refused", () => {
@@ -351,6 +428,119 @@ describe("marketing settings (SOS_PUBLIC_*)", () => {
   });
 });
 
+describe("WhatsApp call to action (SOS_PUBLIC_WHATSAPP_NUMBER, docs/17 §5.6)", () => {
+  // A synthetic number: never a real person's.
+  const NUMBER = "+919000000000";
+  const DIGITS = "919000000000";
+  const MESSAGE = "Hello, I'd like to see SchoolOS for our school.";
+  const HREF = `https://wa.me/${DIGITS}?text=${encodeURIComponent(MESSAGE)}`;
+  const whatsappLinks = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLAnchorElement>("a")].filter((a) =>
+      (a.getAttribute("href") ?? "").startsWith("https://wa.me/"),
+    );
+
+  it("accepts only an international number of digits with an optional leading +", () => {
+    expect(readMarketingSettings({ SOS_PUBLIC_WHATSAPP_NUMBER: NUMBER }).whatsappNumber).toBe(
+      DIGITS,
+    );
+    expect(
+      readMarketingSettings({ SOS_PUBLIC_WHATSAPP_NUMBER: ` ${DIGITS} ` }).whatsappNumber,
+    ).toBe(DIGITS);
+    for (const bad of [
+      "not-a-number",
+      "+91 90000 00000",
+      "+91-9000000000",
+      "(91) 9000000000",
+      "++919000000000",
+      "0919000000000",
+      "+1234567",
+      "+1234567890123456",
+      "919000000000?text=hi",
+      "919000000000/extra",
+      "javascript:alert(1)",
+      "+٩١٩٠٠٠٠٠٠٠٠",
+    ]) {
+      expect(
+        readMarketingSettings({ SOS_PUBLIC_WHATSAPP_NUMBER: bad }).whatsappNumber,
+        bad,
+      ).toBeNull();
+    }
+  });
+
+  it("the prefilled message is the agreed text and names no student", () => {
+    expect(m.cta.whatsappMessage).toBe(MESSAGE);
+  });
+
+  it("the link is built from the digits and the URL-encoded message", () => {
+    expect(HREF).toBe(
+      "https://wa.me/919000000000?text=Hello%2C%20I'd%20like%20to%20see%20SchoolOS%20for%20our%20school.",
+    );
+  });
+
+  for (const name of NAMES) {
+    it(`${name}: hidden when the number is unset or invalid`, () => {
+      withContact();
+      const { container, unmount } = render(name);
+      expect(whatsappLinks(container)).toHaveLength(0);
+      expect(container.textContent).not.toContain(m.cta.whatsapp);
+      unmount();
+      vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", "+91 90000 00000");
+      const second = render(name);
+      expect(whatsappLinks(second.container)).toHaveLength(0);
+    });
+
+    it(`${name}: when set, "Ask on WhatsApp" is a plain wa.me link with the encoded message`, () => {
+      withContact();
+      vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", NUMBER);
+      const { container } = render(name);
+      const links = whatsappLinks(container);
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        expect(link).toHaveAttribute("href", HREF);
+        expect(link).toHaveAttribute("rel", "noopener noreferrer");
+        // The name starts with the visible label and says it opens WhatsApp (WCAG 2.5.3).
+        expect(link.textContent).toMatch(new RegExp(`^${m.cta.whatsapp}`));
+        expect(link.textContent).toContain(m.cta.whatsappOpens);
+      }
+      // The header carries it too.
+      expect(whatsappLinks(screen.getByRole("banner")).length).toBeGreaterThan(0);
+      // Still CSP-safe: wa.me is the only address outside the site.
+      for (const link of container.querySelectorAll("a")) {
+        expect(link.getAttribute("href") ?? "").toMatch(
+          /^(#|\/(?!\/)|mailto:|https:\/\/wa\.me\/\d+\?text=)/,
+        );
+      }
+      expect(container.querySelectorAll("[style]")).toHaveLength(0);
+    });
+  }
+
+  it("sits beside 'Talk to us' in the hero and the closing band, and on each plan", () => {
+    withContact();
+    vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", NUMBER);
+    const home = render("welcome");
+    const hero = screen.getByRole("heading", { level: 1 }).closest("section");
+    expect(whatsappLinks(hero as HTMLElement)).toHaveLength(1);
+    const closing = screen.getByRole("heading", { level: 2, name: m.home.closing.title });
+    expect(whatsappLinks(closing.closest("section") as HTMLElement)).toHaveLength(1);
+    home.unmount();
+    render("pricing");
+    for (const plan of ["shared", "dedicated"] as const) {
+      const card = screen.getByRole("article", { name: m.pricing[plan].name });
+      expect(whatsappLinks(card), plan).toHaveLength(1);
+    }
+  });
+
+  it("shows even without an email address, and never on the dedicated sign-in page", () => {
+    vi.stubEnv("SOS_PUBLIC_WHATSAPP_NUMBER", NUMBER);
+    const { container, unmount } = render("welcome");
+    expect(whatsappLinks(container).length).toBeGreaterThan(0);
+    unmount();
+    vi.stubEnv("SOS_DEPLOYMENT_MODE", "dedicated");
+    const dedicated = render("welcome");
+    expect(whatsappLinks(dedicated.container)).toHaveLength(0);
+  });
+});
+
 describe("honest claims (docs/01, 07, 08, 14, 16)", () => {
   it("the marketing copy has no prices, ratings, testimonials, customer counts or certifications", () => {
     const text = JSON.stringify(messages.en.marketing);
@@ -358,13 +548,15 @@ describe("honest claims (docs/01, 07, 08, 14, 16)", () => {
     expect(text).not.toMatch(/★|\brating|testimonial|trusted by|customers? (love|say)|\bloved\b/i);
     expect(text).not.toMatch(/\b\d[\d,]*\+? (schools|students|users|teachers|customers)\b/i);
     expect(text).not.toMatch(/\bISO ?27001|SOC ?2|certified|HIPAA|GDPR compliant/i);
+    // AI is sold as question bundles described in words: never "unlimited", never tokens.
+    expect(text).not.toMatch(/unlimited|\btokens?\b/i);
     expect(text).not.toMatch(/Telugu/);
   });
 });
 
 describe("the signed-out page links to the public home page", () => {
   it("keeps its SchoolOS home link", async () => {
-    pathname = "/en/signed-out";
+    pathname = "/signed-out";
     renderWithIntl(await SignedOutPage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByRole("link", { name: messages.en.auth.signedOut.signIn })).toHaveAttribute(
       "href",

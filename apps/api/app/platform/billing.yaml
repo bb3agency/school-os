@@ -22,7 +22,7 @@ billing:
   # Suspension inside a window needs a platform_owner (docs/16 §9.3).
   # Items: {name, boards: [BOARD, ...] ([] = every board), start: YYYY-MM-DD, end: YYYY-MM-DD}
   protected_windows: []
-# Billable "AI answers" (docs/16 §11, ADR-0037): the usage collector (shared tier) and each
+# Billable "AI answers" (docs/16 §11, ADR-0038): the usage collector (shared tier) and each
 # dedicated host count, per school and IST day, the kb.queries rows with one of these statuses in
 # the school's own session; only the count leaves it. 'answered' = an AI answer with citations;
 # not_found, refused, search_only and error are free. A reuse of a cached answer is an

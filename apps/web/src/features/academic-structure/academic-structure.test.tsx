@@ -21,7 +21,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/settings/structure",
+    usePathname: () => "/settings/structure",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -702,7 +702,7 @@ describe("archive and unarchive (US-202, FR-TEN-010)", () => {
     const years = await region("Academic years");
     const row = (await within(years).findByText("2025-26")).closest("li") as HTMLElement;
     const link = within(row).getByRole("link", { name: /Promote students/ });
-    expect(link).toHaveAttribute("href", `/en/settings/structure/years/${YEAR_OLD.id}/promotions`);
+    expect(link).toHaveAttribute("href", `/settings/structure/years/${YEAR_OLD.id}/promotions`);
     expect(link).toHaveAccessibleName("Promote students (academic year 2025-26)");
   });
 });

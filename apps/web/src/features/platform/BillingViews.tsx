@@ -461,7 +461,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
   );
 }
 
-/** ADR-0037 (docs/16 §5.6): AI answer bundles, a monthly add-on with an answer quota. */
+/** ADR-0038 (docs/16 §5.6): AI answer bundles, a monthly add-on with an answer quota. */
 function AiBundlesTable() {
   const t = useTranslations("platform.plans");
   const tstatus = useTranslations("status.plan");

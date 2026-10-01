@@ -31,3 +31,12 @@ export const PLANNED_FEATURES: ReadonlySet<FeatureSection> = new Set(["certifica
 export function mailtoHref(email: string): string {
   return `mailto:${email}`;
 }
+
+/**
+ * "Ask on WhatsApp": a plain wa.me link with a prefilled greeting (owner decision). `digits`
+ * comes from `readMarketingSettings` (validated); the message is fixed UI text and never
+ * carries student or other personal data.
+ */
+export function whatsappHref(digits: string, message: string): string {
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}

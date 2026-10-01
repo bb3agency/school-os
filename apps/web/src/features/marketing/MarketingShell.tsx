@@ -31,7 +31,11 @@ export function MarketingShell({
   return (
     <div className="mk flex min-h-viewport flex-col">
       <SkipLink label={tc("skipToContent")} />
-      <SiteHeader current={current} contactEmail={settings.contactEmail} />
+      <SiteHeader
+        current={current}
+        contactEmail={settings.contactEmail}
+        whatsappNumber={settings.whatsappNumber}
+      />
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         {children}
       </main>

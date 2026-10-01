@@ -1,4 +1,4 @@
-"""Commercial catalogue: plans, one-time fee, AI answer bundles and overage (ADR-0037).
+"""Commercial catalogue: plans, one-time fee, AI answer bundles and overage (ADR-0038).
 
 FR-PLT-010 (plans), FR-PLT-013 (subscriptions), FR-PLT-015..017 (invoices, GST), FR-PLT-020
 (usage metering). Owner-approved prices of 2026-10-01, ex-GST: Shared ₹4,999 a month plus a

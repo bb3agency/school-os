@@ -104,7 +104,7 @@ describe("platform dashboard: needs-attention list (FR-PLT-001)", () => {
     expect(within(card).getByText("1 school is still being set up")).toBeVisible();
     expect(
       within(card).getByRole("link", { name: pm.dashboard.attention.openFleet }),
-    ).toHaveAttribute("href", "/en/platform/fleet?status=unreachable");
+    ).toHaveAttribute("href", "/platform/fleet?status=unreachable");
     // The fleet tile shows its share as a ring with a text value.
     expect(
       screen.getByRole("progressbar", { name: pm.dashboard.fleetHealthyShare }),
@@ -124,7 +124,7 @@ describe("schools: filter bar (FR-PLT-001)", () => {
     expect(screen.getByText(pm.schools.noMatchTitle)).toBeVisible();
     expect(screen.getByRole("link", { name: pm.schools.clearFilters })).toHaveAttribute(
       "href",
-      "/en/platform/schools",
+      "/platform/schools",
     );
   });
 

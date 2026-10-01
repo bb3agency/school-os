@@ -108,7 +108,7 @@ export function usePlanDirectory(): {
   }, [query.data]);
 }
 
-/** AI answer bundles (ADR-0037): the plans screen, the subscription picker and names. */
+/** AI answer bundles (ADR-0038): the plans screen, the subscription picker and names. */
 export function useAiBundles(): Loadable<AiBundle[]> {
   const api = useBffClient("operator");
   return useApiQuery(

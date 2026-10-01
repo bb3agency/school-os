@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · implementation amendments 2026-09-29 (ADR-0029), 2026-10-01 (ADR-0037) |
+| Status | Accepted · implementation amendments 2026-09-29 (ADR-0029), 2026-10-01 (ADR-0038) |
 | Date | 2026-09-27 |
 | Deciders | Founder (product owner decisions of 2026-09-27 on the M0 "decisions needed" list, [14 · M0 status](../14-roadmap.md#m0-status-2026-09-26)) |
 | Amends / supersedes | Amends [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (settles Amendments A6 and A10) and [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) (what `platform` may call on the tenant side) |
@@ -94,7 +94,7 @@ transaction (the follow-up above).
 
 ## Amendments (2026-10-01)
 
-**B2 · Billable AI answer count (ADR-0037).** `platform/usage.py` already opens the school's own
+**B2 · Billable AI answer count (ADR-0038).** `platform/usage.py` already opens the school's own
 `tenant_session` for one aggregate count per school per day (distinct active users from
 `audit.events`). In the same pattern it now also counts, per IST day, the school's `kb.queries`
 rows and those with a billable status (`billing.yaml` → `ai_answers.billable_statuses`) and
