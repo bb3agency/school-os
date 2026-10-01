@@ -85,6 +85,7 @@ markers = [
   "db: needs a PostgreSQL test database (testcontainers or SOS_TEST_DATABASE_URL)",
   "redis: needs Valkey/Redis",
   "s3: needs an S3-compatible endpoint",
+  "recall_sweep: heavy authorised-recall sweep (docs/06 §6); runs only with SOS_RECALL_SWEEP=1",
 ]
 
 [tool.coverage.run]
