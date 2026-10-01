@@ -108,7 +108,26 @@ const PLAN = (id: string, code: string, status: string, version = 1) => ({
   features: {},
   published_at: status === "draft" ? null : "2026-06-01T00:00:00Z",
   created_at: "2026-06-01T00:00:00Z",
+  one_time_fee_inr: code === "standard" ? "15000.00" : "0.00",
+  description: code === "standard" ? "Synthetic shared plan wording." : null,
 });
+
+const BUNDLE = (id: string, name: string, answers: number, price: string) => ({
+  id,
+  code: `ai-${name.toLowerCase()}`,
+  version: 1,
+  name,
+  included_answers: answers,
+  price_inr: price,
+  overage_rate_inr: "1.50",
+  status: "published",
+  published_at: "2026-10-01T00:00:00Z",
+});
+const BUNDLES = [
+  BUNDLE("0192f3a4-0000-7000-8000-00000000d001", "Lite", 300, "699.00"),
+  BUNDLE("0192f3a4-0000-7000-8000-00000000d002", "Standard", 1000, "1499.00"),
+  BUNDLE("0192f3a4-0000-7000-8000-00000000d003", "High", 3000, "3499.00"),
+];
 
 const DETAIL = {
   tenant_id: T,
@@ -175,6 +194,7 @@ beforeEach(() => {
       PLAN("0192f3a4-0000-7000-8000-00000000a002", "premium", "published"),
       PLAN("0192f3a4-0000-7000-8000-00000000a003", "premium", "draft", 2),
     ]);
+  stub.routes["GET /bff/api/v1/platform/ai-bundles"] = () => page(BUNDLES);
 });
 afterEach(uninstallBffStub);
 
@@ -530,6 +550,128 @@ describe("plans, subscriptions and invoices (FR-PLT-010..019)", () => {
       expect(bodyOf(`POST /bff/api/v1/platform/subscriptions/${SUB.id}/change-plan`)).toEqual({
         plan_id: "0192f3a4-0000-7000-8000-00000000a002",
       }),
+    );
+  });
+
+  it("plans show the one-time fee, the wording and the AI answer bundles (ADR-0037)", async () => {
+    renderWithIntl(<PlansScreen />);
+    expect(await screen.findByText("₹15,000.00")).toBeInTheDocument();
+    expect(screen.getByText("Synthetic shared plan wording.")).toBeInTheDocument();
+    const bundles = await screen.findByRole("table", { name: pm.plans.bundlesTitle });
+    const standard = within(bundles).getByRole("row", { name: /Standard/ });
+    expect(within(standard).getByText("1,000")).toBeInTheDocument();
+    expect(within(standard).getByText("₹1,499.00")).toBeInTheDocument();
+    expect(within(standard).getByText("₹1.50")).toBeInTheDocument();
+    // Answers, never tokens or "unlimited", for schools' bundles.
+    expect(bundles.textContent?.toLowerCase()).not.toMatch(/unlimited|token/);
+  });
+
+  it("a new plan sends its one-time fee and description", async () => {
+    stub.routes["POST /bff/api/v1/platform/plans"] = () =>
+      Response.json(PLAN("0192f3a4-0000-7000-8000-00000000a009", "standard", "draft"), {
+        status: 201,
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<PlansScreen />);
+    await user.click(await screen.findByRole("button", { name: pm.plans.newPlan }));
+    const dialog = screen.getByRole("dialog", { name: pm.plans.newPlanTitle });
+    await user.type(within(dialog).getByLabelText(pm.plans.code), "shared-pilot");
+    await user.type(within(dialog).getByLabelText(pm.plans.colName), "Shared pilot");
+    await user.type(within(dialog).getByLabelText(pm.plans.basePrice), "4999.00");
+    await user.type(within(dialog).getByLabelText(pm.plans.oneTimeFee), "15000.00");
+    await user.type(within(dialog).getByLabelText(pm.plans.planDescription), "Pilot wording.");
+    await user.click(within(dialog).getByRole("button", { name: pm.plans.saveDraft }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/platform/plans")).toHaveLength(1));
+    expect(bodyOf("POST /bff/api/v1/platform/plans")).toMatchObject({
+      code: "shared-pilot",
+      base_price_inr: "4999.00",
+      one_time_fee_inr: "15000.00",
+      description: "Pilot wording.",
+    });
+  });
+
+  it("chooses an AI answer bundle for a subscription and shows it (ADR-0037)", async () => {
+    stub.routes["GET /bff/api/v1/platform/subscriptions"] = () =>
+      page([
+        {
+          ...SUB,
+          ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d001",
+          ai_bundle_from: "2026-11-01",
+        },
+      ]);
+    stub.routes[`PUT /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`] = () =>
+      Response.json({
+        ...SUB,
+        ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d002",
+        ai_bundle_from: "2026-11-01",
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<SubscriptionsScreen />);
+    expect(await screen.findByText("Lite: 300 answers a month")).toBeInTheDocument();
+    expect(screen.getByText("One-time fee ₹15,000.00 on the first invoice")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: pm.subscriptions.removeAiBundle })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: pm.subscriptions.chooseAiBundle }));
+    const dialog = screen.getByRole("dialog", { name: pm.subscriptions.chooseAiBundleTitle });
+    const select = within(dialog).getByLabelText(pm.subscriptions.aiBundle);
+    expect(
+      within(select)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      cm.chooseOne,
+      "Lite: 300 answers, ₹699.00 a month, ₹1.50 each extra answer",
+      "Standard: 1,000 answers, ₹1,499.00 a month, ₹1.50 each extra answer",
+      "High: 3,000 answers, ₹3,499.00 a month, ₹1.50 each extra answer",
+    ]);
+    await user.selectOptions(select, "0192f3a4-0000-7000-8000-00000000d002");
+    await user.click(within(dialog).getByRole("button", { name: pm.subscriptions.chooseAiBundle }));
+    await waitFor(() =>
+      expect(bodyOf(`PUT /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`)).toEqual({
+        ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d002",
+      }),
+    );
+  });
+
+  it("removes the AI answer bundle after confirmation", async () => {
+    stub.routes["GET /bff/api/v1/platform/subscriptions"] = () =>
+      page([
+        {
+          ...SUB,
+          ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d003",
+          ai_bundle_from: "2026-11-01",
+        },
+      ]);
+    stub.routes[`DELETE /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`] = () =>
+      Response.json({ ...SUB, ai_bundle_id: null, ai_bundle_from: null });
+    const user = userEvent.setup();
+    renderWithIntl(<SubscriptionsScreen />);
+    await user.click(await screen.findByRole("button", { name: pm.subscriptions.removeAiBundle }));
+    const dialog = screen.getByRole("dialog", { name: pm.subscriptions.removeAiBundleTitle });
+    await user.click(within(dialog).getByRole("button", { name: pm.subscriptions.removeAiBundle }));
+    await waitFor(() =>
+      expect(
+        stub.callsTo(`DELETE /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`),
+      ).toHaveLength(1),
+    );
+  });
+
+  it("offers no AI bundle on an annual plan", async () => {
+    stub.routes["GET /bff/api/v1/platform/plans"] = () =>
+      page([
+        {
+          ...PLAN("0192f3a4-0000-7000-8000-00000000a001", "standard", "published"),
+          billing_period: "annual",
+        },
+      ]);
+    stub.routes["GET /bff/api/v1/platform/subscriptions"] = () => page([SUB]);
+    renderWithIntl(<SubscriptionsScreen />);
+    expect(
+      await screen.findByRole("button", { name: pm.subscriptions.changePlan }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: pm.subscriptions.chooseAiBundle }),
+      ).not.toBeInTheDocument(),
     );
   });
 

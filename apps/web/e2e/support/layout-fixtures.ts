@@ -1274,6 +1274,7 @@ function usageRow(tenant_id: string, day: number, i: number): Schemas["UsageDail
     ai_input_tokens: [420_000, 2_706_000, 0, 37_365_000, 0, 99_000][i % 6] ?? 0,
     ai_output_tokens: [70_000, 451_000, 0, 6_227_500, 0, 16_500][i % 6] ?? 0,
     ai_cost_inr: ["112.40", "721.60", "0.00", "9964.25", "0.00", "26.40"][i % 6] ?? "0.00",
+    ai_answers: [120, 860, 0, 11_980, 0, 30][i % 6] ?? 0,
   };
 }
 

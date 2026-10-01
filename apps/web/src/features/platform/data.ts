@@ -1,9 +1,10 @@
 "use client";
 
-import type { OperatorMe, Plan, TenantSummary } from "@schoolos/api-client";
+import type { AiBundle, OperatorMe, Plan, TenantSummary } from "@schoolos/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import type { Loadable } from "@/lib/loadable";
 
 /** Query-key roots for the control plane; mutations invalidate by these prefixes. */
 export const PK = {
@@ -12,6 +13,7 @@ export const PK = {
   tenants: ["operator", "tenants"],
   tenant: (id: string) => ["operator", "tenants", id] as const,
   plans: ["operator", "plans"],
+  aiBundles: ["operator", "ai-bundles"],
   subscriptions: ["operator", "subscriptions"],
   invoices: ["operator", "invoices"],
   usage: ["operator", "usage"],
@@ -104,6 +106,20 @@ export function usePlanDirectory(): {
       },
     };
   }, [query.data]);
+}
+
+/** AI answer bundles (ADR-0037): the plans screen, the subscription picker and names. */
+export function useAiBundles(): Loadable<AiBundle[]> {
+  const api = useBffClient("operator");
+  return useApiQuery(
+    PK.aiBundles,
+    async () => (await unwrap(api.GET("/api/v1/platform/ai-bundles"))).data,
+  );
+}
+
+/** The loaded value, or ``fallback`` while loading or on error. */
+export function readyOr<T>(state: Loadable<T>, fallback: T): T {
+  return state.status === "ready" ? state.data : fallback;
 }
 
 export function planLabel(plan: Pick<Plan, "name" | "code" | "version">): string {
