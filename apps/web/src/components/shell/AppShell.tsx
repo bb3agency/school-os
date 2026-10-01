@@ -8,6 +8,7 @@ import { usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { useDialogClose } from "@/lib/dialog-motion";
 import { BrandMark } from "./Brand";
+import { canvasFor, type ShellCanvas } from "./canvas";
 import { MotionProvider } from "./MotionProvider";
 import { Sidebar } from "./Sidebar";
 import { sidebarControlClasses, sidebarThemes } from "./sidebar-theme";
@@ -52,6 +53,11 @@ export interface AppShellProps {
   session?: ReactNode;
   /** Announcements and status banners above the page. */
   banner?: ReactNode;
+  /**
+   * The canvas behind the page (docs/17 §3.2). By default `canvasFor(theme, path)`: the
+   * gradient on the dashboards, the near-neutral canvas on dense record screens.
+   */
+  canvas?: ShellCanvas;
   children: ReactNode;
 }
 
@@ -82,6 +88,7 @@ interface Tip {
  *
  * The top bar holds page-wide tools (bell, language). Keyboard: the skip link comes first.
  * Gutters come from `.shell-gutter` and `.shell-frame` (docs/17 §5.1). Print: chrome hidden.
+ * The canvas (gradient or near-neutral) follows `canvasFor` unless `canvas` is given.
  */
 export function AppShell({
   theme = "school",
@@ -94,6 +101,7 @@ export function AppShell({
   topbarActions,
   session,
   banner,
+  canvas,
   children,
 }: AppShellProps) {
   const t = useTranslations("shell");
@@ -109,6 +117,7 @@ export function AppShell({
   const tipRef = useRef<HTMLDivElement>(null);
   const drawerId = useId();
   const topbar = topbars[theme];
+  const surface = canvas ?? canvasFor(theme, pathname);
   const visible = sections.filter((section) => section.items.length > 0);
 
   // The drawer slides back out the way it came in (instant under reduced motion); Escape too.
@@ -204,7 +213,10 @@ export function AppShell({
 
   return (
     <MotionProvider>
-      <div className="flex min-h-viewport">
+      <div
+        data-canvas={surface}
+        className={cn("flex min-h-viewport", surface === "neutral" && "canvas-neutral")}
+      >
         <SkipLink label={tc("skipToContent")} />
 
         {/* The sidebar beside the page (lg and up). */}

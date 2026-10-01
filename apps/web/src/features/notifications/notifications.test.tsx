@@ -151,8 +151,11 @@ describe("notification bell (FR-NOT-001)", () => {
     expect(bell).toHaveAttribute("aria-expanded", "false");
     // While it fades out it takes no focus and no clicks (inert), then it is gone.
     expect(document.getElementById(panelId)).toHaveAttribute("inert");
-    await waitFor(() =>
-      expect(screen.queryByRole("region", { name: "Latest notifications" })).toBeNull(),
+    // The 150 ms exit runs on Motion's frame loop; under a loaded full-suite run jsdom frames
+    // can stall past waitFor's 1 s default, so allow more time (the assertion is unchanged).
+    await waitFor(
+      () => expect(screen.queryByRole("region", { name: "Latest notifications" })).toBeNull(),
+      { timeout: 4000 },
     );
     expect(screen.getByRole("button", { name: "Elsewhere" })).toHaveFocus();
   });

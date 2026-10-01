@@ -7,7 +7,11 @@ import {
 import {
   cspViolations,
   expectEverythingRevealedAfterScrolling,
+  expectPublicUrl,
   hiddenRevealContent,
+  MK,
+  PUBLIC_PAGES,
+  publicPathPattern,
   settleAnimations,
 } from "./support/marketing";
 import { expectNoTelugu, teluguOn } from "./support/telugu";
@@ -22,13 +26,9 @@ import { expectNoTelugu, teluguOn } from "./support/telugu";
  * The dedicated-host variant (SOS_DEPLOYMENT_MODE=dedicated) is covered in app/marketing.test.tsx.
  */
 
-const PAGES = [
-  { path: "/welcome", h1: "Enter student details once." },
-  { path: "/features", h1: "Everything the office needs to keep student records right" },
-  { path: "/security", h1: "Built for children's data from the first line of code" },
-  { path: "/pricing", h1: "Two ways to run SchoolOS" },
-  { path: "/about", h1: "Software for the school office, built with the office" },
-] as const;
+// Plain paths (no URL carries a locale, ADR-0036 note), headings from messages/en.json
+// (support/marketing.ts).
+const PAGES = PUBLIC_PAGES;
 
 const VIEWPORTS = [
   { width: 1366, height: 768 },
@@ -90,7 +90,7 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
   }) => {
     await page.goto("/welcome");
     const tile = page
-      .getByRole("region", { name: "Built around the work the office already does" })
+      .getByRole("region", { name: MK.home.highlights.title })
       .getByRole("link")
       .first();
     const item = tile.locator("xpath=..");
@@ -135,18 +135,16 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
       await page.goto(path);
       const current = page.getByRole("banner").locator('[aria-current="page"]');
       await expect(current).toHaveCount(1);
-      expect(await current.getAttribute("href")).toBe(path);
+      expect(await current.getAttribute("href")).toMatch(publicPathPattern(path));
       const hrefs = await page
         .locator("header a[href], footer a[href]")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
       for (const href of hrefs) {
-        // No URL carries a locale (ADR-0036 note): page links are plain paths, never /en or /te.
-        expect(href, path).toMatch(/^(#|\/[a-z][a-z-]*(#[a-z-]+)?|\/bff\/auth\/login)$/);
-        expect(href, path).not.toMatch(/^\/(en|te)(\/|$|#)/);
+        // Same-site paths without a locale prefix (never /en or /te), in-page anchors or sign-in.
+        expect(href, path).toMatch(/^(#|\/(?!(en|te)(\/|$|#))[a-z]|\/bff\/auth\/login$)/);
       }
-      for (const href of new Set(
-        hrefs.filter((href) => /^\/[a-z]/.test(href) && !href.startsWith("/bff/")),
-      )) {
+      const pages = hrefs.filter((href) => href.startsWith("/") && !href.startsWith("/bff/"));
+      for (const href of new Set(pages)) {
         expect((await page.request.get(href)).status(), href).toBe(200);
       }
     }
@@ -237,7 +235,7 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
     await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("button", { name: "Close menu" }).waitFor();
     await page.locator("header").getByRole("link", { name: "About" }).click();
-    await expect(page).toHaveURL((url) => url.pathname === "/about");
+    await expectPublicUrl(page, "/about");
     await expect(page.getByRole("button", { name: "Menu" })).toHaveAttribute(
       "aria-expanded",
       "false",

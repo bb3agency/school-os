@@ -92,6 +92,7 @@ function PagesCard({ batch }: { batch: ExtractionBatchDetail }) {
     {
       key: "rows",
       header: t("colRows"),
+      numeric: true,
       cell: (row) => <span className="tabular-nums">{count(row.row_count)}</span>,
     },
     {

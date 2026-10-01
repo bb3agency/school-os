@@ -74,13 +74,21 @@ const CONTRAST_PAIRS: ReadonlyArray<readonly [string, string, number, string]> =
   ["info-ink", "info-soft", 4.5, "info alert"],
   ["violet-ink", "violet-soft", 4.5, "violet chip"],
   ["teal-ink", "teal-soft", 4.5, "teal chip"],
-  // Gradient pills: white text on the lighter stop is the worst case
-  ["white", "pill-blue-from", 4.5, "In progress pill (dark stop)"],
-  ["white", "pill-blue-to", 4.5, "In progress pill (light stop)"],
-  ["white", "pill-violet-from", 4.5, "Review pill (dark stop)"],
-  ["white", "pill-violet-to", 4.5, "Review pill (light stop)"],
-  ["white", "pill-teal-from", 4.5, "Done pill (dark stop)"],
-  ["white", "pill-teal-to", 4.5, "Done pill (light stop)"],
+  // Status pills: solid tints with strong text (docs/17 §4, no gradients)
+  ["info-ink", "info-soft", 4.5, "In progress pill"],
+  ["violet-ink", "violet-soft", 4.5, "Review pill"],
+  ["teal-ink", "teal-soft", 4.5, "Done pill"],
+  ["positive-ink", "positive-soft", 4.5, "Positive pill"],
+  ["danger", "danger-soft", 4.5, "Negative pill"],
+  ["primary", "info-soft", 4.5, "Date pill"],
+  ["ink-muted", "surface-muted", 4.5, "Tag pill"],
+  ["ink-muted", "surface", 4.5, "Sample pill"],
+  // Neutral canvas behind dense record screens (docs/17 §3.2)
+  ["ink", "canvas-neutral", 4.5, "text on the neutral canvas"],
+  ["ink-muted", "canvas-neutral", 4.5, "secondary text on the neutral canvas"],
+  ["ink-subtle", "canvas-neutral", 4.5, "notes on the neutral canvas"],
+  ["primary", "canvas-neutral", 4.5, "links and breadcrumbs on the neutral canvas"],
+  ["focus", "canvas-neutral", 3, "focus ring on the neutral canvas"],
   ["white", "ai-from", 4.5, "AI panel text (dark stop)"],
   ["white", "ai-to", 4.5, "AI panel text (light stop)"],
   // Platform chrome
@@ -122,5 +130,48 @@ describe("design tokens meet WCAG 2.2 AA (NFR-A11Y-001)", () => {
   it("the ratio computation matches known values", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 5);
     expect(contrast("#ffffff", "#ffffff")).toBeCloseTo(1, 5);
+  });
+});
+
+/** `--radius-<name>` values in px from a block of CSS (rem × 16). */
+function radii(block: string): Map<string, number> {
+  const found = new Map<string, number>();
+  for (const match of block.matchAll(/--radius-([a-z0-9]+):\s*([\d.]+)(rem|px)\b/g)) {
+    const value = Number(match[2]) * (match[3] === "rem" ? 16 : 1);
+    found.set(match[1] as string, value);
+  }
+  return found;
+}
+
+describe("radius tokens: calm app corners, larger marketing corners (docs/17 §3)", () => {
+  const app = radii(theme);
+  const marketingCss = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), "../../features/marketing/marketing.css"),
+    "utf8",
+  );
+  const mkStart = marketingCss.indexOf(".mk {");
+  const marketing = radii(marketingCss.slice(mkStart, marketingCss.indexOf("}", mkStart)));
+
+  it("cards, dialogs and panels in the app are 10-14px (rounded-xl, rounded-2xl)", () => {
+    for (const name of ["lg", "xl", "2xl"]) {
+      expect(app.get(name), name).toBeGreaterThanOrEqual(10);
+      expect(app.get(name), name).toBeLessThanOrEqual(14);
+    }
+  });
+
+  it("inputs and buttons (rounded-md) are scaled to match: smaller than the cards", () => {
+    expect(app.get("md")).toBeGreaterThanOrEqual(6);
+    expect(app.get("md")).toBeLessThan(app.get("xl") ?? 0);
+    expect(app.get("sm")).toBeLessThanOrEqual(app.get("md") ?? 0);
+  });
+
+  it("the marketing pages (.mk) keep their larger radii", () => {
+    expect(marketing.get("md")).toBe(10);
+    expect(marketing.get("lg")).toBe(14);
+    expect(marketing.get("xl")).toBe(20);
+    expect(marketing.get("2xl")).toBe(24);
+    // rounded-3xl (closing bands) exists only because the theme defines it.
+    expect(app.has("3xl")).toBe(true);
+    expect(marketing.get("3xl")).toBe(32);
   });
 });
