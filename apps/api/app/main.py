@@ -24,6 +24,7 @@ from app.extraction.api import router as extraction_router
 from app.identity.api import router as identity_router
 from app.imports.api import router as imports_router
 from app.insights.api import router as insights_router
+from app.knowledge import service as knowledge
 from app.knowledge.api import router as knowledge_router
 from app.notifications.api import invitations_router
 from app.notifications.api import router as notifications_router
@@ -41,6 +42,9 @@ API_PREFIX = "/api/v1"
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     setup_logging(settings)
+    # Claude safety lock: staging/prod refuse to start while a models.yaml role uses Anthropic
+    # without SOS_ANTHROPIC_ZDR_CONFIRMED (docs/10 §11).
+    knowledge.check_provider_agreements(settings)
     docs_enabled = not settings.is_production_like
     app = FastAPI(
         title="SchoolOS API",

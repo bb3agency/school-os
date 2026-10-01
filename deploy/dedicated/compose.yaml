@@ -67,8 +67,11 @@ x-app-env: &app-env
   SOS_LLM_GCP_CREDENTIALS_SOURCE: ${SOS_LLM_GCP_CREDENTIALS_SOURCE:-}
   SOS_LLM_GCP_CREDENTIALS_JSON: ${SOS_LLM_GCP_CREDENTIALS_JSON:-}
   SOS_LLM_ZDR_CONFIRMED: ${SOS_LLM_ZDR_CONFIRMED:-false}
-  # Anthropic: only while a role in models.yaml uses the fallback provider.
+  # Anthropic: only while a role in models.yaml uses the fallback provider. Claude safety lock: the
+  # api and every Celery process refuse to start while a role uses anthropic unless host.env sets
+  # SOS_ANTHROPIC_ZDR_CONFIRMED=true (only once the Anthropic ZDR agreement and DPA are signed).
   SOS_ANTHROPIC_API_KEY: ${SOS_ANTHROPIC_API_KEY:-}
+  SOS_ANTHROPIC_ZDR_CONFIRMED: ${SOS_ANTHROPIC_ZDR_CONFIRMED:-false}
   # Heartbeat (docs/16 §12): identity from host.env (Terraform), key from the operator secret.
   SOS_CONTROL_PLANE_URL: ${SOS_CONTROL_PLANE_URL:?}
   SOS_DEPLOYMENT_ID: ${SOS_DEPLOYMENT_ID:?}

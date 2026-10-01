@@ -25,6 +25,7 @@ from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.insights.tasks import beat_schedule as insights_beat_schedule
+from app.knowledge.service import check_provider_agreements
 from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
@@ -82,6 +83,8 @@ TASK_MODULES: list[str] = [
 
 def create_celery() -> Celery:
     settings = get_settings()
+    # Claude safety lock (docs/10 §11): the worker refuses to start like the API does.
+    check_provider_agreements(settings)
     broker = settings.redis_url.get_secret_value()
     app = Celery("schoolos", broker=broker, backend=broker, include=TASK_MODULES)
     app.conf.update(

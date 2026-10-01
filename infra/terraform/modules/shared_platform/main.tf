@@ -63,6 +63,9 @@ locals {
     SOS_BILLING_SUPPLIER_STATE_CODE = var.billing_supplier_state_code
     SOS_BILLING_SUPPLIER_ADDRESS    = var.billing_supplier_address
     SOS_LOG_LEVEL                   = var.log_level
+    # Claude safety lock (docs/10 §11): the api and every Celery process refuse to start in
+    # staging/prod while a models.yaml role uses anthropic, unless this is true (default false).
+    SOS_ANTHROPIC_ZDR_CONFIRMED = tostring(var.anthropic_zdr_confirmed)
   }, local.invoice_env)
 
   # Staff invitation email (notifications.send_email runs in the worker; the api queues it). Only the
@@ -481,6 +484,12 @@ module "web" {
     SUPPORT_OIDC_CLIENT_ID = module.cognito.support_client_id
     # Origin of presigned upload/preview URLs (CSP connect-src + img-src, SEC-010/SEC-016).
     FILES_ORIGIN = module.s3.files_browser_origin
+    # Public marketing site (docs/17 §5.6), read at request time; empty = that part is hidden.
+    # Not secrets. Only the web task gets them (dedicated hosts serve no marketing pages).
+    SOS_PUBLIC_CONTACT_EMAIL   = var.public_contact_email
+    SOS_PUBLIC_COMPANY_NAME    = var.public_company_name
+    SOS_PUBLIC_COMPANY_ADDRESS = var.public_company_address
+    SOS_PUBLIC_WHATSAPP_NUMBER = var.public_whatsapp_number
   }
   secrets = {
     SESSION_SECRET              = local.rnd_secret["session_secret"]

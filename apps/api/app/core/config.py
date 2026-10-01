@@ -228,6 +228,12 @@ class Settings(BaseSettings):
     # Anthropic (fallback provider since ADR-0033): needed only while a role in models.yaml uses
     # provider anthropic.
     anthropic_api_key: SecretStr | None = None
+    # Claude safety lock (owner decision 2026-10-01): in staging/prod the API and the worker refuse
+    # to start while any models.yaml role uses provider anthropic, unless this confirms that the
+    # Anthropic Zero Data Retention agreement and DPA are signed (docs/08 §8, docs/10 §11). The
+    # check reads models.yaml, so it lives in the knowledge module (core imports no feature module):
+    # knowledge.gateway.factory.require_provider_agreements, run by create_app and the worker.
+    anthropic_zdr_confirmed: bool = False
     embeddings_api_key: SecretStr | None = None
     # Google Gemini on Vertex AI (ADR-0033; the default LLM provider). Project and location of the
     # Vertex endpoint (product traffic only in India: asia-south1 or asia-south2 in staging/prod),
