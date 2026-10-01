@@ -26,6 +26,16 @@ email_provider = "off"
 # email_route53_zone_id = null
 # email_from            = "SchoolOS <no-reply@mail.<your-domain>>"
 
+# Claude safety lock (docs/10 §11): leave false unless a models.yaml role uses provider anthropic
+# AND the Anthropic Zero Data Retention agreement and DPA are signed.
+# anthropic_zdr_confirmed = false
+
+# Public marketing pages (docs/17 §5.6; not secrets). Empty or unset = that part is hidden.
+# public_contact_email   = "hello@<your-domain>"
+# public_company_name    = "<legal or trading name>"
+# public_company_address = "<line 1>|<line 2>|<city PIN>"
+# public_whatsapp_number = "+91<10-digit number>"
+
 alarm_emails       = ["<dev-alerts@your-domain>"]
 # SEC-023 baseline in the staging account (on by default; 180-day GOVERNANCE-locked CloudTrail).
 # enable_security_baseline = true

@@ -22,6 +22,15 @@ module "platform" {
   email_route53_zone_id       = var.email_route53_zone_id
   email_from                  = var.email_from
 
+  # Claude safety lock (docs/10 §11): true only once the Anthropic ZDR agreement and DPA are signed.
+  anthropic_zdr_confirmed = var.anthropic_zdr_confirmed
+
+  # Public marketing site (docs/17 §5.6): empty = hidden.
+  public_contact_email   = var.public_contact_email
+  public_company_name    = var.public_company_name
+  public_company_address = var.public_company_address
+  public_whatsapp_number = var.public_whatsapp_number
+
   app_domain             = var.app_domain
   admin_domain           = var.admin_domain
   route53_zone_id        = var.route53_zone_id

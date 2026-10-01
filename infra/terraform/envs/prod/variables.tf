@@ -268,3 +268,33 @@ variable "guardduty_runtime_agent_management" {
   type        = list(string)
   default     = []
 }
+
+variable "anthropic_zdr_confirmed" {
+  description = "SOS_ANTHROPIC_ZDR_CONFIRMED (validated by modules/shared_platform): true only once the Anthropic ZDR agreement and DPA are signed; needed while a models.yaml role uses anthropic."
+  type        = bool
+  default     = false
+}
+
+variable "public_contact_email" {
+  description = "SOS_PUBLIC_CONTACT_EMAIL for the marketing pages (validated by modules/shared_platform); empty = hidden."
+  type        = string
+  default     = ""
+}
+
+variable "public_company_name" {
+  description = "SOS_PUBLIC_COMPANY_NAME for the marketing pages; empty = hidden."
+  type        = string
+  default     = ""
+}
+
+variable "public_company_address" {
+  description = "SOS_PUBLIC_COMPANY_ADDRESS for the About page (lines separated by |); empty = hidden."
+  type        = string
+  default     = ""
+}
+
+variable "public_whatsapp_number" {
+  description = "SOS_PUBLIC_WHATSAPP_NUMBER for \"Ask on WhatsApp\" (validated by modules/shared_platform); empty = hidden."
+  type        = string
+  default     = ""
+}
