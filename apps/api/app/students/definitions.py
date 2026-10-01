@@ -3,22 +3,31 @@
 Pure functions over :class:`AttributeDef` (built from ``sis.attribute_definitions`` rows). Every
 text input is checked for a full Aadhaar number first (12 digits passing Verhoeff), so the
 rejection is the same wherever a value comes from: API, import or extraction.
+
+The one exception is the typed APAAR ID (ADR-0037 option (a); FR-STU-015, PRV-020): the value of
+a global ``digits12`` attribute listed in ``attributes.yaml`` (``apaar_id``) is exactly 12 ASCII
+digits and is stored as that attribute only, even when it passes the Verhoeff check. It is never
+treated as, or matched against, an Aadhaar number. Every other field still refuses one.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import functools
 import re
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
+from importlib import resources
 from typing import Any, Final, Literal
+
+import yaml
 
 from app.core.errors import ValidationFailed
 from app.core.redaction import contains_full_aadhaar
 from app.core.textnorm import comparison_key
 
-DataType = Literal["text", "date", "enum", "digits4"]
+DataType = Literal["text", "date", "enum", "digits4", "digits12"]
 Classification = Literal["C1", "C2", "C3"]
 
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
@@ -27,6 +36,9 @@ MIN_DATE: Final = dt.date(1900, 1, 1)
 _CONTROL_RE: Final = re.compile(r"[\x00-\x1f\x7f]")
 _WS_RE: Final = re.compile(r"\s+")
 _MAX_TEXT: Final = 1000
+# digits12 (FR-STU-015): 12 ASCII digits, optionally grouped 4-4-4 by one space or hyphen.
+_DIGITS12_RE: Final = re.compile(r"[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}")
+DIGITS12_CODE: Final = "digits12_required"
 _EXPLICIT_PHONE_RE: Final = re.compile(r"\+91[ \u00a0-]?[6-9][0-9]{4}[ \u00a0-]?[0-9]{5}")
 
 
@@ -142,8 +154,41 @@ def reject_full_aadhaar(values: Mapping[str, object]) -> None:
         raise ValidationFailed(errors, detail=AADHAAR_DETAIL)
 
 
-def find_full_aadhaar(payload: object, path: str = "") -> list[str]:
-    """Paths of all strings/integers in a JSON-like payload that contain a full Aadhaar number."""
+@functools.cache
+def typed_digits12_keys() -> frozenset[str]:
+    """Global ``digits12`` attributes of the packaged catalogue (``apaar_id``, ADR-0037)."""
+    raw = yaml.safe_load(
+        resources.files("app.students").joinpath("attributes.yaml").read_text("utf-8")
+    )
+    return frozenset(
+        key for key, spec in raw["attributes"].items() if spec.get("data_type") == "digits12"
+    )
+
+
+def digits12_value(raw: str) -> str | None:
+    """The 12 ASCII digits of a ``digits12`` input (``1234 5678 9012`` -> ``123456789012``)."""
+    text = clean_text(raw)
+    if _DIGITS12_RE.fullmatch(text) is None:
+        return None
+    return text.replace(" ", "").replace("-", "")
+
+
+def _typed_digits12(payload: Mapping[Any, Any], typed_keys: Collection[str]) -> bool:
+    """A ``{attribute_key: <typed digits12 key>, value: <12 digits>}`` entry (ADR-0037)."""
+    key, value = payload.get("attribute_key"), payload.get("value")
+    return key in typed_keys and isinstance(value, str) and digits12_value(value) is not None
+
+
+def find_full_aadhaar(
+    payload: object, path: str = "", *, typed_keys: Collection[str] = frozenset()
+) -> list[str]:
+    """Paths of all strings/integers in a JSON-like payload that contain a full Aadhaar number.
+
+    ``typed_keys`` (:func:`typed_digits12_keys`, student routes only): the ``value`` of an entry
+    whose ``attribute_key`` is one of them is skipped when it is exactly 12 digits, so a typed
+    APAAR ID is not refused (FR-STU-015). Its ``attribute_key`` and every other field are still
+    scanned.
+    """
     found: list[str] = []
     if isinstance(payload, bool) or payload is None:
         return found
@@ -151,11 +196,20 @@ def find_full_aadhaar(payload: object, path: str = "") -> list[str]:
         if is_full_aadhaar(str(payload)):
             found.append(path or "body")
     elif isinstance(payload, Mapping):
+        skip_value = bool(typed_keys) and _typed_digits12(payload, typed_keys)
         for key, value in payload.items():
-            found.extend(find_full_aadhaar(value, f"{path}.{key}" if path else str(key)))
+            if skip_value and key == "value":
+                continue
+            found.extend(
+                find_full_aadhaar(
+                    value, f"{path}.{key}" if path else str(key), typed_keys=typed_keys
+                )
+            )
     elif isinstance(payload, Sequence):
         for i, value in enumerate(payload):
-            found.extend(find_full_aadhaar(value, f"{path}.{i}" if path else str(i)))
+            found.extend(
+                find_full_aadhaar(value, f"{path}.{i}" if path else str(i), typed_keys=typed_keys)
+            )
     return found
 
 
@@ -173,6 +227,8 @@ def validate_value(
     today: dt.date | None = None,
 ) -> CleanValue:
     """Validate and normalise one value for ``definition`` (422 with field-level codes)."""
+    if _is_typed_digits12(definition):
+        return _digits12(definition, source, raw, field_name)
     if is_full_aadhaar(raw):
         raise ValidationFailed([aadhaar_error(field_name)], detail=AADHAAR_DETAIL)
     allowed = definition.allowed_sources
@@ -202,6 +258,30 @@ def validate_value(
         value = lowered
     norm = comparison_key(value) if definition.is_name else None
     return CleanValue(plain=value, text=value, norm=norm)
+
+
+def _is_typed_digits12(definition: AttributeDef) -> bool:
+    return (
+        definition.data_type == "digits12"
+        and definition.is_global
+        and definition.key in typed_digits12_keys()
+    )
+
+
+def _digits12(definition: AttributeDef, source: str, raw: str, field_name: str) -> CleanValue:
+    """FR-STU-015: exactly 12 ASCII digits, stored only as this attribute (ADR-0037). Anything
+    else that holds a full Aadhaar number is refused as one."""
+    allowed = definition.allowed_sources
+    if allowed is not None and source not in allowed:
+        raise ValidationFailed([error("source", "source_not_allowed")])
+    digits = digits12_value(raw)
+    if digits is None:
+        if is_full_aadhaar(raw):
+            raise ValidationFailed([aadhaar_error(field_name)], detail=AADHAAR_DETAIL)
+        if not clean_text(raw):
+            raise ValidationFailed([error(field_name, "missing")])
+        raise ValidationFailed([error(field_name, DIGITS12_CODE)])
+    return CleanValue(plain=digits, text=digits)
 
 
 def _date_value(

@@ -19,7 +19,12 @@ from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag, if_match_version
 from app.core.errors import ValidationFailed
 from app.students import service as students
-from app.students.definitions import AADHAAR_DETAIL, aadhaar_error, find_full_aadhaar
+from app.students.definitions import (
+    AADHAAR_DETAIL,
+    aadhaar_error,
+    find_full_aadhaar,
+    typed_digits12_keys,
+)
 from app.students.schemas import (
     AttributeOut,
     EnrollmentEnd,
@@ -63,7 +68,8 @@ async def reject_full_aadhaar_body(request: Request) -> None:
         payload = await request.json()
     except (ValueError, UnicodeDecodeError):
         return  # malformed JSON: FastAPI's own validation answers 422
-    paths = find_full_aadhaar(payload)
+    # FR-STU-015 (ADR-0037): only the value of a typed APAAR ID entry is exempt.
+    paths = find_full_aadhaar(payload, typed_keys=typed_digits12_keys())
     if paths:
         raise ValidationFailed([aadhaar_error(p) for p in paths], detail=AADHAAR_DETAIL)
 

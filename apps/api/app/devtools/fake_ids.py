@@ -39,3 +39,28 @@ def last4(number: str) -> str:
     if len(digits) != AADHAAR_LENGTH:
         raise ValueError("expected 12 digits")
     return digits[-4:]
+
+
+APAAR_LENGTH = 12
+PEN_LENGTH = 11
+
+
+def synthetic_apaar_id(rng: random.Random) -> str:
+    """A synthetic APAAR-like ID (12 ASCII digits, ADR-0037) that is never mistaken for an
+    Aadhaar number: it starts with ``1`` (Aadhaar numbers start 2-9) and FAILS the Verhoeff
+    check, so :func:`app.core.redaction.mask_aadhaar` leaves it alone in every pipeline.
+
+    Real APAAR IDs may pass Verhoeff (unknown on 2026-10-01); tests that need such a value build
+    it inside the test process.
+    """
+    body = "1" + "".join(str(rng.randint(0, 9)) for _ in range(APAAR_LENGTH - 2))
+    correct = verhoeff_check_digit(body)
+    number = body + rng.choice([d for d in "0123456789" if d != correct])
+    if verhoeff_valid(number):  # pragma: no cover - impossible by construction
+        raise RuntimeError("generated a valid Verhoeff number")
+    return number
+
+
+def synthetic_udise_pen(rng: random.Random) -> str:
+    """A synthetic UDISE+ PEN-like number (11 digits; the real format is still to confirm)."""
+    return str(rng.randint(1, 9)) + "".join(str(rng.randint(0, 9)) for _ in range(PEN_LENGTH - 1))
