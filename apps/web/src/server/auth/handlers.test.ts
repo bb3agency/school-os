@@ -31,7 +31,7 @@ function locationOf(response: Response): URL {
 describe("GET /bff/auth/login (FR-IAM-001)", () => {
   it("redirects to the IdP with PKCE S256, state and nonce, and a sealed transaction cookie", async () => {
     const response = h.absorb(
-      await handleLogin(h.request("/bff/auth/login?next=/en/settings/users"), h.runtime, "staff"),
+      await handleLogin(h.request("/bff/auth/login?next=/settings/users"), h.runtime, "staff"),
     );
     expect(response.status).toBe(303);
     const url = locationOf(response);
@@ -61,7 +61,7 @@ describe("GET /bff/auth/login (FR-IAM-001)", () => {
 
   it("uses the separate operator client for the platform login", async () => {
     const response = await handleLogin(
-      h.request("/bff/auth/platform/login?next=/en/platform/schools"),
+      h.request("/bff/auth/platform/login?next=/platform/schools"),
       h.runtime,
       "operator",
     );
@@ -84,11 +84,9 @@ describe("GET /bff/auth/login (FR-IAM-001)", () => {
 
 describe("GET /bff/auth/callback", () => {
   it("creates a server-side session with a __Host- cookie and redirects to next", async () => {
-    const response = await h.signIn("staff", clerk, "/en/settings/users");
+    const response = await h.signIn("staff", clerk, "/settings/users");
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe(
-      "https://office.school.example/en/settings/users",
-    );
+    expect(response.headers.get("location")).toBe("https://office.school.example/settings/users");
     const cookies = response.headers.getSetCookie();
     const session = cookies.find((c) => c.startsWith("__Host-sos_session="));
     expect(session).toMatch(
@@ -186,19 +184,28 @@ describe("GET /bff/auth/callback", () => {
   });
 
   it("signs an operator in with a separate cookie", async () => {
-    const response = await h.signIn("operator", { sub: "op-1", mfa: true }, "/te/platform/schools");
-    expect(response.headers.get("location")).toBe(
-      "https://office.school.example/te/platform/schools",
-    );
+    const response = await h.signIn("operator", { sub: "op-1", mfa: true }, "/platform/schools");
+    expect(response.headers.get("location")).toBe("https://office.school.example/platform/schools");
     expect(h.jar.has("__Host-sos_platform_session")).toBe(true);
     expect(h.jar.has("__Host-sos_session")).toBe(false);
+  });
+
+  it("drops an old locale prefix from the return address: no URL carries a locale (ADR-0036 note)", async () => {
+    const operator = await h.signIn("operator", { sub: "op-1", mfa: true }, "/te/platform/schools");
+    expect(operator.headers.get("location")).toBe("https://office.school.example/platform/schools");
+    const staff = await h.signIn("staff", clerk, "/en/settings/users?page=2");
+    expect(staff.headers.get("location")).toBe(
+      "https://office.school.example/settings/users?page=2",
+    );
   });
 
   it.each([
     ["https://evil.example/phish", "https://office.school.example/"],
     ["//evil.example", "https://office.school.example/"],
     ["/\\evil.example", "https://office.school.example/"],
+    ["/platform", "https://office.school.example/"],
     ["/en/platform", "https://office.school.example/"],
+    ["/en//evil.example", "https://office.school.example/evil.example"],
   ])("never redirects to %s after sign-in", async (next, expected) => {
     const response = await h.signIn("staff", clerk, next);
     expect(response.headers.get("location")).toBe(expected);
@@ -330,11 +337,7 @@ describe("GET /bff/auth/step-up (SEC-005)", () => {
     await h.signIn("staff", clerk);
     const before = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
     const response = h.absorb(
-      await handleStepUp(
-        h.request("/bff/auth/step-up?next=/en/settings/users"),
-        h.runtime,
-        "staff",
-      ),
+      await handleStepUp(h.request("/bff/auth/step-up?next=/settings/users"), h.runtime, "staff"),
     );
     const url = locationOf(response);
     expect(url.searchParams.get("prompt")).toBe("login");
@@ -342,7 +345,7 @@ describe("GET /bff/auth/step-up (SEC-005)", () => {
 
     const back = h.idp.staff.authorize(url, clerk);
     const done = h.absorb(await handleCallback(h.request(back.href), h.runtime, "staff"));
-    expect(done.headers.get("location")).toBe("https://office.school.example/en/settings/users");
+    expect(done.headers.get("location")).toBe("https://office.school.example/settings/users");
     const after = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
     expect(after?.id).not.toBe(before?.id);
     expect(after?.familyId).toBe(before?.familyId);
@@ -544,10 +547,8 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
     (await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false }))?.activeTenantId;
 
   it("accepts invitations first, then lists schools; one school becomes active and the login is audited there", async () => {
-    const response = await h.signIn("staff", clerk, "/en/settings/users");
-    expect(response.headers.get("location")).toBe(
-      "https://office.school.example/en/settings/users",
-    );
+    const response = await h.signIn("staff", clerk, "/settings/users");
+    expect(response.headers.get("location")).toBe("https://office.school.example/settings/users");
     expect(paths()).toEqual([
       "/api/v1/me/accept-invitations",
       "/api/v1/me/schools",
@@ -577,7 +578,8 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
   });
 
   it("several schools: go to the picker; the login is audited once the school is chosen", async () => {
-    // Telugu switched on explicitly (ADR-0036): the picker keeps the Telugu UI language.
+    // Telugu switched on explicitly (ADR-0036): the language stays in the NEXT_LOCALE cookie,
+    // so even an old /te return address leads to prefix-less pages.
     vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     h.setApi((request) =>
       request.url.endsWith("/api/v1/me/schools")
@@ -586,7 +588,7 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
     );
     const response = await h.signIn("staff", clerk, "/te/audit");
     expect(response.headers.get("location")).toBe(
-      "https://office.school.example/te/choose-school?next=%2Fte%2Faudit",
+      "https://office.school.example/choose-school?next=%2Faudit",
     );
     expect(paths()).not.toContain("/api/v1/me/login-event");
     expect(await activeTenant()).toBeNull();
@@ -610,23 +612,23 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
     expect(logins()).toHaveLength(1);
   });
 
-  it("no school at all: the 'no access yet' page in the user's language", async () => {
+  it("no school at all: the 'no access yet' page, prefix-less (language from the cookie)", async () => {
     // Telugu switched on explicitly (ADR-0036).
     vi.stubEnv("SOS_TELUGU_ENABLED", "true");
     h.setApi((request) =>
       request.url.endsWith("/api/v1/me/schools") ? json({ data: [] }) : defaultApi(request),
     );
     const response = await h.signIn("staff", clerk, "/te/settings/structure");
-    expect(response.headers.get("location")).toBe("https://office.school.example/te/no-access");
+    expect(response.headers.get("location")).toBe("https://office.school.example/no-access");
     expect(h.jar.has("__Host-sos_session")).toBe(true);
   });
 
-  it("with Telugu switched off, a /te return path lands on the English pages (ADR-0036)", async () => {
+  it("with Telugu switched off, a /te return path lands on the prefix-less pages (ADR-0036)", async () => {
     h.setApi((request) =>
       request.url.endsWith("/api/v1/me/schools") ? json({ data: [] }) : defaultApi(request),
     );
     const response = await h.signIn("staff", clerk, "/te/settings/structure");
-    expect(response.headers.get("location")).toBe("https://office.school.example/en/no-access");
+    expect(response.headers.get("location")).toBe("https://office.school.example/no-access");
   });
 
   it("one suspended school: the picker explains it; the denial is audited", async () => {
@@ -637,7 +639,7 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
     );
     const response = await h.signIn("staff", clerk);
     expect(response.headers.get("location")).toBe(
-      "https://office.school.example/en/choose-school?next=%2F",
+      "https://office.school.example/choose-school?next=%2F",
     );
     const login = h.apiCalls.find((r) => r.url.endsWith("/api/v1/me/login-event"));
     expect(login?.headers.get("x-active-tenant")).toBe(TENANT);
@@ -648,11 +650,7 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
     await h.signIn("staff", clerk);
     const before = h.apiCalls.length;
     const stepUp = h.absorb(
-      await handleStepUp(
-        h.request("/bff/auth/step-up?next=/en/settings/users"),
-        h.runtime,
-        "staff",
-      ),
+      await handleStepUp(h.request("/bff/auth/step-up?next=/settings/users"), h.runtime, "staff"),
     );
     const back = h.idp.staff.authorize(stepUp.headers.get("location") ?? "", clerk);
     await handleCallback(h.request(back.href), h.runtime, "staff");

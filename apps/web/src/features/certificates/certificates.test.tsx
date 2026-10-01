@@ -21,7 +21,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/certificates",
+    usePathname: () => "/certificates",
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -339,10 +339,7 @@ describe("certificate list (US-1101..US-1105)", () => {
     expect(
       pending && within(pending).getByText("Gets its serial number when approved"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Registers" })).toHaveAttribute(
-      "href",
-      "/en/registers",
-    );
+    expect(screen.getByRole("link", { name: "Registers" })).toHaveAttribute("href", "/registers");
   });
 
   it("sends the student filter to the API and offers issuing for that student", async () => {
@@ -354,7 +351,7 @@ describe("certificate list (US-1101..US-1105)", () => {
     expect(await screen.findByText("Showing one student only.")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Issue a certificate" })).toHaveAttribute(
       "href",
-      `/en/students/${STUDENT}/certificates/new`,
+      `/students/${STUDENT}/certificates/new`,
     );
     await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/certificates")).toHaveLength(1));
     expect(
@@ -454,7 +451,7 @@ describe("certificate detail (US-1102..US-1107)", () => {
     );
     await userEvent.click(within(dialog).getByRole("button", { name: "Issue a duplicate" }));
     await waitFor(() =>
-      expect(push).toHaveBeenCalledWith("/en/certificates/0192f3a4-0000-7000-8000-0000000ce009"),
+      expect(push).toHaveBeenCalledWith("/certificates/0192f3a4-0000-7000-8000-0000000ce009"),
     );
     const call = stub.callsTo(`POST /bff/api/v1/certificates/${CERT}/duplicates`)[0];
     expect(call?.headers.get("idempotency-key")).toBeTruthy();
@@ -521,12 +518,12 @@ describe("issue a certificate (US-1101, US-1102, FR-CERT-002)", () => {
     expect(await screen.findByText("Fix these first")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the finding" })).toHaveAttribute(
       "href",
-      `/en/findings/${FINDING}`,
+      `/findings/${FINDING}`,
     );
     const corrections = screen.getAllByRole("link", { name: "Request a correction" });
     expect(corrections.map((link) => link.getAttribute("href"))).toEqual([
-      `/en/change-requests/new?student_id=${STUDENT}&attribute_key=dob`,
-      `/en/change-requests/new?student_id=${STUDENT}&attribute_key=full_name`,
+      `/change-requests/new?student_id=${STUDENT}&attribute_key=dob`,
+      `/change-requests/new?student_id=${STUDENT}&attribute_key=full_name`,
     ]);
     expect(
       screen.getByText(/A data check found a blocking problem \(DQ-002\) in Date of birth/),
@@ -545,7 +542,7 @@ describe("issue a certificate (US-1101, US-1102, FR-CERT-002)", () => {
     await screen.findByText("14/03/2012");
     await userEvent.selectOptions(screen.getByLabelText("Purpose"), "bus_pass");
     await userEvent.click(screen.getByRole("button", { name: "Issue certificate" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith(`/en/certificates/${CERT}`));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/certificates/${CERT}`));
     const call = stub.callsTo(`POST /bff/api/v1/students/${STUDENT}/certificates`)[0];
     expect(JSON.parse(call?.body ?? "{}")).toEqual({
       certificate_type: "bonafide",

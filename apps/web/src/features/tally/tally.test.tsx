@@ -36,7 +36,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/settings/tally",
+    usePathname: () => "/settings/tally",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -220,7 +220,7 @@ describe("connector screen (US-1801, US-1802, US-1803; FR-TALLY-001/002/004/009)
     expect(stub.callsTo("GET /bff/api/v1/tally/devices")).toHaveLength(0);
     expect(screen.getByRole("link", { name: en.connector.toDues })).toHaveAttribute(
       "href",
-      "/en/fees",
+      "/fees",
     );
   });
 
@@ -469,13 +469,13 @@ describe("fee dues (US-1804, FR-TALLY-007)", () => {
     renderWithIntl(<FeeDuesScreen />);
     expect(await screen.findByRole("link", { name: "Synthetic Student One" })).toHaveAttribute(
       "href",
-      `/en/students/${STUDENT}`,
+      `/students/${STUDENT}`,
     );
     expect(screen.getAllByText("₹12,500.00").length).toBeGreaterThan(0);
     expect(screen.getByText(en.dues.unlinkedTitle)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: en.dues.linkLedgers })).toHaveAttribute(
       "href",
-      "/en/settings/tally/ledgers",
+      "/settings/tally/ledgers",
     );
   });
 

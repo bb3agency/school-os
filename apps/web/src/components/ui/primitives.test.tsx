@@ -18,7 +18,7 @@ import { KpiCard } from "./StatCard";
 import { Timeline } from "./Timeline";
 import { Toggle } from "./Toggle";
 
-const path = vi.hoisted(() => ({ current: "/en/students" }));
+const path = vi.hoisted(() => ({ current: "/students" }));
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return { ...actual, usePathname: () => path.current };
@@ -260,7 +260,7 @@ describe("page chrome primitives", () => {
     const crumbs = screen.getByRole("navigation", { name: "You are here" });
     expect(within(crumbs).getByRole("link", { name: "Students" })).toHaveAttribute(
       "href",
-      "/en/students",
+      "/students",
     );
     expect(within(crumbs).getByText("Sample student A")).toHaveAttribute("aria-current", "page");
   });
@@ -296,7 +296,7 @@ describe("page chrome primitives", () => {
         eyebrow="Ask the school"
         suggestionsLabel="Try asking"
         suggestions={[
-          { id: "a", label: "Fee rules", href: "/en/ask?q=fees" },
+          { id: "a", label: "Fee rules", href: "/ask?q=fees" },
           { id: "b", label: "Transfer certificate steps", onSelect: () => picked.push("b") },
         ]}
       >
@@ -307,7 +307,7 @@ describe("page chrome primitives", () => {
     const list = within(panel).getByRole("list", { name: "Try asking" });
     expect(within(list).getByRole("link", { name: "Fee rules" })).toHaveAttribute(
       "href",
-      "/en/ask?q=fees",
+      "/ask?q=fees",
     );
     await user.click(within(list).getByRole("button", { name: "Transfer certificate steps" }));
     expect(picked).toEqual(["b"]);
@@ -333,7 +333,7 @@ const SECTIONS: NavSection[] = [
 
 describe("grouped sidebar navigation (the AppShell tests are in shell/AppShell.test.tsx)", () => {
   it("sections are lists named by their headings; one current page with an accent bar", () => {
-    path.current = "/en/students/abc";
+    path.current = "/students/abc";
     renderWithIntl(<SidebarNav label="Main" sections={SECTIONS} />);
     const nav = screen.getByRole("navigation", { name: "Main" });
     const records = within(nav).getByRole("list", { name: "Records" });
@@ -356,7 +356,7 @@ describe("grouped sidebar navigation (the AppShell tests are in shell/AppShell.t
   });
 
   it("rows are at least 40px tall (WCAG 2.5.8) and labels wrap instead of clipping", () => {
-    path.current = "/en";
+    path.current = "/";
     renderWithIntl(<SidebarNav label="Main" sections={SECTIONS} />);
     for (const link of screen.getAllByRole("link")) {
       expect(link).toHaveClass("min-h-10");
@@ -369,7 +369,7 @@ describe("grouped sidebar navigation (the AppShell tests are in shell/AppShell.t
   });
 
   it("a sub-entry without its own icon gets the corner arrow, so compact mode shows it", () => {
-    path.current = "/en/imports/history";
+    path.current = "/imports/history";
     renderWithIntl(<SidebarNav label="Main" sections={SECTIONS} />);
     const history = screen.getByRole("link", { name: "History" });
     expect(history).toHaveAttribute("aria-current", "page");
@@ -379,7 +379,7 @@ describe("grouped sidebar navigation (the AppShell tests are in shell/AppShell.t
   });
 
   it("platform theme: the active marker is the yellow accent on the dark chrome", () => {
-    path.current = "/en/students";
+    path.current = "/students";
     renderWithIntl(<SidebarNav label="Platform" sections={SECTIONS} theme="platform" />);
     const current = screen.getByRole("link", { current: "page" });
     expect(current).toHaveClass("bg-platform-hover", "text-platform-ink");

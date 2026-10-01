@@ -28,7 +28,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
-    usePathname: () => "/en/imports",
+    usePathname: () => "/imports",
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
@@ -179,7 +179,7 @@ describe("US-401: the imports list", () => {
     );
     expect(screen.getByRole("heading", { name: im.list.uploadTitle })).toBeInTheDocument();
     const link = screen.getByRole("link", { name: /27\/09\/2026/ });
-    expect(link).toHaveAttribute("href", `/en/imports/${ID.import}`);
+    expect(link).toHaveAttribute("href", `/imports/${ID.import}`);
     expect(screen.getByText(im.status.validated)).toBeInTheDocument();
   });
 });
@@ -196,7 +196,7 @@ describe("US-401 AC1..AC3: one import", () => {
       />,
     );
     const link = screen.getByRole("link", { name: messages.en.sheets.import.open });
-    expect(link).toHaveAttribute("href", `/en/imports/${ID.import}/sheet`);
+    expect(link).toHaveAttribute("href", `/imports/${ID.import}/sheet`);
     expect(screen.getByText(messages.en.sheets.import.openDescriptionEdit)).toBeInTheDocument();
     view.unmount();
     renderWithIntl(

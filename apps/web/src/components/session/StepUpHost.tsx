@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -55,7 +55,6 @@ export function StepUpHost({
 }) {
   const t = useTranslations("errors.stepUp");
   const tc = useTranslations("common");
-  const locale = useLocale();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const pending = useRef<Pending | null>(null);
@@ -89,11 +88,11 @@ export function StepUpHost({
       // Someone else signed in at the prompt: never replay this person's action for them.
       pending.current = null;
       current.resolve(false);
-      navigate(`/${locale}`);
+      navigate("/");
       return;
     }
     finish(true);
-  }, [finish, locale, navigate]);
+  }, [finish, navigate]);
 
   useEffect(() => {
     const unregister = registerStepUpHandler("staff", async (fallbackUrl) => {
@@ -133,7 +132,7 @@ export function StepUpHost({
   }, [confirmed]);
 
   function signIn() {
-    const opened = openStepUpWindow(stepUpWindowUrl(locale));
+    const opened = openStepUpWindow(stepUpWindowUrl());
     if (opened) {
       setBlocked(false);
       setWaiting(true);

@@ -7,10 +7,11 @@ import { GET as teluguFont } from "@/app/fonts/telugu/[file]/route";
 import { flattenMessages, icuSignature } from "@/test/icu";
 import {
   enabledLocales,
-  englishPathFor,
   isEnabledLocale,
+  legacyLocalePath,
   teluguEnabled,
   uiLocale,
+  withoutLocalePrefix,
 } from "./languages";
 import { loadMessages, mergeMessages } from "./messages";
 import { TELUGU_FONT_FILES, TELUGU_STYLESHEET, teluguStylesheet } from "./telugu-font";
@@ -48,13 +49,43 @@ describe("SOS_TELUGU_ENABLED: one switch, off by default (ADR-0036)", () => {
     expect(uiLocale("te", ON)).toBe("te");
     expect(uiLocale(undefined, ON)).toBe("en");
   });
+});
 
-  it("maps /te paths to /en only while off", () => {
-    expect(englishPathFor("/te", {})).toBe("/en");
-    expect(englishPathFor("/te/students/1", {})).toBe("/en/students/1");
-    expect(englishPathFor("/teachers", {})).toBeNull();
-    expect(englishPathFor("/en/te", {})).toBeNull();
-    expect(englishPathFor("/te/students", ON)).toBeNull();
+describe("no locale in any URL (product owner 2026-09-30, ADR-0036 note)", () => {
+  it("maps old /en and /te paths to the same path without the prefix", () => {
+    expect(legacyLocalePath("/te")).toEqual({ locale: "te", pathname: "/" });
+    expect(legacyLocalePath("/en/")).toEqual({ locale: "en", pathname: "/" });
+    expect(legacyLocalePath("/te/students/1")).toEqual({ locale: "te", pathname: "/students/1" });
+    expect(legacyLocalePath("/EN/platform")).toEqual({ locale: "en", pathname: "/platform" });
+  });
+
+  it("leaves prefix-less paths alone", () => {
+    for (const path of [
+      "/",
+      "/teachers",
+      "/entries",
+      "/en-in/x",
+      "/students/en",
+      "/students/te/x",
+    ]) {
+      expect(legacyLocalePath(path), path).toBeNull();
+    }
+  });
+
+  it("never produces a protocol-relative path", () => {
+    expect(legacyLocalePath("/en//evil.example")).toEqual({
+      locale: "en",
+      pathname: "/evil.example",
+    });
+    expect(legacyLocalePath("/te///evil.example/x")?.pathname).toBe("/evil.example/x");
+    expect(legacyLocalePath("/en/\\evil.example")?.pathname).toBe("/evil.example");
+  });
+
+  it("strips the prefix from a return address and keeps its query and hash", () => {
+    expect(withoutLocalePrefix("/en/settings/users?page=2#top")).toBe("/settings/users?page=2#top");
+    expect(withoutLocalePrefix("/te?x=1")).toBe("/?x=1");
+    expect(withoutLocalePrefix("/students?next=/en/x")).toBe("/students?next=/en/x");
+    expect(withoutLocalePrefix("/")).toBe("/");
   });
 });
 

@@ -31,7 +31,7 @@ export interface ScreenGroup {
   subject: string | null;
   /** Page that starts the sign-in. */
   signInPath: string;
-  /** Paths without the locale prefix. */
+  /** Paths (no URL carries a locale; the language is the NEXT_LOCALE cookie). */
   pages: string[];
 }
 
@@ -54,10 +54,10 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/signed-out?error=signin_failed",
     ],
   },
-  multi: { subject: "multi", signInPath: "/en/support", pages: ["/choose-school"] },
+  multi: { subject: "multi", signInPath: "/support", pages: ["/choose-school"] },
   school: {
     subject: "clerk",
-    signInPath: "/en/support",
+    signInPath: "/support",
     pages: [
       "",
       "/students",
@@ -116,7 +116,7 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
   },
   platform: {
     subject: "operator-1",
-    signInPath: "/en/platform",
+    signInPath: "/platform",
     pages: [
       "/platform",
       "/platform/schools",

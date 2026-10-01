@@ -6,7 +6,7 @@ import { SchoolShell } from "./SchoolShell";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
-  return { ...actual, usePathname: () => "/en" };
+  return { ...actual, usePathname: () => "/" };
 });
 
 function navLinks() {
@@ -114,7 +114,7 @@ describe("school sidebar: school, account and top bar (docs/17 §5.2)", () => {
     expect(top.getByText("Current school")).toBeInTheDocument();
     expect(top.getByText("Sample Model School")).toBeInTheDocument();
     const change = top.getByRole("link", { name: "Switch school" });
-    expect(change).toHaveAttribute("href", "/en/choose-school");
+    expect(change).toHaveAttribute("href", "/choose-school");
     // One place only: not in the top bar any more.
     expect(
       within(screen.getByRole("banner")).queryByRole("link", { name: "Switch school" }),

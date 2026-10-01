@@ -19,7 +19,7 @@ import {
 import { STREAMING_POLL_MS } from "./conversations";
 
 const nav = vi.hoisted(() => ({
-  path: "/en/ask",
+  path: "/ask",
   params: { locale: "en" } as Record<string, string>,
   replace: vi.fn(),
   push: vi.fn(),
@@ -77,7 +77,7 @@ const finalAnswer = [
 ];
 
 beforeEach(() => {
-  nav.path = "/en/ask";
+  nav.path = "/ask";
   nav.params = { locale: "en" };
   nav.replace.mockReset();
   nav.push.mockReset();
@@ -132,7 +132,7 @@ describe("Ask chat: a new conversation (FR-KB-008, FR-KB-012)", () => {
     renderChat();
     await askQuestion();
     await screen.findByText("The answer is ready.");
-    expect(nav.replace).toHaveBeenCalledWith(`/en/ask/c/${CHAT.conversation}`, { scroll: false });
+    expect(nav.replace).toHaveBeenCalledWith(`/ask/c/${CHAT.conversation}`, { scroll: false });
     // The header shows the conversation's title (the page's h1).
     expect(await screen.findByRole("heading", { level: 1, name: "Exam dates" })).toBeVisible();
   });
@@ -173,7 +173,7 @@ describe("Ask chat: a new conversation (FR-KB-008, FR-KB-012)", () => {
     const open = await screen.findByRole("link", {
       name: "Open: Circular · Exam timings (open the document)",
     });
-    expect(open).toHaveAttribute("href", "/en/documents/0192f3a4-0000-7000-8000-00000000c701");
+    expect(open).toHaveAttribute("href", "/documents/0192f3a4-0000-7000-8000-00000000c701");
     expect(chip).toHaveAttribute("aria-describedby");
     await userEvent.setup().keyboard("{Escape}");
     await waitFor(() =>
@@ -360,7 +360,7 @@ describe("Ask chat: memory in the chat", () => {
     expect(await screen.findByText("Memory updated")).toBeVisible();
     expect(screen.getAllByRole("link", { name: "Manage memory" })[0]).toHaveAttribute(
       "href",
-      "/en/ask/memory",
+      "/ask/memory",
     );
   });
 
@@ -424,7 +424,7 @@ describe("Ask chat: memory in the chat", () => {
       Response.json({ enabled: true, school_enabled: true });
     const { unmount } = renderChat();
     const link = await screen.findByRole("link", { name: /Memory on/ });
-    expect(link).toHaveAttribute("href", "/en/ask/memory");
+    expect(link).toHaveAttribute("href", "/ask/memory");
     expect(link).toHaveAccessibleDescription(/Ask uses what it remembers/);
     unmount();
     stub.routes["GET /bff/api/v1/knowledge/memory-settings"] = () =>
@@ -440,7 +440,7 @@ describe("Ask chat: memory in the chat", () => {
 
 describe("Ask chat: an existing conversation (/ask/c/{id})", () => {
   beforeEach(() => {
-    nav.path = `/en/ask/c/${CHAT.conversation}`;
+    nav.path = `/ask/c/${CHAT.conversation}`;
     nav.params = { locale: "en", conversationId: CHAT.conversation };
   });
 
@@ -513,7 +513,7 @@ describe("Ask chat: an existing conversation (/ask/c/{id})", () => {
       });
     renderChat();
     const card = await screen.findByRole("link", { name: "Your chat · Fees (open the chat)" });
-    expect(card).toHaveAttribute("href", `/en/ask/c/${CHAT.conversation2}#m-${CHAT.query2}`);
+    expect(card).toHaveAttribute("href", `/ask/c/${CHAT.conversation2}#m-${CHAT.query2}`);
     const target = document.getElementById(`m-${CHAT.query}`);
     await waitFor(() => expect(target).toHaveClass("chat-highlight"));
     expect(target).toHaveFocus();
@@ -582,7 +582,7 @@ describe("Ask chat: an existing conversation (/ask/c/{id})", () => {
     stub.routes[detailRoute(CHAT.conversation)] = () => problem(404, "not_found");
     renderChat();
     expect(await screen.findByText("Chat not found")).toBeVisible();
-    expect(screen.getByRole("link", { name: "New chat" })).toHaveAttribute("href", "/en/ask");
+    expect(screen.getByRole("link", { name: "New chat" })).toHaveAttribute("href", "/ask");
   });
 
   it("pins, renames and deletes from the Chat options menu", async () => {
@@ -620,13 +620,13 @@ describe("Ask chat: an existing conversation (/ask/c/{id})", () => {
     const confirm = await screen.findByRole("dialog", { name: "Delete this chat?" });
     await user.click(within(confirm).getByRole("button", { name: "Delete chat" }));
     await waitFor(() => expect(stub.callsTo(DELETE)).toHaveLength(1));
-    expect(nav.push).toHaveBeenCalledWith("/en/ask");
+    expect(nav.push).toHaveBeenCalledWith("/ask");
   });
 });
 
 describe("Ask chat: keyboard shortcuts", () => {
   it("/ moves to the question box; Alt+N starts a new chat", async () => {
-    nav.path = `/en/ask/c/${CHAT.conversation}`;
+    nav.path = `/ask/c/${CHAT.conversation}`;
     nav.params = { locale: "en", conversationId: CHAT.conversation };
     stub.routes[detailRoute(CHAT.conversation)] = () =>
       Response.json({ ...summary(), messages: [message()] });
@@ -642,6 +642,6 @@ describe("Ask chat: keyboard shortcuts", () => {
     await user.keyboard("/");
     expect(box).toHaveValue("/");
     await user.keyboard("{Alt>}n{/Alt}");
-    expect(nav.push).toHaveBeenCalledWith("/en/ask");
+    expect(nav.push).toHaveBeenCalledWith("/ask");
   });
 });

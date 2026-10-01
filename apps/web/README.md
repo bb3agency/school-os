@@ -15,7 +15,7 @@ for eyebrow labels; Noto Sans Telugu only while Telugu is switched on, served by
 `/fonts/telugu`). `docs/17-ui-design-system.md` has the
 component API, do/don't and the contrast table; `src/components/ui/tokens.test.ts` recomputes
 every documented contrast pair. Under `next dev` with the local stub issuer,
-`/en/dev/ui` shows every primitive and variant with synthetic content (a 404 anywhere else,
+`/dev/ui` shows every primitive and variant with synthetic content (a 404 anywhere else,
 same guard as `/dev/sign-in`).
 
 ## Layout
@@ -38,7 +38,7 @@ same guard as `/dev/sign-in`).
 | `src/features/documents/`          | Documents (US-701, FR-DOC-001..008): list/filters in the URL, presigned upload, versions, who can see it, edit details, archive, uploader (`/documents/*`)                                                                                                                                                 |
 | `src/features/ask/`                | Ask the school (US-801..803): `/ask` streams SSE via the BFF (Stop aborts), text answers with source chips, feedback; `/ask/search`, `/ask/verified`                                                                                                                                                       |
 | `src/features/auth/`               | School picker (`/choose-school`), "no access yet" re-check, signed-out view                                                                                                                                                                                                                                |
-| `src/features/dev-ui/`             | Dev-only design-system reference (`/[locale]/dev/ui`, guarded by `isDevSignInEnabled`)                                                                                                                                                                                                                     |
+| `src/features/dev-ui/`             | Dev-only design-system reference (`/dev/ui`, guarded by `isDevSignInEnabled`)                                                                                                                                                                                                                              |
 | `src/features/marketing/`          | Public marketing site (docs/17 §5.6): `/welcome` home, `/features`, `/security`, `/pricing`, `/about`; `MarketingShell`, `SiteHeader`, `Reveal`, sample-data mockups, settings (`settings.ts`, server only); no session                                                                                    |
 | `src/lib/forms.ts`                 | `useApiForm`: native `<form>` + zod, server 422 `errors[].field` → inputs, Idempotency-Key per intent                                                                                                                                                                                                      |
 | `src/lib/api-errors.ts`            | Problem `code` → plain-language message keys (`errors.api.*`, en/te), incl. `same_operator`, 428 step-up                                                                                                                                                                                                   |
@@ -90,10 +90,10 @@ After the OIDC callback (staff, not step-up) the BFF calls, in order:
 2. `GET /api/v1/me/schools` —
    - exactly one **active** school: it becomes the active school (`X-Active-Tenant`) and the
      user lands on `next`;
-   - several schools (or a single suspended one): `/[locale]/choose-school?next=…`, which
+   - several schools (or a single suspended one): `/choose-school?next=…`, which
      lists them with their status (suspended/offboarding disabled, with the reason) and
      POSTs `/bff/auth/active-tenant`;
-   - none: `/[locale]/no-access` ("ask the office to send the invitation again", with a
+   - none: `/no-access` ("ask the office to send the invitation again", with a
      "Check again" button that re-runs accept-invitations).
 3. `POST /api/v1/me/login-event` once the school is known (right away for one school, or on
    the first choice in the picker), so the API can audit it in that school's log.
@@ -104,7 +104,7 @@ permissions; UX only, the API checks every call) and shows "Switch school" when 
 lists more than one school. Platform menus are filtered the same way from `/platform/me`.
 
 **Public marketing pages (`src/features/marketing/`, docs/17 §5.6).** A signed-out visitor
-to the bare school home (`/`, `/en`, `/te`) is sent to the public home page `/welcome` instead
+to the bare school home `/` is sent to the public home page `/welcome` instead
 of the IdP (`requireStaff` → `isSchoolHomePath` in `src/server/session/rsc.ts`); every deep link
 still goes straight to `/bff/auth/login?next=…`, a SchoolOS support session still opens the
 console, and the operator panel is unchanged. `/welcome`, `/features`, `/security`, `/pricing`
@@ -114,6 +114,23 @@ signed-out page links back to `/welcome`. Their claims come from docs/01, 07, 08
 prices, counts or customer names; certificates are marked planned until M3). On a dedicated
 host (`SOS_DEPLOYMENT_MODE=dedicated`) `/welcome` is a plain sign-in card and the other four
 answer 404.
+
+## URLs and languages
+
+No URL carries a locale, in any language (product owner 2026-09-30; ADR-0036 note, docs/17
+§5.4): every page has one address, `/`, `/students`, `/ask/c/<id>`, `/platform/schools`,
+`/dev/sign-in`, `/welcome`, … next-intl runs with `localePrefix: "never"` (`src/i18n/routing.ts`);
+`src/proxy.ts` rewrites each request internally to `app/[locale]/…` (the folder stays: layouts
+and pages still get a `locale` param) with the language from the `NEXT_LOCALE` cookie, then
+`Accept-Language`, among switched-on locales only: with `SOS_TELUGU_ENABLED` off it is English
+whatever the cookie or header says, and the proxy writes no language cookie. Old `/en/…` and
+`/te/…` links answer **308** to the same path without the prefix (query kept, every security
+header set; leading slashes collapsed so `/en//evil.example` stays on this site); with Telugu on,
+an old `/te/…` link first stores `NEXT_LOCALE=te`. The language switcher (Telugu on only) is a
+pair of buttons that set the cookie (`src/i18n/locale-cookie.ts`) and reload the same page.
+Return addresses (`next`) are prefix-less paths; `safeNext` drops an old prefix. Links use
+`Link`/`useRouter` from `@/i18n/navigation` or plain prefix-less paths; never build
+`` `/${locale}/…` ``.
 
 ## BFF routes
 
@@ -173,7 +190,8 @@ SOS_WEB_TEST_REDIS_URL=redis://127.0.0.1:6390/15 npm test -w @schoolos/web
 build: Telugu off (port `E2E_PORT`, the product default, project `chromium`) and Telugu on
 (`E2E_PORT + 1`, project `chromium-telugu`, which runs only the tests tagged `@telugu`;
 ADR-0036). It checks the redirect to sign-in, English only with Telugu off
-(`e2e/english-only.spec.ts`: `/te` redirects, a Telugu browser, no Telugu font), the
+(`e2e/english-only.spec.ts`: old `/te` and `/en` URLs answer 308 to the prefix-less page, a
+Telugu browser or a `NEXT_LOCALE=te` cookie still gets English, no Telugu font), the
 signed-out page (CSP, and Telugu with it on), the health check, axe-core (WCAG 2.2 AA) on
 the signed-out page, the public home page (`e2e/welcome.spec.ts`: home redirect, CSP, axe at
 1366×768 and 375 px in both languages, keyboard tab-through) and every public marketing page
@@ -239,7 +257,7 @@ claims win over anything typed in its claims box, a non-MFA staff session cannot
 locally; the MFA-denial paths are covered by the API and BFF test suites.
 
 **Dev sign-in page:** under `next dev` (`make dev-host`) with a local issuer, open
-<http://localhost:3000/en/dev/sign-in> (the signed-out page links to it). It lists the
+<http://localhost:3000/dev/sign-in> (the signed-out page links to it). It lists the
 synthetic subjects per school (`synth-a`, `synth-b`) and role, with "Copy" and "Sign in"
 (the normal `/bff/auth/login` flow). It is a 404 unless `NODE_ENV=development` **and**
 `OIDC_ISSUER` is on a loopback or `*.localhost` host, so `next start`/production builds
@@ -268,13 +286,13 @@ development issuer (allowed in `local`, refused in staging/prod).
    `synthetic|synth-a|principal|1`) and
    `uv run python -m app.platform.bootstrap_owner --subject <sub> --email … --display-name …`
    for the first operator.
-3. Open <http://localhost:3000/en/settings/structure> and sign in at the stub by typing a
+3. Open <http://localhost:3000/settings/structure> and sign in at the stub by typing a
    synthetic subject (for example `synthetic|synth-a|owner|1`; leave the claims box empty).
    One school → the page; several → the picker.
 4. Check in the browser dev tools: cookie `sos_session` is HttpOnly; no `Authorization`
    header or token appears in any `/bff/*` response, `localStorage` or `sessionStorage`;
    POSTs carry `X-CSRF-Token` (creating POSTs also `Idempotency-Key`).
-5. Operators: <http://localhost:3000/en/platform> signs in with the `platform` issuer.
+5. Operators: <http://localhost:3000/platform> signs in with the `platform` issuer.
 
 Running the web app (or API) on the host instead of in compose: set all four issuer
 variables to `http://localhost:8080/…` (host processes may not resolve `*.localhost`), and

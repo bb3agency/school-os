@@ -10,9 +10,8 @@ import en from "../../messages/en.json" with { type: "json" };
 export const MK = en.marketing;
 
 /**
- * The public pages by their locale-free paths (src/features/marketing/links.ts). Tests open
- * these paths and never write a locale prefix: today the proxy redirects `/features` to
- * `/en/features`; once locale prefixes are removed the same path is served directly.
+ * The public pages by their paths (src/features/marketing/links.ts). No URL carries a locale
+ * (ADR-0036 note, 2026-09-30): each path is served directly, in every language.
  */
 export const PUBLIC_PAGES = [
   { name: "home", path: "/welcome", h1: MK.home.headlineLead },
@@ -31,12 +30,12 @@ function escape(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** A pathname for `path`, with or without the English locale prefix (never `/te`). */
+/** Exactly the pathname `path`: no locale prefix (`/en`, `/te`) is ever accepted. */
 export function publicPathPattern(path: string): RegExp {
-  return new RegExp(`^(?:/en)?${escape(path)}$`);
+  return new RegExp(`^${escape(path)}$`);
 }
 
-/** The current URL is the public page `path` (optionally with `hash`), whatever the prefix. */
+/** The current URL is the public page `path` (optionally with `hash`), with no locale prefix. */
 export async function expectPublicUrl(page: Page, path: string, hash = ""): Promise<void> {
   await expect(page).toHaveURL(
     (url) => publicPathPattern(path).test(url.pathname) && url.hash === hash,
@@ -52,8 +51,7 @@ export async function openPublicPage(page: Page, target: PublicPage): Promise<vo
 
 /**
  * Follows the redirects of `path` without a browser, up to the BFF (whose login route would go
- * on to the IdP), and returns the path and query of every Location seen (at most 5 hops). A test
- * can then accept today's extra `/x` → `/en/x` hop as well as a direct answer.
+ * on to the IdP), and returns the path and query of every Location seen (at most 5 hops).
  */
 export async function redirectChain(request: APIRequestContext, path: string): Promise<string[]> {
   const seen: string[] = [];
