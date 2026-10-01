@@ -3,6 +3,7 @@
 import {
   INVOICE_STATUSES,
   SUBSCRIPTION_STATUSES,
+  type AiBundle,
   type Plan,
   type PlanInput,
   type Subscription,
@@ -13,7 +14,7 @@ import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/ui/Input";
+import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
@@ -22,9 +23,16 @@ import { planTone, subscriptionTone } from "@/features/status";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { FieldErrors } from "@/lib/forms";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
-import { PLAN_CODE_PATTERN, money, optionalInt, optionalMoney, text } from "@/lib/validation";
+import {
+  PLAN_CODE_PATTERN,
+  money,
+  optionalInt,
+  optionalMoney,
+  optionalText,
+  text,
+} from "@/lib/validation";
 import { Link } from "@/i18n/navigation";
-import { PK, useCan, usePlanDirectory, useSchoolDirectory } from "./data";
+import { PK, readyOr, useAiBundles, useCan, usePlanDirectory, useSchoolDirectory } from "./data";
 import { InvoiceTable } from "./InvoiceTable";
 import { FilterCard } from "./FilterCard";
 import { Mono, TierTag } from "./pills";
@@ -49,6 +57,8 @@ const planSchema = z
       .refine((value) => value === "" || /^[0-9]{6}$/.test(value), { error: "invalidSac" })
       .transform((value) => (value === "" ? null : value)),
     trial_days: optionalInt(365),
+    one_time_fee_inr: optionalMoney,
+    description: optionalText(300),
     "limits.students": optionalInt(10_000_000),
     "limits.staff_users": optionalInt(1_000_000),
     "limits.storage_gb": optionalInt(1_000_000),
@@ -73,6 +83,8 @@ const planSchema = z
     gst_rate: value.gst_rate,
     sac_code: value.sac_code,
     trial_days: value.trial_days ?? 30,
+    one_time_fee_inr: value.one_time_fee_inr ?? "0",
+    description: value.description,
     limits: {
       students: value["limits.students"],
       staff_users: value["limits.staff_users"],
@@ -195,7 +207,24 @@ function PlanFields({ errors, base }: { errors: FieldErrors; base?: Plan | undef
           error={errors.trial_days}
           defaultValue={base?.trial_days?.toString() ?? "30"}
         />
+        <TextField
+          name="one_time_fee_inr"
+          label={t("oneTimeFee")}
+          hint={t("oneTimeFeeHint")}
+          inputMode="decimal"
+          error={errors.one_time_fee_inr}
+          defaultValue={base ? base.one_time_fee_inr : ""}
+        />
       </div>
+      <TextAreaField
+        name="description"
+        label={t("planDescription")}
+        hint={t("planDescriptionHint")}
+        error={errors.description}
+        maxLength={300}
+        rows={2}
+        defaultValue={base?.description ?? ""}
+      />
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold">{t("limitsTitle")}</legend>
         <p className="text-sm text-ink-muted">{t("limitsHint")}</p>
@@ -259,7 +288,18 @@ export function PlansScreen({ status = "" }: { status?: string }) {
   );
 
   const columns: Column<Plan>[] = [
-    { key: "name", header: t("colName"), cell: (row) => row.name },
+    {
+      key: "name",
+      header: t("colName"),
+      cell: (row) => (
+        <span className="flex flex-col">
+          <span>{row.name}</span>
+          {row.description ? (
+            <span className="max-w-xs text-xs text-ink-muted">{row.description}</span>
+          ) : null}
+        </span>
+      ),
+    },
     {
       key: "code",
       header: t("code"),
@@ -284,6 +324,18 @@ export function PlansScreen({ status = "" }: { status?: string }) {
             / {row.billing_period === "annual" ? t("perYear") : t("perMonth")}
           </span>
         </span>
+      ),
+    },
+    {
+      key: "fee",
+      header: t("colOneTimeFee"),
+      className: "text-right tabular-nums",
+      cell: (row) => (
+        <Mono>
+          <Value>
+            {Number(row.one_time_fee_inr) > 0 ? formatInr(row.one_time_fee_inr, locale) : null}
+          </Value>
+        </Mono>
       ),
     },
     {
@@ -404,7 +456,59 @@ export function PlansScreen({ status = "" }: { status?: string }) {
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
       />
+      <AiBundlesTable />
     </div>
+  );
+}
+
+/** ADR-0038 (docs/16 §5.6): AI answer bundles, a monthly add-on with an answer quota. */
+function AiBundlesTable() {
+  const t = useTranslations("platform.plans");
+  const tstatus = useTranslations("status.plan");
+  const locale = useLocale();
+  const bundles = useAiBundles();
+  const columns: Column<AiBundle>[] = [
+    { key: "name", header: t("colBundle"), cell: (row) => row.name },
+    {
+      key: "answers",
+      header: t("colIncluded"),
+      className: "text-right tabular-nums",
+      cell: (row) => <Mono>{formatCount(row.included_answers, locale)}</Mono>,
+    },
+    {
+      key: "price",
+      header: t("colBundlePrice"),
+      className: "text-right tabular-nums",
+      cell: (row) => <Mono>{formatInr(row.price_inr, locale)}</Mono>,
+    },
+    {
+      key: "extra",
+      header: t("colExtra"),
+      className: "text-right tabular-nums",
+      cell: (row) => <Mono>{formatInr(row.overage_rate_inr, locale)}</Mono>,
+    },
+    {
+      key: "status",
+      header: t("colStatus"),
+      cell: (row) => <Badge tone={planTone[row.status]}>{tstatus(row.status)}</Badge>,
+    },
+  ];
+  return (
+    <section className="space-y-2" aria-labelledby="ai-bundles-title">
+      <h2 id="ai-bundles-title" className="text-lg font-semibold">
+        {t("bundlesTitle")}
+      </h2>
+      <p className="max-w-3xl text-sm text-ink-muted">{t("bundlesBody")}</p>
+      <DataTable
+        caption={t("bundlesTitle")}
+        captionHidden
+        columns={columns}
+        state={bundles}
+        rowKey={(row) => row.id}
+        emptyTitle={t("bundlesEmptyTitle")}
+        emptyBody={t("bundlesEmptyBody")}
+      />
+    </section>
   );
 }
 
@@ -418,7 +522,15 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
   const tstatus = useTranslations("status.subscription");
   const api = useBffClient("operator");
   const { nameOf: schoolName } = useSchoolDirectory();
-  const { nameOf: planName } = usePlanDirectory();
+  const { nameOf: planName, plans } = usePlanDirectory();
+  const bundles = readyOr(useAiBundles(), []);
+  const locale = useLocale();
+  const feeOf = (planId: string): string | null => {
+    const plan = plans.find((row) => row.id === planId);
+    return plan && Number(plan.one_time_fee_inr) > 0
+      ? formatInr(plan.one_time_fee_inr, locale)
+      : null;
+  };
   const query = { limit: 200, ...(status ? { status } : {}) };
   const subscriptions = useApiQuery(
     [...PK.subscriptions, "list", query],
@@ -449,8 +561,36 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
               {t("pendingPlanValue", { plan: planName(row.pending_plan_id) })}
             </span>
           ) : null}
+          {feeOf(row.plan_id) ? (
+            <span className="block text-xs text-ink-muted">
+              {t("oneTimeFeeValue", { amount: feeOf(row.plan_id) ?? "" })}
+            </span>
+          ) : null}
         </span>
       ),
+    },
+    {
+      key: "ai",
+      header: t("colAiBundle"),
+      cell: (row) => {
+        if (!row.ai_bundle_id) return <span className="text-ink-muted">{t("noAiBundle")}</span>;
+        const bundle = bundles.find((item) => item.id === row.ai_bundle_id);
+        return (
+          <span className="flex flex-col">
+            <span>
+              {bundle
+                ? t("aiBundleValue", {
+                    name: bundle.name,
+                    answers: formatCount(bundle.included_answers, locale) ?? "",
+                  })
+                : row.ai_bundle_id.slice(0, 8)}
+            </span>
+            <span className="text-xs text-ink-muted">
+              {t("aiBundleFrom", { date: formatDate(row.ai_bundle_from) ?? "" })}
+            </span>
+          </span>
+        );
+      },
     },
     {
       key: "status",

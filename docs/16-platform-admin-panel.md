@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.7 · 2026-09-29 |
-| Changes | 0.7: offboarding deletion (M1, ADR-0029): export gate, deletion job as `sos_purger` in the school's own session, crypto-shredding, dedicated teardown confirmation, 30-day deadline alerts, bilingual certificate of deletion, retained audit chain deleted after its retention, `platform.offboarding_runs` and `platform.deletion_certificates` (migration `0032_offboarding`), routes, audit events, Q14 (§5.3, §5.5, §7, §8.1, §16–§19; FR-PLT-005). 0.6: invoice PDFs (M1): template v0 **pending CA review**, render on the `pdf` queue, control-plane storage, download route, `platform.invoice_pdfs` (migration `0029_invoice_pdfs`), audit events, open questions Q11-Q13 (§1, §5.8, §5.8.1, §7, §8.1, §16, §18, §19; FR-PLT-016, FR-PLT-017). 0.5: provisioning is a persisted, resumable state machine (`platform.provisioning_runs`, migration `0020_provisioning_runs`): request fingerprint, lease, failed state, `provisioning:resume`, go-live refused until provisioning completed (§5.3, §5.4, §7, §8.1, §16, §18; FR-PLT-002). 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
+| Version | 0.8 · 2026-10-01 |
+| Changes | 0.8: commercial catalogue (ADR-0038, migration `0041_billing_catalogue`): published Shared and Dedicated plans with a one-time implementation fee, AI answer bundles with an included monthly quota and overage per extra answer, `ai_answers` metering in the school's own session and in the heartbeat, invoice lines `one_time_fee`, `addon` and `usage_overage`, routes, audit events, `usd_inr_rate` review, Q15-Q17 (§5.6, §5.7, §7, §8.1, §10.2, §11, §12.3, §16, §18, §19; FR-PLT-010, FR-PLT-013, FR-PLT-015..017, FR-PLT-020). 0.7: offboarding deletion (M1, ADR-0029): export gate, deletion job as `sos_purger` in the school's own session, crypto-shredding, dedicated teardown confirmation, 30-day deadline alerts, bilingual certificate of deletion, retained audit chain deleted after its retention, `platform.offboarding_runs` and `platform.deletion_certificates` (migration `0032_offboarding`), routes, audit events, Q14 (§5.3, §5.5, §7, §8.1, §16–§19; FR-PLT-005). 0.6: invoice PDFs (M1): template v0 **pending CA review**, render on the `pdf` queue, control-plane storage, download route, `platform.invoice_pdfs` (migration `0029_invoice_pdfs`), audit events, open questions Q11-Q13 (§1, §5.8, §5.8.1, §7, §8.1, §16, §18, §19; FR-PLT-016, FR-PLT-017). 0.5: provisioning is a persisted, resumable state machine (`platform.provisioning_runs`, migration `0020_provisioning_runs`): request fingerprint, lease, failed state, `provisioning:resume`, go-live refused until provisioning completed (§5.3, §5.4, §7, §8.1, §16, §18; FR-PLT-002). 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
 | Capability | C14 · Milestone M0 (roadmap Task 11) |
 | Requirements | FR-PLT-001..030 (03-TRD §3.12) · stories US-1301..US-1310, US-1204 (02-PRD §4) |
-| Decisions | ADR-0013 (privilege separation), ADR-0029 (tenant data deletion at offboarding), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies), ADR-0023 (operator sign-in for break-glass, Proposed), ADR-0024 (resumable provisioning, Proposed) |
+| Decisions | ADR-0013 (privilege separation), ADR-0038 (commercial catalogue: one-time fee, AI answer bundles, overage), ADR-0029 (tenant data deletion at offboarding), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies), ADR-0023 (operator sign-in for break-glass, Proposed), ADR-0024 (resumable provisioning, Proposed) |
 | Related | 04 §16, 05 §3, 07 §6.5–6.6, 08 §14, 09 §4, 10 §15, 11 §11–12, 12 §4.8–4.13 |
 
 ---
@@ -184,11 +184,27 @@ keys_destroyed --(certificate, pdf queue)--> completed   (school status deleted)
 
 ### 5.6 Plans and pricing
 *Permission:* read with `platform.subscriptions.read`; change with `platform.plans.manage` (ᴿ).
-Fields: code, version, name, tier, billing period (monthly/annual), pricing model (flat or per student), base price (INR), per-student price, included students, GST rate (default 18%), SAC code, limits (students, staff users, storage GB, documents, AI tokens per month), included features (flag defaults). Plans are **versioned**: a published plan's prices and limits never change; editing creates a new draft version. Retiring a plan stops new subscriptions; existing ones continue.
+Fields: code, version, name, description (plain wording, up to 300 characters), tier, billing period (monthly/annual), pricing model (flat or per student), base price (INR), per-student price, included students, **one-time fee** (INR, default 0), GST rate (default 18%), SAC code, limits (students, staff users, storage GB, documents, AI tokens per month), included features (flag defaults). Plans are **versioned**: a published plan's prices and limits never change; editing creates a new draft version. Retiring a plan stops new subscriptions; existing ones continue.
+
+**Catalogue (owner, 2026-10-01; ADR-0038).** Prices are ex-GST starting prices; GST is added on the invoice (§10.2). Seeded as published data by migration `0041_billing_catalogue` (`created_by` NULL) and pinned by `tests/platform/test_catalogue.py`:
+
+| Plan (code) | Monthly | One-time "Implementation and data verification" | Wording |
+|---|---|---|---|
+| Shared (`shared`) | ₹4,999 | ₹15,000 | Your school runs as a separate, isolated school on the managed SchoolOS platform in AWS Mumbai. |
+| Dedicated (`dedicated`) | ₹9,900 | ₹49,000 | A managed, isolated SchoolOS environment with your own domain, a dedicated database and a documented data export. (Never "your own server".) |
+
+| AI answer bundle (code) | Answers included a month | Monthly | Each extra answer |
+|---|---|---|---|
+| Lite (`ai-lite`) | 300 | ₹699 | ₹1.50 |
+| Standard (`ai-standard`) | 1,000 | ₹1,499 | ₹1.50 |
+| High (`ai-high`) | 3,000 | ₹3,499 | ₹1.50 |
+
+- **One-time fee:** charged once, on the subscription's first invoice (the draft made at activation, §10.1). A new draft gets the line when no live (non-void) invoice of the subscription carries one, so a voided first invoice moves it to the next new invoice and nothing charges it twice. To waive it, keep the line and add an equal discount line.
+- **AI answer bundles** (`GET /platform/ai-bundles`, read with the plans permission): a monthly add-on with an included number of AI answers a calendar month and a price per extra answer. Never "unlimited"; schools never see tokens. Rows are versioned and frozen like plans (a trigger allows only published → retired and refuses deletes); a new price is a new version from a catalogue migration. The plans screen lists them under the plans.
 
 ### 5.7 Subscriptions
 *Permission:* read `platform.subscriptions.read`; actions `platform.subscriptions.manage` (ᴿ).
-List with filters by status. Actions: activate (trial → active), extend trial, change plan (takes effect at the next period; no proration in M0), set or clear a negotiated price (reason required), **suspend** (only from `past_due` after the grace period, §9), reactivate, cancel. The screen shows whether today falls inside a protected board-exam window (§9.3).
+List with filters by status; each row shows the plan (and its one-time fee, "on the first invoice") and the AI answer bundle with the month it counts from. Actions: activate (trial → active), extend trial, change plan (takes effect at the next period; no proration in M0), **choose, change or remove the AI answer bundle** (monthly plans only, `409 ai_bundle_needs_monthly_plan`; a new bundle counts from the first full calendar month after today, a trial's from the month after activation, so trial answers are free; a change applies to the next invoice and to any month not yet billed, nothing is prorated), set or clear a negotiated price (reason required), **suspend** (only from `past_due` after the grace period, §9), reactivate, cancel. The screen shows whether today falls inside a protected board-exam window (§9.3).
 
 ### 5.8 Invoices and billing accounts
 *Permission:* read `platform.invoices.read`; actions `platform.invoices.manage`.
@@ -770,6 +786,7 @@ Platform chain write (inside the action's transaction, `audit.service.record_pla
 
 Notes on columns that are easy to miss:
 - `plans.trial_days` (default 30, 0–365): trial length for subscriptions started as `trial` on that plan (not a global config value).
+- Migration `0041_billing_catalogue` (ADR-0038): `plans.one_time_fee_inr` (`numeric(14,2) NOT NULL DEFAULT 0`, CHECK ≥ 0), `plans.description` (1–300 characters), `plans.created_by` nullable (NULL = seeded by a catalogue migration); `platform.ai_bundles` (`id`, `code` + `version` unique, `name`, `included_answers` > 0, `price_inr` ≥ 0, `overage_rate_inr` > 0, `status` `published`/`retired`, `published_at`, `created_at`, `updated_at`; trigger `ai_bundles_freeze`: only published → retired, no delete); `subscriptions.ai_bundle_id` (FK) and `ai_bundle_from` (first day of a month; both set or both NULL); `invoice_lines.kind` adds `one_time_fee`, `invoice_lines.usage_month` (first day of the month an `usage_overage` line bills; NULL on every other kind); `usage_daily.ai_answers` (int ≥ 0, default 0). Default privileges give `sos_platform` DML on `ai_bundles`; nothing new for `sos_app`, `sos_definer` or `sos_readonly`. The downgrade refuses while a subscription uses a seeded plan or any bundle, or an overage line records its month.
 - `deployments.boards` (copied from provisioning), `deployments.heartbeat_rotation_started_at` (set iff a next key exists; the old key stops working 7 days after it, `fleet.key_rotation_overlap_days`), `heartbeat_key_ciphertext`/`heartbeat_next_key_ciphertext`: the 32-byte keys **wrapped** with the KMS data key (local-dev wrapper outside AWS), not hashed, because the control plane must recompute each HMAC.
 - `subscriptions.cancel_at_period_end` (+ `cancel_reason`): `cancel` on a paid subscription ends it at period end; a trial is cancelled at once.
 - `usage_threshold_events`: one row per (school, metric, 80/100, billing period) records the first crossing (FR-PLT-021).
@@ -814,9 +831,11 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/plans` | `platform.plans.manage` ᴿ | 201 | Creates a draft (new code or new version) |
 | PATCH | `/platform/plans/{plan_id}` | `platform.plans.manage` ᴿ | 200 | Drafts only |
 | POST | `/platform/plans/{plan_id}/publish` · `/retire` | `platform.plans.manage` ᴿ | 200 | |
+| GET | `/platform/ai-bundles` | `platform.subscriptions.read` or `platform.plans.manage` | 200 | AI answer bundles (§5.6); filter `status` (`published`, `retired`) |
 | GET | `/platform/subscriptions` · `/platform/subscriptions/{sub_id}` | `platform.subscriptions.read` | 200 | Filter by `status` |
 | POST | `/platform/subscriptions/{sub_id}/activate` · `/extend-trial` · `/change-plan` · `/cancel` | `platform.subscriptions.manage` ᴿ | 200 | Plan change at the next period (immediately for a trial); cancel at period end (a trial at once) |
 | PUT · DELETE | `/platform/subscriptions/{sub_id}/price-override` | `platform.subscriptions.manage` ᴿ | 200 | Amount + reason; DELETE clears |
+| PUT · DELETE | `/platform/subscriptions/{sub_id}/ai-bundle` | `platform.subscriptions.manage` ᴿ | 200 | Body `ai_bundle_id`; `422 ai_bundle_not_available` for an unknown or retired bundle, `409 ai_bundle_needs_monthly_plan`, `409 invalid_state` when cancelled; DELETE removes it (§5.7) |
 | POST | `/platform/subscriptions/{sub_id}/suspend` | `platform.subscriptions.manage` ᴿ | 200 | Only `past_due` after grace; exam-window rule (§9.3) |
 | POST | `/platform/subscriptions/{sub_id}/reactivate` | `platform.subscriptions.manage` ᴿ | 200 | |
 | GET | `/platform/invoices` · `/platform/invoices/{invoice_id}` | `platform.invoices.read` | 200 | Filters: `status`, `financial_year`, `tenant_id` |
@@ -921,7 +940,12 @@ Suspension must not cut off a school during board exams or registration deadline
 
 ### 10.2 What it creates
 - For each subscription in `active` or `past_due` whose next period starts in the run month (monthly: every month; annual: on the anniversary month): one **draft** invoice for the coming period (billing in advance). Trials and cancelled or suspended subscriptions are skipped.
-- Lines: plan base price (or the negotiated price override) with the plan's SAC code; for per-student plans, `max(students_active, included_students) − included_students` extra students at the per-student price, where `students_active` is taken from `usage_daily` on the last day of the previous month.
+- Lines, in this order (ADR-0038), all with the plan's SAC code and GST rate:
+  1. `subscription`: plan base price (or the negotiated price override) for the period;
+  2. `one_time_fee`: "Implementation and data verification (one-time)" at the plan's one-time fee, when it is above 0 and no live invoice of the subscription carries one (§5.6);
+  3. `per_student`: for per-student plans, `max(students_active, included_students) − included_students` extra students at the per-student price, where `students_active` is taken from `usage_daily` on the last day of the previous month;
+  4. `addon`: the AI answer bundle for the period, billed in advance ("AI answers: Standard bundle, 1,000 answers a month (start to end)");
+  5. `usage_overage`: the AI answers above the bundle's quota in the calendar month **before** the month the period starts in (M), billed in arrears: "AI answers above the Standard bundle, March 2027: 250 extra answers × ₹1.50" (quantity 250 at ₹1.50 = ₹375.00; `usage_month` = M). Only when M is on or after the bundle's `ai_bundle_from` and no live invoice of the subscription already bills M. Answers = the sum of `usage_daily.ai_answers` over M's IST days (§11); the draft run on the 1st at 02:00 IST follows the collector's 01:30 IST run for the month's last day.
 - Tax: place of supply = billing account state code. If it equals the supplier's state code (supplier legal name, GSTIN and state code from `SOS_BILLING_SUPPLIER_LEGAL_NAME`, `SOS_BILLING_SUPPLIER_GSTIN`, `SOS_BILLING_SUPPLIER_STATE_CODE`; AP = 37; the API refuses to start in staging/prod with the dev placeholders), CGST 9% + SGST 9%; otherwise IGST 18%. Line amounts are rounded half-up to paise; each tax is computed on the taxable value and rounded half-up to paise.
 - Drafts appear in the invoice list for review; a billing admin issues them (usually the same day).
 
@@ -940,11 +964,14 @@ Suspension must not cut off a school during board exams or registration deadline
 | `students_active` | Students with status `active` at end of day |
 | `storage_bytes` | Sum of stored document versions and retained import files |
 | `documents` | Active documents |
-| `ai_queries`, `ai_input_tokens`, `ai_output_tokens`, `ai_cost_usd` | From the LLM gateway's per-tenant meters (`kb.queries`) |
-| `ai_cost_inr` | `ai_cost_usd` × FX rate from config (`billing.usd_inr_rate`, reviewed monthly) |
+| `ai_queries` | Questions asked in Ask (`kb.queries` rows created that IST day) |
+| `ai_answers` | **Billable AI answers**: those rows with a status in `billing.yaml` → `ai_answers.billable_statuses` (`answered`; `not_found`, `refused`, `search_only` and `error` are free). Billed against the AI answer bundle (§10.2) |
+| `ai_input_tokens`, `ai_output_tokens`, `ai_cost_usd` | From the LLM gateway's per-tenant meters (operators only; never shown to schools) |
+| `ai_cost_inr` | `ai_cost_usd` × FX rate from config (`billing.usd_inr_rate`): an **estimate** of our AI spend, never a price a school pays |
 
 - **Shared tier:** beat task `usage.collect_daily` (01:30 IST) calls `core.list_tenant_ids(ARRAY['active','suspended'])` and, for each school, `core.tenant_usage_summary(tenant_id)`, which returns **counts only**, plus one aggregate count in the school's own `tenant_session` (distinct users with audited actions that IST day); results are upserted into `platform.usage_daily` with `source = 'shared_collector'`.
-- **M0 coverage:** `active_users` and `staff_users` (active memberships) are real; `students_active`, `storage_bytes`, `documents` and the AI meters are recorded as 0 until the `sis`/`kb` modules extend `core.tenant_usage_summary` (M1/M2).
+- **Coverage:** `active_users`, `staff_users` (active memberships), `ai_queries` and `ai_answers` are real. The two AI counts are taken in the school's own `tenant_session` like the active-user count (RLS applies; only `status`, `tenant_id` and `created_at` are read and only the numbers leave; ADR-0020 amendment B2, ADR-0038). `students_active`, `storage_bytes`, `documents` and the AI tokens and cost are recorded as 0 until the `sis`/`kb` modules extend `core.tenant_usage_summary`.
+- **`usd_inr_rate`** (`billing.yaml`, with `usd_inr_rate_reviewed_on`; equal to `knowledge/config/models.yaml` `budget.usd_inr_rate`, pinned by a test): reviewed on the first working day of each month against the RBI reference rate and changed by a normal PR when it differs by more than 2%. It only converts cost estimates (AI spend on the dashboard, the school AI budget); plans, bundles and overage are fixed INR prices. The 84.00 set in September 2026 is stale (§19 Q17).
 - **Dedicated tier:** the host computes the same function locally and sends the numbers in its heartbeat `usage` block; the control plane upserts them with `source = 'heartbeat'`.
 - **Thresholds:** after each upsert, compare with plan limits; on first crossing of 80% and 100% per metric per billing period, record a row in `platform.usage_threshold_events` and `usage.limit_threshold_crossed` in the platform audit log. Operator notifications and the email to the school's billing contact (§5.10) are not built yet (no email delivery in M0).
 
@@ -1002,11 +1029,12 @@ No personal data: no names, emails, phone numbers, free text from users, file na
   "audit": { "last_verified_at": "2026-09-26T00:10:00Z", "result": "ok" },
   "usage": { "date": "2026-09-25", "active_users": 23, "staff_users": 41, "students_active": 1984,
              "storage_bytes": 21474836480, "documents": 812, "ai_queries": 57,
+             "ai_answers": 49,
              "ai_input_tokens": 410000, "ai_output_tokens": 52000, "ai_cost_usd": 3.1200 }
 }
 ```
 
-`usage` is the latest complete IST day; the control plane upserts it once per day.
+`usage` is the latest complete IST day; the control plane upserts it once per day. `ai_answers` (billable AI answers, §11) is optional: hosts older than `0041_billing_catalogue` omit it and it is stored as 0. The control plane is upgraded before the hosts (the schema refuses unknown fields).
 
 ### 12.4 Response
 
@@ -1097,7 +1125,7 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Operators | `operator.invited`, `operator.activated` (first MFA sign-in), `operator.bootstrapped` (system, bootstrap CLI), `operator.roles_changed`, `operator.deactivated` (`operator.login` and `operator.step_up` are not recorded yet) |
 | Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.export_confirmed` (+ T), `tenant.deletion_started` (system), `tenant.data_deleted` (system), `tenant.keys_destroyed` (system), `tenant.teardown_confirmed`, `tenant.deletion_failed` (system; step, error code, attempt), `tenant.deletion_certified` (system), `tenant.deleted` (+ T, system), `tenant.deletion_overdue` (system), `tenant.deletion_certificate_downloaded`, `tenant.audit_chain_deleted` (system). The school chain also gets `tenant.data_purged` and `tenant.keys_destroyed` from the purge itself |
 | Plans | `plan.created`, `plan.updated`, `plan.published`, `plan.retired` |
-| Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
+| Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.ai_bundle_set` (bundle code and version), `subscription.ai_bundle_removed`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
 | Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system), `invoice.pdf_rendered` (system; number, template version, size), `invoice.pdf_downloaded` |
 | Usage | `usage.limit_threshold_crossed` (system) |
 | Flags | `flag.updated`, `flag.override_set`, `flag.override_removed` |
@@ -1163,6 +1191,7 @@ In addition to the general suites (12 §4):
 | Platform audit chain | Every mutating platform route writes exactly one event in the same transaction; tamper and gap detection | FR-PLT-029 |
 | Support redaction | Aadhaar-like and phone numbers in ticket messages are masked before storage | FR-PLT-027 |
 | School billing page | `core.current_subscription()` returns only the caller's tenant; other roles get 403 | FR-PLT-030 |
+| Commercial catalogue | Seeded plans and bundles match the owner's prices, Dedicated wording never says "server", bundles frozen; one-time fee on the first invoice only (a rerun or a later draft never repeats it; a voided first invoice moves it to the next new one); bundle line and overage maths (1,250 answers on Standard = 250 × ₹1.50 = ₹375.00), a month billed once, months before `ai_bundle_from` free; CGST + SGST and IGST totals; bundle routes 403 for other roles and 428 without step-up, 404 unknown subscription, 422 unknown bundle, 409 annual plan; AI answers counted per school and IST day in the school's own session, other statuses and schools excluded; heartbeat `ai_answers` optional (`tests/platform/test_catalogue.py`); boundary pin (`test_boundaries.py`) | ADR-0038, FR-PLT-010, FR-PLT-015..017, FR-PLT-020 |
 
 ## 19. Open questions
 
@@ -1182,6 +1211,9 @@ In addition to the general suites (12 §4):
 | Q12 | Language of invoice PDFs. | English only in v0; add Telugu labels only if schools ask (needs reviewed tax terms) | Product owner |
 | Q13 | Sending invoice PDFs to schools (email at issue, FR-PLT-019) and a download on the school-side billing page (§5.18). | Not built (no email delivery in M0/M1); operators download and send manually | Product owner |
 | Q14 | Telugu wording of the certificate of deletion (§5.5.1) | **Implemented** with English and Telugu labels; Telugu marked for review (`billing.yaml` → `offboarding.certificate.telugu_review: pending`) | Product owner + reviewer |
+| Q15 | Which answers count against an AI bundle? A reused cached answer costs no model call; "not found in school records" does call the model. | **Implemented:** `answered` only, cached reuses included (the school got an answer); `not_found`, `refused`, `search_only`, `error` free. Change `ai_answers.billable_statuses` if the owner decides otherwise | Product owner |
+| Q16 | AI bundles on annual plans, and alerts before a school runs past its quota. | Refused on annual plans (`409 ai_bundle_needs_monthly_plan`) until a rule is set (12 × the monthly price in advance, overage monthly or yearly?); an 80%/100% quota alert like the plan limits (§5.10) is not built | Product owner |
+| Q17 | `usd_inr_rate` is 84.00 (September 2026) and stale; it only converts AI cost estimates. | Set it from the RBI USD/INR reference rate on the day of the review (§11) and keep `knowledge/config/models.yaml` equal; the billing admin reviews it monthly | Founder |
 
 ## 20. Requirement map
 

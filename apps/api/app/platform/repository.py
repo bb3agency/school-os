@@ -402,6 +402,43 @@ def usage_on_or_before(session: Session, tenant_id: uuid.UUID, day: dt.date) -> 
     )
 
 
+def ai_answers_between(session: Session, tenant_id: uuid.UUID, start: dt.date, end: dt.date) -> int:
+    """Sum of the daily billable AI answer counts in [start, end) (counts only)."""
+    total: Any = session.execute(
+        select(func.coalesce(func.sum(m.usage_daily.c.ai_answers), 0)).where(
+            m.usage_daily.c.tenant_id == tenant_id,
+            m.usage_daily.c.usage_date >= start,
+            m.usage_daily.c.usage_date < end,
+        )
+    ).scalar_one()
+    return int(total)
+
+
+def subscription_has_line(
+    session: Session,
+    subscription_id: uuid.UUID,
+    *,
+    kind: str,
+    usage_month: dt.date | None = None,
+) -> bool:
+    """Does a live (not void) invoice of the subscription carry a line of ``kind`` (for that
+    ``usage_month`` when given)? Callers hold the subscription row lock."""
+    conds: list[ColumnElement[bool]] = [
+        m.invoices.c.subscription_id == subscription_id,
+        m.invoices.c.status != "void",
+        m.invoice_lines.c.kind == kind,
+    ]
+    if usage_month is not None:
+        conds.append(m.invoice_lines.c.usage_month == usage_month)
+    stmt = select(
+        select(m.invoice_lines.c.id)
+        .join(m.invoices, m.invoices.c.id == m.invoice_lines.c.invoice_id)
+        .where(and_(*conds))
+        .exists()
+    )
+    return bool(session.execute(stmt).scalar_one())
+
+
 def upsert_usage(session: Session, values: Mapping[str, Any]) -> None:
     stmt = pg_insert(m.usage_daily).values(**values)
     cols: dict[str, Any] = {

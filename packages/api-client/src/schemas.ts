@@ -81,6 +81,7 @@ export type PlanInput = Schemas["PlanIn"];
 export type PlanPatch = Schemas["PlanPatch"];
 export type PlanLimits = Schemas["PlanLimits"];
 export type PlanStatus = Plan["status"];
+export type AiBundle = Schemas["AiBundleOut"];
 export type Subscription = Schemas["SubscriptionOut"];
 export type SubscriptionStatus = Subscription["status"];
 export type Invoice = Schemas["InvoiceOut"];

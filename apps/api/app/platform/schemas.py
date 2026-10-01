@@ -72,6 +72,11 @@ EmailStr = Annotated[
     StringConstraints(max_length=254, pattern=r"^[^@\s]{1,64}@[a-z0-9.-]+\.[a-z]{2,63}$"),
 ]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
+PlanDescription = Annotated[
+    str,
+    BeforeValidator(_nfc),
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=300, pattern=_NO_CONTROL),
+]
 Version = Annotated[str, StringConstraints(pattern=r"^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$")]
 Domain = Annotated[
     str,
@@ -167,6 +172,9 @@ class PlanIn(In):
     trial_days: int = Field(default=30, ge=0, le=365)
     limits: PlanLimits = Field(default_factory=PlanLimits)
     features: dict[FlagKey, bool] = Field(default_factory=dict, max_length=50)
+    # "Implementation and data verification", ex-GST, on the subscription's first invoice.
+    one_time_fee_inr: Money | None = None  # None = 0 (no fee)
+    description: PlanDescription | None = None
 
     @model_validator(mode="after")
     def _pricing(self) -> Self:
@@ -183,6 +191,8 @@ class PlanPatch(In):
     trial_days: int | None = Field(default=None, ge=0, le=365)
     limits: PlanLimits | None = None
     features: dict[FlagKey, bool] | None = None
+    one_time_fee_inr: Money | None = None
+    description: PlanDescription | None = None
 
 
 class PlanOut(Out):
@@ -204,6 +214,22 @@ class PlanOut(Out):
     status: Literal["draft", "published", "retired"]
     published_at: dt.datetime | None
     created_at: dt.datetime | None
+    one_time_fee_inr: Decimal
+    description: str | None
+
+
+class AiBundleOut(Out):
+    """An AI answer bundle: a monthly add-on with an included answer quota (never unlimited)."""
+
+    id: uuid.UUID
+    code: str
+    version: int
+    name: str
+    included_answers: int
+    price_inr: Decimal
+    overage_rate_inr: Decimal
+    status: Literal["published", "retired"]
+    published_at: dt.datetime | None
 
 
 # --- billing accounts -------------------------------------------------------------------------
@@ -272,7 +298,14 @@ class SubscriptionOut(Out):
     grace_ends_on: dt.date | None
     cancel_at_period_end: bool
     cancelled_at: dt.datetime | None
+    # AI answer bundle; answers count from the first day of ``ai_bundle_from`` (a month start).
+    ai_bundle_id: uuid.UUID | None = None
+    ai_bundle_from: dt.date | None = None
     version: int
+
+
+class AiBundleIn(In):
+    ai_bundle_id: uuid.UUID
 
 
 class ExtendTrialIn(In):
@@ -295,11 +328,32 @@ class SuspendSubscriptionIn(Reasoned):
 # --- invoices ---------------------------------------------------------------------------------
 
 
+InvoiceLineKind = Literal[
+    "subscription",
+    "per_student",
+    "one_time_fee",
+    "addon",
+    "usage_overage",
+    "discount",
+    "adjustment",
+]
+
+
 class InvoiceLineIn(In):
-    kind: Literal["subscription", "per_student", "addon", "usage_overage", "discount", "adjustment"]
+    kind: InvoiceLineKind
     description: Text200
     quantity: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)] = Decimal("1")
     unit_price_inr: Annotated[Decimal, Field(max_digits=14, decimal_places=2)]
+    # The calendar month (its first day) an AI overage line bills; it stops a second charge.
+    usage_month: dt.date | None = None
+
+    @model_validator(mode="after")
+    def _usage_month(self) -> Self:
+        if self.usage_month is not None and (
+            self.kind != "usage_overage" or self.usage_month.day != 1
+        ):
+            raise ValueError("usage_month is the first day of a month, on overage lines only")
+        return self
 
 
 class InvoiceLineOut(Out):
@@ -311,6 +365,7 @@ class InvoiceLineOut(Out):
     unit_price_inr: Decimal
     amount_inr: Decimal
     gst_rate: Decimal
+    usage_month: dt.date | None = None
 
 
 class InvoiceCreate(In):
@@ -613,6 +668,7 @@ class UsageDailyOut(Out):
     ai_input_tokens: int
     ai_output_tokens: int
     ai_cost_inr: Decimal
+    ai_answers: int = 0
 
 
 # --- flags ------------------------------------------------------------------------------------
@@ -745,6 +801,8 @@ class HbUsage(_Strict):
     ai_input_tokens: int = Field(ge=0)
     ai_output_tokens: int = Field(ge=0)
     ai_cost_usd: Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=4)]
+    # Billable AI answers that day (docs/16 §11); absent from hosts older than 0041 (0).
+    ai_answers: int = Field(default=0, ge=0)
 
 
 class HeartbeatIn(_Strict):

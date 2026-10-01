@@ -986,7 +986,20 @@
       "retireTitle": "{name} వెర్షన్ {version} విరమించాలా?",
       "retireBody": "కొత్త సబ్‌స్క్రిప్షన్‌లు దీన్ని వాడలేవు. ఉన్నవి కొనసాగుతాయి.",
       "emptyTitle": "ఇంకా ప్లాన్లు లేవు",
-      "emptyBody": "పాఠశాలలను ఏర్పాటు చేసే ముందు ధరలు, పరిమితులతో ప్లాన్ సృష్టించి ప్రచురించండి."
+      "emptyBody": "పాఠశాలలను ఏర్పాటు చేసే ముందు ధరలు, పరిమితులతో ప్లాన్ సృష్టించి ప్రచురించండి.",
+      "oneTimeFee": "One-time fee (₹)",
+      "oneTimeFeeHint": "Implementation and data verification, before GST. Charged once, on the school's first invoice. Leave empty for none.",
+      "colOneTimeFee": "One-time fee",
+      "planDescription": "Description",
+      "planDescriptionHint": "Plain words about what the plan gives a school, up to 300 characters.",
+      "bundlesTitle": "AI answer bundles",
+      "bundlesBody": "A monthly add-on for monthly plans. Each bundle includes a number of AI answers a month; answers above it are billed on the next invoice at the price per extra answer. Prices are before GST.",
+      "colBundle": "Bundle",
+      "colIncluded": "Answers a month",
+      "colBundlePrice": "Price a month (before GST)",
+      "colExtra": "Each extra answer",
+      "bundlesEmptyTitle": "No AI answer bundles",
+      "bundlesEmptyBody": "AI answer bundles come from the billing catalogue."
     },
     "subscriptions": {
       "title": "సబ్‌స్క్రిప్షన్‌లు",
@@ -1022,7 +1035,20 @@
       "cancel": "సబ్‌స్క్రిప్షన్ రద్దు చేయండి",
       "cancelTitle": "ఈ సబ్‌స్క్రిప్షన్ రద్దు చేయాలా?",
       "cancelBody": "ప్రస్తుత కాలం చివరి వరకు సక్రియంగా ఉండి, తర్వాత ముగుస్తుంది.",
-      "cancelTrialBody": "ట్రయల్ ఇప్పుడే ముగుస్తుంది."
+      "cancelTrialBody": "ట్రయల్ ఇప్పుడే ముగుస్తుంది.",
+      "oneTimeFeeValue": "One-time fee {amount} on the first invoice",
+      "colAiBundle": "AI answers",
+      "noAiBundle": "No bundle",
+      "aiBundleValue": "{name}: {answers} answers a month",
+      "aiBundleFrom": "Counts from {date}",
+      "chooseAiBundle": "AI answer bundle",
+      "chooseAiBundleTitle": "Choose the AI answer bundle",
+      "chooseAiBundleBody": "Billed every month with the plan. Answers count from the first full calendar month; answers above the bundle are billed on the next invoice.",
+      "aiBundle": "Bundle",
+      "aiBundleOption": "{name}: {answers} answers, {price} a month, {rate} each extra answer",
+      "removeAiBundle": "Remove AI bundle",
+      "removeAiBundleTitle": "Remove the AI answer bundle?",
+      "removeAiBundleBody": "From the next invoice there is no bundle charge and no charge for extra answers."
     },
     "invoices": {
       "title": "ఇన్వాయిస్‌లు",

@@ -1,17 +1,19 @@
 "use client";
 
 import type { Subscription } from "@schoolos/api-client";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
+import { formatCount, formatInr } from "@/lib/format";
 import { localDateTime, reason, uuid } from "@/lib/validation";
-import { PK, planLabel, useCan, usePlanDirectory } from "./data";
+import { PK, planLabel, readyOr, useAiBundles, useCan, usePlanDirectory } from "./data";
 
 const reasonSchema = z.object({ reason });
 const changePlanSchema = z.object({ plan_id: uuid });
+const bundleSchema = z.object({ ai_bundle_id: uuid });
 const extendSchema = z.object({ trial_ends_at: localDateTime });
 const INVALIDATE = [PK.subscriptions, PK.tenants, PK.dashboard] as const;
 
@@ -33,6 +35,8 @@ export function SubscriptionActions({
   const api = useBffClient("operator");
   const can = useCan();
   const { plans } = usePlanDirectory();
+  const bundles = readyOr(useAiBundles(), []);
+  const locale = useLocale();
   if (!can("platform.subscriptions.manage")) return null;
 
   const path = { sub_id: subscription.id };
@@ -41,6 +45,7 @@ export function SubscriptionActions({
     (plan) => plan.status === "published" && (!current || plan.tier === current.tier),
   );
   const status = subscription.status;
+  const monthly = !current || current.billing_period === "monthly";
 
   return (
     <div className="relative flex flex-wrap gap-2">
@@ -131,6 +136,69 @@ export function SubscriptionActions({
             />
           )}
         </ActionDialog>
+      ) : null}
+      {status !== "cancelled" && monthly ? (
+        <ActionDialog
+          triggerLabel={t("chooseAiBundle")}
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("chooseAiBundleTitle")}
+          description={t("chooseAiBundleBody")}
+          confirmLabel={t("chooseAiBundle")}
+          stepUp
+          schema={bundleSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.PUT("/api/v1/platform/subscriptions/{sub_id}/ai-bundle", {
+                params: { path },
+                body: { ai_bundle_id: data.ai_bundle_id },
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <SelectField
+              name="ai_bundle_id"
+              label={t("aiBundle")}
+              placeholder={tv("chooseOne")}
+              error={errors.ai_bundle_id}
+              defaultValue={subscription.ai_bundle_id ?? ""}
+              options={bundles
+                .filter((bundle) => bundle.status === "published")
+                .map((bundle) => ({
+                  value: bundle.id,
+                  label: t("aiBundleOption", {
+                    name: bundle.name,
+                    answers: formatCount(bundle.included_answers, locale) ?? "",
+                    price: formatInr(bundle.price_inr, locale) ?? "",
+                    rate: formatInr(bundle.overage_rate_inr, locale) ?? "",
+                  }),
+                }))}
+            />
+          )}
+        </ActionDialog>
+      ) : null}
+      {status !== "cancelled" && subscription.ai_bundle_id ? (
+        <ActionDialog
+          triggerLabel={t("removeAiBundle")}
+          triggerVariant="ghost"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("removeAiBundleTitle")}
+          description={t("removeAiBundleBody")}
+          confirmLabel={t("removeAiBundle")}
+          stepUp
+          schema={z.object({})}
+          invalidate={INVALIDATE}
+          submit={() =>
+            unwrap(
+              api.DELETE("/api/v1/platform/subscriptions/{sub_id}/ai-bundle", {
+                params: { path },
+              }),
+            )
+          }
+        />
       ) : null}
       {status === "suspended" ? (
         <ActionDialog

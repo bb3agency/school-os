@@ -426,6 +426,90 @@
         "title": "AgentConfigOut",
         "type": "object"
       },
+      "AiBundleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "ai_bundle_id": {
+            "format": "uuid",
+            "title": "Ai Bundle Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ai_bundle_id"
+        ],
+        "title": "AiBundleIn",
+        "type": "object"
+      },
+      "AiBundleOut": {
+        "description": "An AI answer bundle: a monthly add-on with an included answer quota (never unlimited).",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "included_answers": {
+            "title": "Included Answers",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "overage_rate_inr": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Overage Rate Inr",
+            "type": "string"
+          },
+          "price_inr": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Price Inr",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "status": {
+            "enum": [
+              "published",
+              "retired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "version",
+          "name",
+          "included_answers",
+          "price_inr",
+          "overage_rate_inr",
+          "status",
+          "published_at"
+        ],
+        "title": "AiBundleOut",
+        "type": "object"
+      },
       "AnnouncementBrief": {
         "properties": {
           "body_en": {
@@ -9196,6 +9280,7 @@
             "enum": [
               "subscription",
               "per_student",
+              "one_time_fee",
               "addon",
               "usage_overage",
               "discount",
@@ -9229,6 +9314,18 @@
               }
             ],
             "title": "Unit Price Inr"
+          },
+          "usage_month": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Month"
           }
         },
         "required": [
@@ -9276,6 +9373,18 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Unit Price Inr",
             "type": "string"
+          },
+          "usage_month": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Month"
           }
         },
         "required": [
@@ -12192,6 +12301,33 @@
         "title": "Page[AcademicYearOut]",
         "type": "object"
       },
+      "Page_AiBundleOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AiBundleOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Page[AiBundleOut]",
+        "type": "object"
+      },
       "Page_AnnouncementOut_": {
         "properties": {
           "data": {
@@ -13663,6 +13799,19 @@
             "title": "Code",
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "features": {
             "maxProperties": 50,
             "patternProperties": {
@@ -13708,6 +13857,22 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "one_time_fee_inr": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Time Fee Inr"
           },
           "per_student_price_inr": {
             "anyOf": [
@@ -13881,6 +14046,17 @@
             ],
             "title": "Created At"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "features": {
             "additionalProperties": true,
             "title": "Features",
@@ -13914,6 +14090,11 @@
           },
           "name": {
             "title": "Name",
+            "type": "string"
+          },
+          "one_time_fee_inr": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "One Time Fee Inr",
             "type": "string"
           },
           "per_student_price_inr": {
@@ -13992,7 +14173,9 @@
           "features",
           "status",
           "published_at",
-          "created_at"
+          "created_at",
+          "one_time_fee_inr",
+          "description"
         ],
         "title": "PlanOut",
         "type": "object"
@@ -14015,6 +14198,19 @@
               }
             ],
             "title": "Base Price Inr"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           },
           "features": {
             "anyOf": [
@@ -14069,6 +14265,22 @@
               }
             ],
             "title": "Name"
+          },
+          "one_time_fee_inr": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Time Fee Inr"
           },
           "per_student_price_inr": {
             "anyOf": [
@@ -17872,6 +18084,30 @@
       },
       "SubscriptionOut": {
         "properties": {
+          "ai_bundle_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Bundle From"
+          },
+          "ai_bundle_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Bundle Id"
+          },
           "billing_account_id": {
             "format": "uuid",
             "title": "Billing Account Id",
@@ -20577,6 +20813,11 @@
         "properties": {
           "active_users": {
             "title": "Active Users",
+            "type": "integer"
+          },
+          "ai_answers": {
+            "default": 0,
+            "title": "Ai Answers",
             "type": "integer"
           },
           "ai_cost_inr": {
@@ -30546,6 +30787,57 @@
         ]
       }
     },
+    "/api/v1/platform/ai-bundles": {
+      "get": {
+        "description": "AI answer bundles: a monthly add-on with an included number of answers and a price per\nextra answer (docs/16 \u00a75.6). Seeded by catalogue migrations; never unlimited.",
+        "operationId": "list_ai_bundles_api_v1_platform_ai_bundles_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(published|retired)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AiBundleOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Ai Bundles",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/v1/platform/announcements": {
       "get": {
         "operationId": "list_announcements_api_v1_platform_announcements_get",
@@ -32853,6 +33145,102 @@
           }
         },
         "summary": "Activate Subscription",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions/{sub_id}/ai-bundle": {
+      "delete": {
+        "description": "Remove the AI answer bundle: no bundle line and no overage from the next invoice.",
+        "operationId": "remove_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sub_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sub Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Ai Bundle",
+        "tags": [
+          "platform"
+        ]
+      },
+      "put": {
+        "description": "Choose or change the AI answer bundle (monthly plans only; ``409\nai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today\n(a trial's from the month after activation); answers above the quota are billed on the next\ninvoice at the bundle's price per extra answer.",
+        "operationId": "set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sub_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sub Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiBundleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Ai Bundle",
         "tags": [
           "platform"
         ]
