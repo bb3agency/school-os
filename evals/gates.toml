@@ -293,3 +293,23 @@ op = ">="
 threshold = 1.0
 severity = "hard"
 requirements = ["ADR-0036", "FR-KB-006"]
+
+# --- Authorised retrieval recall (sos_evals.authorised_recall; docs/06 §6 "Authorised recall") ---
+# The production vector path against an exact oracle (same RLS session, same ACL predicate, exact
+# cosine ranking) at ACL selectivities of 100, 20, 5 and 1 % of a synthetic school sharing one
+# HNSW graph with other schools. Critical = the narrow callers (<= 5 % visible, a class teacher):
+# a missed passage there becomes a false "not found in school records" (FR-KB-007).
+
+[[gate]]
+metric = "authorised_recall_at_10"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["FR-KB-001", "FR-KB-002"]
+
+[[gate]]
+metric = "authorised_recall_at_10_critical"
+op = ">="
+threshold = 0.95
+severity = "soft"
+requirements = ["FR-KB-001", "FR-KB-007"]

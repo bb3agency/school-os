@@ -230,6 +230,16 @@ def test_FR_KB_001_contextual_yaml_is_consistent() -> None:
     assert config.max_chars <= 1000  # kb.document_chunks.chunk_context CHECK
 
 
+def test_FR_KB_001_exact_search_threshold_is_config_and_validated() -> None:
+    """Routing to exact search below a threshold (docs/06 §6 "Authorised recall")."""
+    config = retrieval.load_retrieval_config()
+    assert config.branches.vector.exact_search_max_rows > 0
+    data = raw("retrieval.yaml")
+    data["branches"]["vector"]["exact_search_max_rows"] = -1
+    with pytest.raises(ValidationError, match="exact_search_max_rows"):
+        retrieval.RetrievalConfig.model_validate(data)
+
+
 def test_FR_KB_001_final_k_cannot_exceed_candidate_lists() -> None:
     data = raw("retrieval.yaml")
     data["final_k"] = 500

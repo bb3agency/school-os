@@ -12,6 +12,11 @@ branches:
     limit: 40        # HNSW, embedding <=> query vector
     iterative_scan: relaxed_order   # pgvector >= 0.8: filtered HNSW still fills the list
     max_scan_tuples: 20000
+    # Route (docs/06 §6 "Authorised recall"): at most this many authorised chunks are ranked
+    # exactly (recall 1.0, measured +40 ms at 4 000 rows); above it HNSW + iterative scan, which
+    # stays >= 0.95 while authorised / shared-table rows >= limit / max_scan_tuples (safe to
+    # ~2.5 M chunks in the shared table at these values; revisit before then).
+    exact_search_max_rows: 5000
   full_text:
     limit: 40
     ts_config: simple

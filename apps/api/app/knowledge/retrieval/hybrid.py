@@ -4,8 +4,13 @@ Per query text (the original first, then translations when ``translated_query_fu
 three candidate lists run in ONE SQL statement (``UNION ALL``), each with
 :func:`.acl.acl_predicate` in its own WHERE clause, before its own ORDER BY/LIMIT:
 
-- ``vector``: ``ORDER BY embedding <=> :qvec LIMIT n`` (HNSW; ``hnsw.ef_search`` and pgvector
-  iterative scans set per transaction from config);
+- ``vector``: ``ORDER BY embedding <=> :qvec LIMIT n``, routed once per search
+  (:func:`vector_route`): when at most ``branches.vector.exact_search_max_rows`` chunks pass the
+  caller's filter (a count bounded at that number + 1, same RLS session and same predicate),
+  the filtered rows are ranked EXACTLY (a ``MATERIALIZED`` CTE the HNSW index cannot serve);
+  otherwise HNSW with ``hnsw.ef_search`` and pgvector iterative scans set per transaction from
+  config. Heavily narrowed callers (a class teacher seeing ~1-2 % of a school) would otherwise
+  lose recall on the shared graph and get a false "not found" (docs/06 §6 "Authorised recall");
 - ``full_text``: ``content_tsv @@ :tsquery`` ranked by ``ts_rank_cd`` (``simple`` config; the
   tsquery is built once per text by PostgreSQL, never by string concatenation in Python);
 - ``trigram``: ``:q <% context_header`` ranked by ``word_similarity`` (typo- and
@@ -62,6 +67,7 @@ from app.knowledge.retrieval.fusion import (
 )
 
 BranchName = Literal["vector", "full_text", "trigram"]
+VectorRoute = Literal["exact", "ann"]
 BRANCHES: Final[tuple[BranchName, ...]] = ("vector", "full_text", "trigram")
 MAX_K: Final = 100
 
@@ -116,12 +122,77 @@ def _tsquery_sql(config: RetrievalConfig) -> Select[tuple[str]]:
     return select(func.replace(cast(func.plainto_tsquery(ts_config, q), Text), " & ", " | "))
 
 
+def authorised_count(session: Session, acl: AclKeys, filters: SearchFilters, cap: int) -> int:
+    """How many chunks pass the caller's filter, counted up to ``cap + 1`` and no further (so
+    the cost is bounded by the school's rows, never by the answer). Same RLS session and the
+    same :func:`.acl.acl_predicate` as the branches; reads no embedding and no text."""
+    inner = (
+        select(literal(1).label("one"))
+        .select_from(_C)
+        .where(acl_predicate(acl, filters))
+        .limit(cap + 1)
+        .subquery("authorised")
+    )
+    return int(session.execute(select(func.count()).select_from(inner)).scalar_one())
+
+
+def vector_route(
+    session: Session, config: RetrievalConfig, acl: AclKeys, filters: SearchFilters
+) -> VectorRoute:
+    """``exact`` when at most ``branches.vector.exact_search_max_rows`` chunks are authorised
+    (0 = always ``ann``). The threshold comes from the recall measurements in docs/06 §6."""
+    cap = config.branches.vector.exact_search_max_rows
+    if cap == 0:
+        return "ann"
+    return "exact" if authorised_count(session, acl, filters, cap) <= cap else "ann"
+
+
+def vector_statement(
+    config: RetrievalConfig,
+    acl: AclKeys,
+    filters: SearchFilters,
+    vector: Sequence[float],
+    index: int = 0,
+    *,
+    route: VectorRoute = "ann",
+) -> Select[Any]:
+    """The vector candidate list: ``(id, r)`` rows plus candidate columns, nearest first.
+
+    ``ann``: ``ORDER BY embedding <=> :q LIMIT n`` over the filtered rows (HNSW with iterative
+    scan, or whatever the planner prefers). ``exact``: the filtered rows and their distances
+    in a ``MATERIALIZED`` CTE (an optimisation fence: no index can order it), then ordered by
+    ``(distance, id)``. Both carry ``acl_predicate`` in their WHERE clause, so nothing the
+    caller may not read is ever ranked (invariant 8)."""
+    limit = config.branches.vector.limit
+    qvec = bindparam(f"qvec_{index}", list(vector), type_=HalfVector(EMBEDDING_DIMENSIONS))
+    distance = _C.embedding.op("<=>", return_type=Float)(qvec)
+    filtered = select(*_CANDIDATE_COLUMNS, distance.label("score")).where(
+        acl_predicate(acl, filters)
+    )
+    if route == "exact":
+        allowed = filtered.cte(f"vector_allowed_{index}").prefix_with("MATERIALIZED")
+        vec_inner = (
+            select(allowed)
+            .order_by(allowed.c.score, allowed.c.id)
+            .limit(limit)
+            .subquery(f"vector_{index}")
+        )
+    else:
+        vec_inner = filtered.order_by(distance).limit(limit).subquery(f"vector_{index}")
+    return select(
+        *(vec_inner.c[c.key] for c in _CANDIDATE_COLUMNS),
+        func.row_number().over(order_by=(vec_inner.c.score, vec_inner.c.id)).label("r"),
+    )
+
+
 def branch_statements(
     config: RetrievalConfig,
     acl: AclKeys,
     filters: SearchFilters,
     query: QueryText,
     index: int = 0,
+    *,
+    vector_route: VectorRoute = "ann",
 ) -> dict[BranchName, Select[Any]]:
     """The three candidate lists for one query text: ``(id, r)`` rows plus candidate columns.
 
@@ -130,19 +201,7 @@ def branch_statements(
     """
     b = config.branches
 
-    qvec = bindparam(f"qvec_{index}", list(query.vector), type_=HalfVector(EMBEDDING_DIMENSIONS))
-    distance = _C.embedding.op("<=>", return_type=Float)(qvec)
-    vec_inner = (
-        select(*_CANDIDATE_COLUMNS, distance.label("score"))
-        .where(acl_predicate(acl, filters))
-        .order_by(distance)
-        .limit(b.vector.limit)
-        .subquery(f"vector_{index}")
-    )
-    vector = select(
-        *(vec_inner.c[c.key] for c in _CANDIDATE_COLUMNS),
-        func.row_number().over(order_by=(vec_inner.c.score, vec_inner.c.id)).label("r"),
-    )
+    vector = vector_statement(config, acl, filters, query.vector, index, route=vector_route)
 
     tsq = cast(bindparam(f"tsquery_{index}", query.tsquery, type_=Text), TSQUERY)
     # Contextual retrieval (docs/06 §4.11): the chunk's context is searched with its text.
@@ -237,11 +296,15 @@ class HybridRetriever:
     def candidates(
         self, session: Session, acl: AclKeys, filters: SearchFilters, texts: Sequence[QueryText]
     ) -> list[Candidate]:
-        """Every branch list for every text, in one statement (all ACL-filtered in SQL)."""
+        """Every branch list for every text, in one statement (all ACL-filtered in SQL). The
+        vector route is decided once for the caller and filters (:func:`vector_route`)."""
+        route = vector_route(session, self._config, acl, filters)
+        trace.get_current_span().set_attribute("retrieval.vector.route", route)
         parts = []
         list_no = 0
         for index, qt in enumerate(texts):
-            for name, stmt in branch_statements(self._config, acl, filters, qt, index).items():
+            branches = branch_statements(self._config, acl, filters, qt, index, vector_route=route)
+            for name, stmt in branches.items():
                 sub = stmt.subquery(f"{name}_{index}_ranked")
                 parts.append(select(literal(list_no).label("list_no"), *sub.c))
                 list_no += 1

@@ -53,6 +53,11 @@ class VectorBranch(Branch):
     until ``limit`` rows pass the tenant/ACL filter (docs/05 §11)."""
     max_scan_tuples: int = Field(ge=100, le=1_000_000)
     """``SET LOCAL hnsw.max_scan_tuples``: upper bound on an iterative scan."""
+    exact_search_max_rows: int = Field(ge=0, le=100_000)
+    """Routing (docs/06 §6 "Authorised recall"): when at most this many chunks pass the
+    caller's filter (counted under RLS with the same predicate, stopping at this number + 1),
+    the vector branch ranks them exactly instead of through HNSW. 0 = always HNSW. Chosen from
+    the recall measurements in docs/06 §6 (``tests/knowledge/test_retrieval_recall.py``)."""
 
 
 class FullTextBranch(Branch):
