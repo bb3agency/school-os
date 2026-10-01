@@ -559,7 +559,7 @@ class _TwoSentenceStandIn:
 def test_FR_KB_005_the_fake_marks_every_sentence_of_a_cited_block() -> None:
     """Like the marker instructions ask of the model: ``[n]`` after every sentence it supports
     (the gateway gives a marker only to the sentence it ends, docs/06 §9 rule 3)."""
-    fake = GeminiWireFake(_TwoSentenceStandIn())  # type: ignore[arg-type]
+    fake = GeminiWireFake(_TwoSentenceStandIn())
     body: dict[str, Any] = {"contents": [{"role": "user", "parts": [{"text": "q"}]}]}
     (part,) = fake.send(request(body))["candidates"][0]["content"]["parts"]
     assert part["text"] == "Fees are due on 15/10/2026. [1] Pay at Rs. 500 per term. [1]"
