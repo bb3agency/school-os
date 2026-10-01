@@ -11,10 +11,16 @@ Rules (docs/16 §5.6-5.9, §9, §10):
   next gapless number of the Indian financial year under a row lock; issued invoices are frozen.
 - GST 18% by default: CGST + SGST when the place of supply equals the supplier's state (AP = 37),
   IGST otherwise; half-up rounding to paise.
+- Commercial catalogue (ADR-0037): a plan's one-time "Implementation and data verification" fee
+  is charged once, on the subscription's first invoice (the next new invoice if that one is
+  voided). An AI answer bundle is a monthly add-on billed in advance with the plan; answers above
+  its quota in a calendar month are billed on the next invoice (``usage_month`` stops a second
+  charge). Answers are counts from ``platform.usage_daily``, never tenant data.
 """
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -48,6 +54,7 @@ from app.platform.common import (
 )
 from app.platform.payments import get_provider
 from app.platform.schemas import (
+    AiBundleOut,
     BillingAccountIn,
     BillingAccountOut,
     InvoiceLineIn,
@@ -137,6 +144,40 @@ def _period_months(plan: Mapping[Any, Any]) -> int:
     return 12 if plan["billing_period"] == "annual" else 1
 
 
+# --- one-time fee, AI bundles and overage (pure) ----------------------------------------------
+
+ONE_TIME_FEE_TEXT = "Implementation and data verification (one-time)"
+
+
+def next_month(day: dt.date) -> dt.date:
+    """The first day of the calendar month after ``day``."""
+    return add_months(day.replace(day=1), 1)
+
+
+def ai_overage(answers: int, included: int, rate: Decimal) -> tuple[int, Decimal]:
+    """(extra answers, amount) for one calendar month: answers above the bundle's quota."""
+    extra = max(int(answers) - int(included), 0)
+    return extra, round_paise(Decimal(extra) * Decimal(rate))
+
+
+def _rupees(amount: Decimal) -> str:
+    return f"₹{Decimal(amount):,.2f}"
+
+
+def overage_description(bundle_name: str, month: dt.date, extra: int, rate: Decimal) -> str:
+    return (
+        f"AI answers above the {bundle_name} bundle, {calendar.month_name[month.month]} "
+        f"{month.year}: {extra:,} extra answers \N{MULTIPLICATION SIGN} {_rupees(rate)}"
+    )
+
+
+def bundle_description(bundle: Mapping[Any, Any], start: dt.date, last_day: dt.date) -> str:
+    return (
+        f"AI answers: {bundle['name']} bundle, {int(bundle['included_answers']):,} answers a "
+        f"month ({start.isoformat()} to {last_day.isoformat()})"
+    )
+
+
 # --- plans ------------------------------------------------------------------------------------
 
 
@@ -150,6 +191,8 @@ def _plan_values(data: PlanIn | PlanPatch) -> dict[str, Any]:
         }
     if "gst_rate" in values:
         values["gst_rate"] = Decimal(values["gst_rate"])
+    if values.get("one_time_fee_inr", 0) is None:  # omitted or null: the default 0, or keep
+        del values["one_time_fee_inr"]
     return values
 
 
@@ -373,18 +416,17 @@ def activate_subscription(
             raise Conflict("Only a trial can be activated.", code="invalid_state")
         plan = repo.get(s, m.plans, sub["pending_plan_id"] or sub["plan_id"])
         plan = must(plan)
-        sub = repo.update_row(
-            s,
-            m.subscriptions,
-            sub_id,
-            {
-                "status": "active",
-                "plan_id": plan["id"],
-                "pending_plan_id": None,
-                "current_period_start": today,
-                "current_period_end": add_months(today, _period_months(plan)),
-            },
-        )
+        values: dict[str, Any] = {
+            "status": "active",
+            "plan_id": plan["id"],
+            "pending_plan_id": None,
+            "current_period_start": today,
+            "current_period_end": add_months(today, _period_months(plan)),
+        }
+        if sub["ai_bundle_id"] is not None:
+            # Trial answers are free: the bundle counts from the month after activation.
+            values["ai_bundle_from"] = max(sub["ai_bundle_from"], next_month(today))
+        sub = repo.update_row(s, m.subscriptions, sub_id, values)
         audit_platform(
             s,
             actor,
@@ -442,6 +484,8 @@ def change_plan(actor: Actor, sub_id: uuid.UUID, plan_id: uuid.UUID) -> Subscrip
         current = must(current)
         if new_plan["tier"] != current["tier"]:
             raise Conflict("Moving between tiers needs a migration project.", code="tier_change")
+        if sub["ai_bundle_id"] is not None:
+            _monthly_only([new_plan])
         if sub["status"] == "trial":
             values: dict[str, Any] = {"plan_id": plan_id, "pending_plan_id": None}
         else:
@@ -475,6 +519,72 @@ def set_price_override(
             sub_id,
             {"price_override_inr": str(amount) if amount is not None else None},
             tenant_id=sub["tenant_id"],
+        )
+        return SubscriptionOut.model_validate(dict(sub))
+
+
+def list_ai_bundles(status: str | None = None) -> list[AiBundleOut]:
+    with platform_session() as s:
+        stmt = select(m.ai_bundles).order_by(
+            m.ai_bundles.c.included_answers, m.ai_bundles.c.version.desc()
+        )
+        if status:
+            stmt = stmt.where(m.ai_bundles.c.status == status)
+        return [AiBundleOut.model_validate(dict(r)) for r in s.execute(stmt).mappings()]
+
+
+def _monthly_only(plans: Iterable[Mapping[Any, Any] | None]) -> None:
+    if any(p is not None and p["billing_period"] != "monthly" for p in plans):
+        raise Conflict(
+            "AI answer bundles are monthly; they need a monthly plan.",
+            code="ai_bundle_needs_monthly_plan",
+        )
+
+
+def set_ai_bundle(
+    actor: Actor,
+    sub_id: uuid.UUID,
+    bundle_id: uuid.UUID | None,
+    *,
+    today: dt.date | None = None,
+) -> SubscriptionOut:
+    """Choose, change or remove the AI answer bundle (docs/16 §5.7).
+
+    A new bundle counts from the first full calendar month after today (a trial's from the month
+    after activation). A change keeps that month and applies to the next invoice and to the quota
+    of any month not yet billed; nothing already invoiced is prorated.
+    """
+    today = today or today_ist()
+    with platform_session() as s, db_errors():
+        sub = _sub_or_404(s, sub_id)
+        if sub["status"] == "cancelled":
+            raise Conflict("The subscription is cancelled.", code="invalid_state")
+        if bundle_id is None:
+            values: dict[str, Any] = {"ai_bundle_id": None, "ai_bundle_from": None}
+            action, summary = "subscription.ai_bundle_removed", {}
+        else:
+            bundle = repo.get(s, m.ai_bundles, bundle_id)
+            if bundle is None or bundle["status"] != "published":
+                raise ValidationFailed(
+                    [
+                        {
+                            "field": "ai_bundle_id",
+                            "code": "ai_bundle_not_available",
+                            "message_key": "errors.ai_bundle",
+                        }
+                    ]
+                )
+            plan_ids = (sub["plan_id"], sub["pending_plan_id"])
+            _monthly_only(repo.get(s, m.plans, p) for p in plan_ids if p is not None)
+            values = {
+                "ai_bundle_id": bundle_id,
+                "ai_bundle_from": sub["ai_bundle_from"] or next_month(today),
+            }
+            action = "subscription.ai_bundle_set"
+            summary = {"ai_bundle_code": bundle["code"], "ai_bundle_version": bundle["version"]}
+        sub = repo.update_row(s, m.subscriptions, sub_id, values)
+        audit_platform(
+            s, actor, action, "subscription", sub_id, summary, tenant_id=sub["tenant_id"]
         )
         return SubscriptionOut.model_validate(dict(sub))
 
@@ -755,6 +865,7 @@ def _line_rows(lines: Sequence[InvoiceLineIn], plan: Mapping[Any, Any]) -> list[
                 "unit_price_inr": line.unit_price_inr,
                 "amount_inr": amount,
                 "gst_rate": plan["gst_rate"],
+                "usage_month": line.usage_month,
             }
         )
     return rows
@@ -783,6 +894,11 @@ def _default_lines(
             unit_price_inr=Decimal(price),
         )
     ]
+    fee = Decimal(plan["one_time_fee_inr"] or 0)
+    if fee > 0 and not repo.subscription_has_line(s, sub["id"], kind="one_time_fee"):
+        lines.append(
+            InvoiceLineIn(kind="one_time_fee", description=ONE_TIME_FEE_TEXT, unit_price_inr=fee)
+        )
     if plan["pricing_model"] == "per_student":
         usage = repo.usage_on_or_before(s, sub["tenant_id"], period_start - dt.timedelta(days=1))
         students = int(usage["students_active"]) if usage else 0
@@ -797,7 +913,53 @@ def _default_lines(
                     unit_price_inr=Decimal(plan["per_student_price_inr"]),
                 )
             )
+    if sub["ai_bundle_id"] is not None:
+        lines.extend(_ai_lines(s, sub, period_start, last_day))
     return lines
+
+
+def _ai_lines(
+    s: Session, sub: Mapping[Any, Any], period_start: dt.date, last_day: dt.date
+) -> list[InvoiceLineIn]:
+    """The bundle (in advance, for this period) and last calendar month's overage (in arrears).
+
+    Overage for month M goes on an invoice whose period starts in M + 1, only from the month the
+    bundle counts from, and only when no live invoice of the subscription already bills M.
+    """
+    bundle = must(repo.get(s, m.ai_bundles, sub["ai_bundle_id"]))
+    lines = [
+        InvoiceLineIn(
+            kind="addon",
+            description=bundle_description(bundle, period_start, last_day),
+            unit_price_inr=Decimal(bundle["price_inr"]),
+        )
+    ]
+    month = add_months(period_start.replace(day=1), -1)
+    if month < sub["ai_bundle_from"] or repo.subscription_has_line(
+        s, sub["id"], kind="usage_overage", usage_month=month
+    ):
+        return lines
+    answers = repo.ai_answers_between(s, sub["tenant_id"], month, next_month(month))
+    rate = Decimal(bundle["overage_rate_inr"])
+    extra, _ = ai_overage(answers, int(bundle["included_answers"]), rate)
+    if extra > 0:
+        lines.append(
+            InvoiceLineIn(
+                kind="usage_overage",
+                description=overage_description(bundle["name"], month, extra, rate),
+                quantity=Decimal(extra),
+                unit_price_inr=rate,
+                usage_month=month,
+            )
+        )
+    return lines
+
+
+def ai_answers_in_month(tenant_id: uuid.UUID, month: dt.date) -> int:
+    """Billable AI answers of one school in one calendar month (counts from usage_daily)."""
+    start = month.replace(day=1)
+    with platform_session() as s:
+        return repo.ai_answers_between(s, tenant_id, start, next_month(start))
 
 
 def _totals(s: Session, invoice: Mapping[Any, Any]) -> dict[str, Any]:

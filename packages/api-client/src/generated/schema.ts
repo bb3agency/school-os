@@ -3203,6 +3203,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/ai-bundles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ai Bundles
+         * @description AI answer bundles: a monthly add-on with an included number of answers and a price per
+         *     extra answer (docs/16 §5.6). Seeded by catalogue migrations; never unlimited.
+         */
+        get: operations["list_ai_bundles_api_v1_platform_ai_bundles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/announcements": {
         parameters: {
             query?: never;
@@ -3840,6 +3861,33 @@ export interface paths {
         /** Activate Subscription */
         post: operations["activate_subscription_api_v1_platform_subscriptions__sub_id__activate_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/subscriptions/{sub_id}/ai-bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Ai Bundle
+         * @description Choose or change the AI answer bundle (monthly plans only; ``409
+         *     ai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today
+         *     (a trial's from the month after activation); answers above the quota are billed on the next
+         *     invoice at the bundle's price per extra answer.
+         */
+        put: operations["set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put"];
+        post?: never;
+        /**
+         * Remove Ai Bundle
+         * @description Remove the AI answer bundle: no bundle line and no overage from the next invoice.
+         */
+        delete: operations["remove_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5863,6 +5911,44 @@ export interface components {
             server_time: string;
             /** Sync Interval Minutes */
             sync_interval_minutes: number;
+        };
+        /** AiBundleIn */
+        AiBundleIn: {
+            /**
+             * Ai Bundle Id
+             * Format: uuid
+             */
+            ai_bundle_id: string;
+        };
+        /**
+         * AiBundleOut
+         * @description An AI answer bundle: a monthly add-on with an included answer quota (never unlimited).
+         */
+        AiBundleOut: {
+            /** Code */
+            code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Included Answers */
+            included_answers: number;
+            /** Name */
+            name: string;
+            /** Overage Rate Inr */
+            overage_rate_inr: string;
+            /** Price Inr */
+            price_inr: string;
+            /** Published At */
+            published_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "published" | "retired";
+            /** Version */
+            version: number;
         };
         /** AnnouncementBrief */
         AnnouncementBrief: {
@@ -9218,7 +9304,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "subscription" | "per_student" | "addon" | "usage_overage" | "discount" | "adjustment";
+            kind: "subscription" | "per_student" | "one_time_fee" | "addon" | "usage_overage" | "discount" | "adjustment";
             /**
              * Quantity
              * @default 1
@@ -9226,6 +9312,8 @@ export interface components {
             quantity: number | string;
             /** Unit Price Inr */
             unit_price_inr: number | string;
+            /** Usage Month */
+            usage_month?: string | null;
         };
         /** InvoiceLineOut */
         InvoiceLineOut: {
@@ -9245,6 +9333,8 @@ export interface components {
             sac_code: string;
             /** Unit Price Inr */
             unit_price_inr: string;
+            /** Usage Month */
+            usage_month?: string | null;
         };
         /** InvoiceOut */
         InvoiceOut: {
@@ -10248,6 +10338,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[AiBundleOut] */
+        Page_AiBundleOut_: {
+            /** Data */
+            data: components["schemas"]["AiBundleOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AnnouncementOut] */
         Page_AnnouncementOut_: {
             /** Data */
@@ -10738,6 +10835,8 @@ export interface components {
             billing_period: "monthly" | "annual";
             /** Code */
             code: string;
+            /** Description */
+            description?: string | null;
             /** Features */
             features?: {
                 [key: string]: boolean;
@@ -10753,6 +10852,8 @@ export interface components {
             limits?: components["schemas"]["PlanLimits"];
             /** Name */
             name: string;
+            /** One Time Fee Inr */
+            one_time_fee_inr?: number | string | null;
             /** Per Student Price Inr */
             per_student_price_inr?: number | string | null;
             /**
@@ -10800,6 +10901,8 @@ export interface components {
             code: string;
             /** Created At */
             created_at: string | null;
+            /** Description */
+            description: string | null;
             /** Features */
             features: {
                 [key: string]: unknown;
@@ -10819,6 +10922,8 @@ export interface components {
             };
             /** Name */
             name: string;
+            /** One Time Fee Inr */
+            one_time_fee_inr: string;
             /** Per Student Price Inr */
             per_student_price_inr: string | null;
             /** Pricing Model */
@@ -10846,6 +10951,8 @@ export interface components {
         PlanPatch: {
             /** Base Price Inr */
             base_price_inr?: number | string | null;
+            /** Description */
+            description?: string | null;
             /** Features */
             features?: {
                 [key: string]: boolean;
@@ -10855,6 +10962,8 @@ export interface components {
             limits?: components["schemas"]["PlanLimits"] | null;
             /** Name */
             name?: string | null;
+            /** One Time Fee Inr */
+            one_time_fee_inr?: number | string | null;
             /** Per Student Price Inr */
             per_student_price_inr?: number | string | null;
             /** Trial Days */
@@ -12301,6 +12410,10 @@ export interface components {
         };
         /** SubscriptionOut */
         SubscriptionOut: {
+            /** Ai Bundle From */
+            ai_bundle_from?: string | null;
+            /** Ai Bundle Id */
+            ai_bundle_id?: string | null;
             /**
              * Billing Account Id
              * Format: uuid
@@ -13285,6 +13398,11 @@ export interface components {
         UsageDailyOut: {
             /** Active Users */
             active_users: number;
+            /**
+             * Ai Answers
+             * @default 0
+             */
+            ai_answers: number;
             /** Ai Cost Inr */
             ai_cost_inr: string;
             /** Ai Input Tokens */
@@ -18864,6 +18982,37 @@ export interface operations {
             };
         };
     };
+    list_ai_bundles_api_v1_platform_ai_bundles_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AiBundleOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_announcements_api_v1_platform_announcements_get: {
         parameters: {
             query?: never;
@@ -20273,6 +20422,72 @@ export interface operations {
         };
     };
     activate_subscription_api_v1_platform_subscriptions__sub_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sub_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sub_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiBundleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_delete: {
         parameters: {
             query?: never;
             header?: never;

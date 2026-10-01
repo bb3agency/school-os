@@ -1,8 +1,9 @@
 """Usage metering and plan limits (FR-PLT-020, FR-PLT-021; docs/16 §5.10, §11).
 
 Counts only, never records. Shared tier: a daily job fans out over ``core.list_tenant_ids``
-and, per school, reads ``core.tenant_usage_summary`` (definer, counts only) plus one aggregate
-count in the school's own ``tenant_session`` (distinct active users from its audit log).
+and, per school, reads ``core.tenant_usage_summary`` (definer, counts only) plus aggregate
+counts in the school's own ``tenant_session`` (RLS applies): distinct active users from its
+audit log, and its Ask questions and billable AI answers from ``kb.queries`` (ADR-0020 B2).
 Dedicated tier: the heartbeat carries the same counts. Limits never block school work in M0;
 crossing 80% / 100% is recorded once per metric per billing period and audited.
 """
@@ -20,7 +21,7 @@ from app.core.db import platform_session, tenant_session
 from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import IST, SYSTEM, audit_platform, billing_cfg, today_ist
+from app.platform.common import IST, SYSTEM, audit_platform, billing_cfg, config, today_ist
 from app.platform.schemas import HbUsage, UsageDailyOut
 from app.tenancy import service as tenancy
 
@@ -43,6 +44,16 @@ _ACTIVE_USERS_SQL = text(
 )
 
 
+# Questions asked and billable AI answers (billing.yaml ai_answers.billable_statuses) that IST
+# day. Counts only: no question, answer or person leaves the school's session.
+_AI_COUNTS_SQL = text(
+    "SELECT count(*) AS queries, "
+    "count(*) FILTER (WHERE q.status = ANY(CAST(:billable AS text[]))) AS answers "
+    "FROM kb.queries AS q "
+    "WHERE q.tenant_id = :t AND q.created_at >= :start AND q.created_at < :end"
+)
+
+
 def _day_bounds(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
     start = dt.datetime.combine(day, dt.time(), IST)
     return start, start + dt.timedelta(days=1)
@@ -57,22 +68,36 @@ def active_users_on(tenant_id: uuid.UUID, day: dt.date) -> int:
         )
 
 
+def ai_counts_on(tenant_id: uuid.UUID, day: dt.date) -> tuple[int, int]:
+    """(questions asked, billable AI answers) that IST day, in the school's own session."""
+    start, end = _day_bounds(day)
+    billable = [str(v) for v in config()["ai_answers"]["billable_statuses"]]
+    with tenant_session(tenant_id) as s:
+        row = s.execute(
+            _AI_COUNTS_SQL, {"t": tenant_id, "start": start, "end": end, "billable": billable}
+        ).one()
+    return int(row.queries), int(row.answers)
+
+
 def snapshot(tenant_id: uuid.UUID, day: dt.date) -> dict[str, Any]:
     """Counts for one school and IST day (no write). Used by the collector and heartbeats."""
     with platform_session() as s:
         counts = tenancy.tenant_usage(s, tenant_id)
+    ai_queries, ai_answers = ai_counts_on(tenant_id, day)
     values: dict[str, Any] = {
         "tenant_id": tenant_id,
         "usage_date": day,
         "source": "shared_collector",
         "active_users": active_users_on(tenant_id, day),
         "staff_users": counts.active_memberships,
-        # Student, storage, document and AI meters join core.tenant_usage_summary as the
-        # sis/kb modules land (definer function extended in their migrations).
+        # Student, storage and document meters and the AI tokens and cost join
+        # core.tenant_usage_summary as the sis/kb modules land (definer function extended in
+        # their migrations).
         "students_active": 0,
         "storage_bytes": 0,
         "documents": 0,
-        "ai_queries": 0,
+        "ai_queries": ai_queries,
+        "ai_answers": ai_answers,
         "ai_input_tokens": 0,
         "ai_output_tokens": 0,
         "ai_cost_usd": Decimal("0"),
@@ -119,6 +144,7 @@ def ingest_heartbeat(session: Any, tenant_id: uuid.UUID, usage: HbUsage) -> None
             "storage_bytes": usage.storage_bytes,
             "documents": usage.documents,
             "ai_queries": usage.ai_queries,
+            "ai_answers": usage.ai_answers,
             "ai_input_tokens": usage.ai_input_tokens,
             "ai_output_tokens": usage.ai_output_tokens,
             "ai_cost_usd": usage.ai_cost_usd,

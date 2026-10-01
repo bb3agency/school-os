@@ -47,6 +47,8 @@ from app.platform.auth import OperatorContext, require_platform
 from app.platform.common import Actor, must, today_ist
 from app.platform.permissions import ANY_OPERATOR
 from app.platform.schemas import (
+    AiBundleIn,
+    AiBundleOut,
     AnnouncementIn,
     AnnouncementOut,
     AuditVerifyOut,
@@ -557,6 +559,17 @@ def retire_plan(
     return billing.set_plan_status(_actor(ctx), plan_id, "retired")
 
 
+@router.get("/ai-bundles", response_model=Page[AiBundleOut])
+def list_ai_bundles(
+    *,
+    ctx: Annotated[Ctx, PlanRead],
+    status: Annotated[str | None, Query(pattern=r"^(published|retired)$")] = None,
+) -> Page[AiBundleOut]:
+    """AI answer bundles: a monthly add-on with an included number of answers and a price per
+    extra answer (docs/16 §5.6). Seeded by catalogue migrations; never unlimited."""
+    return Page[AiBundleOut](data=billing.list_ai_bundles(status))
+
+
 # --- subscriptions ----------------------------------------------------------------------------
 
 SubManage = Depends(require_platform("platform.subscriptions.manage"))
@@ -621,6 +634,23 @@ def set_price_override(
 @router.delete("/subscriptions/{sub_id}/price-override", response_model=SubscriptionOut)
 def clear_price_override(*, sub_id: uuid.UUID, ctx: Annotated[Ctx, SubManage]) -> SubscriptionOut:
     return billing.set_price_override(_actor(ctx), sub_id, None, None)
+
+
+@router.put("/subscriptions/{sub_id}/ai-bundle", response_model=SubscriptionOut)
+def set_ai_bundle(
+    *, sub_id: uuid.UUID, data: AiBundleIn, ctx: Annotated[Ctx, SubManage]
+) -> SubscriptionOut:
+    """Choose or change the AI answer bundle (monthly plans only; ``409
+    ai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today
+    (a trial's from the month after activation); answers above the quota are billed on the next
+    invoice at the bundle's price per extra answer."""
+    return billing.set_ai_bundle(_actor(ctx), sub_id, data.ai_bundle_id)
+
+
+@router.delete("/subscriptions/{sub_id}/ai-bundle", response_model=SubscriptionOut)
+def remove_ai_bundle(*, sub_id: uuid.UUID, ctx: Annotated[Ctx, SubManage]) -> SubscriptionOut:
+    """Remove the AI answer bundle: no bundle line and no overage from the next invoice."""
+    return billing.set_ai_bundle(_actor(ctx), sub_id, None)
 
 
 @router.post("/subscriptions/{sub_id}/suspend", response_model=SubscriptionOut)
