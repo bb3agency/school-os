@@ -194,10 +194,7 @@ export function SheetGrid({
   const filtering = query.trim() !== "";
 
   // An open editor with a changed value is unsaved work: warn before the page is left.
-  useUnsavedChangesWarning(
-    Boolean(editing && editing.draft !== editing.original),
-    t("leaveDraft"),
-  );
+  useUnsavedChangesWarning(Boolean(editing && editing.draft !== editing.original), t("leaveDraft"));
 
   // Keep the active cell inside the grid when the page, the rows or the filter change.
   const row = Math.min(active.row, Math.max(rowCount - 1, 0));

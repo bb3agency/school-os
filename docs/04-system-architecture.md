@@ -86,10 +86,10 @@ flowchart TB
 | `audit` | audit events, chain verification | `record()`, `verify_chain()` | core |
 | `tenancy` | tenants, years, classes, sections, enrolments, settings | `register_tenant()` / `set_tenant_status()` (wrappers over the definer functions), `initialise_tenant()` (keys + post-provision hooks) | core, authz, audit, identity |
 | `students` | students, guardians, attribute values, canonical view | `get_profile()`, `record_value()`, `search()` | core, authz, audit, tenancy |
-| `imports` | batches, mappings, extraction queue | `validate_batch()`, `commit_batch()` | students, documents |
+| `imports` | batches, mappings, extraction queue, staged sheet with encrypted cell edits (`imports.cells`; editable until commit, then read-only: invariant 6) and its CSV/XLSX download (FR-IMP-008/009) | `validate_batch()`, `commit_batch()`, `get_sheet()`, `edit_row()`, `export_sheet()` | students, documents |
 | `dq` | rules, name matching, findings | `run_checks()`, `resolve()` | students |
 | `changes` | change requests | `submit()`, `approve()` | students, dq, documents |
-| `documents` | files, versions, ACLs, scanning | `upload()`, `get_download_url()` | core, authz, audit |
+| `documents` | files, versions, ACLs, scanning; XLSX/CSV sheets read on request (`documents.sheets`, readers in `core.spreadsheet`), edits saved only as a new version through the normal scan and ingest path, downloads (FR-DOC-009..011) | `upload()`, `get_download_url()`, `get_sheet()`, `save_sheet_version()`, `export_sheet()` | core, authz, audit |
 | `knowledge` | ingestion, chunks, embeddings, retrieval, tools, gateway, evals | `ask()`, `ingest()` | documents, students (via service), dq (via service) |
 | `exports` | export profiles, report generation | `generate()` | students, dq |
 | `certificates` | certificate requests, serial numbers, TC/certificate registers, print views, certificate PDFs (M3; 05 §5.7) | `request_certificate()`, `approve()`, `render_pdf()`, `export_records()` | students, dq, documents, tenancy, notifications, ops (via service) |

@@ -350,7 +350,9 @@ export function DocumentSheetPreview({ documentId }: { documentId: string }) {
               editable={false}
               searchable={false}
             />
-            <p className="text-sm text-ink-muted">{t("summary", { rows: sheet.data.total_rows })}</p>
+            <p className="text-sm text-ink-muted">
+              {t("summary", { rows: sheet.data.total_rows })}
+            </p>
           </>
         ) : sheet.status === "error" ? (
           <p className="text-sm">{t("previewUnavailable")}</p>

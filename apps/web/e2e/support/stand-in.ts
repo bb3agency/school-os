@@ -10,6 +10,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
+import { resetSheets, sheetAnswer } from "./sheet-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
 export const API_PORT = Number(process.env.E2E_API_PORT ?? 8099);
@@ -770,6 +771,7 @@ async function startApi(): Promise<Server> {
     if (url.pathname === "/__e2e/reset" && method === "POST") {
       resetJourney();
       resetAsk();
+      resetSheets();
       return send(response, 204, "");
     }
     if (url.pathname.startsWith(FILES_PREFIX)) {
@@ -796,6 +798,27 @@ async function startApi(): Promise<Server> {
         return send(response, 404, problem, "application/problem+json");
       }
       return streamAnswer(response, answer.events, question.includes("slowly"), answer.commit);
+    }
+    // Sheet editor (sheet-api.ts): ETags, If-Match and file downloads.
+    const ifMatch = request.headers["if-match"];
+    const sheet = sheetAnswer(method, url, body, typeof ifMatch === "string" ? ifMatch : undefined);
+    if (sheet?.kind === "file") {
+      response.writeHead(200, {
+        "content-type": sheet.type,
+        "content-disposition": `attachment; filename="${sheet.name}"`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      return response.end(sheet.content);
+    }
+    if (sheet) {
+      if (sheet.etag) response.setHeader("ETag", sheet.etag);
+      return send(
+        response,
+        sheet.status,
+        sheet.body,
+        sheet.status >= 400 ? "application/problem+json" : "application/json",
+      );
     }
     const subject = subjectOf(request);
     const [status, answer] =
