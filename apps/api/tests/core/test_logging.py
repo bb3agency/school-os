@@ -178,6 +178,28 @@ def test_SEC_008_unknown_fields_are_dropped_and_counted(capture: Captured) -> No
     _assert_no_pii(capture.text)
 
 
+def test_SEC_008_sheet_editor_fields_are_dropped(capture: Captured) -> None:
+    """FR-IMP-008, FR-DOC-010: cell values, headers and edit lists of the sheet editor never
+    reach a log line, even if a caller passes them by mistake; only the counts stay."""
+    get_logger("app.imports").info(
+        "imports.sheet.edited",
+        value=SYNTHETIC_NAME,
+        old_value=SYNTHETIC_TELUGU_NAME,
+        new_value=SYNTHETIC_AADHAAR,
+        header="Student name",
+        cells=[{"column": 1, "value": SYNTHETIC_NAME}],
+        edits={"B3": SYNTHETIC_PHONE},
+        resource_type="import_batch",
+        count=1,
+    )
+    line = capture.one()
+    for field in ("value", "old_value", "new_value", "header", "cells", "edits"):
+        assert field not in line
+    assert line["count"] == 1
+    assert line["dropped_fields"] == 6
+    _assert_no_pii(capture.text)
+
+
 def test_SEC_008_non_scalar_values_in_allowed_fields_are_dropped(capture: Captured) -> None:
     get_logger("app.x").info("x.done", resource_id={"name": SYNTHETIC_NAME}, count=3)
     line = capture.one()

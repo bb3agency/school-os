@@ -21,18 +21,12 @@ const self = fileURLToPath(import.meta.url);
  */
 const NOT_YET_SWEPT = new Set([
   // features/imports: spreadsheet onboarding
-  "features/imports/ImportDetail.tsx",
-  "features/imports/ImportSheet.tsx",
   "features/imports/ImportsScreen.tsx",
   "features/imports/parts.tsx",
   // features/documents
-  "features/documents/DocumentDetailScreen.tsx",
-  "features/documents/DocumentSheet.tsx",
   "features/documents/DocumentsScreen.tsx",
   "features/documents/NewDocumentScreen.tsx",
   "features/documents/parts.tsx",
-  // features/sheets
-  "features/sheets/SheetGrid.tsx",
   // features/marketing: public pages
   "features/marketing/AboutView.tsx",
   "features/marketing/FeaturesView.tsx",

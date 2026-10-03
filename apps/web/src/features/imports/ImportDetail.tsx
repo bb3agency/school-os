@@ -261,7 +261,7 @@ function MappingForm({ batch, attributes, label, onChecked }: MappingFormProps) 
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Icon name="file" className="size-4 text-ink-muted" />
-                  <span className="font-medium break-words text-ink">{header}</span>
+                  <span className="font-semibold break-words text-ink">{header}</span>
                   {column.suggested && column.target === null ? (
                     <Badge tone="info">
                       <Icon name="sparkles" className="size-3.5" />
@@ -315,12 +315,16 @@ function RowsCard({
   batch,
   label,
   initialFilter,
+  sheetEditable = false,
 }: {
   batch: ImportBatch;
   label: (key: string) => string;
   initialFilter: RowFilterChoice;
+  /** "Check rows" step: rows with problems can be corrected in the sheet (FR-IMP-008). */
+  sheetEditable?: boolean;
 }) {
   const t = useTranslations("imports.rows");
+  const ts = useTranslations("sheets.import");
   const api = useBffClient("staff");
   const [filter, setFilter] = useState<RowFilterChoice>(initialFilter);
   const pages = useCursorStack();
@@ -432,6 +436,15 @@ function RowsCard({
             }}
             options={ROW_FILTERS.map((value) => ({ value, label: t(`filters.${value}`) }))}
           />
+          {sheetEditable && batch.error_count > 0 ? (
+            <span className="flex flex-col gap-1">
+              <ButtonLink href={`/imports/${batch.id}/sheet`} variant="secondary">
+                <Icon name="layers" className="size-4" />
+                {ts("fixInSheet")}
+              </ButtonLink>
+              <span className="max-w-sm text-xs text-ink-muted">{ts("fixInSheetHint")}</span>
+            </span>
+          ) : null}
         </div>
         <DataTable
           caption={t("title")}
@@ -749,20 +762,20 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
           <dl className="flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-4 text-sm">
             <div>
               <dt className="text-ink-muted">{t("source")}</dt>
-              <dd className="font-medium text-ink">
+              <dd className="text-ink">
                 <SourceName source={data.source} />
               </dd>
             </div>
             {data.committed_at ? (
               <div>
                 <dt className="text-ink-muted">{t("committedAt")}</dt>
-                <dd className="font-medium text-ink">{formatDateTime(data.committed_at)}</dd>
+                <dd className="text-ink">{formatDateTime(data.committed_at)}</dd>
               </div>
             ) : null}
             {data.reverted_at ? (
               <div>
                 <dt className="text-ink-muted">{t("revertedAt")}</dt>
-                <dd className="font-medium text-ink">{formatDateTime(data.reverted_at)}</dd>
+                <dd className="text-ink">{formatDateTime(data.reverted_at)}</dd>
               </div>
             ) : null}
           </dl>
@@ -816,6 +829,12 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
           batch={data}
           label={label}
           initialFilter={data.status === "validated" && data.error_count > 0 ? "error" : "all"}
+          sheetEditable={
+            canRun &&
+            MAPPING_EDITABLE.has(data.status) &&
+            HAS_SHEET.has(data.status) &&
+            !data.raw_file_deleted_at
+          }
         />
       ) : null}
     </div>

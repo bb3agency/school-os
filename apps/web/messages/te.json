@@ -4279,7 +4279,14 @@
         "aadhaar": "పూర్తి ఆధార్ నంబర్ నమోదు చేయవద్దు. చివరి 4 అంకెలు మాత్రమే నమోదు చేయండి.",
         "tooLong": "గరిష్ఠంగా 1,000 అక్షరాలు వాడండి.",
         "control": "విలువను ఒకే లైన్‌లో ఉంచండి."
-      }
+      },
+      "pending": "Not saved yet",
+      "searchLabel": "Find on this page",
+      "searchColumn": "In column",
+      "allColumns": "All columns",
+      "searchCount": "{shown, plural, one {# row} other {# rows}} of {total} on this page match.",
+      "noMatch": "No rows on this page match. Clear the search or try another page.",
+      "leaveDraft": "You have a change you haven't saved. Leave this page and lose it?"
     },
     "import": {
       "title": "షీట్‌ను తనిఖీ చేయండి",
@@ -4317,7 +4324,10 @@
       "openTitle": "షీట్‌ను తనిఖీ చేయండి",
       "openDescriptionEdit": "ప్రతి వరుసను మీ ఫైల్‌లో ఉన్నట్లే చూడండి, వరుసలను జోడించే ముందు గడులను సరిచేయండి. దీన్ని డౌన్‌లోడ్ కూడా చేయవచ్చు.",
       "openDescriptionRead": "ప్రతి వరుసను మీ ఫైల్‌లో ఉన్నట్లే చూడండి, లేదా డౌన్‌లోడ్ చేయండి.",
-      "open": "షీట్ తెరవండి"
+      "open": "షీట్ తెరవండి",
+      "rowWarning": "Has warnings",
+      "fixInSheet": "Correct cells in the sheet",
+      "fixInSheetHint": "Open your file as a sheet, correct the cells with problems and each row is checked again at once."
     },
     "document": {
       "title": "షీట్",
@@ -4355,7 +4365,16 @@
       "note": "సేవ్ చేసిన వెర్షన్‌లో విలువలు మాత్రమే ఉంటాయి, ఫార్మాటింగ్ ఉండదు. డౌన్‌లోడ్‌లలో సేవ్ చేయని మార్పులు ఉంటాయి; వ్యక్తిగత సమాచారం ఉంటే మీరే అని నిర్ధారించమని అడుగుతాం.",
       "pagesLabel": "షీట్ పేజీలు",
       "open": "షీట్‌గా తెరవండి",
-      "openHint": "వరుసలను పట్టికలో చూడండి, గడులను సరిచేయండి లేదా షీట్‌ను డౌన్‌లోడ్ చేయండి."
+      "openHint": "వరుసలను పట్టికలో చూడండి, గడులను సరిచేయండి లేదా షీట్‌ను డౌన్‌లోడ్ చేయండి.",
+      "leaveUnsaved": "Your changes to this sheet are not saved. Leave this page and lose them?",
+      "conflictTitle": "This document changed while you were working",
+      "conflictBody": "Someone saved a newer version. Your changes are still on this page: download them to keep a copy, then reload the sheet and make them again on the newest version.",
+      "conflictDownload": "Download my changes (CSV)",
+      "conflictReload": "Reload the sheet",
+      "previewTitle": "Sheet preview",
+      "previewDescription": "The first rows of the first worksheet. Open the sheet to see every row, correct cells or download it.",
+      "previewCaption": "First rows of the sheet",
+      "previewUnavailable": "This file can't be shown as a table here. Download it instead."
     },
     "errors": {
       "aadhaar_full_number_rejected": {

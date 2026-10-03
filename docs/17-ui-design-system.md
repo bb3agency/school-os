@@ -219,6 +219,30 @@ page from lg, in the menu drawer below lg), a top bar (bell, language; below lg 
 button and wordmark) and `<main id="main">`. See §5.2. `MinimalShell` (`wide` for tables) and
 `Wordmark` serve pages outside a school; `BrandMark` is the round "S" both use.
 
+### 4.1 Sheet grid: editable tables (`@/features/sheets`)
+
+`SheetGrid` (client) shows a spreadsheet page (an import's staged rows, an XLSX/CSV document) on
+the `Table` primitives; use it for any table whose cells are edited in place, never `DataTable`.
+Built for the import sheet (`/imports/{id}/sheet`, linked from the "Check rows" step and the
+import page), the document sheet (`/documents/{id}/sheet`) and the read-only preview of the
+first 10 rows on the document page (FR-IMP-008, FR-DOC-009..011).
+
+| Part                       | Rule                                                                                                                                                                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Layout                     | `TableScroll framed` with `max-h-[70dvh]`: the rows scroll sideways and down inside the labelled, focusable region, never the page (375px to 1366×768). Compact density on the neutral canvas; the row number column stays in view below md                                            |
+| Header                     | Sticky (`top-0`, header tint): column letter (mono), the file's heading (semibold), what the column fills ("Fills: Date of birth") or "Not imported", and a lock for restricted (C3) columns                                                                                                |
+| Rows                       | Row number as the row header (`th scope="row"`, red when the row has errors); optional check column with a status pill (`Valid`, `Has errors`, `Added` …) or a warning `Badge` ("Has warnings"), then the problems in plain words                                                            |
+| Cells                      | Empty cells show "—" (read as "Empty"); restricted cells "Hidden" with a lock (never a value); formulas as mono text with "Formula, not run"; saved changes "Changed" (info tint); changes kept on the page or still being saved "Not saved yet" (warning tint, icon). Colour is never the only signal |
+| Keyboard (WAI-ARIA grid)   | One tab stop (roving `tabindex`): Tab enters on the last active cell, Tab again leaves. Arrows move (at an edge the key is left to the browser so the region scrolls), Home/End and Ctrl+Home/Ctrl+End jump; the focused cell scrolls into view (`block/inline: nearest`, `scroll-pt` clears the sticky header) |
+| Editing                    | Enter or F2 (or double click) opens a one-line input with the value; Enter saves, Escape cancels and returns focus to the cell, Tab saves and leaves the grid (Shift+Tab: before it). Read-only cells carry `aria-readonly`; a read-only grid says why in an info `Alert` above it              |
+| Checks before sending      | NFC, trimmed, blank clears; one line, at most 1,000 characters; a full Aadhaar number is refused with how to fix it ("enter only the last 4 digits"). The API applies the same rules                                                                                                          |
+| Announcements              | One polite `role="status"` line per screen for outcomes ("Row 3 saved. It has no problems now.", "Downloaded …"); "Saving…" is shown, not announced. Failures use `ProblemAlert` with the API's code, never cell values                                                                       |
+| Find on this page          | `SearchInput` + "In column" `SelectField` above the grid filter the rows of the current page (restricted columns are never searched); a polite count says how many match. Paging (100 rows) stays server-side                                                                              |
+| Unsaved work               | `useUnsavedChangesWarning`: an open editor with a changed value, or document changes not yet saved, make links inside SchoolOS ask first and the browser ask before the tab closes                                                                                                         |
+| Conflicts (412)            | Imports: the sheet reloads and the person makes the change again. Documents: the changes stay on the page with "Download my changes (CSV)" and "Reload the sheet"; saving waits for the reload                                                                                               |
+| Downloads                  | CSV (UTF-8 with BOM) and Excel buttons in the page header, through the BFF with the step-up prompt; the note under the grid says changes are included, Aadhaar-like numbers masked and formulas turned into text                                                                           |
+| Motion                     | None (§2 rule 6: never on tables or keyboard navigation)                                                                                                                                                                                                                                   |
+
 ## 5. Page recipe (for screen agents)
 
 ```tsx

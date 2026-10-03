@@ -1,28 +1,46 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Icon } from "@/components/ui/Icon";
+import { SearchInput } from "@/components/ui/Input";
+import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { containsFullAadhaar } from "@/features/students/aadhaar";
 import { cn } from "@/lib/cn";
+import { useUnsavedChangesWarning } from "./unsaved";
 
 /**
- * Spreadsheet grid for the sheet editor (US-401 AC5, US-701 AC5; FR-IMP-008, FR-DOC-009/010).
+ * Spreadsheet grid for the sheet editor (US-401 AC5, US-701 AC5; FR-IMP-008, FR-DOC-009/010;
+ * docs/17 §4.1).
  *
- * WAI-ARIA grid pattern with one tab stop: Tab enters the grid on the last focused cell, the
- * arrow keys move between cells, Home/End go to the first/last cell of the row and
- * Ctrl+Home/Ctrl+End to the first/last cell of the grid. Enter (or F2, or a double click) on
- * a cell that may be changed opens an input with its value: Enter saves, Escape cancels and
- * puts focus back on the cell. Values are single-line text of at most 1,000 characters; a
- * full Aadhaar number is refused here before anything is sent (the API refuses it too).
- * Restricted (C3) cells never carry a value and cannot be edited; formula cells are shown as
- * inert text. The grid scrolls sideways inside its own region, with the row number column
- * kept in view on small screens.
+ * WAI-ARIA grid pattern with one tab stop (roving tabindex): Tab enters the grid on the last
+ * focused cell and Tab again leaves it; the arrow keys move between cells (at an edge the key
+ * is left to the browser, so the region still scrolls), Home/End go to the first/last cell of
+ * the row and Ctrl+Home/Ctrl+End to the first/last cell of the grid. Enter or F2 (or a double
+ * click) on a cell that may be changed opens an input with its value: Enter saves, Escape
+ * cancels and puts focus back on the cell, Tab saves and leaves the grid. Values are single-line
+ * text of at most 1,000 characters; a full Aadhaar number is refused here before anything is
+ * sent (the API refuses it too). Restricted (C3) cells never carry a value and cannot be edited;
+ * formula cells are shown as inert text. Changed cells are marked ("Changed" once saved, "Not
+ * saved yet" while only on the page).
+ *
+ * The header row stays in view while the rows scroll inside their own labelled, focusable
+ * region (sideways and down), so the page never scrolls sideways at 375px or 1366×768. A search
+ * box (and a column choice) filters the rows of the page that is shown. No motion (docs/17 §2.6).
  */
 
 export const MAX_CELL_CHARS = 1000;
 const CONTROL = /[\u0000-\u001f\u007f]/;
+const ALL = "all";
 
 export interface SheetGridColumn {
   index: number;
@@ -36,7 +54,10 @@ export interface SheetGridColumn {
 
 export interface SheetGridCell {
   value: string | null;
+  /** Changed in SchoolOS and saved. */
   edited?: boolean | undefined;
+  /** Changed on this page but not saved yet. */
+  pending?: boolean | undefined;
   restricted?: boolean | undefined;
   formula?: boolean | undefined;
 }
@@ -44,7 +65,7 @@ export interface SheetGridCell {
 export interface SheetGridRow {
   rowNo: number;
   cells: readonly SheetGridCell[];
-  /** Check result shown in the first column (e.g. "Error" with the problems). */
+  /** Check result shown in the first column (e.g. a status pill with the problems). */
   check?: ReactNode;
   /** Marks the row as having problems (row header styling). */
   invalid?: boolean | undefined;
@@ -66,6 +87,27 @@ export function normaliseCellValue(value: string): string | null {
   return text === "" ? null : text;
 }
 
+/** Rows of the page whose (visible) cells contain `query`, in `column` or in any column. */
+export function filterRows(
+  rows: readonly SheetGridRow[],
+  columns: readonly SheetGridColumn[],
+  query: string,
+  column: number | null,
+): readonly SheetGridRow[] {
+  const needle = query.normalize("NFC").trim().toLocaleLowerCase();
+  if (!needle) return rows;
+  const searched = columns.filter(
+    (item) => !item.restricted && (column === null || item.index === column),
+  );
+  return rows.filter((row) =>
+    searched.some((item) => {
+      const cell = row.cells[item.index];
+      if (!cell || cell.restricted || cell.value === null) return false;
+      return cell.value.normalize("NFC").toLocaleLowerCase().includes(needle);
+    }),
+  );
+}
+
 export interface SheetGridProps {
   /** Names the grid and its scroll region. */
   caption: string;
@@ -77,9 +119,12 @@ export interface SheetGridProps {
   editable: boolean;
   /** While a save runs, editing is paused. */
   busy?: boolean | undefined;
+  /** Show the "find on this page" search (default on). */
+  searchable?: boolean | undefined;
   /**
    * Called with the new value (`null` clears the cell) when the user saves a changed cell.
-   * Resolves once the parent has handled it; the grid then puts focus back on the cell.
+   * Resolves once the parent has handled it; the grid then puts focus back on the cell (or,
+   * after Tab, leaves it where Tab went).
    */
   onCommit?: (rowNo: number, column: number, value: string | null) => Promise<void> | void;
 }
@@ -91,12 +136,30 @@ interface Position {
 
 interface Editing extends Position {
   draft: string;
+  original: string;
   problem: CellProblem | null;
 }
 
-/** Position of a cell in the navigation order: the check column (if any) comes first. */
 function focusKey(row: number, col: number): string {
   return `${row}:${col}`;
+}
+
+const TABBABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), ' +
+  'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Focus the next (or previous) tab stop outside `container`, as Tab would from it. */
+function focusOutside(container: HTMLElement, forward: boolean): void {
+  const stops = [...document.querySelectorAll<HTMLElement>(TABBABLE)].filter(
+    (element) =>
+      !container.contains(element) && element.tabIndex >= 0 && !element.closest("[inert]"),
+  );
+  const relation = forward ? Node.DOCUMENT_POSITION_FOLLOWING : Node.DOCUMENT_POSITION_PRECEDING;
+  const candidates = stops.filter(
+    (element) => (container.compareDocumentPosition(element) & relation) !== 0,
+  );
+  const target = forward ? candidates[0] : candidates[candidates.length - 1];
+  target?.focus();
 }
 
 export function SheetGrid({
@@ -106,35 +169,54 @@ export function SheetGrid({
   checkHeader,
   editable,
   busy = false,
+  searchable = true,
   onCommit,
 }: SheetGridProps) {
   const t = useTranslations("sheets.grid");
   const helpId = useId();
   const errorId = useId();
+  const table = useRef<HTMLTableElement>(null);
   const cells = useRef(new Map<string, HTMLElement>());
   const [active, setActive] = useState<Position>({ row: 0, col: 0 });
   const [editing, setEditing] = useState<Editing | null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
+  const [query, setQuery] = useState("");
+  const [searchColumn, setSearchColumn] = useState<string>(ALL);
   const hasCheck = Boolean(checkHeader);
   const offset = hasCheck ? 1 : 0;
   const colCount = columns.length + offset;
-  const rowCount = rows.length;
 
-  // Keep the active cell inside the grid when the page or the rows change.
+  const shown = useMemo(
+    () => filterRows(rows, columns, query, searchColumn === ALL ? null : Number(searchColumn)),
+    [rows, columns, query, searchColumn],
+  );
+  const rowCount = shown.length;
+  const filtering = query.trim() !== "";
+
+  // An open editor with a changed value is unsaved work: warn before the page is left.
+  useUnsavedChangesWarning(Boolean(editing && editing.draft !== editing.original), t("leaveDraft"));
+
+  // Keep the active cell inside the grid when the page, the rows or the filter change.
   const row = Math.min(active.row, Math.max(rowCount - 1, 0));
   const col = Math.min(active.col, Math.max(colCount - 1, 0));
 
   useEffect(() => {
     if (focusRequest === 0) return;
-    cells.current.get(focusKey(row, col))?.focus();
+    const cell = cells.current.get(focusKey(row, col));
+    cell?.focus();
+    // Keep the focused cell fully visible inside the scroll region (not under the header).
+    cell?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [focusRequest, row, col]);
 
-  function moveTo(next: Position) {
-    setActive({
+  function moveTo(next: Position): boolean {
+    const target = {
       row: Math.max(0, Math.min(rowCount - 1, next.row)),
       col: Math.max(0, Math.min(colCount - 1, next.col)),
-    });
+    };
+    if (target.row === row && target.col === col) return false;
+    setActive(target);
     setFocusRequest((n) => n + 1);
+    return true;
   }
 
   function columnAt(position: number): SheetGridColumn | undefined {
@@ -143,7 +225,7 @@ export function SheetGrid({
 
   function canEdit(r: number, c: number): boolean {
     const column = columnAt(c);
-    const cell = column ? rows[r]?.cells[column.index] : undefined;
+    const cell = column ? shown[r]?.cells[column.index] : undefined;
     return Boolean(
       editable && !busy && onCommit && column?.editable && !column.restricted && !cell?.restricted,
     );
@@ -152,9 +234,9 @@ export function SheetGrid({
   function startEditing(r: number, c: number) {
     if (!canEdit(r, c)) return;
     const column = columnAt(c);
-    const value = column ? (rows[r]?.cells[column.index]?.value ?? "") : "";
+    const value = column ? (shown[r]?.cells[column.index]?.value ?? "") : "";
     setActive({ row: r, col: c });
-    setEditing({ row: r, col: c, draft: value, problem: null });
+    setEditing({ row: r, col: c, draft: value, original: value, problem: null });
   }
 
   function stopEditing() {
@@ -162,23 +244,26 @@ export function SheetGrid({
     setFocusRequest((n) => n + 1);
   }
 
-  async function save(current: Editing) {
+  /** Save the editor's value. `leave`: Tab was pressed, focus goes past the grid. */
+  async function save(current: Editing, leave?: "forward" | "backward") {
     const column = columnAt(current.col);
-    const cell = column ? rows[current.row]?.cells[column.index] : undefined;
-    const target = rows[current.row];
-    if (!column || !target || !onCommit) return stopEditing();
+    const cell = column ? shown[current.row]?.cells[column.index] : undefined;
+    const target = shown[current.row];
     const problem = cellProblem(current.draft);
     if (problem) {
       setEditing({ ...current, problem });
       return;
     }
     const value = normaliseCellValue(current.draft);
-    if (value === (cell?.value ?? null)) return stopEditing();
+    const unchanged = !column || !target || !onCommit || value === (cell?.value ?? null);
     setEditing(null);
+    if (leave && table.current) focusOutside(table.current, leave === "forward");
+    else if (unchanged) setFocusRequest((n) => n + 1);
+    if (unchanged) return;
     try {
       await onCommit(target.rowNo, column.index, value);
     } finally {
-      setFocusRequest((n) => n + 1);
+      if (!leave) setFocusRequest((n) => n + 1);
     }
   }
 
@@ -195,15 +280,13 @@ export function SheetGrid({
     };
     const next = moves[event.key];
     if (next) {
-      event.preventDefault();
-      moveTo(next);
+      // At an edge nothing moves and the key is left to the browser (the region scrolls).
+      if (moveTo(next)) event.preventDefault();
       return;
     }
-    if (event.key === "Enter" || event.key === "F2") {
-      if (canEdit(r, c)) {
-        event.preventDefault();
-        startEditing(r, c);
-      }
+    if ((event.key === "Enter" || event.key === "F2") && canEdit(r, c)) {
+      event.preventDefault();
+      startEditing(r, c);
     }
   }
 
@@ -216,6 +299,9 @@ export function SheetGrid({
       event.preventDefault();
       event.stopPropagation(); // do not close a surrounding dialog
       stopEditing();
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      void save(editing, event.shiftKey ? "backward" : "forward");
     }
   }
 
@@ -255,8 +341,13 @@ export function SheetGrid({
             {t("formula")}
           </span>
         ) : null}
-        {cell?.edited ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-info-ink">
+        {cell?.pending ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning-ink">
+            <Icon name="alert" className="size-3" />
+            {t("pending")}
+          </span>
+        ) : cell?.edited ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-info-ink">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
             {t("edited")}
           </span>
@@ -265,13 +356,48 @@ export function SheetGrid({
     );
   }
 
+  const searchColumns = columns.filter((column) => !column.restricted);
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {searchable && rows.length > 0 ? (
+        <div className="flex flex-wrap items-end gap-3" role="search" data-print="hide">
+          <SearchInput
+            label={t("searchLabel")}
+            labelVisible
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            wrapperClassName="w-full max-w-xs"
+            autoComplete="off"
+          />
+          <SelectField
+            label={t("searchColumn")}
+            value={searchColumn}
+            onChange={(event) => setSearchColumn(event.currentTarget.value)}
+            className="w-full max-w-56"
+            options={[
+              { value: ALL, label: t("allColumns") },
+              ...searchColumns.map((column) => ({
+                value: String(column.index),
+                label: `${column.letter} · ${column.header || t("noHeader")}`,
+              })),
+            ]}
+          />
+          <p aria-live="polite" aria-atomic="true" className="pb-2 text-sm text-ink-muted">
+            {filtering ? t("searchCount", { shown: rowCount, total: rows.length }) : ""}
+          </p>
+        </div>
+      ) : null}
       <p id={helpId} className="text-sm text-ink-muted">
         {editable ? t("keyboardHelpEdit") : t("keyboardHelpRead")}
       </p>
-      <TableScroll label={t("scrollLabel", { caption })} framed>
+      <TableScroll
+        label={t("scrollLabel", { caption })}
+        framed
+        className="max-h-[70dvh] overflow-y-auto scroll-pt-20 print:max-h-none"
+      >
         <Table
+          ref={table}
           role="grid"
           density="compact"
           stickyFirstColumn
@@ -283,11 +409,19 @@ export function SheetGrid({
         >
           <THead>
             <Tr role="row" aria-rowindex={1}>
-              <Th role="columnheader" aria-colindex={1} className="w-14">
+              <Th
+                role="columnheader"
+                aria-colindex={1}
+                className="sticky top-0 z-[2] w-14 bg-surface-muted"
+              >
                 {t("rowNumber")}
               </Th>
               {hasCheck ? (
-                <Th role="columnheader" aria-colindex={2} className="min-w-40">
+                <Th
+                  role="columnheader"
+                  aria-colindex={2}
+                  className="sticky top-0 z-[2] min-w-40 bg-surface-muted"
+                >
                   {checkHeader}
                 </Th>
               ) : null}
@@ -296,7 +430,7 @@ export function SheetGrid({
                   key={column.index}
                   role="columnheader"
                   aria-colindex={i + offset + 2}
-                  className="min-w-36 align-bottom whitespace-normal"
+                  className="sticky top-0 z-[2] min-w-36 bg-surface-muted align-bottom whitespace-normal"
                 >
                   <span className="flex flex-col gap-0.5">
                     <span className="flex items-baseline gap-1.5">
@@ -320,7 +454,14 @@ export function SheetGrid({
             </Tr>
           </THead>
           <TBody>
-            {rows.map((line, r) => (
+            {shown.length === 0 && filtering ? (
+              <Tr role="row" aria-rowindex={2}>
+                <Td role="gridcell" aria-colindex={1} colSpan={colCount + 1}>
+                  {t("noMatch")}
+                </Td>
+              </Tr>
+            ) : null}
+            {shown.map((line, r) => (
               <Tr key={line.rowNo} role="row" aria-rowindex={r + 2}>
                 <Th
                   scope="row"
@@ -369,7 +510,11 @@ export function SheetGrid({
                       onDoubleClick={() => startEditing(r, c)}
                       className={cn(
                         "max-w-72 min-w-36 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus",
-                        cell?.edited && "bg-info-soft",
+                        cell?.pending
+                          ? "bg-warning-soft"
+                          : cell?.edited
+                            ? "bg-info-soft"
+                            : undefined,
                       )}
                     >
                       {isEditing && editing ? (
