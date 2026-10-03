@@ -27,7 +27,9 @@ per school)::
 - The bucket is versioned (90-day recovery window for overwrites and deletes). Objects that must
   not be kept at all (PRV-016: an image that showed a full Aadhaar number) are removed with
   :meth:`ObjectStore.discard`, which tags them ``sos-lifecycle=discarded`` before deleting; the
-  lifecycle rule ``discarded-1d`` (infra/terraform) expires such versions after one day.
+  lifecycle rule ``discarded-1d`` (infra/terraform) expires such versions after one day. Every
+  automatic deletion uses it too (retention purges, expired exports and uploads: docs/08 §7,
+  :meth:`ObjectStore.purge_prefix` for a prefix); only a person's delete keeps the 90-day window.
 
 ``ObjectStore`` is a Protocol so tests can swap in an in-memory store; the real implementation
 is :class:`S3ObjectStore` (boto3; SeaweedFS locally and in CI via an endpoint override).

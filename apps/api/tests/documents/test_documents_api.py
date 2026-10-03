@@ -897,11 +897,19 @@ def test_FR_DOC_007_delete_removes_rows_audits_and_purges_objects(
     assert any(str(e["resource_id"]) == doc["id"] for e in events)
     jobs = S.outbox_events(admin_engine, world.a.tenant_id, "document.deleted")
     payload = next(p for p in jobs if p["document_id"] == doc["id"])
+    # A person's delete keeps the bucket's 90-day recovery window: not discarded (docs/08 §7).
+    assert payload["discard"] is False
+    keys = [k for k in store.objects if k.startswith(key_prefix)]
     removed = service.purge_document_objects(
-        world.a.tenant_id, uuid.UUID(payload["document_id"]), payload["batch_ids"], store=store
+        world.a.tenant_id,
+        uuid.UUID(payload["document_id"]),
+        payload["batch_ids"],
+        discard=payload["discard"],
+        store=store,
     )
     assert removed >= 1
     assert not any(k.startswith(key_prefix) for k in store.objects)
+    assert not set(keys) & set(store.discarded)
 
 
 def test_FR_DOC_007_retention_guard_blocks_delete(
@@ -1034,8 +1042,19 @@ def test_FR_DOC_007_system_retention_delete_removes_rows_audits_and_purges_objec
         if p["document_id"] == str(doc)
     )
     assert payload["batch_ids"] == []
-    assert service.purge_document_objects(world.a.tenant_id, doc, [], store=store) >= 1
+    # Automatic retention deletions discard (tag ``sos-lifecycle=discarded``): the bucket rule
+    # ``discarded-1d`` expires the bytes after a day, not the 90-day recovery window.
+    assert payload["discard"] is True
+    keys = [k for k in store.objects if k.startswith(prefix)]
+    assert service.purge_document_objects(
+        world.a.tenant_id, doc, [], discard=payload["discard"], store=store
+    ) == len(keys)
     assert not any(k.startswith(prefix) for k in store.objects)
+    assert set(keys) <= set(store.discarded)
+    # Idempotent: a retried purge finds nothing left and fails nothing.
+    assert (
+        service.purge_document_objects(world.a.tenant_id, doc, [], discard=True, store=store) == 0
+    )
 
 
 def test_FR_DOC_007_system_retention_delete_keeps_guards_reasons_and_tenant(
@@ -1107,6 +1126,8 @@ def test_purge_expired_uploads(world: Any, admin_engine: Engine) -> None:
         ).scalar_one()
     assert service.purge_expired_uploads(world.a.tenant_id, store=S.memory_store()) >= 1
     assert key not in S.memory_store().objects
+    # An automatic purge discards (docs/08 §7): the staging bytes expire after a day.
+    assert key in S.memory_store().discarded
     with admin_engine.connect() as c:
         n: Any = c.execute(
             text("SELECT count(*) FROM kb.upload_intents WHERE id = :i"), {"i": intent}

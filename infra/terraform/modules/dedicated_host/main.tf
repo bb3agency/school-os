@@ -90,7 +90,8 @@ module "files" {
     # FR-ADM-001: the full data export (link valid 24 h, purge job); noncurrent copy after 1 day.
     { id = "tenant-export-2d", tags = { "sos-lifecycle" = "tenant-export-2d" }, expiration_days = 2, noncurrent_version_expiration_days = 1 },
     { id = "import-raw-90d", tags = { "sos-lifecycle" = "import-raw-90d" }, expiration_days = 90 },
-    # PRV-016: images that showed a full Aadhaar number (tagged by the app before it deletes them).
+    # PRV-016 images and every automatic deletion (retention, offboarding; docs/08 §7), tagged
+    # by the app before it deletes them.
     { id = "discarded-1d", tags = { "sos-lifecycle" = "discarded" }, expiration_days = 1, noncurrent_version_expiration_days = 1 },
     { id = "noncurrent-and-multipart", noncurrent_version_expiration_days = 90, abort_incomplete_multipart_days = 7 },
   ]

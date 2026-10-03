@@ -521,6 +521,8 @@ def test_FR_ADM_001_archive_is_purged_24_hours_after_it_was_ready(
     assert key in store.objects, "kept while the link is valid"
     admin.purge_expired(school.tenant_id, now=dt.datetime.now(dt.UTC) + dt.timedelta(hours=25))
     assert key not in store.objects
+    # docs/08 §7: an automatic retention deletion discards (tag for the 1-day bucket rule).
+    assert key in store.discarded
     row = AD.row(admin_engine, export_id)
     assert row["status"] == "expired"
     assert row["files_deleted_at"] is not None
