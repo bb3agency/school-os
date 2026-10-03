@@ -60,7 +60,7 @@ function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="space-y-0.5">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium text-ink">{children}</dd>
+      <dd className="text-ink">{children}</dd>
     </div>
   );
 }

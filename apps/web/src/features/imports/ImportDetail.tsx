@@ -261,7 +261,7 @@ function MappingForm({ batch, attributes, label, onChecked }: MappingFormProps) 
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Icon name="file" className="size-4 text-ink-muted" />
-                  <span className="font-medium break-words text-ink">{header}</span>
+                  <span className="font-semibold break-words text-ink">{header}</span>
                   {column.suggested && column.target === null ? (
                     <Badge tone="info">
                       <Icon name="sparkles" className="size-3.5" />
@@ -762,20 +762,20 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
           <dl className="flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-4 text-sm">
             <div>
               <dt className="text-ink-muted">{t("source")}</dt>
-              <dd className="font-medium text-ink">
+              <dd className="text-ink">
                 <SourceName source={data.source} />
               </dd>
             </div>
             {data.committed_at ? (
               <div>
                 <dt className="text-ink-muted">{t("committedAt")}</dt>
-                <dd className="font-medium text-ink">{formatDateTime(data.committed_at)}</dd>
+                <dd className="text-ink">{formatDateTime(data.committed_at)}</dd>
               </div>
             ) : null}
             {data.reverted_at ? (
               <div>
                 <dt className="text-ink-muted">{t("revertedAt")}</dt>
-                <dd className="font-medium text-ink">{formatDateTime(data.reverted_at)}</dd>
+                <dd className="text-ink">{formatDateTime(data.reverted_at)}</dd>
               </div>
             ) : null}
           </dl>

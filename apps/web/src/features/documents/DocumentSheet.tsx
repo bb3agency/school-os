@@ -222,7 +222,7 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
           </span>
         }
       />
-      <p role="status" aria-live="polite" aria-atomic="true" className="text-sm font-medium">
+      <p role="status" aria-live="polite" aria-atomic="true" className="text-sm">
         {status}
       </p>
       <ProblemAlert error={failure} namespace="sheets.errors" />

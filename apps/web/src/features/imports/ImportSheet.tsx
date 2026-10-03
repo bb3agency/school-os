@@ -239,7 +239,7 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
           </span>
         }
       />
-      <p role="status" aria-live="polite" aria-atomic="true" className="text-sm font-medium">
+      <p role="status" aria-live="polite" aria-atomic="true" className="text-sm">
         {/* "Saving…" is shown, not announced: only the outcome is read out. */}
         {status?.kind === "saving" ? (
           <span aria-hidden="true">{t("saving", { row: status.row })}</span>

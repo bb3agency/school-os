@@ -345,12 +345,12 @@ export function SheetGrid({
           </span>
         ) : null}
         {cell?.pending ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-warning-ink">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning-ink">
             <Icon name="alert" className="size-3" />
             {t("pending")}
           </span>
         ) : cell?.edited ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-info-ink">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-info-ink">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
             {t("edited")}
           </span>
