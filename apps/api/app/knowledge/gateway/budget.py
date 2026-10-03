@@ -14,7 +14,12 @@ budget at ``budget.usd_inr_rate``. Budget months are calendar months in IST. At
 ``alert_fraction`` (80 %) the first crossing per month is reported once; at
 ``degrade_fraction`` (100 %) calls are refused with :class:`BudgetExhausted` and the caller
 answers search-only until the month resets or the school raises its budget (FR-KB-011,
-NFR-CST-001).
+NFR-CST-001). The 100 % alert (owner decision 2026-10-03) is the FIRST reservation refused for
+budget in the school's IST month: reservations stop recorded spend about one estimate below the
+limit, so spend itself never reaches 100 %. It is claimed once per tenant and month with an
+atomic set-if-absent key in the spend store (``sos:kb:exhausted:{tenant}:{YYYY-MM}``) and
+logged like the 80 % alert (``kb.budget.alert_crossed``, ``action="exhausted"``, ids only). A
+budget of 0 (no AI spend at all) is a setting, not a spent budget, and does not alert.
 
 Reservations (FR-KB-011): before each provider call :meth:`BudgetGuard.admit` reserves the
 call's worst-case cost (``models.yaml`` ``budget.reservation.input_tokens`` at the model's input
@@ -149,6 +154,11 @@ class SpendLedger(Protocol):
         (the id is remembered for ``keep_ms``)."""
         ...
 
+    def mark_exhausted(self, tenant_id: uuid.UUID, month: str) -> bool:
+        """Atomically record that the month's budget refused a call; ``True`` only for the
+        first caller of the month (set-if-absent), so the 100 % alert fires once."""
+        ...
+
 
 def _key(tenant_id: uuid.UUID, month: str) -> str:
     return f"sos:kb:spend:{tenant_id}:{month}"
@@ -164,6 +174,10 @@ def _expiry_key(tenant_id: uuid.UUID, month: str) -> str:
 
 def _done_key(tenant_id: uuid.UUID, month: str) -> str:
     return f"sos:kb:resv_done:{tenant_id}:{month}"
+
+
+def _exhausted_key(tenant_id: uuid.UUID, month: str) -> str:
+    return f"sos:kb:exhausted:{tenant_id}:{month}"
 
 
 def _micro(amount: Decimal) -> int:
@@ -183,6 +197,7 @@ class InMemorySpendLedger:
         """Per month key: reservation id -> (micro-USD, expires at ms)."""
         self._done: dict[str, dict[str, int]] = {}
         """Per month key: settled reservation id -> remembered until ms."""
+        self._exhausted: set[str] = set()
         self._lock = threading.Lock()
 
     def _prune(self, key: str, now_ms: int) -> dict[str, tuple[int, int]]:
@@ -250,6 +265,14 @@ class InMemorySpendLedger:
             done[reservation_id] = now_ms + keep_ms
             self._data[key] = self._data.get(key, 0) + _micro(actual)
             return Settlement(_usd(self._data[key]), state)
+
+    def mark_exhausted(self, tenant_id: uuid.UUID, month: str) -> bool:
+        with self._lock:
+            key = _exhausted_key(tenant_id, month)
+            if key in self._exhausted:
+                return False
+            self._exhausted.add(key)
+            return True
 
 
 # KEYS: spend, held (hash id -> micro), expiry (zset id -> expires ms), done (zset id -> keep ms)
@@ -379,6 +402,16 @@ class ValkeySpendLedger:
             raise KVUnavailable("valkey settle failed") from exc
         return Settlement(_usd(int(total)), _STATES[int(state)])
 
+    def mark_exhausted(self, tenant_id: uuid.UUID, month: str) -> bool:
+        """``SET key 1 NX EX`` (one atomic command on the primary): true for the first caller."""
+        try:
+            first = self._client.set(
+                _exhausted_key(tenant_id, month), b"1", nx=True, ex=_SPEND_TTL_S
+            )
+        except redis.RedisError as exc:
+            raise KVUnavailable("valkey set failed") from exc
+        return bool(first)
+
 
 # --- the guard ----------------------------------------------------------------------------------
 
@@ -487,6 +520,7 @@ class BudgetGuard:
             # Fail closed: without the month's spend the budget cannot be enforced.
             raise ProviderUnavailable("AI answers are temporarily unavailable") from exc
         if not held:
+            self._report_exhausted(tenant_id, reservation.month)
             raise BudgetExhausted("This month's AI budget is used up")
         admission = Admission(settings, reservation)
         try:
@@ -495,6 +529,18 @@ class BudgetGuard:
             self.release(admission)
             raise
         return admission
+
+    def _report_exhausted(self, tenant_id: uuid.UUID, month: str) -> None:
+        """NFR-CST-001 100 % alert (owner decision 2026-10-03): the first reservation refused
+        for budget in the school's IST month, reported once through the 80 % alert's event.
+        Never raises: the refusal stands even when the alert cannot be recorded."""
+        try:
+            first = self._ledger.mark_exhausted(tenant_id, month)
+        except KVUnavailable:
+            log.error("kb.budget.alert_unrecorded", tenant_id=tenant_id, action="exhausted")
+            return
+        if first:
+            log.warning("kb.budget.alert_crossed", tenant_id=tenant_id, action="exhausted")
 
     def _rate_limit(self, tenant_id: uuid.UUID, feature: Feature) -> None:
         minute = self._now().strftime("%Y%m%d%H%M")
