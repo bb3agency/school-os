@@ -339,7 +339,9 @@ budget:
   # The amount is the school's setting ai_monthly_budget_inr (tenant settings, FR-TEN-012), read
   # by the composition root through tenancy.service. Spend is metered in USD at list price and
   # converted at this rate; keep it equal to app/platform/billing.yaml usd_inr_rate (a test pins it).
-  usd_inr_rate: "84.00"
+  # FBIL USD/INR reference rate of 28 Sep 2026 (95.968), reviewed 2026-10-03; source and review
+  # rule next to billing.yaml usd_inr_rate (docs/16 §11, §19 Q17).
+  usd_inr_rate: "95.97"
   # Budget months are calendar months in IST (Asia/Kolkata).
   # Before each call the gateway reserves its worst case (input_tokens at the model's input price
   # plus the role's max_output_tokens at its output price) atomically against the month, and

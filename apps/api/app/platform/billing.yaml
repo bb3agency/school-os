@@ -15,9 +15,13 @@ billing:
   # Review: on the first working day of each month the billing admin compares it with the RBI
   # reference rate (USD/INR) and changes it by a normal PR when it differs by more than 2%,
   # updating usd_inr_rate_reviewed_on. Keep app/knowledge/config/models.yaml budget.usd_inr_rate
-  # equal (a test pins it). 84.00 is STALE (set 2026-09); see docs/16 §11.
-  usd_inr_rate: "84.00"
-  usd_inr_rate_reviewed_on: "2026-09-27"
+  # equal (a test pins it).
+  # Source: FBIL USD/INR reference rate (published by FBIL, formerly the RBI reference rate) of
+  # 28 Sep 2026, 95.968, the latest figure that could be confirmed on the 2026-10-03 review
+  # (quoted by CEIC "India Foreign Exchange Rate: RBI: Reference Rate: US Dollars"); rounded to
+  # paise. Replaces 84.00 of 2026-09 (docs/16 §19 Q17).
+  usd_inr_rate: "95.97"
+  usd_inr_rate_reviewed_on: "2026-10-03"
   usage_thresholds: [80, 100]
   # Suspension inside a window needs a platform_owner (docs/16 §9.3).
   # Items: {name, boards: [BOARD, ...] ([] = every board), start: YYYY-MM-DD, end: YYYY-MM-DD}

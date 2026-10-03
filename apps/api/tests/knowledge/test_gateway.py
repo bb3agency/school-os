@@ -69,6 +69,8 @@ QUERY = uuid.UUID("0192f000-0000-7000-8000-0000000000aa")
 DOC = uuid.UUID("0192f000-0000-7000-8000-0000000000d1")
 SOURCE = f"sos://doc/{DOC}/v1#p2"
 NOW = datetime(2026, 9, 15, 6, 0, tzinfo=UTC)
+ONE_USD_INR = load_llm_config().budget.usd_inr_rate
+"""A budget of exactly $1.00 at the configured rate (``models.yaml`` ``budget.usd_inr_rate``)."""
 
 # A synthetic 12-digit number that passes Verhoeff (never a real Aadhaar number).
 AADHAAR = "23456789012" + verhoeff_check_digit("23456789012")
@@ -156,7 +158,7 @@ class Rig:
 
 def rig(
     *steps: Mapping[str, Any] | TransportError,
-    budget_inr: int = 5000,
+    budget_inr: Decimal | int = 5000,
     ai_enabled: bool = True,
     kill_switch_on: bool = True,
     transport: ScriptedTransport | None = None,
@@ -362,7 +364,7 @@ def test_FR_KB_009_failed_calls_are_metered_without_cost() -> None:
 
 
 def test_FR_KB_011_alert_at_80_percent_is_reported_once_per_month() -> None:
-    r = rig(budget_inr=84)  # 84 INR at 84.00 = $1.00
+    r = rig(budget_inr=ONE_USD_INR)  # $1.00 at the configured rate
     r.ledger.add_usd(TENANT, "2026-09", Decimal("0.797"))
     with capture_logs() as logs:
         ask(r)  # +0.004 -> 0.801: crosses 80 %
@@ -373,7 +375,7 @@ def test_FR_KB_011_alert_at_80_percent_is_reported_once_per_month() -> None:
 
 
 def test_FR_KB_011_at_100_percent_calls_stop_and_the_caller_degrades_to_search_only() -> None:
-    r = rig(budget_inr=84)
+    r = rig(budget_inr=ONE_USD_INR)
     r.ledger.add_usd(TENANT, "2026-09", Decimal("1.00"))
     with pytest.raises(BudgetExhausted) as info:
         ask(r)
@@ -396,7 +398,7 @@ def test_FR_KB_011_the_last_call_that_fits_completes_then_the_next_is_refused() 
     # Since reservations (FR-KB-011) a call is admitted only while its worst-case estimate still
     # fits: list price of budget.reservation.input_tokens + the role's max_output_tokens
     # (claude-sonnet-5, answer: 16000 * $2 + 1500 * $10 per MTok = $0.047).
-    r = rig(budget_inr=84)
+    r = rig(budget_inr=ONE_USD_INR)
     r.ledger.add_usd(TENANT, "2026-09", Decimal("0.953"))
     ask(r)  # 0.953 + 0.047 = 1.000: fits exactly; it really costs 0.004
     assert r.ledger.spent_usd(TENANT, "2026-09") == Decimal("0.957")
@@ -416,7 +418,7 @@ def test_FR_KB_011_zero_budget_means_no_ai() -> None:
 def test_FR_KB_011_budget_months_reset_on_the_first_in_ist() -> None:
     assert budget_month(datetime(2026, 9, 30, 18, 29, tzinfo=UTC)) == "2026-09"
     assert budget_month(datetime(2026, 9, 30, 18, 30, tzinfo=UTC)) == "2026-10"
-    r = rig(budget_inr=84)
+    r = rig(budget_inr=ONE_USD_INR)
     r.ledger.add_usd(TENANT, "2026-09", Decimal("5"))
     r.now[0] = datetime(2026, 9, 30, 19, 0, tzinfo=UTC)  # 1 Oct 00:30 IST
     ask(r)
