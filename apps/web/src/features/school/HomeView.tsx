@@ -261,7 +261,7 @@ export function HomeView({ data }: { data: HomeData }) {
               <li key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                 <Link
                   href={`/imports/${item.id}`}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  className="font-semibold text-primary underline-offset-4 hover:underline"
                 >
                   <SourceName source={item.source} />
                 </Link>

@@ -127,7 +127,7 @@ export function AuditVerifyScreen() {
               <div className="min-w-0 flex-1 space-y-1">
                 {state === "idle" ? (
                   <>
-                    <p className="text-lg font-medium text-ink">{t("notRunTitle")}</p>
+                    <p className="text-lg font-semibold text-ink">{t("notRunTitle")}</p>
                     <p className="text-sm text-ink-muted">{t("notRunBody")}</p>
                   </>
                 ) : null}
@@ -139,7 +139,7 @@ export function AuditVerifyScreen() {
                 ) : null}
                 {state === "ok" && result ? (
                   <>
-                    <p className="text-lg font-medium text-ink">{t("okTitle")}</p>
+                    <p className="text-lg font-semibold text-ink">{t("okTitle")}</p>
                     <p className="text-sm text-ink-muted">
                       {result.checked === 0
                         ? t("okEmpty")
@@ -149,7 +149,7 @@ export function AuditVerifyScreen() {
                 ) : null}
                 {state === "broken" && result ? (
                   <>
-                    <p className="text-lg font-medium text-danger">
+                    <p className="text-lg font-semibold text-danger">
                       {t("brokenTitle", { seq: count(result.first_bad_seq ?? 0) })}
                     </p>
                     <p className="text-sm text-ink">

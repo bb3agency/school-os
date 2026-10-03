@@ -49,7 +49,7 @@ function Suggestion({ item }: { item: MemoryEvent }) {
         {done === "saved" ? (
           <Link
             href="/ask/memory"
-            className="font-medium text-primary underline underline-offset-4"
+            className="font-semibold text-primary underline underline-offset-4"
           >
             {t("manage")}
           </Link>
@@ -65,7 +65,7 @@ function Suggestion({ item }: { item: MemoryEvent }) {
       aria-label={t("suggestTitle")}
       className="chat-enter space-y-2 rounded-lg border border-violet-soft bg-violet-soft p-3 text-sm"
     >
-      <p className="flex items-center gap-2 font-medium text-violet-ink">
+      <p className="flex items-center gap-2 font-semibold text-violet-ink">
         <Icon name="memory" className="size-4" />
         {t("suggestTitle")}
       </p>
@@ -113,7 +113,7 @@ export function MemoryNotes({ memory }: { memory: readonly MemoryEvent[] }) {
           <span aria-hidden="true">·</span>
           <Link
             href="/ask/memory"
-            className="font-medium text-primary underline underline-offset-4"
+            className="font-semibold text-primary underline underline-offset-4"
           >
             {t("manage")}
           </Link>

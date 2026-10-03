@@ -74,7 +74,7 @@ export function TicketTable({
       cell: (row) => (
         <Link
           href={`/platform/support/${row.id}`}
-          className="font-mono text-sm font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
+          className="font-mono text-sm whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {row.number}
         </Link>
@@ -443,7 +443,7 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
             <dt className="text-ink-muted">{t("assignee")}</dt>
             <dd>{assignee}</dd>
           </dl>
-          <h3 className="mt-6 mb-3 font-medium text-ink">{t("lifecycle.title")}</h3>
+          <h3 className="mt-6 mb-3 font-semibold text-ink">{t("lifecycle.title")}</h3>
           <TicketLifecycle ticket={data} />
           {manage ? (
             <form

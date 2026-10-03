@@ -271,12 +271,12 @@ export function Composer({
         </div>
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="px-2 text-sm font-medium text-danger">
+        <p id={errorId} role="alert" className="px-2 text-sm font-semibold text-danger">
           {error}
         </p>
       ) : null}
       {!online ? (
-        <p role="status" className="px-2 text-sm font-medium text-warning-ink">
+        <p role="status" className="px-2 text-sm font-semibold text-warning-ink">
           {t("offline")}
         </p>
       ) : null}

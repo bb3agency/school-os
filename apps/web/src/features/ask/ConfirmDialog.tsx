@@ -68,7 +68,7 @@ export function ConfirmDialog({
           }}
         >
           <div className="space-y-2 p-4 sm:p-6">
-            <h2 id={titleId} className="text-lg font-medium">
+            <h2 id={titleId} className="text-lg font-semibold">
               {title}
             </h2>
             {body ? (

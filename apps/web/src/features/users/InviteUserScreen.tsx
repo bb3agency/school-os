@@ -167,7 +167,7 @@ export function InviteUserScreen() {
                 className="space-y-1"
                 aria-describedby={errors.preferred_language ? languageErrorId : undefined}
               >
-                <legend className="text-sm font-medium text-ink">{t("language")}</legend>
+                <legend className="text-sm font-semibold text-ink">{t("language")}</legend>
                 <p className="text-sm text-ink-muted">{t("languageHint")}</p>
                 <div className="flex flex-wrap gap-2">
                   {USER_LANGUAGES.map((value) => (

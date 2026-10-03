@@ -208,7 +208,7 @@ function DevicesCard({ tenantId }: { tenantId: string }) {
                 <TBody>
                   {list.map((device) => (
                     <Tr key={device.id}>
-                      <Td className="font-medium">{device.name}</Td>
+                      <Td className="font-semibold">{device.name}</Td>
                       <Td>
                         <DeviceStatus device={device} />
                       </Td>
@@ -312,7 +312,7 @@ function GroupsForm({ groups, company }: { groups: Group[]; company: string }) {
         {t("privacyBody")}
       </Alert>
       <fieldset aria-labelledby={legendId} className="space-y-2">
-        <legend id={legendId} className="font-medium text-ink">
+        <legend id={legendId} className="font-semibold text-ink">
           {t("legend", { company })}
         </legend>
         <ul className="grid gap-2 sm:grid-cols-2">
@@ -411,7 +411,7 @@ export function TallyConnectorScreen() {
                 {can(CONFIGURE) ? (
                   <Link
                     href="/settings/tally/ledgers"
-                    className="font-medium text-primary underline underline-offset-4"
+                    className="font-semibold text-primary underline underline-offset-4"
                   >
                     {t("connector.toLedgers")}
                   </Link>
@@ -419,7 +419,7 @@ export function TallyConnectorScreen() {
                 {can(FINANCE_READ) ? (
                   <Link
                     href="/fees"
-                    className="font-medium text-primary underline underline-offset-4"
+                    className="font-semibold text-primary underline underline-offset-4"
                   >
                     {t("connector.toDues")}
                   </Link>

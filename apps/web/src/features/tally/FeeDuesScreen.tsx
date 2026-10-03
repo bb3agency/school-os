@@ -81,7 +81,7 @@ export function FeeDuesScreen() {
                   <p>{t("unlinkedBody")}</p>
                   <Link
                     href="/settings/tally/ledgers"
-                    className="mt-2 inline-flex font-medium text-primary underline underline-offset-4"
+                    className="mt-2 inline-flex font-semibold text-primary underline underline-offset-4"
                   >
                     {t("linkLedgers")}
                   </Link>
@@ -110,7 +110,7 @@ export function FeeDuesScreen() {
                               <Td>
                                 <Link
                                   href={`/students/${row.student_id}`}
-                                  className="font-medium text-primary underline underline-offset-4"
+                                  className="font-semibold text-primary underline underline-offset-4"
                                 >
                                   {row.display_name ?? t("noName")}
                                 </Link>

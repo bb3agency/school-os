@@ -50,7 +50,7 @@ function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="space-y-0.5">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium text-ink">{children}</dd>
+      <dd className="font-semibold text-ink">{children}</dd>
     </div>
   );
 }
@@ -114,7 +114,7 @@ function Downloads({ row }: { row: Export }) {
                 <Icon name="file" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-medium text-ink">{tf(file.format)}</span>
+                <span className="block font-semibold text-ink">{tf(file.format)}</span>
                 {size ? (
                   <span className="block font-mono text-xs text-ink-muted">{size}</span>
                 ) : null}

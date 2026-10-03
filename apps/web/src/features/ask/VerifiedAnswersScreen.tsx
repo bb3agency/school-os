@@ -126,7 +126,7 @@ function VerifiedCard({
             {reviewBy ? ` · ${t("reviewDueOn", { date: reviewBy })}` : ""}
           </p>
           <div className="space-y-2">
-            <p className="text-sm font-medium text-ink">{t("citations")}</p>
+            <p className="text-sm font-semibold text-ink">{t("citations")}</p>
             <ol className="grid gap-3 lg:grid-cols-2">
               {answer.citations.map((citation, i) => (
                 <SourceChip

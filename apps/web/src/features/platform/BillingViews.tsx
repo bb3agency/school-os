@@ -544,7 +544,7 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
       cell: (row) => (
         <Link
           href={`/platform/schools/${row.tenant_id}?tab=subscription`}
-          className="font-medium text-primary underline-offset-4 hover:underline"
+          className="font-semibold text-primary underline-offset-4 hover:underline"
         >
           {schoolName(row.tenant_id)}
         </Link>

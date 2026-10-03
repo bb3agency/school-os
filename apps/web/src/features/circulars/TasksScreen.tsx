@@ -284,7 +284,7 @@ export function TasksScreen() {
                         {page.data.map((task) => (
                           <Tr key={task.id}>
                             <Td>
-                              <p className="font-medium break-words text-ink">{task.title}</p>
+                              <p className="font-semibold break-words text-ink">{task.title}</p>
                               {task.details ? (
                                 <p className="text-sm break-words text-ink-muted">{task.details}</p>
                               ) : null}

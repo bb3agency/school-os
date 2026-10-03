@@ -37,7 +37,7 @@ export function LiveStatus({ state }: { state: AskState }) {
         <span className="absolute inset-0 rounded-full bg-primary opacity-30 motion-safe:animate-ping" />
         <span className="relative size-2.5 rounded-full bg-primary" />
       </span>
-      <span key={step.step} className="chat-shimmer-text chat-fade font-medium">
+      <span key={step.step} className="chat-shimmer-text chat-fade">
         {stepLabel(step, t)}
       </span>
     </p>

@@ -338,7 +338,7 @@ export function StudentListView({
 
       {rows === null ? null : (
         <section aria-labelledby="student-results" className="space-y-3">
-          <h2 id="student-results" className="text-lg font-medium text-ink">
+          <h2 id="student-results" className="text-lg font-semibold text-ink">
             {t("resultsTitle")}
           </h2>
           {rows.status === "ready" && rows.data.length > 0 ? (
@@ -414,7 +414,7 @@ function StudentRows({
                     <div className="min-w-0">
                       <Link
                         href={`/students/${row.id}`}
-                        className="font-medium text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
+                        className="font-semibold text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
                       >
                         {row.display_name ?? t("unnamed")}
                       </Link>

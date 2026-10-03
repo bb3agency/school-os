@@ -134,7 +134,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       header: t("colStudent"),
       cell: (row) => (
         <span className="block min-w-36">
-          <span className="block font-medium">
+          <span className="block font-semibold">
             <Value>{row.student.display_name}</Value>
           </span>
           {row.student.admission_no ? (
@@ -187,7 +187,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       cell: (row) => (
         <Link
           href={`/findings/${row.id}`}
-          className="inline-flex items-center gap-1 font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-1 font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {t("openFinding")}
           <span className="sr-only">
@@ -311,7 +311,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
               ]}
             />
             <fieldset className="space-y-1">
-              <legend className="mb-1 text-sm font-medium text-ink">{t("filterStatus")}</legend>
+              <legend className="mb-1 text-sm font-semibold text-ink">{t("filterStatus")}</legend>
               <div className="flex min-h-10 flex-wrap items-center gap-x-4">
                 {FINDING_STATUSES.map((status) => (
                   <Checkbox

@@ -250,7 +250,7 @@ export function ValuesBySourceView({
                           verification={value.verification_status}
                         />
                       ) : null}
-                      <span className="font-mono font-medium">
+                      <span className="font-mono">
                         <ShownValue
                           value={value}
                           attribute={attribute}
@@ -278,7 +278,7 @@ export function ValuesBySourceView({
                   <tr key={key} className="align-top">
                     <th
                       scope="row"
-                      className="px-4 py-4 text-left font-medium whitespace-normal text-ink"
+                      className="px-4 py-4 text-left font-semibold whitespace-normal text-ink"
                     >
                       <span className="block">{label}</span>
                       <span data-print="hide">

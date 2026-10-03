@@ -42,7 +42,7 @@ export function SignedOutView({
       headerActions={
         <Link
           href="/welcome"
-          className="inline-flex min-h-10 items-center rounded-full px-3 text-sm font-medium text-primary underline underline-offset-4 hover:bg-primary-soft"
+          className="inline-flex min-h-10 items-center rounded-full px-3 text-sm font-semibold text-primary underline underline-offset-4 hover:bg-primary-soft"
         >
           {t("signedOut.homeLink")}
         </Link>

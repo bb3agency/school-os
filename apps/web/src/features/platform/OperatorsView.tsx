@@ -99,7 +99,7 @@ export function OperatorsScreen() {
         <span className="flex min-w-48 items-center gap-3">
           <Avatar name={row.display_name} size="sm" decorative />
           <span className="flex min-w-0 flex-col">
-            <span className="font-medium text-ink">
+            <span className="font-semibold text-ink">
               {row.display_name}
               {me?.operator_id === row.id ? (
                 <span className="ml-2 align-middle">
