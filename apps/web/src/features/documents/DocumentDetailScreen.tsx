@@ -7,9 +7,7 @@ import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
-import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Icon } from "@/components/ui/Icon";
 import { Field, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -23,6 +21,7 @@ import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/format";
 import { DOCUMENT_KEYS, useDocument } from "./data";
+import { DocumentSheetPreview } from "./DocumentSheet";
 import {
   aclSchema,
   chosenFile,
@@ -82,17 +81,15 @@ const SHEET_MIME_TYPES: ReadonlySet<string> = new Set([
   "text/csv",
 ]);
 
-function SheetLink({ documentId }: { documentId: string }) {
-  const t = useTranslations("sheets.document");
-  return (
-    <div className="space-y-1 border-t border-border pt-3" data-print="hide">
-      <ButtonLink href={`/documents/${documentId}/sheet`} variant="secondary">
-        <Icon name="layers" className="size-4" />
-        {t("open")}
-      </ButtonLink>
-      <p className="text-xs text-ink-muted">{t("openHint")}</p>
-    </div>
-  );
+/** A ready XLSX/CSV version that is not an import file shows its rows on this page. */
+function showsSheet(doc: DocumentDetail): boolean {
+  const ready = latestReady(doc.versions);
+  return Boolean(ready && SHEET_MIME_TYPES.has(ready.mime_type) && doc.purpose !== "import_file");
+}
+
+function SheetSection({ doc }: { doc: DocumentDetail }) {
+  const mayOpen = useMayOpen(doc);
+  return mayOpen && showsSheet(doc) ? <DocumentSheetPreview documentId={doc.id} /> : null;
 }
 
 /** The newest version that passed the virus check (what "Download" serves). */
@@ -144,9 +141,6 @@ function FileSection({ doc }: { doc: DocumentDetail }) {
             <p className="text-sm">{t("olderReady", { version: ready.version_no })}</p>
           ) : null}
           <p className="text-xs text-ink-muted">{t("linkNote")}</p>
-          {SHEET_MIME_TYPES.has(ready.mime_type) && doc.purpose !== "import_file" ? (
-            <SheetLink documentId={doc.id} />
-          ) : null}
         </>
       ) : (
         <p className="text-sm">{t("nothingReady")}</p>
@@ -549,6 +543,7 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
           <VersionsSection doc={doc} />
         </Card>
       </div>
+      <SheetSection doc={doc} />
       {archived ? (
         <Alert tone="info" title={td("archivedTitle")}>
           {td("archivedBody")}

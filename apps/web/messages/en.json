@@ -4262,7 +4262,7 @@
   },
   "sheets": {
     "grid": {
-      "keyboardHelpEdit": "Use the arrow keys to move between cells. Press Enter to change a cell, Enter again to save it, or Escape to cancel.",
+      "keyboardHelpEdit": "Use the arrow keys to move between cells. Press Enter or F2 to change a cell, Enter to save it or Escape to cancel. Tab leaves the table.",
       "keyboardHelpRead": "Use the arrow keys to move between cells. This sheet can't be changed here.",
       "scrollLabel": "{caption}. Scroll sideways to see all columns.",
       "rowNumber": "Row",
@@ -4279,7 +4279,14 @@
         "aadhaar": "Don't enter a full Aadhaar number. Enter only its last 4 digits.",
         "tooLong": "Use at most 1,000 characters.",
         "control": "Keep the value on one line."
-      }
+      },
+      "pending": "Not saved yet",
+      "searchLabel": "Find on this page",
+      "searchColumn": "In column",
+      "allColumns": "All columns",
+      "searchCount": "{shown, plural, one {# row} other {# rows}} of {total} on this page match.",
+      "noMatch": "No rows on this page match. Clear the search or try another page.",
+      "leaveDraft": "You have a change you haven't saved. Leave this page and lose it?"
     },
     "import": {
       "title": "Check the sheet",
@@ -4317,7 +4324,10 @@
       "openTitle": "Check the sheet",
       "openDescriptionEdit": "See every row as it is in your file and correct cells before you add the rows. You can also download it.",
       "openDescriptionRead": "See every row as it was in your file, or download it.",
-      "open": "Open the sheet"
+      "open": "Open the sheet",
+      "rowWarning": "Has warnings",
+      "fixInSheet": "Correct cells in the sheet",
+      "fixInSheetHint": "Open your file as a sheet, correct the cells with problems and each row is checked again at once."
     },
     "document": {
       "title": "Sheet",
@@ -4355,7 +4365,16 @@
       "note": "The saved version keeps values only, not formatting. Downloads include unsaved changes; for personal data you'll be asked to confirm it's you.",
       "pagesLabel": "Pages of the sheet",
       "open": "Open as a sheet",
-      "openHint": "See the rows in a table, correct cells or download the sheet."
+      "openHint": "See the rows in a table, correct cells or download the sheet.",
+      "leaveUnsaved": "Your changes to this sheet are not saved. Leave this page and lose them?",
+      "conflictTitle": "This document changed while you were working",
+      "conflictBody": "Someone saved a newer version. Your changes are still on this page: download them to keep a copy, then reload the sheet and make them again on the newest version.",
+      "conflictDownload": "Download my changes (CSV)",
+      "conflictReload": "Reload the sheet",
+      "previewTitle": "Sheet preview",
+      "previewDescription": "The first rows of the first worksheet. Open the sheet to see every row, correct cells or download it.",
+      "previewCaption": "First rows of the sheet",
+      "previewUnavailable": "This file can't be shown as a table here. Download it instead."
     },
     "errors": {
       "aadhaar_full_number_rejected": {

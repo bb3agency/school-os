@@ -315,12 +315,16 @@ function RowsCard({
   batch,
   label,
   initialFilter,
+  sheetEditable = false,
 }: {
   batch: ImportBatch;
   label: (key: string) => string;
   initialFilter: RowFilterChoice;
+  /** "Check rows" step: rows with problems can be corrected in the sheet (FR-IMP-008). */
+  sheetEditable?: boolean;
 }) {
   const t = useTranslations("imports.rows");
+  const ts = useTranslations("sheets.import");
   const api = useBffClient("staff");
   const [filter, setFilter] = useState<RowFilterChoice>(initialFilter);
   const pages = useCursorStack();
@@ -432,6 +436,15 @@ function RowsCard({
             }}
             options={ROW_FILTERS.map((value) => ({ value, label: t(`filters.${value}`) }))}
           />
+          {sheetEditable && batch.error_count > 0 ? (
+            <span className="flex flex-col gap-1">
+              <ButtonLink href={`/imports/${batch.id}/sheet`} variant="secondary">
+                <Icon name="layers" className="size-4" />
+                {ts("fixInSheet")}
+              </ButtonLink>
+              <span className="max-w-sm text-xs text-ink-muted">{ts("fixInSheetHint")}</span>
+            </span>
+          ) : null}
         </div>
         <DataTable
           caption={t("title")}
@@ -816,6 +829,12 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
           batch={data}
           label={label}
           initialFilter={data.status === "validated" && data.error_count > 0 ? "error" : "all"}
+          sheetEditable={
+            canRun &&
+            MAPPING_EDITABLE.has(data.status) &&
+            HAS_SHEET.has(data.status) &&
+            !data.raw_file_deleted_at
+          }
         />
       ) : null}
     </div>

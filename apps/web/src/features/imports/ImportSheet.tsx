@@ -25,7 +25,8 @@ type Schemas = components["schemas"];
 export type ImportSheet = Schemas["ImportSheetOut"];
 type SheetRow = Schemas["SheetRowOut"];
 
-const PAGE_SIZE = 50;
+/** 100 rows a page, as the API pages the staged sheet by default. */
+const PAGE_SIZE = 100;
 
 const rowPill: Record<NonNullable<SheetRow["status"]>, PillVariant> = {
   valid: "positive",
@@ -40,6 +41,13 @@ export const importSheetKey = (importId: string, cursor: string | undefined) =>
 
 /** One saved edit or a problem, announced politely to screen readers (aria-live). */
 type Status = { kind: "saving"; row: number } | { kind: "saved"; text: string } | null;
+
+/** The cell being saved: shown with its new value, "Not saved yet", until the API answers. */
+interface PendingCell {
+  rowNo: number;
+  column: number;
+  value: string | null;
+}
 
 /**
  * US-401 AC5/AC6, FR-IMP-008/009: the uploaded file as a sheet, between checking and adding.
@@ -72,6 +80,7 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
   const [status, setStatus] = useState<Status>(null);
   const [failure, setFailure] = useState<unknown>(undefined);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<PendingCell | null>(null);
   const [downloading, setDownloading] = useState<SheetFormat | null>(null);
 
   const crumbs = [
@@ -109,11 +118,18 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
 
   const rows: SheetGridRow[] = data.data.map((row) => ({
     rowNo: row.row_no,
-    cells: row.cells,
+    cells:
+      pending && pending.rowNo === row.row_no
+        ? row.cells.map((cell, index) =>
+            index === pending.column ? { ...cell, value: pending.value, pending: true } : cell,
+          )
+        : row.cells,
     invalid: row.status === "error",
     check: (
       <span className="flex flex-col gap-1.5">
-        {row.status ? (
+        {row.status === "valid" && row.warnings.length > 0 ? (
+          <Badge tone="warning">{t("rowWarning")}</Badge>
+        ) : row.status ? (
           <Pill variant={rowPill[row.status]}>{ti(`status.${row.status}`)}</Pill>
         ) : (
           <Badge tone="neutral">{t("notChecked")}</Badge>
@@ -139,6 +155,7 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
   async function commit(rowNo: number, column: number, value: string | null) {
     setFailure(undefined);
     setStatus({ kind: "saving", row: rowNo });
+    setPending({ rowNo, column, value });
     setBusy(true);
     try {
       const out = await unwrap(
@@ -176,6 +193,7 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
         await queryClient.invalidateQueries({ queryKey: importKey(importId) });
       }
     } finally {
+      setPending(null);
       setBusy(false);
     }
   }
@@ -222,7 +240,12 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
         }
       />
       <p role="status" aria-live="polite" aria-atomic="true" className="text-sm font-medium">
-        {status?.kind === "saving" ? t("saving", { row: status.row }) : (status?.text ?? "")}
+        {/* "Saving…" is shown, not announced: only the outcome is read out. */}
+        {status?.kind === "saving" ? (
+          <span aria-hidden="true">{t("saving", { row: status.row })}</span>
+        ) : (
+          (status?.text ?? "")
+        )}
       </p>
       <ProblemAlert error={failure} namespace={["sheets.errors", "imports.errors"]} />
       {data.read_only_reason ? (

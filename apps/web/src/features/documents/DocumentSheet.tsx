@@ -3,7 +3,7 @@
 import type { components } from "@schoolos/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -12,11 +12,12 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { downloadSheet, type SheetFormat } from "@/features/sheets/download";
 import { sheetProblem } from "@/features/sheets/problems";
 import { SheetGrid, type SheetGridColumn, type SheetGridRow } from "@/features/sheets/SheetGrid";
+import { useUnsavedChangesWarning } from "@/features/sheets/unsaved";
 import { Pager, useCursorStack } from "@/features/students/paging";
 import { LoadGate } from "@/features/students/parts";
 import { ProblemAlert } from "@/features/students/ProblemAlert";
 import type { Locale } from "@/i18n/routing";
-import { newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { ApiError, newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { DOCUMENT_KEYS } from "./data";
 import { ifMatch } from "./types";
 
@@ -24,12 +25,21 @@ type Schemas = components["schemas"];
 export type DocumentSheet = Schemas["DocumentSheetOut"];
 type Edit = Schemas["SheetCellEdit"];
 
-const PAGE_SIZE = 50;
+/** 100 rows a page, as the API pages a document sheet by default. */
+const PAGE_SIZE = 100;
 
 export const documentSheetKey = (documentId: string, cursor: string | undefined) =>
   [...DOCUMENT_KEYS.one(documentId), "sheet", cursor ?? null] as const;
 
 const cellKey = (rowNo: number, column: number) => `${rowNo}:${column}`;
+
+/** The save lost a race: the document got a newer version or changed meanwhile. */
+function isConflict(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.status === 412 || (error.status === 409 && error.code === "version_conflict"))
+  );
+}
 
 /** Unsaved edits as the API takes them (row order, then column). */
 export function editsBody(edits: ReadonlyMap<string, string | null>): Edit[] {
@@ -70,14 +80,10 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
   const [failure, setFailure] = useState<unknown>(undefined);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState<SheetFormat | null>(null);
+  const [conflict, setConflict] = useState(false);
 
-  // Unsaved changes live only on this page: warn before the tab is closed or reloaded.
-  useEffect(() => {
-    if (edits.size === 0) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [edits.size]);
+  // Unsaved changes live only on this page: warn before the page is left (links, tab close).
+  useUnsavedChangesWarning(edits.size > 0, t("leaveUnsaved"));
 
   const crumbs = [
     { label: tn("home"), href: "/" },
@@ -119,7 +125,7 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
     cells: row.cells.map((cell, index) => {
       const key = cellKey(row.row_no, index);
       return edits.has(key)
-        ? { value: edits.get(key) ?? null, edited: true, formula: false }
+        ? { value: edits.get(key) ?? null, pending: true, formula: false }
         : { value: cell.value, formula: cell.formula };
     }),
   }));
@@ -158,10 +164,21 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
       await queryClient.invalidateQueries({ queryKey: DOCUMENT_KEYS.all });
     } catch (error) {
       setStatus("");
-      setFailure(sheetProblem(error));
+      if (isConflict(error)) setConflict(true);
+      else setFailure(sheetProblem(error));
     } finally {
       setSaving(false);
     }
+  }
+
+  /** After a conflict: drop the changes and show the newest version (asked for explicitly). */
+  async function reload() {
+    setConflict(false);
+    setFailure(undefined);
+    setEdits(new Map());
+    pages.reset();
+    setStatus(t("discarded"));
+    await queryClient.invalidateQueries({ queryKey: DOCUMENT_KEYS.one(documentId) });
   }
 
   async function download(format: SheetFormat) {
@@ -209,6 +226,25 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
         {status}
       </p>
       <ProblemAlert error={failure} namespace="sheets.errors" />
+      {conflict ? (
+        <Alert tone="warning" title={t("conflictTitle")}>
+          <p>{t("conflictBody")}</p>
+          <span className="mt-3 flex flex-wrap gap-2" data-print="hide">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void download("csv")}
+              disabled={downloading !== null || edits.size === 0}
+            >
+              <Icon name="arrowDown" className="size-4" />
+              {t("conflictDownload")}
+            </Button>
+            <Button size="sm" onClick={() => void reload()}>
+              {t("conflictReload")}
+            </Button>
+          </span>
+        </Alert>
+      ) : null}
       {data.read_only_reason ? (
         <Alert tone="info" title={t("readOnlyTitle")}>
           {t(`readOnly.${data.read_only_reason}`)}
@@ -235,7 +271,11 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
               >
                 {t("discard")}
               </Button>
-              <Button size="sm" onClick={() => void save()} disabled={edits.size === 0 || saving}>
+              <Button
+                size="sm"
+                onClick={() => void save()}
+                disabled={edits.size === 0 || saving || conflict}
+              >
                 {saving ? t("savingShort") : t("save")}
               </Button>
             </span>
@@ -264,5 +304,69 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
         {t("back")}
       </ButtonLink>
     </div>
+  );
+}
+
+/** Rows shown on the document page; the full sheet is on its own page. */
+const PREVIEW_ROWS = 10;
+
+/**
+ * FR-DOC-009: the first rows of an XLSX/CSV document as a read-only table on the document page,
+ * with "Open as a sheet" for every row, editing and downloads. A file that can't be read as a
+ * sheet (too large, damaged, still being checked) says so; its download stays on the page.
+ */
+export function DocumentSheetPreview({ documentId }: { documentId: string }) {
+  const t = useTranslations("sheets.document");
+  const api = useBffClient("staff");
+  const query = { limit: PREVIEW_ROWS };
+  const sheet = useApiQuery([...DOCUMENT_KEYS.one(documentId), "sheet-preview"], () =>
+    unwrap(
+      api.GET("/api/v1/documents/{document_id}/sheet", {
+        params: { path: { document_id: documentId }, query },
+      }),
+    ),
+  );
+  return (
+    <Card title={t("previewTitle")} description={t("previewDescription")}>
+      <div className="space-y-4">
+        {sheet.status === "ready" ? (
+          <>
+            {sheet.data.sheet_count > 1 ? (
+              <Alert tone="info">{t("otherSheets", { count: sheet.data.sheet_count - 1 })}</Alert>
+            ) : null}
+            <SheetGrid
+              caption={t("previewCaption")}
+              columns={sheet.data.columns.map((column) => ({
+                index: column.index,
+                letter: column.letter,
+                header: column.header,
+                restricted: false,
+                editable: false,
+              }))}
+              rows={sheet.data.data.map((row) => ({
+                rowNo: row.row_no,
+                cells: row.cells.map((cell) => ({ value: cell.value, formula: cell.formula })),
+              }))}
+              editable={false}
+              searchable={false}
+            />
+            <p className="text-sm text-ink-muted">{t("summary", { rows: sheet.data.total_rows })}</p>
+          </>
+        ) : sheet.status === "error" ? (
+          <p className="text-sm">{t("previewUnavailable")}</p>
+        ) : (
+          <LoadGate state={sheet} />
+        )}
+        {sheet.status === "error" ? null : (
+          <div className="space-y-1" data-print="hide">
+            <ButtonLink href={`/documents/${documentId}/sheet`} variant="secondary">
+              <Icon name="layers" className="size-4" />
+              {t("open")}
+            </ButtonLink>
+            <p className="text-xs text-ink-muted">{t("openHint")}</p>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }

@@ -1,11 +1,12 @@
 import type { components } from "@schoolos/api-client";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DocumentSheetScreen, editsBody } from "@/features/documents/DocumentSheet";
 import { ImportSheetScreen } from "@/features/imports/ImportSheet";
+import { Link } from "@/i18n/navigation";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { ATTRIBUTES, fakeAadhaar, ID, me } from "@/test/records-fixtures";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
@@ -65,24 +66,45 @@ function gridRows(): SheetGridRow[] {
 function Harness({
   onCommit,
   editable = true,
+  onLink,
 }: {
   onCommit: (row: number, column: number, value: string | null) => void;
   editable?: boolean;
+  onLink?: () => void;
 }) {
   const [rows] = useState(gridRows);
   return (
-    <SheetGrid
-      caption="Rows"
-      columns={GRID_COLUMNS}
-      rows={rows}
-      editable={editable}
-      onCommit={onCommit}
-    />
+    <>
+      <SheetGrid
+        caption="Rows"
+        columns={GRID_COLUMNS}
+        rows={rows}
+        editable={editable}
+        onCommit={onCommit}
+      />
+      <button type="button">After the grid</button>
+      <Link
+        href="/students"
+        onClick={(event) => {
+          event.preventDefault(); // stands in for the router's navigation
+          onLink?.();
+        }}
+      >
+        Students
+      </Link>
+    </>
   );
 }
 
-/** Tab reaches the scroll region (WCAG 2.1.1), then the grid's one cell tab stop. */
+/**
+ * Tab passes the page search and its column choice, reaches the scroll region (WCAG 2.1.1),
+ * then the grid's one cell tab stop.
+ */
 async function tabIntoGrid(user: ReturnType<typeof userEvent.setup>) {
+  await user.tab();
+  expect(screen.getByRole("searchbox", { name: sh.grid.searchLabel })).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("combobox", { name: sh.grid.searchColumn })).toHaveFocus();
   await user.tab();
   expect(screen.getByRole("region", { name: /Scroll sideways/ })).toHaveFocus();
   await user.tab();
@@ -165,6 +187,85 @@ describe("SheetGrid: keyboard use (arrows, Enter, Escape)", () => {
     await tabIntoGrid(user);
     await user.keyboard("{Enter}");
     expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("Tab saves the open cell and leaves the grid; Shift+Tab goes back before it", async () => {
+    const commit = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<Harness onCommit={commit} />);
+    const cells = within(screen.getByRole("grid")).getAllByRole("gridcell");
+    await tabIntoGrid(user);
+    expect(cells[0]).toHaveFocus();
+    await user.keyboard("{Enter}");
+    const input = screen.getByRole("textbox");
+    await user.clear(input);
+    await user.type(input, "ADM-7");
+    await user.keyboard("{Tab}");
+    expect(commit).toHaveBeenCalledWith(2, 0, "ADM-7");
+    expect(screen.getByRole("button", { name: "After the grid" })).toHaveFocus();
+    // Back into the grid lands on the same cell (one tab stop); Tab from a cell leaves too.
+    await user.tab({ shift: true });
+    expect(cells[0]).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "After the grid" })).toHaveFocus();
+    // Shift+Tab in an unchanged editor closes it without saving and goes before the grid.
+    (cells[0] as HTMLElement).focus();
+    await user.keyboard("{F2}");
+    expect(screen.getByRole("textbox")).toHaveFocus();
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("region", { name: /Scroll sideways/ })).toHaveFocus();
+  });
+
+  it("leaves arrow keys at an edge to the browser (the region scrolls)", () => {
+    renderWithIntl(<Harness onCommit={vi.fn()} />);
+    const cells = within(screen.getByRole("grid")).getAllByRole("gridcell");
+    (cells[0] as HTMLElement).focus();
+    // fireEvent returns false when the handler called preventDefault.
+    expect(fireEvent.keyDown(cells[0] as HTMLElement, { key: "ArrowUp" })).toBe(true);
+    expect(fireEvent.keyDown(cells[0] as HTMLElement, { key: "ArrowLeft" })).toBe(true);
+    expect(fireEvent.keyDown(cells[0] as HTMLElement, { key: "ArrowRight" })).toBe(false);
+  });
+
+  it("finds rows on the page, in every column or in one", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<Harness onCommit={vi.fn()} />);
+    const grid = screen.getByRole("grid");
+    const column = screen.getByRole("combobox", { name: sh.grid.searchColumn });
+    // Restricted columns are never searched, so they are not offered.
+    expect(within(column).queryByRole("option", { name: /Religion/ })).toBeNull();
+    await user.type(screen.getByRole("searchbox", { name: sh.grid.searchLabel }), "adm-2");
+    expect(within(grid).getByText("ADM-2")).toBeInTheDocument();
+    expect(within(grid).queryByText("ADM-1")).toBeNull();
+    expect(screen.getByText("1 row of 2 on this page match.")).toBeInTheDocument();
+    await user.selectOptions(column, "1");
+    expect(within(grid).getByText(sh.grid.noMatch)).toBeInTheDocument();
+    await user.selectOptions(column, "all");
+    await user.clear(screen.getByRole("searchbox"));
+    expect(within(grid).getByText("ADM-1")).toBeInTheDocument();
+    expect(within(grid).getByText("ADM-2")).toBeInTheDocument();
+  });
+
+  it("asks before a link leaves an unsaved cell change", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const followed = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<Harness onCommit={vi.fn()} onLink={followed} />);
+    const link = screen.getByRole("link", { name: "Students" });
+    await user.click(link);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(followed).toHaveBeenCalledTimes(1);
+    (within(screen.getByRole("grid")).getAllByRole("gridcell")[0] as HTMLElement).focus();
+    await user.keyboard("{Enter}");
+    await user.type(screen.getByRole("textbox"), "-changed");
+    await user.click(link);
+    expect(confirm).toHaveBeenCalledWith(sh.grid.leaveDraft);
+    expect(followed).toHaveBeenCalledTimes(1); // stayed on the page
+    confirm.mockReturnValue(true);
+    await user.click(link);
+    expect(followed).toHaveBeenCalledTimes(2);
+    confirm.mockRestore();
   });
 
   it("checks values like the API", () => {
@@ -317,6 +418,39 @@ describe("US-401 AC5/AC6: the import sheet", () => {
     expect(await screen.findByText(sh.errors.precondition_failed.title)).toBeInTheDocument();
   });
 
+  it("marks a cell 'Not saved yet' while it saves, and rows with warnings", async () => {
+    const sheet = importSheet();
+    const second = sheet.data[1];
+    if (!second) throw new Error("fixture");
+    sheet.data[1] = {
+      ...second,
+      status: "valid",
+      errors: [],
+      warnings: [{ field: "full_name", code: "missing", message_key: "errors.missing" }],
+    };
+    importRoutes(sheet);
+    let answer: (response: Response) => void = () => undefined;
+    stub.routes[`PATCH /bff/api/v1/imports/${ID.import}/sheet/rows/2`] = () =>
+      new Promise<Response>((resolve) => {
+        answer = resolve;
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<ImportSheetScreen importId={ID.import} />);
+    const grid = await screen.findByRole("grid");
+    expect(within(grid).getByText(sh.import.rowWarning)).toBeInTheDocument();
+    (within(grid).getAllByRole("gridcell")[2] as HTMLElement).focus();
+    await user.keyboard("{Enter}");
+    const input = screen.getByRole("textbox");
+    await user.clear(input);
+    await user.type(input, "Synthetica Uno{Enter}");
+    // The new value shows at once, marked as not saved, until the API answers.
+    expect(await within(grid).findByText(sh.grid.pending)).toBeInTheDocument();
+    expect(within(grid).getByText("Synthetica Uno")).toBeInTheDocument();
+    answer(problem(412, "precondition_failed"));
+    expect(await screen.findByText(sh.errors.precondition_failed.title)).toBeInTheDocument();
+    expect(within(grid).queryByText(sh.grid.pending)).toBeNull();
+  });
+
   it("is read-only after the rows were added and downloads the sheet", async () => {
     importRoutes(
       importSheet({ editable: false, read_only_reason: "committed", status: "committed" }),
@@ -411,7 +545,9 @@ describe("US-701 AC5: document sheets", () => {
     await user.clear(input);
     await user.type(input, "1300{Enter}");
     expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
-    expect(within(grid).getByText(sh.grid.edited)).toBeInTheDocument();
+    // Kept on the page only: marked "Not saved yet", not "Changed".
+    expect(within(grid).getByText(sh.grid.pending)).toBeInTheDocument();
+    expect(within(grid).queryByText(sh.grid.edited)).toBeNull();
 
     await user.click(screen.getByRole("button", { name: sh.document.download.xlsx }));
     await waitFor(() => expect(saved).toHaveBeenCalled());
@@ -434,6 +570,43 @@ describe("US-701 AC5: document sheets", () => {
     expect(
       screen.getByText(sh.document.pending.replace(/\{count.*$/, "No unsaved changes")),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the changes when a newer version won the race (412), and reloads on request", async () => {
+    stub.routes[`GET /bff/api/v1/documents/${ID.doc}/sheet`] = () => Response.json(documentSheet());
+    stub.routes[`POST /bff/api/v1/documents/${ID.doc}/sheet/versions`] = () =>
+      problem(412, "precondition_failed");
+    stub.routes[`POST /bff/api/v1/documents/${ID.doc}/sheet/export`] = () =>
+      new Response("﻿Receipt,Amount\r\n", {
+        headers: { "content-disposition": 'attachment; filename="circular-sheet.csv"' },
+      });
+    const saved = vi.fn();
+    setSheetSaverForTesting(saved);
+    const user = userEvent.setup();
+    renderWithIntl(<DocumentSheetScreen documentId={ID.doc} />);
+    const grid = await screen.findByRole("grid");
+    (within(grid).getAllByRole("gridcell")[1] as HTMLElement).focus();
+    await user.keyboard("{Enter}");
+    await user.clear(screen.getByRole("textbox"));
+    await user.type(screen.getByRole("textbox"), "1250{Enter}");
+    await user.click(screen.getByRole("button", { name: sh.document.save }));
+    expect(await screen.findByText(sh.document.conflictTitle)).toBeInTheDocument();
+    // The change is still on the page and can be downloaded; saving waits for a reload.
+    expect(within(grid).getByText("1250")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: sh.document.save })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: sh.document.conflictDownload }));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    const [download] = stub.callsTo(`POST /bff/api/v1/documents/${ID.doc}/sheet/export`);
+    expect(JSON.parse(download?.body ?? "{}")).toMatchObject({
+      format: "csv",
+      edits: [{ row_no: 2, column: 1, value: "1250" }],
+    });
+    await user.click(screen.getByRole("button", { name: sh.document.conflictReload }));
+    await waitFor(() =>
+      expect(stub.callsTo(`GET /bff/api/v1/documents/${ID.doc}/sheet`).length).toBe(2),
+    );
+    expect(screen.queryByText(sh.document.conflictTitle)).toBeNull();
+    expect(await screen.findByText("1200")).toBeInTheDocument();
   });
 
   it("says why a sheet can't be saved", async () => {
