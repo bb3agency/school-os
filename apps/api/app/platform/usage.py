@@ -19,6 +19,7 @@ from sqlalchemy import text
 
 from app.core.db import platform_session, tenant_session
 from app.core.logging import get_logger
+from app.platform import billing
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import IST, SYSTEM, audit_platform, billing_cfg, config, today_ist
@@ -126,6 +127,15 @@ def collect_daily(day: dt.date | None = None) -> int:
             done += 1
         except Exception:
             log.exception("platform.usage.collect_failed", tenant_id=str(tenant_id))
+        try:
+            # Reconcile the AI answer allowance the school's budget is derived from (ADR-0020 B3).
+            billing.sync_ai_allowance(tenant_id)
+        except Exception as exc:
+            log.warning(
+                "platform.ai_allowance.sync_failed",
+                tenant_id=str(tenant_id),
+                error_type=type(exc).__name__,
+            )
     log.info("platform.usage.collected", count=done, outcome="ok")
     return done
 

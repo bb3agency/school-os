@@ -49,6 +49,10 @@ TENANCY_ALLOWED = frozenset(
         "verify_tenant_purged",
         "destroy_tenant_keys",
         "purge_expired_audit_chain",
+        # subscription: the AI answer bundle's included answers, the one number from which the
+        # school's AI budget is derived (owner decision 2026-10-03; ADR-0020 amendment B3). Opens
+        # the school's own tenant_session inside tenancy; takes a count in, returns a flag.
+        "set_ai_answer_allowance",
     }
 )
 

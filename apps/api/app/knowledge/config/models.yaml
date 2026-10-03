@@ -346,8 +346,23 @@ budget:
   # Before each call the gateway reserves its worst case (input_tokens at the model's input price
   # plus the role's max_output_tokens at its output price) atomically against the month, and
   # settles it to the real cost afterwards, so concurrent calls cannot overshoot (FR-KB-011).
+  # A school with an AI answer bundle (ADR-0038; owner decision 2026-10-03) gets a monthly budget
+  # DERIVED from it instead of its own ai_monthly_budget_inr setting:
+  #   budget_inr = included_answers x cost_per_answer_usd x (1 + overage_headroom_fraction)
+  #                x usd_inr_rate, rounded to a rupee.
+  # The budget stays a cost cap (above it Ask answers search-only); the bundle's quota and the
+  # overage are billed from answer counts (billing.yaml), never from this.
+  # cost_per_answer_usd is an ESTIMATE for one answered question at list price: ~2 answer-role
+  # calls on gemini-3.5-flash (~10k input incl. <=12k tool results, ~800 output incl. thinking:
+  # 2 x $0.024) plus the small conversation roles (~$0.004), about $0.053, rounded up. Re-check
+  # it against kb.llm_calls once real usage exists. The headroom also covers questions that are
+  # not billable answers (not found, refused) and ingestion calls charged to the same budget.
+  # Lite 300 -> ~Rs 2,591; Standard 1,000 -> ~Rs 8,637; High 3,000 -> ~Rs 25,912 at 95.97.
+  bundle:
+    cost_per_answer_usd: "0.06"
+    overage_headroom_fraction: 0.5
   reservation:
-    input_tokens: 16000               # 12k tool results + system prompt, tools, question, history
+    input_tokens: 16000              # 12k tool results + system prompt, tools, question, history
     ttl_s: 600                        # abandoned reservations lapse; > timeout x 3 attempts + backoff
 
 answer_checks:

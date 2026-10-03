@@ -187,6 +187,18 @@ class BudgetReservation(ConfigModel):
     the longest call (timeout x attempts plus backoff; checked at load)."""
 
 
+class BundleBudget(ConfigModel):
+    """The monthly budget of a school with an AI answer bundle (ADR-0038; owner decision
+    2026-10-03): included answers x ``cost_per_answer_usd`` x (1 + headroom), in INR at
+    ``usd_inr_rate``."""
+
+    cost_per_answer_usd: Decimal = Field(gt=0, le=10)
+    """Estimated list-price cost of one answered question (all its model calls)."""
+    overage_headroom_fraction: float = Field(ge=0, le=2)
+    """Extra budget above the bundle's quota, for billed overage answers and non-billable
+    questions and ingestion calls."""
+
+
 class Budget(ConfigModel):
     """Per-tenant monthly budget thresholds (FR-KB-011, NFR-CST-001)."""
 
@@ -195,6 +207,7 @@ class Budget(ConfigModel):
     """At this share of the budget, Ask degrades to search-only until reset or top-up."""
     usd_inr_rate: Decimal = Field(gt=0)
     """Converts metered USD spend to the school's INR budget (same rate as platform billing)."""
+    bundle: BundleBudget
     reservation: BudgetReservation
 
     @model_validator(mode="after")

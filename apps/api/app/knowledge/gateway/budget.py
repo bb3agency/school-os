@@ -86,6 +86,21 @@ class TenantAiSettings:
     """``ai_monthly_budget_inr``; 0 means no AI spend at all."""
 
 
+def bundle_budget_inr(config: LlmConfig, included_answers: int) -> Decimal:
+    """The monthly budget of a school with an AI answer bundle (owner decision 2026-10-03):
+    included answers x ``budget.bundle.cost_per_answer_usd`` x (1 + headroom), in INR at
+    ``budget.usd_inr_rate``, rounded to a rupee."""
+    if included_answers <= 0:
+        raise ValueError("included_answers must be positive")
+    b = config.budget
+    usd = (
+        Decimal(included_answers)
+        * b.bundle.cost_per_answer_usd
+        * (1 + Decimal(str(b.bundle.overage_headroom_fraction)))
+    )
+    return (usd * b.usd_inr_rate).quantize(Decimal(1))
+
+
 @runtime_checkable
 class TenantAiPolicy(Protocol):
     def settings_for(self, tenant_id: uuid.UUID) -> TenantAiSettings: ...
@@ -614,4 +629,5 @@ __all__ = [
     "TenantAiSettings",
     "ValkeySpendLedger",
     "budget_month",
+    "bundle_budget_inr",
 ]

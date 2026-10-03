@@ -18,7 +18,10 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.knowledge.config.llm import load_llm_config
+from app.knowledge.gateway.budget import bundle_budget_inr
 from app.knowledge.policy import SchoolAiPolicy
+from app.tenancy import service as tenancy
 
 pytestmark = pytest.mark.db
 
@@ -104,4 +107,29 @@ def test_policy_answers_are_cached_briefly(world: Any, admin_engine: Engine) -> 
         now[0] = 16.0
         assert policy.settings_for(school).ai_enabled is False
     finally:
+        _flag(admin_engine, school, True)
+
+
+def test_FR_KB_011_budget_comes_from_the_ai_answer_bundle(world: Any, admin_engine: Engine) -> None:
+    """Owner decision 2026-10-03: with a bundle, the budget is derived from its included answers
+    (``models.yaml`` ``budget.bundle``); without one, the school's own setting applies."""
+    school = world.b.tenant_id
+    try:
+        _flag(admin_engine, school, True)
+        _settings(admin_engine, school, '{"ai_monthly_budget_inr": 1200}')
+        assert tenancy.set_ai_answer_allowance(school, 1000)
+        got = SchoolAiPolicy(ttl_s=0.001).settings_for(school)
+        assert got.monthly_budget_inr == bundle_budget_inr(load_llm_config(), 1000)
+        assert got.monthly_budget_inr != Decimal(1200)
+        assert got.ai_enabled is True
+        # The school's AI switch still applies on top of the bundle.
+        _settings(admin_engine, school, '{"ai_features_enabled": false}')
+        assert SchoolAiPolicy(ttl_s=0.001).settings_for(school).ai_enabled is False
+        _settings(admin_engine, school, '{"ai_features_enabled": true}')
+        # Bundle removed: back to the school's own setting.
+        assert tenancy.set_ai_answer_allowance(school, None)
+        assert SchoolAiPolicy(ttl_s=0.001).settings_for(school).monthly_budget_inr == Decimal(1200)
+    finally:
+        tenancy.set_ai_answer_allowance(school, None)
+        _settings(admin_engine, school, None)
         _flag(admin_engine, school, True)

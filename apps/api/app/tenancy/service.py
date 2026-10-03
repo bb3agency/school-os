@@ -1000,6 +1000,69 @@ def update_tenant_settings(
     return _tenant_out(updated)
 
 
+# --- AI answer allowance from the school's AI answer bundle (ADR-0038; ADR-0020 B3) ----------
+#
+# Owner decision 2026-10-03: a school's monthly AI budget is derived from its AI answer bundle.
+# The bundle lives in the control plane; the control plane hands only its number of included
+# answers to the school through this lifecycle-style call (it never reads tenant data). The
+# number is stored under its own key in ``core.tenants.settings``: not a school setting, so the
+# settings form can neither show nor change it, and a settings edit keeps it.
+
+AI_ALLOWANCE_KEY = "ai_answers_per_month"
+
+
+def set_ai_answer_allowance(
+    tenant_id: uuid.UUID, answers_per_month: int | None, *, engine: Engine | None = None
+) -> bool:
+    """Set (or, with ``None``, clear) the school's AI answers a month; ``True`` if it changed.
+
+    Lifecycle-style call for the control plane (ADR-0020 amendment B3): opens the school's own
+    ``tenant_session`` (sos_app, RLS ``own_tenant``), takes one number in and returns a flag; no
+    tenant data leaves. Idempotent: an unchanged value writes and audits nothing, so the daily
+    reconciliation may call it for every school.
+
+    Audit (tenant chain, actor_type system): ``tenant.ai_allowance_set`` with
+    ``included_answers`` (0 and ``bundle: none`` when cleared).
+    """
+    if answers_per_month is not None and answers_per_month <= 0:
+        raise ValueError("answers_per_month must be positive or None")
+    with tenant_session(tenant_id, engine=engine) as session:
+        tenant = repo.lock_own_tenant(session)
+        if tenant is None:
+            raise NotFound("Tenant not found")
+        stored: dict[str, Any] = dict(tenant.settings or {})
+        if stored.get(AI_ALLOWANCE_KEY) == answers_per_month:
+            return False
+        if answers_per_month is None:
+            stored.pop(AI_ALLOWANCE_KEY, None)
+            summary: dict[str, Any] = {"included_answers": 0, "bundle": "none"}
+        else:
+            stored[AI_ALLOWANCE_KEY] = answers_per_month
+            summary = {"included_answers": answers_per_month}
+        repo.replace_tenant_settings(session, stored)
+        _audit(
+            session,
+            action="tenant.ai_allowance_set",
+            resource_type="tenant",
+            resource_id=tenant_id,
+            summary=summary,
+            system=True,
+        )
+    return True
+
+
+def ai_answer_allowance(session: Session) -> int | None:
+    """The school's AI answers a month from its bundle, or ``None`` without one; read in the
+    school's own ``tenant_session`` (the knowledge budget policy). Any member."""
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("School not found")
+    value = (tenant.settings or {}).get(AI_ALLOWANCE_KEY)
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None
+
+
 def session_settings(session: Session) -> TenantSettings:
     """The school settings a signed-in session applies (idle timeout, date format, languages),
     read in the caller's ``tenant_session`` (FR-TEN-012, FR-IAM-003). Any member."""

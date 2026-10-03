@@ -13,7 +13,7 @@ import json
 import threading
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -463,7 +463,7 @@ def test_FR_KB_011_zero_budget_reserves_nothing(ledger: SpendLedger) -> None:
 # set-if-absent key in the spend store), through the same log event as the 80 % alert.
 
 
-def _exhausted_alerts(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _exhausted_alerts(logs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     return [
         e
         for e in logs

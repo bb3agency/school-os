@@ -240,6 +240,22 @@ def update_tenant_settings(
     ).one_or_none()
 
 
+def lock_own_tenant(session: Session) -> Tenant | None:
+    """The current tenant's row, locked until the transaction ends (``FOR UPDATE``)."""
+    return session.scalars(
+        select(Tenant).with_for_update(), execution_options={"populate_existing": True}
+    ).one_or_none()
+
+
+def replace_tenant_settings(session: Session, settings: dict[str, Any]) -> None:
+    """Write the current tenant's whole settings object and bump ``version`` (so a school form
+    opened before this write gets a stale-version answer instead of overwriting it)."""
+    session.execute(
+        update(Tenant).values(settings=settings, version=Tenant.version + 1),
+        execution_options={"synchronize_session": False},
+    )
+
+
 def clear_tenant_settings(session: Session) -> int:
     """Offboarding (ADR-0029): reset the current school's settings to ``{}``; 1 if it changed."""
     result = session.execute(
