@@ -85,7 +85,7 @@ export function ChooseSchoolView({
               <div className="flex min-w-0 items-start gap-3">
                 <Avatar name={school.name} decorative size="lg" />
                 <div className="min-w-0 space-y-1">
-                  <p className="font-medium text-ink">
+                  <p className="font-semibold text-ink">
                     {school.name}{" "}
                     <span className="font-mono text-xs text-ink-muted">({school.code})</span>
                   </p>

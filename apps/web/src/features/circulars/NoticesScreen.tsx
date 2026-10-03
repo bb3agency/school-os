@@ -143,7 +143,7 @@ export function NoticesScreen() {
                             <Td>
                               <Link
                                 href={`/notices/${notice.id}`}
-                                className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+                                className="font-semibold text-primary underline underline-offset-4 hover:no-underline"
                               >
                                 {notice.title_en || t("untitled")}
                               </Link>

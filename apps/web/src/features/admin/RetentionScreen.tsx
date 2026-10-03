@@ -47,7 +47,7 @@ function FixedRow({ category }: { category: RetentionCategory }) {
   return (
     <li className="grid gap-2 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6">
       <div className="min-w-0 space-y-1">
-        <p className="font-medium text-ink">
+        <p className="font-semibold text-ink">
           <CategoryName category={category} />
         </p>
         <p className="text-sm text-ink-muted">
@@ -56,7 +56,7 @@ function FixedRow({ category }: { category: RetentionCategory }) {
         {!category.enforced ? <p className="text-sm text-ink-muted">{t("notEnforced")}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium text-ink">{t("days", { count: category.days })}</span>
+        <span className="font-semibold text-ink">{t("days", { count: category.days })}</span>
         <Pill variant="tag">{t("fixed")}</Pill>
       </div>
     </li>
@@ -177,7 +177,7 @@ function RetentionForm({
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0 space-y-1">
-            <h2 id={`${saveId}-title`} className="font-medium text-ink">
+            <h2 id={`${saveId}-title`} className="font-semibold text-ink">
               {t("saveTitle")}
             </h2>
             <p className="text-sm text-ink-muted">{t("saveBody")}</p>

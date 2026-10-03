@@ -163,7 +163,7 @@ export function OffboardingProgress({
           {run.in_progress ? <p>{t("inProgress")}</p> : null}
           {inventory ? (
             <table className="w-full text-left">
-              <caption className="mb-1 text-left font-medium">{t("inventoryTitle")}</caption>
+              <caption className="mb-1 text-left font-semibold">{t("inventoryTitle")}</caption>
               <thead className="sr-only">
                 <tr>
                   <th scope="col">{t("category")}</th>

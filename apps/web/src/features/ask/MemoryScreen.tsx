@@ -103,7 +103,7 @@ function MemoryRow({ item, off }: { item: MemoryItem; off: boolean }) {
             className="block w-full rounded-md border border-border-control bg-surface-muted px-3 py-2 text-base"
           />
           {error ? (
-            <p id={errorId} role="alert" className="text-sm font-medium text-danger">
+            <p id={errorId} role="alert" className="text-sm font-semibold text-danger">
               {error}
             </p>
           ) : null}
@@ -333,7 +333,7 @@ export function MemoryScreen() {
             });
           }}
         >
-          <label htmlFor={addId} className="block text-sm font-medium text-ink">
+          <label htmlFor={addId} className="block text-sm font-semibold text-ink">
             {t("add")}
           </label>
           <p id={addHintId} className="text-xs text-ink-subtle">
@@ -362,7 +362,7 @@ export function MemoryScreen() {
           </div>
           {full && !off ? <p className="text-sm text-ink-muted">{t("fullHint")}</p> : null}
           {addError ? (
-            <p id={addErrorId} role="alert" className="text-sm font-medium text-danger">
+            <p id={addErrorId} role="alert" className="text-sm font-semibold text-danger">
               {addError}
             </p>
           ) : null}

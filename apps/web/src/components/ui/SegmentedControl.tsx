@@ -71,7 +71,7 @@ export function SegmentedControl({
           <label
             key={option.value}
             className={cn(
-              "relative inline-flex cursor-pointer items-center justify-center rounded-md border border-transparent text-center font-medium text-ink-muted transition-colors",
+              "relative inline-flex cursor-pointer items-center justify-center rounded-md border border-transparent text-center font-semibold text-ink-muted transition-colors",
               "hover:text-ink",
               "has-checked:border-border has-checked:bg-surface has-checked:text-ink has-checked:shadow-raised",
               "has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus",

@@ -77,7 +77,7 @@ export function ValueChange({ request }: { request: ChangeRequest }) {
         →
       </span>
       <span className="sr-only">{t("newValue")}:</span>
-      <strong className="font-medium">
+      <strong className="font-semibold">
         <DisplayValue
           value={request.new_value}
           masked={request.masked}

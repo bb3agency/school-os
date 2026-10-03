@@ -494,7 +494,7 @@ export function ProvisionSchoolForm() {
                   className={cn(cardClasses({ padding: "sm", tone: "muted" }), "space-y-3")}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-medium text-ink">{stepLabels[group.step]}</h3>
+                    <h3 className="font-semibold text-ink">{stepLabels[group.step]}</h3>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -511,7 +511,7 @@ export function ProvisionSchoolForm() {
                         <dt className="text-ink-muted">{row.label}</dt>
                         <dd
                           className={cn(
-                            "font-medium break-words text-ink",
+                            "break-words text-ink",
                             row.mono && row.value ? "font-mono" : "",
                           )}
                         >

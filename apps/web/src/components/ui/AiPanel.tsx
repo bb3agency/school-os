@@ -39,7 +39,7 @@ export function AiPanel({
 }) {
   const headingId = useId();
   const chip =
-    "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white bg-white px-3.5 py-1.5 text-left text-sm font-medium text-ink shadow-raised transition-colors hover:bg-primary-soft";
+    "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white bg-white px-3.5 py-1.5 text-left text-sm font-semibold text-ink shadow-raised transition-colors hover:bg-primary-soft";
   return (
     <section
       aria-labelledby={headingId}
@@ -54,7 +54,7 @@ export function AiPanel({
           {eyebrow}
         </Eyebrow>
       ) : null}
-      <h2 id={headingId} className="text-2xl font-medium md:text-3xl">
+      <h2 id={headingId} className="text-2xl md:text-3xl">
         {greeting}
       </h2>
       {description ? <p className="mt-2 max-w-2xl text-white">{description}</p> : null}

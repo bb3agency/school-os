@@ -64,7 +64,7 @@ export function UsersScreen() {
             <span className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/settings/users/${row.id}`}
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="font-semibold text-primary underline-offset-4 hover:underline"
               >
                 {row.display_name}
               </Link>
@@ -103,7 +103,7 @@ export function UsersScreen() {
     {
       key: "name",
       header: t("colRole"),
-      cell: (role) => <span className="font-medium">{roleLabel(role.key)}</span>,
+      cell: (role) => <span className="font-semibold">{roleLabel(role.key)}</span>,
     },
     {
       key: "kind",

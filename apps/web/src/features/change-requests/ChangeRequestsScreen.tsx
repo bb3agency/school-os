@@ -72,7 +72,7 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
     {
       key: "field",
       header: t("colField"),
-      cell: (row) => <span className="font-medium">{fieldLabel(row, locale)}</span>,
+      cell: (row) => <span className="font-semibold">{fieldLabel(row, locale)}</span>,
     },
     { key: "change", header: t("colChange"), cell: (row) => <ValueChange request={row} /> },
     {
@@ -101,7 +101,7 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
       cell: (row) => (
         <Link
           href={`/change-requests/${row.id}`}
-          className="font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
+          className="font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {t("open")}
           <span className="sr-only">

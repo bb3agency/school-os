@@ -41,7 +41,7 @@ function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium break-words text-ink">{children}</dd>
+      <dd className="font-semibold break-words text-ink">{children}</dd>
     </div>
   );
 }
@@ -192,7 +192,7 @@ function SuggestionItem({
     <li className="space-y-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 space-y-1">
-          <p className="font-medium break-words text-ink">{suggestion.title}</p>
+          <p className="font-semibold break-words text-ink">{suggestion.title}</p>
           <p className="text-sm text-ink-muted">
             {t("due", { date: formatDate(suggestion.due_on) ?? suggestion.due_on })}
           </p>

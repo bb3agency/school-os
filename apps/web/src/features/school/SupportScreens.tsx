@@ -81,7 +81,7 @@ export function SupportScreen() {
       cell: (row) => (
         <Link
           href={`/support/${row.id}`}
-          className="font-mono text-xs font-medium text-primary underline underline-offset-4 hover:no-underline"
+          className="font-mono text-xs text-primary underline underline-offset-4 hover:no-underline"
         >
           {row.number}
         </Link>

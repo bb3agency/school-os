@@ -215,7 +215,7 @@ function Drafting({ notice }: { notice: Notice }) {
   return (
     <div className="space-y-4">
       <div role="status" aria-live="polite" className="space-y-1">
-        <p className="font-medium text-ink">{t("title")}</p>
+        <p className="font-semibold text-ink">{t("title")}</p>
         <p className="text-sm text-ink-muted">{slow ? t("slow") : t("body")}</p>
       </div>
       <div className={telugu ? "grid gap-4 lg:grid-cols-2" : "max-w-3xl"} aria-hidden="true">

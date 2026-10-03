@@ -176,13 +176,13 @@ function Preview({
         <dl className="flex flex-wrap gap-2 text-sm">
           <div className="flex gap-1">
             <dt className="text-ink-muted">{t("classLabel")}</dt>
-            <dd className="font-medium">
+            <dd className="font-semibold">
               <Value>{preview.class_label}</Value>
             </dd>
           </div>
           <div className="flex gap-1">
             <dt className="text-ink-muted">{t("yearLabel")}</dt>
-            <dd className="font-medium">
+            <dd className="font-semibold">
               <Value>{preview.academic_year_label}</Value>
             </dd>
           </div>
@@ -199,7 +199,7 @@ function Preview({
             <TBody>
               {preview.fields.map((field) => (
                 <Tr key={field.key}>
-                  <Td className="font-medium">{localLabel(field, locale)}</Td>
+                  <Td className="font-semibold">{localLabel(field, locale)}</Td>
                   <Td>
                     <span className="break-anywhere">
                       <Value>{field.value}</Value>

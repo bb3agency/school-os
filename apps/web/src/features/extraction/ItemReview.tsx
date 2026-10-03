@@ -133,7 +133,7 @@ function PageImage({
   return (
     <figure className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2" data-print="hide">
-        <figcaption className="text-sm font-medium text-ink">
+        <figcaption className="text-sm font-semibold text-ink">
           {t("caption", { page: seq, row: item.row_index + 1 })}
         </figcaption>
         <Button
@@ -312,7 +312,7 @@ function ConfirmForm({
   return (
     <form noValidate onSubmit={form.onSubmit} className="space-y-5">
       <fieldset className="space-y-4">
-        <legend className="mb-1 text-lg font-medium text-ink">{t("valuesLegend")}</legend>
+        <legend className="mb-1 text-lg font-semibold text-ink">{t("valuesLegend")}</legend>
         <p className="text-sm text-ink-muted">{t("valuesHint")}</p>
         {keys.map((key) => {
           const field = item.fields[key];
@@ -342,7 +342,7 @@ function ConfirmForm({
             return (
               <div key={key} className={wrapper}>
                 <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-sm font-medium text-ink">{fieldLabel}</p>
+                  <p className="text-sm font-semibold text-ink">{fieldLabel}</p>
                   <p className="inline-flex items-center gap-2 rounded-md bg-surface-muted px-3 py-2 font-mono text-ink">
                     <Icon name="lock" className="size-4 text-ink-muted" />
                     {field.value}
@@ -398,7 +398,7 @@ function ConfirmForm({
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="mb-1 text-lg font-medium text-ink">{t("studentLegend")}</legend>
+        <legend className="mb-1 text-lg font-semibold text-ink">{t("studentLegend")}</legend>
         <label className={choice}>
           <input
             type="radio"
