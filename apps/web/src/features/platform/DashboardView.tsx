@@ -280,7 +280,7 @@ export function DashboardView({
                   </span>
                   <Link
                     href={item.href}
-                    className="inline-flex items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline"
+                    className="inline-flex items-center gap-1 rounded-sm text-sm font-semibold text-primary underline-offset-4 hover:underline"
                   >
                     {item.linkLabel}
                     <Icon name="arrowRight" className="size-4" />

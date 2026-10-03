@@ -154,14 +154,14 @@ export function SourceChip({
             {ref && ref.kind !== "count" && href ? (
               <Link
                 href={href}
-                className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+                className="font-semibold text-primary underline underline-offset-4 hover:no-underline"
                 // The visible title starts the name (WCAG 2.5.3); the rest says what opens.
                 aria-label={`${name} (${ref.kind === "fee" ? tt("sourceOpen") : openLabel(ref, t)})`}
               >
                 {name}
               </Link>
             ) : (
-              <span className="font-medium text-ink">{name}</span>
+              <span className="font-semibold text-ink">{name}</span>
             )}
             {ref?.kind === "doc" && ref.page !== null ? (
               <Pill variant="tag">{t("page", { page: ref.page })}</Pill>

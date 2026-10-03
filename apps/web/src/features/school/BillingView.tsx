@@ -135,7 +135,7 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
           {plan && plan.available ? (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-2xl font-medium text-ink">
+                <p className="text-2xl font-semibold text-ink">
                   <span className="sr-only">{t("plan")}: </span>
                   <Value>{plan.plan_name}</Value>
                 </p>

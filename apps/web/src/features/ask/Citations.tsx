@@ -149,14 +149,14 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
           {ref && ref.kind !== "count" && href ? (
             <Link
               href={href}
-              className="font-medium text-primary underline underline-offset-4 break-anywhere hover:no-underline"
+              className="font-semibold text-primary underline underline-offset-4 break-anywhere hover:no-underline"
               // The visible title starts the name (WCAG 2.5.3); the rest says what opens.
               aria-label={`${name} (${ref.kind === "fee" ? tt("sourceOpen") : openLabel(ref, t)})`}
             >
               {name}
             </Link>
           ) : (
-            <span className="font-medium break-anywhere text-ink">{name}</span>
+            <span className="font-semibold break-anywhere text-ink">{name}</span>
           )}
           {ref?.kind === "doc" && ref.page !== null ? (
             <Pill variant="tag">{t("page", { page: ref.page })}</Pill>

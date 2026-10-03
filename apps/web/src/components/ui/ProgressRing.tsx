@@ -89,7 +89,7 @@ export function ProgressRing({
       {showValue ? (
         <span
           aria-hidden="true"
-          className={cn("relative font-medium text-ink tabular-nums", config.text)}
+          className={cn("relative font-semibold text-ink tabular-nums", config.text)}
         >
           {rounded}%
         </span>

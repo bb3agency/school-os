@@ -88,7 +88,7 @@ function FlagFacts({ flag }: { flag: FlagDetail }) {
     <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
       {rows.map(([label, value]) => (
         <div key={label} className="contents">
-          <dt className="text-sm font-medium text-ink-muted">{label}</dt>
+          <dt className="text-sm text-ink-muted">{label}</dt>
           <dd className="text-sm break-words text-ink">{value}</dd>
         </div>
       ))}

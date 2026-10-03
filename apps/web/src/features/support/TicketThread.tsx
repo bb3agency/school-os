@@ -45,7 +45,7 @@ export function TicketThread({
             >
               <p className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
                 <Avatar name={author} size="sm" decorative />
-                <span className="font-medium text-ink">{author}</span>
+                <span className="font-semibold text-ink">{author}</span>
                 <span className="font-mono">{formatDateTime(message.created_at)}</span>
                 {message.internal_note ? <Badge tone="warning">{t("internalNote")}</Badge> : null}
               </p>

@@ -199,20 +199,20 @@ function YearCard({ year, manage }: { year: AcademicYear; manage: boolean }) {
       }
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-lg font-medium text-ink">{year.label}</h3>
+        <h3 className="text-lg font-semibold text-ink">{year.label}</h3>
         {year.is_current ? <Pill variant="done">{ts("currentBadge")}</Pill> : null}
         {archived ? <Badge tone="warning">{t("archivedBadge")}</Badge> : null}
       </div>
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-ink-muted">{ts("years.colStarts")}</dt>
-          <dd className="font-medium text-ink">
+          <dd className="font-semibold text-ink">
             <Value>{formatDate(year.starts_on)}</Value>
           </dd>
         </div>
         <div>
           <dt className="text-ink-muted">{ts("years.colEnds")}</dt>
-          <dd className="font-medium text-ink">
+          <dd className="font-semibold text-ink">
             <Value>{formatDate(year.ends_on)}</Value>
           </dd>
         </div>

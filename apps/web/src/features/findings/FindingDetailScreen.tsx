@@ -281,7 +281,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
               {data.student.display_name ? (
                 <Avatar name={data.student.display_name} size="sm" decorative />
               ) : null}
-              <span className="font-medium">
+              <span className="font-semibold">
                 <Value>{data.student.display_name}</Value>
               </span>
               {data.student.admission_no ? (
@@ -326,7 +326,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                 <li key={route.code} className="flex gap-3">
                   <span
                     aria-hidden="true"
-                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-action text-xs font-medium text-on-action"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-action text-xs font-semibold text-on-action"
                   >
                     {position + 1}
                   </span>
@@ -418,13 +418,13 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                         <dl className="space-y-2">
                           {data.resolution_note ? (
                             <div>
-                              <dt className="font-medium text-ink">{td("note")}</dt>
+                              <dt className="font-semibold text-ink">{td("note")}</dt>
                               <dd className="whitespace-pre-line">{data.resolution_note}</dd>
                             </div>
                           ) : null}
                           {data.change_request_id ? (
                             <div>
-                              <dt className="font-medium text-ink">{td("linkedRequest")}</dt>
+                              <dt className="font-semibold text-ink">{td("linkedRequest")}</dt>
                               <dd>
                                 <Link
                                   href={`/change-requests/${data.change_request_id}`}
@@ -449,7 +449,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                     status: "done" as const,
                     body: (
                       <dl>
-                        <dt className="font-medium text-ink">{td("waiveReason")}</dt>
+                        <dt className="font-semibold text-ink">{td("waiveReason")}</dt>
                         <dd className="whitespace-pre-line">
                           <Value>{data.waived_reason}</Value>
                         </dd>

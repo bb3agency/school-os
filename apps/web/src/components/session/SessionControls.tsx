@@ -111,7 +111,7 @@ export function SessionControls({
           aria-describedby={hintId}
           data-tooltip={lockLabel}
           className={cn(
-            "flex min-h-10 w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60",
+            "flex min-h-10 w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-60",
             "collapsed:px-0",
             dark
               ? "border-platform-hover text-platform-ink hover:bg-platform-hover"

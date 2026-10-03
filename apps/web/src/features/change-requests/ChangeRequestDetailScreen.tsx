@@ -302,7 +302,7 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
           ...(data.decided_at ? { time: <Value>{formatDateTime(data.decided_at)}</Value> } : {}),
           body: data.decision_note ? (
             <dl>
-              <dt className="font-medium text-ink">
+              <dt className="font-semibold text-ink">
                 {data.status === "rejected" ? td("rejectReason") : td("decisionNote")}
               </dt>
               <dd className="whitespace-pre-line">{data.decision_note}</dd>
@@ -362,7 +362,7 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
                 <Eyebrow as="p" tone="brand">
                   {t("newValue")}
                 </Eyebrow>
-                <p className="mt-2 font-mono text-lg font-medium break-words text-ink">
+                <p className="mt-2 font-mono text-lg break-words text-ink">
                   <DisplayValue
                     value={data.new_value}
                     masked={data.masked}
@@ -375,7 +375,7 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
               <dt className="text-sm text-ink-muted">{td("student")}</dt>
               <dd className="flex flex-wrap items-center gap-2">
                 {student?.name ? <Avatar name={student.name} size="sm" decorative /> : null}
-                <span className="font-medium">
+                <span className="font-semibold">
                   <Value>{student?.name}</Value>
                 </span>
                 {student?.admissionNo ? (

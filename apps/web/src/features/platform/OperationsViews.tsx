@@ -434,7 +434,7 @@ export function FleetScreen({ status = "" }: { status?: string }) {
         <span className="flex min-w-40 flex-col gap-0.5">
           <Link
             href={`/platform/schools/${row.tenant_id}?tab=deployment`}
-            className="font-medium text-primary underline-offset-4 hover:underline"
+            className="font-semibold text-primary underline-offset-4 hover:underline"
           >
             {row.school_name}
           </Link>

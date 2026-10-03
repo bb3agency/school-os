@@ -156,7 +156,7 @@ function AttributeRow({
         canReveal={canReveal}
       />
     ) : (
-      <span className="font-mono font-medium">
+      <span className="font-mono">
         <Value>{format(value, attribute)}</Value>
       </span>
     );
@@ -167,7 +167,7 @@ function AttributeRow({
     <tr className="align-top">
       <th
         scope="row"
-        className="min-w-40 px-4 py-4 text-left font-medium whitespace-normal text-ink"
+        className="min-w-40 px-4 py-4 text-left font-semibold whitespace-normal text-ink"
       >
         {label}
         {attribute?.is_identity ? (

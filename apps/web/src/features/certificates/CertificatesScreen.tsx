@@ -76,7 +76,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
       header: t("colCertificate"),
       cell: (row) => (
         <span className="flex flex-col gap-0.5">
-          <span className="font-medium">{title(row)}</span>
+          <span className="font-semibold">{title(row)}</span>
           {row.serial ? null : <span className="text-xs text-ink-muted">{t("noSerialYet")}</span>}
         </span>
       ),
@@ -111,7 +111,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
       cell: (row) => (
         <Link
           href={`/certificates/${row.id}`}
-          className="font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
+          className="font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {t("open")}
           <span className="sr-only">: {title(row)}</span>

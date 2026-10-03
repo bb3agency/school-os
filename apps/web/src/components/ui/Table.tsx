@@ -124,7 +124,7 @@ export function Th({
     <th
       scope={scope}
       className={cn(
-        "px-4 py-3 text-xs font-medium whitespace-nowrap text-ink-muted",
+        "px-4 py-3 text-xs font-semibold whitespace-nowrap text-ink-muted",
         "group-data-[density=compact]/table:px-3 group-data-[density=compact]/table:py-2",
         numeric && NUMERIC,
         className,

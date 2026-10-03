@@ -55,7 +55,7 @@ function renderInline(nodes: readonly Inline[], ctx: RenderContext): ReactNode[]
           <Link
             key={i}
             href={href}
-            className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+            className="text-primary underline underline-offset-4 hover:no-underline"
           >
             {label}
           </Link>

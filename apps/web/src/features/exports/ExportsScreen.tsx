@@ -74,7 +74,7 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
       cell: (row) => (
         <Link
           href={`/exports/${row.id}`}
-          className="font-medium text-primary underline underline-offset-4"
+          className="font-semibold text-primary underline underline-offset-4"
         >
           {title(row)}
           <span className="sr-only">

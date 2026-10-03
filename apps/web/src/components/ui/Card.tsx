@@ -48,7 +48,7 @@ export interface CardHeaderProps {
   className?: string;
 }
 
-/** Title row of a card: eyebrow, title (18px medium), description and actions. */
+/** Title row of a card: eyebrow, title (18px semibold), description and actions. */
 export function CardHeader({
   title,
   eyebrow,

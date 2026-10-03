@@ -169,7 +169,7 @@ function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium break-words text-ink">{children}</dd>
+      <dd className="font-semibold break-words text-ink">{children}</dd>
     </div>
   );
 }
@@ -230,7 +230,7 @@ function RequestCard({ busy }: { busy: boolean }) {
                 aria-describedby={`${sensitiveId}-hint`}
                 className="mt-1 size-4 shrink-0 accent-primary"
               />
-              <span className="font-medium text-ink">{t("sensitiveLabel")}</span>
+              <span className="font-semibold text-ink">{t("sensitiveLabel")}</span>
             </label>
             <p id={`${sensitiveId}-hint`} className="ps-7 text-sm text-ink-muted">
               {t("sensitiveHint")}

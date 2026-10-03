@@ -114,7 +114,7 @@ const ROWS = [
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section aria-labelledby={`ui-${id}`} className={`${cardClasses()} space-y-5`}>
-      <h2 id={`ui-${id}`} className="text-lg font-medium text-ink">
+      <h2 id={`ui-${id}`} className="text-lg font-semibold text-ink">
         {title}
       </h2>
       {children}
@@ -164,7 +164,7 @@ export function UiReference({ telugu = false }: { telugu?: boolean }) {
           <Eyebrow>Sentiment dynamics · line 8 / 34</Eyebrow>
           <p className="font-display text-6xl leading-none text-ink">1,245</p>
           <p className="text-2xl font-semibold text-ink">Page title, 24px semibold</p>
-          <p className="text-lg font-medium text-ink">Card title, 18px medium</p>
+          <p className="text-lg font-semibold text-ink">Card title, 18px semibold</p>
           <p className="text-ink">Body text, 16px regular, ink.</p>
           <p className="text-sm text-ink-muted">Secondary text, 14px, ink-muted.</p>
           <p className="text-sm text-ink-subtle">1,157 last month · ink-subtle</p>
@@ -427,7 +427,7 @@ export function UiReference({ telugu = false }: { telugu?: boolean }) {
                     <Td>
                       <span className="flex items-center gap-3">
                         <Avatar name={row.name} decorative />
-                        <span className="font-medium">{row.name}</span>
+                        <span className="font-semibold">{row.name}</span>
                       </span>
                     </Td>
                     <Td>{row.cls}</Td>

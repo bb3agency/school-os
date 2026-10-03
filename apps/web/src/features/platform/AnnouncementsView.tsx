@@ -71,7 +71,7 @@ export function AnnouncementsScreen() {
           <Pill variant="tag">{audienceLabel(row)}</Pill>
         </div>
         <div className="space-y-1">
-          <h3 lang={locale} className="font-medium text-ink">
+          <h3 lang={locale} className="font-semibold text-ink">
             {locale === "te" ? row.title_te : row.title_en}
           </h3>
           <p lang={locale} className="text-sm whitespace-pre-wrap text-ink-muted">

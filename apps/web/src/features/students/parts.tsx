@@ -71,7 +71,7 @@ export function SourceChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
         verification === "verified"
           ? "border-positive-border bg-positive-soft text-positive-ink"
           : verification === "rejected"
