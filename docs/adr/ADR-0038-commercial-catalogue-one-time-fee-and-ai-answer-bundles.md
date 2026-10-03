@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · amendment 2026-10-03 (the school AI budget is derived from the bundle) |
 | Date | 2026-10-01 |
 | Deciders | Product owner (commercial model "SaaS first, with a premium Dedicated tier", 2026-10-01); prices below are the owner's |
 | Amends / supersedes | Amends [ADR-0015](ADR-0015-deployment-and-commercial-model.md) (commercial model: adds a one-time fee and a metered add-on to the recurring subscription). Implementation amendment B2 to [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) (the AI answer count). |
@@ -49,3 +49,33 @@ All are ex-GST starting prices; GST (18%, CGST + SGST or IGST) goes on the invoi
 ## Related requirements
 
 FR-PLT-010, FR-PLT-013, FR-PLT-015, FR-PLT-016, FR-PLT-017, FR-PLT-020, FR-PLT-021, FR-KB-009, NFR-CST-001; docs/16 §5.6, §5.7, §7, §8.1, §10.2, §11, §19; ADR-0013, ADR-0015, ADR-0020.
+
+## Amendments (2026-10-03)
+
+**C1 · The school's monthly AI budget is derived from its bundle (product owner, 2026-10-03).**
+Until now the AI budget (FR-KB-011) was the school's own setting `ai_monthly_budget_inr`
+(default ₹5,000), unrelated to what the school buys. Decision and design:
+
+- **Rule.** With a bundle, the budget is `included answers × cost_per_answer_usd × (1 +
+  overage_headroom_fraction) × usd_inr_rate`, rounded to a rupee (`knowledge/config/models.yaml`
+  → `budget.bundle`: an estimated **$0.06** per answered question at list price, **50 %**
+  headroom for billed overage answers and for questions and ingestion calls that are not billable
+  answers; at the 2026-10-03 rate 95.97 that is about ₹2,591 for Lite, ₹8,637 for Standard and
+  ₹25,912 for High). It stays a **cost cap in rupees**, metered in USD per model call exactly as
+  before (reservations, 80 % and 100 % alerts, search-only above it); an "answers per month"
+  cap was not chosen because the gateway meters and reserves per model call, not per answer, and
+  ingestion calls share the budget. Billing is unchanged: quota and overage come from answer
+  counts (§3, §4), never from the budget.
+- **Without a bundle** (trials before a bundle is chosen, annual plans, dedicated hosts for now)
+  the school's own `ai_monthly_budget_inr` setting still applies.
+- **How the number reaches the school.** Only the bundle's included answers cross the boundary,
+  through the lifecycle-style call `tenancy.service.set_ai_answer_allowance` in the school's own
+  `tenant_session` (ADR-0020 amendment B3); `knowledge.policy` reads it with
+  `tenancy.service.ai_answer_allowance`. The allowance applies from the moment the bundle is set
+  (it is a cost cap; the billing month `ai_bundle_from` is unchanged). Reconciled daily by the
+  usage collector.
+- **Commercial note for the owner.** At the estimated $0.06 (≈ ₹5.76) per answer, the ₹1.50
+  overage price and the bundle prices are below our estimated model cost per answer; the estimate
+  must be checked against `kb.llm_calls` once real usage exists (docs/16 §19 Q20).
+
+Related: FR-KB-011, NFR-CST-001, FR-PLT-013; docs/06 §12, docs/16 §5.7, §11, §19 Q18-Q20.
