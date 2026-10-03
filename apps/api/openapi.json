@@ -17931,6 +17931,19 @@
             ],
             "title": "Admission No"
           },
+          "apaar_id": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact APAAR ID (FR-STU-016, ADR-0037): 12 digits, spaces or hyphens between the groups allowed. Matches only the student's current APAAR ID values (verified or recorded, not rejected), within the caller's scope; anything else answers 422 digits12_required. The only search field where a 12-digit number is accepted: query and admission_no still refuse one (aadhaar_full_number_rejected).",
+            "title": "Apaar Id"
+          },
           "class_id": {
             "anyOf": [
               {
@@ -36328,7 +36341,7 @@
     },
     "/api/v1/students/search": {
       "post": {
-        "description": "Find students by partial name in English or Telugu, admission number, class/section\n(``9b``, ``IX-B``) or parent name, with the filters in the JSON body so personal data never\nappears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see\nonly students in their sections/classes this year). Same results, page size and cursor as\n``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:\nnothing is written, so no ``Idempotency-Key``. A full Aadhaar number anywhere in the body is\nrefused (422 ``aadhaar_full_number_rejected``).",
+        "description": "Find students by partial name in English or Telugu, admission number, class/section\n(``9b``, ``IX-B``) or parent name, with the filters in the JSON body so personal data never\nappears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see\nonly students in their sections/classes this year). Same results, page size and cursor as\n``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:\nnothing is written, so no ``Idempotency-Key``. ``apaar_id`` finds a student by exact APAAR\nID (12 digits; current verified or recorded values of the typed ``apaar_id`` attribute only,\nsame scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number. A\nfull Aadhaar number anywhere else in the body is refused (422\n``aadhaar_full_number_rejected``).",
         "operationId": "search_students_by_body_api_v1_students_search_post",
         "requestBody": {
           "content": {

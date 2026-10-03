@@ -1942,7 +1942,10 @@
       "matchedOn": "దీని ద్వారా దొరికింది: {field}",
       "filterYear": "విద్యా సంవత్సరం",
       "currentYear": "ప్రస్తుత సంవత్సరం",
-      "crumbHome": "హోమ్"
+      "crumbHome": "హోమ్",
+      "apaarLabel": "APAAR ID",
+      "apaarHint": "Finds the student with exactly this 12-digit APAAR ID.",
+      "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012."
     },
     "create": {
       "title": "విద్యార్థిని జోడించండి",

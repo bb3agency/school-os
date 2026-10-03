@@ -9,6 +9,7 @@ import { Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
+import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
@@ -42,6 +43,8 @@ export interface StudentFilters {
   status?: string | undefined;
   /** Another academic year's class lists (the current year when unset). */
   yearId?: string | undefined;
+  /** Exact APAAR ID as typed (FR-STU-016); sent only when it is 12 digits. */
+  apaar?: string | undefined;
 }
 
 interface CleanFilters {
@@ -50,6 +53,7 @@ interface CleanFilters {
   section_id?: string;
   status?: StudentStatus;
   academic_year_id?: string;
+  apaar_id?: string;
 }
 
 const filtersSchema = z.object({
@@ -58,7 +62,17 @@ const filtersSchema = z.object({
   section_id: z.string().optional(),
   status: z.string().optional(),
   academic_year_id: z.string().optional(),
+  apaar_id: z.string().optional(),
 });
+
+/** FR-STU-015/016: 12 digits, optionally grouped 4-4-4 by a space or hyphen (as the API). */
+const DIGITS12 = /^\d{4}[ -]?\d{4}[ -]?\d{4}$/;
+
+/** The 12 digits of a typed APAAR ID, or null when it is not one. */
+export function apaarDigits(text: string): string | null {
+  const value = text.trim();
+  return DIGITS12.test(value) ? value.replace(/[ -]/g, "") : null;
+}
 
 /** Search form values → filters (the zod schema only shapes them; cleanFilters checks them). */
 export function filtersFromForm(form: HTMLFormElement): StudentFilters {
@@ -69,14 +83,17 @@ export function filtersFromForm(form: HTMLFormElement): StudentFilters {
     sectionId: parsed.section_id || undefined,
     status: parsed.status || undefined,
     yearId: parsed.academic_year_id || undefined,
+    apaar: parsed.apaar_id?.trim() || undefined,
   };
 }
 
 /** Filters → search body (ignores anything malformed rather than failing the page). */
 export function cleanFilters(filters: StudentFilters): CleanFilters {
   const q = filters.q?.trim().slice(0, 200) ?? "";
+  const apaar = filters.apaar ? apaarDigits(filters.apaar) : null;
   return {
     ...(q ? { query: q } : {}),
+    ...(apaar ? { apaar_id: apaar } : {}),
     ...(filters.classId && UUID_PATTERN.test(filters.classId) ? { class_id: filters.classId } : {}),
     ...(filters.sectionId && UUID_PATTERN.test(filters.sectionId)
       ? { section_id: filters.sectionId }
@@ -165,6 +182,8 @@ export interface StudentListViewProps {
   onPrevious?: (() => void) | undefined;
   /** The search text looked like a full Aadhaar number: it was not sent. */
   aadhaarBlocked?: boolean;
+  /** The APAAR ID was not 12 digits: it was not sent. */
+  apaarInvalid?: boolean;
   /** New search (kept in memory only: names never go into the page URL or history). */
   onSearch: (filters: StudentFilters) => void;
   onClear: () => void;
@@ -180,6 +199,7 @@ export function StudentListView({
   onNext,
   onPrevious,
   aadhaarBlocked = false,
+  apaarInvalid = false,
   onSearch,
   onClear,
 }: StudentListViewProps) {
@@ -213,7 +233,12 @@ export function StudentListView({
         ? { status: "ready", data: results.data.data }
         : results;
   const hasFilters = Boolean(
-    filters.q || filters.classId || filters.sectionId || filters.status || filters.yearId,
+    filters.q ||
+    filters.classId ||
+    filters.sectionId ||
+    filters.status ||
+    filters.yearId ||
+    filters.apaar,
   );
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -306,20 +331,39 @@ export function StudentListView({
               />
             </div>
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <SegmentedControl
-                name="status"
-                legend={t("filterStatus")}
-                legendVisible
-                size="sm"
-                defaultValue={filters.status ?? ""}
-                options={[
-                  { value: "", label: tc("all") },
-                  ...STUDENT_STATUSES.map((value) => ({
-                    value,
-                    label: ts(`status.${value}`),
-                  })),
-                ]}
-              />
+              <div className="flex flex-wrap items-end gap-4">
+                <SegmentedControl
+                  name="status"
+                  legend={t("filterStatus")}
+                  legendVisible
+                  size="sm"
+                  defaultValue={filters.status ?? ""}
+                  options={[
+                    { value: "", label: tc("all") },
+                    ...STUDENT_STATUSES.map((value) => ({
+                      value,
+                      label: ts(`status.${value}`),
+                    })),
+                  ]}
+                />
+                {/*
+                  FR-STU-016 / ADR-0037: the one search field where 12 digits are expected, so
+                  no Aadhaar paste guard here; it matches only the typed APAAR ID, exactly.
+                */}
+                <div className="w-full sm:w-60">
+                  <TextField
+                    name="apaar_id"
+                    label={t("apaarLabel")}
+                    hint={t("apaarHint")}
+                    error={apaarInvalid ? t("apaarInvalid") : undefined}
+                    defaultValue={filters.apaar ?? ""}
+                    maxLength={14}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 {hasFilters ? (
                   <Button variant="ghost" onClick={onClear}>
@@ -371,7 +415,7 @@ export function StudentListView({
 /** "Found by: Father's name" when the match was not on the name or admission number. */
 function matchedField(row: StudentSummary, label: (key: string) => string): string | null {
   const field = row.match.field;
-  if (!field || ["full_name", "admission_no"].includes(field)) return null;
+  if (!field || ["full_name", "admission_no", "apaar_id"].includes(field)) return null;
   return label(field);
 }
 
@@ -466,6 +510,8 @@ export function StudentsScreen() {
   const pages = useCursorStack();
   const cursor = pages.cursor;
   const aadhaarBlocked = Boolean(clean.query && containsFullAadhaar(clean.query));
+  const apaarInvalid = Boolean(filters.apaar && !clean.apaar_id);
+  const blocked = aadhaarBlocked || apaarInvalid;
   const body = {
     ...clean,
     limit: PAGE_SIZE,
@@ -474,7 +520,7 @@ export function StudentsScreen() {
   const results = useApiQuery(
     ["staff", "students", "search", body],
     () => unwrap(api.POST("/api/v1/students/search", { body })),
-    { enabled: !aadhaarBlocked },
+    { enabled: !blocked },
   );
   const next = results.status === "ready" ? results.data.next_cursor : null;
   const search = (value: StudentFilters) => {
@@ -485,11 +531,12 @@ export function StudentsScreen() {
     <StudentListView
       key={formKey}
       filters={filters}
-      results={aadhaarBlocked ? null : results}
+      results={blocked ? null : results}
       structure={structure}
       permissions={permissions}
       pageNumber={pages.page}
       aadhaarBlocked={aadhaarBlocked}
+      apaarInvalid={apaarInvalid}
       onNext={next ? () => pages.next(next) : undefined}
       onPrevious={pages.hasPrevious ? pages.previous : undefined}
       onSearch={search}

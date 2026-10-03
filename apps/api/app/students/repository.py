@@ -21,6 +21,7 @@ from sqlalchemy import (
     case,
     cast,
     delete,
+    exists,
     false,
     func,
     insert,
@@ -786,6 +787,9 @@ class SearchSpec:
     admission_bonus: float
     offset: int
     limit: int
+    # FR-STU-016: exact match on one typed attribute (``apaar_id``), current and not rejected.
+    apaar_key: str | None = None
+    apaar_id: str | None = None
 
 
 def _ws(query: str, column: Any) -> ColumnElement[float]:
@@ -812,6 +816,18 @@ def search(session: Session, spec: SearchSpec) -> list[Row[Any]]:
         conditions.append(Student.status == spec.status)
     if spec.admission_no is not None:
         conditions.append(func.upper(Student.admission_no) == spec.admission_no.upper())
+    if spec.apaar_key is not None and spec.apaar_id is not None:
+        v = aliased(AttributeValue)
+        conditions.append(
+            exists().where(
+                v.tenant_id == Student.tenant_id,
+                v.student_id == Student.id,
+                v.attribute_key == spec.apaar_key,
+                v.superseded_by.is_(None),
+                v.verification_status != "rejected",
+                v.value_text == spec.apaar_id,
+            )
+        )
     if spec.admission_terms:
         adm = func.upper(func.coalesce(Student.admission_no, ""))
         conditions.append(or_(*[func.starts_with(adm, t) for t in spec.admission_terms]))

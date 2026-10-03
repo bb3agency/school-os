@@ -1942,7 +1942,10 @@
       "matchedOn": "Found by: {field}",
       "filterYear": "Academic year",
       "currentYear": "Current year",
-      "crumbHome": "Home"
+      "crumbHome": "Home",
+      "apaarLabel": "APAAR ID",
+      "apaarHint": "Finds the student with exactly this 12-digit APAAR ID.",
+      "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012."
     },
     "create": {
       "title": "Add a student",

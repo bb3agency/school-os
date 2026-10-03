@@ -76,12 +76,14 @@ from app.students import repository as repo
 from app.students.canonical import Resolution, resolve
 from app.students.definitions import (
     AADHAAR_DETAIL,
+    DIGITS12_CODE,
     MASK,
     AttributeDef,
     CanonicalPolicy,
     CleanValue,
     aadhaar_display,
     aadhaar_error,
+    digits12_value,
     error,
     is_full_aadhaar,
     normalize_phone,
@@ -126,6 +128,9 @@ from app.tenancy import service as tenancy
 READ: Final = "student.read_basic"
 SENSITIVE: Final = "student.read_sensitive"
 UPDATE: Final = "student.update_nonidentity"
+
+APAAR_SEARCH_FIELD: Final = "apaar_id"
+"""Search-body field and typed attribute for the exact APAAR ID search (FR-STU-016, ADR-0037)."""
 
 VALUES_TABLE: Final = "sis.attribute_values"
 VALUE_COLUMN: Final = "value_ciphertext"
@@ -1428,9 +1433,18 @@ def search(
     (``9b``, ``IX-B``) and parent names (FR-STU-010, US-302). Scope: current-year enrolments in
     the caller's sections for scoped holders (US-302 AC2). ``filters.academic_year_id`` picks
     another year: its enrolments give the class and section, and scoped holders reach that
-    year's sections exactly as they reach the current year's."""
+    year's sections exactly as they reach the current year's.
+
+    ``filters.apaar_id`` (FR-STU-016, ADR-0037): exact match on the typed ``apaar_id``
+    attribute only, current values that are verified or recorded (not rejected); same scope.
+    The value is never logged or audited (PRV-020)."""
     if filters.query and is_full_aadhaar(filters.query):
         raise ValidationFailed([aadhaar_error("query")], detail=AADHAAR_DETAIL)
+    apaar: str | None = None
+    if filters.apaar_id is not None:
+        apaar = digits12_value(filters.apaar_id)
+        if apaar is None:
+            raise ValidationFailed([error(APAAR_SEARCH_FIELD, DIGITS12_CODE)])
     cfg = search_config()
     offset = _offset(cursor, cfg.max_offset)
     structure = _structure(session, filters.academic_year_id)
@@ -1471,9 +1485,12 @@ def search(
             admission_bonus=cfg.admission_exact_bonus,
             offset=offset,
             limit=limit,
+            apaar_key=APAAR_SEARCH_FIELD if apaar is not None else None,
+            apaar_id=apaar,
         ),
     )
     ranked = bool(parsed.name_key or parsed.admission_terms)
+    unranked_field = APAAR_SEARCH_FIELD if apaar is not None else None
     items = [
         StudentSummary(
             id=r.id,
@@ -1483,7 +1500,7 @@ def search(
             class_section=structure.label(r.section_id),
             section_id=r.section_id,
             match=StudentMatch(
-                field=r.match_field if ranked else None,
+                field=r.match_field if ranked else unranked_field,
                 score=round(float(r.score), 3) if ranked else None,
             ),
         )
