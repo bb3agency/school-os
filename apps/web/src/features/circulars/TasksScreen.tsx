@@ -36,8 +36,12 @@ import {
   type TaskStatus,
 } from "./data";
 import { DuePill, LoadGate, TaskStatusPill } from "./parts";
+import { canEditTask, TaskEditDialog } from "./TaskEditDialog";
 
-/** The moves a row offers: start, done, reopen; cancel only for task.manage holders. */
+/**
+ * The moves a row offers: start, done, reopen; cancel only for task.manage holders, who may
+ * also edit open and in-progress tasks.
+ */
 function nextMoves(task: Task, manager: boolean): TaskStatus[] {
   switch (task.status) {
     case "open":
@@ -51,7 +55,15 @@ function nextMoves(task: Task, manager: boolean): TaskStatus[] {
   }
 }
 
-function RowActions({ task, manager }: { task: Task; manager: boolean }) {
+function RowActions({
+  task,
+  manager,
+  onEdited,
+}: {
+  task: Task;
+  manager: boolean;
+  onEdited: () => void;
+}) {
   const t = useTranslations("tasks");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
@@ -93,6 +105,7 @@ function RowActions({ task, manager }: { task: Task; manager: boolean }) {
             {t(`move.${status}`)}
           </Button>
         ))}
+        {manager && canEditTask(task) ? <TaskEditDialog task={task} onSaved={onEdited} /> : null}
       </div>
       <ApiErrorAlert error={error} namespace="tasks" />
     </div>
@@ -190,7 +203,7 @@ function NewTaskCard() {
 /**
  * Tasks (US-1603, US-1604): "My tasks" for everyone with `task.read`; the whole school's tasks
  * for `task.read_all`. Soonest due first, overdue marked in words; owners mark tasks in progress
- * or done; `task.manage` holders add, and cancel tasks. Reminders come in the bell.
+ * or done; `task.manage` holders add, edit (open and in progress) and cancel tasks. Reminders come in the bell.
  */
 export function TasksScreen() {
   const t = useTranslations("tasks");
@@ -205,6 +218,7 @@ export function TasksScreen() {
     due: "any",
   });
   const list = useTasks(filters, allowed);
+  const [edited, setEdited] = useState(false);
   const today = todayIst();
 
   return (
@@ -262,6 +276,11 @@ export function TasksScreen() {
                 }))}
               />
             </div>
+            {edited ? (
+              <Alert tone="success" live className="mb-4">
+                {t("edit.updated")}
+              </Alert>
+            ) : null}
             <LoadGate data={meLoaded ? list : { status: "loading" }}>
               {(page) =>
                 page.data.length === 0 ? (
@@ -308,7 +327,11 @@ export function TasksScreen() {
                               <TaskStatusPill status={task.status} />
                             </Td>
                             <Td>
-                              <RowActions task={task} manager={manager} />
+                              <RowActions
+                                task={task}
+                                manager={manager}
+                                onEdited={() => setEdited(true)}
+                              />
                             </Td>
                           </Tr>
                         ))}
