@@ -313,6 +313,10 @@ class SubscriptionOut(Out):
     current_period_start: dt.date
     current_period_end: dt.date
     price_override_inr: Decimal | None
+    # Operator-written reason for the negotiated price (docs/16 §5.3); never student data. Set
+    # exactly when ``price_override_inr`` is (DB check). Operators only: the school's own
+    # billing page uses its own schema.
+    override_reason: str | None
     past_due_since: dt.date | None
     grace_ends_on: dt.date | None
     cancel_at_period_end: bool

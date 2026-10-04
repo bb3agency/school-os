@@ -1147,6 +1147,7 @@ function subscription(i: number, tenant_id: string): Schemas["SubscriptionOut"] 
     cancelled_at: status === "cancelled" ? at(20) : null,
     pending_plan_id: i === 6 ? uid("00000000a0", 2) : null,
     price_override_inr: i === 3 ? "123456.78" : null,
+    override_reason: i === 3 ? "Multi-campus society, price agreed in writing" : null,
     version: 1 + i,
   };
 }

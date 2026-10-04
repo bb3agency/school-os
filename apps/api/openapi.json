@@ -18242,6 +18242,17 @@
             "title": "Id",
             "type": "string"
           },
+          "override_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Reason"
+          },
           "past_due_since": {
             "anyOf": [
               {
@@ -18327,6 +18338,7 @@
           "current_period_start",
           "current_period_end",
           "price_override_inr",
+          "override_reason",
           "past_due_since",
           "grace_ends_on",
           "cancel_at_period_end",

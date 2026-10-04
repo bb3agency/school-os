@@ -12484,6 +12484,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Override Reason */
+            override_reason: string | null;
             /** Past Due Since */
             past_due_since: string | null;
             /** Pending Plan Id */

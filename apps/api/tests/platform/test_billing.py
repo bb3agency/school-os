@@ -534,6 +534,34 @@ def test_FR_PLT_011_trial_activate_and_extend(
     assert api.call("POST", f"/subscriptions/{sub}/activate", billing_admin).status_code == 409
 
 
+def test_FR_PLT_013_negotiated_price_returns_its_reason(
+    api: Api,
+    owner: Operator,
+    billing_admin: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+) -> None:
+    """docs/16 §5.3: the subscription shows the negotiated price and its reason (operators)."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    assert api.call("GET", f"/subscriptions/{sub}", billing_admin).json()["override_reason"] is None
+    reason = "Pilot school, price agreed in writing (ref SS/2026/3)"
+    res = api.call(
+        "PUT",
+        f"/subscriptions/{sub}/price-override",
+        billing_admin,
+        json={"price_override_inr": "3999.00", "reason": reason},
+    )
+    assert res.status_code == 200, res.text
+    assert (res.json()["price_override_inr"], res.json()["override_reason"]) == ("3999.00", reason)
+    viewer = make_operator("platform_viewer")
+    read = api.call("GET", f"/subscriptions/{sub}", viewer).json()
+    assert (read["price_override_inr"], read["override_reason"]) == ("3999.00", reason)
+    listed = api.call("GET", "/subscriptions", viewer).json()["data"]
+    assert next(row for row in listed if row["id"] == sub)["override_reason"] == reason
+    cleared = api.call("DELETE", f"/subscriptions/{sub}/price-override", billing_admin).json()
+    assert (cleared["price_override_inr"], cleared["override_reason"]) == (None, None)
+
+
 def test_FR_PLT_013_billing_account_gstin_validation_and_etag(
     api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:
