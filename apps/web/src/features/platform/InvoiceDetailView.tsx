@@ -124,7 +124,7 @@ export function InvoicePayments({
     {
       key: "amount",
       header: t("colAmount"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => (
         <span className="flex flex-col items-end">
           <Mono>{inr(row.amount_inr)}</Mono>
@@ -137,23 +137,28 @@ export function InvoicePayments({
       ),
     },
     {
+      // Method with the reference under it: one column keeps the table inside 1366×768.
       key: "method",
       header: t("colMethod"),
-      cell: (row) =>
-        (PAYMENT_METHODS as readonly string[]).includes(row.method)
-          ? tm(row.method as PaymentMethod)
-          : row.method,
-    },
-    {
-      key: "reference",
-      header: t("colReference"),
-      cell: (row) => <span className="font-mono text-xs break-all">{row.reference}</span>,
+      cell: (row) => (
+        <span className="flex max-w-40 min-w-24 flex-col gap-0.5">
+          <span>
+            {(PAYMENT_METHODS as readonly string[]).includes(row.method)
+              ? tm(row.method as PaymentMethod)
+              : row.method}
+          </span>
+          <span className="font-mono text-xs [overflow-wrap:anywhere] text-ink-muted">
+            <span className="sr-only">{t("colReference")}: </span>
+            <span>{row.reference}</span>
+          </span>
+        </span>
+      ),
     },
     {
       key: "recorded",
       header: t("colRecordedBy"),
       cell: (row) => (
-        <span className="flex min-w-36 flex-col gap-0.5">
+        <span className="flex min-w-28 flex-col gap-0.5">
           <Value>{row.recorded_by_name ?? null}</Value>
           <MonoTime value={row.recorded_at} />
         </span>
@@ -163,10 +168,10 @@ export function InvoicePayments({
       key: "status",
       header: t("colStatus"),
       cell: (row) => (
-        <span className="flex min-w-44 flex-col items-start gap-1">
+        <span className="flex max-w-60 min-w-32 flex-col items-start gap-1">
           <PaymentStatusPill status={row.status} />
           {row.status === "reversed" ? (
-            <span className="text-xs text-ink-muted">
+            <span className="text-xs [overflow-wrap:anywhere] text-ink-muted">
               {t("reversedBy", {
                 name: row.reversed_by_name ?? t("unknownOperator"),
                 date: formatDate(row.reversed_at) ?? "",
@@ -174,7 +179,7 @@ export function InvoicePayments({
             </span>
           ) : null}
           {row.status === "reversed" && row.reversal_reason ? (
-            <span className="max-w-72 text-xs text-ink">
+            <span className="text-xs [overflow-wrap:anywhere] text-ink">
               {t("reversalReason", { reason: row.reversal_reason })}
             </span>
           ) : null}
@@ -194,6 +199,7 @@ export function InvoicePayments({
         captionHidden
         columns={columns}
         state={payments}
+        density="compact"
         rowKey={(row) => row.id}
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
