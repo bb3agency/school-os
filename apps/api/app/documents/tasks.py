@@ -13,6 +13,9 @@
   for the short lifecycle rule. Retries with backoff while the store fails.
 - ``documents.sweep_discarded_objects`` (beat, daily): the same for versions discarded in the
   last 7 days, in case the outbox task gave up.
+- ``documents.discard_unused_object`` (queue ``maintenance``): consumer of
+  ``document.object.discard_requested`` (W3-06); discards an object the upload path no longer
+  needs (the api only queues it: its role cannot tag or delete). Retries with backoff.
 
 Register this module in ``sos_worker.celery_app.TASK_MODULES`` and merge
 :func:`beat_schedule` into the beat configuration.
@@ -128,6 +131,27 @@ def discard_object(
                 resource_type="document",
                 resource_id=document_id,
             )
+            return False
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 3600)) from exc
+
+
+@shared_task(
+    name=service.OBJECT_DISCARD_TASK,
+    bind=True,
+    queue="maintenance",
+    acks_late=True,
+    max_retries=DISCARD_MAX_RETRIES,
+    ignore_result=True,
+)
+def discard_unused_object(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> bool:
+    try:
+        return service.discard_unused_object(_uuid(tenant_id), payload)
+    except ObjectStoreError as exc:
+        if self.request.retries >= DISCARD_MAX_RETRIES:
+            # A staging object is removed by the daily purge_expired_uploads anyway.
+            log.error("documents.discard_unused.failed", error_code="storage_unavailable")
             return False
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 3600)) from exc
 

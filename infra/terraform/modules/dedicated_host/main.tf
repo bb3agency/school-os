@@ -179,28 +179,17 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   policy_arn = "arn:${local.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# Audit W3-06: the host role is used by the host's own scripts (secrets, release bundles, backups,
+# WAL-G, logs) and never reaches the school's files. Each app container gets its own role through
+# short-lived credentials that scripts/app-credentials.sh writes for it (credential_process files,
+# refreshed every 10 minutes by schoolos-app-credentials.timer). IMDS hop limit 1 (below) keeps every
+# container away from the instance role. The internet-facing api role cannot tag or delete files; only
+# the worker role discards (PRV-016, retention, the api's queued leftovers).
 data "aws_iam_policy_document" "host" {
   statement {
-    sid       = "FilesBucketList"
-    # ListBucketVersions: discard and purge tag every stored version (PRV-016, audit W3-07).
-    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
-    resources = [module.files.arn]
-  }
-
-  statement {
-    sid = "FilesBucketObjects"
-    actions = [
-      "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectVersion",
-      "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:PutObjectVersionTagging",
-      "s3:AbortMultipartUpload",
-    ]
-    resources = ["${module.files.arn}/*"]
-  }
-
-  statement {
-    sid       = "AuditArchiveWrite"
-    actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
-    resources = [module.audit_archive.arn, "${module.audit_archive.arn}/*"]
+    sid       = "AssumeAppRoles"
+    actions   = ["sts:AssumeRole"]
+    resources = [aws_iam_role.app["api"].arn, aws_iam_role.app["worker"].arn]
   }
 
   # Backups: write + read for restore drills. No delete except WAL-G's own retention under wal-g/
@@ -233,12 +222,6 @@ data "aws_iam_policy_document" "host" {
     sid       = "SchoolKeys"
     actions   = ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey"]
     resources = [var.kms_key_arn, var.backup_kms_key_arn]
-  }
-
-  statement {
-    sid       = "AuditSigning"
-    actions   = ["kms:Sign", "kms:GetPublicKey"]
-    resources = [module.audit_signing_key.key_arns["audit-signing"]]
   }
 
   statement {
@@ -281,6 +264,95 @@ resource "aws_iam_role_policy" "host" {
   name   = "schoolos-host"
   role   = aws_iam_role.host.id
   policy = data.aws_iam_policy_document.host.json
+}
+
+# --- App container roles (audit W3-06) -------------------------------------------------------
+
+# Only the host role (root on the host, through scripts/app-credentials.sh) may assume them.
+data "aws_iam_policy_document" "app_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.host.arn]
+    }
+  }
+}
+
+resource "aws_iam_role" "app" {
+  for_each = toset(["api", "worker"])
+
+  name                 = "${local.name}-${each.key}"
+  assume_role_policy   = data.aws_iam_policy_document.app_assume.json
+  max_session_duration = 3600
+  tags                 = local.tags
+}
+
+# api (internet-facing): read and write school files, never tag or delete them.
+data "aws_iam_policy_document" "api" {
+  statement {
+    sid       = "FilesBucketList"
+    actions   = ["s3:ListBucket"]
+    resources = [module.files.arn]
+  }
+
+  statement {
+    sid       = "FilesBucketObjects"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:GetObjectTagging", "s3:AbortMultipartUpload"]
+    resources = ["${module.files.arn}/*"]
+  }
+
+  statement {
+    sid       = "DataKey"
+    actions   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"]
+    resources = [var.kms_key_arn]
+  }
+}
+
+# worker: the files (including discard: tag, then delete), the audit archive and its signing key.
+data "aws_iam_policy_document" "worker" {
+  statement {
+    sid = "FilesBucketList"
+    # ListBucketVersions: discard and purge tag every stored version (PRV-016, audit W3-07).
+    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
+    resources = [module.files.arn]
+  }
+
+  statement {
+    sid = "FilesBucketObjects"
+    actions = [
+      "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectVersion",
+      "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:PutObjectVersionTagging",
+      "s3:AbortMultipartUpload",
+    ]
+    resources = ["${module.files.arn}/*"]
+  }
+
+  statement {
+    sid       = "AuditArchiveWrite"
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
+    resources = [module.audit_archive.arn, "${module.audit_archive.arn}/*"]
+  }
+
+  statement {
+    sid       = "DataKey"
+    actions   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"]
+    resources = [var.kms_key_arn]
+  }
+
+  statement {
+    sid       = "AuditSigning"
+    actions   = ["kms:Sign", "kms:GetPublicKey"]
+    resources = [module.audit_signing_key.key_arns["audit-signing"]]
+  }
+}
+
+resource "aws_iam_role_policy" "app" {
+  for_each = aws_iam_role.app
+
+  name   = "schoolos-${each.key}"
+  role   = each.value.id
+  policy = each.key == "api" ? data.aws_iam_policy_document.api.json : data.aws_iam_policy_document.worker.json
 }
 
 resource "aws_iam_instance_profile" "host" {
@@ -378,8 +450,10 @@ resource "aws_instance" "host" {
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"
-    # 2 hops so containers on the Docker bridge can obtain the instance-role credentials.
-    http_put_response_hop_limit = 2
+    # Audit W3-06: 1 hop, so no container on a Docker bridge can reach the instance role. Each app
+    # container gets its own role's short-lived credentials from scripts/app-credentials.sh instead.
+    # 2 only while an older release (whose containers still use IMDS) is upgraded (README).
+    http_put_response_hop_limit = var.imds_hop_limit
     instance_metadata_tags      = "disabled"
   }
 

@@ -619,3 +619,45 @@ run "contact_email_with_query_refused" {
 
   expect_failures = [var.public_contact_email]
 }
+
+# Audit W3-06: the internet-facing api cannot tag (sos-lifecycle=discarded / export-7d) or delete any
+# school file; only the worker discards. worker-pdf may only tag its own exports export-7d.
+run "api_role_cannot_tag_or_delete_school_files" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.api.statement : length(setintersection(toset(s.actions), toset([
+        "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:PutObjectTagging", "s3:PutObjectVersionTagging",
+        "s3:DeleteObjectTagging", "s3:*", "s3:Delete*", "s3:Put*", "*",
+      ]))) == 0 || alltrue([for r in s.resources : !strcontains(r, "/t/")])
+    ])
+    error_message = "The api task role must not tag or delete under files/t/* (W3-06)."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.worker.statement :
+      s.sid == "FilesDiscard" && toset(s.actions) == toset(["s3:DeleteObject", "s3:PutObjectTagging", "s3:PutObjectVersionTagging"]) && toset(s.resources) == toset(["arn:aws:s3:::sos-staging-files-444455556666/t/*"])
+    ])
+    error_message = "The worker task role discards (tag + delete) under files/t/*."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.worker_pdf.statement :
+      !contains(s.actions, "s3:DeleteObject") && !contains(s.actions, "s3:PutObjectVersionTagging")
+    ])
+    error_message = "worker-pdf never deletes school files nor tags older versions."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.worker_pdf.statement :
+      s.sid == "ExportLifecycleTag" && toset(s.actions) == toset(["s3:PutObjectTagging"])
+      && toset(s.resources) == toset(["arn:aws:s3:::sos-staging-files-444455556666/t/*/exports/*"])
+      && anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "s3:RequestObjectTag/sos-lifecycle" && toset(c.values) == toset(["export-7d"])])
+    ])
+    error_message = "worker-pdf may set only sos-lifecycle=export-7d, only on t/*/exports/*."
+  }
+}

@@ -14,6 +14,8 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   region     = data.aws_region.current.region
   secret_ns  = "sos/${var.env}"
+  # Known at plan time (the bucket name is), so tests can check the task-role resources (W3-06).
+  files_arn = "arn:aws:s3:::${module.s3.files_bucket}"
 
   image = {
     api    = "${module.ecr.repository_urls["api"]}:${var.release_version}"
@@ -339,12 +341,16 @@ check "pdf_worker_has_egress" {
 
 # --- Task role policies ------------------------------------------------------------------------
 
+# Audit W3-06: the internet-facing api can read and write school files but never tag or delete them
+# (no s3:DeleteObject, s3:PutObjectTagging or s3:PutObjectVersionTagging on t/*): tagging an object
+# sos-lifecycle=discarded (or export-7d) and deleting it would bypass the 90-day recovery window.
+# The api queues every discard as an outbox event (document.object.discard_requested); only the
+# worker role below tags and deletes. Asserted by tests/shared_platform.tftest.hcl.
 data "aws_iam_policy_document" "api" {
   statement {
     sid       = "FilesList"
-    # ListBucketVersions: discard and purge tag every stored version (PRV-016, audit W3-07).
-    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
-    resources = [module.s3.files_bucket_arn]
+    actions   = ["s3:ListBucket"]
+    resources = [local.files_arn]
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
@@ -354,8 +360,8 @@ data "aws_iam_policy_document" "api" {
 
   statement {
     sid       = "FilesObjects"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:PutObjectVersionTagging", "s3:AbortMultipartUpload"]
-    resources = ["${module.s3.files_bucket_arn}/t/*"]
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:GetObjectTagging", "s3:AbortMultipartUpload"]
+    resources = ["${local.files_arn}/t/*"]
   }
 
   # Control-plane invoice PDFs (docs/16 §5.8, ADR-0017 Amendment 2026-09-28) and certificates
@@ -365,8 +371,8 @@ data "aws_iam_policy_document" "api" {
     sid     = "InvoicePdfObjects"
     actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = [
-      "${module.s3.files_bucket_arn}/platform/invoices/*",
-      "${module.s3.files_bucket_arn}/platform/deletion-certificates/*",
+      "${local.files_arn}/platform/invoices/*",
+      "${local.files_arn}/platform/deletion-certificates/*",
     ]
   }
 
@@ -401,8 +407,45 @@ data "aws_iam_policy_document" "api" {
   }
 }
 
+# worker-pdf: the api's file access plus the one tag its exports carry (export-7d, set in the same
+# PUT by documents.store_export_file), only under t/<tenant>/exports/. No delete, no other tag.
+data "aws_iam_policy_document" "worker_pdf" {
+  source_policy_documents = [data.aws_iam_policy_document.api.json]
+
+  statement {
+    sid       = "ExportLifecycleTag"
+    actions   = ["s3:PutObjectTagging"]
+    resources = ["${local.files_arn}/t/*/exports/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "s3:RequestObjectTag/sos-lifecycle"
+      values   = ["export-7d"]
+    }
+  }
+}
+
 data "aws_iam_policy_document" "worker" {
   source_policy_documents = [data.aws_iam_policy_document.api.json]
+
+  # Audit W3-06: only the worker discards (PRV-016, retention purges, offboarding, the upload path's
+  # leftovers queued by the api) and tags exports on upload. ListBucketVersions: discard and purge
+  # tag every stored version (audit W3-07).
+  statement {
+    sid       = "FilesListVersions"
+    actions   = ["s3:ListBucketVersions"]
+    resources = [local.files_arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["t/*"]
+    }
+  }
+
+  statement {
+    sid       = "FilesDiscard"
+    actions   = ["s3:DeleteObject", "s3:PutObjectTagging", "s3:PutObjectVersionTagging"]
+    resources = ["${local.files_arn}/t/*"]
+  }
 
   # Daily signed audit export (07 §4 T4): write-only into the Object Lock bucket.
   statement {
@@ -591,7 +634,7 @@ module "worker" {
 
 # Consumes only the pdf queue, on the sandbox capacity (ADR-0025 option A), with the Chromium sandbox
 # on (pdf.chromium_sandbox). No provider API keys (it calls no LLM/embeddings/OCR provider); task
-# role = the api's (files bucket + data key), no audit archive or signing key.
+# role = the api's file access + the export-7d tag (worker_pdf), no delete, no audit archive or signing key.
 module "worker_pdf" {
   source = "../ecs_service"
 
@@ -620,7 +663,7 @@ module "worker_pdf" {
   secret_arns             = local.app_base_secret_arns
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
-  task_role_policy_json   = data.aws_iam_policy_document.api.json
+  task_role_policy_json   = data.aws_iam_policy_document.worker_pdf.json
   log_kms_key_arn         = local.kms_logs
   tags                    = var.tags
 }

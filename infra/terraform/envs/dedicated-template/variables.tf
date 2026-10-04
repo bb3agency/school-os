@@ -143,6 +143,12 @@ variable "route53_zone_id" {
   default     = null
 }
 
+variable "imds_hop_limit" {
+  description = "IMDSv2 hop limit of the host: 1 (default, audit W3-06). 2 only for the apply before upgrading a host from a release older than the per-container credentials (deploy/dedicated/README.md: Upgrading)."
+  type        = number
+  default     = 1
+}
+
 variable "walg_enabled" {
   description = "Continuous WAL archiving (RPO <= 15 min)."
   type        = bool

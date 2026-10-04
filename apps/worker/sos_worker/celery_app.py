@@ -108,6 +108,7 @@ def create_celery() -> Celery:
             "documents.scan": {"queue": "ingest"},
             # PRV-016: deleting the files of discarded versions (outbox consumer + daily sweep).
             "documents.discard_object": {"queue": "maintenance"},
+            "documents.discard_unused_object": {"queue": "maintenance"},
             "documents.sweep_discarded_objects": {"queue": "maintenance"},
             # FR-IMP-001..004: spreadsheet parsing, checking and commit (outbox consumers).
             "imports.parse": {"queue": "ingest"},

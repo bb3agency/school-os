@@ -177,10 +177,10 @@ run "audit_signing_key_for_the_host" {
 
   assert {
     condition = anytrue([
-      for s in data.aws_iam_policy_document.host.statement :
+      for s in data.aws_iam_policy_document.worker.statement :
       s.sid == "AuditSigning" && toset(s.actions) == toset(["kms:Sign", "kms:GetPublicKey"]) && length(s.resources) == 1
     ])
-    error_message = "The instance role may kms:Sign and kms:GetPublicKey with the signing key only."
+    error_message = "The worker role (which runs audit.archive_daily; W3-06 moved it off the instance role) may kms:Sign and kms:GetPublicKey with the signing key only."
   }
 }
 
@@ -325,4 +325,65 @@ run "support_issuer_is_never_the_staff_pool" {
   }
 
   expect_failures = [var.support_oidc_issuer]
+}
+
+# Audit W3-06: the api and the worker have separate roles; the internet-facing api can never tag or
+# delete a school file, and no container reaches the instance role (IMDS hop limit 1).
+run "api_role_cannot_tag_or_delete_school_files" {
+  command = plan
+
+  assert {
+    condition     = one(aws_instance.host.metadata_options).http_put_response_hop_limit == 1
+    error_message = "IMDS hop limit 1: containers on the Docker bridges cannot reach the instance role."
+  }
+
+  assert {
+    condition     = toset(keys(aws_iam_role.app)) == toset(["api", "worker"]) && alltrue([for r in aws_iam_role.app : r.max_session_duration == 3600])
+    error_message = "One role per app container (api, worker), sessions of at most an hour."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.api.statement : length(setintersection(toset(s.actions), toset([
+        "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:PutObjectTagging", "s3:PutObjectVersionTagging",
+        "s3:DeleteObjectTagging", "s3:*", "s3:Delete*", "s3:Put*", "*", "kms:Sign",
+      ]))) == 0
+    ])
+    error_message = "The api role must not tag or delete files, nor sign audit archives (W3-06)."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.worker.statement :
+      s.sid == "FilesBucketObjects" && length(setsubtract(toset(["s3:DeleteObject", "s3:PutObjectTagging", "s3:PutObjectVersionTagging"]), toset(s.actions))) == 0
+    ])
+    error_message = "Only the worker role discards (tag + delete)."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.host.statement :
+      !contains(s.actions, "s3:PutObjectTagging") && !contains(s.actions, "s3:PutObjectVersionTagging") && !contains(s.actions, "kms:Sign")
+      && (!contains(s.actions, "s3:DeleteObject") || s.sid == "WalgRetention")
+    ])
+    error_message = "The instance role no longer reaches the files (only WAL-G's own retention deletes)."
+  }
+
+  assert {
+    condition = (
+      length(data.aws_iam_policy_document.app_assume.statement) == 1
+      && alltrue([for s in data.aws_iam_policy_document.app_assume.statement : s.actions == toset(["sts:AssumeRole"]) && length(s.principals) == 1 && alltrue([for p in s.principals : p.type == "AWS"])])
+    )
+    error_message = "The app roles trust only the host role (assumed by scripts/app-credentials.sh on the host)."
+  }
+}
+
+run "imds_hop_limit_is_one_or_two" {
+  command = plan
+
+  variables {
+    imds_hop_limit = 3
+  }
+
+  expect_failures = [var.imds_hop_limit]
 }

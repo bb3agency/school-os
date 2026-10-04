@@ -3,11 +3,12 @@
 # through SSM Run Command):
 #   1. mount the encrypted data EBS volume at /var/lib/schoolos (xfs, by volume ID)
 #   2. create data directories with the container UIDs
-#   3. install systemd units (stack, nightly backup, monthly reboot, unattended-upgrades schedule)
+#   3. install systemd units (stack, nightly backup, monthly reboot, credential refresh, unattended-upgrades)
 #   4. fetch secrets (waits until operator-supplied secrets are set)
 #   5. optional WAL-G install
 #   6. worker sandbox profiles (seccomp + AppArmor for Chromium, ADR-0025)
-#   7. pull images, start db/valkey, run db-bootstrap (infra/db/bootstrap.sql) and migrations, start stack
+#   7. each app container's own AWS credentials (audit W3-06)
+#   8. pull images, start db/valkey, run db-bootstrap (infra/db/bootstrap.sql) and migrations, start stack
 set -euo pipefail
 export SOS_SCRIPT=bootstrap
 here="$(dirname "$(readlink -f "$0")")"
@@ -60,19 +61,8 @@ make_dirs() {
 }
 
 # --- 3. systemd -------------------------------------------------------------------------------
-install_units() {
-  local unit
-  for unit in "$release_dir"/systemd/*.service "$release_dir"/systemd/*.timer; do
-    sed "s#@INSTALL_DIR@#$SOS_INSTALL_DIR#g" "$unit" >"/etc/systemd/system/$(basename "$unit")"
-  done
-  install -d -m 0755 /etc/systemd/system/apt-daily-upgrade.timer.d
-  install -m 0644 "$release_dir/systemd/apt-daily-upgrade.timer.d/schoolos.conf" \
-    /etc/systemd/system/apt-daily-upgrade.timer.d/schoolos.conf
-  systemctl daemon-reload
-  systemctl enable schoolos.service schoolos-backup.timer schoolos-monthly-reboot.timer
-  systemctl start schoolos-backup.timer schoolos-monthly-reboot.timer
-  systemctl restart apt-daily-upgrade.timer
-}
+# lib.sh install_units: the stack, nightly backup, monthly reboot, the app containers' credential
+# refresh (audit W3-06) and the unattended-upgrades schedule.
 
 # --- 4. secrets -------------------------------------------------------------------------------
 wait_for_secrets() {
@@ -131,9 +121,10 @@ start_stack() {
 
 mount_data_volume
 make_dirs
-install_units
+install_units "$release_dir"
 wait_for_secrets
 install_walg
 install_host_profiles "$release_dir"
+refresh_app_credentials || die "could not write the app containers' AWS credentials (audit W3-06)"
 start_stack
 info "bootstrap complete. Next: scripts/compose.sh run --rm api python -m app.platform.provision_dedicated (README: Provisioning step 6)."

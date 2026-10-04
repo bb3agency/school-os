@@ -143,6 +143,18 @@ def lock_intent(session: Session, intent_id: uuid.UUID) -> UploadIntent | None:
     ).one_or_none()
 
 
+def get_intent(session: Session, intent_id: uuid.UUID) -> UploadIntent | None:
+    return session.scalars(select(UploadIntent).where(UploadIntent.id == intent_id)).one_or_none()
+
+
+def object_key_in_use(session: Session, object_key: str) -> bool:
+    """Whether a version of the current school points at ``object_key``."""
+    found = session.scalar(
+        select(DocumentVersion.id).where(DocumentVersion.object_key == object_key).limit(1)
+    )
+    return found is not None
+
+
 def consume_intent(session: Session, intent_id: uuid.UUID, now: dt.datetime) -> None:
     session.execute(
         update(UploadIntent)
