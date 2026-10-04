@@ -2078,7 +2078,15 @@ def add_guardian(
         if data.full_name or data.phone or data.address:
             raise ValidationFailed([error("guardian_id", "link_or_create")])
         guardian = repo.get_guardian(session, data.guardian_id)
-        if guardian is None:
+        # Only a guardian of a student the caller reaches may be linked (SEC-015): linking
+        # would otherwise expose another section's guardian (C3 phone/address) and its edits.
+        if guardian is None or (
+            _allowed_sections(ctx, UPDATE, structure) is not None
+            and not any(
+                _in_scope(session, ctx, sid, UPDATE, structure)
+                for sid in repo.guardian_student_ids(session, guardian.id)
+            )
+        ):
             raise ValidationFailed([error("guardian_id", "not_found")])
         created = False
     else:
