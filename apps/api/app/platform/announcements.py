@@ -190,6 +190,12 @@ def cancel(actor: Actor, announcement_id: uuid.UUID) -> AnnouncementOut:
         if row is None:
             raise NotFound("Announcement not found")
         if row["status"] != "cancelled":
+            if has_ended(row["ends_at"], now()):
+                # Owner decision 2026-10-04: an ended announcement is fully read-only; a
+                # cancelled one keeps answering with itself (cancelling twice is harmless).
+                raise Conflict(
+                    "An announcement that has ended cannot change.", code="invalid_state"
+                )
             row = repo.update_row(s, m.announcements, announcement_id, {"status": "cancelled"})
             audit_platform(s, actor, "announcement.cancelled", "announcement", announcement_id, {})
         return _out(row)

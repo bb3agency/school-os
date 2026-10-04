@@ -162,3 +162,77 @@ def test_FR_PLT_026_edit_needs_announcements_manage(
     for role in ("billing_admin", "platform_engineer", "platform_viewer"):
         res = _patch(api, make_operator(role), row)
         assert (res.status_code, res.json()["code"]) == (403, "forbidden"), role
+
+
+# --- cancel (owner decision 2026-10-04: an ended announcement is fully read-only) ----------
+
+
+def _cancel(api: Api, op: Operator, row: dict[str, Any]) -> Any:
+    return api.call("POST", f"/announcements/{row['id']}/cancel", op)
+
+
+@pytest.mark.parametrize(
+    ("status", "moment"),
+    [
+        ("draft", T0 - dt.timedelta(days=1)),
+        ("scheduled", T0 - dt.timedelta(days=1)),
+        ("scheduled", T0 + dt.timedelta(minutes=30)),  # live
+        ("scheduled", T1 - dt.timedelta(microseconds=1)),
+    ],
+)
+def test_FR_PLT_026_draft_scheduled_and_live_announcements_can_be_cancelled(
+    api: Api, agent: Operator, monkeypatch: pytest.MonkeyPatch, status: str, moment: dt.datetime
+) -> None:
+    row = _create(api, agent, status=status)
+    _at(monkeypatch, moment)
+    res = _cancel(api, agent, row)
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "cancelled"
+
+
+@pytest.mark.parametrize("status", ["draft", "scheduled"])
+@pytest.mark.parametrize("after", [dt.timedelta(0), dt.timedelta(days=30)])
+def test_FR_PLT_026_an_ended_announcement_cannot_be_cancelled(
+    api: Api,
+    agent: Operator,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+    after: dt.timedelta,
+) -> None:
+    row = _create(api, agent, status=status)
+    _at(monkeypatch, T1 + after)
+    res = _cancel(api, agent, row)
+    assert (res.status_code, res.json()["code"]) == (409, "invalid_state"), res.text
+    assert res.json()["detail"] == "An announcement that has ended cannot change."
+    stored = announcements.get(uuid.UUID(row["id"]))
+    assert (stored.status, stored.version) == (status, row["version"])
+
+
+def test_FR_PLT_026_cancelling_twice_keeps_its_answer_even_after_the_end(
+    api: Api, agent: Operator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    row = _create(api, agent)
+    _at(monkeypatch, T0 - dt.timedelta(days=1))
+    first = _cancel(api, agent, row)
+    assert first.status_code == 200, first.text
+    again = _cancel(api, agent, row)
+    assert (again.status_code, again.json()) == (200, first.json())
+    _at(monkeypatch, T1 + dt.timedelta(days=1))
+    later = _cancel(api, agent, row)
+    assert (later.status_code, later.json()) == (200, first.json())
+
+
+@pytest.mark.parametrize("ended", [False, True])
+def test_FR_PLT_026_cancel_needs_announcements_manage(
+    api: Api,
+    agent: Operator,
+    make_operator: MakeOperator,
+    monkeypatch: pytest.MonkeyPatch,
+    ended: bool,
+) -> None:
+    row = _create(api, agent)
+    _at(monkeypatch, T1 if ended else T0 - dt.timedelta(days=1))
+    for role in ("billing_admin", "platform_engineer", "platform_viewer"):
+        res = _cancel(api, make_operator(role), row)
+        assert (res.status_code, res.json()["code"]) == (403, "forbidden"), role
+    assert announcements.get(uuid.UUID(row["id"])).status == "scheduled"
