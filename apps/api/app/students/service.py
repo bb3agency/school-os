@@ -1174,6 +1174,10 @@ def enrol(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     section = _enrolment_target(session, data.section_id)
+    # The target section must be in reach too, as for PATCH (SEC-015).
+    allowed = _allowed_sections(ctx, UPDATE, structure)
+    if allowed is not None and section.id not in allowed:
+        raise ValidationFailed([error("section_id", "not_found")])
     out = _enrol(session, ctx, student, section, roll_no=data.roll_no, started_on=data.started_on)
     _touch(session, student, _definitions(session))
     _values_changed(session, student_id, [ENROLLMENT_KEY])
@@ -2074,7 +2078,15 @@ def add_guardian(
         if data.full_name or data.phone or data.address:
             raise ValidationFailed([error("guardian_id", "link_or_create")])
         guardian = repo.get_guardian(session, data.guardian_id)
-        if guardian is None:
+        # Only a guardian of a student the caller reaches may be linked (SEC-015): linking
+        # would otherwise expose another section's guardian (C3 phone/address) and its edits.
+        if guardian is None or (
+            _allowed_sections(ctx, UPDATE, structure) is not None
+            and not any(
+                _in_scope(session, ctx, sid, UPDATE, structure)
+                for sid in repo.guardian_student_ids(session, guardian.id)
+            )
+        ):
             raise ValidationFailed([error("guardian_id", "not_found")])
         created = False
     else:

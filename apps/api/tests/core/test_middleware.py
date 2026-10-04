@@ -365,6 +365,25 @@ def test_SEC_010_multipart_has_its_own_limit(client: TestClient) -> None:
     assert client.post("/api/v1/raw", files=big).status_code == 413
 
 
+@pytest.mark.parametrize(
+    "path", ["/api/v1/fleet/heartbeat", "/api/v1/edge/tally/enrol", "/api/v1/students/search"]
+)
+def test_SEC_010_a_multipart_content_type_does_not_raise_the_limit_on_the_real_app(
+    path: str,
+) -> None:
+    """No route takes multipart (files go to presigned S3 URLs), so claiming
+    ``multipart/form-data`` must not let an unauthenticated client make the API buffer 10 MB
+    before the machine guards (fleet heartbeat, Tally edge) or authentication run."""
+    client = TestClient(create_app(), raise_server_exceptions=False)
+    body = b"z" * (2 * 1024 * 1024)
+    res = client.post(
+        path,
+        content=body,
+        headers={"Content-Type": "multipart/form-data; boundary=x"},
+    )
+    assert res.status_code == 413, res.text
+
+
 # --- ASGI hygiene ---------------------------------------------------------------------------
 
 

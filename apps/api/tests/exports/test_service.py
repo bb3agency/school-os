@@ -430,6 +430,53 @@ def test_SEC_015_scoped_requester_gets_only_reachable_students(
     assert outside not in ids
 
 
+def test_SEC_015_sensitive_and_findings_reach_only_their_own_scope(
+    school: Any, section: str, admin_engine: Engine
+) -> None:
+    """A membership whose student.read_basic is school-wide but whose student.read_sensitive
+    and dq.findings.read reach only 9A (e.g. exam coordinator + class teacher roles): a
+    whole-school export with restricted values (or a pre-check with findings) used to freeze
+    every student, so C3 values of other sections were exported. Only 9A is frozen now."""
+    inside = EX.student(school, section_key="section_9a")
+    outside = EX.student(school, section_key=section)
+    base = EX.ctx(school, school.people["principal"], "principal")
+    mixed = dataclasses.replace(
+        base,
+        scoped_permissions=frozenset({"student.read_sensitive", "dq.findings.read"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    out = EX.request_precheck(
+        school,
+        school.people["principal"],
+        "",
+        section_keys=(),
+        include_sensitive=True,
+        as_ctx=mixed,
+    )
+    ids = EX.export_row(admin_engine, out.id)["student_ids"]
+    assert inside in ids
+    assert outside not in ids
+    plain = EX.request_precheck(
+        school, school.people["principal"], "", section_keys=(), as_ctx=mixed
+    )
+    ids = EX.export_row(admin_engine, plain.id)["student_ids"]
+    assert outside not in ids  # findings are scoped by dq.findings.read
+    listed = EX.request_list(
+        school,
+        school.people["principal"],
+        "",
+        columns=("admission_no", "health_notes"),
+        section_keys=(),
+        as_ctx=mixed,
+    )
+    ids = EX.export_row(admin_engine, listed.id)["student_ids"]
+    assert inside in ids
+    assert outside not in ids
+    # Without restricted columns a student list follows student.read_basic (whole school).
+    basic = EX.request_list(school, school.people["principal"], "", section_keys=(), as_ctx=mixed)
+    assert outside in EX.export_row(admin_engine, basic.id)["student_ids"]
+
+
 def test_permission_revoked_before_the_worker_runs_fails_the_export(
     school: Any, section: str, admin_engine: Engine
 ) -> None:

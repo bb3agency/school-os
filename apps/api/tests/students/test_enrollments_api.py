@@ -45,6 +45,98 @@ def test_FR_TEN_010_list_enrolments_is_scoped(world: Any, api: Any) -> None:
     assert api.call(b_owner, "GET", f"{BASE}/{in_9a}/enrollments").status_code == 404
 
 
+def _scoped_editor(
+    world: Any,
+    admin_engine: Engine,
+    permissions: tuple[str, ...] = ("student.read_basic", "student.update_nonidentity"),
+) -> Any:
+    """A member of school A with a custom role (always scoped) limited to section 9A."""
+    tid = world.a.tenant_id
+    key = f"scoped_editor_{uuid.uuid4().hex[:8]}"
+    role_id = uuid.uuid4()
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
+                "VALUES (:r, :t, :k, 'Synthetic scoped editor', 'కృత్రిమ సంపాదకుడు')"
+            ),
+            {"r": role_id, "t": tid, "k": key},
+        )
+        for perm in permissions:
+            c.execute(
+                text(
+                    "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                    "VALUES (:t, :r, :p)"
+                ),
+                {"t": tid, "r": role_id, "p": perm},
+            )
+    return W.add_member(admin_engine, tid, [key], scopes=[("section", world.a.ids["section_9a"])])
+
+
+def test_SEC_015_scoped_editor_cannot_link_a_guardian_of_a_student_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Linking an existing guardian (siblings, FR-STU-008) needs that guardian to belong to a
+    student the caller reaches; before, a 9A editor with read_sensitive could link a 9C
+    student's guardian to a 9A student and then reveal its C3 phone and address."""
+    editor = _scoped_editor(
+        world,
+        admin_engine,
+        ("student.read_basic", "student.update_nonidentity", "student.read_sensitive"),
+    )
+    in_9a, in_9c, sibling = _student(world), _student(world, "section_9c"), _student(world)
+    foreign = SW.add_guardian(world.a, in_9c, full_name="Synthetica Other Parent")
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{in_9a}/guardians",
+        json={"relationship": "mother", "guardian_id": str(foreign)},
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["code"] == "not_found"
+    reachable = SW.add_guardian(world.a, sibling, full_name="Synthetica Reachable Parent")
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{in_9a}/guardians",
+        json={"relationship": "father", "guardian_id": str(reachable)},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_SEC_015_scoped_editor_cannot_enrol_into_a_section_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A scoped ``student.update_nonidentity`` holder (custom roles are always scoped) may move
+    a student only between sections they reach, as ``PATCH .../enrollments/{id}`` already
+    requires; before, ``POST .../enrollments`` checked only the student, so a 9A editor could
+    move a 9A student into 9C (or any year)."""
+    editor = _scoped_editor(world, admin_engine)
+    sid = _student(world)
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{sid}/enrollments",
+        json={"section_id": str(world.a.ids["section_9c"])},
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0] == {
+        "field": "section_id",
+        "code": "not_found",
+        "message_key": "errors.not_found",
+    }
+    assert _only_enrolment(api, world, sid)["section_id"] == str(world.a.ids["section_9a"])
+    # Within scope the request passes the scope check (and meets the ordinary state rule).
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{sid}/enrollments",
+        json={"section_id": str(world.a.ids["section_9a"]), "roll_no": "41"},
+    )
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "already_enrolled"
+
+
 def test_FR_TEN_010_patch_roll_number_and_section_with_if_match(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:

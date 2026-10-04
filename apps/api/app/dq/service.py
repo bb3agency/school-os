@@ -153,7 +153,9 @@ def _reach(session: Session, ctx: UserContext) -> frozenset[uuid.UUID] | None:
         return None
     if not ctx.has(READ):
         return frozenset()
-    return frozenset(students.list_students_in_scope(session, ctx))
+    # Both grants' scopes apply (SEC-015): a school-wide read_basic from one role must not
+    # widen a scoped dq.findings.read from another.
+    return frozenset(students.list_students_in_scope(session, ctx, permissions=(READ,)))
 
 
 def _visible(reach: frozenset[uuid.UUID] | None, student_id: uuid.UUID | None) -> bool:
